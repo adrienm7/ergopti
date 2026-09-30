@@ -32,7 +32,9 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				ids[#ids + 1] = id
 			end
 			table.sort(ids)
-			helpers.assert_eq(ids, { "gestures", "keyboard_layout", "llm", "metrics", "shortcuts" })
+			-- Hotstrings take part like every config.toml category: a skipped one
+			-- left its choices, delays and engine switch outside the restore.
+			helpers.assert_eq(ids, { "gestures", "hotstrings", "keyboard_layout", "llm", "metrics", "shortcuts" })
 			for _, name in ipairs({ "backup_path", "confirm", "paused", "refresh" }) do
 				helpers.assert_type(requested.options[name], "function")
 			end

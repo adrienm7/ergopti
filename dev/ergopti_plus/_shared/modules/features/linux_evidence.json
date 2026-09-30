@@ -35,6 +35,23 @@
 				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_auto.lua"
 			]
 		},
+		"magic_key_source": {
+			"members": ["hotstrings.magic_key_source"],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua",
+				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_source.lua"
+			]
+		},
 		"dynamic_master": {
 			"members": ["hotstrings.dynamic.enabled"],
 			"registered": "yes",

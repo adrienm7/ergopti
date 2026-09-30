@@ -87,9 +87,10 @@
 			"properties": {
 				"enabled": { "type": "boolean" },
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
-				"magic_key_source_scan": {
+				"magic_key_source": {
+					"_comment": "The physical magic key: \"auto\" or a KeyboardEvent.code. The accepted codes are the feature manifest's enum_values for hotstrings.magic_key_source, not restated here.",
 					"type": "string",
-					"pattern": "^[Ss][Cc](?!000$)[0-9A-Fa-f]{3}$"
+					"pattern": "^(auto|[A-Z][A-Za-z0-9]+)$"
 				},
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },

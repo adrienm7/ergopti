@@ -1305,6 +1305,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local layout_scope = nil
 	local llm_scope = nil
 	local shortcuts_scope = nil
+	local hotstrings_scope = nil
 	--- The scoped owner of one config.toml category, created on first use, or
 	--- nil when this session cannot own it (read-only, or its runtime absent).
 	--- @param scope string Manifest scope id.
@@ -1422,6 +1423,54 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return metrics_scope
 		end
+		if scope == "hotstrings" then
+			-- The typing engine is the scope's runtime: without it no registry,
+			-- delay inventory or scalar owner can acknowledge a candidate.
+			if read_only_reason ~= nil or type(keymap) ~= "table" then return nil end
+			if not hotstrings_scope then
+				local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+				local FileSystem = require("adapters.file_system")
+				local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+				hotstrings_scope = require("ui.menu.hotstrings_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = FileSystem,
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, keymap = keymap, config = HotstringsConfig,
+					-- The magic-key row updates the editor with the keymap; the scope does too.
+					editor = hotstring_editor,
+					is_personal = function(name)
+						return require("infra.personal_hotstrings").is_personal_group(name)
+					end,
+					start_engine = function()
+						return KeymapLifecycle.ensure_started({ state = state, keymap = keymap }, "hotstrings scope")
+					end,
+					stop_engine = function() return keymap.stop() == true end,
+					remove = function(target) return FileSystem.remove_exact(target) == true end,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod) ~= "table"
+							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".hotstrings-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					override_backup_path = function()
+						scope_generation = scope_generation + 1
+						return HotstringsConfig.get_override_path() .. ".hotstrings-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.hotstrings.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			return hotstrings_scope
+		end
 		if scope ~= "keyboard_layout" then return nil end
 		if read_only_reason ~= nil then return nil end
 		if not layout_scope then
@@ -1469,8 +1518,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil then return false end
 		if not global_scope then
 			local owners = { gestures = gesture_scope_owner }
-			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "llm", "metrics" }) do
+			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
 				owners[scope] = function() return preference_scope_owner(scope) end
+			end
+			-- The Hotstrings owner also needs its override file: one it cannot
+			-- serve is skipped and named, like an owner this Mac lacks, instead of
+			-- refusing every other category with it.
+			owners.hotstrings = function()
+				local owner = preference_scope_owner("hotstrings")
+				if owner == nil then return nil end
+				local reason = owner.unavailable()
+				if reason ~= nil then
+					Logger.warn(LOG, "Global scope skips hotstrings: %s.", tostring(reason))
+					return nil
+				end
+				return owner
 			end
 			global_scope = require("ui.menu.global_scope").new({
 				owners = owners,

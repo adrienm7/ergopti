@@ -4,9 +4,9 @@
 --- MODULE: Hotstring Scalar Preferences (Linux)
 --- DESCRIPTION:
 --- Owns the hotstring settings that are single canonical config.toml leaves:
---- the magic key, the four preview toggles, the dynamic master and each dynamic
---- family. Absence resolves through the manifest's neutral default, so an empty
---- configuration switches every one of them off.
+--- the magic key and its physical key, the four preview toggles, the dynamic
+--- master and each dynamic family. Absence resolves through the manifest's
+--- neutral default, so an empty configuration switches every one of them off.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One cached document. The magic key and the dynamic family switches are
@@ -29,6 +29,7 @@ local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
+local Terminators = require("keymap.terminators")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -37,6 +38,7 @@ local LOG = "infra.hotstring_preferences"
 --- is owned here without a second list.
 local OWNED = {
 	"hotstrings.trigger_char",
+	"hotstrings.magic_key_source",
 	"hotstrings.preview_star_enabled",
 	"hotstrings.preview_autocorrect_enabled",
 	"hotstrings.preview_ai_enabled",
@@ -55,7 +57,18 @@ for _, path in ipairs(OWNED) do
 	_owned[path] = type(neutral)
 end
 
+-- Owners' rules beyond the declared type. A stored value its owner refuses
+-- (a magic key today's shared policy rejects) is outdated for the cleanup
+-- exactly as it is for the owner's reader, which warns with the same words.
+local VALUE_RULES = {
+	["hotstrings.trigger_char"] = function(value) return Terminators.validate_magic_key(value) == true end,
+}
+
 local _document = nil
+-- Bumped on every change of _document, so a reader that caches what it derived
+-- from a leaf (the physical magic key's evdev code, asked on every grabbed
+-- key-down) knows when to derive it again.
+local _generation = 0
 local _scope_owner = nil
 local _file = nil
 
@@ -69,6 +82,14 @@ local _file = nil
 -- =========================================
 
 local function file() return _file or ConfigPaths.config("config.toml") end
+
+--- Makes a document the cached one.
+--- @param document table|false|nil Decoded document; false after a refused
+---   first read, nil to read again.
+local function publish(document)
+	_document = document
+	_generation = _generation + 1
+end
 
 local function clone(value)
 	if type(value) ~= "table" then return value end
@@ -102,6 +123,13 @@ local function inspect(document, path)
 	end
 	if value ~= nil and type(value) ~= _owned[path] then
 		return nil, path, "the value is not a " .. _owned[path]
+	end
+	-- An enum leaf (the physical magic key) holding a value its manifest no
+	-- longer lists is outdated on its own, never read as another choice.
+	local entry = value ~= nil and Manifest.find_entry_by_path(path) or nil
+	if type(entry) == "table" and entry.type == "enum" then
+		local fits, detail = ConfigOutdated.manifest_value_fits(entry, value, "linux")
+		if not fits then return nil, path, detail end
 	end
 	return value
 end
@@ -159,7 +187,7 @@ function M.refresh()
 		Logger.error(LOG, "Hotstring preferences were not refreshed: %s.", tostring(document))
 		return false
 	end
-	_document = document
+	publish(document)
 	return true
 end
 
@@ -171,7 +199,7 @@ end
 local function current()
 	if _document == nil and not M.refresh() then
 		Logger.error(LOG, "Hotstring preferences are unreadable; every owned leaf stays neutral.")
-		_document = false
+		publish(false)
 	end
 	return _document or {}
 end
@@ -184,6 +212,13 @@ function M.get(path)
 	local value = lookup(current(), path)
 	if value == nil then return Manifest.default_for(path) end
 	return value
+end
+
+--- The generation of the cached document: it changes whenever the document
+--- does (a write, a refresh, a scope's adoption or restoration).
+--- @return number
+function M.generation()
+	return _generation
 end
 
 --- Whether an owned leaf is explicitly present in the cached document.
@@ -210,7 +245,12 @@ end
 function M.mark_config_reads(document, mark)
 	validate(document)
 	for _, path in ipairs(OWNED) do
-		if lookup(document, path) ~= nil then mark((table.unpack or unpack)(segments(path))) end
+		local value = lookup(document, path)
+		if value ~= nil and VALUE_RULES[path] and not VALUE_RULES[path](value) then
+			ConfigOutdated.report(path, ConfigOutdated.REFUSED, Logger)
+		elseif value ~= nil then
+			mark((table.unpack or unpack)(segments(path)))
+		end
 	end
 end
 
@@ -249,7 +289,7 @@ function M.set_many(values)
 		end
 		local written, why, content = Writer.batch_write(file(), rows, nil, source)
 		if written ~= true then return false, why end
-		_document = decode(content)
+		publish(decode(content))
 		return true
 	end)
 	if called and committed == true then return true end
@@ -328,7 +368,7 @@ function M.adopt(owner, document)
 		Logger.error(LOG, "Candidate hotstring preferences were refused: %s.", tostring(validated))
 		return false
 	end
-	_document = clone(validated)
+	publish(clone(validated))
 	return true
 end
 
@@ -338,7 +378,7 @@ end
 --- @return boolean restored
 function M.restore(owner, snapshot)
 	if _scope_owner ~= owner or type(snapshot) ~= "table" or type(snapshot.document) ~= "table" then return false end
-	_document = clone(snapshot.document)
+	publish(clone(snapshot.document))
 	return true
 end
 
@@ -348,7 +388,7 @@ end
 function M._set_file_for_test(path)
 	if path ~= nil and (type(path) ~= "string" or path:sub(1, 1) ~= "/") then return false end
 	_file = path
-	_document = nil
+	publish(nil)
 	return true
 end
 

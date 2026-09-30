@@ -505,7 +505,8 @@ _OnbWeb_LoadExistingConfig(Dir, Request) {
 
 ; Validates the page's finish payload before anything changes.
 ; @param Answers any The payload's "answers" value.
-; @returns {Map|String} "locale", "config_dir" and "rows", or why it was refused.
+; @returns {Map|String} "locale", "config_dir", "rows" and "tap_hold_keys", or
+;   why it was refused.
 _OnbWeb_FinishPlan(Answers) {
 	if !(Answers is Map)
 		return "the answers are not an object"
@@ -521,12 +522,17 @@ _OnbWeb_FinishPlan(Answers) {
 	Rows := OnboardingAnswerRows(Index, Answers.Get("operations", ""))
 	if !(Rows is Array)
 		return Rows
-	return Map("locale", Locale, "config_dir", ConfigDir, "rows", Rows)
+	TapHoldKeys := OnboardingTapHoldKeys(Index, Answers.Get("operations", ""))
+	if !(TapHoldKeys is Array)
+		return TapHoldKeys
+	return Map("locale", Locale, "config_dir", ConfigDir, "rows", Rows,
+		"tap_hold_keys", TapHoldKeys)
 }
 
-; Commits the validated answers through _Onboarding_Commit (config.toml and,
-; when the folder moves, paths.toml in one transaction, then Reload). A refused
-; payload writes nothing and leaves the wizard open.
+; Commits the validated answers through _Onboarding_Commit (config.toml, the
+; imported tap-hold keys' tap_hold.toml and, when the folder moves, paths.toml
+; in one transaction, then Reload). A refused payload writes nothing and leaves
+; the wizard open.
 ; @param Answers any The payload's "answers" value.
 ; @returns {Boolean}
 _OnbWeb_Finish(Answers) {
@@ -541,7 +547,8 @@ _OnbWeb_Finish(Answers) {
 		_Onboarding_ShowError("onboarding.error.invalid_answers")
 		return false
 	}
-	try LoggerInfo("Onboarding", "Committing {1} wizard answer row(s).", Plan["rows"].Length)
+	try LoggerInfo("Onboarding", "Committing {1} wizard answer row(s) and {2} tap-hold key(s).",
+		Plan["rows"].Length, Plan["tap_hold_keys"].Length)
 	_ob_locale := Plan["locale"]
 	_OB_ALTGR_PASSTHROUGH := false
 
@@ -550,7 +557,8 @@ _OnbWeb_Finish(Answers) {
 	; Close the WebView2 controller only from the accepted reload hand-off. The
 	; config/path owners remain held until that callback, and a refused reload
 	; leaves this retry surface intact.
-	return _Onboarding_Commit(Plan["locale"], Plan["config_dir"], Plan["rows"], _OnbWeb_Reset)
+	TapHoldKeys := Plan["tap_hold_keys"]
+	return _Onboarding_Commit(Plan["locale"], Plan["config_dir"], Plan["rows"], TapHoldKeys, _OnbWeb_Reset)
 }
 
 ; Starts the elevated touchpad-gesture configuration (registry value set + PnP

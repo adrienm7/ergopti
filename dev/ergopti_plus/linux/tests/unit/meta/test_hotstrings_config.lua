@@ -436,6 +436,54 @@ helpers.describe("hotstrings_config", function()
         helpers.assert_true(fires(engine), "the valid neighbour reaches the engine")
       end)
     end)
+
+    helpers.it("names once the override entries of a retired category or section (config-outdated-overrides)", function()
+      -- They were kept and ignored in silence for good: no reset rewrites
+      -- them, and the config cleanup never reads this file.
+      local dir = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "") .. "/ergopti_overrides_probe"
+      os.execute("mkdir -p '" .. dir .. "'")
+      local fh = assert(io.open(dir .. "/hotstrings_overrides.toml", "w"))
+      fh:write("[_global]\ndelay = 0.3\n[probe]\ndelay = 0.2\n[probe.main]\ndelay = 0.1\n"
+        .. "[probe.gone_section]\ndelay = 0.1\n[retired_category]\ndelay = 0.5\n")
+      fh:close()
+      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["logger.shim"]
+      local warnings = {}
+      local logger = helpers.make_logger_stub()
+      logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+      package.loaded["logger.shim"] = logger
+      package.loaded["modules.hotstrings.loader"] = {
+        find_toml_files = function() return {} end,
+        list_subdirs = function() return {} end,
+        read_file = function() return nil end,
+        load_catalogue = function()
+          return { committed = true, errors = 0, mappings = {}, categories = {
+            probe = { id = "probe", path = "/bundled/probe.toml", sections = { main = { count = 1 } }, sections_order = { "main" } },
+          } }
+        end,
+      }
+      local ok, err = pcall(function()
+        require("config_outdated").reset_for_tests()
+        local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
+        cfg._set_override_config_dir_for_test(dir)
+        Choices.with_file(cfg, nil, function()
+          helpers.assert_true(cfg.init(make_engine(), dir .. "/hotstrings"))
+          local _, committed = cfg.load_all()
+          helpers.assert_true(committed)
+          local text = table.concat(warnings, "\n")
+          helpers.assert_eq(#warnings, 2, text)
+          helpers.assert_contains(text, "'retired_category' in '" .. dir .. "/hotstrings_overrides.toml'")
+          helpers.assert_contains(text, "'probe.gone_section' in '" .. dir .. "/hotstrings_overrides.toml'")
+          cfg.load_all()
+          helpers.assert_eq(#warnings, 2, "a reload does not name them again")
+        end)
+        cfg._set_override_config_dir_for_test(nil)
+      end)
+      package.loaded["modules.hotstrings.loader"] = saved_loader
+      package.loaded["logger.shim"] = saved_logger
+      package.loaded["modules.hotstrings.hotstrings_config"] = nil
+      os.execute("rm -rf '" .. dir .. "'")
+      if not ok then error(err, 0) end
+    end)
   end)
 
   -- ==========================================================================

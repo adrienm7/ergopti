@@ -457,26 +457,32 @@ Test("magic key: the configured key wins over the layout's declaration and the O
 ; records whether it was consulted at all.
 _KLT_MagicKeySourceOrderCase() {
 	Probe := { Calls: 0, Answer: "SC024" }
+	Shipped := { Calls: 0 }
 	Resolve(Changes) {
-		Inputs := Map("chosen", false, "configured", "SC02E", "declared", "", "emulated", false,
-			"keycodes", LayoutRegistry_Keycodes(), "detect", () => (Probe.Calls += 1, Probe.Answer))
+		Inputs := Map("chosen", false, "configured", "auto", "declared", "", "emulated", false,
+			"keycodes", LayoutRegistry_Keycodes(), "detect", () => (Probe.Calls += 1, Probe.Answer),
+			"shipped", () => (Shipped.Calls += 1, "KeyC"))
 		for Key, Value in Changes
 			Inputs[Key] := Value
 		return LayoutRegistry_MagicKeySource(Inputs)
 	}
-	Chosen := Resolve(Map("chosen", true, "configured", "SC031", "declared", "KeyC"))
+	; [hotstrings] magic_key_source names the key by its KeyboardEvent.code, the
+	; spelling every driver shares: KeyN is SC031 on Windows.
+	Chosen := Resolve(Map("chosen", true, "configured", "KeyN", "declared", "KeyC"))
 	AssertEqual("SC031", Chosen["scan"], "the user's key wins over the layout's declaration")
 	AssertEqual("user", Chosen["origin"])
 	AssertFalse(Chosen["follows_os_layout"])
 	AssertTrue(Chosen["overrides_emulation"], "a chosen key is the magic key on any layout")
 	AssertEqual(0, Probe.Calls, "a configured key is never replaced by a detection")
+	AssertEqual(0, Shipped.Calls, "nor read from the shipped layout")
 	Declared := Resolve(Map("declared", "Semicolon", "emulated", true))
 	AssertEqual("SC027", Declared["scan"], "the declared KeyboardEvent.code reaches its scan code")
 	AssertEqual("layout", Declared["origin"])
 	AssertTrue(Declared["overrides_emulation"], "the declaring layout yields its key to the magic key")
 	AssertEqual(0, Probe.Calls)
 	Emulated := Resolve(Map("emulated", true))
-	AssertEqual("SC02E", Emulated["scan"], "an emulated layout without declaration keeps the default key")
+	AssertEqual("SC02E", Emulated["scan"], "an emulated layout without declaration keeps the shipped key")
+	AssertEqual(1, Shipped.Calls, "the shipped key is read only when nothing else names one")
 	AssertFalse(Emulated["follows_os_layout"], "and never follows the OS layout it replaces")
 	AssertFalse(Emulated["overrides_emulation"], "a layout declaring no magic key keeps its own character")
 	AssertEqual(0, Probe.Calls, "the OS layout an emulation replaces is never probed")
@@ -486,9 +492,11 @@ _KLT_MagicKeySourceOrderCase() {
 	AssertTrue(Detected["follows_os_layout"])
 	Probe.Answer := ""
 	Missing := Resolve(Map())
-	AssertEqual("SC02E", Missing["scan"], "a character on no key keeps the default")
+	AssertEqual("SC02E", Missing["scan"], "a character on no key keeps the shipped key")
 	AssertTrue(Missing["follows_os_layout"], "another OS layout may still carry the character")
 	AssertThrows(() => Resolve(Map("declared", "MouseLeft")), "a code no layout key has is refused")
+	AssertEqual("KeyC", LayoutRegistry_ShippedMagicKey(),
+		"the last-resort key is the one the shipped Ergopti layout declares: SC02E, the former default")
 }
 
 Test("magic key: the active layout's declaration comes from its extension (layout-magic-key)",

@@ -7,12 +7,15 @@
 ; its hosts, mirroring _shared/lua/onboarding_answers.lua: the generated
 ; catalogue (_shared/ui/_generated/onboarding_catalogue.json) names the manifest
 ; paths the wizard may write on Windows, and this module turns the page's
-; finish payload into the rows of one atomic config.toml batch, and a
-; configuration back into the values a re-run starts from.
+; finish payload into the rows of one atomic config.toml batch and the
+; tap-hold keys to import, and a configuration back into the values a re-run
+; starts from.
 ;
 ; FEATURES & RATIONALE:
 ; 1. No interpretation: every answer is a manifest path and a value. The host
-;    never translates a question into keys of its own.
+;    never translates a question into keys of its own. A tap-hold key is the
+;    one answer that is no configuration path: tap_hold.toml holds the keys, so
+;    the catalogue names the key and the tap-hold writer imports its preset.
 ; 2. Fail-closed validation: a path outside the catalogue, a value the row
 ;    cannot take, a duplicate or a malformed payload refuses the whole batch
 ;    before anything is written.
@@ -55,7 +58,9 @@ OnboardingCatalogue() {
 ; Indexes the paths the wizard may write on Windows.
 ; @param Text string The catalogue JSON.
 ; @returns {Map} "pages" (Array) and "entries" (Map path -> entry Map with
-;   "kind" switch|choice|character, "default", and "value" or "max_characters").
+;   "kind" switch|choice|tap_hold_key|character, "default", and "value" or
+;   "max_characters"; a tap_hold_key entry also names its "key" and the
+;   "customised" value a configured key of the user's reads as).
 OnboardingCatalogueIndex(Text) {
 	global ONBOARDING_CATALOGUE_SCHEMA_VERSION, ONBOARDING_CATALOGUE_DRIVER
 	Catalogue := JsonParse(Text)
@@ -71,6 +76,10 @@ OnboardingCatalogueIndex(Text) {
 			throw ValueError("the onboarding catalogue has a malformed page")
 		if Page.Has("master")
 			_OnboardingClaim(Entries, Page["master"], "switch")
+		; The Shortcuts answer also writes the key-combinations switch, which its
+		; master no longer reaches.
+		if Page.Has("sub_switch")
+			_OnboardingClaim(Entries, Page["sub_switch"], "switch")
 		if Page.Has("magic_key")
 			_OnboardingClaim(Entries, Page["magic_key"], "character")
 		_OnboardingClaimGroups(Entries, Page.Get("groups", []))
@@ -90,7 +99,8 @@ _OnboardingClaimGroups(Entries, Groups) {
 		if Group.Has("path")
 			_OnboardingClaim(Entries, Group, "choice")
 		for Item in Group.Get("items", [])
-			_OnboardingClaim(Entries, Item, "choice")
+			_OnboardingClaim(Entries, Item,
+				(Item is Map) && Item.Has("tap_hold_key") ? "tap_hold_key" : "choice")
 		_OnboardingClaimGroups(Entries, Group.Get("groups", []))
 	}
 }
@@ -98,7 +108,7 @@ _OnboardingClaimGroups(Entries, Groups) {
 ; Records one writable path, refusing a second row for it.
 ; @param Entries Map Index being built.
 ; @param Row Map Catalogue row.
-; @param Kind string switch, choice or character.
+; @param Kind string switch, choice, tap_hold_key or character.
 _OnboardingClaim(Entries, Row, Kind) {
 	Path := (Row is Map) ? Row.Get("path", "") : ""
 	if !(Path is String) || Path == ""
@@ -106,8 +116,16 @@ _OnboardingClaim(Entries, Row, Kind) {
 	if Entries.Has(Path)
 		throw ValueError("the onboarding catalogue writes " . Path . " twice")
 	Entry := Map("kind", Kind, "default", (Kind == "switch") ? false : Row["default"])
-	if (Kind == "choice")
+	if (Kind == "choice" || Kind == "tap_hold_key")
 		Entry["value"] := Row["value"]
+	if (Kind == "tap_hold_key") {
+		Key := Row["tap_hold_key"]
+		Customised := Row.Get("customised_value", "")
+		if !(Key is String) || Key == "" || !(Customised is String) || Customised == ""
+			throw ValueError("the onboarding catalogue names a tap-hold key without an id or a customised value")
+		Entry["key"] := Key
+		Entry["customised"] := Customised
+	}
 	if (Kind == "character") {
 		Limit := Row.Get("max_characters", 0)
 		if !(Limit is Integer) || Limit < 1
@@ -133,9 +151,34 @@ _OnboardingClaim(Entries, Row, Kind) {
 ; @returns {Array|String} Rows { Section, Key, Value | Delete } for the TOML
 ;   writer, or why the whole batch was refused.
 OnboardingAnswerRows(Index, Operations) {
+	Answers := _OnboardingSplitAnswers(Index, Operations)
+	return (Answers is Map) ? Answers["rows"] : Answers
+}
+
+; The tap-hold keys the answers import: every checked key of the Tap-Holds
+; page, in answer order, for the tap-hold writer. The whole payload is
+; validated as OnboardingAnswerRows validates it.
+; @param Index Map From OnboardingCatalogueIndex.
+; @param Operations any The payload's "operations" value.
+; @returns {Array|String} Key ids (empty when nothing is imported), or why the
+;   whole batch was refused.
+OnboardingTapHoldKeys(Index, Operations) {
+	Answers := _OnboardingSplitAnswers(Index, Operations)
+	return (Answers is Map) ? Answers["tap_hold_keys"] : Answers
+}
+
+; Validates the page's operations as a whole and splits them between their
+; owners: configuration rows for the TOML writer, checked tap-hold keys for
+; the tap-hold writer.
+; @param Index Map From OnboardingCatalogueIndex.
+; @param Operations any The payload's "operations" value.
+; @returns {Map|String} "rows" and "tap_hold_keys", or why the whole batch was
+;   refused.
+_OnboardingSplitAnswers(Index, Operations) {
 	if !(Operations is Array)
 		return "the answers carry no operations"
 	Rows := []
+	Keys := []
 	Seen := Map()
 	for Position, Operation in Operations {
 		if !(Operation is Map) || !Operation.Has("path") || !Operation.Has("value")
@@ -146,15 +189,22 @@ OnboardingAnswerRows(Index, Operations) {
 		if Seen.Has(Path)
 			return Path . " is answered twice"
 		Seen[Path] := true
-		Why := _OnboardingAnswerRefusal(Index["entries"][Path], Operation["value"])
+		Entry := Index["entries"][Path]
+		Why := _OnboardingAnswerRefusal(Entry, Operation["value"])
 		if (Why != "")
 			return Path . ": " . Why
+		if (Entry["kind"] == "tap_hold_key") {
+			; An unchecked key keeps whatever it has: nothing is written for it.
+			if _OnboardingSameAnswer(Operation["value"], Entry["value"])
+				Keys.Push(Entry["key"])
+			continue
+		}
 		try Row := ManifestSparseOperation(Path, Operation["value"])
 		catch as Err
 			return Path . " is not a configuration path of this driver: " . Err.Message
 		Rows.Push(Row)
 	}
-	return Rows
+	return Map("rows", Rows, "tap_hold_keys", Keys)
 }
 
 ; Why a value cannot be written to an entry, or "" when it can.
@@ -165,7 +215,7 @@ _OnboardingAnswerRefusal(Entry, Value) {
 	Kind := Entry["kind"]
 	if (Kind == "switch")
 		return _OnboardingIsBoolean(Value) ? "" : "a category switch takes true or false"
-	if (Kind == "choice") {
+	if (Kind == "choice" || Kind == "tap_hold_key") {
 		if _OnboardingSameAnswer(Value, Entry["value"]) || _OnboardingSameAnswer(Value, Entry["default"])
 			return ""
 		return "an imported item takes its recommendation or its neutral value"
@@ -219,30 +269,64 @@ OnboardingCurrentValues(Index, Sections) {
 		if (Prefix == "")
 			continue
 		for Key, Value in Keys {
-			if Index["entries"].Has(Prefix . "." . Key)
-				Values[Prefix . "." . Key] := Value
+			; A tap-hold key lives in tap_hold.toml, never in config.toml.
+			Path := Prefix . "." . Key
+			if Index["entries"].Has(Path) && Index["entries"][Path]["kind"] != "tap_hold_key"
+				Values[Path] := Value
 		}
 	}
 	return Values
 }
 
-; Reads the wizard values a config.toml holds; an absent file holds none.
+; The wizard values of the keys a tap_hold.toml configures: a key set to its
+; recommendation reads as imported, any other setting as customised, which the
+; page keeps as it is and never imports over.
+; @param Index Map From OnboardingCatalogueIndex.
+; @param Report Map Key id -> "recommended" or "customised", from TapHoldKeyReport.
+; @returns {Map} Path -> value (TOML_Bool for an imported key).
+OnboardingTapHoldValues(Index, Report) {
+	Values := Map()
+	for Path, Entry in Index["entries"] {
+		if (Entry["kind"] != "tap_hold_key") || !Report.Has(Entry["key"])
+			continue
+		State := Report[Entry["key"]]
+		if (State == "recommended")
+			Values[Path] := TOML_Bool(Entry["value"])
+		else if (State == "customised")
+			Values[Path] := Entry["customised"]
+		else
+			throw ValueError("unknown tap-hold key state " . String(State))
+	}
+	return Values
+}
+
+; Reads the wizard values a config.toml holds and those of the tap_hold.toml
+; beside it; absent files hold none.
 ; @param Index Map From OnboardingCatalogueIndex.
 ; @param ConfigPath string
-; @returns {Map|String} The values, or why the file could not be read.
+; @returns {Map|String} The values, or why a file could not be read.
 OnboardingReadCurrentValues(Index, ConfigPath) {
+	global _SharedDir
 	try LoggerStart("Onboarding", "Reading the wizard values of {1}…", ConfigPath)
-	if !FileExist(ConfigPath) {
-		try LoggerSuccess("Onboarding", "No configuration at {1}: every page starts neutral.", ConfigPath)
-		return Map()
+	Values := Map()
+	if FileExist(ConfigPath) {
+		Sections := TOML_ParseFreshFileTyped(ConfigPath, &DiscardedArrays)
+		if TOML_ReadFailed(ConfigPath) || DiscardedArrays {
+			try LoggerError("Onboarding", "The configuration at {1} could not be read.", ConfigPath)
+			return "the configuration at " . ConfigPath . " could not be read"
+		}
+		Values := OnboardingCurrentValues(Index, Sections)
 	}
-	Sections := TOML_ParseFreshFileTyped(ConfigPath, &DiscardedArrays)
-	if TOML_ReadFailed(ConfigPath) || DiscardedArrays {
-		try LoggerError("Onboarding", "The configuration at {1} could not be read.", ConfigPath)
-		return "the configuration at " . ConfigPath . " could not be read"
+	TapHoldPath := TapHoldConfigPathBeside(ConfigPath)
+	Report := TapHoldKeyReport(TapHoldPath, _SharedDir . "\tap_hold\defaults.toml")
+	if (Report is String) {
+		try LoggerError("Onboarding", "The tap-hold keys at {1} could not be read: {2}.", TapHoldPath, Report)
+		return Report
 	}
-	Values := OnboardingCurrentValues(Index, Sections)
-	try LoggerSuccess("Onboarding", "Read {1} wizard value(s) from {2}.", Values.Count, ConfigPath)
+	for Path, Value in OnboardingTapHoldValues(Index, Report)
+		Values[Path] := Value
+	try LoggerSuccess("Onboarding", "Read {1} wizard value(s) from {2} and its tap-hold file.",
+		Values.Count, ConfigPath)
 	return Values
 }
 

@@ -65,7 +65,11 @@ function M.new(options)
 	ports.transaction_factory = function(config)
 		config.gestures = gestures
 		config.owned_paths = keyboard.get_owned_config_paths
-		config.prepare_rows = Preferences.prepare_shortcut_updates
+		-- The scope's reset owns both assignment containers, an older build's
+		-- plain value included.
+		config.prepare_rows = function(source, rows)
+			return Preferences.prepare_shortcut_updates(source, rows, Preferences.SHORTCUT_CONTAINERS)
+		end
 		return Scope.new(config)
 	end
 	ports.runtime = {

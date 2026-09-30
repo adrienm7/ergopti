@@ -119,9 +119,9 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 		-- One wrong-typed leaf made the whole document unreadable: two ERRORs at
 		-- boot, the user's magic key replaced by the default, and a cleanup that
 		-- reported the file as unreadable.
-		local source = '[hotstrings]\ntrigger_char = "#"\npreview_star_enabled = "on"\n'
+		local source = '[hotstrings]\ntrigger_char = "§"\npreview_star_enabled = "on"\n'
 		with_recorded_log(source, function(Preferences, path, errors, warnings)
-			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "#")
+			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "§")
 			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false)
 			helpers.assert_eq(errors, {})
 			helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
@@ -136,10 +136,10 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 	end)
 
 	helpers.it("reads the leaves under an old scalar parent as neutral (config-outdated-preferences)", function()
-		local source = '[hotstrings]\ntrigger_char = "#"\ndynamic = true\n'
+		local source = '[hotstrings]\ntrigger_char = "§"\ndynamic = true\n'
 		with_recorded_log(source, function(Preferences, _, errors)
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.date.enabled"), false)
-			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "#")
+			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "§")
 			helpers.assert_eq(errors, {})
 			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 1)

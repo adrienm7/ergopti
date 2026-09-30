@@ -40,6 +40,27 @@ helpers.describe("terminal macOS shortcut scopes", function()
 		end)
 	end)
 
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("removes a plain keyboard or tap_keys value with its " .. mode .. " reset (config-outdated-shortcuts-reset)",
+			function()
+				-- The value an older build left where the scope keeps a table of
+				-- assignments made every row below it unwritable, so the reset the
+				-- user asked for was refused by the very value it replaces.
+				local source = '[shortcuts]\nenabled = true\nkeyboard = "legacy"\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+				Fixture.run(function(f)
+					local committed, detail = f.owner.apply(mode)
+					helpers.assert_eq(committed, true, detail)
+					local decoded = Codec.decode(f.files.config)
+					for _, key in ipairs({ "keyboard", "tap_keys" }) do
+						local value = decoded.shortcuts and decoded.shortcuts[key]
+						helpers.assert_true(value == nil or (type(value) == "table" and #value == 0),
+							key .. " holds no outdated value after the reset: " .. f.files.config)
+					end
+					helpers.assert_eq(decoded.future.keep, 7, "the rest of the file is kept")
+				end, source)
+			end)
+	end
+
 	helpers.it("compensates refused publication with exact native choices and save baselines", function()
 		Fixture.run(function(f)
 			local before, checkpoint = f.files.config, f.checkpoint.capture()

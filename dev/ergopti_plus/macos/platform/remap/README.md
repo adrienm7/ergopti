@@ -4,13 +4,33 @@
 
 This module generates ErgoptiPlus complex modifications and merges them into the user's existing `karabiner.json`. It also persists the ErgoptiPlus remapping preferences stored in `config_karabiner.toml`.
 
-Karabiner-Elements itself is shared, multi-process infrastructure. Its UI and
-menubar process, root Core Service (called `karabiner_grabber` before v15.7),
-console user server, user/session agents, observers, watchers, extensions and
-`Karabiner-VirtualHIDDevice-Daemon`/DriverKit helpers are never owned, killed,
-unloaded, launched or restarted by ErgoptiPlus. Its tap-holds and chords are
-configured under the same "Tap-Holds" menu Windows uses, while stock Karabiner
-and the user's personal rules stay active alongside it.
+Its tap-holds and chords are configured under the same "Tap-Holds" menu
+Windows uses.
+
+## Runtime modes
+
+[ADR 011](../../../docs/adr/011-owned-karabiner-runtime.md) defines two modes.
+Everything below this section describes the shared mode, which is the only one
+implemented today.
+
+- **Shared (legacy, current production).** Onboarding installs the official
+  Karabiner-Elements 16.0.0 application and ErgoptiPlus merges its token-scoped
+  rules into the user's `karabiner.json`. Karabiner-Elements is then shared,
+  multi-process infrastructure: its UI and menubar process, root Core Service
+  (called `karabiner_grabber` before v15.7), console user server, user/session
+  agents, observers, watchers, extensions and
+  `Karabiner-VirtualHIDDevice-Daemon`/DriverKit helpers are never owned, killed,
+  unloaded, launched or restarted by ErgoptiPlus, and the user's personal rules
+  stay active alongside the generated ones.
+- **Owned (decided 2026-09-29, not yet shipped).** No Karabiner-Elements
+  application. Ergopti runs its own background runtime: the unmodified pqrs
+  VirtualHIDDevice plus a self-signed headless fork of Karabiner-Elements
+  16.3.0 (Core-Service, Console-User-Server, `karabiner_cli`) that also streams
+  the physical keys to the keylogger. It runs only while Tap-Hold is on, reads a
+  complete configuration owned by Ergopti instead of the user's
+  `~/.config/karabiner`, and, through the menu option « close other Karabiner
+  instances » (on by default), quits any other active Karabiner while it runs.
+  The HS-274 delivery plan lists the work packages that build it.
 
 ## « Ergopti uses Karabiner »
 
@@ -101,7 +121,7 @@ its rule from the user's `layers.toml` on every regeneration (no file, no rule).
 release before that appended verbatim; it is never deployed, only compared, to
 prove and remove an older unleased ErgoptiPlus block.
 
-The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`.
+The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keylogger never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
 
 ## Lifecycle API
 

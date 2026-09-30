@@ -376,16 +376,33 @@ input_altering = false
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
+# The physical key that types the magic key while `hotstrings.magic_key.replace`
+# is on, named by its W3C KeyboardEvent.code like a layout extension's
+# [extension.magic_key] declaration, so one value means the same key on every
+# driver: Windows resolves it to a scan code, macOS to a virtual keycode and
+# Linux to an evdev code, all through _shared/data/keycodes/physical_keys.json.
+# "auto" leaves the key to the layout: on Windows the emulated layout's declared
+# key, or the key typing magic_key_source_char on the OS layout, or the key the
+# built-in Ergopti layout declares; on macOS and Linux the OS keyboard layout,
+# which types the magic key itself (the driver remaps nothing). The candidates
+# are the character keys a registry layout defines
+# (_shared/modules/layouts/mac_keycodes.json) except Space, which every
+# hotstring terminator relies on; tools/test/test-magic-key-source.cjs pins both
+# lists together. It replaced the Windows-only magic_key_source_scan in config
+# schema v5 (migrations.toml), so a value is a parameter of the replace feature,
+# not an activation of its own.
 [[features.hotstrings]]
-id = "magic_key_source_scan"
-default = "SC02E"
-recommended = "SC02E"
+id = "magic_key_source"
+default = "auto"
+recommended = "auto"
 input_altering = false
-type = "string"
-description_key = "menu.hotstrings.magic_key_source_scan"
-platforms = ["ahk"]
-reason_key = "platform_reason.magic_key_source_is_windows"
+type = "enum"
+enum_values = ["auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]
+description_key = "menu.hotstrings.magic_key_source"
 
+# The character whose key Windows looks for on the OS layout when no key is
+# chosen and no emulated layout declares one. The Lua drivers have no such
+# detection: without a choice their OS layout types the magic key itself.
 [[features.hotstrings]]
 id = "magic_key_source_char"
 default = "j"
@@ -394,7 +411,7 @@ input_altering = false
 type = "string"
 description_key = "menu.hotstrings.magic_key_source_char"
 platforms = ["ahk"]
-reason_key = "platform_reason.magic_key_source_is_windows"
+reason_key = "platform_reason.magic_key_detection_is_windows"
 
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
 # it was written: macOS ships the engine (modules/keymap/expander.lua
@@ -4942,6 +4959,15 @@ type = "feature"
 path = "hotstrings.magic_key.replace"
 i18n = "menu.layout.replace"
 
+# The physical key the replace switch above turns into the magic key
+# (hotstrings.magic_key_source), on every driver: one row naming the key in
+# effect, whose submenu captures the next key pressed, restores the automatic
+# key or lists every candidate. A `list`, because each candidate is labelled
+# with what the user's own layout types on it, which only the driver can ask.
+[[menu.layout_menu]]
+type = "list"
+id = "magic_key_source"
+
 [[menu.layout_menu]]
 type = "feature"
 path = "layout.ctrl_magic_save"
@@ -4973,6 +4999,21 @@ id = "hotstrings_toggle"
 i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
+
+# The Hotstrings scope, beside its switch like the IA and Metrics ones. Each
+# driver registers both commands on its scope owner, which changes config.toml
+# and the override file as one transaction: recommended delays are written
+# where the corpus inheritance differs, and the Ergopti extension's bound
+# groups (SFB reduction, rolls, repeat corrections) are covered like any other.
+[[menu.hotstrings_menu]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
 
 [[menu.hotstrings_menu]]
 type = "---"
@@ -5817,6 +5858,8 @@ restore_exclude = []
 #                whose recommendation differs from its neutral default.
 #                "hotstrings": every bundled section, language -> file ->
 #                section from _shared/modules/hotstrings/_index.toml.
+#                "tap_holds": every key of the platform's column of the shared
+#                tap-hold catalogue its engine ships a recommendation for.
 #                "none": the question alone (AI and metrics consent).
 #   exclude      Scope prefixes left out of a "recommended" checklist.
 #   labels       Label keys for recommended items whose manifest description
@@ -5825,8 +5868,19 @@ restore_exclude = []
 #   note_key     Per-platform explanation for a page without a question.
 #   consent      The answer is a privacy consent: never pre-selected.
 #   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
-# The wizard persists only manifest paths. A checklist's pre-selection is the
-# manifest `recommended` value, and every question starts at No.
+#   sub_switch   Per-platform switch of part of the checklist that the category
+#                switch does not reach: `path` names it and `menu_group` the
+#                menu group whose `feature` rows are the sections it governs.
+#                The answer writes it only where it changes what is in force:
+#                off when it turns the category switch from Yes to No, on when
+#                it imports one of those items that was off.
+#   state        Per-platform switch a page without a category switch starts
+#                its question from: its host reads it from its own file and
+#                reports it with the values in force; the page never writes it.
+# The wizard persists only manifest paths, except the tap-hold keys: no driver
+# keeps those in config.toml, so each host imports a checked key's shipped
+# recommendation through its own tap-hold writer. A checklist's pre-selection is
+# the manifest `recommended` value, and every question starts at No.
 [onboarding]
 order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
 
@@ -5834,11 +5888,13 @@ order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", 
 title_key = "menu.tapholds.title"
 question_key = "menu.tapholds.enable"
 description_key = "onboarding.page.tap_holds.description"
-master = { ahk = "category_enabled.tap_holds" }
-checklist = "none"
 # macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
-# both written by their Tap-Holds menu: a config.toml answer would never be read.
-note_key = { hs = "onboarding.page.tap_holds.menu_note", linux = "onboarding.page.tap_holds.menu_note" }
+# where a config.toml answer would never be read: there, importing a checked
+# key switches the Tap-Holds on in that file, and a No or an empty list writes
+# nothing. The question starts from that switch, which the host reports.
+master = { ahk = "category_enabled.tap_holds" }
+state = { hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
+checklist = "tap_holds"
 
 [onboarding.pages.shortcuts]
 title_key = "menu.shortcuts.title"
@@ -5848,6 +5904,12 @@ master = { ahk = "category_enabled.shortcuts", hs = "shortcuts.enabled", linux =
 checklist = "recommended"
 # The user's own shortcut toggles: their labels come from the personal file.
 exclude = ["shortcuts.personal"]
+# The key combinations follow only their own switch (decision of 2026-09-29),
+# which the Shortcuts master no longer reaches, while this page still lists the
+# Windows AltGr / LAlt / CapsLock families: a re-run answered No must leave
+# them off as the master once did. macOS lists no combination here and Linux
+# has no combination engine.
+sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = "key_combinations_group" } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"

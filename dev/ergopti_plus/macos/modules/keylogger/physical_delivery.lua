@@ -7,8 +7,23 @@ local Wire = require("modules.keylogger.physical_wire")
 local Baseline = require("modules.keylogger.physical_baseline")
 local decimal, successor = Wire.decimal, Wire.successor
 
+--- Orders uncounted tally rows by page, usage, keyboard type and reason.
+---@param left table Tally row.
+---@param right table Tally row.
+---@return boolean
+local function tally_order(left, right)
+	if left.page ~= right.page then return left.page < right.page end
+	if left.usage ~= right.usage then return left.usage < right.usage end
+	if left.keyboard_type ~= right.keyboard_type then return left.keyboard_type < right.keyboard_type end
+	return left.reason < right.reason
+end
+
 --- Creates a single-use receiver; a stopped or failed owner cannot be reopened.
---- The keycode callback receives usage and the exact decimal device identity.
+--- The keycode callback receives the usage page, the usage, the device's keyboard
+--- type and the exact decimal device identity; it returns the macOS keycode, or
+--- nil and the reason the press cannot be attributed. An unattributed press is
+--- tallied as uncounted coverage, never guessed and never a reason to retire the
+--- capture.
 ---@param dependencies table admit, context, keycode and emit callbacks; batch_limit.
 ---@return table receiver
 function M.new(dependencies)
@@ -19,6 +34,7 @@ function M.new(dependencies)
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical batch limit")
 	local state, ownership, sequence = "new", nil, "0"
 	local initial
+	local uncounted = {}
 	local receiver = {}
 
 	--- Returns whether this receiver still owns delivery.
@@ -27,6 +43,19 @@ function M.new(dependencies)
 
 	--- Revokes delivery before any successor capture can begin.
 	function receiver.stop() state, ownership, initial = "stopped", nil, nil end
+
+	--- Reports the presses delivered but not credited, for the capture's coverage.
+	--- Only fully committed batches are included, and privacy-excluded presses never are.
+	---@return table rows { page, usage, keyboard_type, reason, count } in a stable order.
+	function receiver.uncounted()
+		local rows = {}
+		for _, entry in pairs(uncounted) do
+			rows[#rows + 1] = { page = entry.page, usage = entry.usage,
+				keyboard_type = entry.keyboard_type, reason = entry.reason, count = entry.count }
+		end
+		table.sort(rows, tally_order)
+		return rows
+	end
 
 	--- Admits a producer envelope through the caller's coverage and privacy owner.
 	---@param frame table Decoded opened frame.
@@ -85,7 +114,7 @@ function M.new(dependencies)
 				assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= length,
 					"Physical batch must be a dense array")
 			end
-			local next_sequence, pending = sequence, {}
+			local next_sequence, pending, pending_uncounted = sequence, {}, {}
 			for index = 1, length do
 				local row = frame.records[index]
 				assert(type(row) == "table", "Missing physical record")
@@ -97,16 +126,23 @@ function M.new(dependencies)
 				assert(type(row.has_page) == "boolean" and type(row.has_usage) == "boolean"
 					and type(row.page) == "number" and type(row.usage) == "number"
 					and row.page % 1 == 0 and row.usage % 1 == 0, "Invalid physical usage")
-				local physical_press = initial.press(row)
-				if row.has_page and row.has_usage and row.page == 7 and row.usage >= 4 and row.usage <= 255 then
-					if physical_press then
-						local keycode = dependencies.keycode(row.usage, row.device)
+				if initial.press(row) then
+					local keyboard_type = initial.keyboard_type(row.device)
+					local keycode, reason = dependencies.keycode(row.page, row.usage, keyboard_type, row.device)
+					if keycode ~= nil then
 						assert(type(keycode) == "number" and keycode >= 0 and keycode % 1 == 0,
-							"Unsupported physical key usage")
-						local context = dependencies.context(row.timestamp, row.device)
-						assert(type(context) == "table" and type(context.allowed) == "boolean",
-							"Physical event context is unavailable")
-						if context.allowed then
+							"Invalid physical keycode")
+					else
+						assert(type(reason) == "string" and reason ~= "", "Uncounted physical usage has no reason")
+					end
+					local context = dependencies.context(row.timestamp, row.device)
+					assert(type(context) == "table" and type(context.allowed) == "boolean",
+						"Physical event context is unavailable")
+					if context.allowed then
+						if keycode == nil then
+							pending_uncounted[#pending_uncounted + 1] = { page = row.page, usage = row.usage,
+								keyboard_type = keyboard_type, reason = reason }
+						else
 							assert(type(context.app) == "string" and context.app ~= ""
 								and type(context.timestamp) == "string" and context.timestamp ~= "",
 								"Physical event context is incomplete")
@@ -121,6 +157,16 @@ function M.new(dependencies)
 				dependencies.emit(press)
 			end
 			assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
+			for _, press in ipairs(pending_uncounted) do
+				local key = table.concat({ press.reason, press.page, press.usage, press.keyboard_type }, ":")
+				local entry = uncounted[key]
+				if not entry then
+					entry = { page = press.page, usage = press.usage, keyboard_type = press.keyboard_type,
+						reason = press.reason, count = 0 }
+					uncounted[key] = entry
+				end
+				entry.count = entry.count + 1
+			end
 			sequence = next_sequence
 		end)
 		if not ok then

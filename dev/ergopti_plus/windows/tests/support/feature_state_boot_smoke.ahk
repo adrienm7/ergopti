@@ -72,8 +72,10 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
-		case "invalid_source_scan":
-			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_scan", "not-a-scan")
+		case "outdated_source_key":
+			_FeatureStateSmokeOutdatedSourceKey()
+		case "retired_source_scan":
+			_FeatureStateSmokeRetiredSourceScan()
 		case "invalid_source_char":
 			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_char", "two")
 		case "invalid_category_string":
@@ -94,7 +96,7 @@ _FeatureStateSmokeParsedConfig() {
     TempConfig := A_Temp . "\ergopti_feature_state_boot_" . DllCall("GetCurrentProcessId") . ".toml"
     try {
         try FileDelete(TempConfig)
-        FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source_scan = "SC031"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
+        FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
         Cache := ParseTomlFile(TempConfig)
         ReadScriptConfig(Cache)
         ReadCategoryEnabled(Cache)
@@ -102,7 +104,8 @@ _FeatureStateSmokeParsedConfig() {
         try FileDelete(TempConfig)
     }
     _FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "trigger_char")
-    _FeatureStateSmokeAssert("SC031", ScriptInformation["MagicKeySourceScan"], "magic_key_source_scan")
+    _FeatureStateSmokeAssert("KeyN", ScriptInformation["MagicKeySource"], "magic_key_source")
+    _FeatureStateSmokeAssert(true, ScriptInformation["MagicKeySourceChosen"], "a named source key is a choice")
     _FeatureStateSmokeAssert("n", ScriptInformation["MagicKeySourceChar"], "magic_key_source_char")
     _FeatureStateSmokeAssert(true, ScriptInformation["AltGrIsKanaRemap"], "alt_gr_is_kana_remap")
     _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "repeat_key_enabled")
@@ -167,8 +170,10 @@ _FeatureStateSmokeManifestDefaults() {
 		_FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
 		ScriptInformation["MagicKey"], "manifest trigger default")
 	_FeatureStateSmokeAssert(
-		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_scan"),
-		ScriptInformation["MagicKeySourceScan"], "manifest source scan default")
+		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source"),
+		ScriptInformation["MagicKeySource"], "manifest source key default")
+	_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"],
+		"the manifest default leaves the source key to the layout")
 	_FeatureStateSmokeAssert(
 		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_char"),
 		ScriptInformation["MagicKeySourceChar"], "manifest source character default")
@@ -210,6 +215,32 @@ _FeatureStateSmokeValidUnicodeTrigger() {
 
 _FeatureStateSmokeInvalidValue(Section, Key, Value) {
 	ReadScriptConfig(Map(Section, Map(Key, Value)))
+}
+
+; An outdated source key is reported by the loader and offered by the cleanup:
+; here it reads as the automatic key, it never aborts the boot. The loader's
+; case-insensitive enum rule is followed, in the manifest's spelling.
+_FeatureStateSmokeOutdatedSourceKey() {
+	global ScriptInformation
+	for Value in ["SC03B", "not-a-key", 46, ""] {
+		ReadScriptConfig(Map("hotstrings", Map("magic_key_source", Value)))
+		_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "outdated source key")
+		_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "outdated source key choice")
+	}
+	ReadScriptConfig(Map("hotstrings", Map("magic_key_source", "keyj")))
+	; _FeatureStateSmokeAssert compares with the case-insensitive !=.
+	if (ScriptInformation["MagicKeySource"] !== "KeyJ")
+		throw Error("loader-accepted spelling: expected KeyJ, got " . ScriptInformation["MagicKeySource"])
+	_FeatureStateSmokeAssert(true, ScriptInformation["MagicKeySourceChosen"], "loader-accepted choice")
+}
+
+; The Windows-only scan code was renamed by config schema v5: the reader drops
+; the old spelling at once, so a file the migration did not reach chooses nothing.
+_FeatureStateSmokeRetiredSourceScan() {
+	global ScriptInformation
+	ReadScriptConfig(Map("hotstrings", Map("magic_key_source_scan", "SC031")))
+	_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "retired scan code")
+	_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "retired scan code choice")
 }
 
 _FeatureStateSmokeInvalidCategory(Value) {

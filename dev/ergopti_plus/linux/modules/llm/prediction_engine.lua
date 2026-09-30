@@ -23,6 +23,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local HttpBridge = require("infra.llm_bridge")
 local PromptBuilder = require("llm.prompt_builder")
 local ProfileSelector = require("llm.profile_selector")
@@ -2539,12 +2540,26 @@ function M.set_triggers(triggers)
 	return true
 end
 
---- The selected backend: "ollama" or "api".
+--- Whether a stored backend choice is one this build runs.
+--- @param kind any
+--- @return boolean
+function M.is_backend(kind)
+	return BACKENDS[kind] == true
+end
+
+--- The selected backend: "ollama" or "api". A stored backend this build no
+--- longer runs (a retired provider id) is an outdated entry: warned once and
+--- read as the manifest default, never a raise on the menu or typing path.
 --- @return string
 function M.get_backend()
 	local value = require("infra.llm_preferences").get(BACKEND_KEY)
+	if value ~= nil and not BACKENDS[value] then
+		-- The cleanup's spelling (mark_config_read), so the entry is named once.
+		ConfigOutdated.report(BACKEND_KEY, ConfigOutdated.REFUSED, Logger)
+		value = nil
+	end
 	if value == nil then value = require("infra.manifest_reader").default_for(BACKEND_KEY) end
-	assert(BACKENDS[value], "invalid configured prediction backend")
+	assert(BACKENDS[value], "the manifest default prediction backend is not one this build runs")
 	return value
 end
 

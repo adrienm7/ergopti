@@ -17,6 +17,15 @@ local function dense(registry)
 	return registry
 end
 
+--- Whether a stored payload is an older build's shape rather than a versioned
+--- envelope: text without a "v<N>:" prefix. A newer version or a damaged v1
+--- envelope is not outdated: decode() refuses it, so it is never overwritten.
+--- @param payload any Stored llm.user_profiles value.
+--- @return boolean
+function M.is_outdated(payload)
+	return type(payload) == "string" and payload ~= "" and payload:match("^v%d+:") == nil
+end
+
 --- Decodes declared storage without importing any legacy namespace.
 --- @param payload string Canonical v1 envelope or neutral empty string.
 --- @return table registry Detached records, including unreadable entries.

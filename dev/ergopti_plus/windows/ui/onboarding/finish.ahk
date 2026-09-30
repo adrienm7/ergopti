@@ -4,10 +4,12 @@
 ; MODULE: Onboarding / Config Write + Reload
 ; DESCRIPTION:
 ; Commits the wizard's validated answers: one transactional write of the
-; candidate config.toml (and of paths.toml when the configuration folder
-; moves), stamped with this build's schema version, then a single Reload so
-; every module starts from the new file. A refused reload rolls both files back
-; and leaves the wizard open for a retry.
+; candidate config.toml (with the imported tap-hold keys' tap_hold.toml, and
+; paths.toml when the configuration folder moves), stamped with this build's
+; schema version, then a single Reload so every module starts from the new
+; files. A refused reload rolls every file back and leaves the wizard open for
+; a retry. A tap_hold.toml that cannot take the import leaves the other
+; answers to be saved without it, as on macOS and Linux, and the user is told.
 ;
 ; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
@@ -23,6 +25,32 @@
 ; ======= 1/ Config write and reload =======
 ; ==========================================
 ; ==========================================
+
+; The tap_hold.toml target a wizard commit publishes beside config.toml, with
+; the file it replaces backed up first. A file that cannot take the import
+; (unreadable, or holding a key of the user's) must not cost the other answers,
+; as on macOS and Linux: the commit saves them without the keys, then says so.
+; @param Path string The tap_hold.toml beside the candidate config.toml.
+; @param Keys Array Validated key ids from OnboardingTapHoldKeys.
+; @returns {Map|String} The transition target, or why the keys are not imported.
+_Onboarding_TapHoldTarget(Path, Keys) {
+	global _SharedDir
+	try {
+		Image := TapHoldImportImage(Path, _SharedDir . "\tap_hold\defaults.toml", Keys)
+		Backup := TapHoldImportBackup(Path, Image)
+		ExpectedOld := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"])
+		if !(ExpectedOld is Map)
+			throw Error("the bytes of '" . Path . "' could not be verified")
+	} catch as Err {
+		try LoggerError("Onboarding",
+			"The tap-hold keys cannot be imported into '{1}': {2}. The other answers are saved without them.",
+			Path, Err.Message)
+		return Err.Message
+	}
+	if (Backup != "")
+		try LoggerInfo("Onboarding", "Backed up '{1}' to '{2}' before the tap-hold import.", Path, Backup)
+	return ConfigTransitionPresentTarget(Path, Image["content"], ExpectedOld)
+}
 
 ; The configuration rows a wizard commit writes: the chosen language, then the
 ; answers the page gave as manifest paths (already validated and sparse).
@@ -42,12 +70,18 @@ _Onboarding_CommitUpdates(Locale, Rows) {
 ; the FilePathsEditor dialog (infra/onboarding-independent helper in
 ; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
 ; structurally identical files.
+; The Tap-Holds page's checked keys are imported by the tap-hold writer into
+; the tap_hold.toml beside the candidate config.toml, in the same transition,
+; so a key never lands in a folder whose answers were not saved. A tap-hold
+; file that cannot take them is left alone and the user told once the other
+; answers are saved.
 ; @param Locale string Locale code the user picked.
 ; @param ConfigDir string Folder typed on the config page; "" is the OS default.
 ; @param Rows Array Validated rows from OnboardingAnswerRows.
+; @param TapHoldKeys Array Validated key ids from OnboardingTapHoldKeys.
 ; @param BeforeReloadFn Func|0 Teardown lent to the accepted reload hand-off.
 ; @returns {Boolean} False when nothing was committed or the reload was refused.
-_Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
+_Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 	; If the user picked a custom config directory on the config page, persist
 	; its candidate config before pointing paths.toml at it.
 	; The boot path resolver will then route ConfigurationFile to the new location
@@ -90,6 +124,9 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 		}
 
 		updates := _Onboarding_CommitUpdates(Locale, Rows)
+		TapHoldPath := ""
+		if (TapHoldKeys.Length > 0)
+			TapHoldPath := TapHoldConfigPathBeside(CandidateConfig)
 
 		; The wizard is reachable from the live tray as well as first boot. Hold
 		; current config ownership from candidate write through paths.toml
@@ -97,6 +134,8 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 		; an already-open menu dialog commit to whichever path the partial
 		; transition exposed.
 		TransitionPaths := [CandidateConfig]
+		if (TapHoldPath != "")
+			TransitionPaths.Push(TapHoldPath)
 		if PathRedirectRequired
 			TransitionPaths.Push(_PathsFile)
 		AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
@@ -138,6 +177,13 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 			}
 			TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig,
 				CandidateResult["content"], ExpectedCandidateOld)]
+			TapHoldsRefused := false
+			if (TapHoldPath != "") {
+				TapHoldTarget := _Onboarding_TapHoldTarget(TapHoldPath, TapHoldKeys)
+				TapHoldsRefused := !(TapHoldTarget is Map)
+				if !TapHoldsRefused
+					TargetSpecs.Push(TapHoldTarget)
+			}
 			if PathRedirectRequired {
 				; The rewrite keeps the user's LogsDirPath.
 				try LocatorContent := ConfigTransitionPathsTomlContent(
@@ -166,6 +212,9 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 					"onboarding.error.commit_transition")
 				return false
 			}
+			; The other answers are saved: only now can the notice say so.
+			if TapHoldsRefused
+				_Onboarding_ShowError("onboarding.error.tap_holds_import")
 
 			; Publish only the fully persisted state. The teardown callback runs from
 			; the reload hand-off only after every refusal gate accepts, so a failed

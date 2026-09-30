@@ -12,7 +12,7 @@ alt_gr_is_kana_remap = false
 
 [hotstrings]
 trigger_char = "★"
-magic_key_source_scan = "SC02E"
+magic_key_source = "auto"
 magic_key_source_char = "j"
 repeat_key_enabled = false
 

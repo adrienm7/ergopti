@@ -129,11 +129,21 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; pass — that defeats the guard.
 ;
 ; modules+lib: 2026-06-21 at 256 (DllCall=110, COM=19, FileIO=127), re-measured
-;              2026-07-31 at 253 and tightened to the real value.
+;              2026-07-31 at 253 and tightened to the real value, re-measured
+;              2026-09-30 at 252 (DllCall=154, COM=4, FileIO=94) and tightened
+;              again. That last number comes from two independent
+;              re-implementations of _AOPR_CountFiles (Python and Node, no
+;              AutoHotkey available) that agree on it: the same 255 files, a
+;              leading UTF-8 BOM dropped as FileRead does, lines split on LF
+;              with CR trimmed, spaces and tabs trimmed, ";" lines skipped,
+;              and only A-Z folded as InStr's default CaseSense does. The same
+;              re-implementation reproduces the entry-point family baseline
+;              below, which was read from this counter's own output, category
+;              by category.
 ; ui:          2026-07-31, first measurement (DllCall=108, COM=2, FileIO=20).
 ;              Not a regression — this tree had never been counted.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
-_AOPR_BASELINE_CORE  := 253
+_AOPR_BASELINE_CORE  := 252
 _AOPR_BASELINE_UI    := 130
 _AOPR_BASELINE_ENTRY := 8
 

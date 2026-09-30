@@ -14,8 +14,10 @@
 ---   - a hold is stored as the picker spells it: "Ctrl + Shift", "shift+ctrl"
 ---     and "AltGr" are read as "ctrl+shift" and "alt_gr" (the Windows loader
 ---     accepts the same spellings), and a modifier or layer no driver knows
----     is an error logged and a hold dropped: the key keeps its tap, as the
----     Windows loader refuses an unknown hold where it reads it;
+---     is an outdated entry warned once and a hold dropped: the key keeps its
+---     tap, as the Windows loader refuses an unknown hold where it reads it;
+---   - a user key the Linux engine cannot remap, or a field no key has, is
+---     warned once, naming tap_hold.toml, and left out; the rest applies;
 ---   - only [tap_hold] inherit_defaults = true lays the user file over the
 ---     shipped keys; otherwise it starts from no keys at all (an empty file is
 ---     the keyboard's own behaviour), and enabled = false switches the feature
@@ -32,6 +34,7 @@ local TomlCodec = require("toml_codec")
 local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
+local Outdated = require("config_outdated")
 
 local LOG = "platform.remap.tap_hold_loader"
 
@@ -40,6 +43,17 @@ local MAX_THRESHOLD_SECONDS = 10
 M.FALLBACK_THRESHOLD_SECONDS = 0.2
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
+
+-- The per-key fields that decide what a key does, compared by key_report().
+local BEHAVIOUR_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "time_activation_seconds" }
+
+-- Every field a tap-hold key has (the writer's OWNED_KEY_FIELDS).
+local KEY_FIELDS = {
+	tap_action = true, hold_modifier = true, hold_layer = true, enabled = true, time_activation_seconds = true,
+}
+
+-- What a warning names when a candidate document has no file path yet.
+local USER_FILE_NAME = "tap_hold.toml"
 
 --- Reads and decodes one TOML file.
 --- @param path string
@@ -60,17 +74,30 @@ local HOLD_FIELDS = {
 	hold_layer = HoldOptions.canonical_layer,
 }
 
---- Validates one key's fields; a bad field disables the key.
+--- Validates one key's fields; a bad field disables the key. A value the
+--- user's file holds that this build no longer accepts is an outdated entry:
+--- warned once, naming the file, never an ERROR. The same value in the shipped
+--- defaults is a shipped-data bug, and stays an ERROR.
 --- @param key_id string
 --- @param fields table
 --- @param hold_picker table|nil The shared `[tap_hold.hold_picker]` catalogue.
+--- @param origin function origin(field) -> the file the field's value came
+---   from, and whether that file is the user's.
 --- @return table
-local function validated(key_id, fields, hold_picker)
+local function validated(key_id, fields, hold_picker, origin)
 	local key = {}
 	for field, value in pairs(fields) do key[field] = value end
+	local function outdated(field, detail)
+		local file, from_user = origin(field)
+		if from_user then
+			Outdated.report_in_file(file, { "tap_hold", "keys", key_id, field }, detail)
+		else
+			Logger.error(LOG, "Shipped tap-hold defaults '%s': [tap_hold.keys.%s] %s — %s.", file, key_id, field, detail)
+		end
+	end
 	for _, field in ipairs(STRING_FIELDS) do
 		if key[field] ~= nil and type(key[field]) ~= "string" then
-			Logger.error(LOG, "Tap-hold key '%s': %s must be a string — key disabled.", key_id, field)
+			outdated(field, "it must be a string; the key is disabled")
 			key.enabled = false
 		end
 	end
@@ -83,21 +110,20 @@ local function validated(key_id, fields, hold_picker)
 				-- The hold alone goes, as the Windows loader drops it
 				-- (_TapHold_ParseFileInto): the key keeps its tap, so a
 				-- CapsLock with a mistyped hold still types Enter.
-				Logger.error(LOG, "Tap-hold key '%s': %s '%s' — %s; the key keeps its tap and holds nothing.",
-					key_id, field, key[field], err)
+				outdated(field, string.format("'%s': %s; the key keeps its tap and holds nothing", key[field], err))
 				key[field] = nil
 			end
 		end
 	end
 	if key.enabled ~= nil and type(key.enabled) ~= "boolean" then
-		Logger.error(LOG, "Tap-hold key '%s': enabled must be true or false — key disabled.", key_id)
+		outdated("enabled", "it must be true or false; the key is disabled")
 		key.enabled = false
 	end
 	local seconds = tonumber(key.time_activation_seconds)
 	if not seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
 		if key.time_activation_seconds ~= nil then
-			Logger.warn(LOG, "Tap-hold key '%s': threshold %s is outside 0..%d s — using %.1f s.",
-				key_id, tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, M.FALLBACK_THRESHOLD_SECONDS)
+			outdated("time_activation_seconds", string.format("%s is outside 0..%d s; %.1f s is used",
+				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, M.FALLBACK_THRESHOLD_SECONDS))
 		end
 		key.time_activation_seconds = M.FALLBACK_THRESHOLD_SECONDS
 	end
@@ -147,21 +173,30 @@ function M.load(defaults_path, user_path)
 		if user_err == "absent" then user_err = nil end
 		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — tap-holds remain neutral.", user_path, user_err) end
 	end
-	return M.load_document(defaults_path, user, user_err)
+	return M.load_document(defaults_path, user, user_err, user_path)
 end
 
 --- Builds the effective configuration from an already decoded user document,
 --- so a scope transaction can acknowledge its candidate before publishing it.
+--- A user key this driver cannot remap, or a field no tap-hold key has, is an
+--- outdated entry: warned once and left out, and the rest of the file applies.
 --- @param defaults_path string The shared defaults.toml.
 --- @param user table|nil Decoded user document; nil means no user file.
 --- @param user_err string|nil Why the user file could not be read.
---- @return table Same shape as M.load().
-function M.load_document(defaults_path, user, user_err)
+--- @param user_path string|nil Where the user document lives, named by warnings.
+--- @return table Same shape as M.load(), plus `user_fields`: key id -> the
+---   fields the user file sets.
+function M.load_document(defaults_path, user, user_err, user_path)
 	local defaults = read_defaults(defaults_path)
 	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
 		and defaults.tap_hold.keys or {}
 	local section = user and type(user.tap_hold) == "table" and user.tap_hold or {}
 	local overrides = type(section.keys) == "table" and section.keys or {}
+	-- Shipped data like the hold picker: a user file cannot move a key.
+	local catalog = KeyCatalog.for_platform(defaults, "linux")
+	local remappable = {}
+	for _, entry in ipairs(catalog) do remappable[entry.id] = true end
+	local user_file = user_path or USER_FILE_NAME
 
 	local keys = {}
 	if section.inherit_defaults == true then
@@ -172,30 +207,87 @@ function M.load_document(defaults_path, user, user_err)
 			end
 		end
 	end
+	local user_fields = {}
 	for key_id, override in pairs(overrides) do
-		if type(override) == "table" then
+		if not remappable[key_id] then
+			Outdated.report_in_file(user_file, { "tap_hold", "keys", tostring(key_id) },
+				"the Linux engine has no such tap-hold key")
+		elseif type(override) == "table" then
 			local merged = keys[key_id] or {}
+			user_fields[key_id] = {}
 			-- A modifier hold and a layer hold exclude each other: the user's
 			-- choice of one drops the default's other.
 			if override.hold_modifier ~= nil then merged.hold_layer = nil end
 			if override.hold_layer ~= nil then merged.hold_modifier = nil end
-			for field, value in pairs(override) do merged[field] = value end
+			for field, value in pairs(override) do
+				if KEY_FIELDS[field] then
+					merged[field] = value
+					user_fields[key_id][field] = true
+				else
+					Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id, tostring(field) },
+						"no tap-hold key has this field")
+				end
+			end
 			keys[key_id] = merged
 		end
 	end
 	-- The hold picker's catalogue is the shipped one: a user file changes what a
 	-- key does, not what the tray offers or what a hold may be.
 	local hold_picker = type(defaults.tap_hold) == "table" and defaults.tap_hold.hold_picker or nil
-	for key_id, fields in pairs(keys) do keys[key_id] = validated(key_id, fields, hold_picker) end
+	for key_id, fields in pairs(keys) do
+		local set_by_user = user_fields[key_id] or {}
+		keys[key_id] = validated(key_id, fields, hold_picker, function(field)
+			if set_by_user[field] then return user_file, true end
+			return defaults_path, false
+		end)
+	end
 
 	return {
 		enabled = section.enabled == true or (section.enabled == nil and Manifest.default_for("tap_holds.enabled")),
 		keys = keys,
 		user_error = user_err,
+		user_path = user_file,
+		user_fields = user_fields,
 		hold_picker = hold_picker,
-		-- Shipped data like the hold picker: a user file cannot move a key.
-		catalog = KeyCatalog.for_platform(defaults, "linux"),
+		catalog = catalog,
 	}
+end
+
+--- Whether a loaded key does exactly what the recommendation does.
+--- @param fields table Validated fields of the key.
+--- @param recommended table|nil Validated fields of its recommendation.
+--- @return boolean
+local function behaves_as(fields, recommended)
+	if type(recommended) ~= "table" or (fields.enabled ~= false) ~= (recommended.enabled ~= false) then
+		return false
+	end
+	for _, field in ipairs(BEHAVIOUR_FIELDS) do
+		if fields[field] ~= recommended[field] then return false end
+	end
+	return true
+end
+
+--- The first-run wizard's view of a folder's tap_hold.toml: the Tap-Holds
+--- switch in force and each key it configures, as the shipped recommendation or
+--- as the user's own setting, compared through the same validation the engine
+--- runs. A key the file leaves to the keyboard is absent, so the wizard may
+--- import it; it never imports over another one.
+--- @param defaults_path string The shared defaults.toml.
+--- @param user_path string The folder's tap_hold.toml.
+--- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
+--- @return string|nil err Why the file could not be read.
+function M.key_report(defaults_path, user_path)
+	local user, user_err = read_toml(user_path)
+	if user_err == "absent" then user, user_err = nil, nil end
+	if user_err then return nil, "'" .. tostring(user_path) .. "' is " .. user_err end
+	local loaded = M.load_document(defaults_path, user, nil)
+	local recommended = M.load_document(defaults_path,
+		{ tap_hold = { keys = M.preset_keys(defaults_path) } }, nil).keys
+	local keys = {}
+	for key_id, fields in pairs(loaded.keys) do
+		keys[key_id] = behaves_as(fields, recommended[key_id]) and "recommended" or "customised"
+	end
+	return { enabled = loaded.enabled, keys = keys }
 end
 
 return M

@@ -69,6 +69,59 @@ helpers.describe("Remap configuration sparse loading", function()
 		helpers.assert_eq(#warnings, 2, table.concat(warnings, " | "))
 		helpers.assert_eq(state.tap_hold_config.escape, { tap = "none", hold = "none" })
 	end)
+
+	helpers.it("names outdated bindings once and never refuses a save over them (config-outdated-karabiner)", function()
+		-- A retired key's scalar value reached the save, whose encoding asserted
+		-- a table: every remap save failed with an ERROR. Retired entries were
+		-- kept and re-saved in silence.
+		local source = '[tap_holds.config]\nretired_key = "legacy"\n'
+			.. '[tap_holds.config.escape]\ntap = "copy"\n'
+			.. '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
+		helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim",
+			"infra.toml.codec", "toml_codec" }, function()
+			local warnings, errors = {}, {}
+			local logger = helpers.make_logger_stub()
+			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			require("config_outdated").reset_for_tests()
+			local config = helpers.load_with_stubs("platform.remap.config")
+			local files = require("adapters.file_system")
+			local old_read, old_write = files.read_with_status, files.write_if_unchanged
+			local written
+			files.read_with_status = function() return source, "ok" end
+			files.write_if_unchanged = function(_, content) written = content; return true end
+			local ok, err = pcall(function()
+				local keys, combos = { { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } }
+				local state, status = config.load_user_config(keys, combos, "karabiner.toml")
+				helpers.assert_eq(status, "ok")
+				helpers.assert_nil(state.tap_hold_config.retired_key)
+				helpers.assert_nil(state.mod_combos_config.retired_combo)
+				helpers.assert_eq(state.tap_hold_config.escape, { tap = "copy", hold = "none" })
+				local text = table.concat(warnings, "\n")
+				helpers.assert_eq(#warnings, 2, text)
+				for _, entry in ipairs({ "tap_holds.config.retired_key", "mod_combos.config.retired_combo" }) do
+					helpers.assert_true(text:find("'" .. entry .. "' in 'karabiner.toml'", 1, true) ~= nil, entry .. ": " .. text)
+				end
+				config.load_user_config(keys, combos, "karabiner.toml")
+				helpers.assert_eq(#warnings, 2, "a reload does not name them again")
+				state.tap_hold_config.tab = { tap = "paste", hold = "none" }
+				helpers.assert_true(config.save_user_config(state, "karabiner.toml"), "the save is never refused")
+				helpers.assert_eq(errors, {})
+				local stored = require("infra.toml.codec").decode(written)
+				helpers.assert_eq(stored.tap_holds.config.tab.tap, "paste")
+				helpers.assert_eq(stored.tap_holds.config.retired_key, "legacy", "a retired entry stays for the user to fix")
+				helpers.assert_eq(stored.mod_combos.config.retired_combo.hold, "ctrl")
+				source = '[tap_holds.config]\ntab = "legacy"\n'
+				local known = config.load_user_config(keys, combos, "karabiner.toml")
+				helpers.assert_eq(known.tap_hold_config.tab, { tap = "none", hold = "none" }, "it runs as neutral")
+				helpers.assert_true(table.concat(warnings, "\n"):find("'tap_holds.config.tab' in 'karabiner.toml'", 1, true)
+					~= nil, "a known key's unusable binding is named too")
+			end)
+			files.read_with_status, files.write_if_unchanged = old_read, old_write
+			if not ok then error(err, 0) end
+		end)
+	end)
 end)
 
 return true

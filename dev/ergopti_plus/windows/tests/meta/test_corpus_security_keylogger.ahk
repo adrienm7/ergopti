@@ -69,7 +69,7 @@ _KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex) {
 ; =====================================================
 ; =====================================================
 
-; The three vector assertions below take their vector EXPLICITLY and are wired
+; The vector assertions below take their vector EXPLICITLY and are wired
 ; up with .Bind(). The file used to freeze the loop variable by assigning it to
 ; another outer local (``VidCopy := VecId``) — which freezes nothing: every
 ; closure shares that one variable and sees whatever the LAST iteration left in
@@ -96,6 +96,12 @@ _SecCorpus_LiveShape(VecId, Expected) {
 		"SEC-008: keystrokes after the transition into a secure field must persist nothing")
 	AssertEqual(1, Expected["typing_entries_for_normal"],
 		"and the normal-field keystrokes before it must still be flushed, or the vector proves nothing about the transition")
+}
+
+;--- SEC-009: the ES_PASSWORD bit of the vector's Win32 class and style.
+_SecCorpus_PasswordStyle(Win32Class, Win32StyleHex) {
+	AssertTrue(_KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex),
+		"[SEC-009] ES_PASSWORD bit 0x20 in style 0x80000020 on Edit class must trigger detection")
 }
 
 ;--- An id this driver handles nowhere.
@@ -162,12 +168,8 @@ _SecurityCorpus_RunAll() {
 			Input := Vec["input"]
 			Win32Class    := Input.Has("win32_class") ? Input["win32_class"] : ""
 			Win32StyleHex := Input.Has("win32_style") ? Input["win32_style"] : "0"
-			_SEC009() {
-				Result := _KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex)
-				AssertTrue(Result,
-					"[SEC-009] ES_PASSWORD bit 0x20 in style 0x80000020 on Edit class must trigger detection")
-			}
-			Test("[corpus:SEC-009] ES_PASSWORD bit on Edit class triggers detection", _SEC009)
+			Test("[corpus:SEC-009] ES_PASSWORD bit on Edit class triggers detection",
+				_SecCorpus_PasswordStyle.Bind(Win32Class, Win32StyleHex))
 
 			; Negative case: same class, bit cleared
 			_SEC009Neg() {

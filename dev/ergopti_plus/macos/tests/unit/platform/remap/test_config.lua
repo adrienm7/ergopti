@@ -261,7 +261,7 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 					mod_combos = { config = {} },
 				}
 			end
-			local loaded = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/config_karabiner.toml")
 			helpers.assert_eq(loaded.tap_holds_enabled, case.expected)
 			helpers.assert_eq(loaded.tap_hold_config.escape.hold, "ctrl",
 				"the assignments load unchanged whatever the switch")

@@ -642,7 +642,7 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 			helpers.assert_not_nil(result, "the matcher must expose the completed candidate")
 			helpers.assert_eq(result.max_interkey_gap_ms, 1100,
 				"the largest pause must stay aligned at position " .. tostring(pause_after))
-			helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75),
+			helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 0),
 				"a pause before any character must expire the trigger")
 		end
 	end)
@@ -651,7 +651,7 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 		local result = _timed_abcd({ 0, 750, 1500, 2250 })
 		helpers.assert_eq(result.max_interkey_gap_ms, 750,
 			"the complete trigger span must report its largest adjacent pause")
-		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 0),
 			"the configured boundary is inclusive")
 	end)
 
@@ -669,8 +669,36 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 		end
 		helpers.assert_eq(result.max_interkey_gap_ms, 100,
 			"a click, control key or focus reset must discard the earlier timestamp")
-		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 0),
 			"fresh post-reset typing must remain eligible")
+	end)
+
+	-- Stamped by os.time() * 1000, the clock the Linux daemon falls back to
+	-- without luv: keys typed together read 1000 ms apart when the second turns
+	-- over between them, and the 0.75 s default delay dropped the trigger.
+	helpers.it("a whole-second clock turning over between two keys is no pause", function()
+		local result = _timed_abcd({ 5000, 5000, 6000, 6000 })
+		helpers.assert_eq(result.max_interkey_gap_ms, 1000, "the second boundary reads as a 1000 ms gap")
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 1000),
+			"a gap no wider than the clock's resolution may be no pause at all")
+		helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 0),
+			"on an exact clock the same gap is a real pause")
+	end)
+
+	helpers.it("a whole-second clock still expires a pause it can prove", function()
+		local result = _timed_abcd({ 5000, 5000, 7000, 7000 })
+		helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 1000),
+			"two seconds apart on that clock is more than a second of real pause")
+	end)
+
+	helpers.it("refuses a missing or negative clock resolution", function()
+		local result = _timed_abcd({ 0, 100, 200, 300 })
+		for _, resolution in ipairs({ -1, "0", false }) do
+			helpers.assert_throws(function() engine_mod.within_interkey_delay(result, 0.75, resolution) end,
+				"a resolution of " .. tostring(resolution) .. " must be refused")
+		end
+		helpers.assert_throws(function() engine_mod.within_interkey_delay(result, 0.75) end,
+			"a caller that names no clock resolution must be refused")
 	end)
 end)
 

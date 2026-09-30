@@ -46,6 +46,10 @@ local LOG = "paths"
 -- partial install from resolving and then failing at every subsequent read.
 local SHARED_PROBE_FILE = "data/locales/en.json"
 
+-- Refusals of the installed-layouts record already logged: the roots are read
+-- at every hotstring reload, and one ERROR per reason is enough to name it.
+local _installed_refusals_reported = {}
+
 
 
 
@@ -213,8 +217,19 @@ function M.extension_roots()
 	end
 	-- Resolve lazily: the layout registry itself imports Paths at module load.
 	local LayoutRegistry = require("modules.keymap.layout_registry")
-	for _, root in ipairs(LayoutRegistry.extension_roots()) do
-		roots[#roots + 1] = root
+	-- The installed-layouts record may have been written by another build or
+	-- cut short by a crash or a sync tool. Its layouts' packs are then missing
+	-- from this load, reported, while the bundled and the user's packs still
+	-- load, as on macOS: the daemon's startup never depends on that record.
+	local ok_installed, installed = pcall(LayoutRegistry.extension_roots)
+	if ok_installed then
+		for _, root in ipairs(installed) do roots[#roots + 1] = root end
+	else
+		local reason = tostring(installed)
+		if not _installed_refusals_reported[reason] then
+			_installed_refusals_reported[reason] = true
+			Logger.error(LOG, "The installed layouts' extensions are skipped: %s.", reason)
+		end
 	end
 	-- The Ergopti extension the driver ships is installed by shipping
 	-- (layouts/extension.shipped_root), after the installed generations.

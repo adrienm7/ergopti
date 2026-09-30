@@ -76,10 +76,11 @@ ResetHotstringRecorders() {
 global ScriptInformation := Map(
     "MagicKey", "★",
     ; The physical magic key as the boot resolves it (feature_state.ahk and
-    ; LayoutRegistry_MagicKeySource): the shipped default, not chosen, fixed.
+    ; LayoutRegistry_MagicKeySource): automatic, not chosen, on the shipped key.
+    "MagicKeySource", "auto",
     "MagicKeySourceScan", "SC02E",
     "MagicKeySourceChar", "j",
-    "MagicKeySourceScanChosen", false,
+    "MagicKeySourceChosen", false,
     "MagicKeySourceFollowsOsLayout", false,
     "MagicKeySourceOverridesEmulation", false,
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",

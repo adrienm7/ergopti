@@ -105,6 +105,7 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("modules.hotstrings.magic_key")
+local MagicKeySource    = require("modules.hotstrings.magic_key_source")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
@@ -701,7 +702,7 @@ local function main()
 			engine:reset()
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
-		user_path = require("infra.config_paths").config("tap_hold.toml"),
+		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live.
@@ -857,10 +858,12 @@ local function main()
 		-- consumed trigger, and 0 means "always". The engine keeps timestamps aligned
 		-- with its rolling buffer, including resets and chained expansions, so an
 		-- earlier pause cannot disappear merely because the final pair was quick.
+		-- The clock's resolution goes with the stamps: without luv it counts whole
+		-- seconds, and a trigger typed across a second boundary read as a pause.
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec) then
+			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec, Monotonic.resolution_ms()) then
 				Logger.debug(LOG,
 					"Expired: '%s' had a %.2fs pause, its category allows %.2fs.",
 					tostring(result.trigger),
@@ -1311,6 +1314,35 @@ local function main()
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
 
+	-- The physical magic key: a plain press of the key chosen in [hotstrings]
+	-- magic_key_source types the magic key instead of its own character, while
+	-- the magic key's replace section is on. Decided first in the consumption
+	-- callback below, so no other consumer reads the key it replaces; the typed
+	-- magic key then takes the character path, as a re-emitted key would.
+	MagicKeySource.init({
+		is_active = function() return not script_actions.is_paused() end,
+		replace_on = function() return hotstrings_config.is_section_enabled("magickey", "replace") end,
+		magic_key = MagicKey.get,
+		-- Key presses only: a clipboard paste on every press is no typing, and
+		-- a character the layout lacks leaves the key its own.
+		can_type = injector.can_type_directly,
+		type_text = function(text)
+			if opts.dry_run then return false end
+			local result = injector.type_directly(text)
+			return type(result) == "table" and result.ok == true
+		end,
+		dispatch_char = function(char, code) on_char(char, code) end,
+		-- Decided before wrap-on-type, which then never sees the key: the ★
+		-- typed over a selection must end its window, or a wrap symbol typed
+		-- next would put the deleted text back from PRIMARY.
+		end_selection = wrap_on_type.end_selection_window,
+		-- A captured key must never reach an application, which only the grab
+		-- guarantees; the menu greys the capture row otherwise.
+		can_capture = function() return keyboard_hook.get_mode() == "intercept" end,
+		key_text = keyboard_hook.key_text,
+		defer = function(fn, delay_ms) return event_loop.defer(fn, delay_ms) end,
+	})
+
 	local function on_click()
 		secure_focus_guard.invalidate()
 		wrap_on_type.on_pointer_down()
@@ -1321,103 +1353,14 @@ local function main()
 
 	-- 8.7b) Restore the word-delimiter choices.
 	--
-	-- The shared catalogue keeps them in memory only, so every delimiter the user
-	-- switched off came back on at the next start — and the feature exists
-	-- precisely so a user can say "expand on ★ and nothing else". A setting that
-	-- forgets itself is worse than one that is missing.
-	-- The FULL state, both directions, plus the user's own delimiters.
-	--
-	-- This stored only the OFF list until 2026-08-05, and that is not the same
-	-- thing: 15 of the 25 catalogue delimiters ship DISABLED, so a user who
-	-- switched ")" or "/" on got it for the session and found it off again after
-	-- a restart, with nothing said. Recording a delta against a default only works
-	-- when the default is one-sided, and this one is not.
-	--
-	-- Custom delimiters were not stored at all, so one added from the menu
-	-- vanished at the next start.
-	local TERMINATORS_KEY = "hotstrings.terminator_state"
-	local CUSTOM_TERMINATORS_KEY = "hotstrings.custom_terminators"
-
-	-- The record separator inside each stored list. Chosen because a delimiter is
-	-- a single printable character and a comma is a plausible one, so the old
-	-- comma-joined format could not have held custom entries unambiguously.
-	local RECORD_SEP = "\30"
-	local FIELD_SEP = "\31"
-
-	local function persist_terminators()
-		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return false end
-		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if not ok_storage or type(Storage.set_many) ~= "function" then
-			Logger.error(LOG, "Word-delimiter state could not be persisted — storage is unavailable.")
-			return false
-		end
-
-		local state, custom = {}, {}
-		for _, def in ipairs(terminators_mod.get_terminator_defs() or {}) do
-			if def.key then
-				state[#state + 1] = def.key .. FIELD_SEP
-					.. (terminators_mod.is_terminator_enabled(def.key) and "1" or "0")
-				if def.custom then
-					local char = type(def.chars) == "table" and def.chars[1] or nil
-					if char then
-						custom[#custom + 1] = table.concat({
-							def.key, char, def.label or char, def.consume and "1" or "0",
-						}, FIELD_SEP)
-					end
-				end
-			end
-		end
-		table.sort(state)
-		table.sort(custom)
-		local persisted = Storage.set_many({
-			[TERMINATORS_KEY] = table.concat(state, RECORD_SEP),
-			[CUSTOM_TERMINATORS_KEY] = table.concat(custom, RECORD_SEP),
-		})
-		if not persisted then
-			Logger.error(LOG, "Word-delimiter state could not be persisted — the menu change was refused.")
-			return false
-		end
-		return true
-	end
-
-	local function restore_terminators()
-		if not terminators_mod or type(terminators_mod.set_terminator_enabled) ~= "function" then return end
-		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if not ok_storage then return end
-
-		-- The user's own delimiters first: their enabled state is in the same list
-		-- as the catalogue's, and applying it to a delimiter that does not exist yet
-		-- would be dropped.
-		local restored_custom = 0
-		local raw_custom = Storage.get(CUSTOM_TERMINATORS_KEY, "")
-		if type(raw_custom) == "string" and raw_custom ~= "" then
-			for record in raw_custom:gmatch("[^" .. RECORD_SEP .. "]+") do
-				local fields = {}
-				for field in record:gmatch("[^" .. FIELD_SEP .. "]+") do fields[#fields + 1] = field end
-				if #fields >= 4 and type(terminators_mod.add_custom_terminator) == "function" then
-					terminators_mod.add_custom_terminator(fields[1], fields[2], fields[3], fields[4] == "1")
-					restored_custom = restored_custom + 1
-				end
-			end
-		end
-
-		local applied = 0
-		local raw = Storage.get(TERMINATORS_KEY, "")
-		if type(raw) == "string" and raw ~= "" then
-			for record in raw:gmatch("[^" .. RECORD_SEP .. "]+") do
-				local key, flag = record:match("^(.-)" .. FIELD_SEP .. "([01])$")
-				if key then
-					terminators_mod.set_terminator_enabled(key, flag == "1")
-					applied = applied + 1
-				end
-			end
-		end
-
-		Logger.info(LOG, "Restored %d word-delimiter state(s) and %d custom delimiter(s).",
-			applied, restored_custom)
-	end
-
-	restore_terminators()
+	-- The shared catalogue keeps them in memory only, so without this every
+	-- delimiter the user switched came back to its default at the next start, and
+	-- the feature exists precisely so a user can say "expand on ★ and nothing
+	-- else". They are config.toml leaves (modules/hotstrings/terminator_settings),
+	-- carried over once from the storage.json keys earlier builds used (8.0), so
+	-- the hotstrings scope restores and clears them with the other settings.
+	local terminator_settings = require("modules.hotstrings.terminator_settings")
+	terminator_settings.load()
 
 	-- 8.8) Start the keyboard hook adapter, in INTERCEPT mode by default.
 	--
@@ -1493,6 +1436,7 @@ local function main()
 		return true
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if MagicKeySource.on_key(detail) then return true end
 		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine
@@ -1616,6 +1560,9 @@ local function main()
 				-- The preview renderer's own copy of the four toggles, which a
 				-- hotstrings scope refreshes alongside their canonical leaves.
 				tooltip_preview = tooltip_preview,
+				-- The physical magic key: the keyboard-layout menu reads and
+				-- chooses it, and captures one by pressing it.
+				magic_key_source = MagicKeySource,
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
@@ -1678,7 +1625,7 @@ local function main()
 			-- Called by any menu row whose change the menu itself must reflect.
 			-- Persisting here rather than in the shared catalogue keeps that module
 			-- free of a storage dependency it has no other reason to carry.
-			on_persist_terminators = persist_terminators,
+			on_persist_terminators = terminator_settings.persist,
 			on_menu_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

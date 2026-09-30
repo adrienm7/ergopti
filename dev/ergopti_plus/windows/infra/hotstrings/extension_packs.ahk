@@ -62,7 +62,17 @@ global EXTENSION_KEY_CODE_PATTERN := "^[A-Z][A-Za-z0-9]*$"
  */
 HotstringExtensions_Roots(ConfigDir, BundledRoot, RegistryDir := unset) {
 	Roots := [BundledRoot]
-	for Root in LayoutExtension_Roots(LayoutRegistry_LocalDir(ConfigDir))
+	; The installed-layouts record may have been written by another build or
+	; cut short by a crash or a sync tool. Its layouts' packs are then missing
+	; from this load, reported, while the bundled, shipped and user packs still
+	; load, as on macOS and Linux: startup never depends on that record, and the
+	; layout manager keeps refusing installs and removals on it.
+	try Installed := LayoutExtension_Roots(LayoutRegistry_LocalDir(ConfigDir))
+	catch as Err {
+		LoggerError("ExtensionPacks", "The installed layouts' extensions are skipped: {1}", Err.Message)
+		Installed := []
+	}
+	for Root in Installed
 		Roots.Push(Root)
 	Shipped := HotstringExtensions_ShippedRoot(IsSet(RegistryDir) ? RegistryDir : LayoutRegistry_BundledDir())
 	if IsObject(Shipped)

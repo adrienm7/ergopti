@@ -35,6 +35,23 @@
 ; =============================================
 ; =============================================
 
+; The i18n keys the calls of one message function in Body pass as literals,
+; in source order, one per line.
+; @param Body string Commit source, full-line comments stripped.
+; @param Function string The message function's name.
+; @param Count Integer Receives how many calls of it Body makes, keyed or not.
+; @returns {String}
+_ONA_LiteralKeys(Body, Function, &Count) {
+	RegExReplace(Body, Function . "\(", "", &Count)
+	Keys := ""
+	Position := 1
+	while (Position := RegExMatch(Body, Function . '\(\s*"([a-z_.]+)"\s*\)', &Match, Position)) {
+		Keys .= Match[1] . "`n"
+		Position += Match.Len
+	}
+	return Keys
+}
+
 
 
 
@@ -107,23 +124,27 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		"commit failures must be shown by the one renderer that follows the wizard's language")
 	Assert(CommitBody != "" && ErrorBody != "",
 		"onboarding commit and its error renderer must remain source-visible")
-	RegExReplace(CommitBody, "_Onboarding_CommitError\(", "",
-		&ErrorCallCount)
-	AssertEqual(8, ErrorCallCount,
-		"the complete onboarding commit failure class must remain enumerated")
-	for Key in [
-		"onboarding.error.commit_invalid_config_dir",
-		"onboarding.error.commit_transaction_busy",
-		"onboarding.error.commit_candidate_render",
-		"onboarding.error.commit_source_verification",
-		"onboarding.error.commit_redirect_render",
-		"onboarding.error.commit_transition",
-		"onboarding.error.commit_rollback",
-		"onboarding.error.commit_unexpected"
-	] {
-		Assert(InStr(CommitBody, '"' . Key . '"') > 0,
-			"every onboarding failure branch must pass an i18n key: " . Key)
-	}
+	; A count alone let a new branch in unnoticed, or one showing an untranslated
+	; string; each branch is named here by the key it shows, in source order.
+	Listed := _ONA_LiteralKeys(CommitBody, "_Onboarding_CommitError", &ErrorCallCount)
+	StrReplace(Listed, "`n", "`n", , &KeyedCount)
+	AssertEqual(ErrorCallCount, KeyedCount,
+		"every onboarding commit failure must pass a literal i18n key the wizard's language resolves")
+	AssertEqual("onboarding.error.commit_invalid_config_dir`n"
+		. "onboarding.error.commit_transaction_busy`n"
+		. "onboarding.error.commit_candidate_render`n"
+		. "onboarding.error.commit_source_verification`n"
+		. "onboarding.error.commit_redirect_render`n"
+		. "onboarding.error.commit_transition`n"
+		. "onboarding.error.commit_unexpected`n"
+		. "onboarding.error.commit_rollback`n",
+		Listed, "the complete onboarding commit failure class must remain enumerated, branch by branch")
+	; A tap_hold.toml that cannot take the import is no commit failure: the
+	; other answers are saved, then one notice in the same language says so.
+	Notices := _ONA_LiteralKeys(CommitBody, "_Onboarding_ShowError", &NoticeCount)
+	AssertEqual(1, NoticeCount, "the commit shows one notice outside its failures")
+	AssertEqual("onboarding.error.tap_holds_import`n", Notices,
+		"the tap-hold notice passes its literal i18n key to the renderer that follows the wizard's language")
 	Assert(InStr(ErrorBody, "IsSet(_ob_locale)") > 0
 		&& InStr(ErrorBody, '_Onboarding_Translate(Code, Key)') > 0
 		&& InStr(ErrorBody,

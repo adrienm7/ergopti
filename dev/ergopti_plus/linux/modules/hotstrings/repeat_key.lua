@@ -33,6 +33,7 @@ local Paths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Preferences = require("infra.hotstring_preferences")
+local ConfigOutdated = require("config_outdated")
 
 local LOG = "hotstrings.repeat_key"
 
@@ -53,17 +54,22 @@ local UTF8_CODEPOINT = "[%z\1-\127\194-\244][\128-\191]*"
 -- =========================================
 -- =========================================
 
---- Resolves exactly the leaf consumed by this runtime owner.
+--- Resolves exactly the leaf consumed by this runtime owner. A value another
+--- build or a hand edit left in another shape is an outdated entry: warned
+--- once, read as the neutral default and left unmarked for the cleanup.
 --- @param document table Decoded canonical configuration.
 --- @param mark function|nil Cleanup ownership visitor.
 --- @return boolean enabled
 local function resolve_setting(document, mark)
-	local section = document.hotstrings
-	assert(section == nil or type(section) == "table", "hotstrings configuration must be a table")
+	local section = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger)
 	local value = section and section.repeat_key_enabled
+	if value ~= nil and type(value) ~= "boolean" then
+		ConfigOutdated.report(FEATURE_PATH, "the value is not a boolean", Logger)
+		value = nil
+	end
 	if value == nil then value = Manifest.default_for(FEATURE_PATH)
 	elseif mark then mark("hotstrings", "repeat_key_enabled") end
-	assert(type(value) == "boolean", "repeat_key_enabled must be boolean")
+	assert(type(value) == "boolean", "the manifest default of repeat_key_enabled must be a boolean")
 	return value
 end
 

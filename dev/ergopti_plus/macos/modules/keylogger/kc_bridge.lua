@@ -13,9 +13,12 @@
 ---    to any application, making it impossible for the HS event tap to see the
 ---    original physical key. A shell_command in each tap/hold manipulator appends
 ---    the physical key_code name to a log file; this module reads that file.
---- 2. Output Suppression: Builds a set of all output keycodes produced by
----    remapped tap/hold keys. The keylogger init skips meta.kc logging for those
----    keycodes so physical and remapped counts are never double-counted.
+--- 2. Managed Output Set: Builds the set of output keycodes produced by remapped
+---    tap/hold keys. The keylogger does NOT use it to suppress credits: a managed
+---    output keycode is also a real key (a passthrough Space shares 49 with a
+---    remapped Escape), so suppression loses presses (HS-274). The exclusive
+---    source policy lives in physical_accounting_mode.lua; this set and the
+---    ledger retire together once the producer stream is the default.
 --- 3. File Watcher: Uses hs.pathwatcher so draining is event-driven — no timer
 ---    polling — and never blocks the HID event tap.
 --- 4. Atomic Read: Each drain pass records the byte offset reached so partial
@@ -60,9 +63,9 @@ local _init_tap_hold_config = nil
 local _init_available_actions = nil
 local _may_persist = nil
 
--- Set of numeric HS keycodes that are KE remap outputs (not physical inputs).
--- Populated by _build_managed_output_set() at init time; read by
--- M.is_ke_managed_output_kc() so the keylogger can suppress false kc counts.
+-- Set of numeric HS keycodes that KE remap outputs can produce. Populated by
+-- build_managed_output_set() at init time and read only by the diagnostic
+-- M.is_ke_managed_output_kc(): the same keycodes are also real physical keys.
 local _managed_output_kcs = {}
 
 -- Watcher that fires whenever KC_LOG_PATH is written to.
@@ -182,7 +185,7 @@ local function build_managed_output_set(tap_hold_config, available_actions)
 
 	for _ in pairs(new_set) do count = count + 1 end
 	_managed_output_kcs = new_set
-	Logger.info(LOG, "Managed output kc set rebuilt: %d unique kc(s) suppressed.", count)
+	Logger.info(LOG, "Managed output kc set rebuilt: %d unique kc(s) claimed.", count)
 end
 
 
@@ -361,8 +364,8 @@ end
 -- =============================
 
 --- Returns true when the given macOS virtual keycode is a KE remap output.
---- The keylogger calls this to skip meta.kc logging for remapped output keys,
---- preventing double-counting when the physical key is already logged here.
+--- Diagnostic only: an output keycode is not proof that a keystroke was
+--- remapped, so no credit is ever suppressed on this answer (HS-274).
 --- @param kc_num number The macOS virtual keycode to test.
 --- @return boolean
 function M.is_ke_managed_output_kc(kc_num)

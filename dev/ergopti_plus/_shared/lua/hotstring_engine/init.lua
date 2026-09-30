@@ -356,15 +356,26 @@ end
 --- Whether a timed match stayed within its configured inter-key delay.
 --- A zero delay disables expiry. A positive delay fails closed when the caller
 --- did not provide monotonic timestamps for every consumed codepoint.
+---
+--- A gap is the difference of two clock readings, which overstates the real
+--- pause by up to the clock's resolution: on a whole-second clock two keys
+--- typed a millisecond apart read 1000 ms apart when the second turns over
+--- between them, and a 0.75 s delay then dropped the trigger. So only a pause
+--- that exceeds the delay by more than the resolution expires the match.
 --- @param result table Match returned by engine:on_char().
 --- @param delay_sec number Maximum adjacent pause in seconds; zero disables it.
+--- @param resolution_ms number Resolution of the clock that stamped the keys; zero when exact.
 --- @return boolean
-function M.within_interkey_delay(result, delay_sec)
+function M.within_interkey_delay(result, delay_sec, resolution_ms)
+	if type(resolution_ms) ~= "number" or resolution_ms < 0 then
+		error("within_interkey_delay(): the clock resolution must be a non-negative number, got "
+			.. tostring(resolution_ms), 2)
+	end
 	local limit = tonumber(delay_sec)
 	if not limit or limit <= 0 then return true end
 	if type(result) ~= "table" then return false end
 	local gap_ms = tonumber(result.max_interkey_gap_ms)
-	return gap_ms ~= nil and gap_ms <= limit * 1000
+	return gap_ms ~= nil and gap_ms - resolution_ms <= limit * 1000
 end
 
 

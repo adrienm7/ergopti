@@ -15,10 +15,13 @@
 --- 3. No interpretation: the page answers with manifest paths and values; the
 ---    shared onboarding_answers contract validates them against the generated
 ---    catalogue and they reach config.toml in one versioned batch_write, then
----    hs.reload() starts every module from the file.
+---    hs.reload() starts every module from the file. The Tap-Holds page's
+---    checked keys go to the remap owner, which imports their recommendation
+---    into config_karabiner.toml and switches the Tap-Holds on there.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
----    user picks.
+---    user picks, the tap-hold keys and switch included, which the remap owner
+---    reports from that folder's config_karabiner.toml.
 --- ==============================================================================
 
 local M = {}
@@ -52,11 +55,19 @@ local WINDOW_TITLE_KEY       = "onboarding.window_title"
 -- Delay between the success notification and the reload that applies it.
 local RELOAD_DELAY_SEC = 1.5
 
+-- How long the running bridge may take to answer the tap-hold import before
+-- the wizard reloads without its answer: its deployment waits on the remap
+-- guardian (20 s at most to register) and the lease, never on the user.
+local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
+
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
+
+-- Keeps each tap-hold import's backup of config_karabiner.toml unique.
+local _backup_sequence = 0
 
 -- WebView + usercontent bridge state (singleton)
 local _webview      = nil
@@ -221,12 +232,50 @@ function M.config_values(decoded, mark)
 	return Answers.current_values(catalogue(), decoded, mark)
 end
 
---- The configured value of every wizard path in a config file.
+--- The config_karabiner.toml beside a config.toml: the remap settings of the
+--- same configuration folder, named as the path resolver names them.
+--- @param config_path string Absolute config.toml path.
+--- @return string
+local function remap_settings_beside(config_path)
+	local name = require("infra.config_paths").get("KarabinerConfigPath"):match("([^/\\]+)$")
+	local folder = type(config_path) == "string" and config_path:match("^(.*)[/\\][^/\\]+$") or nil
+	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
+	return folder .. "/" .. name
+end
+
+--- The wizard values of the tap-hold keys and switch the remap owner reports
+--- beside a config.toml: a configured key is shown as kept, never imported over.
+--- @param config_path string Absolute config.toml path.
+--- @return table|nil values nil when the remap settings cannot be read.
+local function tap_hold_values(config_path)
+	local ok, report, err = pcall(function()
+		return require("platform.remap").recommended_key_report(remap_settings_beside(config_path))
+	end)
+	if not ok or type(report) ~= "table" then
+		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
+		return nil
+	end
+	return Answers.tap_hold_values(catalogue(), report)
+end
+
+--- Adds the tap-hold values beside a config.toml to its configured values.
+--- @param values table Values of config.toml, completed in place.
+--- @param config_path string Absolute config.toml path.
+--- @return table|nil values nil when the remap settings cannot be read.
+local function with_tap_hold_values(values, config_path)
+	local tap_holds = tap_hold_values(config_path)
+	if not tap_holds then return nil end
+	for path, value in pairs(tap_holds) do values[path] = value end
+	return values
+end
+
+--- The configured value of every wizard path in a config file and in the
+--- remap settings beside it.
 --- @param path string Absolute config.toml path.
---- @return table|nil values Empty for an absent file, nil when unreadable.
+--- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function current_values(path)
 	local content, status = FileSystem.read_with_status(path)
-	if status == "absent" then return {} end
+	if status == "absent" then return with_tap_hold_values({}, path) end
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "The configuration in force could not be read (%s).", tostring(status))
 		return nil
@@ -236,8 +285,9 @@ local function current_values(path)
 		Logger.error(LOG, "The configuration in force could not be decoded.")
 		return nil
 	end
-	return M.config_values(decoded)
+	return with_tap_hold_values(M.config_values(decoded), path)
 end
+M._current_values = current_values
 
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings(). Used both for the initial render and for the
@@ -438,8 +488,84 @@ local function prepare_destination(path)
 	return true
 end
 
+--- Imports the checked tap-hold keys through the remap owner. The running
+--- bridge takes them in its settings transaction when it runs the folder the
+--- wizard set up; before it starts (the first run), once it stopped, or for a
+--- folder the wizard moves the configuration to, the owner saves them to that
+--- folder's file, which the reload reads.
+--- Either way the owner backs the file up first.
+--- @param keys table Key ids of tap_hold_keys.json, at least one.
+--- @param moved boolean Whether the wizard moved the configuration folder.
+--- @param on_done function Callback fn(ok, detail), called exactly once.
+local function import_tap_holds(keys, moved, on_done)
+	local ok_remap, Remap = pcall(require, "platform.remap")
+	if not ok_remap or type(Remap) ~= "table" then
+		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
+		return
+	end
+	local ok_path, path = pcall(require("infra.config_paths").get, "KarabinerConfigPath")
+	if not ok_path then
+		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
+		return
+	end
+	_backup_sequence = _backup_sequence + 1
+	local backup_path = string.format("%s.tap_holds-%d-%d.bak", path, os.time(), _backup_sequence)
+	if Remap.is_running() and not moved then
+		Remap.import_recommended_keys({ keys = keys, backup_path = backup_path },
+			function(ok, reason) on_done(ok == true, reason) end)
+		return
+	end
+	local saved_ok, saved, detail = pcall(Remap.save_recommended_keys,
+		{ keys = keys, path = path, backup_path = backup_path })
+	on_done(saved_ok and saved == true, saved_ok and detail or saved)
+end
+
+--- Shows a notice once deferred work runs: never inside the callback of an
+--- owner that is still dispatching, such as a Karabiner terminal.
+--- @param key string Locale key of the notice.
+--- @param after function|nil Work to run once the user dismissed it.
+local function deferred_notice(key, after)
+	local scheduled = DeferredWork.after(0, function()
+		require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"), i18n.get(key),
+			i18n.get("onboarding.btn.ok"))
+		if after then after() end
+	end, "onboarding.notice")
+	if scheduled ~= true then
+		Logger.error(LOG, "The notice '%s' could not be scheduled.", key)
+		if after then after() end
+	end
+end
+
+--- Reloads Hammerspoon so every module starts from the saved answers. Once the
+--- termination coordinator runs, the reload is an owned request: a refusal or
+--- an abort tells the user the answers still wait for a reload. Without it no
+--- Karabiner lease was taken this session, and the reload wrapper reloads
+--- natively, as it does for every caller.
+local function reload_applying_answers()
+	local TerminationCoordinator = require("infra.termination_coordinator")
+	if TerminationCoordinator.is_initialized() ~= true then
+		hs.reload()
+		return
+	end
+	local told = false
+	local function reload_still_needed(detail)
+		if told then return end
+		told = true
+		Logger.error(LOG, "The reload that applies the onboarding answers did not run: %s.", tostring(detail))
+		deferred_notice("onboarding.error.reload_pending")
+	end
+	local call_ok, accepted = pcall(TerminationCoordinator.request_reload_owned, "onboarding",
+		reload_still_needed)
+	-- An accepted reload may already have finalized this environment: nothing
+	-- runs after it.
+	if not call_ok or accepted ~= true then
+		reload_still_needed(call_ok and "the reload request was refused" or accepted)
+	end
+end
+
 --- Validates the answers, persists the folder and the language, writes every
---- answer to config.toml in one batch and reloads Hammerspoon.
+--- answer to config.toml in one batch, imports the checked tap-hold keys and
+--- reloads Hammerspoon.
 --- @param answers table The answers object from the JS "finish" message.
 local function commit(answers)
 	Logger.start(LOG, "Committing the onboarding answers…")
@@ -447,9 +573,10 @@ local function commit(answers)
 	-- Validate the whole payload before any side effect: a refused answer must
 	-- not leave the folder or the language changed behind it.
 	local catalogue_ok, index = pcall(catalogue)
-	local rows, refusal
+	local rows, refusal, tap_hold_keys
 	if catalogue_ok then
 		rows, refusal = Answers.rows(index, answers.operations, ManifestReader)
+		tap_hold_keys = rows and Answers.tap_hold_keys(index, answers.operations, ManifestReader)
 	else
 		refusal = index
 	end
@@ -465,6 +592,7 @@ local function commit(answers)
 	-- final reload, so subsequent saves go there straight away. An
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
+	local previous_config_path = _config_path
 	if answers.config_dir ~= "" then
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		local persisted, persist_err = M._persist_config_dir(
@@ -514,10 +642,47 @@ local function commit(answers)
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
-	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-	DeferredWork.after(RELOAD_DELAY_SEC, function()
-		hs.reload()
-	end, "onboarding.reload")
+	local function announce_and_reload()
+		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
+		if DeferredWork.after(RELOAD_DELAY_SEC, reload_applying_answers, "onboarding.reload") ~= true then
+			Logger.error(LOG, "The reload that applies the onboarding answers could not be scheduled.")
+			deferred_notice("onboarding.error.reload_pending")
+		end
+	end
+	if #tap_hold_keys == 0 then
+		announce_and_reload()
+		return
+	end
+	-- The answers are saved: a refused import leaves config_karabiner.toml as
+	-- it was, says so, and the reload still applies the rest. A bridge that
+	-- never answers cannot hold the reload back past the timeout either.
+	local settled = false
+	local function settle(ok, detail, notice_key)
+		settled = true
+		if ok then
+			Logger.success(LOG, "Imported %d recommended tap-hold key(s).", #tap_hold_keys)
+			announce_and_reload()
+			return
+		end
+		Logger.error(LOG, "The recommended tap-hold keys were not imported: %s.", tostring(detail))
+		deferred_notice(notice_key, announce_and_reload)
+	end
+	local armed = DeferredWork.after(TAP_HOLD_IMPORT_TIMEOUT_SEC, function()
+		if settled then return end
+		settle(false, string.format("no answer within %d s", TAP_HOLD_IMPORT_TIMEOUT_SEC),
+			"onboarding.error.tap_holds_import_timeout")
+	end, "onboarding.tap_holds_import_timeout")
+	if armed ~= true then
+		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import runs without it.")
+	end
+	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
+		if settled then
+			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
+				tostring(detail))
+			return
+		end
+		settle(ok, detail, "onboarding.error.tap_holds_import")
+	end)
 end
 
 
@@ -636,7 +801,10 @@ local function handle_message(body)
 			if not read_ok then import_failure("dependency"); return false end
 			if status == "absent" then
 				if not reported then import_failure("absent") end
-				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = {} })
+				local absent_values = with_tap_hold_values({}, cfg_path)
+				if not publication_is_current(owner, view) then return false end
+				if not absent_values then import_failure("answers"); return false end
+				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values })
 			end
 			if status ~= "ok" or type(content) ~= "string" then
 				if not reported then import_failure("read") end
@@ -645,7 +813,9 @@ local function handle_message(body)
 			local decoded, parsed = pcall(toml_codec.decode, content)
 			if not publication_is_current(owner, view) then return false end
 			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
-			local projected, values = pcall(function() return Answers.current_values(catalogue(), parsed) end)
+			local projected, values = pcall(function()
+				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path)
+			end)
 			if not publication_is_current(owner, view) then return false end
 			if not projected or type(values) ~= "table" then import_failure("answers"); return false end
 			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values })

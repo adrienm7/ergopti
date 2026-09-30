@@ -19,10 +19,13 @@
 ---    path.
 --- 3. The preference save baseline follows the cleanup, so the next menu change
 ---    is not refused as an external edit.
+--- 4. Warned is offered. After boot, each entry the cleanup would offer is
+---    named once in the log, as the Windows loader does at startup.
 --- ==============================================================================
 
 local M = {}
 local Engine = require("config_unused_keys")
+local ConfigOutdated = require("config_outdated")
 
 
 
@@ -56,6 +59,28 @@ function M.find(path, file_adapter)
 		collect = M.collect,
 		file_adapter = file_adapter or require("adapters.file_system"),
 	})
+end
+
+--- Names once each entry of config.toml no macOS reader uses, as the Windows
+--- loader does at startup: the WARNING behind every entry « Nettoyer
+--- config.toml » offers. An entry its owner already reported keeps the owner's
+--- own warning. An unreadable or malformed file names nothing here: its
+--- readers already refuse it loudly.
+--- @param path string Absolute path to config.toml.
+--- @param file_adapter table|nil File adapter; the macOS FileSystem by default.
+--- @return number named Entries this call named.
+function M.warn_unused(path, file_adapter)
+	local scan
+	local reported = ConfigOutdated.collect_reports(function() scan = M.find(path, file_adapter) end)
+	if scan.status ~= "ok" then return 0 end
+	local named = 0
+	for _, key in ipairs(scan.keys) do
+		if not reported[table.concat(key.path, ".")] then
+			ConfigOutdated.report(key.path, "no reader of this build uses it")
+			named = named + 1
+		end
+	end
+	return named
 end
 
 

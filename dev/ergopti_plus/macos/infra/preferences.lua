@@ -37,6 +37,7 @@ local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
+local Agent     = require("llm.agent")
 local LOG       = "preferences"
 
 
@@ -65,6 +66,8 @@ local KEY_MAP = {
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
 	preview_star_enabled                 = { sec = "hotstrings"                                        },
 	trigger_char                         = { sec = "hotstrings"                                        },
+	-- One of the manifest's enum values: take_value reports any other as outdated.
+	magic_key_source                     = { sec = "hotstrings", enum = true                           },
 	-- Dynamic hotstrings sub-section
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
@@ -207,6 +210,68 @@ function M.action_is_retired(value)
 	if type(catalogue) ~= "table" or type(catalogue.is_assignable) ~= "function" then return false end
 	if catalogue.is_assignable(value) == true then return false end
 	return true, "action '" .. value .. "' no longer exists"
+end
+
+--- Owner check of one [gestures.action_parameters] entry: its name must end in
+--- an action that still takes a parameter, and its value must still fit that
+--- parameter (a removed wrap pair, a retired language). The gesture catalogue
+--- judges it once loaded, as for retired actions; without it, or when its own
+--- validator cannot judge, every entry is kept. Whether the binding before the
+--- action still exists is not judged: no single catalogue lists every binding
+--- (gesture slots, keyboard__, tap_key__, script__…).
+--- @param key string Persisted parameter key.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function action_parameter_fits(key, value)
+	local catalogue = package.loaded["modules.gestures.actions"]
+	if type(catalogue) ~= "table" or type(catalogue.split_action_parameter_key) ~= "function"
+		or type(catalogue.validate_action_parameter) ~= "function" then return true end
+	local _, action = catalogue.split_action_parameter_key(key)
+	if not action then return false, "no action parameter of this build has this name" end
+	local judged, valid = pcall(catalogue.validate_action_parameter, action, value)
+	if judged and not valid then return false, "the value no longer fits its action's parameter" end
+	return true
+end
+
+--- Owner check of one [hotstrings.delays] entry: a delay the keymap still
+--- declares (set_delay refuses any other), holding a number (it replaces any
+--- other value by the default in silence). The keymap judges it once loaded,
+--- which boot does before loading preferences; without it every entry is kept.
+--- @param key string Persisted delay key.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function delay_fits(key, value)
+	local keymap = package.loaded["modules.keymap"]
+	if type(keymap) ~= "table" or type(keymap.DELAYS_DEFAULT) ~= "table" then return true end
+	if keymap.DELAYS_DEFAULT[key] == nil then return false, "no hotstring delay of this build has this name" end
+	if tonumber(value) == nil then return false, "the value is not a number of seconds" end
+	return true
+end
+
+--- The prompt profile ids a document can name: the shipped built-ins and the
+--- document's own [llm.profiles] user_profiles, plus the legacy ids the active
+--- profile's owner still migrates silently. nil when the shipped list cannot
+--- be read: nothing can then be proved gone, and every reference is kept.
+--- @param grouped table Decoded config.toml.
+--- @return table|nil ids Set of profile ids.
+--- @return table|nil legacy Set of legacy ids the active profile may hold.
+local function known_profile_ids(grouped)
+	local Selector = require("llm.profile_selector")
+	local builtins = Selector.load_built_in_profiles()
+	if type(builtins) ~= "table" or #builtins == 0 then return nil, nil end
+	local ids, legacy = {}, {}
+	for _, profile in ipairs(builtins) do
+		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
+	end
+	for old in pairs(Selector.load_legacy_ids()) do legacy[old] = true end
+	local llm = type(grouped.llm) == "table" and grouped.llm or {}
+	local profiles = type(llm.profiles) == "table" and llm.profiles or {}
+	for _, profile in ipairs(type(profiles.user_profiles) == "table" and profiles.user_profiles or {}) do
+		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
+	end
+	return ids, legacy
 end
 
 --- Value rules of owners that accept more than the manifest's Lua type. The
@@ -355,6 +420,33 @@ local function persisted_units_fit(spec, value)
 	return true
 end
 
+--- Owners' rules for scalars whose value set is closed beyond the manifest's
+--- Lua type. The agent's modes are shared with every driver (llm.agent).
+local SCALAR_VALUE_RULES = {
+	llm_agent_mode = function(value)
+		if Agent.MODES[value] then return true end
+		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
+	end,
+}
+
+--- Whether a persisted scalar still holds a value its owner accepts: its own
+--- rule, or membership of its manifest enum (ui.menubar_icon). A retired value
+--- reaching the state was replayed into a refusal (an agent mode's boot ERROR)
+--- or drawn with an ERROR; it is outdated configuration instead.
+--- @param flat_key string Flat state key.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function scalar_value_fits(flat_key, value)
+	if SCALAR_VALUE_RULES[flat_key] then return SCALAR_VALUE_RULES[flat_key](value) end
+	local spec = KEY_MAP[flat_key]
+	if not spec then return true end
+	local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or flat_key)
+	local entry = Manifest.find_entry_by_path(path)
+	if type(entry) ~= "table" or entry.type ~= "enum" then return true end
+	return ConfigOutdated.manifest_value_fits(entry, value, "hs")
+end
+
 --- Resolves canonical defaults/operations into the units used by their native owner.
 --- @param path string Canonical configuration path.
 --- @param value any Value expressed in persisted units.
@@ -501,10 +593,45 @@ local function flatten_from_disk(grouped, mark)
 	--- Takes one owned value, unless it cannot cross its unit boundary: such a
 	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
 	--- the whole file load as corrupt.
+	-- The profile ids this document can name, read once and only when needed.
+	local profile_ids, legacy_profile_ids, profile_ids_read = nil, nil, false
+	local function document_profile_ids()
+		if not profile_ids_read then
+			profile_ids, legacy_profile_ids = known_profile_ids(grouped)
+			profile_ids_read = true
+		end
+		return profile_ids, legacy_profile_ids
+	end
 	local function take_value(flat_key, value, ...)
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
+		local spec = KEY_MAP[flat_key]
+		if fits and spec and spec.enum then
+			-- A value the manifest no longer lists (a key a newer build added, a
+			-- hand edit) is outdated on its own, never a guess at another key.
+			fits, detail = ConfigOutdated.manifest_value_fits(
+				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
+		end
+		if fits then fits, detail = scalar_value_fits(flat_key, value) end
+		if fits and flat_key == "llm_active_profile" then
+			-- A deleted or renamed profile silently ran "basic" at every prediction.
+			local ids, legacy = document_profile_ids()
+			if ids and not ids[value] and not legacy[value] then
+				fits, detail = false, "no built-in or user profile has this id"
+			end
+		end
 		if not fits then
 			ConfigOutdated.report({ ... }, detail)
+			return
+		end
+		local ids = flat_key == "llm_profile_shortcuts" and type(value) == "table" and document_profile_ids() or nil
+		if ids then
+			-- A shortcut of a deleted profile was unbound with a WARNING at every
+			-- boot and never removed from disk.
+			flat[flat_key] = ConfigOutdated.partition({ ... }, value, function(id, shortcut)
+				if not ids[id] then return false, "no built-in or user profile has this id" end
+				if type(shortcut) ~= "table" then return false, "a profile shortcut is a table of mods and key" end
+				return true
+			end, mark)
 			return
 		end
 		flat[flat_key] = value
@@ -552,6 +679,15 @@ local function flatten_from_disk(grouped, mark)
 								boolean_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
+						elseif nested_fk == "delays" then
+							-- A retired delay was ignored by set_delay and saved back
+							-- at every save, never offered.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned, delay_fits, mark)
+						elseif nested_fk == "gesture_action_parameters" then
+							-- The boot replay dropped these in silence and the whole
+							-- table was marked, so none was ever offered.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								action_parameter_fits, mark)
 						else
 							take_value(nested_fk, owned, sec_name, disk_key)
 						end
@@ -696,6 +832,12 @@ end
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
 local _owned_publications = {}
+-- Paths load() judged outdated, per destination: never read into the state,
+-- which holds their default instead. An ordinary save must not turn that
+-- default into a delete of the outdated value, which belongs to the config
+-- cleanup that offers it (as Windows full saves keep boot-outdated entries);
+-- a value the user sets there replaces it and ends the exemption.
+local _load_outdated = {}
 
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
@@ -822,13 +964,17 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
-	local flattened, values = pcall(flatten_from_disk, tbl)
+	local values
+	local flattened, outdated = pcall(ConfigOutdated.collect_reports, function()
+		values = flatten_from_disk(tbl)
+	end)
 	if not flattened then
 		_source_snapshots[prefs_file] = nil
 		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	_load_outdated[prefs_file] = outdated
 	return values, "ok"
 end
 
@@ -969,7 +1115,8 @@ local function prepare_inline_updates(source, updates, root)
 			if path == root or path:sub(1, #root + 1) == root .. "." then
 				local value = decoded
 				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
-				if type(value) == "table" then inline[path] = { record = record, value = value } end
+				-- A list is not a table of settings: no owned leaf lives inside it.
+				if type(value) == "table" and #value == 0 then inline[path] = { record = record, value = value } end
 			end
 		end
 	end
@@ -1017,12 +1164,31 @@ function M.prepare_llm_updates(source, updates)
 	return prepare_inline_updates(source, updates, "llm")
 end
 
+--- The assignment containers of [shortcuts] a write may replace when they
+--- hold an older build's plain value: the Shortcuts scope owns both.
+M.SHORTCUT_CONTAINERS = { "keyboard", "tap_keys" }
+
 --- Prepares declared shortcut leaves while preserving inline neighbors.
 --- @param source table Classified source.
 --- @param updates table Owned leaf operations.
+--- @param containers table|nil Assignment containers this write fills
+---   (`keyboard`, `tap_keys`). A plain value an older build left there (`keyboard
+---   = "…"`) would make every row below it unwritable, so the write replaces
+---   it. Any other container, and every ordinary save (nil), leaves such a
+---   value on disk for the config cleanup, which offers it.
 --- @return table Prepared writer operations.
-function M.prepare_shortcut_updates(source, updates)
-	return prepare_inline_updates(source, updates, "shortcuts")
+function M.prepare_shortcut_updates(source, updates, containers)
+	local rows = {}
+	local decoded = TomlCodec.decode(source.content or "")
+	local section = type(decoded) == "table" and decoded.shortcuts or nil
+	for _, key in ipairs(type(section) == "table" and containers or {}) do
+		local value = section[key]
+		if value ~= nil and (type(value) ~= "table" or #value > 0) then
+			rows[#rows + 1] = { section = "shortcuts", key = key, delete = true }
+		end
+	end
+	for _, row in ipairs(prepare_inline_updates(source, updates, "shortcuts")) do rows[#rows + 1] = row end
+	return rows
 end
 
 --- Preserves unowned hotstring neighbors while changing declared inline leaves.
@@ -1205,8 +1371,20 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
+	-- A value load() judged outdated is left for the cleanup: the state holds
+	-- its default, whose sparse delete must not erase it (see _load_outdated).
+	local outdated = _load_outdated[prefs_file] or {}
+	local replaced = {}
 	local ok, updates = pcall(function()
-		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))))
+		local leaves = {}
+		for _, row in ipairs(sparse_updates(existing)) do
+			local path = row.section .. "." .. row.key
+			if not (row.delete and outdated[path]) then
+				leaves[#leaves + 1] = row
+				if outdated[path] then replaced[#replaced + 1] = path end
+			end
+		end
+		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
@@ -1233,6 +1411,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
+	-- The user's own value replaced the outdated one: its later default is a
+	-- real choice again, saved sparsely like any other.
+	for _, path in ipairs(replaced) do outdated[path] = nil end
 	return true, existing, runtime
 end
 

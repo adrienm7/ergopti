@@ -40,3 +40,4 @@ Files are named `NNN-short-slug.md` where `NNN` is a zero-padded three-digit seq
 | [006](006-cross-driver-corpus-testing.md) | Shared test-vector corpus consumed by all drivers               | Accepted           |
 | [007](007-i18n-audit-findings.md)         | i18n audit findings (1.3.6)                                     | Partially resolved |
 | [009](009-config-versioning.md)           | Config versioning and deprecation policy                        | Accepted           |
+| [011](011-owned-karabiner-runtime.md)     | An Ergopti-owned background Karabiner runtime (HS-274)          | Accepted           |

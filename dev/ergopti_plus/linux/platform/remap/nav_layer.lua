@@ -5,6 +5,8 @@
 --- DESCRIPTION:
 --- Compiles the shared layer vocabulary into daemon-owned evdev chords. Only
 --- explicitly configured bindings run; an absent file leaves every key native.
+--- An outdated entry never stops the daemon: it is warned once and ignored,
+--- and the rest of the file still binds (the maintainer's outdated-entry rule).
 --- ==============================================================================
 
 local M = {}
@@ -12,8 +14,15 @@ local Layers = require("keymap.layers")
 local Json = require("json")
 local Toml = require("toml_codec")
 local Files = require("keymap.layer_editor")
+local Outdated = require("config_outdated")
 
 local MODIFIER_KEYS = { ctrl = "ControlLeft", alt = "AltLeft", shift = "ShiftLeft", meta = "MetaLeft" }
+
+-- Shared loader codes that reject the layer file as a whole.
+local WHOLE_FILE_ERRORS = {
+	file_unreadable = true, toml_invalid = true,
+	schema_version_missing = true, schema_version_unsupported = true,
+}
 
 --- Resolves a keyboard key through the canonical physical registry.
 local function key_code(registry, name)
@@ -52,7 +61,32 @@ function M.compile(bindings, registry)
 	return layer
 end
 
---- Reads and validates the user's complete layer before publishing any binding.
+--- Whether the shared loader rejected the file as a whole: unreadable, not
+--- TOML, without or with another layers schema version, or a `layers` value
+--- that is not a table. Such a file binds nothing, and that stays this load's
+--- failure; every other error names one entry.
+--- @param item table A shared loader error record.
+--- @return boolean
+local function rejects_whole_file(item)
+	return WHOLE_FILE_ERRORS[item.code] == true or (item.code == "invalid_value_type" and item.layer == nil)
+end
+
+--- The TOML path of the entry one loader error names.
+--- @param item table A shared loader error record.
+--- @return table segments
+local function entry_path(item)
+	local segments = {}
+	if item.layer ~= nil then segments = { "layers", item.layer } end
+	for _, field in ipairs({ "section", "key" }) do
+		if item[field] ~= nil then segments[#segments + 1] = item[field] end
+	end
+	return segments
+end
+
+--- Reads the user's layer. A file the shared loader rejects as a whole raises,
+--- so a reload keeps the layer in force; an entry this build no longer runs (a
+--- retired action, key, field or layer) is warned once and ignored, and every
+--- other binding of the file still loads.
 --- @param opts table { shared_root, config_dir }.
 --- @return table layer Native chords for the navigation layer.
 function M.load(opts)
@@ -64,13 +98,18 @@ function M.load(opts)
 		config_dir = opts.config_dir, os = "linux", ctx = ctx,
 		toml_decode = Toml.decode, read_file = Files.read_file,
 	})
-	if not result.ok then
-		local errors = {}
-		for _, item in ipairs(result.errors) do errors[#errors + 1] = Layers.error_signature(item) end
-		error("invalid navigation layer: " .. table.concat(errors, "; "), 2)
+	for _, item in ipairs(result.errors) do
+		if rejects_whole_file(item) then
+			error("invalid navigation layer: " .. Layers.error_signature(item) .. " (" .. tostring(item.detail) .. ")", 2)
+		end
+	end
+	for _, item in ipairs(result.errors) do
+		Outdated.report_in_file(result.path, entry_path(item), tostring(item.detail))
 	end
 	for name in pairs(result.layers) do
-		if name ~= "nav" then error("the native engine cannot activate layer " .. name, 2) end
+		if name ~= "nav" then
+			Outdated.report_in_file(result.path, { "layers", name }, "the Linux engine only activates the 'nav' layer")
+		end
 	end
 	return M.compile(result.layers.nav or {}, ctx.registry)
 end
