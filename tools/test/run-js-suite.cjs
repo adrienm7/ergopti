@@ -289,6 +289,12 @@ const CHECKS = [
 		repro: 'npm run test:menu-first-group'
 	},
 	{
+		name: 'no driver builds more menu rows outside the shared manifest than its baseline (native-menu-rows ratchet)',
+		cmd: 'node',
+		args: ['tools/test/test-native-menu-rows.cjs'],
+		repro: 'npm run test:native-menu-rows'
+	},
+	{
 		name: 'no restore or clear row asks a question on any driver (restore-recommended-no-confirm)',
 		cmd: 'node',
 		args: ['tools/test/test-restore-recommended-no-confirm.cjs'],

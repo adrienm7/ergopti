@@ -280,6 +280,7 @@
 		"test:space-wrap-retired": "node ./tools/test/test-space-wrap-toggle-retired.cjs",
 		"test:menu-reset-terminology": "node ./tools/test/test-menu-reset-terminology.cjs",
 		"test:menu-first-group": "node ./tools/test/test-menu-first-group.cjs",
+		"test:native-menu-rows": "node ./tools/test/test-native-menu-rows.cjs",
 		"test:restore-recommended-no-confirm": "node ./tools/test/test-restore-recommended-no-confirm.cjs",
 		"test:approved-menu-labels": "node ./tools/test/test-approved-menu-labels.cjs",
 		"test:tap-hold-hold-options-parity": "node ./tools/test/test-tap-hold-hold-options-parity.cjs",
