@@ -1330,6 +1330,18 @@ local function main()
 		end,
 	})
 
+	-- The script-management chords (AltGr + Enter, Backspace, Delete, Escape),
+	-- shared by the three drivers: a chord whose slot runs an action runs it on
+	-- the next loop tick and never reaches the application; an unassigned slot,
+	-- the switch off or, while paused, any action outside script management
+	-- leave the chord to it. They follow no feature switch but their own, so a
+	-- paused daemon can always be resumed from the keyboard.
+	local script_chords = require("modules.shortcuts.script_chords")
+	script_chords.init({
+		is_paused = function() return script_actions.is_paused() end,
+		defer = function(fn) return event_loop.defer(fn) end,
+	})
+
 	-- The number-row tap keys: a plain press of one the user assigned runs its
 	-- action on the next loop tick and never reaches the application. Decided in
 	-- the consumption callback below, before wrap-on-type sees the key.
@@ -1464,6 +1476,7 @@ local function main()
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
 		if MagicKeySource.on_key(detail) then return true end
+		if script_chords.on_key(detail) then return true end
 		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine

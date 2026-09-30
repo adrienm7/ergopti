@@ -703,15 +703,23 @@ function cataloguePaths(driver) {
 	);
 })();
 
-(function macosScriptControlRowsNameTheirChordThenTheirAction() {
+(function scriptChordsAreNoWizardRows() {
+	// script-chords-three-os-2026-09-30: the script chords start with their
+	// preset on every driver, so the wizard has nothing of theirs to import.
 	const page = openWizard({ platform: 'macos' });
 	page.platform = 'macos';
 	goToPage(page, 'shortcuts');
 	answer(page, true);
 	const rows = checkRows(page);
-	const row = rows.find((candidate) => candidate.trigger === 'Right Opt + Return');
-	assert.ok(row, 'the script-control row names its chord alone');
-	assert.equal(row.action, locale('en')['sg_actions.script_pause_toggle']);
+	const chordLabels = new Set(
+		['return', 'backspace', 'delete', 'escape'].map(
+			(key) => locale('en')[`sg_labels.script_ropt_${key}`]
+		)
+	);
+	assert.ok(
+		rows.every((candidate) => !chordLabels.has(candidate.trigger)),
+		'no script chord is a row of the Shortcuts page'
+	);
 	assert.ok(
 		rows.every((candidate) => !candidate.text.includes('%s')),
 		'no row shows a raw placeholder'
@@ -1059,8 +1067,7 @@ function assertSeparated(row, where) {
 		'Ctrl + E': en['shortcuts.label_ctrl_e'],
 		'Ctrl + .': en['shortcuts.label_ctrl_period'],
 		'Ctrl + CapsLock': en['shortcuts.label_ctrl_capslock'],
-		'Ctrl + Space': en['sg_actions.llm_generate_prediction'],
-		'Right Opt + ⌫': en['sg_actions.script_reload']
+		'Ctrl + Space': en['sg_actions.llm_generate_prediction']
 	};
 	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
 	// no shortcut the wizard offers any more.

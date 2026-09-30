@@ -132,7 +132,7 @@ local KEY_MAP = {
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
-	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "enabled" },
+	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "chords_enabled" },
 
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
@@ -513,7 +513,7 @@ local function group_for_disk(flat)
 				end
 			elseif type(v) == "table" then
 				-- Copy into the section: [shortcuts.script_control] also holds the
-				-- `enabled` scalar. Storing the state table itself let that scalar
+				-- `chords_enabled` scalar. Storing the state table itself let that scalar
 				-- be written INTO the live key-slot table, which then handed a
 				-- boolean to the script-control setter as if it were a key slot.
 				local owned = {}
@@ -654,7 +654,7 @@ local function flatten_from_disk(grouped, mark)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
-						-- A scalar can share the table (shortcuts.script_control.enabled):
+						-- A scalar can share the table (shortcuts.script_control.chords_enabled):
 						-- it goes to its own state key, never into the nested map.
 						local owned = {}
 						for inner_key, inner_val in pairs(disk_val) do

@@ -1,0 +1,13 @@
+# _shared/tests/corpus/config_migrations/shipped_script_chords_renamed_on_macos/input.toml
+
+[_meta]
+schema_version = 6
+
+[shortcuts]
+enabled = true
+
+[shortcuts.script_control]
+backspace = "none"
+enabled = true
+escape = "open_config"
+return_key = "script_pause_toggle"

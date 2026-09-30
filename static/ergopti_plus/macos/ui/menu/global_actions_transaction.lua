@@ -25,12 +25,15 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local ChordCatalogue = require("infra.script_chord_catalogue")
 
 local LOG = "menu_global_actions"
 local DISABLED_ACTION = "none"
 local KEYBOARD_SETTING_PREFIX = "keyboard_shortcut_"
 local RESET_SETTING_KEYS = { "llm_api_entries", "llm_api_entry_id" }
-local SCRIPT_SLOTS = { "return_key", "backspace", "escape" }
+-- The script chord slots every driver shares, in menu order.
+local SCRIPT_SLOTS = {}
+for _, slot in ipairs(ChordCatalogue.get().slots) do SCRIPT_SLOTS[#SCRIPT_SLOTS + 1] = slot.id end
 
 --- Clones nested values without sharing keys or children.
 --- @param value any Source value.

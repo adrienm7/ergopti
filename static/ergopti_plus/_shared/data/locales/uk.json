@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + Enter",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "Правий Opt + ⌫",
+	"sg_labels.script_ropt_delete": "Правий Opt + ⌦",
 	"sg_labels.script_ropt_escape": "Правий Opt + Esc",
 	"sg_labels.script_ropt_return": "Правий Opt + Return",
 	"shortcut_utils.format_hint": "Використовуйте формат mods+клавіша, наприклад cmd+shift+b",

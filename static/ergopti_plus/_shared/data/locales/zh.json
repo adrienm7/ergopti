@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + 回车",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "右 Opt + ⌫",
+	"sg_labels.script_ropt_delete": "右 Opt + ⌦",
 	"sg_labels.script_ropt_escape": "右 Opt + Esc",
 	"sg_labels.script_ropt_return": "右 Opt + Return",
 	"shortcut_utils.format_hint": "请使用 mods+键 格式，例如 cmd+shift+b",

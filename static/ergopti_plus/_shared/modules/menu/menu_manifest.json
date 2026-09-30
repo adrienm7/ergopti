@@ -635,11 +635,7 @@
 			"i18n": "menu.shortcuts.script_shortcuts",
 			"checked_when": [
 				"script_control_enabled"
-			],
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -762,43 +758,24 @@
 			"checked_when": [
 				"script_control_enabled"
 			],
-			"category": "ScriptControl",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"category": "ScriptControl"
 		},
 		{
 			"type": "command",
 			"id": "scope_restore",
-			"i18n": "common.restore_recommended",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"i18n": "common.restore_recommended"
 		},
 		{
 			"type": "command",
 			"id": "scope_clear",
-			"i18n": "common.clear_to_system",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"i18n": "common.clear_to_system"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",
-			"id": "script_control_shortcuts",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"id": "script_control_shortcuts"
 		}
 	],
 	"metrics_menu": [

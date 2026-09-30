@@ -32,10 +32,12 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- rebuilt without the Tap-Holds: rule count and digest() of the rules. Change
 -- a pin only for an intended change of the Tap-Holds-on rules; the failure
 -- message prints the new digest. Intended changes since: the recommended
--- layer hold taps the F19 exit sentinel on release (layer-wheel-slots).
+-- layer hold taps the F19 exit sentinel on release (layer-wheel-slots), and
+-- the shared script chords add the Delete chord's running and paused rules in
+-- the shared slot order (script-chords-three-os-2026-09-30).
 local TAP_HOLDS_ON_PINS = {
-	default     = { rules = 22, digest = "c930021047a6f7b0" },
-	recommended = { rules = 28, digest = "fae26183c3120498" },
+	default     = { rules = 24, digest = "7daf21a75cee322f" },
+	recommended = { rules = 30, digest = "c4ac599a14ff7dce" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

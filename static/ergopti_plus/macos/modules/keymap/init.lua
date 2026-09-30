@@ -1101,6 +1101,7 @@ local FAST_EXIT_KEYCODES = {
 	[105] = true,  -- F13 Karabiner Return sentinel
 	[107] = true,  -- F14 Karabiner Backspace sentinel
 	[113] = true,  -- F15 Karabiner Escape sentinel
+	[79]  = true,  -- F18 Karabiner Delete sentinel
 	-- F16 (keycode 106) intentionally absent: it is the LLM chain signal injected
 	-- by apply_prediction and must reach handle_llm_keys further down in this
 	-- handler. Fast-exiting it forced the 500 ms fallback timer path every time.

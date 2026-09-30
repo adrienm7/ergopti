@@ -13,7 +13,9 @@
  *   3. The ids macOS stopped offering are migrated: config migration step
  *      v5_to_v6 maps each one to the action that does the same thing, in every
  *      key of config.toml it lists, and those keys are the whole enumerable
- *      action slot space of macOS (gesture slots, tap keys, script control).
+ *      action slot space of macOS (gesture slots, tap keys, script control),
+ *      each named as it was at v6: a later rename step leads back to it, and
+ *      a key macOS gained after v6 (INTRODUCED_AFTER_V6) held no retired id.
  * In-memory mutations prove each check can fail.
  * ==============================================================================
  */
@@ -27,6 +29,10 @@ const toml = require('smol-toml');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^﻿/, '');
 const PLATFORMS = ['ahk', 'hs', 'linux'];
+
+// Action keys macOS gained after config schema v6, so no v5 id can be in them:
+// the Delete script chord came with the shared chords of v6_to_v7.
+const INTRODUCED_AFTER_V6 = new Set(['shortcuts.script_control.script_altgr_delete']);
 
 // What each switching action switches and where, in the English label.
 const SWITCHING = {
@@ -132,12 +138,27 @@ function validate(input) {
 			`migration: ${op.section}.${op.key} must map every merged id to its twin`
 		);
 	}
-	for (const key of input.actionKeys) {
+	// A later rename step gives a v6 key its current name: follow it back.
+	const renamedFrom = new Map();
+	for (const later of Object.values(input.registry.steps || {})) {
+		if (later.from < 6) continue;
+		for (const op of later.ops || []) {
+			if (op.op !== 'rename') continue;
+			renamedFrom.set(
+				`${op.to_section || op.section}.${op.to_key || op.key}`,
+				`${op.section}.${op.key}`
+			);
+		}
+	}
+	const keysAtV6 = input.actionKeys
+		.filter((key) => !INTRODUCED_AFTER_V6.has(key))
+		.map((key) => renamedFrom.get(key) || key);
+	for (const key of keysAtV6) {
 		check(listed.has(key), `migration: ${key} holds an action id and is not migrated`);
 	}
 	check(
-		listed.size === input.actionKeys.length,
-		`migration: ${listed.size} key(s) listed for ${input.actionKeys.length} action key(s)`
+		listed.size === keysAtV6.length,
+		`migration: ${listed.size} key(s) listed for ${keysAtV6.length} action key(s)`
 	);
 	return { errors, checks };
 }

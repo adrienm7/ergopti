@@ -366,8 +366,8 @@ helpers.with_stub_scope(MODULES, function()
 				"tap_4 = \"open_url\"",
 				"",
 				"[shortcuts.script_control]",
-				"backspace = \"retired_action_xyz\"",
-				"escape = \"script_quit\"",
+				"script_altgr_backspace = \"retired_action_xyz\"",
+				"script_altgr_escape = \"script_quit\"",
 				"",
 				"[shortcuts.keyboard]",
 				"cmd_k = \"retired_action_xyz\"",
@@ -385,14 +385,14 @@ helpers.with_stub_scope(MODULES, function()
 			local ok, err = pcall(function()
 				local flat = Preferences.flatten_document(TomlCodec.decode(source))
 				helpers.assert_eq(flat.gesture_actions, { tap_4 = "open_url" })
-				helpers.assert_eq(flat.script_control_shortcuts, { escape = "script_quit" })
+				helpers.assert_eq(flat.script_control_shortcuts, { script_altgr_escape = "script_quit" })
 				local offered = {}
 				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
 					offered[#offered + 1] = key.section .. "." .. key.key
 				end
 				table.sort(offered)
 				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.cmd_k",
-					"shortcuts.script_control.backspace", "shortcuts.tap_keys.number_row_left" })
+					"shortcuts.script_control.script_altgr_backspace", "shortcuts.tap_keys.number_row_left" })
 			end)
 			package.loaded["modules.gestures.actions"] = saved
 			if not ok then error(err, 0) end

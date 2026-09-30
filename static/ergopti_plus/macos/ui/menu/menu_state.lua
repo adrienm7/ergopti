@@ -660,6 +660,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				keyname, action)
 		end
 	end
+	if core_mods.shortcuts_mod and type(state.script_control_enabled) == "boolean"
+		and type(core_mods.shortcuts_mod.set_script_chords_enabled) == "function" then
+		try("shortcuts", "shortcuts.set_script_chords_enabled", core_mods.shortcuts_mod.set_script_chords_enabled,
+			state.script_control_enabled)
+	end
 	if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
 		try("shortcuts", "shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
 	end

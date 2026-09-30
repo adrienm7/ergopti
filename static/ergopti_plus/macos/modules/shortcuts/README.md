@@ -34,4 +34,4 @@ Shortcuts.init(shared_state)
 Shortcuts.start()
 ```
 
-`M.DEFAULT_STATE` is the canonical source for default shortcut states and the ChatGPT URL. Script-control bindings (`return_key`, `backspace`, `escape`) map to named actions (`script_pause_toggle`, `script_reload`, `script_quit`) so the UI can rebind them without touching key-registration logic.
+`M.DEFAULT_STATE` is the canonical source for default shortcut states and the ChatGPT URL. The script chords are the four slots every driver shares (`script_altgr_enter`, `script_altgr_backspace`, `script_altgr_delete`, `script_altgr_escape`, right Option with Return, Backspace, Delete or Escape, listed by `_shared/modules/actions/script_chords.json`). They start with their preset actions (`script_pause_toggle`, `script_reload`, `open_personal_shortcuts`, `script_quit`), and the UI can rebind them without touching key-registration logic. Karabiner turns a chord into its sentinel only while its slot runs an action (`platform/remap/script_chord_rules.lua`).

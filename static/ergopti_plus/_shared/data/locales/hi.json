@@ -2216,6 +2216,7 @@
 	"sg_labels.script_altgr_enter": "AltGr + एंटर",
 	"sg_labels.script_altgr_escape": "AltGr + Esc",
 	"sg_labels.script_ropt_backspace": "दायां Opt + ⌫",
+	"sg_labels.script_ropt_delete": "दायां Opt + ⌦",
 	"sg_labels.script_ropt_escape": "दायां Opt + Esc",
 	"sg_labels.script_ropt_return": "दायां Opt + Return",
 	"shortcut_utils.format_hint": "mods+कुंजी प्रारूप उपयोग करें, जैसे cmd+shift+b",

@@ -92,6 +92,7 @@ function M.new(options)
 	transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = Manifest, owners = owners, owned_paths = inventory, prepare_batch = prepare,
+		select = options.select,
 		capture = function(source, candidate, updates)
 			local native = options.capture(source, candidate, updates)
 			assert(type(native) == "table", "scope native capture was not acknowledged")
