@@ -230,6 +230,17 @@ local function capture_security_metadata(path)
 	}
 end
 
+--- Extended attributes owned by macOS itself. No process can copy or set them,
+--- so a staged replacement can never carry the destination's value and they
+--- are left out of the equality proof. com.apple.provenance (macOS 13+) is
+--- stamped by the kernel on every file written by an app that carries a
+--- provenance tag, such as one installed from a download or through Homebrew,
+--- and its value names the writing app; com.apple.macl is the TCC access label.
+local OS_OWNED_XATTRS = {
+	["com.apple.provenance"] = true,
+	["com.apple.macl"] = true,
+}
+
 --- Compares security metadata, optionally including source inode identity.
 --- @param expected table Previously captured metadata.
 --- @param actual table Newly captured metadata.
@@ -254,12 +265,12 @@ local function security_metadata_equal(expected, actual, include_identity)
 		return false, "extended-attribute metadata is unavailable"
 	end
 	for name, value in pairs(expected_xattrs.values) do
-		if actual_xattrs.values[name] ~= value then
+		if not OS_OWNED_XATTRS[name] and actual_xattrs.values[name] ~= value then
 			return false, "extended attribute changed: " .. name
 		end
 	end
 	for name in pairs(actual_xattrs.values) do
-		if expected_xattrs.values[name] == nil then
+		if not OS_OWNED_XATTRS[name] and expected_xattrs.values[name] == nil then
 			return false, "unexpected extended attribute appeared: " .. name
 		end
 	end
