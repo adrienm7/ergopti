@@ -38,6 +38,25 @@ helpers.describe("LLM navigation settings", function()
 		helpers.assert_eq(settings.set({ "alt", "alt" }), false)
 		package.loaded["infra.llm_preferences"] = previous
 	end)
+
+	helpers.it("keeps a navigation chord of its own, bare by default (llm-tooltip-chords-consumed)", function()
+		local previous = package.loaded["infra.llm_preferences"]
+		local storage = PreferencesFixture.new()
+		package.loaded["infra.llm_preferences"] = storage
+		local settings = helpers.load_module("modules.llm.navigation_settings")
+		settings._reset()
+		helpers.assert_eq(settings.get_navigation(), {}, "bare Up and Down navigate by default")
+		helpers.assert_true(settings.matches_navigation({}))
+		helpers.assert_eq(settings.matches_navigation({ shift = true }), false, "Shift+Down is the application's")
+		helpers.assert_true(settings.set_navigation({ "shift", "ctrl" }))
+		helpers.assert_eq(settings.get_navigation(), { "ctrl", "shift" })
+		helpers.assert_eq(storage.get("llm.navigation.nav_modifiers"), { "ctrl", "shift" })
+		helpers.assert_eq(settings.get(), {}, "the validation chord is a separate setting")
+		helpers.assert_true(settings.matches_navigation({ ctrl = true, shift = true }))
+		helpers.assert_eq(settings.matches_navigation({ ctrl = true, shift = true, alt = true }), false)
+		helpers.assert_eq(settings.set_navigation({ "win" }), false, "only the four chord modifiers exist")
+		package.loaded["infra.llm_preferences"] = previous
+	end)
 end)
 
 helpers.describe("keyboard hook validation consumption", function()

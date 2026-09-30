@@ -2117,25 +2117,43 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_navigation"] = function(target)
 		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
 		if not ok_navigation then return end
-		local current = NavigationSettings.get()
-		local current_label = #current > 0 and table.concat(current, "+") or i18n_safe("menu.settings.no_modifier")
-		local rows = {}
-		for _, option in ipairs(NavigationSettings.options()) do
-			local label = #option > 0 and table.concat(option, "+") or i18n_safe("menu.settings.no_modifier")
-			local checked = #option == #current
-			for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
-			rows[#rows + 1] = {
-				label = label,
-				checked = checked,
-				action = function()
-					NavigationSettings.set(option)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
+		-- One choice list per chord: the navigation modifiers held with Up and
+		-- Down, and the validation modifiers held with a digit.
+		local function chord_rows(current, bare_label, set)
+			local rows = {}
+			for _, option in ipairs(NavigationSettings.options()) do
+				local label = #option > 0 and table.concat(option, "+") or bare_label
+				local checked = #option == #current
+				for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
+				rows[#rows + 1] = {
+					label = label,
+					checked = checked,
+					action = function()
+						set(option)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			end
+			return rows
 		end
+		local arrows_only = i18n_safe("menu.llm.arrows_only")
+		local no_modifier = i18n_safe("menu.settings.no_modifier")
+		local navigation = NavigationSettings.get_navigation()
+		local validation = NavigationSettings.get()
 		append_rendered_row(target, {
-			label = string.format(i18n_safe("menu.llm.val_label"), current_label),
-			items = rows,
+			label = i18n_safe("menu.llm.nav_menu_title"),
+			items = {
+				{
+					label = i18n_safe("menu.llm.nav_label") .. " — "
+						.. (#navigation > 0 and table.concat(navigation, "+") or arrows_only),
+					items = chord_rows(navigation, arrows_only, NavigationSettings.set_navigation),
+				},
+				{
+					label = string.format(i18n_safe("menu.llm.val_label"),
+						#validation > 0 and table.concat(validation, "+") or no_modifier),
+					items = chord_rows(validation, no_modifier, NavigationSettings.set),
+				},
+			},
 			disabled = not enabled or nil,
 		}, "llm_navigation")
 	end

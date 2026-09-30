@@ -106,6 +106,14 @@ M.KEY_ESC       = 1
 M.KEY_UP        = 103
 M.KEY_DOWN      = 108
 
+--- The digit-row keys, KEY_1 to KEY_0, by the prediction slot each numbers (0
+--- is slot 10). The validation chord names the physical key, as the macOS
+--- keycodes do: Shift+1 is slot 1 although Shift makes that key type "!".
+M.DIGIT_ROW_SLOT = {
+	[2] = 1, [3] = 2, [4] = 3, [5] = 4, [6] = 5,
+	[7] = 6, [8] = 7, [9] = 8, [10] = 9, [11] = 10,
+}
+
 --- Codes the domain wants by name. A key absent from this table and absent from
 --- the layout produces nothing, which is correct: it is a key this driver has no
 --- opinion about, and under a grab it is still re-emitted untouched.
