@@ -1416,7 +1416,9 @@ description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
 # A bare digit accepts prediction N by default: the digit is swallowed while
 # the tooltip shows predictions, and types normally otherwise. The AI menu can
-# require a modifier (Alt, Ctrl, Cmd/Win, Shift or a combination).
+# require a modifier (Alt, Ctrl, Cmd/Win, Shift or a combination). Up and Down,
+# with the navigation modifiers (none by default), move the active prediction
+# the same way. Only that exact chord is swallowed; any other reaches the app.
 [[features.llm.navigation]]
 id = "nav_modifiers"
 default = []
@@ -1424,7 +1426,7 @@ recommended = []
 input_altering = false
 type = "array"
 description_key = "menu.llm.nav_modifiers_prompt"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 
 [[features.llm.navigation]]
 id = "val_modifiers"

@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 -- Selected by a declaration unique to ui/menu/menu_llm/models_manager_mlx.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
-local src = helpers.read_driver_source("\"Cause inconnue. Consultez la console Hammerspoon.\"")
+local src = helpers.read_driver_source("--- MODULE: MLX Models Manager\n")
 helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager_mlx.lua source must be locatable")
 
 -- Locate the get_installed_models block.

@@ -52,8 +52,10 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 	ClaimBody := _DriverFuncBody("_LLM_Accept_ClaimAndDispatch")
 	FocusBody := _DriverFuncBody("_LLM_Accept_FocusMatchesSource")
 	SlotBody := _DriverFuncBody("LLM_Tooltip_TryAcceptSlot")
-	SlotPolicyBody := _DriverFuncBody("_LLM_Accept_SlotIsAllowed")
-	BarePolicyBody := _DriverFuncBody("_LLM_Accept_IsBarePhysicalTabEvent")
+	; Each policy has one implementation, the refusal that names its failing
+	; gate; the predicates only compare it with "" (llm-accept-inserts).
+	SlotPolicyBody := _DriverFuncBody("_LLM_Accept_SlotRefusal")
+	BarePolicyBody := _DriverFuncBody("_LLM_Accept_BareTabRefusal")
 	ProbeBody := _DriverFuncBody("_LLM_Accept_ReadInputSnapshot")
 
 	Assert(InStr(AcceptBody, "LLM_Tooltip_GetAcceptSnapshot()") > 0
@@ -74,6 +76,11 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 	Assert(InStr(SlotBody, "_LLM_Accept_SlotIsAllowed(") > 0
 		and InStr(SlotBody, "_LLM_Accept_ClaimAndDispatch(Presented") > 0,
 		"the validation-chord primitive must apply its own policy, then the shared claim")
+	Assert(InStr(_DriverFuncBody("_LLM_Accept_SlotIsAllowed"),
+			"_LLM_Accept_SlotRefusal(") > 0
+		and InStr(_DriverFuncBody("_LLM_Accept_IsBareUserTabEvent"),
+			"_LLM_Accept_BareTabRefusal(") > 0,
+		"each policy predicate must delegate to its single refusal implementation")
 	for Needle in ["ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)",
 			"ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)",
 			"Presented.ActiveIdx != SlotIdx",
@@ -83,10 +90,13 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 			"validation-chord policy is missing required term: " . Needle)
 	}
 	Assert(InStr(AcceptBody, "if _LLM_AcceptInProgress") > 0
-		and InStr(AcceptBody, "_LLM_Accept_IsBarePhysicalTabEvent(") > 0,
-		"HotIf/InputHook callbacks may share a claim only after repeating bare-physical-Tab validation")
+		and InStr(AcceptBody, "_LLM_Accept_IsBareUserTabEvent(") > 0,
+		"HotIf/InputHook callbacks may share a claim only after repeating bare user-Tab validation")
 
-	for Needle in ["IsPhysicalTabEvent", "ctrl_down", "alt_down", "shift_down", "win_down", "tab_down"] {
+	; The user's Tab is the physical Tab while it is down, or a tap-hold's Tab
+	; tap while the dispatcher still runs that very tap (llm-accept-inserts).
+	for Needle in ["TabProvenance", "ctrl_down", "alt_down", "shift_down",
+			"win_down", "tab_down", "TapHoldTapInDispatch() != TapKey"] {
 		Assert(InStr(BarePolicyBody, Needle) > 0,
 			"canonical bare-Tab event policy is missing required term: " . Needle)
 	}
@@ -236,10 +246,10 @@ _TLTSH_EveryDirectAcceptCallIsCanonical() {
 		"the bridge must pass its raw-event provenance into canonical acceptance")
 	Assert(InStr(FeedBody, "IsPhysicalEvent := false") > 0,
 		"the bridge must default unknown/dispatcher events to non-physical provenance")
-	Assert(InStr(FireTabBody, "LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent, Modifiers)") > 0,
+	Assert(InStr(FireTabBody, "LLM_Tooltip_TryAcceptTab(TabProvenance, Modifiers)") > 0,
 		"gesture/tap-hold/menu Tab output must delegate event provenance and modifiers to canonical acceptance")
-	Assert(InStr(FireTabBody, "IsPhysicalTabEvent := false") > 0,
-		"the shared wrapper must fail closed unless a physical Tab producer opts in explicitly")
+	Assert(InStr(FireTabBody, "TabProvenance := false") > 0,
+		"the shared wrapper must fail closed unless a user Tab producer passes its provenance")
 	Assert(InStr(FireTabBody, 'TextPressKey("Tab", Modifiers)') > 0,
 		"a rejected acceptance must still emit the caller's configured Tab navigation")
 	AssertEqual(2, _TLTSH_Count(PrefixBody, "LLM_Bridge_FeedKeyDownIfActive(VK, true)"),
@@ -295,13 +305,26 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 	RemapSrc := _DriverDirConcat("platform/remap")
 
 	; The physical Tab accepts only through the SC00F handlers, which declare
-	; their provenance to the policy directly (_TabAcceptVisiblePrediction); the
-	; wrapper is left to the producers of a synthetic Tab, which must fail it
-	; (llm-tab-accepts-visible-prediction).
+	; their provenance to the policy directly (_TabAcceptVisiblePrediction)
+	; (llm-tab-accepts-visible-prediction). A tap-hold's Tab tap is the user's own
+	; Tab key: it passes the dispatcher's provenance, which the policy trusts
+	; only while that tap is dispatched. A gesture passes none and must fail
+	; (llm-accept-inserts).
 	Assert(InStr(GestureSrc, "LLM_Tooltip_FireTabOrAccept([])") > 0,
-		"gesture Tab must pass through the same wrapper and fail physical-Tab validation")
-	Assert(InStr(RemapSrc, "return LLM_Tooltip_FireTabOrAccept(Modifiers)") > 0,
-		"the tap-hold keystroke tap must send a Tab through canonical physical-Tab validation")
+		"gesture Tab must pass through the same wrapper and fail user-Tab validation")
+	Assert(InStr(RemapSrc,
+			"return LLM_Tooltip_FireTabOrAccept(Modifiers, TapHoldTapProvenance())") > 0,
+		"the tap-hold keystroke tap must send a Tab through canonical user-Tab validation with its dispatch provenance")
+	DispatchBody := RegExReplace(_DriverFuncBody("TapHoldDispatchTap"), "\s+", " ")
+	MarkAt := InStr(DispatchBody, "_TapHoldTapInDispatch := KeyId try TapFn.Call()")
+	Assert(MarkAt > 0,
+		"the dispatcher must name the tapped key for exactly the duration of its tap callback")
+	Assert(InStr(DispatchBody, "finally _TapHoldTapInDispatch := PreviousTap", true, MarkAt) > 0,
+		"the dispatcher must restore the outer provenance even when the tap callback throws")
+	AssertEqual(3, _TLTSH_Count(DriverSrc, "_TapHoldTapInDispatch := "),
+		"only the dispatcher may set the tap provenance: the global initialiser, the dispatch and its restore")
+	AssertEqual(2, _TLTSH_Count(DriverSrc, "TapHoldTapProvenance()"),
+		"the tap provenance must have one definition and the single keystroke-tap caller")
 	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))') > 0,
 		"LAlt Tab remap must pass through canonical physical-Tab validation")
 	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("right_ctrl", TapHoldEmitKeyTap.Bind("Tab"))') > 0,

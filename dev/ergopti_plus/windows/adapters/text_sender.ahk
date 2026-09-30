@@ -65,7 +65,9 @@ global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
 ; it falls back to SendEvent and the driver's InputHooks observe them. Level 0
 ; is below the I1 threshold of the hook dispatcher and the prefix watcher, so
 ; the output stays invisible to them either way, whatever SendLevel the calling
-; hotkey thread runs at (2 for the tap-holds).
+; hotkey thread runs at (2 for the tap-holds and the physical Tab, which accepts
+; an AI prediction from its #InputLevel 2 hotkey thread). Every emission goes
+; through _TextSenderAtSendLevel.
 global TEXT_SENDER_SEND_LEVEL := 0
 
 ; Injectable send primitives — point at the real AHK built-ins by default.
@@ -279,7 +281,8 @@ _TextSenderAdmissionCurrent(Opts, &Failure := "") {
 ; first on the open thread. Admission is still checked at the last possible
 ; instant; sender, canonical RAM journal and mirrors then share one Critical
 ; boundary so visible output cannot race Suspend or physical input. GUI/file
-; work returned by atomic_commit remains outside the transaction.
+; work returned by atomic_commit remains outside the transaction. The output
+; goes out at TEXT_SENDER_SEND_LEVEL like every other TextSender emission.
 ; @return {Object} { Ok, ErrorMessage, Rejected }.
 _TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
 	AtomicPrepare := (Opts is Map) ? Opts.Get("atomic_prepare", 0) : 0
@@ -308,7 +311,7 @@ _TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
 		if !_TextSenderAdmissionCurrent(Opts, &ErrorMessage)
 			Rejected := true
 		if !Rejected {
-			SenderFn.Call()
+			_TextSenderAtSendLevel(SenderFn)
 			Emitted := true
 			if (PrepareError = "" and HasMethod(AtomicJournal, "Call")) {
 				try {
@@ -392,13 +395,32 @@ _TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
 	}
 }
 
+; Runs one TextSender OS emission at TEXT_SENDER_SEND_LEVEL and gives the
+; calling thread its own SendLevel back, even when the emission throws. This is
+; the one owner of the emission level: the text of an accepted AI prediction
+; used to reach its send primitive directly, so a physical Tab accepting it from
+; its #InputLevel 2 hotkey typed the prediction at SendLevel 2, as input every
+; hook below level 2 treats as the user's own typing
+; (llm-accept-injects-exact-text).
+; @param SendFn {Func} Zero-arity emission.
+; @return {Any} What SendFn returned.
+_TextSenderAtSendLevel(SendFn) {
+	global TEXT_SENDER_SEND_LEVEL
+	PreviousSendLevel := A_SendLevel
+	SendLevel(TEXT_SENDER_SEND_LEVEL)
+	try
+		return SendFn.Call()
+	finally
+		SendLevel(PreviousSendLevel)
+}
+
 ; Calls the injectable SendInput primitive without allowing an OS/injection
 ; failure to escape from a keyboard-facing adapter method.  A thrown SendInput
 ; in a timer callback otherwise skips the completion callback and leaves the
 ; process-wide clipboard FIFO permanently busy; in a hold path it can also
 ; strand a partially applied modifier transaction.
 _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
-	global _AHK_SendInput, TEXT_SENDER_SEND_LEVEL
+	global _AHK_SendInput
 
 	; Every TextPressKey emission funnels through here at SendLevel 0, and the
 	; prefix watcher's InputHook is armed "V L0 I1" — so it filters these out by
@@ -419,8 +441,6 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 	;     only; they touch neither the caret nor the document.
 	;
 	; The send runs at TEXT_SENDER_SEND_LEVEL, never at the caller's level.
-	PreviousSendLevel := A_SendLevel
-	SendLevel(TEXT_SENDER_SEND_LEVEL)
 	try {
 		; Declaration and OS output are one transaction. HS_DeclareSyntheticEffect
 		; used to restore Critical and run tooltip effects before this call, which
@@ -430,9 +450,10 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 		; IsSet-guarded because headless adapter runners may omit the hotstring layer.
 		if ((Operation == "key press" or Operation == "modified key press")
 			and IsSet(HS_RunSyntheticInputTransaction)) {
-			HS_RunSyntheticInputTransaction(Keys, _AHK_SendInput.Bind(Keys))
+			_TextSenderAtSendLevel(
+				() => HS_RunSyntheticInputTransaction(Keys, _AHK_SendInput.Bind(Keys)))
 		} else {
-			_AHK_SendInput.Call(Keys)
+			_TextSenderAtSendLevel(_AHK_SendInput.Bind(Keys))
 		}
 		return true
 	} catch as Err {
@@ -442,8 +463,6 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 		if LogFailure
 			LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
 		return false
-	} finally {
-		SendLevel(PreviousSendLevel)
 	}
 }
 
@@ -758,7 +777,7 @@ TextSend(Text, Opts, Callback) {
 			Ok := true
 			ErrorMessage := ""
 			try
-				_AHK_SendText.Call(Text)
+				_TextSenderAtSendLevel(() => _AHK_SendText.Call(Text))
 			catch as Err {
 				LoggerError("TextSender", "TextSend: direct-mode SendText failed: {1}", Err.Message)
 				Ok := false

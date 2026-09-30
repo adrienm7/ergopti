@@ -2434,31 +2434,36 @@ local function offer_visible()
 	return true
 end
 
---- Consumes the validation chord (a digit, with the configured modifiers —
---- none by default) while an offer is on screen.
+--- Consumes the chords of the offer on screen: the navigation chord (Up or
+--- Down with the navigation modifiers) and the validation chord (a digit with
+--- the validation modifiers), each exact and bare by default.
 ---
+--- The navigation chord moves the active prediction while several are shown.
 --- A digit that numbers a shown prediction is the instruction to insert it,
---- never text, even when the insertion fails. A digit beyond the predictions
---- on offer (5 with three shown) is text and reaches the application, as on
---- Windows and macOS.
---- @param detail table { key, mods }
+--- never text, even when the insertion fails. Any other chord, an arrow over a
+--- single prediction, and a digit beyond the predictions on offer (5 with
+--- three shown) reach the application, as on Windows and macOS
+--- (llm-tooltip-chords-consumed).
+--- @param detail table { key, code, mods }
 --- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
 	if _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
+	local navigation = detail.code == EvdevCodes.KEY_UP and -1 or detail.code == EvdevCodes.KEY_DOWN and 1 or nil
+	if navigation then
+		if #_suggestions < 2 or not (_overlay and type(_overlay.move) == "function")
+			or not NavigationSettings.matches_navigation(detail.mods) then return false end
+		_overlay.move(navigation)
+		return true
+	end
 	-- Tab accepts live mode's rewrite or runs the selected agent action, and
 	-- only while that tooltip is on screen: another offer, a modified key or no
-	-- offer leave Tab to the application. Up and Down move the agent's selection.
+	-- offer leave Tab to the application.
 	local agent_offer = _suggestion_context ~= nil and _suggestion_context.agent ~= nil
-	local navigation = detail.code == EvdevCodes.KEY_UP and -1 or detail.code == EvdevCodes.KEY_DOWN and 1 or nil
-	if detail.code == EvdevCodes.KEY_TAB or (navigation and agent_offer) then
+	if detail.code == EvdevCodes.KEY_TAB then
 		if not (_suggestion_context and (_suggestion_context.live or agent_offer)) then return false end
 		for _, held in pairs(type(detail.mods) == "table" and detail.mods or {}) do
 			if held then return false end
-		end
-		if navigation then
-			if _overlay and type(_overlay.move) == "function" then _overlay.move(navigation) end
-			return true
 		end
 		local index = 1
 		if agent_offer and _overlay and type(_overlay.active_index) == "function" then
@@ -2470,10 +2475,16 @@ function M.handle_shortcut(detail)
 		return true
 	end
 	if not NavigationSettings.matches(detail.mods) then return false end
-	local key = tostring(detail.key or detail.char or "")
-	local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
-	if not digit then return false end
-	local index = digit == "0" and 10 or tonumber(digit)
+	-- A digit-row key numbers its slot whatever the chord makes it type, so
+	-- Shift+1 is slot 1, not "!". Another key typing a digit (the keypad with
+	-- NumLock on) numbers the slot of that digit.
+	local index = EvdevCodes.DIGIT_ROW_SLOT[detail.code]
+	if not index then
+		local key = tostring(detail.key or detail.char or "")
+		local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
+		if not digit then return false end
+		index = digit == "0" and 10 or tonumber(digit)
+	end
 	if not _suggestions[index] then return false end
 	if not M.accept(index) then
 		Logger.warn(LOG, "Prediction %d could not be inserted — the key is swallowed, nothing typed.", index)

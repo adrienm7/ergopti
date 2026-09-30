@@ -39,10 +39,21 @@
 #    is forwarded to stderr line by line. The Lua side logs each stderr
 #    line via Logger.info so 'tail -f /tmp/ergopti.log' shows live progress.
 # 8. Fail fast: any unrecoverable failure (no network, install blocked by a
-#    firewall) aborts with a non-zero exit code and a clear French message
-#    that the Lua side propagates verbatim to the user notification.
+#    firewall) aborts with a non-zero exit code after printing the line that
+#    names the cause; mlx_bootstrap_diagnosis.lua turns it into the user's
+#    message.
 # 9. Bash 3.2 compatible: macOS still ships bash 3.2 as /bin/bash — no
 #    associative arrays, no '${var,,}', nothing that requires bash 4+.
+# 10. Import-proven publication: a candidate venv is published, and exit 0
+#    reported, only after its interpreter imported the MLX packages; the
+#    fast path proves the same before trusting an installed venv.
+# 11. Owned locations: uv's own interpreter (Apple Silicon, never a system or
+#    Homebrew Python), and under the launcher uv, its interpreters and its
+#    cache in Ergopti's Application Support folder, so a ~/.local or ~/.cache
+#    that belongs to another account cannot refuse the installation.
+# 12. Repair: ERGOPTI_MLX_REPAIR=1 removes Ergopti's own venv (only that
+#    folder, never a link or a folder without a Python environment) and
+#    rebuilds it from freshly downloaded packages.
 # ==============================================================================
 
 set -eu
@@ -85,6 +96,17 @@ UV_LOCK="$HS_ROOT/uv.lock"
 # requires-python clause — bumping one without the other breaks the
 # fast-path hash check.
 PYTHON_VERSION="3.11"
+# The exact interpreter uv provides: MLX publishes Apple Silicon wheels only,
+# so an x86_64 Python (an Intel Homebrew under /usr/local, or an x86_64 uv
+# under Rosetta) could never install it. System and Homebrew interpreters are
+# never used: they can be externally managed or disappear on an upgrade.
+PYTHON_REQUEST="cpython-${PYTHON_VERSION}-macos-aarch64-none"
+export UV_PYTHON_PREFERENCE=only-managed
+
+# The statement both this script and the Lua import probe of
+# ui/menu/menu_llm/models_manager_mlx.lua run: a venv that cannot import these
+# is never published nor reused.
+MLX_IMPORT_PROBE="import mlx_lm; import huggingface_hub; import jinja2; import safetensors; import truststore"
 
 # Prepend the canonical uv install locations so a freshly installed uv is
 # discoverable without re-sourcing the shell profile. Order matters: prefer
@@ -124,11 +146,36 @@ log_error() {
 	printf "[MLX-DEPS] ❌ %s\n" "$1" >&2
 }
 
+# Imports the MLX packages with an interpreter. On failure the interpreter's
+# own error is printed, since it names the cause (a missing module, a library
+# macOS refused to load, a permission).
+probe_imports() {
+	local probe_output
+	if probe_output="$("$1" -c "$MLX_IMPORT_PROBE" 2>&1)"; then
+		return 0
+	fi
+	printf "%s\n" "$probe_output" >&2
+	log_error "MLX packages do not import with $1: $(printf "%s\n" "$probe_output" | tail -n 1)"
+	return 1
+}
+
+# Drops the quarantine attribute from files this script just installed, so
+# macOS never refuses to load their libraries. Absent outside macOS.
+clear_quarantine() {
+	if [ -x /usr/bin/xattr ] && [ -e "$1" ]; then
+		/usr/bin/xattr -dr com.apple.quarantine "$1" 2>/dev/null || true
+	fi
+}
+
 # Locates uv in PATH or in the well-known install directories. Prints the
 # absolute path on success, returns non-zero on failure.
 locate_uv() {
 	if command -v uv >/dev/null 2>&1; then
 		command -v uv
+		return 0
+	fi
+	if [ -n "${UV_INSTALL_DIR:-}" ] && [ -x "$UV_INSTALL_DIR/uv" ]; then
+		echo "$UV_INSTALL_DIR/uv"
 		return 0
 	fi
 	if [ -x "$HOME/.local/bin/uv" ]; then
@@ -154,8 +201,24 @@ if [ -n "${ERGOPTI_CONFIG_DIR:-}" ]; then
 	VENV_DIR="$APP_SUPPORT_DIR/mlx-venv"
 	UV_SYNC_FROZEN_FLAG="--frozen"
 	log_info "Mode bundle détecté — venv redirigé vers $VENV_DIR"
+	# uv, its interpreters and its cache live in Ergopti's folder: a ~/.local
+	# or ~/.cache owned by another account (a former "sudo pip") refused them.
+	UV_OWNED_DIR="$APP_SUPPORT_DIR/mlx-uv"
+	export UV_INSTALL_DIR="$UV_OWNED_DIR/bin"
+	export UV_CACHE_DIR="$UV_OWNED_DIR/cache"
+	export UV_PYTHON_INSTALL_DIR="$UV_OWNED_DIR/python"
+	export UV_PYTHON_BIN_DIR="$UV_OWNED_DIR/python-bin"
 else
 	UV_SYNC_FROZEN_FLAG=""
+fi
+
+# The Astral installer never edits the user's shell profiles: this script
+# finds uv by path, and a profile it cannot write aborted the installation.
+export UV_NO_MODIFY_PATH=1
+
+REPAIR_MODE=0
+if [ "${ERGOPTI_MLX_REPAIR:-}" = "1" ]; then
+	REPAIR_MODE=1
 fi
 
 # Derived from VENV_DIR after the potential bundle-mode override so the
@@ -203,9 +266,9 @@ else
 		exit 1
 	fi
 
-	# The installer writes uv to ~/.local/bin by default on recent versions
-	# and to ~/.cargo/bin on older ones. We pre-extended PATH above to cover
-	# both, then re-locate the binary explicitly. Verbose progress from the
+	# The installer writes uv to UV_INSTALL_DIR under the launcher, else to
+	# ~/.local/bin on recent versions and to ~/.cargo/bin on older ones.
+	# locate_uv() checks each of them explicitly. Verbose progress from the
 	# installer goes to stderr so the Lua side surfaces it via Logger.info.
 	# curl flags add resilience for slow / flaky connections: --connect-timeout
 	# avoids hanging on a dead DNS, --max-time bounds the total install
@@ -216,6 +279,9 @@ else
 	curl_uv_install() {
 		curl_resilient https://astral.sh/uv/install.sh | sh >&2
 	}
+	if [ -n "${UV_INSTALL_DIR:-}" ]; then
+		mkdir -p "$UV_INSTALL_DIR"
+	fi
 	if ! retry_network curl_uv_install; then
 		log_error "Téléchargement / installation de uv impossible. Vérifiez votre connexion réseau (ou un éventuel pare-feu)."
 		exit 1
@@ -231,7 +297,9 @@ fi
 # Sanity-check that uv actually runs. A binary on disk that segfaults or
 # has the wrong architecture would otherwise fail much later in the process
 # with a confusing error.
-if ! "$UV_BIN" --version >/dev/null 2>&1; then
+if ! uv_version_output="$("$UV_BIN" --version 2>&1)"; then
+	# The binary's own error names the cause ("Bad CPU type in executable").
+	printf "%s\n" "$uv_version_output" >&2
 	log_error "Le binaire uv ($UV_BIN) ne s'exécute pas correctement."
 	exit 1
 fi
@@ -248,14 +316,14 @@ fi
 # 'uv python find' returns non-zero when no managed or system interpreter
 # matching the constraint is available. In that case we ask uv to download
 # one — the user does not need a system Python.
-if ! "$UV_BIN" python find "$PYTHON_VERSION" >/dev/null 2>&1; then
+if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
 	emit_marker "PYTHON_INSTALLING"
 	log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 	# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
 	# it verbatim so the live log shows real download progress. Wrapped in
 	# retry_network so a tethered / throttled connection doesn't fail the
 	# whole bootstrap on a single TCP reset.
-	uv_python_install() { "$UV_BIN" python install "$PYTHON_VERSION" >&2; }
+	uv_python_install() { "$UV_BIN" python install "$PYTHON_REQUEST" >&2; }
 	if ! retry_network uv_python_install; then
 		log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
 		exit 1
@@ -287,13 +355,58 @@ if ! DEPS_FINGERPRINT="$(dependency_fingerprint)"; then
 	exit 1
 fi
 
-# Fast path: the venv exists, the hash file matches, AND the four pinned
-# imports the Hammerspoon side expects all resolve — nothing to do, exit
-# silently. The import probe is the safety net: an earlier run could have
-# written the hash marker without actually installing anything (e.g. the
-# pre-fix `uv pip sync pyproject.toml` was a silent no-op), and a hash-only
-# check would then keep skipping work forever. When the imports fail, drop
-# the hash file so the slow path runs unconditionally below.
+# Repair: remove Ergopti's own venv, and the staging leftovers of an
+# interrupted run, before anything else can reuse them. Only the folder this
+# script derived, and only when it is a real folder holding a Python
+# environment (or nothing): never a link, a file, or a foreign folder.
+venv_is_removable() {
+	if [ -L "$VENV_DIR" ]; then
+		log_error "Refusing to remove '$VENV_DIR': it is a symbolic link, not Ergopti's MLX venv."
+		return 1
+	fi
+	if [ ! -e "$VENV_DIR" ]; then
+		return 0
+	fi
+	if [ ! -d "$VENV_DIR" ]; then
+		log_error "Refusing to remove '$VENV_DIR': it is not a folder."
+		return 1
+	fi
+	if [ -f "$VENV_DIR/pyvenv.cfg" ] || [ -e "$VENV_DIR/bin/python" ] || [ -L "$VENV_DIR/bin/python" ]; then
+		return 0
+	fi
+	if [ -z "$(ls -A "$VENV_DIR" 2>/dev/null)" ]; then
+		return 0
+	fi
+	log_error "Refusing to remove '$VENV_DIR': it holds no Python environment."
+	return 1
+}
+
+if [ "$REPAIR_MODE" = "1" ]; then
+	emit_marker "VENV_SYNC_RAN"
+	emit_marker "VENV_REMOVING"
+	if ! venv_is_removable; then
+		exit 5
+	fi
+	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
+		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
+			continue
+		fi
+		log_info "Removing $leftover before rebuilding the MLX venv."
+		if ! remove_output="$(rm -rf -- "$leftover" 2>&1)"; then
+			printf "%s\n" "$remove_output" >&2
+			log_error "Cannot remove '$leftover': $(printf "%s\n" "$remove_output" | tail -n 1)"
+			exit 6
+		fi
+	done
+fi
+
+# Fast path: the venv exists, the hash file matches, AND the pinned imports
+# the Hammerspoon side expects all resolve — nothing to do, exit silently.
+# The import probe is the safety net: an earlier run could have written the
+# hash marker without actually installing anything (e.g. the pre-fix
+# `uv pip sync pyproject.toml` was a silent no-op, or a venv whose libraries
+# macOS refuses to load), and a hash-only check would then keep skipping work
+# forever. When the imports fail, the slow path rebuilds it below.
 if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 	LAST_HASH="$(cat "$SYNC_HASH_FILE" 2>/dev/null || true)"
 	if [ "$LAST_HASH" = "$DEPS_FINGERPRINT" ]; then
@@ -307,20 +420,26 @@ if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 		if [ -d "$SP_DIR/mlx_lm" ] && [ -d "$SP_DIR/huggingface_hub" ] \
 			&& [ -d "$SP_DIR/jinja2" ] && [ -d "$SP_DIR/safetensors" ] \
 				&& [ -d "$SP_DIR/truststore" ]; then
-			# Disk says the four packages are there; trust the hash and exit.
-			# The import probe is intentionally skipped here — keeping the
-			# fast path as fast as the original (~50 ms) on a healthy venv.
-			exit 0
+			# The directories exist; the venv is reused only when they import.
+			# The Lua side reuses an installed venv without running this
+			# script, so this probe runs only on a selection that found none.
+			if probe_imports "$VENV_DIR/bin/python"; then
+				exit 0
+			fi
+			log_info "The installed venv does not import MLX — rebuilding it."
+		else
+			log_info "Hash matched but site-packages incomplete — re-syncing dependencies."
 		fi
-		log_info "Hash matched but site-packages incomplete — re-syncing dependencies."
 	fi
 fi
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then
 # emit the granular DEPS_SYNCING marker so the user knows we are at the
-# pip-sync step specifically.
-emit_marker "VENV_SYNC_RAN"
+# pip-sync step specifically. A repair already emitted it.
+if [ "$REPAIR_MODE" != "1" ]; then
+	emit_marker "VENV_SYNC_RAN"
+fi
 emit_marker "VENV_CREATING"
 
 # Build the replacement beside the live environment. A signal may arrive at
@@ -354,7 +473,7 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 log_info "Création du virtualenv candidat : $STAGING_VENV"
-if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_VERSION" >&2; then
+if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_REQUEST" >&2; then
 	log_error "Impossible de créer le virtualenv candidat via 'uv venv'."
 	exit 1
 fi
@@ -373,6 +492,11 @@ cd "$HS_ROOT"
 # captive portal, packet loss) doesn't fail the bootstrap on a single
 # stalled wheel download. uv has internal retries but they are not
 # configurable, so this outer retry covers cases where uv itself gives up.
+# A repair downloads every package again instead of trusting the cache.
+UV_SYNC_REPAIR_FLAG=""
+if [ "$REPAIR_MODE" = "1" ]; then
+	UV_SYNC_REPAIR_FLAG="--refresh"
+fi
 uv_deps_sync() {
 	# $UV_SYNC_FROZEN_FLAG is "--frozen" in bundle mode (read-only .app) so uv
 	# reads the committed lock file without attempting to rewrite it.
@@ -380,15 +504,25 @@ uv_deps_sync() {
 	UV_PROJECT_ENVIRONMENT="$STAGING_VENV" VIRTUAL_ENV="$STAGING_VENV" "$UV_BIN" sync \
 		--project "$HS_ROOT" \
 		--python "$STAGING_VENV/bin/python" \
-		$UV_SYNC_FROZEN_FLAG \
+		$UV_SYNC_FROZEN_FLAG $UV_SYNC_REPAIR_FLAG \
 		--verbose --no-progress >&2
 }
 if ! retry_network uv_deps_sync; then
-	log_error "'uv sync' a échoué — vérifiez votre connexion réseau et les versions épinglées dans pyproject.toml."
+	log_error "uv sync failed; the uv error above names the cause."
 	exit 1
 fi
 
 emit_marker "DEPS_SYNCED"
+
+# Nothing is published, and no fingerprint written, before the candidate's
+# interpreter imported the MLX packages: a venv that cannot import mlx_lm was
+# once published as installed and then reused for good.
+emit_marker "IMPORT_CHECKING"
+clear_quarantine "$STAGING_VENV"
+clear_quarantine "${UV_PYTHON_INSTALL_DIR:-}"
+if ! probe_imports "$STAGING_VENV/bin/python"; then
+	exit 4
+fi
 
 # Development-mode uv sync may update uv.lock while resolving. Recompute after
 # the successful sync so the newly published environment already owns the

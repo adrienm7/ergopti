@@ -1820,6 +1820,17 @@ local function create_menu(deps)
 						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
 				end, function(reason) on_done(false, reason) end)
 		end)
+		-- A repaired MLX runtime restarts the model it could not load, as
+		-- selecting that model does; the repair offer owns the button.
+		require("ui.menu.menu_llm.mlx_repair_offer").set_resume(function()
+				if state.llm_backend ~= "mlx" or state.llm_enabled ~= true then return true end
+				local model = state.llm_model
+				if type(model) ~= "string" or model == "" then
+						model = state.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_mlx or ""
+				end
+				if model == "" then return true end
+				return switch_model(model)
+		end)
 		-- The llm_agent_auto_toggle action persists the mode it switches to
 		-- through the same transaction as the menu.
 		require("modules.llm.agent_runner").set_mode_persister(function(mode)

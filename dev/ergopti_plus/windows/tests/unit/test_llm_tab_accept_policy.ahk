@@ -354,3 +354,141 @@ _LTAP_SlotAcceptPolicyTable() {
 
 Test("LLM accept: released validation chord inserts only its exact slot (llm-val-chord-inserts)",
 	_LTAP_SlotAcceptPolicyTable)
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 7/ A tap-hold's Tab tap is the user's Tab =======
+; =========================================================
+; =========================================================
+
+; The recommended preset taps Tab with AltGr (tap_hold defaults: alt_gr
+; tap_action "tab"). Its tap sent the Tab with no provenance, which the policy
+; refused as synthetic, so it typed a Tab over every prediction instead of
+; inserting it (llm-accept-inserts). The dispatcher now names the key it taps,
+; and the policy trusts that Tab only while the very tap is being dispatched.
+
+; Runs Fn inside one real dispatch of KeyId's tap, with KeyId configured.
+_LTAP_InTapDispatch(KeyId, Fn) {
+	global TapHold, _TH_TapHoldTrackState
+	PreviousTapHold := TapHold
+	TapHold := Map("keys", Map(KeyId, Map(
+		"tap_action", "tab",
+		"time_activation_seconds", 0.2)), "layers", Map())
+	_TH_TapHoldTrackState := Map()
+	try return TapHoldDispatchTap(KeyId, Fn)
+	finally {
+		TapHold := PreviousTapHold
+		_TH_TapHoldTrackState := Map()
+	}
+}
+
+_LTAP_TapHoldTabTapAccepts() {
+	_LTAP_Setup()
+	try {
+		; The tap runs on the key's release: Tab itself is never down.
+		Released := _LTAP_Input(false)
+		Probe := { Provenance: 0, Accepted: -1 }
+		Dispatched := _LTAP_InTapDispatch("alt_gr", (*) => (
+			Probe.Provenance := TapHoldTapProvenance(),
+			Probe.Accepted := LLM_Tooltip_TryAcceptTab(Probe.Provenance, [],
+				Released, _LTAP_RecordAccept)))
+		AssertTrue(Dispatched, "the AltGr tap must be dispatched")
+		AssertTrue((Probe.Provenance is Map)
+				&& Probe.Provenance["kind"] == "tap_hold_tap"
+				&& Probe.Provenance["key_id"] == "alt_gr",
+			"a Tab tapped inside the dispatch must carry the key the user tapped")
+		AssertTrue(Probe.Accepted,
+			"the tap-hold's Tab must accept the shown prediction like the physical Tab")
+		AssertEqual(1, _LTAP_AcceptCount, "the prediction must be injected exactly once")
+		AssertEqual("predicted text", _LTAP_LastAcceptedText)
+		AssertEqual(false, TapHoldTapProvenance(),
+			"no tap provenance may outlive its dispatch")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: a tap-hold tap emitting Tab inserts the shown prediction (llm-accept-inserts)",
+	_LTAP_TapHoldTabTapAccepts)
+
+_LTAP_OnlyTheDispatchedTapHoldTabAccepts() {
+	_LTAP_Setup()
+	try {
+		Released := _LTAP_Input(false)
+		Source := Map("hwnd", 100, "control", 1001)
+		Stale := Map("kind", "tap_hold_tap", "key_id", "alt_gr")
+		AssertFalse(LLM_Tooltip_TryAcceptTab(Stale, [], Released, _LTAP_RecordAccept),
+			"a tap provenance replayed outside its dispatch must not accept")
+		AssertEqual("the tap of alt_gr is no longer being dispatched",
+			_LLM_Accept_RefusalGate(Stale, [], Released, Source),
+			"the stale provenance must be named")
+		AssertFalse(LLM_Tooltip_TryAcceptTab(false, [], Released, _LTAP_RecordAccept),
+			"a gesture's Tab carries no provenance and must never accept")
+		AssertEqual("the Tab is neither the physical Tab nor a tap-hold's tap",
+			_LLM_Accept_RefusalGate(false, [], Released, Source))
+		Probe := { Chord: -1, Other: -1, Elsewhere: -1 }
+		_LTAP_InTapDispatch("alt_gr", (*) => (
+			Probe.Chord := LLM_Tooltip_TryAcceptTab(TapHoldTapProvenance(), "Blind",
+				Released, _LTAP_RecordAccept),
+			Probe.Other := LLM_Tooltip_TryAcceptTab(
+				Map("kind", "tap_hold_tap", "key_id", "left_alt"), [],
+				Released, _LTAP_RecordAccept),
+			Probe.Elsewhere := LLM_Tooltip_TryAcceptTab(TapHoldTapProvenance(), [],
+				_LTAP_Input(false, false, false, false, false, 200),
+				_LTAP_RecordAccept)))
+		AssertFalse(Probe.Chord, "a tap under a held modifier is a chord, never an acceptance")
+		AssertFalse(Probe.Other, "only the key being tapped may accept")
+		AssertFalse(Probe.Elsewhere, "the tap must be typed in the control the prediction belongs to")
+		AssertEqual(0, _LTAP_AcceptCount, "no refused Tab may inject")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: only the tap being dispatched, bare and in its control, accepts (llm-accept-inserts)",
+	_LTAP_OnlyTheDispatchedTapHoldTabAccepts)
+
+; The real AltGr tap, through _TapHoldInvokeConfiguredAction and
+; TapHoldEmitKeyTap, reaches the policy as the user's Tab. The test process is
+; not the control the prediction was rendered for, so the policy refuses on
+; focus: the Tab is typed, and the refusal is one WARNING naming that gate.
+; Before the fix the tap reached the policy as a synthetic Tab, refused silently.
+_LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab() {
+	global _AHK_SendInput, _TapHoldModifierIsHeld, _Stub_LlmTooltipLoading
+	_LTAP_Setup()
+	PreviousSend := _AHK_SendInput
+	PreviousHeld := _TapHoldModifierIsHeld
+	Sent := []
+	Captured := []
+	_AHK_SendInput := (Keys) => (Sent.Push(Keys), Keys)
+	_TapHoldModifierIsHeld := (Name) => false
+	_Stub_LlmTooltipLoading := false
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		_LTAP_InTapDispatch("alt_gr", (*) => _TapHoldInvokeConfiguredAction("alt_gr"))
+		AssertEqual(1, Sent.Length, "the refused tap must still type its Tab")
+		AssertEqual("{Tab}", Sent.Length ? Sent[1] : "")
+		Traced := 0
+		for Line in Captured {
+			if InStr(Line, "[WARNING]")
+					&& InStr(Line, "Tab not accepted over a shown prediction")
+					&& InStr(Line, "focus")
+				Traced++
+		}
+		AssertEqual(1, Traced,
+			"the AltGr tap must reach the policy as the user's Tab and be refused on focus only")
+		AssertEqual(0, _LTAP_AcceptCount)
+	} finally {
+		LoggerClearTestSink()
+		_AHK_SendInput := PreviousSend
+		_TapHoldModifierIsHeld := PreviousHeld
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: the real AltGr Tab tap reaches the policy as the user's Tab (llm-accept-inserts)",
+	_LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab)

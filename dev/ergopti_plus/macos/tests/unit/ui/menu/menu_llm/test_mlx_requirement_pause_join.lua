@@ -43,6 +43,7 @@ local OWNED_MODULES = {
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
 	"modules.llm.mlx_deps_checker",
+	"modules.llm.mlx_bootstrap_diagnosis",
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
 	"modules.llm.warmup_controller",
@@ -58,6 +59,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.models_manager_mlx_server",
 	"ui.menu.menu_llm.models_manager_mlx_download",
 	"ui.menu.menu_llm.models_manager_mlx",
+	"ui.menu.menu_llm.mlx_repair_offer",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.startup_controller",
@@ -1255,9 +1257,10 @@ end)
 helpers.describe("MLX import probe failure names a working action (mlx-runtime-broken)", function()
 	--- Runs one failed probe with the given runtime state and returns the record.
 	--- @param runtime table { installed, running, failed }
-	--- @return table record { notices, invalidations, probe_args }
-	local function run_failed_probe(runtime)
-		local record = { notices = {}, invalidations = 0 }
+	--- @param stderr string|nil The interpreter's error, a missing module by default.
+	--- @return table record { notices, invalidations, causes, offers, probe_args }
+	local function run_failed_probe(runtime, stderr)
+		local record = { notices = {}, invalidations = 0, causes = {}, offers = {} }
 		with_fixture(function(native)
 			install_subject_stubs(native)
 			package.loaded["infra.notifications"] = {
@@ -1270,11 +1273,19 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 				is_task_running = function() return runtime.running == true end,
 				runtime_installed = function() return runtime.installed == true end,
 				has_failed = function() return runtime.failed == true end,
+				is_runtime_broken = function() return runtime.broken == true end,
 				get_failure_message = function() return "fixture failure" end,
 				reset_bootstrap_state = function() return true end,
-				invalidate_runtime = function()
+				invalidate_runtime = function(cause)
 					record.invalidations = record.invalidations + 1
+					record.causes[#record.causes + 1] = cause
 					runtime.installed = false
+					return true
+				end,
+			}
+			package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = {
+				offer = function(cause)
+					record.offers[#record.offers + 1] = cause or "checker cause"
 					return true
 				end,
 			}
@@ -1290,7 +1301,8 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 				}))
 			helpers.assert_eq(#native.tasks, 1)
 			record.probe_args = native.tasks[1].args
-			native.tasks[1].on_done(1, "", "ModuleNotFoundError: No module named 'mlx_lm'")
+			native.tasks[1].on_done(1, "",
+				stderr or "Traceback (most recent call last):\nModuleNotFoundError: No module named 'mlx_lm'\n")
 			helpers.assert_eq(cancelled, "dependency_probe_failed")
 			helpers.assert_eq(native.server_starts, {})
 			helpers.assert_true(script_control.stop())
@@ -1298,14 +1310,17 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 		return record
 	end
 
-	helpers.it("invalidates an installed but broken runtime and says how to rebuild it", function()
+	helpers.it("invalidates an installed but broken runtime and offers the button that rebuilds it", function()
 		local record = run_failed_probe({ installed = true })
 		helpers.assert_eq(record.invalidations, 1,
 			"an installed runtime that fails its imports must read as not installed")
-		helpers.assert_eq(#record.notices, 1)
-		helpers.assert_eq(record.notices[1].title, "mlx.runtime_broken_title")
-		helpers.assert_eq(record.notices[1].body, "mlx.runtime_broken_body",
-			"no bootstrap runs on its own, so the message must not claim one is in progress")
+		-- The notice used to ask for an MLX selection, which did nothing while
+		-- MLX was already the selected backend: the repair dialog replaces it.
+		helpers.assert_eq(#record.notices, 0,
+			"no bootstrap runs on its own, so no notice may claim one is in progress")
+		helpers.assert_eq(#record.offers, 1, "the failure offers its repair button")
+		helpers.assert_eq(record.offers[1].kind, "import_failed")
+		helpers.assert_eq(record.offers[1].repairable, true)
 	end)
 
 	helpers.it("keeps the in-progress message only while the selected install runs", function()
@@ -1320,6 +1335,14 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 		helpers.assert_eq(record.notices[1].title, "mlx.runtime_missing_title")
 	end)
 
+	helpers.it("offers the repair again when the flagged runtime fails once more", function()
+		local record = run_failed_probe({ installed = false, broken = true })
+		helpers.assert_eq(record.invalidations, 0)
+		helpers.assert_eq(#record.notices, 0)
+		helpers.assert_eq(record.offers, { "checker cause" },
+			"a runtime already flagged broken offers its repair, not an install")
+	end)
+
 	helpers.it("probes every package the bootstrap fast path checks", function()
 		local record = run_failed_probe({ installed = true })
 		local command = record.probe_args[#record.probe_args]
@@ -1328,6 +1351,76 @@ helpers.describe("MLX import probe failure names a working action (mlx-runtime-b
 			helpers.assert_true(command:find("import " .. package_name, 1, true) ~= nil,
 				"the import probe must cover " .. package_name)
 		end
+	end)
+end)
+
+
+
+
+
+helpers.describe("A partial MLX venv is detected from its probe's own error (mlx-bootstrap-partial-venv)", function()
+	--- Runs one failed probe on an installed runtime and returns what it flagged.
+	--- @param stderr string The interpreter's error output.
+	--- @return table record
+	local function probe_installed(stderr)
+		local record = { notices = {}, invalidations = 0, causes = {}, offers = {} }
+		with_fixture(function(native)
+			install_subject_stubs(native)
+			package.loaded["infra.notifications"] = {
+				notify = function(title, body, kind)
+					record.notices[#record.notices + 1] = { title = title, body = body, kind = kind }
+					return true
+				end,
+			}
+			package.loaded["modules.llm.mlx_deps_checker"] = {
+				is_task_running = function() return false end,
+				runtime_installed = function() return true end,
+				has_failed = function() return false end,
+				invalidate_runtime = function(cause)
+					record.invalidations = record.invalidations + 1
+					record.causes[#record.causes + 1] = cause
+					return true
+				end,
+			}
+			package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = {
+				offer = function(cause)
+					record.offers[#record.offers + 1] = cause
+					return true
+				end,
+			}
+			local script_control = start_script_control()
+			local manager = build_manager(script_control)
+			local capability = manager.create_requirement_owner("activation")
+			helpers.assert_true(manager.check_requirements("fixture-model",
+				function() return true end, function() return true end, {
+					requirement_owner = capability,
+					is_current = function() return true end,
+				}))
+			native.tasks[1].on_done(1, "", stderr)
+			helpers.assert_eq(native.server_starts, {}, "a broken runtime never starts the server")
+			helpers.assert_true(script_control.stop())
+		end)
+		return record
+	end
+
+	helpers.it("flags the runtime broken with the missing module the probe printed", function()
+		local record = probe_installed("Traceback (most recent call last):\n"
+			.. "  File \"<string>\", line 1, in <module>\n"
+			.. "ModuleNotFoundError: No module named 'mlx'\n")
+		helpers.assert_eq(record.invalidations, 1)
+		helpers.assert_eq(record.causes[1].kind, "import_failed")
+		helpers.assert_eq(record.causes[1].line, "ModuleNotFoundError: No module named 'mlx'",
+			"the probe's stderr used to be discarded; it names what is missing")
+		helpers.assert_eq(record.offers[1], record.causes[1], "the offer shows the same cause")
+	end)
+
+	helpers.it("names a permission refusal on a library of the venv", function()
+		local library = "/Users/fixture/Library/Application Support/Ergopti/mlx-venv/lib/python3.11/site-packages/mlx/core.cpython-311-darwin.so"
+		local record = probe_installed("ImportError: dlopen(" .. library
+			.. ", 0x0002): Operation not permitted\n")
+		helpers.assert_eq(record.causes[1].kind, "permission")
+		helpers.assert_eq(record.causes[1].path, library)
+		helpers.assert_eq(record.offers[1].path, library)
 	end)
 end)
 
