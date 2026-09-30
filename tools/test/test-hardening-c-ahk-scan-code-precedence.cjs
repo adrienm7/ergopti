@@ -12,12 +12,25 @@
  * its name or virtual key (`Tab::`, `^Tab`, `vk09`, `Tab Up`) then never
  * fires, eligible scan-code variant or not.
  *
- * ROOT CAUSE ENCODED (incident of 2026-09-30):
+ * The rule holds for character keys too, whatever the layout puts on them:
+ * the AltGr layer registers `SC138 & SCnnn` for every character key in every
+ * emulation state, so each is resolved by scan code. A hotkey the hook owns
+ * that names a character (`~^v`, `$^x`, `^y` under #HotIf or #InputLevel 2)
+ * never fires from the physical key. A plain, global `^!+i::` at #InputLevel 0
+ * is a RegisterHotKey hotkey instead (hotkey.cpp: HK_NORMAL unless `~ $ *`,
+ * `< >`, `Up`, `&`, a criterion without a global variant, an input level or
+ * #UseHook requires the hook): the OS matches its virtual key once the hook
+ * lets the key through, so it fires on the key typing that character.
+ *
+ * ROOT CAUSE ENCODED (incidents of 2026-09-30):
  * The AI prediction's `Tab::` accept was dead from the day remap/tab.ahk
  * declared SC00F. Tab accepted only inside the Tab tap-hold; the switch to
  * neutral defaults (tap-holds off) exposed it, and Tab went to the application
  * instead of accepting the prediction (45704357d). The same class hid the
- * AltGr tap-hold behind `RAlt::` (altgr-single-identity-2026-09-25).
+ * AltGr tap-hold behind `RAlt::` (altgr-single-identity-2026-09-25), and the
+ * keylogger's `~^v` paste hotkey never fired, the layout's `^SC02F` and the
+ * AltGr layer holding every V key: the paste is now observed on the
+ * HookDispatcher InputHook, which no hotkey precedence reaches.
  *
  * FEATURES & RATIONALE:
  * 1. Mirrors windows/tests/meta/test_hardening_c_scan_code_shadows_key_name.ahk
@@ -26,12 +39,19 @@
  * 2. Names are resolved from the physical-key registry
  *    (_shared/data/keycodes/physical_keys.json: `ahk_send` → `ahk`), plus the
  *    AutoHotkey aliases and the fixed Windows virtual-key codes of those
- *    layout-independent keys. Character keys are named through the active
- *    layout, which no source scan knows: they are out of this guard's scope.
+ *    layout-independent keys. A character key (a one-character name or its
+ *    virtual key) is any registry key without a fixed name; the AltGr rows of
+ *    the emulation golden fixture prove every one of them is declared by scan
+ *    code, and a key that stops being so fails the guard instead of passing.
  * 3. Static labels and literal Hotkey() registrations are both scanned, with
  *    comments removed, and a floor on each count keeps the scan honest.
- * 4. A self-check replays the pre-fix shape (`Tab::` beside `SC00F::`) and a
- *    clean shape through the same scanner.
+ *    #InputLevel, #HotIf and #UseHook are positional across #Include, so the
+ *    context of each static label is read by walking the include graph of
+ *    each script at the driver root (ErgoptiPlus.ahk) in parse order. A
+ *    literal Hotkey() call runs under a HotIf context no source scan knows, so
+ *    it counts as a hook hotkey.
+ * 4. A self-check replays the pre-fix shapes (`Tab::` beside `SC00F::`, the
+ *    `~^v` registration) and clean shapes through the same scanner.
  * 5. `--root <dir>` scans another checkout's copy of the Windows tree.
  * ==============================================================================
  */
@@ -46,6 +66,7 @@ const ROOT =
 	rootArg > 0 ? path.resolve(process.argv[rootArg + 1]) : path.resolve(__dirname, '..', '..');
 const REGISTRY_ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
+const GOLDEN = path.join(WINDOWS, 'tests', 'fixtures', 'ergopti_emulation_golden.json');
 const REGISTRY = path.join(
 	REGISTRY_ROOT,
 	'static',
@@ -98,6 +119,20 @@ const VK_NAMES = {
 	a5: 'ralt'
 };
 
+// Windows virtual-key ranges (WinUser.h) that name characters: digits,
+// letters and the OEM punctuation keys the active layout assigns.
+const CHARACTER_VK_RANGES = [
+	[0x30, 0x39],
+	[0x41, 0x5a],
+	[0xba, 0xc0],
+	[0xdb, 0xdf],
+	[0xe2, 0xe2]
+];
+
+// The AltGr levels of the emulation, which RegisterAltGrLayer registers as
+// `SC138 & SCnnn` whatever the emulation state (only their criteria vary).
+const ALTGR_LEVELS = ['altgr_rows', 'altgr_number_row', 'altgr_plus'];
+
 /** Lowercased key name -> SCnnn, from the physical-key registry. */
 function nameTable() {
 	const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
@@ -114,6 +149,26 @@ function nameTable() {
 		table.set(`vk${vk}`, table.get(name));
 	}
 	return table;
+}
+
+/** SCnnn -> registry code of every character key: a key with no fixed name. */
+function characterKeys() {
+	const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+	const keys = new Map();
+	for (const [code, record] of Object.entries(registry.keys)) {
+		if (record.kind !== 'key' || record.ahk_send || !/^SC[0-9A-F]{3}$/.test(record.ahk)) continue;
+		keys.set(record.ahk, code);
+	}
+	return keys;
+}
+
+/** Whether a declaration's key names a character: one character, or its VK. */
+function isCharacterKey(key) {
+	if (key.length === 1) return true;
+	const vk = key.match(/^vk([0-9a-f]{2})$/);
+	if (!vk) return false;
+	const code = parseInt(vk[1], 16);
+	return CHARACTER_VK_RANGES.some(([low, high]) => code >= low && code <= high);
 }
 
 /** Every .ahk file of the driver, tests, vendor and generated code excluded. */
@@ -224,6 +279,102 @@ function analyse(decls, names) {
 	return { scanCodes, named, offenders };
 }
 
+/**
+ * Resolves one #Include argument (after its `*i`) as AutoHotkey v2 does: a
+ * relative path from the including file's directory (or the last directory an
+ * #Include named), %A_ScriptDir% as the entry's directory. Library and other
+ * variable paths resolve to null.
+ */
+function resolveInclude(arg, dir, file) {
+	if (arg.startsWith('<')) return null;
+	const expanded = arg
+		.replace(/%A_ScriptDir%/gi, WINDOWS)
+		.replace(/%A_LineFile%/gi, file)
+		.replace(/\\/g, '/');
+	if (expanded.includes('%')) return null;
+	return path.resolve(dir, expanded);
+}
+
+/**
+ * Applies one comment-free line to the positional directive state, visiting
+ * an #Include target in place, as AutoHotkey parses it.
+ */
+function applyDirective(line, state, cursor, visit) {
+	let m;
+	if ((m = line.match(/^\s*#InputLevel\b\s*(\d*)/i))) state.level = m[1] ? Number(m[1]) : 0;
+	else if ((m = line.match(/^\s*#UseHook\b\s*(\S*)/i)))
+		state.useHook = !/^(false|off|0)$/i.test(m[1]);
+	else if ((m = line.match(/^\s*#HotIf\b(.*)$/i))) state.hotIf = m[1].trim() !== '';
+	else if ((m = line.match(/^\s*#Include(?:Again)?\s+(?:\*i\s+)?(.+?)\s*$/i))) {
+		const target = resolveInclude(m[1], cursor.dir, cursor.file);
+		if (target && fs.existsSync(target)) {
+			if (fs.statSync(target).isDirectory()) cursor.dir = target;
+			else visit(target);
+		}
+	}
+}
+
+/**
+ * The directive context of every line of every file a script at the driver
+ * root includes: file -> [{ level, hotIf, useHook }] indexed by line - 1.
+ */
+function includeContexts() {
+	const contexts = new Map();
+	for (const root of fs.readdirSync(WINDOWS).filter((name) => name.endsWith('.ahk'))) {
+		const state = { level: 0, hotIf: false, useHook: false };
+		const visit = (file) => {
+			if (contexts.has(file)) return;
+			const perLine = [];
+			contexts.set(file, perLine);
+			const cursor = { dir: path.dirname(file), file };
+			for (const line of stripComments(fs.readFileSync(file, 'utf8')).split('\n')) {
+				applyDirective(line, state, cursor, visit);
+				perLine.push({ ...state });
+			}
+		};
+		visit(path.join(WINDOWS, root));
+	}
+	return contexts;
+}
+
+/**
+ * Why AutoHotkey's hook, not RegisterHotKey, owns a declaration (an empty list
+ * for a registered hotkey), from its syntax and its directive context.
+ */
+function hookReasons(d, context) {
+	const reasons = [];
+	if (d.kind === 'call') reasons.push('a Hotkey() registration, whose HotIf context no scan knows');
+	const prefix = d.text.match(/^[~*$#!^+<>]*/)[0];
+	for (const symbol of ['~', '$', '*', '<', '>']) {
+		if (prefix.includes(symbol)) reasons.push(`the ${symbol} prefix`);
+	}
+	if (/\s+up\s*$/i.test(d.text)) reasons.push('a key-up hotkey');
+	if (d.text.includes('&')) reasons.push('a custom combination');
+	if (d.kind === 'label') {
+		if (!context) reasons.push('no #Include path from a driver root script, so no known context');
+		else {
+			if (context.hotIf) reasons.push('a #HotIf criterion');
+			if (context.level !== 0) reasons.push(`#InputLevel ${context.level}`);
+			if (context.useHook) reasons.push('#UseHook');
+		}
+	}
+	return reasons;
+}
+
+/** Character-key declarations that the hook owns, with the reasons. */
+function characterOffenders(decls, contextOf) {
+	const uses = [];
+	const offenders = [];
+	for (const d of decls) {
+		const key = keysOf(d.text).find(isCharacterKey);
+		if (key === undefined) continue;
+		uses.push(d);
+		const reasons = hookReasons(d, contextOf(d));
+		if (reasons.length > 0) offenders.push({ ...d, key, reasons });
+	}
+	return { uses, offenders };
+}
+
 function describe(d) {
 	return `${path.relative(ROOT, d.file).replace(/\\/g, '/')}:${d.line} ${d.kind} "${d.text}"`;
 }
@@ -257,6 +408,41 @@ const errors = [];
 	}
 }
 
+// ── Self-check: character keys the hook owns, registered ones spared ────────
+{
+	const lines = stripComments(
+		[
+			'^!+i:: {',
+			'}',
+			'#InputLevel 2',
+			'^!+j:: return',
+			'#InputLevel 0',
+			'#HotIf Foo()',
+			'^k:: return',
+			'#HotIf',
+			'$^m:: return',
+			'Tab:: return',
+			'SC02F:: return',
+			'Hotkey("~^v", Fn)',
+			'Hotkey("~^vk56", Fn)',
+			'Hotkey("^vk0D", Fn)'
+		].join('\n')
+	).split('\n');
+	const state = { level: 0, hotIf: false, useHook: false };
+	const cursor = { dir: WINDOWS, file: 'fixture.ahk' };
+	const perLine = lines.map((line) => {
+		applyDirective(line, state, cursor, () => {});
+		return { ...state };
+	});
+	const found = declarations(lines.join('\n'), 'fixture.ahk');
+	const { offenders } = characterOffenders(found, (d) => perLine[d.line - 1]);
+	const got = offenders.map((o) => o.text).join(', ');
+	const want = '^!+j, ^k, $^m, ~^v, ~^vk56';
+	if (got !== want) {
+		errors.push(`self-check: the character scan flagged [${got}], expected [${want}]`);
+	}
+}
+
 // ── The driver ──────────────────────────────────────────────────────────────
 const files = driverFiles(WINDOWS);
 const decls = [];
@@ -284,6 +470,68 @@ for (const o of offenders) {
 	);
 }
 
+// ── Character keys ──────────────────────────────────────────────────────────
+const golden = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
+const altGr = new Set();
+for (const level of ALTGR_LEVELS) {
+	if (!golden.levels[level]) errors.push(`the emulation golden fixture lost its ${level} level`);
+	else for (const sc of Object.keys(golden.levels[level])) altGr.add(sc.toUpperCase());
+}
+const layoutCode = files
+	.filter((f) => f.replace(/\\/g, '/').endsWith('modules/keymap/layout.ahk'))
+	.map((f) => stripComments(fs.readFileSync(f, 'utf8')))
+	.join('\n');
+if (!/^RegisterAltGrLayer\(\)\s*$/m.test(layoutCode))
+	errors.push('modules/keymap/layout.ahk must still register the AltGr layer unconditionally');
+const altGrRegistrations = files
+	.map(
+		(f) =>
+			(stripComments(fs.readFileSync(f, 'utf8')).match(/Hotkey\("SC138 & " \. SC,/g) || []).length
+	)
+	.reduce((a, b) => a + b, 0);
+if (altGrRegistrations < 3)
+	errors.push('the AltGr layer must still register its keys as "SC138 & SCnnn" hotkeys');
+const characters = characterKeys();
+if (characters.size < 40)
+	errors.push(`the registry names only ${characters.size} character key(s)`);
+for (const [sc, code] of characters) {
+	if (!altGr.has(sc) && !scanCodes.has(sc))
+		errors.push(
+			`the character key ${code} (${sc}) is no longer declared by scan code: the character rule ` +
+				'below assumes every character key is; revisit it before relaxing this'
+		);
+}
+
+const contexts = includeContexts();
+const contextOf = (d) => (contexts.get(d.file) || [])[d.line - 1];
+const labelContexts = decls
+	.filter((d) => d.kind === 'label')
+	.map(contextOf)
+	.filter(Boolean);
+if (labelContexts.length !== labels)
+	errors.push(
+		`the #Include walk reached ${labelContexts.length} of the ${labels} static label(s): ` +
+			'every driver hotkey must be reachable from a driver root script'
+	);
+if (contexts.size < 100)
+	errors.push(
+		`the #Include walk from the driver root scripts reached only ${contexts.size} file(s)`
+	);
+if (labelContexts.filter((c) => c.level !== 0).length < 20)
+	errors.push('the #Include walk no longer places the layout hotkeys under #InputLevel 2');
+if (labelContexts.filter((c) => c.hotIf).length < 20)
+	errors.push('the #Include walk no longer sees the #HotIf criteria of static hotkeys');
+const { uses: characterUses, offenders: characterHooks } = characterOffenders(decls, contextOf);
+
+for (const o of characterHooks) {
+	errors.push(
+		`${describe(o)} names the character ${o.key} and the hook owns it (${o.reasons.join(', ')}): ` +
+			'every character key is declared by scan code (the AltGr layer), so the hook looks that key ' +
+			'up by scan code only and this hotkey never fires. Observe the key on the HookDispatcher, ' +
+			'declare it by scan code, or keep it a plain global hotkey at #InputLevel 0.'
+	);
+}
+
 if (errors.length > 0) {
 	for (const e of errors) console.error(`  FAIL  ${e}`);
 	console.error(`\n[hardening-c-ahk-scan-code-precedence] ${errors.length} problem(s).`);
@@ -291,5 +539,6 @@ if (errors.length > 0) {
 }
 console.log(
 	`[hardening-c-ahk-scan-code-precedence] ${files.length} files, ${labels} labels, ${calls} ` +
-		`Hotkey() calls: ${scanCodes.size} scan-code keys, ${named.length} name/VK uses, none shadowed.`
+		`Hotkey() calls: ${scanCodes.size} scan-code keys, ${named.length} name/VK uses and ` +
+		`${characterUses.length} character hotkey(s), none shadowed.`
 );
