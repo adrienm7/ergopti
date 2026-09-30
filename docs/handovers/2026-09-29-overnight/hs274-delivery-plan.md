@@ -211,7 +211,7 @@ Effort is in focused agent-days, including CI iteration.
   - `UninstallWorker.swift`.
   - `RemapLeaseWorker.swift:62`: accept the owned CLI path for the selected runtime only.
   - The rewritten `tests/meta/test_karabiner_stock_process_isolation.lua` and `tests/support/karabiner_isolation/syntax.lua`. They allow exactly the Ergopti-labelled runtime and still reject any control of stock `/Library/Application Support/org.pqrs/Karabiner-Elements` processes.
-- **Coexistence:** if official Karabiner-Elements is installed or running, or another VirtualHIDDevice version is active, the owned mode reports an explicit, named `unavailable` state and Ergopti stays in shared mode. Final policy is Q1 in section 6.
+- **Coexistence:** decided in Q1 of section 6. When the owned runtime starts, Ergopti quits any other active Karabiner, under the menu option « close other Karabiner instances », on by default. With the option off, owned mode reports an explicit, named `unavailable` state instead of fighting the other grabber. Another active VirtualHIDDevice version remains an explicit, named `unavailable` state until its policy is decided.
 - **Depends on:** WP5.
 - **Verify:**
   - [L] `npm run test:hs` for the onboarding state machine: absent, installed-pending, waiting-approval, enabled, foreign Karabiner installed, foreign Karabiner running.
@@ -340,15 +340,22 @@ The fork also gives a fail-safe that kanata does not: if the console-user-server
 - **S0:** all code dormant. CI proves shared-mode generator output and boot are byte-identical.
 - **S1:** `runtime = owned` on the maintainer's Mac with the ledger still on. The owned console server runs the same shell commands.
 - **S2:** `physical_source = stream` opt-in.
-- **S3:** `owned` plus `stream` become the default for new installs without a foreign Karabiner-Elements. Existing users are offered migration, with an uninstall of the Karabiner-Elements that Ergopti installed, and only with consent.
+- **S3:** `owned` plus `stream` become the default for new installs; a foreign Karabiner-Elements is closed while the runtime runs, under the default-on option of Q1. Existing users are offered migration, with an uninstall of the Karabiner-Elements that Ergopti installed, and only with consent. The runtime only ever runs while Tap-Hold is on (Q4).
 - **S4:** after one release, WP10 retires the ledger. Retiring shared mode is a separate decision.
 
 ---
 
-## 6. Questions for the maintainer
+## 6. Questions for the maintainer, and the answers of 2026-09-29
+
+The maintainer answered every question on 2026-09-29 ([decision log](DECISIONS.md)). The answers are binding and recorded as [ADR 011](../../../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md); where an answer differs from a recommendation above, the answer wins.
 
 1. **Coexistence.** When a user already has their own Karabiner-Elements installed or running, which should Ergopti do: (a) keep that user on shared mode, so owned mode reports "unavailable: your Karabiner-Elements is active" (recommended); (b) require them to uninstall it; or (c) take over with explicit consent? The same question applies to VirtualHIDDevice version skew, since only one version can be active system-wide.
+   - **Answer:** (c), through a default-on option. While the owned runtime runs, Ergopti quits any other active Karabiner, governed by the menu option « close other Karabiner instances » (on by default). A user keeps their own Karabiner by turning Ergopti's Tap-Hold off or unticking the option; owned mode then reports an explicit `unavailable` state. This deliberately overrides R3 for that option only. VirtualHIDDevice version skew was not answered and stays an explicit, named `unavailable` state until it is.
 2. **Branding and Apple Developer ID.** Is the residual pqrs VirtualHIDDevice branding acceptable (hidden manager app, notification, Driver Extensions entry)? Would you get an Apple Developer ID? It would allow notarization and `SMAppService.daemon`, and remove the Gatekeeper and "unidentified developer" friction.
+   - **Answer:** the pqrs branding is acceptable. No Apple Developer ID: the runtime stays self-signed with the stable Ergopti identity, and the Gatekeeper friction is accepted. Peer authorization must therefore pin the Ergopti certificate leaf (WP4).
 3. **Fork ownership.** Will you own a fork of Karabiner-Elements 16.3.0 (9312593e) and its re-anchoring on each upstream bump? Owned mode's generator semantics would then move from 16.0.0 to 16.3.0, while shared mode stays on 16.0.0 until it is retired.
+   - **Answer:** yes. The target no longer installs Karabiner as the Karabiner-Elements application: it ships only the unmodified pqrs VirtualHIDDevice and the headless 3-product 16.3.0 fork with the HS-274 stream. Shared mode stays the production path until then.
 4. **Metrics semantics.** Should the heatmap become physical-only once `stream` is on: no autorepeat, and nav-layer letters rather than arrows, with a note on history? Should metrics-only users with remapping off still run the owned core just to capture?
+   - **Answer:** the heatmap becomes physical-only once the stream is active (no autorepeat; nav-layer letters count as letters). The runtime runs only while Tap-Hold is on: metrics-only users do not run it, and their metrics keep the Quartz event tap.
 5. **Hardware and scope.** Which real Mac and keyboards are available for WP9 (Apple internal with fn/globe, ISO or ANSI external, Bluetooth, two at once)? Should the fn/globe and media (consumer) keys be counted or explicitly left uncounted?
+   - **Answer:** count everything, fn/globe and media keys included. Only the internal Mac keyboard (with fn/globe) is available for real-Mac acceptance; external ISO/ANSI, Bluetooth and two-keyboard cases stay on virtual fixtures.
