@@ -162,6 +162,21 @@ the feature lacks. Both renderers draw it; the driver registers
 the feature path. The macOS menubar icon (`ui.menubar_icon`) is the first one;
 the update channel and frequency rows have the same shape.
 
+### project-script-chords-are-active-by-default
+
+An empty configuration alters no input: every input-altering manifest entry
+defaults to off. The one exception is the script-management chords. The
+maintainer decided on 2026-09-30 that they are no typing feature, since they
+pause, reload, quit and edit the driver. Such an entry carries
+`active_by_default = true` and a default equal to its recommended value. The
+builder refuses any other shape, and `test-defaults-single-source.cjs` pins
+the approved list. A config.toml that names "none" keeps a chord off, and a
+missing key takes the preset. The wizard lists only entries whose preset
+differs from their default, so the chords left its Shortcuts page. Action:
+never extend the list without a maintainer decision. A clear that must give
+the system's behaviour writes the off value explicitly, because deleting the
+key restores the preset.
+
 ### project-restore-and-clear-read-two-shared-keys
 
 Every row that puts a section back to Ergopti's preset reads

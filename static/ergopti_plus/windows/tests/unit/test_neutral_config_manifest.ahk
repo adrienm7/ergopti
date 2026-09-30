@@ -6,6 +6,13 @@ _NeutralConfigManifestProjections() {
 	AssertEqual(ManifestRecommendedFor("category_enabled.shortcuts"), true)
 	AssertEqual(ManifestDefaultFor("shortcuts.keyboard.win_a"), "none")
 	AssertEqual(ManifestRecommendedFor("shortcuts.keyboard.win_a"), "select_line")
+	; The declared exception: the script-management chords start with their
+	; preset (maintainer decision of 2026-09-30).
+	for Slot, Action in Map("script_altgr_enter", "script_pause_toggle", "script_altgr_backspace", "script_reload",
+			"script_altgr_delete", "open_personal_shortcuts", "script_altgr_escape", "script_quit") {
+		AssertEqual(Action, ManifestDefaultFor("shortcuts.script_control." . Slot), Slot . " starts with its preset")
+		AssertEqual(Action, ManifestRecommendedFor("shortcuts.script_control." . Slot), Slot . " keeps its preset")
+	}
 	State := ManifestBuildFeaturesMap()
 	State["hotstrings"]["magic_key"]["replace"]["enabled"] := true
 	AssertEqual(ManifestDefaultFor("hotstrings.magic_key.replace.enabled"), false,
@@ -82,7 +89,12 @@ Test("neutral-config: an absent tap-hold file imports no recommended bindings", 
 _NeutralConfigRealFeatureState() {
 	AssertEqual(0, _FeatureStateBootRun("neutral"), "real neutral startup must complete")
 }
-Test("neutral-config: real feature state boot leaves every master and shortcut off", _NeutralConfigRealFeatureState)
+Test("neutral-config: real feature state boot leaves every master and shortcut off, the script chords on their preset", _NeutralConfigRealFeatureState)
+
+_NeutralConfigScriptNone() {
+	AssertEqual(0, _FeatureStateBootRun("script_none"), "a stored none must survive the preset default")
+}
+Test("neutral-config: a config naming none for a script chord keeps it off (script-chords-on-2026-09-30)", _NeutralConfigScriptNone)
 
 _NeutralConfigFirstBoot() {
 	AssertEqual(0, _FeatureStateBootRun("neutral_first_boot"), "real first boot must remain neutral")

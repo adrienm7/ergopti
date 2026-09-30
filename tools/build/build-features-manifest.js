@@ -209,6 +209,26 @@ function validate(features) {
 				`feature ${f.path} must declare exactly one of default / default_per_platform`
 			);
 		}
+		// The one declared exception to "an empty configuration alters no input":
+		// an entry the maintainer switched on starts with its preset, never with a
+		// third value only this flag would explain.
+		if (f.active_by_default !== undefined) {
+			if (f.active_by_default !== true || f.input_altering !== true) {
+				throw new Error(
+					`feature ${f.path}: active_by_default is only "true" on an input_altering entry`
+				);
+			}
+			for (const platform of f.platforms || PLATFORMS) {
+				if (
+					JSON.stringify(resolveDefault(f, platform)) !==
+					JSON.stringify(resolveRecommended(f, platform))
+				) {
+					throw new Error(
+						`feature ${f.path} is active_by_default, so its ${platform} default must be its recommended value`
+					);
+				}
+			}
+		}
 		if (f.type === 'enum' && (!f.enum_values || f.enum_values.length === 0)) {
 			throw new Error(`feature ${f.path} has type=enum but no enum_values`);
 		}

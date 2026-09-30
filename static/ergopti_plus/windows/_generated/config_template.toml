@@ -409,10 +409,10 @@ professional_environment = false
 programmable_keyboard = false
 
 [shortcuts.script_control]
-script_altgr_backspace = "none"
-script_altgr_delete = "none"
-script_altgr_enter = "none"
-script_altgr_escape = "none"
+script_altgr_backspace = "script_reload"
+script_altgr_delete = "open_personal_shortcuts"
+script_altgr_enter = "script_pause_toggle"
+script_altgr_escape = "script_quit"
 
 [shortcuts.keyboard]
 ctrl_b = "none"

@@ -40,6 +40,13 @@
 #       description_key         Required. i18n key for the menu label.
 #       platforms               Optional. Defaults to the parent section's
 #                               ``platforms`` value if absent.
+#       active_by_default       Optional, true only on an input_altering entry
+#                               the maintainer decided to switch on in an empty
+#                               configuration: its default must equal its
+#                               recommended value. Every other input-altering
+#                               entry defaults to off (false / "none" / "");
+#                               tools/test/test-defaults-single-source.cjs
+#                               pins the approved list.
 #       superseded_reason_key   Optional, Windows-only booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
@@ -2229,39 +2236,49 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 # ===== 3.5.9 shortcuts.script_control =====
 # ==========================================
 
+# The script-management chords (AltGr + Enter, BackSpace, Delete, Escape) start
+# with their preset in an empty configuration: the maintainer's decision of
+# 2026-09-30, because they pause, reload, quit and edit the driver and are no
+# typing feature. They are the declared exception to "every input-altering
+# feature is off by default" (active_by_default); a config.toml that names
+# "none" for a slot keeps it off.
 [[features.shortcuts.script_control]]
 id = "script_altgr_backspace"
 platforms = ["ahk"]
-default = "none"
+default = "script_reload"
 recommended = "script_reload"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_backspace"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_delete"
 platforms = ["ahk"]
-default = "none"
+default = "open_personal_shortcuts"
 recommended = "open_personal_shortcuts"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_delete"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_enter"
 platforms = ["ahk"]
-default = "none"
+default = "script_pause_toggle"
 recommended = "script_pause_toggle"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_enter"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_escape"
 platforms = ["ahk"]
-default = "none"
+default = "script_quit"
 recommended = "script_quit"
 input_altering = true
+active_by_default = true
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
@@ -5940,10 +5957,6 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"
-"shortcuts.script_control.script_altgr_backspace" = "sg_labels.script_altgr_backspace"
-"shortcuts.script_control.script_altgr_delete" = "sg_labels.script_altgr_delete"
-"shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
-"shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
 "shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
 "shortcuts.script_control.return_key" = "sg_labels.script_ropt_return"
 "shortcuts.script_control.backspace" = "sg_labels.script_ropt_backspace"
