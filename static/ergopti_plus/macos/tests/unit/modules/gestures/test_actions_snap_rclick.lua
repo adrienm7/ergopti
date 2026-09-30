@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 -- Selected by a declaration unique to modules/gestures/actions.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
-local src = helpers.read_driver_source("local function switch_to_previous_window_precise")
+local src = helpers.read_driver_source("local function switch_to_least_recent_application")
 helpers.assert_true(src ~= nil, "modules/gestures/actions.lua source must be locatable")
 
 -- The synthetic click-hold subsystem (the guarded mouseUp re-toggle) was

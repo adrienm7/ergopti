@@ -1704,6 +1704,12 @@ const CHECKS = [
 		repro: 'npm run test:number-row-full-capture'
 	},
 	{
+		name: 'app and window switching actions carry one explicit label each and migrate the ids macOS merged',
+		cmd: 'node',
+		args: ['tools/test/test-app-switch-labels.cjs'],
+		repro: 'npm run test:app-switch-labels'
+	},
+	{
 		name: 'action picker greys a host-disabled row with its reason and never confirms it',
 		cmd: 'node',
 		args: ['tools/test/test-action-picker-disabled-rows.cjs'],

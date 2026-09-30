@@ -3596,7 +3596,7 @@
 									},
 									{
 										"path": "gestures.tap_4",
-										"value": "app_window_previous",
+										"value": "win_app_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3606,7 +3606,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.app_window_previous"
+												"key": "sg_actions.win_app_next"
 											}
 										]
 									},

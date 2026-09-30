@@ -1030,7 +1030,7 @@ function assertSeparated(row, where) {
 			return page;
 		})()
 	).find((row) => row.name === 'Tab');
-	assert.equal(macTab.action, 'tap: ⇥ ◱ ← Alt+Tab — Prev. window (all apps) · hold: Fn');
+	assert.equal(macTab.action, 'tap: ◱ Previous window — all screens · hold: Fn');
 	const winCaps = checkRows(
 		(() => {
 			const page = openWizard({ platform: 'windows' });

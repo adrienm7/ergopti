@@ -2592,7 +2592,7 @@ description_key = "menu.gestures.tap_3"
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous", linux = "none" }
+recommended_per_platform = { ahk = "screenshot_window_clipboard", hs = "win_app_next", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_4"
