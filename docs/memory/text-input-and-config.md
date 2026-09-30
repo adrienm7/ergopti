@@ -80,6 +80,17 @@ replaces only the driver's own file: the user's same-stem copy (Linux user
 folder, macOS configured hotstrings folder) keeps the category, or each bound
 section it declares, so route with the source's origin, never by stem alone.
 
+### project-word-delimiters-are-config-leaves
+
+Both Lua drivers keep word delimiters in config.toml:
+`[hotstrings.terminator_states]` maps a delimiter key to its state (an absent
+key is the shared catalogue default; Linux writes only differences) and
+`hotstrings.terminators` is an inline list of `{ key, char, label, consume }`
+records. Linux reads and writes them through
+`modules/hotstrings/terminator_settings` (storage.json is imported once);
+Windows keeps its delimiter string in the override file. The shared writer
+cannot address an `[[array-of-tables]]` element, so keep the list inline.
+
 ### project-hotstrings-self-healing-cache
 
 Grouped hotstrings are canonical TOML plus a gitignored TSV runtime cache, not

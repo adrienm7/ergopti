@@ -182,6 +182,9 @@ retry_restore: build it on `config_scope_transaction` (its `revert()` puts
 the runtime snapshot back, then each published file while it still holds our
 bytes) and wrap it with `config_scope_participant.synchronous`, then register
 it in `linux/infra/global_scope.lua` or the macOS `apply_global_scope` owners.
+A macOS `scoped_preferences` owner with its own `transaction_factory` must
+return `revert` and `release` too, holding any fence its runtime restore needs
+(the Hotstrings override fence), or the composition raises on rollback.
 A scope whose manifest declares a `preset` owns that file through the
 transaction's `presets` port; rows under its prefixes never reach config.toml.
 
