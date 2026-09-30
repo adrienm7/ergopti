@@ -752,6 +752,23 @@ LLM_TooltipNavCycleIsOwned() {
 	return IsObject(_LLM_TooltipNavCycleRecord())
 }
 
+; The slot a cycle of Delta lands on from Current among Count slots: past the
+; first slot it loops to the last, and past the last back to the first. The one
+; wrap rule of every prediction cycle (LLM_TooltipCycleActiveIdx, and the plan
+; callback in menu_llm/tab_accept.ahk).
+; @param {Integer} Current - The active slot.
+; @param {Integer} Delta - -1 for the previous slot, 1 for the next one.
+; @param {Integer} Count - The number of slots shown.
+; @returns {Integer} The target slot.
+LLM_TooltipWrapSlot(Current, Delta, Count) {
+	Target := Current + Delta
+	if (Target < 1)
+		return Count
+	if (Target > Count)
+		return 1
+	return Target
+}
+
 ; Moves the ▶ marker of the prediction the navigation chord cycles by Delta
 ; slots, wrapping around at both ends, and repaints it in place:
 ; LLM_TooltipSetActiveIdx republishes the record to the native owner with its
@@ -768,11 +785,7 @@ LLM_TooltipCycleActiveIdx(Delta, SetActiveIdxFn := 0) {
 	Record := _LLM_TooltipNavCycleRecord()
 	if !IsObject(Record)
 		return 0
-	Target := Record.ActiveIdx + Delta
-	if (Target < 1)
-		Target := Record.Slots.Length
-	else if (Target > Record.Slots.Length)
-		Target := 1
+	Target := LLM_TooltipWrapSlot(Record.ActiveIdx, Delta, Record.Slots.Length)
 	if !HasMethod(SetActiveIdxFn, "Call")
 		SetActiveIdxFn := LLM_TooltipSetActiveIdx
 	return SetActiveIdxFn.Call(Target) ? Target : 0
