@@ -174,6 +174,28 @@ function _currentlyOn(entry) {
 }
 
 /**
+ * Whether an item may only be added and its key is already configured: a
+ * tap-hold key set to its recommendation or customised by the user. The page
+ * shows such a key as it is and never imports over it.
+ * @param {object} item
+ * @returns {boolean}
+ */
+function _locked(item) {
+	return (
+		item.customised_value !== undefined && Object.prototype.hasOwnProperty.call(_current, item.path)
+	);
+}
+
+/**
+ * Whether an item holds the user's own setting rather than the recommendation.
+ * @param {object} item
+ * @returns {boolean}
+ */
+function _customised(item) {
+	return item.customised_value !== undefined && _current[item.path] === item.customised_value;
+}
+
+/**
  * Visits every checklist item of a group tree.
  * @param {Array<object>} groups
  * @param {function(object): void} visit
@@ -214,23 +236,26 @@ function _countItems(group, state) {
 
 /**
  * Builds a page's answer from the configuration in force: the question starts
- * at the category switch's value (No when absent) and every item at whether it
- * is already imported.
+ * at the category switch's value (No when absent), or at the state its host
+ * reports where no config.toml switch exists, and every item at whether it is
+ * already imported.
  * @param {object} page
  * @returns {object}
  */
 function _initialState(page) {
 	var state = { answer: false, checked: {}, prefilled: false, magic: null, custom: '' };
-	var anyOn = false;
+	var configured = false;
 	_eachItem(page.groups, function (item) {
 		var on = _currentlyOn(item);
 		state.checked[item.path] = on;
-		if (on) anyOn = true;
+		if (on || _locked(item)) configured = true;
 	});
-	state.answer = page.master ? _currentValue(page.master) === true : anyOn;
-	// An existing selection is shown as it is; only a page with nothing imported
-	// yet receives the recommendation when its question turns to Yes.
-	state.prefilled = anyOn;
+	if (page.master) state.answer = _currentValue(page.master) === true;
+	else if (page.state) state.answer = _currentValue(page.state) === true;
+	else state.answer = configured;
+	// An existing selection is shown as it is; only a page with nothing
+	// configured yet receives the recommendation when its question turns to Yes.
+	state.prefilled = configured;
 	if (page.magic_key && Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)) {
 		state.magic = _current[page.magic_key.path];
 	}
@@ -255,7 +280,7 @@ function _setAnswer(page, answer) {
 	state.answer = answer;
 	if (answer && !state.prefilled) {
 		_eachItem(page.groups, function (item) {
-			state.checked[item.path] = item.recommended === true;
+			if (!_locked(item)) state.checked[item.path] = item.recommended === true;
 		});
 		state.prefilled = true;
 	}
@@ -679,7 +704,7 @@ function _groupNode(page, group, state, depth) {
 			!state.answer,
 			function (checked) {
 				_eachItem([group], function (item) {
-					state.checked[item.path] = checked;
+					if (!_locked(item)) state.checked[item.path] = checked;
 				});
 				_renderChecklist(page, state);
 			}
@@ -688,12 +713,15 @@ function _groupNode(page, group, state, depth) {
 		node.appendChild(header);
 	}
 	(group.items || []).forEach(function (item) {
+		var text = _customised(item)
+			? _format(_t('onboarding.checklist.customised'), [_itemLabel(item)])
+			: _itemLabel(item);
 		node.appendChild(
 			_checkRow(
-				_itemLabel(item),
+				text,
 				state.answer && state.checked[item.path] === true,
 				false,
-				!state.answer,
+				!state.answer || _locked(item),
 				function (checked) {
 					state.checked[item.path] = checked;
 					_renderChecklist(page, state);

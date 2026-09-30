@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Nei",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Ja",
+	"onboarding.checklist.customised": "{1} — din egen innstilling, beholdes",
 	"onboarding.checklist.inactive": "Svar Ja for å velge hva som skal importeres.",
 	"onboarding.checklist.summary": "Elementer som skal importeres: {1} av {2} valgt",
 	"onboarding.done.body": "Konfigurasjon lagret. Skriptet lastes inn på nytt nå.",

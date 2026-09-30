@@ -132,8 +132,11 @@ These are software implementations; final hardware verification remains below.
    config.toml in the wizard's own transition, macOS goes through the remap
    owner's settings transaction (a file save before the bridge starts or for a
    moved folder), Linux through tap_hold_writer into the chosen folder, where
-   macOS and Linux also switch the Tap-Holds on. The Windows part is statically
-   checked only until its CI run. Until W1 moves them into config.toml, Linux
+   macOS and Linux also switch the Tap-Holds on. A re-run reads the keys each
+   folder already configures: the page opens at the switch in force, shows a
+   key at its recommendation checked and one of the user's as kept, locks both,
+   and every writer refuses to import over the latter and backs up the file it
+   replaces. The Windows part is statically checked only until its CI run. Until W1 moves them into config.toml, Linux
    applies its hotstring sections through hotstrings_config (storage.json) and
    leaves the trigger to its tray.
 8. [x] Complete A4: TapHold menu grouped by hand, shared catalogue, key

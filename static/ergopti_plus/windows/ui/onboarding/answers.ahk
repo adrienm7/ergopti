@@ -59,7 +59,8 @@ OnboardingCatalogue() {
 ; @param Text string The catalogue JSON.
 ; @returns {Map} "pages" (Array) and "entries" (Map path -> entry Map with
 ;   "kind" switch|choice|tap_hold_key|character, "default", and "value" or
-;   "max_characters"; a tap_hold_key entry also names its "key").
+;   "max_characters"; a tap_hold_key entry also names its "key" and the
+;   "customised" value a configured key of the user's reads as).
 OnboardingCatalogueIndex(Text) {
 	global ONBOARDING_CATALOGUE_SCHEMA_VERSION, ONBOARDING_CATALOGUE_DRIVER
 	Catalogue := JsonParse(Text)
@@ -119,9 +120,11 @@ _OnboardingClaim(Entries, Row, Kind) {
 		Entry["value"] := Row["value"]
 	if (Kind == "tap_hold_key") {
 		Key := Row["tap_hold_key"]
-		if !(Key is String) || Key == ""
-			throw ValueError("the onboarding catalogue names a tap-hold key without an id")
+		Customised := Row.Get("customised_value", "")
+		if !(Key is String) || Key == "" || !(Customised is String) || Customised == ""
+			throw ValueError("the onboarding catalogue names a tap-hold key without an id or a customised value")
 		Entry["key"] := Key
+		Entry["customised"] := Customised
 	}
 	if (Kind == "character") {
 		Limit := Row.Get("max_characters", 0)
@@ -275,23 +278,55 @@ OnboardingCurrentValues(Index, Sections) {
 	return Values
 }
 
-; Reads the wizard values a config.toml holds; an absent file holds none.
+; The wizard values of the keys a tap_hold.toml configures: a key set to its
+; recommendation reads as imported, any other setting as customised, which the
+; page keeps as it is and never imports over.
+; @param Index Map From OnboardingCatalogueIndex.
+; @param Report Map Key id -> "recommended" or "customised", from TapHoldKeyReport.
+; @returns {Map} Path -> value (TOML_Bool for an imported key).
+OnboardingTapHoldValues(Index, Report) {
+	Values := Map()
+	for Path, Entry in Index["entries"] {
+		if (Entry["kind"] != "tap_hold_key") || !Report.Has(Entry["key"])
+			continue
+		State := Report[Entry["key"]]
+		if (State == "recommended")
+			Values[Path] := TOML_Bool(Entry["value"])
+		else if (State == "customised")
+			Values[Path] := Entry["customised"]
+		else
+			throw ValueError("unknown tap-hold key state " . String(State))
+	}
+	return Values
+}
+
+; Reads the wizard values a config.toml holds and those of the tap_hold.toml
+; beside it; absent files hold none.
 ; @param Index Map From OnboardingCatalogueIndex.
 ; @param ConfigPath string
-; @returns {Map|String} The values, or why the file could not be read.
+; @returns {Map|String} The values, or why a file could not be read.
 OnboardingReadCurrentValues(Index, ConfigPath) {
+	global _SharedDir
 	try LoggerStart("Onboarding", "Reading the wizard values of {1}…", ConfigPath)
-	if !FileExist(ConfigPath) {
-		try LoggerSuccess("Onboarding", "No configuration at {1}: every page starts neutral.", ConfigPath)
-		return Map()
+	Values := Map()
+	if FileExist(ConfigPath) {
+		Sections := TOML_ParseFreshFileTyped(ConfigPath, &DiscardedArrays)
+		if TOML_ReadFailed(ConfigPath) || DiscardedArrays {
+			try LoggerError("Onboarding", "The configuration at {1} could not be read.", ConfigPath)
+			return "the configuration at " . ConfigPath . " could not be read"
+		}
+		Values := OnboardingCurrentValues(Index, Sections)
 	}
-	Sections := TOML_ParseFreshFileTyped(ConfigPath, &DiscardedArrays)
-	if TOML_ReadFailed(ConfigPath) || DiscardedArrays {
-		try LoggerError("Onboarding", "The configuration at {1} could not be read.", ConfigPath)
-		return "the configuration at " . ConfigPath . " could not be read"
+	TapHoldPath := TapHoldConfigPathBeside(ConfigPath)
+	Report := TapHoldKeyReport(TapHoldPath, _SharedDir . "\tap_hold\defaults.toml")
+	if (Report is String) {
+		try LoggerError("Onboarding", "The tap-hold keys at {1} could not be read: {2}.", TapHoldPath, Report)
+		return Report
 	}
-	Values := OnboardingCurrentValues(Index, Sections)
-	try LoggerSuccess("Onboarding", "Read {1} wizard value(s) from {2}.", Values.Count, ConfigPath)
+	for Path, Value in OnboardingTapHoldValues(Index, Report)
+		Values[Path] := Value
+	try LoggerSuccess("Onboarding", "Read {1} wizard value(s) from {2} and its tap-hold file.",
+		Values.Count, ConfigPath)
 	return Values
 }
 

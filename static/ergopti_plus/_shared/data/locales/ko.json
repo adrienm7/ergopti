@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "아니요",
 	"onboarding.btn.ok": "확인",
 	"onboarding.btn.yes": "예",
+	"onboarding.checklist.customised": "{1} — 사용자 설정 (그대로 유지)",
 	"onboarding.checklist.inactive": "가져올 항목을 선택하려면 예를 선택하세요.",
 	"onboarding.checklist.summary": "가져올 항목: {2}개 중 {1}개 선택됨",
 	"onboarding.done.body": "설정이 저장되었습니다. 이제 스크립트가 다시 로드됩니다.",

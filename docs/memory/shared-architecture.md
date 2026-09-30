@@ -215,8 +215,12 @@ single-bracket header: the Windows narrow tap-hold parser recognises only
 engine's recommended keys from this table; their answers
 (`tap_holds.keys.<id>`, marked `tap_hold_key`) are no configuration paths, and
 each host hands the checked keys to its own tap-hold writer, never to
-config.toml. Action: add a key to the catalogue and to its engine in the same
-change, and keep every manifest path out of `tap_holds.keys`.
+config.toml. On a re-run each host reads the keys the folder's tap-hold owner
+already configures (the preset reads as `true`, any other setting as the
+item's `customised_value`); the page locks those rows and the writers refuse
+to import over a customised key, backing up the file they replace. Action:
+add a key to the catalogue and to its engine in the same change, and keep
+every manifest path out of `tap_holds.keys`.
 
 ### project-key-combinations-have-their-own-gate
 

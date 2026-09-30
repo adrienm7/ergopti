@@ -84,7 +84,8 @@ const PAGE_FIELDS = new Set([
 	'section_path',
 	'neutral_label_key',
 	'magic_key',
-	'sub_switch'
+	'sub_switch',
+	'state'
 ]);
 
 // The separator a hotstring file writes between groups of its sections_order.
@@ -94,6 +95,11 @@ const SECTION_SEPARATOR = '-';
 // configuration key: every host hands these answers to its own tap-hold writer
 // and never to config.toml, so the prefix stays outside every manifest path.
 const TAP_HOLD_KEY_PREFIX = 'tap_holds.keys.';
+
+// The value a host reports for a tap-hold key that holds a setting other than
+// the recommendation. The page shows such a key as kept and never imports it:
+// the wizard only adds keys, it never overwrites one the user configured.
+const TAP_HOLD_CUSTOMISED = 'customised';
 
 // The keys each engine ships a recommendation for: Windows and Linux read the
 // [tap_hold.keys.*] preset, macOS its own Karabiner slots, where a key whose
@@ -444,7 +450,8 @@ function validatePage(id, page, manifest, labels) {
 		'note_key',
 		'file_path',
 		'section_path',
-		'sub_switch'
+		'sub_switch',
+		'state'
 	]) {
 		if (page[field] === undefined) continue;
 		if (!isPlainObject(page[field]))
@@ -557,6 +564,35 @@ function subSwitchFor(id, page, platform, master, groups, manifest, projection) 
 		items.push(...governed);
 	}
 	return { path: declared.path, default: values.default, items };
+}
+
+/**
+ * The page's state on one platform, or null: on a platform without a category
+ * switch in config.toml, the switch its host reads from its own file so the
+ * question starts from what is in force. The page never writes it.
+ * @param {string} id Page id.
+ * @param {object} page Declaration.
+ * @param {string} platform Manifest platform token.
+ * @param {object|null} master The page's category switch on the platform.
+ * @param {object} projection Manifest projection.
+ * @returns {object|null} State descriptor.
+ */
+function stateFor(id, page, platform, master, projection) {
+	const statePath = page.state && page.state[platform];
+	if (statePath === undefined) return null;
+	if (master) {
+		throw new Error(
+			`onboarding page ${id}: ${platform} asks through a category switch, not a state`
+		);
+	}
+	const values = projection.project(statePath, platform);
+	if (typeof values.default !== 'boolean') {
+		throw new Error(`onboarding page ${id}: ${statePath} must be a boolean`);
+	}
+	if (projection.scopeOf(statePath) !== id) {
+		throw new Error(`onboarding page ${id}: ${statePath} belongs to another scope`);
+	}
+	return { path: statePath, default: values.default };
 }
 
 /**
@@ -808,6 +844,7 @@ function tapHoldGroups(id, platform, labels) {
 			default: false,
 			recommended: true,
 			tap_hold_key: key,
+			customised_value: TAP_HOLD_CUSTOMISED,
 			label: [{ key: labels.requireKey(entry.label_key, `onboarding page ${id} key ${key}`) }]
 		});
 	}
@@ -917,6 +954,8 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 		groups
 	};
 	if (master) built.master = master;
+	const state = stateFor(id, page, platform, master, projection);
+	if (state) built.state = state;
 	const subSwitch = subSwitchFor(id, page, platform, master, groups, manifest, projection);
 	if (subSwitch) built.sub_switch = subSwitch;
 	if (hint) built.hint_key = hint;
@@ -995,6 +1034,7 @@ function buildCatalogue() {
 		for (const page of data.pages) {
 			if (page.master) claim(page.master);
 			if (page.sub_switch) claim(page.sub_switch);
+			if (page.state) claim(page.state);
 			if (page.magic_key) claim(page.magic_key);
 			(function walk(groups) {
 				for (const group of groups) {

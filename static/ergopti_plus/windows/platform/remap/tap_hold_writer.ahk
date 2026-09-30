@@ -992,12 +992,120 @@ TapHoldConfigPathBeside(ConfigPath) {
 	return Folder . "\tap_hold.toml"
 }
 
+; Whether a loaded or parsed TOML value is true.
+; @param Value any
+; @returns {Boolean}
+_TH_TomlTrue(Value) => (Value is TOML_Bool) ? Value.Value : ((Value is Integer) && Value == 1)
+
+; Same type and value; strings compare case-sensitively, TOML Booleans by value.
+; @returns {Boolean}
+_TH_SameValue(Left, Right) {
+	if (Left is TOML_Bool) || (Right is TOML_Bool)
+		return (Left is TOML_Bool) && (Right is TOML_Bool) && Left.Value == Right.Value
+	return Type(Left) == Type(Right) && Left == Right
+}
+
+; Whether two key entries hold the same owned fields with the same values.
+; @param Left Map
+; @param Right Map
+; @returns {Boolean}
+_TH_SameOwnedFields(Left, Right) {
+	Kinds := TapHoldFieldKinds()
+	for Field in Kinds {
+		if (Left.Has(Field) != Right.Has(Field))
+			return false
+		if Left.Has(Field) && !_TH_SameValue(Left[Field], Right[Field])
+			return false
+	}
+	return true
+}
+
+; The owned fields of every [tap_hold.keys.<id>] section of a parsed file.
+; @param Sections Map From TOML_ParseFreshFileTyped.
+; @returns {Map} Key id -> Map of owned fields.
+_TH_OwnedKeySections(Sections) {
+	Kinds := TapHoldFieldKinds()
+	Keys := Map()
+	for Section, Fields in Sections {
+		if !RegExMatch(Section, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &Match)
+			continue
+		Owned := Map()
+		for Field, Value in Fields {
+			if Kinds.Has(Field)
+				Owned[Field] := Value
+		}
+		Keys[Match[1]] := Owned
+	}
+	return Keys
+}
+
+; The first-run wizard's view of a tap_hold.toml, read fresh from disk: each
+; key the file configures (its owned fields, over the shipped preset when the
+; file inherits it) is "recommended" when those fields are exactly the preset's
+; and "customised" for any other setting. A key the file leaves to the keyboard
+; is absent, so the wizard may import it; it never imports over another one.
+; @param Path string A tap_hold.toml.
+; @param Defaults string The shared defaults.toml holding the preset.
+; @returns {Map|String} Key id -> state, or why the file could not be read.
+TapHoldKeyReport(Path, Defaults) {
+	if !FileExist(Path)
+		return Map()
+	Sections := TOML_ParseFreshFileTyped(Path, &DiscardedArrays)
+	if TOML_ReadFailed(Path) || DiscardedArrays
+		return "the tap-hold file '" . Path . "' could not be read"
+	Preset := LoadTapHoldToml(Defaults)["keys"]
+	Keys := Map()
+	Root := Sections.Get("tap_hold", Map())
+	if Root.Has("inherit_defaults") && _TH_TomlTrue(Root["inherit_defaults"]) {
+		for KeyId, Fields in Preset
+			Keys[KeyId] := _TH_CloneData(Fields)
+	}
+	for KeyId, Fields in _TH_OwnedKeySections(Sections) {
+		if !Keys.Has(KeyId)
+			Keys[KeyId] := Map()
+		; A modifier hold and a layer hold exclude each other, as in the loader.
+		if Fields.Has("hold_modifier") && Keys[KeyId].Has("hold_layer")
+			Keys[KeyId].Delete("hold_layer")
+		if Fields.Has("hold_layer") && Keys[KeyId].Has("hold_modifier")
+			Keys[KeyId].Delete("hold_modifier")
+		for Field, Value in Fields
+			Keys[KeyId][Field] := Value
+	}
+	Report := Map()
+	for KeyId, Fields in Keys {
+		if (Fields.Count == 0)
+			continue
+		if Preset.Has(KeyId) && _TH_SameOwnedFields(Fields, Preset[KeyId])
+			Report[KeyId] := "recommended"
+		else
+			Report[KeyId] := "customised"
+	}
+	return Report
+}
+
+; Backs up the tap_hold.toml a wizard import replaces, as a configuration scope
+; backs up its files, and verifies the copy.
+; @param Path string The tap_hold.toml.
+; @param Image Map Its rendered import, from TapHoldImportImage.
+; @returns {String} The backup path, "" for a file the import creates.
+; Throws when the backup cannot be made and verified.
+TapHoldImportBackup(Path, Image) {
+	if !Image["source_present"]
+		return ""
+	Backup := ConfigUnusedKeysBackupPath(Path, FormatTime(A_Now, "yyyyMMdd-HHmmss") . "-" . A_TickCount)
+	Written := FSWriteCreateDurable(Backup, Image["source_content"])
+	if !(Written is Integer) || Written != 1 || !FSUtf8ExactMatches(Backup, Image["source_content"])
+		throw Error("The tap-hold file '" . Path . "' could not be backed up.")
+	return Backup
+}
+
 ; Renders the first-run wizard's Tap-Holds answer into a tap_hold.toml image
 ; without publishing it: each key named takes exactly the shipped preset's
-; fields, the owned fields it had are replaced as one, and nothing else in the
-; file changes, so a key the user left unchecked keeps whatever it had. The
-; wizard publishes the image in its own configuration transition, beside the
-; config.toml whose category switch turns the Tap-Holds on.
+; fields and nothing else in the file changes, so a key the user left
+; unchecked keeps whatever it had. It only adds keys: a key holding the user's
+; own setting refuses the whole import. The wizard publishes the image in its
+; own configuration transition, beside the config.toml whose category switch
+; turns the Tap-Holds on.
 ; @param Path string The tap_hold.toml of the folder being set up.
 ; @param Defaults string The shared defaults.toml holding the preset.
 ; @param KeyIds Array Key ids of this driver's catalogue column, at least one.
@@ -1014,6 +1122,9 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 		throw Error("The canonical tap-hold preset is unreadable or empty.")
 	Present := FileExist(Path) ? 1 : 0
 	Existing := Present ? TOML_ParseFreshFile(Path) : Map()
+	Report := TapHoldKeyReport(Path, Defaults)
+	if (Report is String)
+		throw Error(Report)
 	Kinds := TapHoldFieldKinds()
 	Rows := []
 	Imported := Map()
@@ -1022,6 +1133,8 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			throw ValueError("The shipped preset recommends nothing for tap-hold key '" . String(KeyId) . "'.")
 		if Imported.Has(KeyId)
 			throw ValueError("Tap-hold key '" . KeyId . "' is imported twice.")
+		if (Report.Get(KeyId, "") == "customised")
+			throw ValueError("Tap-hold key '" . KeyId . "' holds the user's own setting.")
 		Imported[KeyId] := true
 		Section := "tap_hold.keys." . KeyId
 		if Existing.Has(Section) {

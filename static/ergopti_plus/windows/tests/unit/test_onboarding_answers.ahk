@@ -10,7 +10,9 @@
 ; deletions, the file the wizard creates is stamped with the schema version, and
 ; a re-run reads the values in force back through the same paths. The Tap-Holds
 ; page's checked keys never become config.toml rows: the tap-hold writer renders
-; their preset into the tap_hold.toml the same transaction publishes.
+; their preset into the tap_hold.toml the same transaction publishes. A re-run
+; reads that file too, shows a key of the user's as kept, and never imports
+; over it; the file an import replaces is backed up first.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -31,6 +33,20 @@ _TOAN_NewPath() {
 	Sequence += 1
 	return A_Temp . "\ergopti-onboarding-answers-" . A_ScriptHwnd . "-"
 		. A_TickCount . "-" . Sequence . ".toml"
+}
+
+; A fresh temporary configuration folder: the tap_hold.toml beside a
+; config.toml there is the test's own, never one another test left in A_Temp.
+_TOAN_NewFolder() {
+	Folder := SubStr(_TOAN_NewPath(), 1, -5)
+	DirCreate(Folder)
+	return Folder
+}
+
+; Removes a folder _TOAN_NewFolder created, with every file in it.
+_TOAN_DeleteFolder(Folder) {
+	try FileDelete(Folder . "\*.*")
+	try DirDelete(Folder)
 }
 
 ; One page operation, as the page posts it.
@@ -305,8 +321,8 @@ _TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
 	Defaults := _SharedDir . "\tap_hold\defaults.toml"
 	Path := _TOAN_NewPath()
 	Rendered := _TOAN_NewPath()
-	Source := '[tap_hold]`ninherit_defaults = false`n[tap_hold.keys.caps_lock]`ntap_action = "copy"`n'
-		. 'hold_layer = "nav"`n[tap_hold.keys.left_shift]`ntap_action = "paste"`n[private]`nnote = "keep"`n'
+	Source := '[tap_hold]`ninherit_defaults = false`n'
+		. '[tap_hold.keys.left_shift]`ntap_action = "paste"`n[private]`nnote = "keep"`n'
 	try {
 		AssertTrue(FSWriteDurable(Path, Source))
 		Image := TapHoldImportImage(Path, Defaults, ["caps_lock"])
@@ -318,7 +334,6 @@ _TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
 		Preset := LoadTapHoldToml(Defaults)
 		for Field, Value in Preset["keys"]["caps_lock"]
 			AssertEqual(Value, Loaded["keys"]["caps_lock"][Field], "caps_lock." . Field . " is the preset's")
-		AssertFalse(Loaded["keys"]["caps_lock"].Has("hold_layer"), "the old hold does not survive the preset's")
 		AssertEqual("paste", Loaded["keys"]["left_shift"]["tap_action"], "an unchecked key keeps what it had")
 		AssertFalse(Loaded["keys"].Has("left_alt"), "a key nobody checked is not written")
 		AssertEqual("keep", TOML_ParseFreshFile(Rendered)["private"]["note"])
@@ -338,6 +353,34 @@ _TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
 Test("onboarding answers: the tap-hold import renders only the checked keys' preset (onboarding-answers-windows)",
 	_TOAN_TapHoldImportRendersOnlyTheCheckedKeys)
 
+; A re-run answered Yes imported over the keys the user had set.
+_TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp() {
+	global _SharedDir
+	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\tap_hold.toml"
+	Source := '[tap_hold.keys.left_alt]`ntap_action = "escape"`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertThrows(() => TapHoldImportImage(Path, Defaults, ["caps_lock", "left_alt"]),
+			"a key holding the user's own setting refuses the whole import")
+		Image := TapHoldImportImage(Path, Defaults, ["caps_lock"])
+		Backup := TapHoldImportBackup(Path, Image)
+		AssertTrue(Backup != "" && FileExist(Backup), "the file an import replaces is backed up first")
+		SplitPath(Backup, , &BackupFolder)
+		AssertEqual(Folder, BackupFolder, "the backup sits beside the file it protects")
+		AssertTrue(FSUtf8ExactMatches(Backup, Source), "the backup holds the exact bytes the import replaces")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "backing up publishes nothing")
+		Created := Folder . "\created.toml"
+		AssertEqual("", TapHoldImportBackup(Created, TapHoldImportImage(Created, Defaults, ["tab"])),
+			"a file the import creates has nothing to back up")
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("onboarding answers: the tap-hold import keeps the user's keys and backs up (onboarding-answers-windows)",
+	_TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp)
+
 
 
 
@@ -350,7 +393,8 @@ Test("onboarding answers: the tap-hold import renders only the checked keys' pre
 
 _TOAN_RerunReadsTheValuesInForce() {
 	Index := OnboardingCatalogue()
-	Path := _TOAN_NewPath()
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\config.toml"
 	try {
 		AssertTrue(FSWrite(Path, '[gestures]`nenabled = false`n[hotstrings]`ntrigger_char = ";"`n'
 			. '[unrelated]`nenabled = true`n'))
@@ -361,25 +405,71 @@ _TOAN_RerunReadsTheValuesInForce() {
 		AssertContains(Json, '"gestures.enabled":false',
 			"an explicit false is a configured value the page shows")
 		AssertContains(Json, '"hotstrings.trigger_char":";"')
+		FileDelete(Path)
+		Absent := OnboardingReadCurrentValues(Index, Path)
+		AssertTrue(Absent is Map && Absent.Count == 0, "an absent file starts every page neutral")
+		AssertEqual("{}", OnboardingValuesJson(Absent))
 	} finally {
-		try FileDelete(Path)
+		_TOAN_DeleteFolder(Folder)
 	}
-	Absent := OnboardingReadCurrentValues(Index, _TOAN_NewPath())
-	AssertTrue(Absent is Map && Absent.Count == 0, "an absent file starts every page neutral")
-	AssertEqual("{}", OnboardingValuesJson(Absent))
 }
 Test("onboarding answers: a re-run reads the values in force (onboarding-answers-windows)",
 	_TOAN_RerunReadsTheValuesInForce)
 
+; A re-run pre-checked every key and imported over the user's own settings:
+; the page now shows each key the tap_hold.toml beside config.toml configures.
+_TOAN_TapHoldReportTellsImportedFromCustomised() {
+	global _SharedDir
+	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Index := OnboardingCatalogue()
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\tap_hold.toml"
+	try {
+		Empty := TapHoldKeyReport(Path, Defaults)
+		AssertTrue(Empty is Map && Empty.Count == 0, "a folder without tap_hold.toml configures no key")
+		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = false`n'
+			. '[tap_hold.keys.caps_lock]`ntime_activation_seconds = 0.35`ntap_action = "enter"`n'
+			. 'hold_modifier = "ctrl"`n[tap_hold.keys.left_alt]`ntap_action = "escape"`n'))
+		Report := TapHoldKeyReport(Path, Defaults)
+		AssertTrue(Report is Map, "a readable file is reported")
+		AssertEqual(2, Report.Count, "a key the file leaves out stays free")
+		AssertEqual("recommended", Report.Get("caps_lock", ""), "a key set to its recommendation reads as imported")
+		AssertEqual("customised", Report.Get("left_alt", ""), "any other setting is the user's own")
+		Values := OnboardingReadCurrentValues(Index, Folder . "\config.toml")
+		AssertTrue(Values is Map, "a folder without config.toml still reads its tap-hold keys")
+		AssertEqual(2, Values.Count)
+		Json := OnboardingValuesJson(Values)
+		AssertContains(Json, '"tap_holds.keys.caps_lock":true', "an imported key shows checked")
+		AssertContains(Json, '"tap_holds.keys.left_alt":"customised"', "a customised key shows as kept")
+		FileDelete(Path)
+		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = true`n'
+			. '[tap_hold.keys.tab]`ntap_action = "enter"`n'))
+		Inherited := TapHoldKeyReport(Path, Defaults)
+		AssertEqual(LoadTapHoldToml(Defaults)["keys"].Count, Inherited.Count,
+			"a file that inherits the preset configures every key it recommends")
+		AssertEqual("recommended", Inherited["caps_lock"])
+		AssertEqual("customised", Inherited["tab"])
+		FileDelete(Path)
+		AssertTrue(FSWriteDurable(Path, '[tap_hold.keys.left_alt]`ntap_action = [`n  "escape",`n'))
+		AssertTrue(OnboardingReadCurrentValues(Index, Folder . "\config.toml") is String,
+			"an unreadable tap-hold file never opens a neutral page")
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("onboarding answers: a re-run reads the tap-hold keys beside config.toml (onboarding-answers-windows)",
+	_TOAN_TapHoldReportTellsImportedFromCustomised)
+
 _TOAN_UnreadableConfigurationIsNeverShownNeutral() {
 	Index := OnboardingCatalogue()
-	Path := _TOAN_NewPath()
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\config.toml"
 	try {
 		AssertTrue(FSWrite(Path, "[gestures]`nenabled = [`n  true,`n"))
 		AssertTrue(OnboardingReadCurrentValues(Index, Path) is String,
 			"neutral pages over a damaged file would overwrite answers the user gave")
 	} finally {
-		try FileDelete(Path)
+		_TOAN_DeleteFolder(Folder)
 	}
 }
 Test("onboarding answers: a damaged configuration is refused, not shown neutral (onboarding-answers-windows)",

@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Nej",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Ja",
+	"onboarding.checklist.customised": "{1} — din egen inställning, behålls",
 	"onboarding.checklist.inactive": "Svara Ja för att välja vad som ska importeras.",
 	"onboarding.checklist.summary": "Objekt att importera: {1} av {2} valda",
 	"onboarding.done.body": "Konfigurationen sparad. Skriptet laddas om nu.",

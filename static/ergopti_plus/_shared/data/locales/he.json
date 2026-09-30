@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "לא",
 	"onboarding.btn.ok": "אישור",
 	"onboarding.btn.yes": "כן",
+	"onboarding.checklist.customised": "{1} — ההגדרה שלך, נשמרת",
 	"onboarding.checklist.inactive": "ענו כן כדי לבחור מה לייבא.",
 	"onboarding.checklist.summary": "פריטים לייבוא: נבחרו {1} מתוך {2}",
 	"onboarding.done.body": "ההגדרות נשמרו. הסקריפט יטען מחדש עכשיו.",

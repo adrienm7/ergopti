@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "لا",
 	"onboarding.btn.ok": "موافق",
 	"onboarding.btn.yes": "نعم",
+	"onboarding.checklist.customised": "{1} — إعدادك الخاص، يبقى كما هو",
 	"onboarding.checklist.inactive": "أجب بنعم لاختيار ما سيتم استيراده.",
 	"onboarding.checklist.summary": "العناصر المراد استيرادها: تم تحديد {1} من {2}",
 	"onboarding.done.body": "تم حفظ الإعدادات. سيتم إعادة تحميل البرنامج الآن.",

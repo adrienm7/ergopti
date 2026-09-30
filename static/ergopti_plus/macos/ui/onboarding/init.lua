@@ -20,7 +20,8 @@
 ---    into config_karabiner.toml and switches the Tap-Holds on there.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
----    user picks.
+---    user picks, the tap-hold keys and switch included, which the remap owner
+---    reports from that folder's config_karabiner.toml.
 --- ==============================================================================
 
 local M = {}
@@ -59,6 +60,9 @@ local _config_path  = nil
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
+
+-- Keeps each tap-hold import's backup of config_karabiner.toml unique.
+local _backup_sequence = 0
 
 -- WebView + usercontent bridge state (singleton)
 local _webview      = nil
@@ -223,12 +227,50 @@ function M.config_values(decoded, mark)
 	return Answers.current_values(catalogue(), decoded, mark)
 end
 
---- The configured value of every wizard path in a config file.
+--- The config_karabiner.toml beside a config.toml: the remap settings of the
+--- same configuration folder, named as the path resolver names them.
+--- @param config_path string Absolute config.toml path.
+--- @return string
+local function remap_settings_beside(config_path)
+	local name = require("infra.config_paths").get("KarabinerConfigPath"):match("([^/\\]+)$")
+	local folder = type(config_path) == "string" and config_path:match("^(.*)[/\\][^/\\]+$") or nil
+	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
+	return folder .. "/" .. name
+end
+
+--- The wizard values of the tap-hold keys and switch the remap owner reports
+--- beside a config.toml: a configured key is shown as kept, never imported over.
+--- @param config_path string Absolute config.toml path.
+--- @return table|nil values nil when the remap settings cannot be read.
+local function tap_hold_values(config_path)
+	local ok, report, err = pcall(function()
+		return require("platform.remap").recommended_key_report(remap_settings_beside(config_path))
+	end)
+	if not ok or type(report) ~= "table" then
+		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
+		return nil
+	end
+	return Answers.tap_hold_values(catalogue(), report)
+end
+
+--- Adds the tap-hold values beside a config.toml to its configured values.
+--- @param values table Values of config.toml, completed in place.
+--- @param config_path string Absolute config.toml path.
+--- @return table|nil values nil when the remap settings cannot be read.
+local function with_tap_hold_values(values, config_path)
+	local tap_holds = tap_hold_values(config_path)
+	if not tap_holds then return nil end
+	for path, value in pairs(tap_holds) do values[path] = value end
+	return values
+end
+
+--- The configured value of every wizard path in a config file and in the
+--- remap settings beside it.
 --- @param path string Absolute config.toml path.
---- @return table|nil values Empty for an absent file, nil when unreadable.
+--- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function current_values(path)
 	local content, status = FileSystem.read_with_status(path)
-	if status == "absent" then return {} end
+	if status == "absent" then return with_tap_hold_values({}, path) end
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "The configuration in force could not be read (%s).", tostring(status))
 		return nil
@@ -238,8 +280,9 @@ local function current_values(path)
 		Logger.error(LOG, "The configuration in force could not be decoded.")
 		return nil
 	end
-	return M.config_values(decoded)
+	return with_tap_hold_values(M.config_values(decoded), path)
 end
+M._current_values = current_values
 
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings(). Used both for the initial render and for the
@@ -445,6 +488,7 @@ end
 --- wizard set up; before it starts (the first run) or for a folder the wizard
 --- moves the configuration to, the owner saves them to that folder's file,
 --- which the reload reads.
+--- Either way the owner backs the file up first.
 --- @param keys table Key ids of tap_hold_keys.json, at least one.
 --- @param moved boolean Whether the wizard moved the configuration folder.
 --- @param on_done function Callback fn(ok, detail), called exactly once.
@@ -454,16 +498,20 @@ local function import_tap_holds(keys, moved, on_done)
 		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
 		return
 	end
-	if Remap.is_initialized() and not moved then
-		Remap.import_recommended_keys(keys, function(ok, reason) on_done(ok == true, reason) end)
-		return
-	end
 	local ok_path, path = pcall(require("infra.config_paths").get, "KarabinerConfigPath")
 	if not ok_path then
 		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
 		return
 	end
-	local saved_ok, saved, detail = pcall(Remap.save_recommended_keys, keys, path)
+	_backup_sequence = _backup_sequence + 1
+	local backup_path = string.format("%s.tap_holds-%d-%d.bak", path, os.time(), _backup_sequence)
+	if Remap.is_initialized() and not moved then
+		Remap.import_recommended_keys({ keys = keys, backup_path = backup_path },
+			function(ok, reason) on_done(ok == true, reason) end)
+		return
+	end
+	local saved_ok, saved, detail = pcall(Remap.save_recommended_keys,
+		{ keys = keys, path = path, backup_path = backup_path })
 	on_done(saved_ok and saved == true, saved_ok and detail or saved)
 end
 
@@ -686,7 +734,10 @@ local function handle_message(body)
 			if not read_ok then import_failure("dependency"); return false end
 			if status == "absent" then
 				if not reported then import_failure("absent") end
-				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = {} })
+				local absent_values = with_tap_hold_values({}, cfg_path)
+				if not publication_is_current(owner, view) then return false end
+				if not absent_values then import_failure("answers"); return false end
+				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values })
 			end
 			if status ~= "ok" or type(content) ~= "string" then
 				if not reported then import_failure("read") end
@@ -695,7 +746,9 @@ local function handle_message(body)
 			local decoded, parsed = pcall(toml_codec.decode, content)
 			if not publication_is_current(owner, view) then return false end
 			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
-			local projected, values = pcall(function() return Answers.current_values(catalogue(), parsed) end)
+			local projected, values = pcall(function()
+				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path)
+			end)
 			if not publication_is_current(owner, view) then return false end
 			if not projected or type(values) ~= "table" then import_failure("answers"); return false end
 			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values })

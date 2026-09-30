@@ -198,3 +198,53 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 	end)
 
 end)
+
+-- The first-run wizard's re-run pre-checked every key and imported over the
+-- user's own settings: it now shows what this report says is in force.
+helpers.describe("tap-hold config: the wizard's report of a folder", function()
+
+	--- Reports on a user file holding `text` exactly.
+	local function report(text)
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write(text)
+		fh:close()
+		local result, err = Config.key_report(DEFAULTS, path)
+		os.remove(path)
+		return result, err
+	end
+
+	helpers.it("reports a folder without a tap-hold file as neutral", function()
+		helpers.assert_eq(Config.key_report(DEFAULTS, "/nonexistent/tap_hold.toml"), { enabled = false, keys = {} })
+	end)
+
+	helpers.it("tells an imported key from one the user set, and reads the switch", function()
+		local result = report('[tap_hold]\nenabled = true\n'
+			.. '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\ntap_action = "enter"\nhold_modifier = "ctrl"\n'
+			.. '[tap_hold.keys.left_alt]\ntime_activation_seconds = 0.3\ntap_action = "backspace"\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.left_ctrl]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+			.. '[tap_hold.keys.tab]\nenabled = false\n')
+		helpers.assert_eq(result, { enabled = true, keys = {
+			caps_lock = "recommended",
+			left_alt = "customised",
+			left_ctrl = "recommended",
+			tab = "customised",
+		} }, "a key with another delay or turned off is the user's own setting; one that behaves as the preset is not")
+	end)
+
+	helpers.it("reads every inherited key as the recommendation", function()
+		local result = report('[tap_hold]\nenabled = false\ninherit_defaults = true\n'
+			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\n')
+		helpers.assert_eq(result.enabled, false)
+		helpers.assert_eq(result.keys.left_shift, "customised")
+		helpers.assert_eq(result.keys.caps_lock, "recommended")
+		helpers.assert_eq(result.keys.tab, "recommended")
+	end)
+
+	helpers.it("refuses a malformed file rather than report it neutral", function()
+		local result, err = report('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
+		helpers.assert_nil(result)
+		helpers.assert_type(err, "string")
+	end)
+
+end)

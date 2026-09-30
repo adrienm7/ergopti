@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "नहीं",
 	"onboarding.btn.ok": "ठीक है",
 	"onboarding.btn.yes": "हाँ",
+	"onboarding.checklist.customised": "{1} — आपकी अपनी सेटिंग, जस की तस रखी जाएगी",
 	"onboarding.checklist.inactive": "क्या आयात करना है, यह चुनने के लिए हाँ चुनें।",
 	"onboarding.checklist.summary": "आयात करने योग्य आइटम: {2} में से {1} चुने गए",
 	"onboarding.done.body": "कॉन्फ़िगरेशन सहेजा गया। स्क्रिप्ट अब पुनः लोड होगी।",

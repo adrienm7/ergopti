@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "いいえ",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "はい",
+	"onboarding.checklist.customised": "{1} — ご自身の設定（そのまま保持）",
 	"onboarding.checklist.inactive": "インポートする項目を選ぶには「はい」を選択してください。",
 	"onboarding.checklist.summary": "インポートする項目：{2} 件中 {1} 件を選択",
 	"onboarding.done.body": "設定を保存しました。スクリプトを今すぐ再読み込みします。",

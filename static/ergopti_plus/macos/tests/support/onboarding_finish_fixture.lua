@@ -51,10 +51,12 @@ end
 --- Runs one finish message through the production handler.
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
 ---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
----   remap = { initialized, hold_import, import_ok, save_ok }|nil,
+---   remap = { initialized, hold_import, import_ok, save_ok, report }|nil,
 ---   menu_paths = table|nil }`. A held import leaves its callback in
----   state.import_callbacks for the scenario to settle.
---- @param scenario function scenario(state) with the recorded side effects.
+---   state.import_callbacks for the scenario to settle; `report` is what the
+---   owner reports of the tap-hold keys in force (nil: unreadable). Without
+---   `answers` no message runs, for a scenario that reads through the module.
+--- @param scenario function scenario(state, onboarding) with the recorded side effects.
 function M.with_finish(opts, scenario)
 	local saved = {}
 	for _, name in ipairs(MODULE_NAMES) do
@@ -101,22 +103,30 @@ function M.with_finish(opts, scenario)
 	}
 	-- The remap owner: a running bridge takes the import in its settings
 	-- transaction and answers through a callback; otherwise it saves the file.
+	-- Either way the request names the backup the owner takes first.
 	local remap = opts.remap or {}
-	state.imports, state.saves, state.import_callbacks = {}, {}, {}
+	state.imports, state.saves, state.import_callbacks, state.backups, state.reports = {}, {}, {}, {}, {}
 	package.loaded["platform.remap"] = {
 		is_initialized = function() return remap.initialized == true end,
-		import_recommended_keys = function(keys, on_done)
-			state.imports[#state.imports + 1] = keys
+		recommended_key_report = function(path)
+			state.reports[#state.reports + 1] = path
+			if remap.report == nil then return nil, "the settings file is unsafe" end
+			return remap.report
+		end,
+		import_recommended_keys = function(request, on_done)
+			state.imports[#state.imports + 1] = request.keys
+			state.backups[#state.backups + 1] = request.backup_path
 			if remap.hold_import then
 				state.import_callbacks[#state.import_callbacks + 1] = on_done
 				return true
 			end
 			local ok = remap.import_ok ~= false
-			on_done(ok, ok and "ready" or "activation-failed", #keys)
+			on_done(ok, ok and "ready" or "activation-failed", #request.keys)
 			return ok
 		end,
-		save_recommended_keys = function(keys, path)
-			state.saves[#state.saves + 1] = { keys = keys, path = path }
+		save_recommended_keys = function(request)
+			state.saves[#state.saves + 1] = { keys = request.keys, path = request.path }
+			state.backups[#state.backups + 1] = request.backup_path
 			if remap.save_ok == false then return false, "the settings file is unsafe" end
 			return true
 		end,
@@ -152,8 +162,8 @@ function M.with_finish(opts, scenario)
 		helpers.assert_not_nil(config_path_index,
 			"the fixture must assign the real commit destination upvalue")
 		debug.setupvalue(onboarding.run, config_path_index, "/virtual/onboarding-config.toml")
-		handle_message({ action = "finish", answers = opts.answers })
-		scenario(state)
+		if opts.answers ~= nil then handle_message({ action = "finish", answers = opts.answers }) end
+		scenario(state, onboarding)
 	end, debug.traceback)
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
