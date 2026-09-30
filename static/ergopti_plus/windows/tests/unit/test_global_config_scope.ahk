@@ -46,24 +46,27 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		_PersonalShortcutsRegistry := Map("__Order", ["registered tool"], "registered tool", Map())
 		KeyboardShortcutAssignments := Map("win_b", "open_url")
 		GestureActionParameters := TOML_ParseFreshFile(Fixture.path)["action_parameters"].Clone()
-		if Mode == "recommended" {
-			Factory := "_MI_GlobalScopeCommands"
-			Commands := %Factory%(Fixture.options)
-			Rendered.Delete()
-			Rendered := MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands,
-				Map("start_at_login_enabled", (*) => false))
-			ItemId := 0
-			Loop TrayMenuItemCount(Rendered) {
-				Candidate := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", A_Index - 1, "uint")
-				if _MenuDispatchCallbacks.Has(Candidate) && ObjPtr(_MenuDispatchCallbacks[Candidate]) == ObjPtr(Commands["restore_recommended"])
-					ItemId := Candidate
-			}
-			Assert(ItemId != 0, "the existing product Restore row must dispatch to the global owner")
-			Receipt := (_MenuDispatchCallbacks[ItemId])()
-		} else {
-			Apply := "ConfigGlobalScopeApply"
-			Receipt := %Apply%(Mode, Fixture.options)
+		; Both rows of the Configuration menu's first group dispatch to the
+		; global owner: « Restaurer » first, « Tout effacer » second, then a
+		; separator (menu-first-group). An inert cleanup row follows it, so the
+		; renderer draws the separator.
+		Factory := "_MI_GlobalScopeCommands"
+		Commands := %Factory%(Fixture.options)
+		Commands["clean_unused_keys"] := (*) => ""
+		Id := Mode == "clear" ? "scope_clear" : "scope_restore"
+		Rendered.Delete()
+		Rendered := MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands,
+			Map("start_at_login_enabled", (*) => false))
+		ItemId := 0, Position := -1
+		Loop TrayMenuItemCount(Rendered) {
+			Candidate := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", A_Index - 1, "uint")
+			if _MenuDispatchCallbacks.Has(Candidate) && ObjPtr(_MenuDispatchCallbacks[Candidate]) == ObjPtr(Commands[Id])
+				ItemId := Candidate, Position := A_Index - 1
 		}
+		Assert(ItemId != 0, "the Configuration " . Id . " row must dispatch to the global owner")
+		AssertEqual(Mode == "clear" ? 1 : 0, Position, "the global scope rows open the Configuration menu")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 2), "a separator closes the Configuration first group")
+		Receipt := (_MenuDispatchCallbacks[ItemId])()
 		AssertEqual(12, Backups, "all stores reach one coordinated backup boundary")
 		if Scenario == "backup" || Scenario == "external" {
 			AssertEqual(0, Launches)
@@ -141,7 +144,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	}
 }
 Test("global-config-scope: real Restore dispatch publishes twelve stores and compensates refusal", _GlobalScopeComposition.Bind("recommended"))
-Test("global-config-scope: clear removes owned overrides and compensates every file", _GlobalScopeComposition.Bind("clear"))
+Test("global-config-scope: real Clear dispatch removes owned overrides and compensates every file", _GlobalScopeComposition.Bind("clear"))
 Test("global-config-scope: recommendations preserve absent consent", _GlobalScopeComposition.Bind("recommended", "absent"))
 Test("global-config-scope: late backup refusal publishes nothing", _GlobalScopeComposition.Bind("clear", "backup"))
 Test("global-config-scope: external last-file edit preserves the foreign version", _GlobalScopeComposition.Bind("clear", "external"))

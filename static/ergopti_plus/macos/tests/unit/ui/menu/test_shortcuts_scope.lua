@@ -109,11 +109,10 @@ helpers.describe("terminal macOS shortcut scopes", function()
 		end)
 	end)
 
-	for _, field in ipairs({ "confirm", "paused", "idle", "modal_pause", "stale_source", "native_mismatch" }) do
+	for _, field in ipairs({ "paused", "idle", "stale_source", "native_mismatch" }) do
 		helpers.it("refuses " .. field .. " before backup or native publication", function()
 			Fixture.run(function(f)
-				if field == "confirm" or field == "idle" then f.controls[field] = false
-				elseif field == "modal_pause" then f.controls.on_confirm = function() f.controls.paused = true end
+				if field == "idle" then f.controls[field] = false
 				elseif field == "stale_source" then f.files.config = f.files.config .. "# external editor\n"
 				elseif field == "native_mismatch" then helpers.assert_eq(f.keyboard.stop(), true)
 				else f.controls[field] = true end

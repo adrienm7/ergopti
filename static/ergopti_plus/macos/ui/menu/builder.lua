@@ -591,15 +591,18 @@ function M.generate(ctx, menu_mods, actions)
 		["apps"]            = function() return module_rows("apps") end,
 		["configuration"]   = function()
 			-- Every row is `type = "command"` in the manifest: labels, order and
-			-- the separator are declared, and this file supplies only what each
+			-- the separators are declared, and this file supplies only what each
 			-- row does. Read once, so the pause gate below can tell the rows apart
-			-- by the handler they carry.
+			-- by the handler they carry. The global scope's restore and clear open
+			-- the menu, like every settings menu's.
 			local restore = actions.reset_defaults
+			local clear = actions.clear_to_system
 			local clean = actions.clean_unused_keys
 			local cfg_ctx = {}
 			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
 			cfg_ctx.commands = {
-				["restore_recommended"] = restore,
+				["scope_restore"]       = restore,
+				["scope_clear"]         = clear,
 				["clean_unused_keys"]   = clean,
 				["config_folder"]       = actions.open_paths,
 				["setup_wizard"]        = actions.show_setup_wizard,
@@ -622,11 +625,13 @@ function M.generate(ctx, menu_mods, actions)
 			-- snapshots what was running and resume_all() restores that snapshot.
 			-- A row that rewrites the configuration in between is either discarded
 			-- on resume or breaks the « pause = tout éteint » invariant, so those
-			-- two are greyed AND stripped of their handler: a disabled row whose fn
-			-- survives still fires the moment the greying is rendered wrong
-			-- somewhere else. The two rows that only open a window stay live.
+			-- three are greyed AND stripped of their handler: a disabled row whose
+			-- fn survives still fires the moment the greying is rendered wrong
+			-- somewhere else. The rows that only open a window stay live.
 			local pause_gated = {}
-			for _, fn in ipairs({ restore, clean }) do
+			-- pairs, not ipairs: an unregistered command is nil, and ipairs would
+			-- stop there and leave the rows after it ungated.
+			for _, fn in pairs({ restore = restore, clear = clear, clean = clean }) do
 				-- An unregistered command draws no row, so it has nothing to gate.
 				if type(fn) == "function" then pause_gated[fn] = true end
 			end

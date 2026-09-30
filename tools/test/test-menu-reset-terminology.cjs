@@ -59,17 +59,18 @@ const RESTORE_IDS = new Set([
 const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 
 // Menus that must keep declaring the rows: menu -> [restore rows, clear rows].
-// Shortcuts and Layout declare the restore alone (shortcuts-restore-row), and
-// so does the AI menu since its clear row was retired (ai-menu-no-clear).
+// Metrics and the AI menu declare the restore alone: the maintainer retired
+// their clear rows on 2026-09-30 (ai-menu-no-clear). Where each row sits is
+// test-menu-first-group.cjs's.
 const EXPECTED_ROWS = {
-	configuration_menu: [1, 0],
+	configuration_menu: [1, 1],
 	gestures_menu: [1, 1],
 	hotstrings_menu: [1, 1],
-	layout_menu: [1, 0],
+	layout_menu: [1, 1],
 	llm_menu: [1, 0],
-	metrics_menu: [1, 1],
+	metrics_menu: [1, 0],
 	script_control_group: [1, 1],
-	shortcuts_menu: [1, 0],
+	shortcuts_menu: [1, 1],
 	tap_holds_menu: [1, 1]
 };
 

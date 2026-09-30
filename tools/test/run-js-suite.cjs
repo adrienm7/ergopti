@@ -283,7 +283,13 @@ const CHECKS = [
 		repro: 'node tools/test/test-menu-reset-terminology.cjs'
 	},
 	{
-		name: 'restoring the recommended values asks no question on any driver (restore-recommended-no-confirm)',
+		name: 'every settings menu opens with its switch, restore and clear, then a separator (menu-first-group)',
+		cmd: 'node',
+		args: ['tools/test/test-menu-first-group.cjs'],
+		repro: 'npm run test:menu-first-group'
+	},
+	{
+		name: 'no restore or clear row asks a question on any driver (restore-recommended-no-confirm)',
 		cmd: 'node',
 		args: ['tools/test/test-restore-recommended-no-confirm.cjs'],
 		repro: 'npm run test:restore-recommended-no-confirm'

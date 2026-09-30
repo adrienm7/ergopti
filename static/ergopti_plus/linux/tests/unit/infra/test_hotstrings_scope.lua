@@ -315,23 +315,23 @@ helpers.describe("hotstrings scope: refusals", function()
 		end)
 	end)
 
-	for _, mode in ipairs({ "clear", "recommended", "cancel" }) do
+	-- Neither row asks: the maintainer retired the clear's question on
+	-- 2026-09-30, the scope owner's backups being the way back.
+	for _, mode in ipairs({ "clear", "recommended" }) do
 		helpers.it("routes the rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(c)
 				local renderer = require("infra.manifest_menu")
 				local root = renderer.get_root()
 				local top, execute = root.top_level, os.execute
-				local selected = mode == "recommended" and "recommended" or "clear"
-				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
+				local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					-- The real hotstrings_menu declaration: the rows are the manifest's.
 					root.top_level = { { id = "hotstrings" } }
 					os.execute = function(command)
-						if command:find("command -v zenity", 1, true) then return 0 end
-						if command:find("zenity --question", 1, true) then
+						if command:find("zenity", 1, true) then
 							questions = questions + 1
-							return mode == "cancel" and 1 or 0
+							return 0
 						end
 						return execute(command)
 					end
@@ -348,17 +348,10 @@ helpers.describe("hotstrings scope: refusals", function()
 					end
 					helpers.assert_eq(type(action), "function", "the hotstrings row is registered")
 					action()
-					local expected = mode ~= "cancel"
-					helpers.assert_eq(changed, expected and 1 or 0)
-					-- Only the clear asks (restore-recommended-no-confirm).
-					helpers.assert_eq(questions, selected == "clear" and 1 or 0)
-					if expected then
-						helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
-						helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, mode == "clear" and 1.0 or 0.5)
-					else
-						helpers.assert_eq(read(c.config_path), CONFIG)
-						helpers.assert_eq(read(c.override_path), OVERRIDES)
-					end
+					helpers.assert_eq(changed, 1)
+					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
+					helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
+					helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, mode == "clear" and 1.0 or 0.5)
 				end)
 				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end

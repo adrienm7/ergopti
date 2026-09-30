@@ -268,7 +268,7 @@ local function fixture(options)
 		backup_path = function() generation = generation + 1; return "config-backup-" .. generation end,
 		override_backup_path = function() generation = generation + 1; return "overrides-backup-" .. generation end,
 		admission = function(_, callback) return callback() end,
-		paused = function() return false end, confirm = function() return controls.confirm ~= false end,
+		paused = function() return false end,
 		keymap = km, config = Config, is_personal = function(name) return name == "personal" end,
 		editor = { set_trigger_char = function(value) editor.trigger = value end },
 		start_engine = function()
@@ -528,7 +528,6 @@ helpers.describe("macOS hotstrings scope", function()
 			backup_path = function(scope) return "remap-" .. scope end,
 			defer = function(continuation) continuation(); return true end,
 			paused = function() return false end,
-			confirm = function() return true end,
 			refresh = function(committed, report) refreshes[#refreshes + 1] = { committed, report } end,
 		})
 		helpers.assert_eq(global.apply("recommended"), true)

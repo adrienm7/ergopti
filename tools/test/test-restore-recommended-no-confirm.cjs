@@ -2,25 +2,26 @@
 
 /**
  * ==============================================================================
- * MODULE: Restoring the Recommended Values Asks Nothing, on Every Driver
+ * MODULE: Restore And Clear Ask Nothing, on Every Driver
  * DESCRIPTION:
  * Regression restore-recommended-no-confirm. Every « ↺ Restaurer les valeurs
  * conseillées » row used to open a default-No question before it applied: the
  * macOS scope owners and the tap-hold row asked through block_alert, the Linux
  * rows through zenity, each with the restore label as its text. The maintainer
- * retired that step. A restore is recoverable through the backup its owner
- * writes first; only a clear, which removes a section's settings, still asks.
+ * retired that step, and on 2026-09-30 the « ✕ Tout effacer » question too,
+ * per menu and global alike (« action directe partout, la sauvegarde
+ * suffit »): both are recoverable through the backup their owner writes first,
+ * and Windows never asked.
  *
  * WHAT THIS HOLDS, across the three drivers and the shared pages:
- *   1. The registry: every manifest row labelled common.restore_recommended is
- *      registered by each driver that shows it, so the scans below have
- *      subjects. Each driver's suite clicks the rows themselves
- *      (test_restore_recommended_no_confirm.lua, .ahk).
- *   2. No function that asks a question names the restore label: the label is
- *      a row, never the text of a question.
- *   3. A function that receives a scope mode and asks a question asks it under
- *      a `mode == "clear"` condition, so a question moved to the shared path
- *      would ask before a restore again.
+ *   1. The registry: every manifest row labelled common.restore_recommended or
+ *      common.clear_to_system is registered by each driver that shows it, so
+ *      the scans below have subjects. Each driver's suite clicks the rows
+ *      themselves (test_restore_recommended_no_confirm.lua, .ahk).
+ *   2. No function that asks a question names either label: a label is a row,
+ *      never the text of a question.
+ *   3. No function that receives a scope mode asks a question, whatever the
+ *      mode: a question guarded by `mode == "clear"` is the retired shape.
  *   4. No shared page function that restores the recommended values asks.
  *
  * A source scan is the right tool at this boundary: it is the one place that
@@ -40,6 +41,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
 const RESTORE_KEY = 'common.restore_recommended';
+const CLEAR_KEY = 'common.clear_to_system';
 
 const DRIVERS = [
 	{ platform: 'hs', dir: 'macos', ext: '.lua' },
@@ -58,7 +60,6 @@ const QUESTION_CALLS = {
 
 // A function that receives or reads a scope mode.
 const MODE_NAME = /\b(?:mode|Mode|selected_mode)\b/;
-const CLEAR_GUARD = /\b(?:mode|Mode)\s*==\s*"clear"/;
 const JS_RESTORE = /restoreRecommended|common\.restore_recommended|btn-restore/;
 
 const errors = [];
@@ -137,26 +138,6 @@ function enclosing(spans, at) {
 }
 
 /**
- * Whether a question at one line sits under a clear-only condition: on the line
- * itself, or on an enclosing `if` between it and its function's first line.
- * @param {string[]} lines
- * @param {{start: number}} span
- * @param {number} at Question line index.
- * @returns {boolean}
- */
-function guardedByClear(lines, span, at) {
-	if (CLEAR_GUARD.test(lines[at])) return true;
-	let depth = indentOf(lines[at]);
-	for (let line = at - 1; line >= span.start; line -= 1) {
-		const indent = indentOf(lines[line]);
-		if (lines[line].trim() === '' || indent >= depth) continue;
-		depth = indent;
-		if (/^\s*(?:else)?if\b/i.test(lines[line]) && CLEAR_GUARD.test(lines[line])) return true;
-	}
-	return false;
-}
-
-/**
  * Checks every question of one file against rules 2 and 3.
  * @param {string} rel Path shown in a failure.
  * @param {string} source Comment-stripped source.
@@ -172,13 +153,17 @@ function checkQuestions(rel, source, ext) {
 		questions += 1;
 		const span = enclosing(spans, at);
 		const body = lines.slice(span.start, span.end + 1).join('\n');
-		if (body.includes(RESTORE_KEY) || (ext === '.js' && JS_RESTORE.test(body))) {
+		if (
+			body.includes(RESTORE_KEY) ||
+			body.includes(CLEAR_KEY) ||
+			(ext === '.js' && JS_RESTORE.test(body))
+		) {
 			errors.push(
-				`${rel}:${at + 1} asks a question in a function that restores the recommended values.`
+				`${rel}:${at + 1} asks a question in a function that restores or clears a scope.`
 			);
 		}
-		if (ext !== '.js' && MODE_NAME.test(body) && !guardedByClear(lines, span, at)) {
-			errors.push(`${rel}:${at + 1} asks a question for every scope mode; only a clear may ask.`);
+		if (ext !== '.js' && MODE_NAME.test(body)) {
+			errors.push(`${rel}:${at + 1} asks a question in a function given a scope mode.`);
 		}
 	});
 	return questions;
@@ -236,10 +221,15 @@ function stripJsComments(source) {
 	assert.equal(shape(everyMode, '.lua').length, 1, 'a question before every mode is caught');
 	const clearOnly =
 		'function owner.apply(mode)\n\tif mode == "clear" then\n\t\tif options.confirm(mode) ~= true then return false end\n\tend\nend\n';
-	assert.deepEqual(shape(clearOnly, '.lua'), [], 'a question under a clear condition passes');
+	assert.equal(shape(clearOnly, '.lua').length, 1, 'the retired clear-only question is caught');
 	const sameLine =
 		'local function apply(mode)\n\tif mode == "clear" and not confirm_clear(title) then return false end\nend\n';
-	assert.deepEqual(shape(sameLine, '.lua'), []);
+	assert.equal(shape(sameLine, '.lua').length, 1, 'the retired Linux clear question is caught');
+	const clearLabel =
+		'local function ask()\n\tif ask_yes_no(title, i18n.get("common.clear_to_system")) then end\nend\n';
+	assert.equal(shape(clearLabel, '.lua').length, 1, 'a question naming the clear label is caught');
+	const unrelated = 'local function ask_delete()\n\tif ask_yes_no(title, text) then end\nend\n';
+	assert.deepEqual(shape(unrelated, '.lua'), [], 'an unrelated question passes');
 	const ahkRestore =
 		'Restore(Mode) {\n\tif MsgBox(t("common.restore_recommended"), "", "YesNo") != "Yes"\n\t\treturn\n}\n';
 	assert.equal(shape(ahkRestore, '.ahk').length, 2, 'an AHK question before a restore is caught');
@@ -258,15 +248,22 @@ function stripJsComments(source) {
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const restoreRows = [];
+let clearRows = 0;
 for (const [menu, rows] of Object.entries(manifest)) {
 	if (!Array.isArray(rows)) continue;
 	for (const row of rows) {
-		if (row && row.type === 'command' && row.i18n === RESTORE_KEY)
+		if (row && row.type === 'command' && (row.i18n === RESTORE_KEY || row.i18n === CLEAR_KEY)) {
 			restoreRows.push({ menu, id: row.id, platforms: row.platforms });
+			if (row.i18n === CLEAR_KEY) clearRows += 1;
+		}
 	}
 }
-if (restoreRows.length < 6)
-	errors.push(`the manifest declares ${restoreRows.length} restore row(s), expected at least 6.`);
+if (restoreRows.length - clearRows < 6)
+	errors.push(
+		`the manifest declares ${restoreRows.length - clearRows} restore row(s), expected at least 6.`
+	);
+if (clearRows < 5)
+	errors.push(`the manifest declares ${clearRows} clear row(s), expected at least 5.`);
 
 const driverSources = {};
 for (const driver of DRIVERS) {
@@ -292,9 +289,10 @@ for (const row of restoreRows) {
 // ==================================================
 // ==================================================
 
-// Floors a little under the counts measured on 2026-09-30: a scan that stops
+// Floors a little under the counts measured on 2026-09-30, once the clear's
+// questions were gone (macOS 25, Linux 10, Windows 8): a scan that stops
 // matching the helpers would otherwise pass over nothing.
-const floors = { macos: 25, linux: 15, windows: 6 };
+const floors = { macos: 22, linux: 8, windows: 6 };
 const counts = {};
 for (const driver of DRIVERS) {
 	let questions = 0;
@@ -331,13 +329,13 @@ if (pages < 1) errors.push('found no question on any shared page — the page sc
 // ==================================================
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] Restoring the recommended values must not ask a question:\x1b[0m');
+	console.error('\x1b[31m[FAIL] Restoring or clearing a scope must not ask a question:\x1b[0m');
 	for (const error of errors) console.error(`  - ${error}`);
 	process.exit(1);
 }
 
 const perDriver = DRIVERS.map((driver) => `${driver.dir} ${counts[driver.dir]}`).join(', ');
 console.log(
-	`\x1b[32m[OK] ${restoreRows.length} restore row(s) apply at once; no question ` +
-		`(${perDriver}, shared Lua ${sharedLua}, pages ${pages}) asks before a restore.\x1b[0m`
+	`\x1b[32m[OK] ${restoreRows.length} restore/clear row(s) apply at once; no question ` +
+		`(${perDriver}, shared Lua ${sharedLua}, pages ${pages}) asks before either.\x1b[0m`
 );

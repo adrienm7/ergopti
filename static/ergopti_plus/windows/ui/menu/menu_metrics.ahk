@@ -175,6 +175,10 @@ _MET_WpmWidgetGraph(M, _Cat, Getters) {
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
 
 ; Consent is excluded from recommendations by the shared scope declaration.
+; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+; The Configuration clear still composes the metrics settings.
 _MET_ScopeCommands(Options := unset) {
-	return ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
+	Commands := ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
+	Commands.Delete("scope_clear")
+	return Commands
 }

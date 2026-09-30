@@ -309,16 +309,6 @@ local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
 	return succeeded(Modal.run(function() return os.execute(command) end))
 end
 
---- Asks the default-No question a clear needs before it removes a section's
---- settings. Restoring the recommended values asks nothing: it applies at once,
---- after the scope owner's verified backup.
---- @param title string Already-translated dialog title.
---- @return boolean confirmed False for No, and when nobody could be asked.
-local function confirm_clear(title)
-	return ask_yes_no(title, i18n_safe("common.clear_to_system"),
-		i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) == true
-end
-
 local function gesture_slot_label(slot)
 	local fingers, direction = tostring(slot):match("^swipe_(%d+)_(.+)$")
 	if fingers and direction then
@@ -563,19 +553,18 @@ local function _hotstrings_on(ctx)
 	return type(dyn) == "table" and type(dyn.is_enabled) == "function" and dyn.is_enabled() == true
 end
 
---- Restores the Hotstrings scope at once, or clears it once the user confirms.
+--- Restores or clears the Hotstrings scope at once. Neither asks: the scope
+--- owner's verified backups are the way back (the maintainer retired the
+--- clear's question on 2026-09-30).
 ---
---- Shared by the Hotstrings rows and the Configuration « restore recommended »
---- row, so both reach the one transaction that writes the manifest's recommended
---- values after verified backups. Deleting the explicit choices instead yields the
---- neutral state, where every catalogue is off: the opposite of the label.
+--- The one transaction that writes the manifest's recommended values after
+--- verified backups. Deleting the explicit choices instead yields the neutral
+--- state, where every catalogue is off: the opposite of the restore's label.
 --- @param ctx table Menu context: paused, is_paused, dyn_hotstrings, tooltip_preview, on_menu_changed.
 --- @param mode string "recommended" or "clear".
---- @param title string Title of the question a clear asks.
 --- @return boolean committed
-local function _apply_hotstrings_scope(ctx, mode, title)
+local function _apply_hotstrings_scope(ctx, mode)
 	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-	if mode == "clear" and not confirm_clear(title) then return false end
 	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
 		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1675,11 +1664,11 @@ local function _manifest_hotstring_rows(ctx, config)
 	local function hotstrings_on() return _hotstrings_on(ctx) end
 	local whole_tree = all_sections_row(all_category_ids())
 
-	--- Restores the Hotstrings scope at once, or clears it once the user confirms.
+	--- Restores or clears the Hotstrings scope at once.
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean committed
 	local function apply_hotstrings_scope(mode)
-		return _apply_hotstrings_scope(ctx, mode, i18n_safe("menu.hotstrings.title"))
+		return _apply_hotstrings_scope(ctx, mode)
 	end
 
 	hs_ctx.commands = {
@@ -2552,10 +2541,11 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handed to every other submenu builder in this file.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
-	local function apply_metrics_scope(mode)
+	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+	-- The Configuration clear still composes the metrics scope owner.
+	local function restore_metrics_scope()
 		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.metrics.title")) then return false end
-		local committed = require("infra.metrics_scope").apply(mode, ctx.is_paused)
+		local committed = require("infra.metrics_scope").apply("recommended", ctx.is_paused)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
@@ -2567,8 +2557,7 @@ local function _manifest_metrics_rows(ctx, k)
 	render_ctx.commands = {
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
-		["scope_restore"] = function() return apply_metrics_scope("recommended") end,
-		["scope_clear"] = function() return apply_metrics_scope("clear") end,
+		["scope_restore"] = restore_metrics_scope,
 		["metrics_toggle"] = function()
 			if type(k.set_enabled) ~= "function" then
 				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
@@ -3023,7 +3012,6 @@ local function _build_shortcuts(ctx)
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	local function apply_shortcuts_scope(mode)
 		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.shortcuts.title")) then return false end
 		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -3276,17 +3264,17 @@ local function _build_tap_holds(ctx)
 		if ok and want then ok = th.set_enabled(true) end
 		changed(ok)
 	end
-	-- The two whole-section rows run the shared scope transaction: both files
-	-- backed up, the engine acknowledging the candidate before it is published.
+	-- The scope's restore and clear, the first group after the switch, run the
+	-- shared scope transaction at once: both files backed up, the engine
+	-- acknowledging the candidate before it is published.
 	local function apply_scope(mode)
 		if ctx.paused == true then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.tapholds.title")) then return false end
 		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
 		changed(committed)
 		return committed
 	end
-	render_ctx.commands["reset_defaults"] = function() return apply_scope("recommended") end
-	render_ctx.commands["disable_all"] = function() return apply_scope("clear") end
+	render_ctx.commands["scope_restore"] = function() return apply_scope("recommended") end
+	render_ctx.commands["scope_clear"] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
@@ -3326,21 +3314,17 @@ local function _build_gestures(ctx)
 	local gesture_rows = {}
 	local function apply_scope(mode)
 		if ctx.paused == true then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.gestures.title")) then return false end
 		local committed = ge.apply_scope(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
 
-	-- The two whole-tree actions are `command` rows since 2026-08-07: the renderer
-	-- builds each row and its label from the declaration, and this driver
-	-- registers only what the click does. All three drivers had been writing the
-	-- same two rows with the same two labels.
+	-- The scope's restore and clear are `command` rows of the first group: the
+	-- renderer builds each row and its label from the declaration, right after
+	-- the switch, and this driver registers only what the click does.
 	local gesture_commands = {
-		["restore_defaults"] = function() return apply_scope("recommended") end,
-		["disable_all"] = function()
-			return apply_scope("clear")
-		end,
+		["scope_restore"] = function() return apply_scope("recommended") end,
+		["scope_clear"] = function() return apply_scope("clear") end,
 	}
 
 	-- The master toggle's BEHAVIOUR. Its label, its position and the two i18n keys
@@ -3496,12 +3480,11 @@ local function _build_configuration(ctx)
 		end
 	end
 
-	-- The global restore composes every category's own scope owner, all of
-	-- them or none of them. It applies at once; the global clear asks one
-	-- default-No question first.
+	-- The global restore and clear compose every category's own scope owner,
+	-- all of them or none of them, at once: each owner backs up first, so
+	-- neither asks (the maintainer retired the clear's question on 2026-09-30).
 	local function apply_global_scope(mode)
 		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.configuration.title")) then return false end
 		local GlobalScope = require("infra.global_scope")
 		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
 		-- « Reverted » is only said when it is true; a pending rollback is an
@@ -3520,8 +3503,10 @@ local function _build_configuration(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
 		-- Every category through its own scope owner, hotstrings included: the
-		-- recommended hotstrings, never the neutral state where every catalogue is off.
-		["restore_recommended"] = function() return apply_global_scope("recommended") end,
+		-- recommended hotstrings, never the neutral state where every catalogue is
+		-- off, and that neutral state for the clear.
+		["scope_restore"] = function() return apply_global_scope("recommended") end,
+		["scope_clear"] = function() return apply_global_scope("clear") end,
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))

@@ -200,11 +200,24 @@ Every row that puts a section back to Ergopti's preset reads
 so the OS behaves as without Ergopti reads `common.clear_to_system`, whatever
 the menu. A new reset or clear row takes one of the two keys, never a per-menu
 label; `test-menu-reset-terminology.cjs` holds the manifest rows, the rows
-drivers build by hand and the retired keys. A restore applies at once, because
-its owner backs up first; only a clear asks, default No. The macOS owners call
-their `confirm` port for a clear only, and the maintainer retired the restore
-question on 2026-09-30: `test-restore-recommended-no-confirm.cjs` rejects a
-question whose function names the restore label or runs for every mode.
+drivers build by hand and the retired keys. Neither asks: each owner backs up
+first, and the maintainer retired the restore question, then the clear one
+(2026-09-30, per menu and global). The macOS scoped owners and global scope
+refuse a `confirm` port; `test-restore-recommended-no-confirm.cjs` rejects a
+question in a function given a scope mode or naming either label.
+
+### project-a-settings-menu-opens-with-switch-restore-clear
+
+Every manifest menu that shows a scope row opens with its `toggle` (when it
+has one), `scope_restore`, `scope_clear`, then `---`, and shows no scope row
+after that separator (the maintainer's rule of 2026-09-30); Configuration
+opens with the global pair. The ids are the same in every menu, so each
+driver registers `scope_restore`/`scope_clear` on that menu's scope owner.
+`test-menu-first-group.cjs` checks each platform's projection; its declared
+exceptions are restore-only menus (AI, Metrics: the maintainer said clearing
+them means nothing, while the global clear still composes their owners).
+Action: add a scope row to the first group of the manifest menu, never below
+it and never natively.
 
 ### project-a-composite-scope-composes-revertible-owners
 

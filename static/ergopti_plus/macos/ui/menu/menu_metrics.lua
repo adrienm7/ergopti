@@ -741,11 +741,11 @@ function M.build(ctx)
 		["wpm_menubar"]    = cmd_wpm_menubar,
 		["menubar_colors"] = cmd_menubar_colors,
 	}
-	for command, mode in pairs({ ["scope_restore"] = "recommended", ["scope_clear"] = "clear" }) do
-		render_ctx.commands[command] = function()
-			if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
-			return ctx.apply_preference_scope("metrics", mode)
-		end
+	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+	-- The Configuration clear still composes the metrics scope owner.
+	render_ctx.commands["scope_restore"] = function()
+		if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
+		return ctx.apply_preference_scope("metrics", "recommended")
 	end
 
 	local menu = ManifestMenu.build("metrics_menu", "Metrics", dyn_handlers, nil, render_ctx, list_providers)

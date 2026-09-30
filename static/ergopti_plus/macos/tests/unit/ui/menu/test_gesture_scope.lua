@@ -67,10 +67,6 @@ local function fixture(source)
 		demotions = demotions,
 		capture_preferences = function() return prefs.snapshot(state, {}, modules) end,
 		backup_path = function() return "backup" end,
-		confirm = function()
-			if controls.confirm_hook then controls.confirm_hook() end
-			return controls.confirm ~= false
-		end,
 		paused = function() return controls.paused == true end,
 		admission = function(_, callback) return callback() end,
 	})
@@ -100,7 +96,7 @@ end
 helpers.describe("macOS complete gesture scope", function()
 	helpers.it("clears every owned setting and parameter while preserving nested neighbors", function()
 		local owner, gestures, files, state, _, prefs, save, writes, original = fixture()
-		local committed, detail = menu_commands(owner, gestures, state).disable_all()
+		local committed, detail = menu_commands(owner, gestures, state).scope_clear()
 		helpers.assert_eq(committed, true, detail)
 		local decoded = Codec.decode(files.config)
 		helpers.assert_eq(decoded.gestures.enabled, nil)
@@ -124,7 +120,7 @@ helpers.describe("macOS complete gesture scope", function()
 	end)
 	helpers.it("restores recommendations and seeds the rollback snapshot used by a later failed save", function()
 		local owner, gestures, files, state, controls, _, save = fixture()
-		helpers.assert_eq(menu_commands(owner, gestures, state).restore_defaults(), true)
+		helpers.assert_eq(menu_commands(owner, gestures, state).scope_restore(), true)
 		for slot, value in pairs(gestures.RECOMMENDED_GESTURES) do helpers.assert_eq(gestures.get_action(slot), value) end
 		helpers.assert_eq(state.gestures, Manifest.recommended_for("gestures.enabled"))
 		local committed = files.config
@@ -134,11 +130,11 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(gestures.get_action("tap_4"), gestures.RECOMMENDED_GESTURES.tap_4)
 		helpers.assert_eq(files.config, committed)
 	end)
-	helpers.it("cancellation and pause leave every store untouched", function()
-		for _, key in ipairs({ "confirm", "paused" }) do
+	helpers.it("a pause leaves every store untouched", function()
+		for _, mode in ipairs({ "clear", "recommended" }) do
 			local owner, gestures, files, _, controls, _, _, writes, original = fixture()
-			controls[key] = key == "paused"
-			helpers.assert_eq(owner.apply("clear"), false)
+			controls.paused = true
+			helpers.assert_eq(owner.apply(mode), false)
 			helpers.assert_eq(writes(), 0)
 			helpers.assert_eq(files.config, original)
 			helpers.assert_eq(gestures.get_action("tap_4"), "open_url")
@@ -214,14 +210,6 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(owner.pending(), true)
 		gestures.set_action = setter
 		helpers.assert_eq(owner.retry_restore(), true)
-	end)
-	helpers.it("rechecks pause after the modal confirmation returns", function()
-		local owner, _, files, _, controls, _, _, writes, original = fixture()
-		controls.confirm_hook = function() controls.paused = true end
-		-- Only a clear opens the modal; a restore asks nothing.
-		helpers.assert_eq(owner.apply("clear"), false)
-		helpers.assert_eq(files.config, original)
-		helpers.assert_eq(writes(), 0)
 	end)
 end)
 

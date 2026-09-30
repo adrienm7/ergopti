@@ -34,18 +34,22 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 		GestureActionParameters := TOML_ParseFreshFile(Fixture.path)["action_parameters"]
 		Factory := "_TH_ScopeCommands"
 		Commands := %Factory%(Fixture.options)
-		Id := Mode == "clear" ? "disable_all" : "reset_defaults"
+		Id := Mode == "clear" ? "scope_clear" : "scope_restore"
 		Rendered.Delete()
 		Rendered := MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "",
 			Map("tap_hold_keys_left", (*) => [], "tap_hold_keys_right", (*) => []),
 			Commands, Map("tapholds_enabled", (*) => false))
-		ItemId := 0
+		ItemId := 0, Position := -1
 		Loop TrayMenuItemCount(Rendered) {
 			CandidateId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", A_Index - 1, "uint")
 			if _MenuDispatchCallbacks.Has(CandidateId) && ObjPtr(_MenuDispatchCallbacks[CandidateId]) == ObjPtr(Commands[Id])
-				ItemId := CandidateId
+				ItemId := CandidateId, Position := A_Index - 1
 		}
 		Assert(ItemId != 0, "the actual manifest menu must register the terminal scope command")
+		; The first group (menu-first-group): the switch, the restore, the clear,
+		; then a separator.
+		AssertEqual(Mode == "clear" ? 2 : 1, Position, "the scope rows follow the switch")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 3), "a separator closes the first group")
 		Receipt := (_MenuDispatchCallbacks[ItemId])()
 		if RefuseBackup || ExternalEdit {
 			AssertEqual(2, Backups)

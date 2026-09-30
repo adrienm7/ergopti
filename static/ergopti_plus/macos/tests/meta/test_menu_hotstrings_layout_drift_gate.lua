@@ -132,10 +132,11 @@ local CANONICAL_LAYOUT_MENU = {
 	-- Ergopti layout (its .bundle, the active variants, the menubar icon) are
 	-- told apart from those that work on any layout (pause/resume switching, the
 	-- key turned into a star key). Same rows as before, regrouped under headers.
-	-- UPDATED 2026-09-30: the keyboard-layout scope's restore opens the menu
-	-- (shortcuts-restore-row); menu_keyboard_layout.lua registers scope_restore
-	-- on apply_preference_scope, so the renderer draws it from this row.
+	-- UPDATED 2026-09-30: the keyboard-layout scope's restore then clear open
+	-- the menu (the first group of every settings menu); menu_keyboard_layout.lua
+	-- registers both on apply_preference_scope, so the renderer draws them here.
 	"command:scope_restore",
+	"command:scope_clear",
 	"---",
 	-- UPDATED: the Ergopti section is the custom layout section, on every
 	-- driver: the registry layouts the layout manager installs, and its window.

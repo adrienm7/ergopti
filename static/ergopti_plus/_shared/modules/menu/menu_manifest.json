@@ -364,8 +364,16 @@
 	"configuration_menu": [
 		{
 			"type": "command",
-			"id": "restore_recommended",
+			"id": "scope_restore",
 			"i18n": "common.restore_recommended"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system"
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "command",
@@ -526,6 +534,16 @@
 			"type": "command",
 			"id": "scope_restore",
 			"i18n": "common.restore_recommended",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"reason_key": "platform_reason.shortcuts_restore_is_composed_on_macos"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
 			"platforms": [
 				"ahk",
 				"linux"
@@ -745,7 +763,7 @@
 		},
 		{
 			"type": "command",
-			"id": "restore_recommended",
+			"id": "scope_restore",
 			"i18n": "common.restore_recommended",
 			"platforms": [
 				"ahk"
@@ -754,7 +772,7 @@
 		},
 		{
 			"type": "command",
-			"id": "clear_to_system",
+			"id": "scope_clear",
 			"i18n": "common.clear_to_system",
 			"platforms": [
 				"ahk"
@@ -790,11 +808,6 @@
 			"type": "command",
 			"id": "scope_restore",
 			"i18n": "common.restore_recommended"
-		},
-		{
-			"type": "command",
-			"id": "scope_clear",
-			"i18n": "common.clear_to_system"
 		},
 		{
 			"type": "---"
@@ -1032,6 +1045,16 @@
 			"type": "command",
 			"id": "scope_restore",
 			"i18n": "common.restore_recommended",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.no_layout_settings_on_linux"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
 			"platforms": [
 				"ahk",
 				"hs"
@@ -1361,6 +1384,16 @@
 			"category": "Gestures"
 		},
 		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system"
+		},
+		{
 			"type": "---"
 		},
 		{
@@ -1389,26 +1422,6 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
-		},
-		{
-			"type": "command",
-			"id": "disable_all",
-			"i18n": "common.clear_to_system",
-			"platforms": [
-				"hs",
-				"ahk",
-				"linux"
-			]
-		},
-		{
-			"type": "command",
-			"id": "restore_defaults",
-			"i18n": "common.restore_recommended",
-			"platforms": [
-				"hs",
-				"ahk",
-				"linux"
-			]
 		},
 		{
 			"type": "---"
@@ -1505,16 +1518,13 @@
 			"category": "TapHolds"
 		},
 		{
-			"type": "---"
-		},
-		{
 			"type": "command",
-			"id": "reset_defaults",
+			"id": "scope_restore",
 			"i18n": "common.restore_recommended"
 		},
 		{
 			"type": "command",
-			"id": "disable_all",
+			"id": "scope_clear",
 			"i18n": "common.clear_to_system"
 		},
 		{
