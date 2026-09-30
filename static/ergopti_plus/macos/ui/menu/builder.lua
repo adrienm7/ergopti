@@ -21,6 +21,7 @@ local i18n       = require("infra.i18n")
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
 local HotCounter  = require("ui.menu.hotstring_counter")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
 
@@ -245,6 +246,10 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local function toggle_all_hotstrings()
 		if not ctx or not ctx.hotfiles or type(ctx.hotfiles) ~= "table" then return end
 		local enable = not all_enabled
+		-- Switching on starts the typing engine first, like every section switch:
+		-- after « Clear » it is stopped, and groups turned on without it fire
+		-- nothing. The gate also publishes state.keymap, which the save persists.
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstrings") then return false end
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			if name ~= "custom" and name ~= "personal" then
