@@ -26,6 +26,7 @@ local MODULE_NAMES = {
 	"infra.toml.codec",
 	"infra.toml.writer",
 	"infra.config_paths",
+	"infra.termination_coordinator",
 	"platform.remap",
 	"ui.menu.menu_paths",
 	"ui.onboarding",
@@ -51,11 +52,13 @@ end
 --- Runs one finish message through the production handler.
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
 ---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
----   remap = { initialized, hold_import, import_ok, save_ok, report }|nil,
----   menu_paths = table|nil }`. A held import leaves its callback in
----   state.import_callbacks for the scenario to settle; `report` is what the
----   owner reports of the tap-hold keys in force (nil: unreadable). Without
----   `answers` no message runs, for a scenario that reads through the module.
+---   remap = { initialized, running, hold_import, import_ok, save_ok, report }|nil,
+---   reload = "accepted"|"refused"|nil, menu_paths = table|nil }`. A held
+---   import leaves its callback in state.import_callbacks for the scenario to
+---   settle; `report` is what the owner reports of the tap-hold keys in force
+---   (nil: unreadable). Deferred work is recorded in state.pending, never run,
+---   so a scenario runs it with M.run_deferred. Without `answers` no message
+---   runs, for a scenario that reads through the module.
 --- @param scenario function scenario(state, onboarding) with the recorded side effects.
 function M.with_finish(opts, scenario)
 	local saved = {}
@@ -66,6 +69,8 @@ function M.with_finish(opts, scenario)
 	local state = {
 		alerts = {},
 		deferred = 0,
+		pending = {},
+		reloads = {},
 		locale_persists = 0,
 		locale_switches = 0,
 		notifications = 0,
@@ -93,7 +98,19 @@ function M.with_finish(opts, scenario)
 		notify = function() state.notifications = state.notifications + 1; return true end,
 	}
 	package.loaded["infra.deferred_work"] = {
-		after = function() state.deferred = state.deferred + 1; return true end,
+		after = function(delay, fn, label)
+			state.deferred = state.deferred + 1
+			state.pending[#state.pending + 1] = { delay = delay, fn = fn, label = label }
+			return true
+		end,
+	}
+	-- The owned reload: it records the request and its abort callback.
+	package.loaded["infra.termination_coordinator"] = {
+		is_initialized = function() return true end,
+		request_reload_owned = function(reason, on_aborted)
+			state.reloads[#state.reloads + 1] = { reason = reason, on_aborted = on_aborted }
+			return opts.reload ~= "refused"
+		end,
 	}
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function(title, body, button)
@@ -107,7 +124,10 @@ function M.with_finish(opts, scenario)
 	local remap = opts.remap or {}
 	state.imports, state.saves, state.import_callbacks, state.backups, state.reports = {}, {}, {}, {}, {}
 	package.loaded["platform.remap"] = {
+		-- An initialized bridge may have stopped: only a running one takes
+		-- a transaction.
 		is_initialized = function() return remap.initialized == true end,
+		is_running = function() return remap.running == true end,
 		recommended_key_report = function(path)
 			state.reports[#state.reports + 1] = path
 			if remap.report == nil then return nil, "the settings file is unsafe" end
@@ -167,6 +187,33 @@ function M.with_finish(opts, scenario)
 	end, debug.traceback)
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
+end
+
+--- Runs the first recorded deferred work with a label, once.
+--- @param state table Fixture state.
+--- @param label string DeferredWork label.
+--- @return boolean ran False when no such work is pending.
+function M.run_deferred(state, label)
+	for index, work in ipairs(state.pending) do
+		if work.label == label then
+			table.remove(state.pending, index)
+			work.fn()
+			return true
+		end
+	end
+	return false
+end
+
+--- Counts the recorded deferred work with a label.
+--- @param state table Fixture state.
+--- @param label string DeferredWork label.
+--- @return integer count
+function M.count_deferred(state, label)
+	local count = 0
+	for _, work in ipairs(state.pending) do
+		if work.label == label then count = count + 1 end
+	end
+	return count
 end
 
 return M

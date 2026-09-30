@@ -4481,12 +4481,12 @@ function M.set_mod_combos_enabled(value)
 	return committed
 end
 
---- Whether M.init() has built the live settings. The first-run wizard runs
---- before it, and a wizard that moves the configuration folder runs while it
---- still holds the previous folder's settings.
---- @return boolean initialized
-function M.is_initialized()
-	return _state ~= nil
+--- Whether a live bridge can take a settings transaction now: M.init() built
+--- its settings and its lifecycle is running. The first-run wizard runs before
+--- it, and a stopped or stopping bridge refuses every transaction.
+--- @return boolean running
+function M.is_running()
+	return _state ~= nil and _running == true and not _shutdown_requested
 end
 
 --- Whether the running bridge still owes a settings save: a bulk candidate or

@@ -14,12 +14,16 @@
 --- the wizard moves the configuration to, the owner saves them to that folder's
 --- file, each time over a backup of its own beside that file. No tap-hold key
 --- reaches config.toml, an unchecked key or a No imports nothing, and the
---- reload waits for the import.
+--- reload waits for the import, never past a bounded timeout. A notice waits
+--- for deferred work, never inside the owner's callback, and a reload the
+--- termination coordinator refuses or aborts tells the user one is needed.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.onboarding_finish_fixture")
 local with_finish = Fixture.with_finish
+
+local RELOAD, NOTICE, TIMEOUT = "onboarding.reload", "onboarding.notice", "onboarding.tap_holds_import_timeout"
 
 --- A finish payload answering the Tap-Holds page and one config.toml question.
 --- @param keys table Key id -> checked.
@@ -71,22 +75,33 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 				path = Fixture.KARABINER_CONFIG_PATH } }, "only the checked keys, in the folder's own file")
 			assert_one_backup(state)
 			helpers.assert_eq(state.notifications, 1)
-			helpers.assert_eq(state.deferred, 1, "then the reload starts the bridge on them")
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1, "then the reload starts the bridge on them")
 			helpers.assert_eq(#state.alerts, 0)
 		end)
 	end)
 
 	helpers.it("hands them to the running bridge and reloads only once it answered", function()
-		with_finish({ answers = answers({ caps_lock = true }), remap = { initialized = true, hold_import = true } },
+		with_finish({ answers = answers({ caps_lock = true }), remap = { running = true, hold_import = true } },
 			function(state)
 				assert_only_config_rows(state)
 				helpers.assert_eq(state.imports, { { "caps_lock" } })
 				assert_one_backup(state)
 				helpers.assert_eq(#state.saves, 0, "a running bridge's file is never written behind it")
-				helpers.assert_eq(state.deferred, 0, "no reload while the Karabiner transaction runs")
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0, "no reload while the Karabiner transaction runs")
 				state.import_callbacks[1](true, "ready", 1)
 				helpers.assert_eq(state.notifications, 1)
-				helpers.assert_eq(state.deferred, 1)
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+				helpers.assert_eq(#state.alerts, 0)
+			end)
+	end)
+
+	-- An initialized bridge that stopped refuses every transaction: routed to
+	-- it, the keys were refused as "lifecycle-inactive" and never saved.
+	helpers.it("saves them to the file of a bridge that stopped", function()
+		with_finish({ answers = answers({ caps_lock = true }), remap = { initialized = true, running = false } },
+			function(state)
+				helpers.assert_eq(#state.imports, 0, "a stopped bridge takes no transaction")
+				helpers.assert_eq(state.saves, { { keys = { "caps_lock" }, path = Fixture.KARABINER_CONFIG_PATH } })
 				helpers.assert_eq(#state.alerts, 0)
 			end)
 	end)
@@ -96,7 +111,7 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 			persist_config_dir_for_wizard = function() return true end,
 			get = function() return "/virtual/moved/hammerspoon/config.toml" end,
 		}
-		with_finish({ answers = answers({ tab = true }, "/virtual/moved"), remap = { initialized = true },
+		with_finish({ answers = answers({ tab = true }, "/virtual/moved"), remap = { running = true },
 			menu_paths = menu_paths }, function(state)
 			helpers.assert_eq(state.writes[1].path, "/virtual/moved/hammerspoon/config.toml")
 			helpers.assert_eq(#state.imports, 0,
@@ -150,24 +165,87 @@ end)
 
 helpers.describe("the wizard imports nothing it was not asked to", function()
 	helpers.it("writes nothing for a No or an unchecked list", function()
-		for _, remap in ipairs({ { initialized = false }, { initialized = true } }) do
+		for _, remap in ipairs({ { running = false }, { running = true } }) do
 			with_finish({ answers = answers({ caps_lock = false, tab = false }), remap = remap }, function(state)
 				assert_only_config_rows(state)
 				helpers.assert_eq(#state.imports, 0)
 				helpers.assert_eq(#state.saves, 0)
 				helpers.assert_eq(state.deferred, 1, "the reload does not wait for an import that never started")
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
 			end)
 		end
 	end)
 
-	helpers.it("says so when the import is refused, and still applies the saved answers", function()
-		for _, remap in ipairs({ { initialized = true, import_ok = false }, { initialized = false, save_ok = false } }) do
+	-- The alert blocked inside the owner's terminal callback, while the remap
+	-- transaction was still dispatching it.
+	helpers.it("says so once deferred work runs, then still applies the saved answers", function()
+		for _, remap in ipairs({ { running = true, import_ok = false }, { running = false, save_ok = false } }) do
 			with_finish({ answers = answers({ caps_lock = true }), remap = remap }, function(state)
 				assert_only_config_rows(state)
+				helpers.assert_eq(#state.alerts, 0, "no modal inside the owner's callback")
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0, "the reload follows the notice")
+				helpers.assert_true(Fixture.run_deferred(state, NOTICE))
 				helpers.assert_eq(#state.alerts, 1)
 				helpers.assert_eq(state.alerts[1].body, "onboarding.error.tap_holds_import")
-				helpers.assert_eq(state.deferred, 1, "the other answers are saved and apply at the reload")
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1,
+					"the other answers are saved and apply at the reload")
 			end)
 		end
+	end)
+end)
+
+
+
+
+
+-- =================================================
+-- =================================================
+-- ======= 4/ The Reload Happens Or Says Why =======
+-- =================================================
+-- =================================================
+
+helpers.describe("the wizard's reload always happens or says why", function()
+	-- A bridge that never answered kept the wizard closed and unreloaded.
+	helpers.it("reloads without an import that never answers, with a notice", function()
+		with_finish({ answers = answers({ caps_lock = true }), remap = { running = true, hold_import = true } },
+			function(state)
+				helpers.assert_eq(Fixture.count_deferred(state, TIMEOUT), 1, "the wait is bounded")
+				helpers.assert_true(Fixture.run_deferred(state, TIMEOUT))
+				helpers.assert_true(Fixture.run_deferred(state, NOTICE))
+				helpers.assert_eq(state.alerts[1].body, "onboarding.error.tap_holds_import_timeout")
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+				state.import_callbacks[1](true, "ready", 1)
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1, "a late answer reloads nothing more")
+				helpers.assert_eq(#state.alerts, 1)
+			end)
+	end)
+
+	helpers.it("lets the timeout pass once the import answered", function()
+		with_finish({ answers = answers({ caps_lock = true }), remap = { running = true } }, function(state)
+			helpers.assert_true(Fixture.run_deferred(state, TIMEOUT))
+			helpers.assert_eq(#state.alerts, 0)
+			helpers.assert_eq(Fixture.count_deferred(state, NOTICE), 0)
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+		end)
+	end)
+
+	-- hs.reload() went to the coordinator unowned: a refused or aborted reload
+	-- left the answers saved but unapplied, with the wizard already closed.
+	helpers.it("asks the coordinator for an owned reload, and says when it is still needed", function()
+		with_finish({ answers = answers({}) }, function(state)
+			helpers.assert_true(Fixture.run_deferred(state, RELOAD))
+			helpers.assert_eq(#state.reloads, 1)
+			helpers.assert_eq(state.reloads[1].reason, "onboarding")
+			helpers.assert_eq(#state.alerts, 0, "an accepted reload says nothing")
+			state.reloads[1].on_aborted("the lease fence failed")
+			helpers.assert_true(Fixture.run_deferred(state, NOTICE))
+			helpers.assert_eq(state.alerts[1].body, "onboarding.error.reload_pending")
+		end)
+		with_finish({ answers = answers({}), reload = "refused" }, function(state)
+			helpers.assert_true(Fixture.run_deferred(state, RELOAD))
+			helpers.assert_true(Fixture.run_deferred(state, NOTICE))
+			helpers.assert_eq(state.alerts[1].body, "onboarding.error.reload_pending")
+			helpers.assert_eq(#state.alerts, 1)
+		end)
 	end)
 end)
