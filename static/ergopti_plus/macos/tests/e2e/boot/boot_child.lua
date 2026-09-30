@@ -14,7 +14,8 @@
 ---   [<machine>, a world.MACHINES name; standard by default]
 --- Arch: the processor `uname -m` names (arm64 or x86_64).
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
---- « Restore recommended values » answered Yes).
+--- « Restore recommended values » answered Yes), python_helper (boot, then the
+--- display-mirror shortcut, a helper that runs Python).
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines (the lease workers started, the final lease phase
 --- and the native reloads among them), and a final E2E_DONE line.
@@ -89,6 +90,9 @@ World.flush_logs()
 if not booted then World.record("BOOT_RAISED", boot_error) end
 World.record("FACT", "timers_fired=" .. idle(VIRTUAL_MINUTE_SEC))
 World.flush_logs()
+-- What follows is the scenario's action, not the boot (hardening-h counts the
+-- Pythons each one started).
+World.record("PHASE", "action")
 
 
 
@@ -141,6 +145,15 @@ elseif ACTION == "open_windows" then
 		end
 		idle(5)
 	end
+elseif ACTION == "python_helper" then
+	-- As a keyboard shortcut slot runs it; its Python answers "single_screen".
+	local Actions = require("modules.gestures.actions")
+	local ran, result = xpcall(function() return Actions.execute_single("display_mirror_toggle", "keyboard__e2e") end,
+		debug.traceback)
+	if not ran or result ~= true then
+		World.record("SCENARIO_FAILED", "display_mirror_toggle did not run: " .. tostring(result))
+	end
+	idle(5)
 elseif ACTION ~= "boot" then
 	World.record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 end
