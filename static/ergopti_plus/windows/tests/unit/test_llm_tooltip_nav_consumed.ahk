@@ -7,12 +7,13 @@
 ; prediction tooltip's navigation keys reached the application behind it.
 ;
 ; MECHANISM ENCODED (llm-tooltip-nav-consumed): the native navigation owner
-; cycles the slot on the configured Up / Down chord, but its plan contract
+; cycled the slot on the configured Up / Down chord, but its plan contract
 ; (NavPlanIsValid) requires every cycle route to pass the key on, so the caret
 ; always moved in the application too. macOS consumes the arrows while it shows
-; several predictions (handle_llm_keys). Static wildcard hotkeys, next in the
-; hook chain, now swallow the committed cycle chord while the owner cycles a
-; multi-slot prediction, with exactly its modifiers, at the routes' input level.
+; several predictions (handle_llm_keys). Static wildcard hotkeys now cycle and
+; swallow the committed chord while the owner routes a multi-slot prediction,
+; with exactly its modifiers, at the routes' input level; the native owner no
+; longer cycles (test_llm_nav_cycle_windows, llm-nav-cycle-windows).
 ;
 ; Section 2 (llm-tooltip-chords-consumed) runs the whole matrix of the rule the
 ; three drivers share: for every configured modifier set, only the exact
@@ -58,7 +59,7 @@ _LTNC_ChordConsumedWhileTheOwnerCycles() {
 			Chord := Mods == "" ? Map() : Map("Ctrl", true)
 			Other := Mods == "" ? Map("Shift", true) : Map()
 			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Up", _LTNC_HeldFn(Chord)),
-				Mods . ": no committed plan means no native cycle, so nothing to consume")
+				Mods . ": no committed plan means no chord, so nothing to consume")
 			Bound := LLM_Menu_BindNavHotkeys(
 				Map("nav_modifiers", Mods, "val_modifiers", ""), 0, 0,
 				_LNEO_CaptureLog.Bind(State), 0,
@@ -96,7 +97,7 @@ _LTNC_ChordConsumedWhileTheOwnerCycles() {
 		"a stopped native owner must never let the key be swallowed")
 }
 
-Test("LLM nav: the cycle chord is consumed while the owner cycles a multi-slot prediction (llm-tooltip-nav-consumed)",
+Test("LLM nav: the cycle chord is consumed while the owner routes a multi-slot prediction (llm-tooltip-nav-consumed)",
 	_LTNC_ChordConsumedWhileTheOwnerCycles)
 
 _LTNC_ChordHotkeysSwallowTheKey() {
@@ -109,8 +110,11 @@ _LTNC_ChordHotkeysSwallowTheKey() {
 			Found++
 			AssertEqual("*", Variant.Prefix,
 				Key . ": one wildcard hotkey serves every configured modifier; the criterion demands the exact chord")
-			Assert(RegExMatch(Variant.Body, "^\*" . Key . "::\s*return\b") > 0,
-				Key . ": the hotkey must consume the key, never pass it on: " . Variant.Body)
+			; The action cycles: a bare return swallowed the key without moving the
+			; marker once this hook ran first (llm-nav-cycle-windows).
+			Assert(RegExMatch(Variant.Body,
+					"^\*" . Key . '::\s*LLM_Menu_NavCycleChord\("' . Key . '"\)') > 0,
+				Key . ": the hotkey must cycle and consume the key, never pass it on: " . Variant.Body)
 		}
 		AssertEqual(1, Found, Key . " must have exactly one consuming hotkey")
 	}
