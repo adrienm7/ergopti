@@ -219,6 +219,20 @@ can never win over a static one. The number-row tap keys
 scancodes; a `#HotIf` that answers false hands the key to the emulation or the
 OS. `tools/test/test-tap-keys-single-source.cjs` pins that order.
 
+### project-ahk-scan-code-hotkey-shadows-the-key-name
+
+One `SCnnn::` hotkey makes the hook resolve that physical key by its scan code
+only (hook.cpp: ChangeHookState sets `sc_takes_precedence`; LowLevelCommon then
+looks up Kscm alone and lets the key through when no variant is eligible). A
+hotkey named by the virtual key (`Tab::`, `^Tab`, `vk09`) never fires for the
+physical key, eligible SC variant or not. The prediction's `Tab::` accept was
+dead from the day `remap/tab.ahk` declared SC00F: Tab accepted only inside the
+Tab tap-hold, so the neutral configuration (tap-holds off) sent it to the
+application. Action: bind a key the driver already binds by scan code through
+that scan code, and let variant order decide precedence
+(`test_llm_tab_accepts_visible_prediction.ahk`). The registrar resolves named
+keys on the VK axis, so a user chord on Tab is exposed to the same shadow.
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a
