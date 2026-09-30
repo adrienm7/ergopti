@@ -30,6 +30,14 @@
 ---    never left its loading state. The generated document instead carries the
 ---    shared driver policy (_shared/lua/webview/document_csp.lua) with a
 ---    per-document nonce on every script.
+--- 5. One-click release install: « Install this version » posts install_release.
+---    The shared sequence (_shared/lua/updater/release_install.lua) backs the
+---    configuration up (modules/updater/config_backup.lua), finds the release
+---    in the list this window last fetched from the GitHub API, then downloads
+---    and verifies it and arms the app replacement
+---    (modules/updater/release_installer.lua) before the controlled quit. Each
+---    phase reaches the page through setInstallProgress(). The restore banner
+---    posts restore_backup; the driver reloads on the restored configuration.
 --- ==============================================================================
 
 local M = {}
@@ -45,6 +53,8 @@ local Json       = require("json")
 local ReleaseSources = require("updater.release_sources")
 local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
+local ReleaseInstall = require("updater.release_install")
+local VersionOrder = require("updater.version")
 
 local LOG = "changelog_window"
 
@@ -149,6 +159,27 @@ local _closing = false
 -- The caller's update-channel owner ({ get, set, subscribe }), or nil when the
 -- window was opened without one (no subscription banner then).
 local _channel_owner = nil
+-- The release list the last fetch published: { kind = "json", releases } or
+-- { kind = "feed" }. An install finds its release here, so the page and the
+-- host act on one list.
+local _last_list = nil
+-- The install session (created on the first request).
+local _install_session = nil
+
+-- Test seam: { updater, backup, installer, coordinator }.
+M._deps = nil
+
+--- The owners the install and the restore go through.
+--- @return table
+local function deps()
+	if M._deps then return M._deps end
+	return {
+		updater = require("modules.updater"),
+		backup = require("modules.updater.config_backup"),
+		installer = require("modules.updater.release_installer"),
+		coordinator = require("infra.termination_coordinator"),
+	}
+end
 
 --- Checks publication authority independently of retained native cleanup handles.
 --- @param owner table? Captured session identity.
@@ -314,10 +345,12 @@ local function fetch_and_inject(channel)
 		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 
 		if result.error then
+			_last_list = nil
 			eval(string.format("injectError(%s)", js_str(i18n.get(result.error_key))), request_generation)
 			return
 		end
 		if result.kind == "feed" then
+			_last_list = { kind = "feed" }
 			-- The shared page converts the feed; the text travels as a JS string.
 			eval(string.format("injectReleasesFeed(%s,%s)", js_str(result.body), js_str(channel)),
 				request_generation)
@@ -341,6 +374,7 @@ local function fetch_and_inject(channel)
 		end
 
 		local releases = data
+		_last_list = { kind = "json", releases = data }
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
@@ -360,7 +394,155 @@ end
 
 -- ===========================================
 -- ===========================================
--- ======= 3/ Window Lifecycle Helpers =======
+-- ======= 3/ Release Install ================
+-- ===========================================
+-- ===========================================
+
+--- Encodes a host message for the page; "<" is escaped so no value can close
+--- the script it is evaluated in.
+--- @param value table
+--- @return string|nil
+local function js_value(value)
+	local ok, encoded = pcall(Json.encode, value)
+	if not ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "A Versions page message could not be encoded.")
+		return nil
+	end
+	return (encoded:gsub("<", "\\u003c"))
+end
+
+--- Why this build cannot install a release, or nil when it can.
+--- @return string|nil key Locale key the page shows.
+local function install_blocked()
+	if deps().updater.is_local_source() then return "changelog_window.install_blocked_source" end
+	return nil
+end
+
+--- The newest restorable pre-install backup as the page describes it, or nil.
+--- @return table|nil
+local function restorable_backup()
+	local owner = deps().backup.owner()
+	local latest = owner and owner.latest("pre_install") or nil
+	if not latest then return nil end
+	return { id = latest.id, created_at = latest.created_at, tag = latest.tag }
+end
+
+--- Finds a release in the list the page shows.
+--- @param tag string
+--- @return table|nil release Decoded release object.
+--- @return string|nil reason Locale key when it is not there.
+local function find_release(tag)
+	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
+	-- The Atom feed carries no asset list and no digest.
+	if _last_list.kind ~= "json" then return nil, ReleaseInstall.REASON.no_details end
+	local registry = load_channels()
+	if not registry or not registry.channel_for_tag(tag) then return nil, ReleaseInstall.REASON.unknown_release end
+	local wanted = VersionOrder.normalize_tag(tag)
+	for _, release in ipairs(_last_list.releases) do
+		if type(release) == "table" and VersionOrder.normalize_tag(release.tag_name) == wanted then
+			return release, nil
+		end
+	end
+	return nil, ReleaseInstall.REASON.unknown_release
+end
+
+--- The install session, over the configuration backup, the release installer
+--- and the controlled quit.
+--- @return table session
+local function install_session()
+	if _install_session then return _install_session end
+	_install_session = ReleaseInstall.new({
+		logger = Logger,
+		log = LOG,
+		blocked = install_blocked,
+		find_release = function(tag) return find_release(tag) end,
+		backup = function(release)
+			local owner, err = deps().backup.owner()
+			if not owner then return nil, err end
+			return owner.create("pre_install", { tag = release.tag_name,
+				from_version = deps().updater.current_version() })
+		end,
+		resolve_asset = function(release) return deps().installer.find_asset(release) end,
+		download = function(asset, _, done)
+			return deps().installer.stage(asset, function(staged, stage, detail)
+				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
+					detail)
+			end) == true
+		end,
+		install = function(staged)
+			local armed, err = deps().installer.arm_swap(staged)
+			if armed == true then return true end
+			return false, ReleaseInstall.REASON.install, err
+		end,
+		restart = function()
+			return deps().coordinator.request_user_exit("release_install") == true
+		end,
+		report = function(message)
+			local encoded = js_value(message)
+			if encoded then eval(string.format("setInstallProgress(%s)", encoded)) end
+		end,
+	})
+	return _install_session
+end
+
+--- Restores a pre-install backup and reloads the driver on it.
+--- @param id any Backup id posted by the page.
+local function restore_from_page(id)
+	local function answer(message)
+		local encoded = js_value(message)
+		if encoded then eval(string.format("setRestoreProgress(%s)", encoded)) end
+	end
+	if install_session().busy() then
+		answer({ phase = "failed", reason_key = "changelog_window.restore_error_unexpected" })
+		return
+	end
+	answer({ phase = "restoring" })
+	local owner = deps().backup.owner()
+	if not owner then
+		answer({ phase = "failed", reason_key = "changelog_window.restore_error_backup" })
+		return
+	end
+	local restored, reason, pre = owner.restore(id)
+	if not restored then
+		answer({ phase = "failed", backup_path = pre and pre.path or nil,
+			reason_key = reason == "missing" and "changelog_window.restore_error_missing"
+				or reason == "backup" and "changelog_window.restore_error_backup"
+				or "changelog_window.restore_error_unexpected" })
+		return
+	end
+	answer({ phase = "restored", backup_path = pre and pre.path or nil })
+	local ok, accepted = pcall(deps().coordinator.request_reload, "config_restore")
+	if not ok or accepted ~= true then
+		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(accepted))
+	end
+end
+
+--- The page seeds of what this build can install and restore.
+--- @return string script
+local function install_seed()
+	local ok, seed = pcall(function()
+		local blocked = install_blocked()
+		local backup = restorable_backup()
+		return string.format("window.__installed_version=%s;window.__install_blocked_key=%s;"
+			.. "window.__restorable_backup=%s;", js_str(deps().updater.current_version()),
+			js_str(blocked or ""), backup and js_value(backup) or "null")
+	end)
+	if not ok then
+		Logger.error(LOG, "The Versions page gets no install buttons: %s.", tostring(seed))
+		return ""
+	end
+	return seed
+end
+
+M._install_seed = install_seed
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Window Lifecycle Helpers =======
 -- ===========================================
 -- ===========================================
 
@@ -425,6 +607,11 @@ local function ensure_ucc(owner)
 			fetch_and_inject(body.channel)
 		elseif body.action == "set_channel" then
 			subscribe_from_page(body.channel)
+		elseif body.action == "install_release" then
+			-- Only this click installs a chosen release: nothing else calls the session.
+			install_session().install(body.tag, body.channel)
+		elseif body.action == "restore_backup" then
+			restore_from_page(body.id)
 		elseif body.action == "open_url" and type(body.url) == "string" then
 			if ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened changelog release URL.")
@@ -440,7 +627,7 @@ end
 
 -- =============================
 -- =============================
--- ======= 4/ Public API =======
+-- ======= 5/ Public API =======
 -- =============================
 -- =============================
 
@@ -470,7 +657,8 @@ local function build_window(channel, opening_generation, focus_owner)
 		"window.__subscribed_channel=%s;window.__channel_switch_restarts=false;",
 		js_str(_channel_owner.get())) or ""
 	local config_script = string.format(
-		"<script>%s%swindow.__changelog_channel=%s;</script>", repository, subscription, js_str(channel))
+		"<script>%s%s%swindow.__changelog_channel=%s;</script>", repository, subscription, install_seed(),
+		js_str(channel))
 
 	-- Build HTML with repo config injected before script.js IIFE runs.
 	-- ui_builder.build_injected_html inlines CSS/JS; we then patch the result

@@ -1884,6 +1884,18 @@ const CHECKS = [
 		repro: 'npm run test:changelog-channel-sync'
 	},
 	{
+		name: 'Versions page: one click installs a chosen release through the host, restore banner',
+		cmd: 'node',
+		args: ['tools/test/test-changelog-release-install.cjs'],
+		repro: 'npm run test:changelog-release-install'
+	},
+	{
+		name: 'release install: only clicks install on every driver, one set of install reasons',
+		cmd: 'node',
+		args: ['tools/test/test-release-install-contract.cjs'],
+		repro: 'npm run test:release-install-contract'
+	},
+	{
 		name: 'download actions retain their operation session across native reuse',
 		cmd: 'node',
 		args: ['tools/test/test-download-window-session.cjs'],

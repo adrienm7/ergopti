@@ -1,0 +1,275 @@
+--- macos/tests/unit/modules/updater/test_release_installer.lua
+
+--- ==============================================================================
+--- MODULE: Chosen Release Installer (macOS)
+--- DESCRIPTION:
+--- The Versions window installs a chosen release through
+--- modules/updater/release_installer.lua, because Sparkle refuses to install a
+--- lower build number. These cases pin its checks: the exact repository asset
+--- and its SHA-256, a staging script that stops at the first failed check
+--- (download, digest, version, code signature) and a replacement that only
+--- happens after the launcher quit and puts the previous app back when it
+--- fails. The two scripts run for real under /bin/sh with the macOS tools
+--- replaced by recording fakes; nothing is downloaded or installed.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local TAG = "v0.0.0-dev.139"
+local DIGEST = string.rep("ab", 32)
+local URL = "https://github.com/adrienm7/ergopti/releases/download/" .. TAG .. "/ErgoptiPlus.app.zip"
+local IDS = { owner = "adrienm7", repo = "ergopti", asset = "ErgoptiPlus.app.zip" }
+
+--- Runs a shell command and returns its exit status and output.
+--- @param command string
+--- @return number status
+--- @return string output
+local function sh(command)
+	local pipe = assert(io.popen(command .. " 2>&1; echo \"__status=$?\""))
+	local output = pipe:read("*a")
+	pipe:close()
+	local status = tonumber(output:match("__status=(%d+)%s*$"))
+	return status, (output:gsub("__status=%d+%s*$", ""))
+end
+
+--- A fresh installer module, so each suite's seams start from the defaults.
+local function fresh_installer()
+	package.loaded["modules.updater.release_installer"] = nil
+	return require("modules.updater.release_installer")
+end
+
+local function quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end
+
+local function read(path)
+	local handle = io.open(path, "rb")
+	if not handle then return nil end
+	local text = handle:read("*a")
+	handle:close()
+	return text
+end
+
+local function write(path, text)
+	local handle = assert(io.open(path, "wb"))
+	handle:write(text)
+	handle:close()
+end
+
+--- A fresh scratch folder under TMPDIR.
+local function scratch()
+	local base = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
+	local dir = base .. "/ergopti-installer-test-" .. tostring(os.time()) .. "-" .. tostring(math.random(1e6))
+	assert(sh("mkdir -p " .. quote(dir)) == 0)
+	return dir
+end
+
+--- Writes an executable fake tool.
+local function fake(dir, name, body)
+	local path = dir .. "/" .. name
+	write(path, "#!/bin/sh\n" .. body .. "\n")
+	assert(sh("chmod +x " .. quote(path)) == 0)
+	return path
+end
+
+helpers.describe("release_installer: the authenticated asset", function()
+	local Installer = fresh_installer()
+
+	local function release(asset)
+		return { tag_name = TAG, assets = { { name = "other.zip" }, asset } }
+	end
+
+	helpers.it("binds the exact repository URL and GitHub's SHA-256", function()
+		local asset = Installer.find_asset(release({ name = IDS.asset, browser_download_url = URL,
+			digest = "sha256:" .. DIGEST:upper() }), IDS)
+		helpers.assert_eq(asset.url, URL)
+		helpers.assert_eq(asset.digest, DIGEST, "the digest is compared in lower case")
+		helpers.assert_eq(asset.version, "0.0.0-dev.139")
+	end)
+
+	helpers.it("refuses an archive without its digest, at another URL, or absent", function()
+		helpers.assert_nil(Installer.find_asset(release({ name = IDS.asset, browser_download_url = URL }), IDS))
+		helpers.assert_nil(Installer.find_asset(release({ name = IDS.asset,
+			browser_download_url = "https://evil.example/ErgoptiPlus.app.zip", digest = "sha256:" .. DIGEST }), IDS))
+		helpers.assert_nil(Installer.find_asset(release({ name = IDS.asset, browser_download_url = URL,
+			digest = "md5:0" }), IDS))
+		helpers.assert_nil(Installer.find_asset({ tag_name = TAG, assets = {} }, IDS))
+		helpers.assert_nil(Installer.find_asset({ tag_name = "v1; rm -rf /", assets = {} }, IDS))
+	end)
+
+	helpers.it("names the declared macOS archive from the shared defaults", function()
+		local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+		local defaults = require("json").decode(handle:read("*a"))
+		handle:close()
+		helpers.assert_eq(defaults.release_assets.macos_bundle, IDS.asset)
+	end)
+end)
+
+helpers.describe("release_installer: staging and replacement dispatch", function()
+	local Installer = fresh_installer()
+	local env = {
+		ERGOPTI_LAUNCHER_EXECUTABLE = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+		ERGOPTI_LAUNCHER_PID = "4242",
+		TMPDIR = "/private/tmp/user",
+	}
+	Installer._getenv = function(name) return env[name] end
+
+	helpers.it("reads the installed app and the launcher from the launcher's environment", function()
+		helpers.assert_eq(Installer.app_bundle(), "/Applications/ErgoptiPlus.app")
+		helpers.assert_eq(Installer.launcher_pid(), "4242")
+	end)
+
+	helpers.it("passes every release value as an argument and classifies the exit", function()
+		local spawned = {}
+		Installer._spawn = function(executable, args, on_done)
+			spawned[#spawned + 1] = { executable = executable, args = args, on_done = on_done }
+			return { start = function() return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST }
+		local results = {}
+		helpers.assert_true(Installer.stage(asset, function(...) results[#results + 1] = { ... } end))
+		local call = spawned[1]
+		helpers.assert_eq(call.executable, "/bin/sh")
+		helpers.assert_eq(call.args[2], Installer.STAGE_SCRIPT, "the script text is a constant")
+		helpers.assert_eq(call.args[4], URL)
+		helpers.assert_eq(call.args[5], DIGEST)
+		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
+		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
+		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
+		call.on_done(10, "", "curl: (6) Could not resolve host")
+		call.on_done(21, "", "")
+		call.on_done(27, "", "code object is not signed")
+		helpers.assert_eq(results[1][1], "/private/tmp/user/x/app/ErgoptiPlus.app")
+		helpers.assert_eq(results[2][2], "download")
+		helpers.assert_eq(results[3][2], "verify")
+		helpers.assert_eq(results[4][2], "verify")
+		helpers.assert_nil(results[4][1])
+	end)
+
+	helpers.it("arms the replacement detached, with the previous app kept aside", function()
+		local ran = {}
+		Installer._run = function(executable, args) ran[#ran + 1] = { executable = executable, args = args }; return true end
+		helpers.assert_true(Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app"))
+		local args = ran[1].args
+		helpers.assert_eq(ran[1].executable, "/bin/sh")
+		helpers.assert_true(args[2]:find("nohup", 1, true) ~= nil, "the replacement outlives this process")
+		helpers.assert_eq(args[4], Installer.SWAP_SCRIPT)
+		helpers.assert_eq(args[5], "4242")
+		helpers.assert_eq(args[6], "/Applications/ErgoptiPlus.app")
+		helpers.assert_eq(args[7], "/private/tmp/user/x/app/ErgoptiPlus.app")
+		helpers.assert_eq(args[8], "/Applications/ErgoptiPlus.app.previous")
+		helpers.assert_eq(args[9], "/private/tmp/user/x/swap.log")
+		helpers.assert_eq(select(1, Installer.arm_swap("/etc/passwd")), false, "only a staged app is accepted")
+	end)
+
+	helpers.it("refuses outside a packaged launch", function()
+		env.ERGOPTI_LAUNCHER_EXECUTABLE = nil
+		helpers.assert_nil(Installer.app_bundle())
+		helpers.assert_eq(Installer.stage({ tag = TAG }, function() end), false)
+		helpers.assert_eq(select(1, Installer.arm_swap("/private/tmp/user/x/app/ErgoptiPlus.app")), false)
+	end)
+end)
+
+helpers.describe("release_installer: the staging script under /bin/sh", function()
+	local Installer = fresh_installer()
+
+	--- Runs the staging script with fake tools; returns status and output.
+	local function stage(opts)
+		local dir = scratch()
+		local tools = dir .. "/tools"
+		assert(sh("mkdir -p " .. quote(tools)) == 0)
+		local payload = dir .. "/payload.zip"
+		write(payload, "archive bytes")
+		local digest = opts.digest or select(2, sh("sha256sum " .. quote(payload))):match("^(%x+)")
+		local calls = dir .. "/calls"
+		local curl = fake(tools, "curl", 'echo curl >> ' .. quote(calls) .. '\nout=""; while [ $# -gt 0 ]; do'
+			.. ' [ "$1" = "--output" ] && out=$2; shift; done; '
+			.. (opts.curl_fails and "exit 22" or "cp " .. quote(payload) .. ' "$out"'))
+		local shasum = fake(tools, "shasum", 'sha256sum "$3"')
+		local ditto = fake(tools, "ditto", 'echo ditto >> ' .. quote(calls) .. '\nmkdir -p "$4/ErgoptiPlus.app/Contents"')
+		local plist = fake(tools, "PlistBuddy", 'echo ' .. quote(opts.version or "0.0.0-dev.139"))
+		local codesign = fake(tools, "codesign", 'echo "codesign $1" >> ' .. quote(calls)
+			.. '\nif [ "$1" = "-d" ]; then echo "designated => identifier \\"com.ergoptiplus.app\\""; exit 0; fi\n'
+			.. (opts.unsigned and "exit 1" or "exit 0"))
+		local script = Installer.STAGE_SCRIPT
+			:gsub("/usr/bin/curl", curl):gsub("/usr/bin/shasum", shasum):gsub("/usr/bin/ditto", ditto)
+			:gsub("/usr/libexec/PlistBuddy", plist):gsub("/usr/bin/codesign", codesign)
+		local status, output = sh("sh -c " .. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
+			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app")
+		local called = read(calls) or ""
+		sh("rm -rf " .. quote(dir))
+		return status, output, called
+	end
+
+	helpers.it("prints READY only after the digest, the version and the signature pass", function()
+		local status, output, called = stage({})
+		helpers.assert_eq(status, 0, output)
+		helpers.assert_true(output:match("^READY /.+/stage/app/ErgoptiPlus%.app") ~= nil, output)
+		helpers.assert_eq(called, "curl\nditto\ncodesign -d\ncodesign --verify\n")
+	end)
+
+	helpers.it("stops at a failed download", function()
+		local status, _, called = stage({ curl_fails = true })
+		helpers.assert_eq(status, Installer.EXIT_DOWNLOAD)
+		helpers.assert_eq(called, "curl\n")
+	end)
+
+	helpers.it("never extracts an archive whose SHA-256 differs", function()
+		local status, output, called = stage({ digest = string.rep("0", 64) })
+		helpers.assert_eq(status, 21)
+		helpers.assert_true(output:find("READY", 1, true) == nil)
+		helpers.assert_eq(called, "curl\n")
+	end)
+
+	helpers.it("refuses an archive carrying another version", function()
+		local status = stage({ version = "0.0.0-dev.138" })
+		helpers.assert_eq(status, 25)
+	end)
+
+	helpers.it("refuses an app its signing identity does not match", function()
+		local status, output = stage({ unsigned = true })
+		helpers.assert_eq(status, 27)
+		helpers.assert_true(output:find("READY", 1, true) == nil)
+	end)
+end)
+
+helpers.describe("release_installer: the replacement script under /bin/sh", function()
+	local Installer = fresh_installer()
+
+	local function swap(opts)
+		local dir = scratch()
+		local app, staged, previous = dir .. "/ErgoptiPlus.app", dir .. "/stage/app/ErgoptiPlus.app", dir .. "/ErgoptiPlus.app.previous"
+		assert(sh("mkdir -p " .. quote(app) .. " " .. quote(staged)) == 0)
+		write(app .. "/marker", "installed")
+		write(staged .. "/marker", "chosen")
+		if opts.previous then assert(sh("mkdir -p " .. quote(previous)) == 0) end
+		if opts.no_stage then sh("rm -rf " .. quote(staged)) end
+		local opened = dir .. "/opened"
+		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
+		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
+		local pid = opts.pid or "999999999"
+		local status, output = sh("sh -c " .. quote(script) .. " swap " .. pid .. " " .. quote(app) .. " "
+			.. quote(staged) .. " " .. quote(previous))
+		local result = {
+			status = status, output = output,
+			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",
+			app_path = app,
+		}
+		sh("rm -rf " .. quote(dir))
+		return result
+	end
+
+	helpers.it("waits for the launcher, keeps the previous app and opens the chosen one", function()
+		local _, sleeper = sh("sleep 0.4 >/dev/null 2>&1 & echo $!")
+		local result = swap({ pid = sleeper:match("(%d+)"), previous = true })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen")
+		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+
+	helpers.it("puts the previous app back and opens it when the chosen one cannot move in", function()
+		local result = swap({ no_stage = true })
+		helpers.assert_eq(result.status, 6)
+		helpers.assert_eq(result.app, "installed")
+		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+end)

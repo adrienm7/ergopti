@@ -17,6 +17,9 @@
  * file (test_updater.ahk, test_updater_version_compare.lua), so a divergence in
  * any driver — especially a re-introduced lexicographic non-semver fallback —
  * fails its suite. Models the proven tooltip-tint parity gate.
+ *
+ * The page port (_shared/ui/version_order.js), which the Versions page loads as
+ * a plain script to label its install buttons, replays the same table here.
  * ==============================================================================
  */
 
@@ -24,6 +27,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -34,6 +38,24 @@ const vectorsPath = path.join(
 	ROOT,
 	'static/ergopti_plus/_shared/modules/updater/version_vectors.json'
 );
+const pagePortPath = path.join(ROOT, 'static/ergopti_plus/_shared/ui/version_order.js');
+
+/**
+ * Loads the page port the way a page does: a plain script in one context.
+ * @returns {{compare: Function}}
+ */
+function loadPagePort() {
+	const sandbox = {};
+	vm.createContext(sandbox);
+	vm.runInContext(
+		`${fs.readFileSync(pagePortPath, 'utf8')}\nthis.__port = ReleaseVersionOrder;`,
+		sandbox,
+		{
+			filename: 'version_order.js'
+		}
+	);
+	return sandbox.__port;
+}
 
 // version.js is an ESM module (the repo is type:module); load it via dynamic
 // import so this CommonJS runner can read its compareVersions export.
@@ -48,6 +70,7 @@ const vectorsPath = path.join(
 	}
 
 	const failures = [];
+	const pagePort = loadPagePort();
 	for (const v of vectors) {
 		const got = compareVersions(v.a, v.b);
 		if (got !== v.expect) {
@@ -55,11 +78,17 @@ const vectorsPath = path.join(
 				`${v.id}: compareVersions(${JSON.stringify(v.a)}, ${JSON.stringify(v.b)}) expected ${v.expect}, got ${got}`
 			);
 		}
+		const page = pagePort.compare(v.a, v.b);
+		if (page !== v.expect) {
+			failures.push(
+				`${v.id}: page port compare(${JSON.stringify(v.a)}, ${JSON.stringify(v.b)}) expected ${v.expect}, got ${page}`
+			);
+		}
 	}
 
 	if (failures.length > 0) {
 		console.error(
-			'\x1b[31m[ERROR] JS compareVersions disagrees with the shared parity vectors:\x1b[0m'
+			'\x1b[31m[ERROR] JS compareVersions or the page port disagrees with the shared parity vectors:\x1b[0m'
 		);
 		for (const f of failures) console.error('  - ' + f);
 		console.error(
@@ -69,6 +98,6 @@ const vectorsPath = path.join(
 	}
 
 	console.log(
-		`\x1b[32m[OK] JS compareVersions matches all ${vectors.length} shared version vectors (incl. fail-closed non-semver).\x1b[0m`
+		`\x1b[32m[OK] JS compareVersions and the page port match all ${vectors.length} shared version vectors (incl. fail-closed non-semver).\x1b[0m`
 	);
 })();

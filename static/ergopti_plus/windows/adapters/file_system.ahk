@@ -767,6 +767,68 @@ FSReadRange(Path, Start, Count, BlankNul := false) {
 	return Map("ok", true, "buffer", Buf, "snapshot", Snapshot, "nul_bytes", Blanked)
 }
 
+; Copies a file byte for byte to a path that must not exist yet, then checks
+; the copy reads back as its source. The configuration backup's copies.
+; @param Source {String} File to copy.
+; @param Destination {String} New path; an existing one is never replaced.
+; @return {Boolean} True only for a complete, verified copy; a mismatched copy
+;   is removed.
+FSCopyCreateVerified(Source, Destination) {
+	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+		return false
+	try FileCopy(Source, Destination, false)
+	catch
+		return false
+	if FSSameBytes(Source, Destination)
+		return true
+	try FileDelete(Destination)
+	return false
+}
+
+; Whether two files hold exactly the same bytes.
+; @param PathA {String}
+; @param PathB {String}
+; @return {Boolean} False when either cannot be read.
+FSSameBytes(PathA, PathB) {
+	try {
+		A := FileRead(PathA, "RAW")
+		B := FileRead(PathB, "RAW")
+	} catch {
+		return false
+	}
+	if (A.Size != B.Size)
+		return false
+	if (A.Size == 0)
+		return true
+	return DllCall("ntdll\RtlCompareMemory", "Ptr", A, "Ptr", B, "UPtr", A.Size, "UPtr") == A.Size
+}
+
+; Replaces a file by the bytes of another through a verified same-directory
+; stage and one atomic rename; a failure leaves the destination as it was.
+; @param Source {String} File whose bytes are published.
+; @param Destination {String} File replaced (or created).
+; @return {Boolean}
+FSCopyReplaceAtomic(Source, Destination) {
+	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+		return false
+	Stage := Destination . ".ergopti-restore.tmp"
+	try FileCopy(Source, Stage, true)
+	catch
+		return false
+	if FSSameBytes(Source, Stage) && FSAtomicMoveReplace(Stage, Destination)
+		return true
+	try FileDelete(Stage)
+	return false
+}
+
+; Whether a path is a reparse point (a symbolic link or a junction), which a
+; folder walk never follows: it can lead back up the tree.
+; @param Path {String}
+; @return {Boolean}
+FSIsReparsePoint(Path) {
+	return InStr(FileExist(Path), "L") > 0
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.

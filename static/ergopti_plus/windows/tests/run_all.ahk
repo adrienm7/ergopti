@@ -462,6 +462,7 @@ InstallSendNoOps()
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_release_install.ahk
 #Include unit/test_uninstall.ahk
 #Include unit/test_start_at_login.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
