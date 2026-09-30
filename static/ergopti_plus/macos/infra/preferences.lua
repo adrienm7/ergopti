@@ -1154,19 +1154,24 @@ function M.prepare_llm_updates(source, updates)
 	return prepare_inline_updates(source, updates, "llm")
 end
 
+--- The assignment containers of [shortcuts] a write may replace when they
+--- hold an older build's plain value: the Shortcuts scope owns both.
+M.SHORTCUT_CONTAINERS = { "keyboard", "tap_keys" }
+
 --- Prepares declared shortcut leaves while preserving inline neighbors.
 --- @param source table Classified source.
 --- @param updates table Owned leaf operations.
+--- @param containers table|nil Assignment containers this write fills
+---   (`keyboard`, `tap_keys`). A plain value an older build left there (`keyboard
+---   = "…"`) would make every row below it unwritable, so the write replaces
+---   it. Any other container, and every ordinary save (nil), leaves such a
+---   value on disk for the config cleanup, which offers it.
 --- @return table Prepared writer operations.
-function M.prepare_shortcut_updates(source, updates)
-	-- A plain value an older build left where the shortcut scope keeps a table
-	-- of assignments (`keyboard = "…"`) would make every row below it
-	-- unwritable. The scope owns that container, so the outdated value goes
-	-- with its reset instead of refusing it, as the Linux scope does.
+function M.prepare_shortcut_updates(source, updates, containers)
 	local rows = {}
 	local decoded = TomlCodec.decode(source.content or "")
 	local section = type(decoded) == "table" and decoded.shortcuts or nil
-	for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
+	for _, key in ipairs(type(section) == "table" and containers or {}) do
 		local value = section[key]
 		if value ~= nil and (type(value) ~= "table" or #value > 0) then
 			rows[#rows + 1] = { section = "shortcuts", key = key, delete = true }
