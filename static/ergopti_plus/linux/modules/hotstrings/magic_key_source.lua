@@ -175,6 +175,9 @@ end
 ---   type_text     fn(text) -> boolean  Types text with key presses only, never
 ---                                  the clipboard (injector.type_directly).
 ---   dispatch_char fn(char, code)   The character path a typed key takes.
+---   end_selection fn()             The typed magic key replaced any selection:
+---                                  wrap-on-type's selection window ends, as it
+---                                  does for every key that reaches it.
 ---   can_capture   fn() -> boolean  The hook owns the keyboard (grab), so a
 ---                                  captured key never reaches an application.
 ---   key_text      fn(evdev) -> string|nil  What the XKB layout types there.
@@ -183,7 +186,7 @@ function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
 	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
-		"can_capture", "key_text", "defer" }) do
+		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
 	Logger.start(LOG, "Initializing…")
@@ -284,6 +287,7 @@ function M.on_key(detail)
 			tostring(called and "injection refused" or typed))
 		return false
 	end
+	_deps.end_selection()
 	_deps.dispatch_char(magic, detail.code)
 	return true
 end

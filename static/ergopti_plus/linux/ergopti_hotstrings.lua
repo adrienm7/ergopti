@@ -1332,6 +1332,10 @@ local function main()
 			return type(result) == "table" and result.ok == true
 		end,
 		dispatch_char = function(char, code) on_char(char, code) end,
+		-- Decided before wrap-on-type, which then never sees the key: the ★
+		-- typed over a selection must end its window, or a wrap symbol typed
+		-- next would put the deleted text back from PRIMARY.
+		end_selection = wrap_on_type.end_selection_window,
 		-- A captured key must never reach an application, which only the grab
 		-- guarantees; the menu greys the capture row otherwise.
 		can_capture = function() return keyboard_hook.get_mode() == "intercept" end,
