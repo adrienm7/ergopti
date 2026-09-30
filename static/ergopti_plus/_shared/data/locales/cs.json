@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ Přehled oken aplikace",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — Předch. aplikace",
+	"sg_actions.app_previous_screen": "⇥ Předchozí aplikace — tato obrazovka",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — Předchozí aplikace",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — Předch. okno",
 	"sg_actions.arrow_down": "↓ Šipka dolů",

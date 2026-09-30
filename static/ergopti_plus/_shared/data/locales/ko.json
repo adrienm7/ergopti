@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (모니터)",
 	"sg_actions.app_expose": "◱ 앱 Exposé",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — 이전 앱",
+	"sg_actions.app_previous_screen": "⇥ 이전 앱 — 이 화면",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — 이전 앱",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — 이전 창",
 	"sg_actions.arrow_down": "↓ 아래 화살표",

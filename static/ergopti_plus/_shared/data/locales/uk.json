@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (монітор)",
 	"sg_actions.app_expose": "◱ App Exposé",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — Поп. програма",
+	"sg_actions.app_previous_screen": "⇥ Попередня програма — цей екран",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — Попередня програма",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — Поп. вікно",
 	"sg_actions.arrow_down": "↓ Стрілка вниз",

@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (شاشة)",
 	"sg_actions.app_expose": "◱ عرض نوافذ التطبيق",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — التطبيق السابق",
+	"sg_actions.app_previous_screen": "⇥ التطبيق السابق — هذه الشاشة",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — التطبيق السابق",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — النافذة السابقة",
 	"sg_actions.arrow_down": "↓ سهم لأسفل",

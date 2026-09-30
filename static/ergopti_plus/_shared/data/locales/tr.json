@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (ekran)",
 	"sg_actions.app_expose": "◱ Exposé Uygulaması",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — Önceki uyg.",
+	"sg_actions.app_previous_screen": "⇥ Önceki uygulama — bu ekran",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — Önceki uygulama",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — Önceki pencere",
 	"sg_actions.arrow_down": "↓ Aşağı Ok",

@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (מסך)",
 	"sg_actions.app_expose": "◱ App Exposé",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — יישום קודם",
+	"sg_actions.app_previous_screen": "⇥ היישום הקודם — מסך זה",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — יישום קודם",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — חלון קודם",
 	"sg_actions.arrow_down": "↓ חץ למטה",

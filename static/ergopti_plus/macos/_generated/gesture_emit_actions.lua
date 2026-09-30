@@ -29,7 +29,6 @@ return {
 	{ id = "close_window", key = "w", mods = { "cmd" } },
 	{ id = "cmd_backspace", key = "delete", mods = { "cmd" } },
 	{ id = "cmd_delete_fwd", key = "forwarddelete", mods = { "cmd" } },
-	{ id = "cmd_shift_tab", key = "tab", mods = { "cmd", "shift" } },
 	{ id = "cycle_windows_in_app", key = "f17", mods = {  } },
 	{ id = "delete", key = "forwarddelete", mods = {  } },
 	{ id = "doc_end", key = "down", mods = { "cmd" } },
