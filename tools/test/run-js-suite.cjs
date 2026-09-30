@@ -1698,6 +1698,12 @@ const CHECKS = [
 		repro: 'npm run test:keyboard-slot-defaults'
 	},
 	{
+		name: 'the number-row key left of 1 recommends an instant capture of every screen on every driver',
+		cmd: 'node',
+		args: ['tools/test/test-number-row-full-capture.cjs'],
+		repro: 'npm run test:number-row-full-capture'
+	},
+	{
 		name: 'action picker greys a host-disabled row with its reason and never confirms it',
 		cmd: 'node',
 		args: ['tools/test/test-action-picker-disabled-rows.cjs'],

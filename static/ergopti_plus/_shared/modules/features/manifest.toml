@@ -2456,13 +2456,15 @@ description_key = "menu.shortcuts.keyboard.super_space"
 # action assigned to it (any catalogue action, through the shared picker) and
 # is swallowed; with a modifier held, on the AltGr layer, or set to "none", it
 # keeps its own character. Each driver's key identity is
-# _shared/modules/actions/tap_keys.json. The key left of 1 opens the system's
-# capture tool by default; the two right of 0 start unassigned.
+# _shared/modules/actions/tap_keys.json. The key left of 1 is recommended to
+# save every screen at once, with no selection to make: it exists to catch
+# something that is only on screen for a moment. The two right of 0 start
+# unassigned.
 [[features.shortcuts.tap_keys]]
 id = "number_row_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended = "screen_capture"
+recommended = "screenshot_fullscreen_save"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_left"
