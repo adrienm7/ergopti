@@ -23,7 +23,8 @@ local MODULES = {
 --- @param open_fails boolean
 --- @param init_opts table
 --- @param body function
-local function with_manager(open_fails, init_opts, body)
+--- @param no_touchpad boolean|nil The machine has no touchpad (a desktop).
+local function with_manager(open_fails, init_opts, body, no_touchpad)
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
 
@@ -47,6 +48,7 @@ local function with_manager(open_fails, init_opts, body)
 	package.loaded["adapters.evdev_reader"] = reader
 	package.loaded["modules.gestures.touchpad_finder"] = {
 		find = function()
+			if no_touchpad then return nil, "no device reports multitouch slots" end
 			return {
 				path = "/dev/input/event-test-touchpad",
 				name = "Test Touchpad",
@@ -127,6 +129,24 @@ helpers.describe("gestures: enabling after disabled boot", function()
 		helpers.assert_true(#result.errors >= 1, "the failed transition must be visible in the error log")
 		helpers.assert_true(table.concat(result.errors, "\n"):find("could not start", 1, true) ~= nil,
 			"the error must explain why the feature remained disabled")
+	end)
+
+	-- hardening-a-startup-zero-error: a config.toml with gestures on, on a
+	-- desktop, logged an ERROR (and opened the error window) at every start.
+	helpers.it("starts a machine without a touchpad with gestures configured on, disabled and without an error", function()
+		local result = with_manager(false, { enabled = true, persist = false }, function(manager, reader, errors)
+			return {
+				state = manager.is_enabled(),
+				reading = manager.is_reading(),
+				open_attempt = reader.open_attempt,
+				errors = errors,
+			}
+		end, true)
+
+		helpers.assert_eq(result.state, false, "no touchpad leaves gestures disabled")
+		helpers.assert_eq(result.reading, false, "no touchpad leaves no reader to pump")
+		helpers.assert_eq(result.open_attempt, nil, "no device is opened")
+		helpers.assert_eq(#result.errors, 0, "a desktop is not an error: " .. table.concat(result.errors, "; "))
 	end)
 
 end)
