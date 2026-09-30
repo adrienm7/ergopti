@@ -34,6 +34,10 @@
  *    script from loading. Both shipped in one push because AutoHotkey was not
  *    available where the code was written; the checks self-test on those exact
  *    lines before scanning.
+ * 7. a reserved word used as a parameter, an assignment target or a for-loop
+ *    variable (`for Case in Cases`), which AHK rejects at load with a modal
+ *    dialog. The loop form was written again in a test on 2026-09-30, and the
+ *    gate then checked only the first two positions.
  *
  * FEATURES & RATIONALE:
  * - Cross-platform: runs in the JS validation layer (npm run test:js) so a parse
@@ -201,6 +205,22 @@ function bracketErrors(codeLines) {
 	return found;
 }
 
+/**
+ * The reserved words a line binds as for-loop variables (`for Key, Value in`).
+ * @param {string} line Source line with comments and strings already blanked.
+ * @returns {string[]} The offending names.
+ */
+function reservedLoopVariables(line) {
+	const loop = line.match(/^\s*for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\b/i);
+	if (!loop) return [];
+	return [loop[1], loop[2]].filter((name) => name && RESERVED_LOWER.has(name.toLowerCase()));
+}
+
+if (reservedLoopVariables('\t\t\tfor Case in [').join() !== 'Case') {
+	console.error('The reserved-word check no longer detects a for-loop variable named Case.');
+	process.exit(1);
+}
+
 // The two lines that shipped: the gate must see both before it may pass a tree.
 const SELF_TEST = [
 	['\t\tExpected := JsonParse(Build("openai", Map(', '\t\t\t"image", "QUJD", "max_tokens", 1))))'],
@@ -303,6 +323,13 @@ for (const file of files) {
 					);
 				}
 			}
+		}
+
+		for (const name of reservedLoopVariables(stripped)) {
+			errors.push(
+				`${rel}:${i + 1}: "${name}" is an AHK v2 reserved word used as a for-loop ` +
+					'variable — this fails at LOAD time with a modal dialog. Rename the variable.'
+			);
 		}
 
 		// And as an assignment target, which AHK rejects the same way.
