@@ -23,6 +23,9 @@
  * 5. The earlier regressions stay pinned: the title follows the previewed
  *    locale and names the product once, a folder picked natively reaches the
  *    payload, and the metrics consent names the store of the chosen folder.
+ * 6. Every item that imports an action names its trigger, then the page's own
+ *    separator element, then the action: a tap-hold key its recommended tap and
+ *    hold, a shortcut its chord (wizard-checklist-labels).
  * ==============================================================================
  */
 
@@ -160,7 +163,18 @@ function loadPage() {
 		const el = {
 			tagName: tag.toUpperCase(),
 			id,
-			textContent: '',
+			// As in a real DOM: an element's text is its children's, and setting it
+			// replaces them.
+			ownText: '',
+			get textContent() {
+				return this.children.length > 0
+					? this.children.map((child) => child.textContent).join('')
+					: this.ownText;
+			},
+			set textContent(value) {
+				this.children = [];
+				this.ownText = String(value);
+			},
 			value: '',
 			placeholder: '',
 			hidden: false,
@@ -371,15 +385,28 @@ function finish(page) {
 }
 
 /**
- * Every checkbox row under the checklist body, with its label.
+ * Every checkbox row under the checklist body, with its label: its whole text,
+ * and for a row that imports an action its trigger, separator and action spans.
+ * `name` is the trigger of such a row and the whole text of any other.
  * @param {object} page
- * @returns {Array<{text: string, box: object}>}
+ * @returns {Array<{text: string, name: string, parts: Array<object>, box: object}>}
  */
 function checkRows(page) {
 	return page
 		.el('page-checklist-body')
 		.querySelectorAll('check-row')
-		.map((row) => ({ text: row.children[1].textContent, box: row.children[0] }));
+		.map((row) => {
+			const label = row.children[1];
+			const parts = label.children;
+			return {
+				text: label.textContent,
+				name: parts.length > 0 ? parts[0].textContent : label.textContent,
+				parts,
+				trigger: parts.length > 0 ? parts[0].textContent : null,
+				action: parts.length > 0 ? parts[parts.length - 1].textContent : null,
+				box: row.children[0]
+			};
+		});
 }
 
 /**
@@ -549,7 +576,8 @@ function cataloguePaths(driver) {
 	const slot = items.find((item) => item.path === 'shortcuts.keyboard.win_a');
 	assert.ok(slot, 'Win + A is a recommended keyboard slot');
 	const slotRow = rows[items.indexOf(slot)];
-	assert.equal(slotRow.text, 'Win + A → ' + locale('en')[slot.value_label.key]);
+	assert.equal(slotRow.trigger, 'Win + A');
+	assert.equal(slotRow.action, locale('en')['sg_actions.select_line']);
 	toggle(slotRow);
 	const done = finish(page);
 	const imported = done.answers.operations.filter((operation) =>
@@ -675,18 +703,17 @@ function cataloguePaths(driver) {
 	);
 })();
 
-(function macosScriptControlLabelsFillTheirPlaceholder() {
+(function macosScriptControlRowsNameTheirChordThenTheirAction() {
 	const page = openWizard({ platform: 'macos' });
 	page.platform = 'macos';
 	goToPage(page, 'shortcuts');
 	answer(page, true);
-	const texts = checkRows(page).map((row) => row.text);
-	const expected = locale('en')
-		['menu.shortcuts.right_opt_return'].split('%s')
-		.join(locale('en')['sg_actions.script_pause_toggle']);
-	assert.ok(texts.includes(expected), 'the action fills the %s of the slot label');
+	const rows = checkRows(page);
+	const row = rows.find((candidate) => candidate.trigger === 'Right Opt + Return');
+	assert.ok(row, 'the script-control row names its chord alone');
+	assert.equal(row.action, locale('en')['sg_actions.script_pause_toggle']);
 	assert.ok(
-		texts.every((text) => !text.includes('%s')),
+		rows.every((candidate) => !candidate.text.includes('%s')),
 		'no row shows a raw placeholder'
 	);
 })();
@@ -809,7 +836,9 @@ function recommendedTapHoldKeys(driver) {
 		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
 		const expected = recommendedTapHoldKeys(driver);
 		assert.ok(expected.length >= 7, `${driver}: the engine recommends its tap-hold keys`);
-		const items = described.groups.flatMap((group) => group.items);
+		const items = described.groups
+			.flatMap((group) => group.items)
+			.map(({ value_label: _assignment, ...item }) => item);
 		assert.deepEqual(
 			items,
 			expected.map((key) => ({
@@ -866,6 +895,186 @@ function recommendedTapHoldKeys(driver) {
 	assert.equal(windows.master.path, 'category_enabled.tap_holds', 'Windows reads its switch there');
 })();
 
+/**
+ * The English label of a tap and of a hold an engine ships for one key, as its
+ * tray names them: Windows and Linux through the action registry and the hold
+ * picker, macOS through its Karabiner actions (registry label under the
+ * Karabiner alias, else the catalogue's short label).
+ * @param {string} driver
+ * @param {string} key The key's id on the driver.
+ * @returns {{tap: string, hold: string}}
+ */
+function expectedTapHold(driver, key) {
+	const en = locale('en');
+	if (driver === 'macos') {
+		const aliases = TOML.parse(
+			fs.readFileSync(path.join(SHARED, 'modules/actions/actions.toml'), 'utf8')
+		).karabiner_aliases;
+		const karabiner = JSON.parse(
+			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
+		);
+		const name = (action) =>
+			en['sg_actions.' + (aliases[action] || action)] ||
+			karabiner.find((entry) => entry.id === action).short_label;
+		const slots = TAP_HOLD_DEFAULTS.hs_tap_hold[key];
+		return { tap: name(slots.tap), hold: name(slots.hold) };
+	}
+	const preset = TAP_HOLD_DEFAULTS.tap_hold.keys[key];
+	const tap = preset.tap_action ? en['sg_actions.' + preset.tap_action] : en['tap_hold.tap.none'];
+	let hold = en['tap_hold.hold.none'];
+	if (preset.hold_layer) hold = en['tap_hold.hold.' + preset.hold_layer + '_layer'];
+	else if (preset.hold_modifier) {
+		hold = preset.hold_modifier
+			.split('+')
+			.map((modifier) => en['tap_hold.hold.' + modifier])
+			.join(' + ');
+	}
+	return { tap, hold };
+}
+
+/**
+ * Asserts a row draws its trigger, the separator element, then its action.
+ * @param {object} row From checkRows.
+ * @param {string} where Assertion context.
+ */
+function assertSeparated(row, where) {
+	assert.deepEqual(
+		row.parts.map((part) => part.className),
+		['item-trigger', 'value-separator', 'item-action'],
+		`${where}: trigger, separator element, action`
+	);
+	assert.equal(row.parts[1].textContent.trim(), CATALOGUE.value_separator, `${where}: separator`);
+	for (const text of [row.trigger, row.action]) {
+		assert.ok(!text.includes(CATALOGUE.value_separator), `${where}: no label shows the separator`);
+		assert.ok(!text.includes('%s'), `${where}: no label shows a raw placeholder`);
+	}
+	assert.ok(!row.trigger.includes(' → '), `${where}: the trigger spells no separator of its own`);
+}
+
+(function tapHoldItemsShowTheirRecommendedTapAndHold() {
+	// wizard-checklist-labels: the list named only the keys, never what each one
+	// would do once imported.
+	const en = locale('en');
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const page = openWizard({ platform: driver });
+		page.platform = driver;
+		goToPage(page, 'tap_holds');
+		answer(page, true);
+		const rows = checkRows(page);
+		const keys = [...tapHoldKeyItems(driver).values()];
+		assert.ok(keys.length >= 7, `${driver}: recommended keys are listed`);
+		for (const item of keys) {
+			const row = rows.find((candidate) => candidate.name === en[item.label[0].key]);
+			assert.ok(row, `${driver}: ${item.tap_hold_key} has its row`);
+			assertSeparated(row, `${driver}/${item.tap_hold_key}`);
+			const { tap, hold } = expectedTapHold(driver, item.tap_hold_key);
+			assert.equal(
+				row.action,
+				en['onboarding.checklist.tap_hold'].split('{1}').join(tap).split('{2}').join(hold),
+				`${driver}: ${item.tap_hold_key} shows the tap and the hold it imports`
+			);
+		}
+	}
+	const macTab = checkRows(
+		(() => {
+			const page = openWizard({ platform: 'macos' });
+			goToPage(page, 'tap_holds');
+			answer(page, true);
+			return page;
+		})()
+	).find((row) => row.name === 'Tab');
+	assert.equal(macTab.action, 'tap: ⇥ ◱ ← Alt+Tab — Prev. window (all apps) · hold: Fn');
+	const winCaps = checkRows(
+		(() => {
+			const page = openWizard({ platform: 'windows' });
+			page.platform = 'windows';
+			goToPage(page, 'tap_holds');
+			answer(page, true);
+			return page;
+		})()
+	).find((row) => row.name === 'CapsLock');
+	assert.equal(winCaps.action, 'tap: ↵ Enter · hold: Ctrl');
+})();
+
+(function shortcutItemsShowTheirChordBeforeTheAction() {
+	// wizard-checklist-labels: the macOS built-in shortcuts listed only what they
+	// do, never the key combination they are bound to.
+	const en = locale('en');
+	const page = openWizard({ platform: 'macos' });
+	page.platform = 'macos';
+	goToPage(page, 'shortcuts');
+	answer(page, true);
+	const rows = checkRows(page);
+	const row = (trigger) => rows.find((candidate) => candidate.trigger === trigger);
+	const expected = {
+		'Cmd + Shift + V': en['shortcuts.label_cmd_shift_v'],
+		'Ctrl + A': en['shortcuts.label_ctrl_a'],
+		'Ctrl + E': en['shortcuts.label_ctrl_e'],
+		'Ctrl + .': en['shortcuts.label_ctrl_period'],
+		'Ctrl + CapsLock': en['shortcuts.label_ctrl_capslock'],
+		'Layer + Scroll': en['shortcuts.label_layer_scroll'],
+		'Ctrl + Space': en['sg_actions.llm_generate_prediction'],
+		'Right Opt + ⌫': en['sg_actions.script_reload']
+	};
+	for (const [trigger, action] of Object.entries(expected)) {
+		assert.ok(row(trigger), `macOS lists ${trigger}`);
+		assertSeparated(row(trigger), `macos/${trigger}`);
+		assert.equal(row(trigger).action, action, `macOS: ${trigger} runs ${action}`);
+	}
+	const builtIns = pageOf(page, 'shortcuts').groups[0].items.filter((item) =>
+		item.path.startsWith('shortcuts.keys.')
+	);
+	assert.ok(builtIns.length >= 20, 'macOS recommends its built-in shortcuts');
+	for (const item of builtIns) {
+		const shown = rows.find((candidate) => candidate.action === en[item.value_label[0].key]);
+		assert.ok(shown && shown.trigger !== '', `macOS: ${item.path} names its chord`);
+	}
+	const linux = openWizard({ platform: 'linux' });
+	linux.platform = 'linux';
+	goToPage(linux, 'shortcuts');
+	answer(linux, true);
+	const superSpace = checkRows(linux).find((candidate) => candidate.trigger === 'Super + Space');
+	assert.ok(superSpace, 'Linux names its Super + Space chord alone');
+	assert.equal(superSpace.action, en['sg_actions.llm_generate_prediction']);
+})();
+
+(function everyActionItemDrawsTheSeparatorElement() {
+	// wizard-checklist-labels: « Swipe 3 doigts ↓ → ⧉ → Onglet suivant » drew the
+	// separator as the same arrow the labels contain.
+	for (const code of ['en', 'fr']) {
+		for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+			const page = openWizard({ platform: driver, locale: code, strings: locale(code) });
+			page.platform = driver;
+			next(page, 2);
+			let separated = 0;
+			for (const id of APPROVED_ORDER) {
+				const described = pageOf(page, id);
+				if (!page.el('page-question').classList.contains('hidden')) answer(page, true);
+				const items = [];
+				(function walk(groups) {
+					for (const group of groups) {
+						items.push(...(group.items || []));
+						walk(group.groups || []);
+					}
+				})(described.groups);
+				// A page without a checklist hides the previous page's rows.
+				const listed = !page.el('page-checklist').classList.contains('hidden');
+				const rows = listed ? checkRows(page).filter((row) => row.parts.length > 0) : [];
+				assert.equal(
+					rows.length,
+					items.filter((item) => item.value_label).length,
+					`${code}/${driver}/${id}: one separated row per item that imports an action`
+				);
+				rows.forEach((row) => assertSeparated(row, `${code}/${driver}/${id}/${row.trigger}`));
+				separated += rows.length;
+				page.click('btn-next');
+			}
+			assert.ok(separated >= 10, `${code}/${driver}: the action items are separated`);
+		}
+	}
+	assert.ok(!/' → '/.test(source), 'the page spells no text separator of its own');
+})();
+
 (function aYesImportsOnlyTheCheckedKeysAndANoImportsNone() {
 	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
 		const keys = [...tapHoldKeyItems(driver).values()];
@@ -874,7 +1083,7 @@ function recommendedTapHoldKeys(driver) {
 		page.platform = driver;
 		goToPage(page, 'tap_holds');
 		answer(page, true);
-		const rows = checkRows(page).filter((row) => labels.has(row.text));
+		const rows = checkRows(page).filter((row) => labels.has(row.name));
 		assert.equal(rows.length, keys.length, `${driver}: one row per recommended key`);
 		assert.ok(
 			rows.every((row) => row.box.checked && !row.box.disabled),
@@ -885,7 +1094,7 @@ function recommendedTapHoldKeys(driver) {
 		const imported = finish(page).answers.operations.filter((op) =>
 			tapHoldKeyItems(driver).has(op.path)
 		);
-		const leftItem = labels.get(left.text);
+		const leftItem = labels.get(left.name);
 		assert.deepEqual(
 			imported,
 			keys.filter((item) => item !== leftItem).map((item) => ({ path: item.path, value: true })),
@@ -929,8 +1138,8 @@ function recommendedTapHoldKeys(driver) {
 		const rowOf = (item) =>
 			checkRows(page).find(
 				(row) =>
-					row.text === text(item) ||
-					row.text === locale('en')['onboarding.checklist.customised'].split('{1}').join(text(item))
+					row.name === text(item) ||
+					row.name === locale('en')['onboarding.checklist.customised'].split('{1}').join(text(item))
 			);
 		assert.equal(rowOf(imported).box.checked, true, `${driver}: an imported key shows checked`);
 		assert.equal(rowOf(imported).box.disabled, true, `${driver}: and is kept as it is`);
@@ -940,7 +1149,12 @@ function recommendedTapHoldKeys(driver) {
 			`${driver}: a customised key is not the recommendation`
 		);
 		assert.equal(rowOf(customised).box.disabled, true, `${driver}: and cannot be imported over`);
-		assert.notEqual(rowOf(customised).text, text(customised), `${driver}: its row says it is kept`);
+		assert.notEqual(rowOf(customised).name, text(customised), `${driver}: its row says it is kept`);
+		assert.equal(
+			rowOf(customised).trigger,
+			null,
+			`${driver}: a kept key shows no recommended tap and hold it would not receive`
+		);
 		assert.ok(
 			free.every((item) => rowOf(item).box.checked === false && rowOf(item).box.disabled === false),
 			`${driver}: a configured page pre-checks nothing, and the free keys stay choosable`
@@ -1394,5 +1608,5 @@ function advanceToMetrics(page) {
 })();
 
 console.log(
-	'Onboarding wizard page: pages, defaults, manifest paths, re-run, title, folder and consent passed.'
+	'Onboarding wizard page: pages, defaults, manifest paths, re-run, title, folder, consent and checklist labels passed.'
 );

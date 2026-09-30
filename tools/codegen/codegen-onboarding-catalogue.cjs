@@ -14,6 +14,8 @@
  *   _shared/modules/hotstrings/_index.toml   languages and category order
  *   _shared/modules/hotstrings/**.toml       file and section descriptions
  *   _shared/tap_hold/defaults.toml           tap-hold keys and each engine's preset
+ *   _shared/modules/actions/actions.toml     [karabiner_aliases] of the macOS tap-hold actions
+ *   macos/platform/remap/data/actions.json   macOS tap-hold action labels without a locale key
  *   _shared/data/locales/*.json              label keys must exist in all 21
  *   _shared/data/locale_names.json           language-pack labels
  *
@@ -32,7 +34,10 @@
  * 2. Labels are locale keys the drivers already use, resolved through the tray
  *    menu's candidate chain; an item whose label exists in no locale stops the
  *    generation instead of shipping a raw identifier.
- * 3. Deterministic: manifest and file order, no timestamp.
+ * 3. An item that binds an action names its trigger (a chord, a gesture, a
+ *    tap-hold key) and the action apart, so the page draws one separator
+ *    between them: VALUE_SEPARATOR, which no label may contain.
+ * 4. Deterministic: manifest and file order, no timestamp.
  *
  * USAGE:  node tools/codegen/codegen-onboarding-catalogue.cjs
  * ==============================================================================
@@ -53,6 +58,17 @@ const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
 // magic key's repeat corrections) to their historical categories and sections.
 const ERGOPTI_EXTENSION_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti');
 const TAP_HOLD_DEFAULTS_PATH = shared('tap_hold', 'defaults.toml');
+const ACTIONS_PATH = shared('modules', 'actions', 'actions.toml');
+const MACOS_REMAP_ACTIONS_PATH = path.join(
+	REPO_ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'platform',
+	'remap',
+	'data',
+	'actions.json'
+);
 const LOCALE_DIR = shared('data', 'locales');
 const LOCALE_NAMES_PATH = shared('data', 'locale_names.json');
 const PAGE_OUTPUT = shared('ui', '_generated', 'onboarding_catalogue.js');
@@ -85,8 +101,18 @@ const PAGE_FIELDS = new Set([
 	'neutral_label_key',
 	'magic_key',
 	'sub_switch',
-	'state'
+	'state',
+	'triggers'
 ]);
+
+// What the page draws between an item's trigger and the action it imports. No
+// label may contain it, nor the "%s" of a tray label that spells its own
+// separator, so trigger and action always read apart.
+const VALUE_SEPARATOR = '➔';
+const LABEL_PLACEHOLDER = '%s';
+
+// The page template joining a tap-hold key's tap and hold, as {1} and {2}.
+const TAP_HOLD_ASSIGNMENT_KEY = 'onboarding.checklist.tap_hold';
 
 // The separator a hotstring file writes between groups of its sections_order.
 const SECTION_SEPARATOR = '-';
@@ -373,6 +399,17 @@ function createLabels(locales) {
 		return { text_ref: id };
 	}
 
+	/** Whether the canonical locale translates the key. */
+	function hasKey(key) {
+		const value = locales.get('en')[key];
+		return typeof value === 'string' && value !== '';
+	}
+
+	/** Every translation of a key, for checks over what the page will show. */
+	function translations(key) {
+		return codes.map((code) => locales.get(code)[key]);
+	}
+
 	/** The picker label of an action identifier used as a slot value. */
 	function actionLabelKey(action, context) {
 		const en = locales.get('en');
@@ -382,36 +419,134 @@ function createLabels(locales) {
 		throw new Error(`${context}: action ${action} has no picker label`);
 	}
 
-	return { requireKey, featureLabelKey, localizedText, actionLabelKey, codes, texts };
+	return {
+		requireKey,
+		hasKey,
+		translations,
+		featureLabelKey,
+		localizedText,
+		actionLabelKey,
+		codes,
+		texts
+	};
 }
 
-// Keyboard-slot ids spell their chord: the Windows tray formats them the same
-// way (windows/infra/config_io.ahk _FormatSlotLabel). Only named keys translate.
-const CHORD_PREFIXES = [
-	['ctrl_shift_', 'Ctrl + Shift + '],
-	['ctrl_', 'Ctrl + '],
-	['win_', 'Win + '],
-	['alt_', 'Alt + ']
-];
+// Keyboard-slot and built-in shortcut ids spell their chord: a modifier prefix,
+// then the key, formatted as each tray prints them: the Windows slots
+// (windows/infra/config_io.ahk _FormatSlotLabel), the macOS Shortcuts menu
+// (macos/ui/menu/menu_shortcuts.lua pretty_key) and the Linux slot prefixes
+// (linux/modules/shortcuts/keyboard_shortcuts.lua SLOT_MODS). Longest prefix
+// first; only named keys translate.
+const CHORD_PREFIXES = {
+	ahk: [
+		['ctrl_shift_', 'Ctrl + Shift + '],
+		['ctrl_', 'Ctrl + '],
+		['win_', 'Win + '],
+		['alt_', 'Alt + ']
+	],
+	hs: [
+		['hs_ctrl_shift_', 'Ctrl + Shift + '],
+		['hs_ctrl_', 'Ctrl + '],
+		['hs_option_', 'Option + '],
+		['cmd_shift_', 'Cmd + Shift + '],
+		['cmd_', 'Cmd + '],
+		['ctrl_', 'Ctrl + ']
+	],
+	linux: [
+		['ctrl_shift_', 'Ctrl + Shift + '],
+		['super_shift_', 'Super + Shift + '],
+		['alt_shift_', 'Alt + Shift + '],
+		['ctrl_', 'Ctrl + '],
+		['super_', 'Super + '],
+		['alt_', 'Alt + ']
+	]
+};
 const CHORD_KEY_NAMES = { space: 'common.key_space', enter: 'common.key_enter' };
-const CHORD_KEY_GLYPHS = { period: '.', comma: ',', sc029: '²' };
+const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²', capslock: 'CapsLock' };
+// The key the macOS Cmd + star shortcut names: the hotstring trigger character.
+const CHORD_TRIGGER_KEY = 'star';
+const TRIGGER_CHARACTER_PATH = 'hotstrings.trigger_char';
+
+// The manifest sections whose ids spell a chord: the keyboard slots, whose
+// value is the action they run, and the macOS built-in shortcuts, whose label
+// is the action their chord runs.
+const SLOT_SECTION = 'shortcuts.keyboard';
+const BUILT_IN_SHORTCUT_SECTION = 'shortcuts.keys';
 
 /**
- * Label segments of a keyboard slot id, or null when the id spells no chord.
- * @param {string} slot Slot id such as win_a.
+ * Label segments of a keyboard slot or built-in shortcut id on one platform,
+ * or null when the id spells no chord.
+ * @param {string} slot Id such as win_a or cmd_shift_v.
+ * @param {string} platform Manifest platform token.
  * @param {object} labels Label helpers.
+ * @param {function(): string} triggerCharacter The platform's default trigger.
  * @returns {object[]|null} Segments.
  */
-function chordSegments(slot, labels) {
-	for (const [prefix, text] of CHORD_PREFIXES) {
+function chordSegments(slot, platform, labels, triggerCharacter) {
+	for (const [prefix, text] of CHORD_PREFIXES[platform]) {
 		if (!slot.startsWith(prefix)) continue;
 		const key = slot.slice(prefix.length);
+		if (key === '') return null;
 		if (Object.hasOwn(CHORD_KEY_NAMES, key)) {
 			return [{ text }, { key: labels.requireKey(CHORD_KEY_NAMES[key], slot) }];
 		}
+		if (key === CHORD_TRIGGER_KEY) return [{ text: text + triggerCharacter() }];
 		return [{ text: text + (CHORD_KEY_GLYPHS[key] || key.toUpperCase()) }];
 	}
 	return null;
+}
+
+/**
+ * Refuses a checklist label that could not read apart from the separator the
+ * page draws between a trigger and its action: one containing the separator
+ * itself, or a tray template's "%s" that spells its own. A template segment
+ * must fill each of its arguments.
+ * @param {object} platforms Built platforms.
+ * @param {object} labels Label helpers.
+ */
+function refuseSeparatorsInLabels(platforms, labels) {
+	const refuse = (text, where) => {
+		for (const needle of [VALUE_SEPARATOR, LABEL_PLACEHOLDER]) {
+			if (text.includes(needle)) throw new Error(`${where} shows "${needle}": ${text}`);
+		}
+	};
+	const walkSegments = (segments, where) => {
+		for (const segment of segments) {
+			if (typeof segment.key === 'string') {
+				labels.translations(segment.key).forEach((text) => refuse(text, `${where} ${segment.key}`));
+			} else if (typeof segment.text === 'string') {
+				refuse(segment.text, where);
+			} else if (typeof segment.text_ref === 'string') {
+				Object.values(labels.texts[segment.text_ref]).forEach((text) => refuse(text, where));
+			} else if (typeof segment.template === 'string') {
+				for (const text of labels.translations(segment.template)) {
+					refuse(text, `${where} ${segment.template}`);
+					segment.args.forEach((_arg, index) => {
+						if (!text.includes(`{${index + 1}}`)) {
+							throw new Error(`${where} ${segment.template} does not show {${index + 1}}: ${text}`);
+						}
+					});
+				}
+				segment.args.forEach((arg) => walkSegments(arg, where));
+			} else {
+				throw new Error(`${where} has an unknown label segment`);
+			}
+		}
+	};
+	for (const [driver, data] of Object.entries(platforms)) {
+		for (const page of data.pages) {
+			(function walk(groups) {
+				for (const group of groups) {
+					if (group.label) walkSegments(group.label, `${driver}/${page.id}`);
+					for (const item of group.items || []) {
+						walkSegments(item.label, `${driver}/${item.path}`);
+						if (item.value_label) walkSegments(item.value_label, `${driver}/${item.path}`);
+					}
+					walk(group.groups || []);
+				}
+			})(page.groups);
+		}
+	}
 }
 
 // ==========================================
@@ -597,15 +732,28 @@ function stateFor(id, page, platform, master, projection) {
 
 /**
  * The recommended checklist: every input-altering feature of the scope, on the
- * platform, whose recommendation differs from its neutral default.
+ * platform, whose recommendation differs from its neutral default. An item that
+ * binds an action is labelled by its trigger and carries the action apart, as
+ * its value_label.
  * @returns {object[]} One unlabelled group, or none.
  */
 function recommendedItems(id, page, platform, master, features, projection, labels, usedOverrides) {
 	const excluded = page.exclude || [];
 	const overrides = page.labels || {};
+	const triggers = page.triggers || {};
 	for (const [itemPath, key] of Object.entries(overrides)) {
 		labels.requireKey(key, `onboarding page ${id} label for ${itemPath}`);
 	}
+	for (const [itemPath, key] of Object.entries(triggers)) {
+		labels.requireKey(key, `onboarding page ${id} trigger for ${itemPath}`);
+	}
+	const triggerCharacter = () => {
+		const character = projection.project(TRIGGER_CHARACTER_PATH, platform).default;
+		if (typeof character !== 'string' || character === '') {
+			throw new Error(`${TRIGGER_CHARACTER_PATH} has no default character on ${platform}`);
+		}
+		return character;
+	};
 	const items = [];
 	for (const feature of features.values()) {
 		if (projection.scopeOf(feature.path) !== id) continue;
@@ -618,14 +766,32 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 		if (sameValue(values.default, values.recommended)) continue;
 		const context = `onboarding page ${id} item ${itemPath}`;
 		let label;
+		let action = null;
 		if (Object.hasOwn(overrides, itemPath)) {
 			label = [{ key: overrides[itemPath] }];
 			usedOverrides.add(itemPath);
-		} else if (feature.type === 'action' && feature.section === 'shortcuts.keyboard') {
-			label = chordSegments(feature.id, labels);
+		} else if (feature.type === 'action' && feature.section === SLOT_SECTION) {
+			label = chordSegments(feature.id, platform, labels, triggerCharacter);
 			if (!label) label = [{ key: labels.featureLabelKey(feature, context) }];
+		} else if (feature.section === BUILT_IN_SHORTCUT_SECTION) {
+			// The label names what the shortcut does, so its trigger comes first.
+			if (Object.hasOwn(triggers, itemPath)) {
+				label = [{ key: triggers[itemPath] }];
+				usedOverrides.add(itemPath);
+			} else {
+				label = chordSegments(feature.id, platform, labels, triggerCharacter);
+			}
+			if (!label) {
+				throw new Error(
+					`${context}: its id spells no chord; name its trigger in [onboarding.pages.${id}.triggers]`
+				);
+			}
+			action = [{ key: labels.featureLabelKey(feature, context) }];
 		} else {
 			label = [{ key: labels.featureLabelKey(feature, context) }];
+		}
+		if (feature.type === 'action') {
+			action = [{ key: labels.actionLabelKey(values.recommended, context) }];
 		}
 		const item = {
 			path: itemPath,
@@ -634,8 +800,7 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 			recommended: true,
 			label
 		};
-		if (feature.type === 'action')
-			item.value_label = { key: labels.actionLabelKey(values.recommended, context) };
+		if (action) item.value_label = action;
 		items.push(item);
 	}
 	return items.length > 0 ? [{ items }] : [];
@@ -812,11 +977,77 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 }
 
 /**
+ * Creates the resolver of macOS tap-hold action labels, named as its tray
+ * names them (macos/platform/remap/config.lua localise_action_labels): the
+ * action registry's label under the action's Karabiner alias, else the
+ * Karabiner catalogue's own short label.
+ * @param {object} labels Label helpers.
+ * @returns {function(string, string): object[]} Action id, context → segments.
+ */
+function createKarabinerLabels(labels) {
+	const aliases = TOML.parse(fs.readFileSync(ACTIONS_PATH, 'utf8')).karabiner_aliases || {};
+	const actions = JSON.parse(fs.readFileSync(MACOS_REMAP_ACTIONS_PATH, 'utf8'));
+	return function karabinerActionSegments(action, context) {
+		const registryKey = `sg_actions.${aliases[action] || action}`;
+		if (labels.hasKey(registryKey)) return [{ key: labels.requireKey(registryKey, context) }];
+		const entry = actions.find((candidate) => candidate.id === action);
+		const text = entry && (entry.short_label || entry.label);
+		if (typeof text !== 'string' || text === '') {
+			throw new Error(`${context}: Karabiner action ${action} has no label`);
+		}
+		return [{ text }];
+	};
+}
+
+/**
+ * The tap and the hold a platform's engine ships for one key, as label
+ * segments named the way its tray names them: Windows and Linux through the
+ * action registry and the hold picker's labels, macOS through its Karabiner
+ * actions.
+ * @param {string} platform Manifest platform token.
+ * @param {string} key The key's id on the platform.
+ * @param {object} defaults Parsed defaults.toml.
+ * @param {object} labels Label helpers.
+ * @param {function(string, string): object[]} karabinerLabel macOS action labels.
+ * @param {string} context Error context.
+ * @returns {{tap: object[], hold: object[]}} Segments.
+ */
+function tapHoldAssignment(platform, key, defaults, labels, karabinerLabel, context) {
+	if (platform === 'hs') {
+		const slots = defaults.hs_tap_hold[key];
+		return {
+			tap: karabinerLabel(slots.tap, `${context} tap`),
+			hold: karabinerLabel(slots.hold, `${context} hold`)
+		};
+	}
+	const preset = defaults.tap_hold.keys[key];
+	const tap =
+		typeof preset.tap_action === 'string' && preset.tap_action !== ''
+			? [{ key: labels.actionLabelKey(preset.tap_action, `${context} tap`) }]
+			: [{ key: labels.requireKey('tap_hold.tap.none', context) }];
+	let hold;
+	if (typeof preset.hold_layer === 'string' && preset.hold_layer !== '') {
+		hold = [{ key: labels.requireKey(`tap_hold.hold.${preset.hold_layer}_layer`, context) }];
+	} else if (typeof preset.hold_modifier === 'string' && preset.hold_modifier !== '') {
+		// A combination reads as the tray draws it: its modifiers joined by " + ".
+		hold = [];
+		for (const modifier of preset.hold_modifier.split('+')) {
+			if (hold.length > 0) hold.push({ text: ' + ' });
+			hold.push({ key: labels.requireKey(`tap_hold.hold.${modifier.trim()}`, context) });
+		}
+	} else {
+		hold = [{ key: labels.requireKey('tap_hold.hold.none', context) }];
+	}
+	return { tap, hold };
+}
+
+/**
  * The tap-hold checklist: every key of the platform's column of the shared key
  * catalogue that its engine ships a recommendation for, in tray order under the
  * tray's two hand headers. An item imports that key's recommended tap and hold
  * through the host's tap-hold writer; the host reads the recommendation from
- * the same defaults.toml, so the catalogue carries only the key id.
+ * the same defaults.toml, so the catalogue carries the key id, and the tap and
+ * hold only as the label the page shows.
  * @param {string} id Page id.
  * @param {string} platform Manifest platform token.
  * @param {object} labels Label helpers.
@@ -824,6 +1055,8 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
  */
 function tapHoldGroups(id, platform, labels) {
 	const defaults = TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS_PATH, 'utf8'));
+	const template = labels.requireKey(TAP_HOLD_ASSIGNMENT_KEY, `onboarding page ${id}`);
+	const karabinerLabel = createKarabinerLabels(labels);
 	const catalog = defaults.tap_hold && defaults.tap_hold.catalog && defaults.tap_hold.catalog.keys;
 	if (!Array.isArray(catalog) || catalog.length === 0) {
 		throw new Error('_shared/tap_hold/defaults.toml declares no [tap_hold.catalog] keys');
@@ -838,6 +1071,8 @@ function tapHoldGroups(id, platform, labels) {
 		if (!recommended.has(key)) continue;
 		if (!hands.has(entry.hand))
 			throw new Error(`tap-hold key ${entry.id} names unknown hand ${entry.hand}`);
+		const context = `onboarding page ${id} key ${key}`;
+		const assignment = tapHoldAssignment(platform, key, defaults, labels, karabinerLabel, context);
 		hands.get(entry.hand).push({
 			path: TAP_HOLD_KEY_PREFIX + key,
 			value: true,
@@ -845,7 +1080,8 @@ function tapHoldGroups(id, platform, labels) {
 			recommended: true,
 			tap_hold_key: key,
 			customised_value: TAP_HOLD_CUSTOMISED,
-			label: [{ key: labels.requireKey(entry.label_key, `onboarding page ${id} key ${key}`) }]
+			label: [{ key: labels.requireKey(entry.label_key, context) }],
+			value_label: [{ template, args: [assignment.tap, assignment.hold] }]
 		});
 	}
 	for (const key of recommended) {
@@ -1051,15 +1287,24 @@ function buildCatalogue() {
 			for (const [key, child] of Object.entries(value)) refuseNull(child, `${where}.${key}`);
 		}
 	})(platforms, 'platforms');
-	// A label kept for an item no platform lists outlives the gap it filled.
+	// A label or trigger kept for an item no platform lists outlives the gap it filled.
 	for (const id of order) {
-		for (const itemPath of Object.keys(manifest.onboarding.pages[id].labels || {})) {
-			if (!usedOverrides.has(itemPath)) {
-				throw new Error(`[onboarding.pages.${id}.labels] ${itemPath} labels no checklist item`);
+		for (const table of ['labels', 'triggers']) {
+			for (const itemPath of Object.keys(manifest.onboarding.pages[id][table] || {})) {
+				if (!usedOverrides.has(itemPath)) {
+					throw new Error(`[onboarding.pages.${id}.${table}] ${itemPath} names no checklist item`);
+				}
 			}
 		}
 	}
-	return { schema_version: SCHEMA_VERSION, order, texts: labels.texts, platforms };
+	refuseSeparatorsInLabels(platforms, labels);
+	return {
+		schema_version: SCHEMA_VERSION,
+		order,
+		value_separator: VALUE_SEPARATOR,
+		texts: labels.texts,
+		platforms
+	};
 }
 
 // ==========================================
@@ -1117,4 +1362,4 @@ if (require.main === module) {
 	write(HOST_OUTPUT, JSON.stringify(catalogue, null, '\t') + '\n');
 }
 
-module.exports = { buildCatalogue, DRIVERS, SCHEMA_VERSION };
+module.exports = { buildCatalogue, DRIVERS, SCHEMA_VERSION, VALUE_SEPARATOR };

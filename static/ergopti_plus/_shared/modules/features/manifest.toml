@@ -5918,9 +5918,16 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 "shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
 "shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
 "shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
-"shortcuts.script_control.return_key" = "menu.shortcuts.right_opt_return"
-"shortcuts.script_control.backspace" = "menu.shortcuts.right_opt_back"
-"shortcuts.script_control.escape" = "menu.shortcuts.right_opt_escape"
+"shortcuts.script_control.return_key" = "sg_labels.script_ropt_return"
+"shortcuts.script_control.backspace" = "sg_labels.script_ropt_backspace"
+"shortcuts.script_control.escape" = "sg_labels.script_ropt_escape"
+
+# What triggers a macOS built-in shortcut whose id spells no key combination,
+# as the Shortcuts menu names it; every other one of them shows the chord its id
+# spells, before the action it runs.
+[onboarding.pages.shortcuts.triggers]
+"shortcuts.keys.layer_scroll" = "menu.shortcuts.key_layer_scroll"
+"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.altgr_symbol"
 
 [onboarding.pages.gestures]
 title_key = "menu.gestures.title"
