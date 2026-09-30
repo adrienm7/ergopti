@@ -110,12 +110,18 @@ These are software implementations; final hardware verification remains below.
    `hotstrings_menu` declares `scope_restore`/`scope_clear` beside the switch
    and all three drivers register them (Windows from `_HS_ScopeCommands`);
    macOS constructs its owner once per session and composes it into the
-   global restore, its transaction now reverting and releasing; Linux word
+   global restore (skipped and named when its override file cannot be
+   served), its transaction now reverting and releasing, and a scope's
+   retained inverse is settled through the writer fence so the other
+   categories' reverts and every later writer are admitted again; the macOS
+   Hotstrings switch starts the typing engine « Clear » stopped. Linux word
    delimiters are config.toml leaves (`[hotstrings.terminator_states]`,
    `hotstrings.terminators`, the macOS paths) imported once from
-   storage.json, and both Linux modes return them to the catalogue as
-   Windows does. Still open: the macOS scope leaves its delimiter leaves as
-   they are, and the Windows rows are verified statically only.
+   storage.json; a save writes only what the menu changed; both Linux modes
+   return the shipped delimiters to their defaults and keep the user's own
+   (user data, as the delimiter submenu does). Still open: the macOS scope
+   leaves its delimiter states as they are (Windows resets its whole
+   delimiter string), and the Windows rows are verified statically only.
 6. [~] Complete L4 extension layout geometry and physical magic-key behavior.
    Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
 7. [~] Complete W2: seven-page first-run opt-in wizard, per-category recommended
