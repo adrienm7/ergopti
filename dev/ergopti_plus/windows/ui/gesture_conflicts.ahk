@@ -23,13 +23,11 @@ GestureSystemGroup(Slot) {
 ; Read is injectable and returns an empty string for absent registry values.
 GestureSystemSlotConfigured(Slot, Read) {
 	global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS_NAMES, GESTURE_REG_KEY_PARAMS
-	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
+	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES, GESTURE_REG_FAMILY_ENABLES
 	global GESTURE_REG_CUSTOM_VALUE, GESTURE_REG_CUSTOM_TAP_VALUE
 	if !GESTURE_REG_ACTIONS.Has(Slot)
 		return false
-	Family := InStr(Slot, "_3") ? "ThreeFinger" : "FourFinger"
-	Family .= SubStr(Slot, 1, 3) == "tap" ? "TapEnabled" : "SlideEnabled"
-	Expected := Map(Family, GESTURE_REG_CUSTOM_VALUE,
+	Expected := Map(GESTURE_REG_FAMILY_ENABLES[Slot], GESTURE_REG_CUSTOM_VALUE,
 		GESTURE_REG_ACTIONS[Slot], GESTURE_REG_CUSTOM_VALUE,
 		GESTURE_REG_KEY_PARAMS_NAMES[Slot], GESTURE_REG_KEY_PARAMS[Slot])
 	if GESTURE_REG_ENABLE_NAMES.Has(Slot)
@@ -116,9 +114,13 @@ GestureSystemNotice(Slot, OnDone := 0) {
 		State["callbacks"][Group] := []
 	if IsObject(OnDone)
 		State["callbacks"][Group].Push(OnDone)
-	if State["windows"].Has(Group)
+	if State["windows"].Has(Group) {
+		; Requested again: bring the open notice back in front. A reload the
+		; user asked for waits on it, and an ordinary window can be covered.
+		WMPresentWindow(State["windows"][Group])
 		return true
-	G := Gui("+AlwaysOnTop", t("menu.gestures.conflict_title"))
+	}
+	G := Gui("", t("menu.gestures.conflict_title"))
 	G.AddText("w440", t("gesture.slots." . Slot) . "`n" . t("gestures.system.not_configured"))
 	G.AddButton("xm", t("menu.gestures.open_settings")).OnEvent("Click",
 		(*) => GestureSystemFinishNotice(Group, G, "settings"))
@@ -127,7 +129,9 @@ GestureSystemNotice(Slot, OnDone := 0) {
 	G.OnEvent("Close", (*) => GestureSystemFinishNotice(Group, G, "close"))
 	G.OnEvent("Escape", (*) => GestureSystemFinishNotice(Group, G, "close"))
 	State["windows"][Group] := G
-	G.Show("NoActivate")
+	; Shown and focused: an ErgoptiPlus window is never kept on top, so a
+	; notice left inactive was covered by the next click in another app.
+	G.Show()
 	return true
 }
 

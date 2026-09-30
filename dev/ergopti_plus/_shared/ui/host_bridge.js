@@ -33,6 +33,7 @@
 //   prompt_bridge             — _shared/ui/prompt_editor
 //   release_notes_bridge      — _shared/ui/release_notes (Windows update prompt)
 //   token_bridge              — _shared/ui/token_prompt
+//   update_check_bridge       — _shared/ui/update_check
 //   healthcheck               — _shared/ui/healthcheck
 //
 // The Linux host (WebKit2GTK) MUST register only the current page's handler via

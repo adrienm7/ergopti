@@ -551,7 +551,7 @@ local function with_menu_fixture(options, callback)
 		set_on_pause_change = noop,
 		set_extras = function(candidate)
 			-- The menu hands its actions table here too; the reset marks it.
-			if type(candidate) == "table" and type(candidate.reset_defaults) == "function" then
+			if type(candidate) == "table" and type(candidate.factory_reset) == "function" then
 				observations.actions = candidate
 			end
 			return true
@@ -694,7 +694,7 @@ local function with_menu_fixture(options, callback)
 		helpers.assert_not_nil(menu)
 		helpers.assert_type(observations.dynamic_menu_callback, "function")
 		observations.dynamic_menu_callback()
-		helpers.assert_type(observations.actions and observations.actions.reset_defaults, "function")
+		helpers.assert_type(observations.actions and observations.actions.factory_reset, "function")
 		-- Retired on every driver: no menu row and no action may reach them.
 		helpers.assert_nil(observations.actions.enable_all, "Enable All is retired")
 		helpers.assert_nil(observations.actions.disable_all, "Disable All is retired")
@@ -771,7 +771,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			with_menu_fixture({}, function(observations)
 				helpers.assert_eq(case.start(observations), true, case.label .. " must be accepted")
 				helpers.assert_true(observations.termination_pending)
-				helpers.assert_eq(observations.actions.reset_defaults(), false,
+				helpers.assert_eq(observations.actions.factory_reset(), false,
 					case.label .. " must fence a later factory reset")
 				helpers.assert_eq(observations.calls["karabiner-reset"] or 0, 0)
 				helpers.assert_eq(observations.files, observations.initial_files)
@@ -785,10 +785,10 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			observations.hooks[
 				"file-restore:/virtual/config_karabiner.toml:after"
 			] = function()
-				nested_result = observations.actions.reset_defaults()
+				nested_result = observations.actions.factory_reset()
 			end
 
-			helpers.assert_eq(observations.actions.reset_defaults(), false)
+			helpers.assert_eq(observations.actions.factory_reset(), false)
 			helpers.assert_eq(nested_result, false,
 				"rollback owns its inverse until the mutating boundary returns")
 			assert_fully_restored(observations)
@@ -812,7 +812,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 				or { "false", "nil", "throw", "false-after", "nil-after", "throw-after" }
 			for _, mode in ipairs(modes) do
 				with_menu_fixture({ failures = { [boundary] = fail(mode) } }, function(observations)
-					helpers.assert_eq(observations.actions.reset_defaults(), false)
+					helpers.assert_eq(observations.actions.factory_reset(), false)
 					assert_fully_restored(observations)
 					helpers.assert_eq(observations.reload_commits, 0)
 				end)
@@ -823,7 +823,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 	helpers.it("requires exact Karabiner deployment before requesting reload", function()
 		for _, mode in ipairs({ "false", "nil", "throw", "sync-success-false", "sync-success-nil" }) do
 			with_menu_fixture({ failures = { ["karabiner-reset"] = fail(mode) } }, function(observations)
-				helpers.assert_eq(observations.actions.reset_defaults(), false)
+				helpers.assert_eq(observations.actions.factory_reset(), false)
 				assert_fully_restored(observations)
 				helpers.assert_eq(observations.calls.reload or 0, 0)
 			end)
@@ -832,7 +832,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 
 	helpers.it("compensates a negative reset deployment terminal before reload", function()
 		with_menu_fixture({ failures = { ["karabiner-reset"] = fail("pending") } }, function(observations)
-			helpers.assert_eq(observations.actions.reset_defaults(), true)
+			helpers.assert_eq(observations.actions.factory_reset(), true)
 			observations.terminals["karabiner-reset"](false, "regeneration-refused")
 			assert_fully_restored(observations)
 			helpers.assert_eq(observations.calls.reload or 0, 0)
@@ -842,7 +842,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 	helpers.it("compensates every reload handoff refusal without a success claim", function()
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			with_menu_fixture({ failures = { reload = fail(mode) } }, function(observations)
-				helpers.assert_eq(observations.actions.reset_defaults(), false)
+				helpers.assert_eq(observations.actions.factory_reset(), false)
 				assert_fully_restored(observations)
 				helpers.assert_eq(observations.reset_journal_phase, "cleared",
 					"a refused reload must settle the restored journal")
@@ -856,7 +856,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 		for _, label in ipairs({ "reset-journal:prepared", "reset-journal:commit" }) do
 			for _, mode in ipairs({ "false", "nil", "throw", "false-after", "throw-after" }) do
 				with_menu_fixture({ failures = { [label] = fail(mode) } }, function(observations)
-					helpers.assert_eq(observations.actions.reset_defaults(), false,
+					helpers.assert_eq(observations.actions.factory_reset(), false,
 						label .. " " .. mode .. " must refuse the reset")
 					assert_fully_restored(observations)
 					helpers.assert_eq(observations.reset_journal_phase, "cleared",
@@ -872,10 +872,10 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			reload = fail("false"),
 			["file-restore:/virtual/config_karabiner.toml"] = fail("false"),
 		} }, function(observations)
-			helpers.assert_eq(observations.actions.reset_defaults(), false)
+			helpers.assert_eq(observations.actions.factory_reset(), false)
 			helpers.assert_nil(observations.files["/virtual/config_karabiner.toml"],
 				"the refused inverse remains owned as cleanup debt")
-			helpers.assert_eq(observations.actions.reset_defaults(), true,
+			helpers.assert_eq(observations.actions.factory_reset(), true,
 				"the retry must finish debt before starting one new candidate")
 			helpers.assert_eq(observations.reload_commits, 1)
 			helpers.assert_eq(#observations.notifications, 0,
@@ -888,8 +888,8 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 
 	helpers.it("keeps reset fenced through a returning reload with no post-reload tail", function()
 		with_menu_fixture({ failures = { ["karabiner-reset"] = fail("pending") } }, function(observations)
-			helpers.assert_eq(observations.actions.reset_defaults(), true)
-			helpers.assert_eq(observations.actions.reset_defaults(), false,
+			helpers.assert_eq(observations.actions.factory_reset(), true)
+			helpers.assert_eq(observations.actions.factory_reset(), false,
 				"a second reset shares the one pending owner")
 			helpers.assert_eq(observations.reload_commits, 0)
 			local terminal = observations.terminals["karabiner-reset"]
@@ -899,7 +899,7 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_eq(#observations.notifications, 0)
 			helpers.assert_eq(observations.post_reload_effects, 0,
 				"no UI or logger capability may run after the coordinator returned from hs.reload")
-			helpers.assert_eq(observations.actions.reset_defaults(), false,
+			helpers.assert_eq(observations.actions.factory_reset(), false,
 				"the global mutation owner remains fenced until the Lua state is replaced")
 			helpers.assert_nil(observations.files["/virtual/config.toml"])
 			helpers.assert_not_nil(observations.files[
@@ -917,10 +917,10 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 
 	helpers.it("rolls back an accepted reload whose exact lease later aborts", function()
 		with_menu_fixture({ failures = { reload = fail("pending") } }, function(observations)
-			helpers.assert_eq(observations.actions.reset_defaults(), true)
+			helpers.assert_eq(observations.actions.factory_reset(), true)
 			helpers.assert_type(observations.reload_abort, "function")
 			helpers.assert_type(observations.builder_ctx, "table")
-			helpers.assert_eq(observations.actions.reset_defaults(), false,
+			helpers.assert_eq(observations.actions.factory_reset(), false,
 				"an accepted reload handoff still owns every overlapping writer")
 			helpers.assert_eq(observations.actions.reload(), false,
 				"a manual reload cannot supersede the reset handoff")

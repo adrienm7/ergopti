@@ -26,14 +26,15 @@
 --- 2. Defaults from the manifest, never re-typed. `hotstrings.preview_*` already
 ---    declares each default for this driver; repeating `true` here would be a
 ---    second source that silently wins the day a default changes.
---- 3. Persisted. These are preferences, and a preference that resets at every
----    restart teaches the user the setting does not work.
+--- 3. Persisted as canonical config.toml leaves, sparse against the manifest.
+---    A preference that resets at every restart teaches the user the setting
+---    does not work.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
-local Storage = require("adapters.storage")
+local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "hotstrings.preview_settings"
@@ -50,9 +51,8 @@ local TOGGLES = {
 	{ name = "colored",     manifest = "hotstrings.preview_colored_tooltips",    label = "menu.hotstrings.tooltip_colored" },
 }
 
--- The manifest path doubles as the storage key: the two name the same setting,
--- and keeping them equal removes a mapping that would otherwise have to be kept
--- right by hand.
+-- The manifest path is the canonical config.toml leaf: the two name the same
+-- setting, so no mapping between them has to be kept right by hand.
 local _by_name = nil
 local _on_change = nil
 
@@ -107,9 +107,7 @@ function M.get(name)
 		Logger.error(LOG, "get(): '%s' is not a preview toggle.", tostring(name))
 		return false
 	end
-	local stored = Storage.get(toggle.manifest, nil)
-	if type(stored) == "boolean" then return stored end
-	return M.default(name)
+	return Preferences.get(toggle.manifest)
 end
 
 --- Whether the user has chosen something other than the shipped value.
@@ -118,8 +116,7 @@ end
 function M.is_customised(name)
 	local toggle = by_name()[name]
 	if not toggle then return false end
-	local stored = Storage.get(toggle.manifest, nil)
-	return type(stored) == "boolean" and stored ~= M.default(name)
+	return Preferences.is_explicit(toggle.manifest) and Preferences.get(toggle.manifest) ~= M.default(name)
 end
 
 
@@ -142,8 +139,12 @@ function M.set(name, value)
 		return false
 	end
 
-	local wanted = value and true or false
-	if not Storage.set(toggle.manifest, wanted) then
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set(): '%s' requires a boolean.", name)
+		return false
+	end
+	local wanted = value
+	if not Preferences.set(toggle.manifest, wanted) then
 		Logger.error(LOG, "Could not persist '%s' — the change would be lost at restart.", toggle.manifest)
 		return false
 	end

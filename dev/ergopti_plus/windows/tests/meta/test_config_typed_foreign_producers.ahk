@@ -3,10 +3,9 @@
 ; ==============================================================================
 ; MODULE: Foreign Configuration Boolean Producer Guards
 ; DESCRIPTION:
-; Foreign category gates and the onboarding gesture marker have no manifest
-; type. Their producers must explicitly retain Boolean intent. These guards
-; cover live-engine and onboarding UI paths without invoking their side effects;
-; unit tests separately prove sentinel rendering and real gesture persistence.
+; Foreign category gates have no manifest type. Their producers must explicitly
+; retain Boolean intent. These guards cover live-engine paths without invoking
+; their side effects; unit tests separately prove sentinel rendering.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -40,13 +39,3 @@ _CTFP_CategoryProducersRetainBooleanIntent() {
 }
 Test("config: every category producer retains foreign Boolean intent "
 	. "(config-typed-foreign-categories)", _CTFP_CategoryProducersRetainBooleanIntent)
-
-_CTFP_OnboardingMarkerRetainsBooleanIntent() {
-	Body := _StripFullLineComments(_DriverFuncBody("_Onboarding_Commit"))
-	Assert(Body != "", "the onboarding producer must exist")
-	AssertTrue(RegExMatch(Body,
-		'Key:\s*"auto_configure_on_next_start",\s*Value:\s*TOML_Bool\(true\)'),
-		"the subsystem-owned onboarding marker is not covered by manifest typing")
-}
-Test("config: onboarding gives its foreign gesture marker explicit Boolean intent "
-	. "(config-typed-foreign-onboarding)", _CTFP_OnboardingMarkerRetainsBooleanIntent)

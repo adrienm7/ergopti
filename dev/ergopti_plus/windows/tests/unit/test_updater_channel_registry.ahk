@@ -79,3 +79,20 @@ _UpdChanTest_PickVectors() {
 	}
 }
 Test("Update channels: a channel's latest release is picked by semver (shared vectors)", _UpdChanTest_PickVectors)
+
+_UpdChanTest_NewerElsewhereVectors() {
+	Vectors := _UpdChanTest_Vectors()["newer_elsewhere"]
+	AssertTrue(Vectors.Length >= 10, "newer_elsewhere vectors: >=10 expected, got " . Vectors.Length)
+	for _, V in Vectors {
+		Found := UpdateChannels_NewerElsewhere(V["releases"], V["selected"], V["installed"])
+		Expected := V["expect"]
+		AssertEqual(Expected.Length, Found.Length, "newer_elsewhere vector " . V["id"] . ": entry count")
+		for Index, Entry in Expected {
+			if (Index > Found.Length)
+				break
+			AssertEqual(Entry["channel"], Found[Index]["channel"], "newer_elsewhere vector " . V["id"] . ": channel #" . Index)
+			AssertEqual(Entry["tag"], Found[Index]["tag"], "newer_elsewhere vector " . V["id"] . ": tag #" . Index)
+		}
+	}
+}
+Test("Update channels: other channels newer than the installed build are listed (shared vectors)", _UpdChanTest_NewerElsewhereVectors)

@@ -57,7 +57,7 @@ local function with_window(scenario)
 		screen = { mainScreen = function()
 			return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
 		end },
-		drawing = { windowLevels = { floating = 1 } },
+		drawing = { windowLevels = { normal = 0, floating = 1 } },
 		timer = { secondsSinceEpoch = function() return 1 end },
 	}
 	local ok, err = xpcall(function()

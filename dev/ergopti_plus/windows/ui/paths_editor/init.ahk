@@ -73,7 +73,7 @@ _PathsEdWeb_TryOpen() {
 
 	; Singleton — bring the existing editor to the front.
 	if (_PathsEdWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _PathsEdWeb_Gui.Hwnd)
+		WMPresentWindow(_PathsEdWeb_Gui)
 		return true
 	}
 	_PathsEdWeb_SessionEpoch += 1
@@ -315,17 +315,10 @@ _PathsFile_Write(N, LogsDir := 0) {
 	OwnerBundle := AcquireResult["bundle"]
 	ReleaseBundle := true
 	; The WAL is located beside this stable file and names its owner config.toml.
-	; Settle native and durable authority before changing the next boot's
-	; directory selection, then retain this same owner through Reload. The WAL
+	; Retain this same owner from the locator change through Reload. The WAL
 	; snapshots the old locator before publishing its replacement, so a crash can
 	; never leave a truncated paths.toml or ambiguous directory authority.
 	try {
-		if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
-			try LoggerError("PathsEditor", "Could not change the config directory while LLM trigger recovery is incomplete.")
-			try MsgBox(t("paths_editor.save_failed"),
-				t("paths_editor.save_failed_title"), "Iconx")
-			return false
-		}
 		try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
 		; A configuration-folder change keeps the user's LogsDirPath.
 		if (LogsDir is Integer)

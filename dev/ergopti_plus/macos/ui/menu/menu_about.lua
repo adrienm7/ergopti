@@ -4,9 +4,10 @@
 --- MODULE: Menu About / Update
 --- DESCRIPTION:
 --- Builds the "About / Update" sub-menu for the macOS menubar. The automatic
---- checks are the Lua driver's (modules/updater/auto_check.lua); the check row
---- crosses the narrow launcher adapter so Sparkle verifies, downloads, installs,
---- and relaunches the outer application bundle only when the user clicks it.
+--- checks are the Lua driver's (modules/updater/auto_check.lua); "Check for
+--- updates" opens the shared update-check window (ui/update_check), and only an
+--- install crosses the narrow launcher adapter, so Sparkle verifies, downloads,
+--- installs and relaunches the outer application bundle when the user asks.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
@@ -14,11 +15,16 @@
 --- 1b. Lua cadence: the frequency picker lists the shared presets and persists
 ---    through the menu session's automatic-check owner (ctx.update_checks); the
 ---    check row names a release that owner found.
---- 2. One channel owner: the rows list every channel of the shared registry and
----    subscribe through the menu session's channel owner (ctx.channel_owner,
----    modules/updater/channel.lua), which persists the choice and
----    tells the launcher which feed Sparkle reads; the check names the same
----    channel, so the menu cannot diverge from Sparkle's feed.
+--- 2. One channel owner: one submenu, titled with the subscribed channel, lists
+---    every channel of the shared registry and subscribes through the menu
+---    session's channel owner (ctx.channel_owner, modules/updater/channel.lua),
+---    which persists the choice and tells the launcher which feed Sparkle
+---    reads; the check names the same channel, so the menu cannot diverge from
+---    Sparkle's feed.
+--- 3. Build identity: the version row names the running build and the commit
+---    it was built from through the shared formatter (updater.version_label),
+---    so a source run reads « Version locale (<commit>) », never a bare
+---    "local", and an unknown commit is said, never guessed.
 --- ==============================================================================
 
 local M = {}
@@ -27,6 +33,7 @@ local Logger    = require("infra.logger")
 local i18n      = require("infra.i18n")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
+local VersionLabel = require("updater.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
 local LOG       = "menu_about"
@@ -44,10 +51,6 @@ local LOG       = "menu_about"
 
 local function is_local_source()
 	return Updater.is_local_source()
-end
-
-local function current_version()
-	return Updater.current_version()
 end
 
 local function releases_page_url()
@@ -78,15 +81,51 @@ end
 
 
 
---- "Update to {tag}" by plain substitution: a tag is outside data, and a "%" in
---- it would be read as a capture reference in a gsub replacement.
+--- Fills one named placeholder by plain substitution: the value is outside data
+--- (a release tag, a translated channel name), and a "%" in it would be read as
+--- a capture reference in a gsub replacement.
+--- @param template string Translated template.
+--- @param placeholder string Placeholder such as "{tag}".
+--- @param value string Value to put in its place.
+--- @return string label
+local function fill(template, placeholder, value)
+	local at = template:find(placeholder, 1, true)
+	if not at then return template .. " " .. value end
+	return template:sub(1, at - 1) .. value .. template:sub(at + #placeholder)
+end
+
+--- "Update to {tag}".
 --- @param tag string Release tag.
 --- @return string label
 local function update_now_label(tag)
-	local template = i18n.get("menu.about.update_now")
-	local at = template:find("{tag}", 1, true)
-	if not at then return template .. " " .. tag end
-	return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
+	return fill(i18n.get("menu.about.update_now"), "{tag}", tag)
+end
+
+--- The channel picker: one submenu titled with the subscribed channel's name,
+--- one row per registry channel in registry order, ticked on the subscribed
+--- one. A click subscribes through the owner, which persists the choice and
+--- redraws the menu, so the title follows.
+--- @param owner table The menu session's update-channel owner.
+--- @param subscribed string Registry id of the subscribed channel.
+--- @return table row A provider row with its items.
+local function channel_picker(owner, subscribed)
+	local registry = Updater.channels()
+	local rows = {}
+	for _, id in ipairs(registry.ids()) do
+		rows[#rows + 1] = {
+			label = i18n.get(registry.channel(id).menu_label_key),
+			checked = id == subscribed,
+			action = function()
+				Logger.info(LOG, "User chose the update channel '%s'.", id)
+				owner.set(id)
+			end,
+		}
+	end
+	return {
+		label = fill(i18n.get("menu.about.channel_menu"), "{channel}",
+			i18n.get(registry.channel(subscribed).label_key)),
+		items = rows,
+	}
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
@@ -123,26 +162,25 @@ end
 
 --- Builds the About / Update sub-menu item.
 --- @param ctx table Menu context.
+--- @param actions table|nil The menu session's actions; its uninstall runs the
+---   row that closes the submenu.
 --- @return table Menu item table for insertion into the parent menu.
-function M.build(ctx)
+function M.build(ctx, actions)
 	local owner = type(ctx) == "table" and ctx.channel_owner or nil
 	if type(owner) ~= "table" then
 		Logger.error(LOG, "No update channel owner in the menu context — the channel rows are left out.")
 	end
 	local channel = owner and owner.get() or Updater.installed_channel()
-	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
 	local local_src = is_local_source()
 
-	-- First disabled item mirrors AHK: "ErgoptiPlus <version>".
-	-- e.g. "ErgoptiPlus v0.2.1-dev" or "ErgoptiPlus local"
-	local ver_display
-	if ver == "local" then
-		ver_display = "ErgoptiPlus local"
-	else
-		ver_display = "ErgoptiPlus " .. ver
-	end
+	-- The build and the commit it was built from, in the shared wording:
+	-- « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	-- (c3005e0b9) » for a source run. The identity is resolved once per Lua
+	-- state by the updater facade, so a rebuild reads no file.
+	local identity = Updater.build_identity()
+	local ver_display = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n.get)
 
 	local menu_items = {}
 
@@ -156,33 +194,36 @@ function M.build(ctx)
 
 	table.insert(menu_items, { separator = true })
 
-	-- One row per registry channel, ticked on the subscribed one, right before the
-	-- check row. The owner persists the choice and refreshes the menu.
-	local registry = Updater.channels()
-	for _, id in ipairs(owner and registry.ids() or {}) do
-		table.insert(menu_items, {
-			label = i18n.get(registry.channel(id).menu_label_key),
-			checked = id == channel,
-			action = function()
-				Logger.info(LOG, "User chose the update channel '%s'.", id)
-				owner.set(id)
-			end,
-		})
-	end
+	-- The channel picker, right before the check row. Without an owner nothing
+	-- could persist a choice, so the picker is left out rather than drawn dead.
+	if owner then table.insert(menu_items, channel_picker(owner, channel)) end
 
 	if not local_src then
 		-- A packaged build hands the transaction to Sparkle on this click only;
 		-- the automatic checks name the release they found here.
 		local checks = type(ctx) == "table" and ctx.update_checks or nil
 		local latest = type(checks) == "table" and checks.latest() or nil
+		-- "Check for updates" asks the Lua driver and answers in the shared
+		-- update-check window; a row that already names a release is the user's
+		-- consent to install it, so it goes straight to Sparkle.
 		local check_row = {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()
-				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
-				UpdateLauncher.request_check(channel)
+				Logger.info(LOG, "User asked for an update check (channel: %s).", channel)
+				require("ui.update_check").open({
+					checks = checks,
+					channel_owner = owner,
+					on_change = type(ctx) == "table" and ctx.updateMenu or nil,
+				})
 			end,
 		}
-		if latest then check_row.label = update_now_label(latest.tag) end
+		if latest then
+			check_row.label = update_now_label(latest.tag)
+			check_row.action = function()
+				Logger.info(LOG, "User triggered one-click update to %s (channel: %s).", latest.tag, latest.channel)
+				UpdateLauncher.request_check(latest.channel)
+			end
+		end
 		table.insert(menu_items, check_row)
 		if type(checks) == "table" then
 			table.insert(menu_items, frequency_picker(checks))
@@ -191,10 +232,11 @@ function M.build(ctx)
 		end
 	end
 
-	-- The updater block above is the manifest's `about_updates` list; the two rows
-	-- below it are `command` declarations. The separator between them is a `---`
-	-- row. Until 2026-08-07 the whole submenu was assembled here and described
-	-- nowhere, on all three drivers at once.
+	-- The updater block above is the manifest's `about_updates` list; the rows
+	-- below it are `command` declarations, set apart by `---` rows: Versions,
+	-- its GitHub page, then Uninstall, which closes the submenu. Until 2026-08-07
+	-- the whole submenu was assembled here and described nowhere, on all three
+	-- drivers at once.
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {
@@ -203,6 +245,9 @@ function M.build(ctx)
 			show_changelog(channel, owner)
 		end,
 		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
+		-- The menu session's uninstall transaction; an unregistered command is
+		-- reported by the renderer and draws no row that would do nothing.
+		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 
 	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {

@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Drives the window's deferred focus through a refused deletion and a native
 --- close: a focus continuation of a window that is gone must never bring
---- Hammerspoon forward. The copy poller these tests also covered is gone: the
+--- Hammerspoon forward. The window is presented only through the shared focus
+--- helper, never by a level (ui-focus-not-topmost). The copy poller these tests also covered is gone: the
 --- page now posts its actions to a message handler
 --- (tests/unit/ui/test_healthcheck_bridge_actions.lua).
 --- ==============================================================================
@@ -103,35 +104,21 @@ helpers.describe("healthcheck window focus ownership", function()
 		end
 	end)
 
-	helpers.it("(webview-focus-owner) healthcheck fallback cannot focus after refused deletion", function()
-		local pending, focuses = {}, 0
-		local healthcheck = load_healthcheck({
-			after = function(_, callback)
-				pending[#pending + 1] = callback
-				return { timer = {} }, true
-			end,
-			cancel = function() return true end,
-		})
+	helpers.it("(ui-focus-not-topmost) healthcheck presents only through the shared focus helper", function()
+		local healthcheck, context = load_healthcheck({ cancel = function() return true end })
 		local view = hs.webview.new()
-		local previous_preload = package.preload["ui.ui_builder"]
-		local previous_builder = package.loaded["ui.ui_builder"]
-		local ok, err = xpcall(function()
-			view.show = function(self)
-				package.loaded["ui.ui_builder"] = nil
-				package.preload["ui.ui_builder"] = function() error("focus helper unavailable") end
-				return self
-			end
-			hs.focus = function() focuses = focuses + 1 end
-			helpers.assert_true(healthcheck.show_window())
-			helpers.assert_eq(#pending, 1)
-			view.delete = function() error("native deletion refused") end
-			helpers.assert_eq(healthcheck.show_window(), false)
-			pending[1]()
-			helpers.assert_eq(focuses, 0, "cleanup-only fallback must not foreground Hammerspoon")
-		end, debug.traceback)
-		package.preload["ui.ui_builder"] = previous_preload
-		package.loaded["ui.ui_builder"] = previous_builder
-		if not ok then error(err, 0) end
+		local presented = {}
+		package.loaded["ui.ui_builder"].force_focus = function(target, is_new, lifecycle)
+			presented[#presented + 1] = { target = target, is_new = is_new, lifecycle = lifecycle }
+			return true
+		end
+		view.bringToFront = function() error("bringToFront pins the diagnostics window above other apps") end
+		helpers.assert_true(healthcheck.show_window())
+		helpers.assert_eq(#presented, 1)
+		helpers.assert_true(presented[1].target == view, "the exact diagnostics window is presented")
+		helpers.assert_eq(presented[1].is_new, true)
+		helpers.assert_eq(presented[1].lifecycle.is_current(), true)
+		context.window_callback("closing")
 	end)
 
 	helpers.it("(webview-focus-owner) healthcheck refused deletion permanently revokes deferred focus", function()

@@ -50,7 +50,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				hs_stub.fs.attributes = function(path)
 					if path:match("/extensions/$") then return { mode = "directory" } end
 					if path:match("/extensions/demo$") then return { mode = "directory" } end
-					if path:match("/extensions/demo/shortcuts/menu%.lua$") then
+					if path:match("/shortcuts/menu%.lua$") then
 						return { mode = "file" }
 					end
 					return nil
@@ -117,6 +117,13 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				local MenuShortcuts = require("ui.menu.menu_shortcuts")
 				local item = MenuShortcuts.build({
 					base_dir = "/fixture/driver/",
+					-- The boot catalogue owns which extensions exist; the menu walks no folder.
+					extension_packs = {
+						{ id = "demo", name = "demo", dir = "/fixture/extensions/demo" },
+						-- A layout installed through the manager: its generation is no
+						-- child of the bundled folder the menu used to walk.
+						{ id = "ergol", name = "Ergo-L", dir = "/config/layouts/extensions/ergol/0123/ergol" },
+					},
 					shortcuts = {
 						list_shortcuts = function() return {} end,
 						resume_bindings = function() return true end,
@@ -137,14 +144,17 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					state_getters = {},
 				})
 
-				helpers.assert_eq(#load_calls, 1)
+				helpers.assert_eq(#load_calls, 2)
 				helpers.assert_true(load_calls[1].path:match("/extensions/demo/shortcuts/menu%.lua$") ~= nil)
+				helpers.assert_eq(load_calls[2].path, "/config/layouts/extensions/ergol/0123/ergol/shortcuts/menu.lua",
+					"an installed layout's shortcuts come from its committed generation")
 				helpers.assert_eq(load_calls[1].mode, "t")
 				helpers.assert_type(load_calls[1].environment, "table")
-				helpers.assert_eq(#item.submenu, 3)
+				helpers.assert_eq(#item.submenu, 4)
 				helpers.assert_eq(item.submenu[3].label, "demo")
 				helpers.assert_eq(item.submenu[3].items[1].label, "DEMO")
 				helpers.assert_eq(item.submenu[3].items[1].proof, "1:2")
+				helpers.assert_eq(item.submenu[4].label, "Ergo-L", "the shared manifest name labels the row")
 				helpers.assert_eq(_G.hs152_extension_pollution, nil,
 					"the extension chunk must not publish globals into the host")
 			end)

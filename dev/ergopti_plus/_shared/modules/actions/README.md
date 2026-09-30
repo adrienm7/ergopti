@@ -35,7 +35,7 @@ the set of actions it can actually run, in both directions (tests tagged
 handler hidden by its declaration, fails the build.
 
 A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
-`shortcut`) is validated, prompted
+`shortcut`, `app`) is validated, prompted
 for and explained by each driver's gesture module: macOS
 `modules/gestures/actions.lua` (`validate_action_parameter`,
 `parameter_prompt`, `parameter_error`), Linux `modules/gestures/manager.lua`

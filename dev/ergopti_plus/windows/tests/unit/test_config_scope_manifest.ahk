@@ -113,7 +113,7 @@ _ScopeOwnerFixture() {
 	Path := Directory . "\config.toml"
 	Assert(FSWriteDurable(Path, Source))
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
-		"settle", (*) => 1, "prepare", (*) => 1, "notify", (*) => 0)
+		"settle", (*) => 1, "notify", (*) => 0)
 	return { directory: Directory, path: Path, source: Source, options: Options }
 }
 
@@ -289,28 +289,6 @@ _ScopeOwnerRetainsRollbackDebt() {
 	}
 }
 Test("config-scope: failed rollback retains the exact terminal barrier until recovery", _ScopeOwnerRetainsRollbackDebt)
-
-_ScopeOwnerPreparationRefusal() {
-	Fixture := _ScopeOwnerFixture()
-	Launches := 0
-	Launch(*) {
-		Launches += 1
-		return true
-	}
-	Fixture.options["reload"] := Launch
-	Fixture.options["prepare"] := (*) => false
-	try {
-		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
-		AssertEqual(Receipt["status"], "refused")
-		AssertEqual(Launches, 0)
-		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
-		Assert(!FileExist(Receipt["backup"]), "native refusal precedes backup and publication")
-		Lease := _ConfigWriteLeaseTryAcquire(Fixture.path, "after preparation refusal")
-		Assert(Lease is Object)
-		_ConfigWriteLeaseRelease(Lease)
-	} finally _ScopeOwnerCleanup(Fixture)
-}
-Test("config-scope: native recovery refusal precedes backup and publication", _ScopeOwnerPreparationRefusal)
 
 ; A transient hash failure must not become the optional no-precondition sentinel.
 _ScopeExpectedOldHashRefusal(AdditionalFile := false) {

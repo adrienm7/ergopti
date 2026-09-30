@@ -97,13 +97,18 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 		end)
 	end)
 
-	helpers.it("refuses malformed canonical values without overwriting or falling back", function()
+	helpers.it("never opens an old-shape URL and lets a new choice replace it (config-outdated-chatgpt)", function()
+		-- A stored value that is not an HTTP(S) URL is outdated configuration:
+		-- it used to make every read raise, so Ctrl+G, the menu and the cleanup
+		-- all failed on it.
 		with_subject('[shortcuts]\nchatgpt_url = false\n', function(subject, _, path)
-			local before = Sandbox.read_bytes(path)
-			local reason = helpers.assert_throws(subject.get_url, "malformed canonical URL must be refused")
-			helpers.assert_contains(tostring(reason), "ChatGPT shortcut URL")
-			helpers.assert_eq(subject.set_url("https://new.example"), false)
-			helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(subject.get_url(), subject.DEFAULT_URL, "the value never reaches xdg-open")
+			local marked = {}
+			subject.mark_config_reads(Codec.decode(Sandbox.read_bytes(path)),
+				function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+			helpers.assert_eq(marked, {}, "left unmarked, so the cleanup offers it")
+			helpers.assert_true(subject.set_url("https://new.example"))
+			helpers.assert_eq(subject.get_url(), "https://new.example")
 		end)
 	end)
 

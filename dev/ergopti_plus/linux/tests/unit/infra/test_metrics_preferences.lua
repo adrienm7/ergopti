@@ -106,15 +106,29 @@ helpers.describe("canonical metrics preferences", function()
 		end)
 	end)
 
-	helpers.it("refuses malformed sources and malformed booleans without overwriting", function()
-		for _, source in ipairs({ '[metrics\n', '[metrics]\nenabled = "true"\n' }) do
-			with_config(source, function(preferences, path)
-				local accepted = pcall(preferences.get, "metrics.enabled")
-				helpers.assert_eq(accepted, false)
-				helpers.assert_eq(preferences.set("metrics.enabled", true), false)
-				helpers.assert_eq(Sandbox.read_bytes(path), source)
-			end)
-		end
+	helpers.it("refuses a malformed source without overwriting it", function()
+		local source = '[metrics\n'
+		with_config(source, function(preferences, path)
+			local accepted = pcall(preferences.get, "metrics.enabled")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(preferences.set("metrics.enabled", true), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+		end)
+	end)
+
+	helpers.it("reads an old-shape boolean as neutral and offers it for cleanup (config-outdated-metrics)", function()
+		-- One wrong-typed leaf used to refuse every read, write and scope of the
+		-- domain, and made the cleanup report the whole file as unreadable.
+		local source = '[metrics]\nenabled = "true"\nwpm_widget_colors = false\n'
+		with_config(source, function(preferences, path)
+			helpers.assert_eq(preferences.get("metrics.enabled"), false, "never read as consent")
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "metrics", "enabled" })
+			helpers.assert_true(preferences.set("metrics.enabled", true), "a new choice replaces the old shape")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).metrics.enabled, true)
+		end)
 	end)
 
 	helpers.it("refuses unknown ownership and nonboolean values", function()

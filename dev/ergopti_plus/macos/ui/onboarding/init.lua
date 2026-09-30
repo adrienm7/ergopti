@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Onboarding Wizard
 --- DESCRIPTION:
---- First-launch setup wizard guiding the user through the initial configuration
---- of Ergopti via a webview-based multi-step form.
+--- Hosts the shared first-run wizard (_shared/ui/onboarding) on macOS: one
+--- opt-in page per configuration scope after the language and folder steps.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Consistent UI: Uses the same webview + usercontent bridge pattern as all
@@ -12,10 +12,13 @@
 --- 2. Live Locale Switch: Selecting a language in step 1 triggers a "previewLocale"
 ---    message; Lua loads the strings and injects them back via applyStrings() so
 ---    subsequent steps render in the chosen language without a reload.
---- 3. Atomic Write: All collected answers are flushed to config.toml in a single
----    toml_writer.batch_write() call at the end, then hs.reload().
---- 4. Single-message Finish: The JS sends one "finish" message containing all
----    answers at once, so Lua never has to maintain per-step state.
+--- 3. No interpretation: the page answers with manifest paths and values; the
+---    shared onboarding_answers contract validates them against the generated
+---    catalogue and they reach config.toml in one versioned batch_write, then
+---    hs.reload() starts every module from the file.
+--- 4. Re-run shows the values in force: the page receives the configured value
+---    of every wizard path, for the folder it opens on and for any folder the
+---    user picks.
 --- ==============================================================================
 
 local M = {}
@@ -30,10 +33,14 @@ local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
-local Storage       = require("adapters.storage")
+local Answers       = require("onboarding_answers")
+local Json          = require("json")
 local LOG          = "onboarding"
 
-local SETTINGS_COMPLETED_KEY = "onboarding.completed"
+-- The catalogue platform this host reads and the id the config migration
+-- registry knows this driver by.
+local CATALOGUE_DRIVER = "macos"
+local MIGRATION_DRIVER = "hs"
 
 -- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
@@ -42,37 +49,14 @@ local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
 -- onboarding.welcome.title already carries it (it is the page heading).
 local WINDOW_TITLE_KEY       = "onboarding.window_title"
 
--- Every locale string the shared wizard page reads. One list for both initData
--- and the live preview, so a locale switch cannot drop a key the first render had.
-local STRING_KEYS = {
-	"onboarding.welcome.title", "onboarding.welcome.heading",
-	"onboarding.language.placeholder",
-	"onboarding.layout.title", "onboarding.layout.desc",
-	"onboarding.layout.yes",  "onboarding.layout.no",
-	"onboarding.magic_key.title", "onboarding.magic_key.desc",
-	"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
-	"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
-	"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
-	"onboarding.metrics.title", "onboarding.metrics.desc",
-	-- Raw {1} template: the page fills it with the metrics path of the folder
-	-- chosen on the config step (window.setMetricsPath).
-	"dialog.metrics.enable_warning",
-	"onboarding.gestures.title", "onboarding.gestures.desc",
-	-- Same macOS-gestures-conflict warning shown by the tray "Enable
-	-- gestures" toggle — surfaced on step 5 in an orange box so the
-	-- user knows about the system-setting conflict before committing.
-	"dialog.gestures.warning_msg",
-	"onboarding.yes", "onboarding.no",
-	"onboarding.back", "onboarding.next", "onboarding.finish",
-	-- Inserted config-folder step reuses the same labels as the
-	-- tray-menu folder editor so we don't duplicate translations.
-	"dialog.config_folder.title", "dialog.config_folder.label",
-	"dialog.config_folder.hint", "dialog.config_folder.select_title",
-	"common.browse",
-}
+-- Delay between the success notification and the reload that applies it.
+local RELOAD_DELAY_SEC = 1.5
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
+
+-- The generated catalogue of this driver, loaded by the first run.
+local _catalogue = nil
 
 -- WebView + usercontent bridge state (singleton)
 local _webview      = nil
@@ -85,31 +69,6 @@ local _focus_owner = nil
 -- Windows driver can consume the same files via its WebView2 host; resolve it
 -- through Paths.shared (mirrors changelog / download_window / model_browser).
 local ASSETS_DIR = (Paths.shared("ui/onboarding") or "") .. "/"
-
---- Resolve the absolute file:// URL to the Ergopti layout preview JPG so
---- the webview can <img src="…"> it directly. ASSETS_DIR is
---- static/ergopti_plus/_shared/ui/onboarding/ ; the image lives at
---- static/img/ergopti.jpg, four directories above (same depth as the former
---- macos/ui/onboarding/ location, so the relative path is unchanged). Returns
---- nil when the file is missing so the JS side keeps the preview hidden.
---- @return string|nil
-local function _layout_image_url()
-	local img_path = ASSETS_DIR .. "../../../../img/ergopti.jpg"
-	local attrs = hs.fs.attributes(img_path)
-	if not attrs then
-		Logger.debug(LOG, "Layout preview image missing at '%s' — step 2 renders without it.", img_path)
-		return nil
-	end
-	-- Canonicalise to an absolute path so the file:// URI is well-formed
-	-- regardless of which working directory Hammerspoon was launched from.
-	local absolute = hs.fs.pathToAbsolute(img_path) or img_path
-	-- Percent-encode spaces (and a handful of other reserved chars) so the
-	-- browser engine treats the URL as a single resource. Slashes stay literal.
-	local encoded = absolute:gsub("([^%w%-%./_~/\\:])", function(c)
-		return string.format("%%%02X", string.byte(c))
-	end)
-	return "file://" .. encoded
-end
 
 
 
@@ -200,46 +159,112 @@ function M._metrics_path_for(config_dir)
 	return ConfigPaths.metrics_dir(dir)
 end
 
+--- Reads one shipped data file of the shared tree, through the read-only
+--- accessor every module uses for shipped data (configuration goes through
+--- read_with_status).
+--- @param relative string Path under _shared/.
+--- @return string|nil content
+--- @return string|nil detail Why the file could not be read.
+local function read_shared(relative)
+	local path = Paths.shared(relative)
+	local content = FileSystem.read(path)
+	if type(content) ~= "string" then return nil, tostring(path) .. " is unreadable" end
+	return content
+end
+
+--- The wizard catalogue of this driver, read once from the generated file.
+--- Raises when the file is missing or malformed: the wizard cannot ask or
+--- validate anything without it.
+--- @return table index From onboarding_answers.load.
+local function catalogue()
+	if _catalogue then return _catalogue end
+	local text, detail = read_shared(Answers.CATALOGUE_PATH)
+	if not text then error("the onboarding catalogue is unreadable: " .. tostring(detail)) end
+	_catalogue = Answers.load(text, CATALOGUE_DRIVER)
+	return _catalogue
+end
+
+--- The complete string table of a locale, straight from its locale file: the
+--- page resolves every label the catalogue names, so no hand-kept subset can
+--- drop one.
+--- @param code string Locale code.
+--- @return table|nil strings
+local function locale_strings(code)
+	local text, detail = read_shared("data/locales/" .. tostring(code) .. ".json")
+	local strings = text and Json.decode(text) or nil
+	if type(strings) ~= "table" then
+		Logger.error(LOG, "Onboarding locale '%s' is unavailable (%s).", tostring(code),
+			tostring(text and "invalid JSON" or detail))
+		return nil
+	end
+	return strings
+end
+
+--- Whether a locale code is one this build ships.
+--- @param code any
+--- @return boolean
+local function known_locale(code)
+	if type(code) ~= "string" then return false end
+	for _, entry in ipairs(require("_generated.locale_table")) do
+		if entry.code == code then return true end
+	end
+	return false
+end
+
+--- The configured value of every wizard path of a decoded config.toml. The
+--- wizard reads the file on a re-run, so the unused-key cleanup marks what it
+--- takes through the same projection.
+--- @param decoded table Decoded config.toml.
+--- @param mark function|nil mark(...segments) for each key present and read.
+--- @return table values `{ [path] = value }`.
+function M.config_values(decoded, mark)
+	return Answers.current_values(catalogue(), decoded, mark)
+end
+
+--- The configured value of every wizard path in a config file.
+--- @param path string Absolute config.toml path.
+--- @return table|nil values Empty for an absent file, nil when unreadable.
+local function current_values(path)
+	local content, status = FileSystem.read_with_status(path)
+	if status == "absent" then return {} end
+	if status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "The configuration in force could not be read (%s).", tostring(status))
+		return nil
+	end
+	local decoded_ok, decoded = pcall(toml_codec.decode, content)
+	if not decoded_ok or type(decoded) ~= "table" then
+		Logger.error(LOG, "The configuration in force could not be decoded.")
+		return nil
+	end
+	return M.config_values(decoded)
+end
+
 --- Loads the strings for a given locale code and injects them into the webview
---- via window.applyStrings().  Used both for the initial render and for the
---- live-preview when the user hovers over a language row.
+--- via window.applyStrings(). Used both for the initial render and for the
+--- live preview when the user clicks a language row.
 --- @param code string Locale code, e.g. "fr".
 --- @param owner table Captured wizard owner.
 --- @param view userdata|table Captured native window.
 local function inject_strings(code, owner, view)
 	if not publication_is_current(owner, view) then return end
-	local strings = {}
-
-	-- Pull every translated string out of i18n by temporarily pointing it at
-	-- the requested locale, then restoring the previous locale.
-	local prev_code = i18n.get_locale()
-	i18n.set_locale_no_reload(code)
-	for _, k in ipairs(STRING_KEYS) do
-		strings[k] = i18n.get(k)
-	end
-	local window_title = i18n.get(WINDOW_TITLE_KEY)
-
-	i18n.set_locale_no_reload(prev_code)
-
+	local strings = locale_strings(code)
+	if not strings then return end
 	-- Wrap strings + the locale code together so the JS side can discard
 	-- responses that arrived out of order (stale rapid-switch results).
-	local payload = { locale = code, strings = strings }
 	Logger.debug(LOG, "Injecting strings for locale '%s'…", code)
-	submit_data(owner, view, "applyStrings", payload)
-	retitle(owner, view, window_title)
+	submit_data(owner, view, "applyStrings", { locale = code, strings = strings })
+	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
 end
 
---- Sends the full initData payload (locale + strings + default answers) to the
---- webview so the first step renders correctly on open.
+--- Sends the initData payload (locale, strings, folders and the values in
+--- force) so the first step renders correctly on open.
 local function inject_init_data()
 	local owner, view = _focus_owner, _webview
 	if not publication_is_current(owner, view) then return end
 
 	local current_locale = i18n.get_locale()
-	local strings = {}
-	for _, k in ipairs(STRING_KEYS) do
-		strings[k] = i18n.get(k)
-	end
+	local strings = locale_strings(current_locale)
+	if not strings then return end
 
 	-- Resolve the current + default config directories so the wizard can
 	-- pre-fill the input AND show the default as a placeholder.
@@ -254,56 +279,40 @@ local function inject_init_data()
 		end
 	end
 
-	-- Detect the active macOS keyboard layout name so the JS step 3 can
-	-- pre-select ù on AZERTY / ; on QWERTY. ``hs.keycodes.currentLayout``
-	-- returns a string like "U.S." or "French" — pass it through and let
-	-- the JS-side _pickDefaultMagicKey() classify by substring match.
+	-- The active input source ("U.S.", "French", "Ergopti") lets the hotstrings
+	-- page propose a trigger character the user can type.
 	local system_layout = ""
 	pcall(function()
 		local v = hs.keycodes.currentLayout()
 		if type(v) == "string" then system_layout = v end
 	end)
 
-	local payload = {
-		locale             = current_locale,
-		strings            = strings,
-		default_config_dir = default_config_dir,
-		system_layout      = system_layout,
-		layout_image_url   = _layout_image_url(),
-		-- Locale list rendered on step 1. Pulled from lib.i18n so the
-		-- wizard, the menubar language submenu and the AHK tray menu
-		-- all show identical ordering — non-Latin script names trail
-		-- after the Latin ones rather than intermixing alphabetically.
-		locales            = i18n.get_sorted_locales(),
-		answers = {
-			locale       = current_locale,
-			use_ergopti  = true,
-			-- ★ (BLACK STAR, U+2605) is the documented Ergopti default —
-			-- a dedicated key on the Ergopti+ layout, and what the rest
-			-- of the app already calls "the magic key". Step 3 will
-			-- swap this to ù / ; if the user picks a non-Ergopti layout
-			-- on step 2 and the system KB is AZERTY / QWERTY.
-			magic_key    = ManifestReader.default_for("hotstrings.trigger_char"),
-			-- Pre-fill with the current config dir when it diverges from
-			-- the OS default — otherwise leave empty so the placeholder
-			-- shows the default and the wizard treats "no change" as the
-			-- happy path.
-			config_dir   = (cur_config_dir ~= default_config_dir) and cur_config_dir or "",
-			use_metrics  = false,
-			use_gestures = false,
-		},
-	}
-	local resolved, metrics_path = pcall(M._metrics_path_for, payload.answers.config_dir)
+	local values = current_values(_config_path)
+	if not values then return end
+
+	local config_dir = (cur_config_dir ~= default_config_dir) and cur_config_dir or ""
+	local resolved, metrics_path = pcall(M._metrics_path_for, config_dir)
 	if not resolved then
 		Logger.error(LOG, "Onboarding metrics path unresolved: %s.", tostring(metrics_path))
 		return
 	end
-	payload.metrics_path = metrics_path
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
-	submit_data(owner, view, "initData", payload)
+	submit_data(owner, view, "initData", {
+		platform           = CATALOGUE_DRIVER,
+		locale             = current_locale,
+		strings            = strings,
+		-- One locale order for the wizard and every tray language menu.
+		locales            = i18n.get_sorted_locales(),
+		default_config_dir = default_config_dir,
+		-- Empty when the folder is the OS default: the placeholder shows it.
+		config_dir         = config_dir,
+		system_layout      = system_layout,
+		current            = values,
+		metrics_path       = metrics_path,
+	})
 	-- initData resets the page to the current locale; keep the window in step.
-	retitle(owner, view, i18n.get(WINDOW_TITLE_KEY))
+	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
 end
 
 
@@ -314,130 +323,6 @@ end
 -- ======= 2/ Finish and commit =============
 -- ============================================
 -- ============================================
-
---- Converts a JS truthy value to a real Lua boolean so toml_writer emits a BARE
---- TOML boolean (`true`/`false`), not a quoted "true"/"false" string. A quoted
---- "false" decodes back to the Lua STRING "false", which is truthy — so a feature
---- the user explicitly DECLINED in the wizard would silently re-activate on the
---- post-wizard reload (every boot gate is a bare `if state.flag then`).
---- @param value any
---- @return boolean
-local function to_bool(value)
-	return value == true or value == "true"
-end
-
---- Builds the config.toml update list from the wizard answers, using the CANONICAL
---- HS config schema (infra/preferences.lua KEY_MAP) — lowercase sections, clean
---- ``enabled`` flags. Pure (no I/O) so the schema is unit-testable: a regression
---- to AHK-style keys (which the macOS loader ignores, silently dropping every
---- wizard choice) is caught by tests/unit/ui/test_onboarding_config_schema.lua.
---- @param answers table The wizard answers (use_ergopti, magic_key, use_metrics, use_gestures).
---- @return table Array of { section, key, value } updates for toml_writer.batch_write.
-function M._build_config_updates(answers)
-	answers = type(answers) == "table" and answers or {}
-	return {
-		-- use_ergopti = "use the Ergopti hotstring engine" → [hotstrings].enabled.
-		{ section = "hotstrings", key = "enabled",      value = to_bool(answers.use_ergopti)  },
-		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or ManifestReader.default_for("hotstrings.trigger_char") },
-		{ section = "metrics",    key = "enabled",      value = to_bool(answers.use_metrics)   },
-		{ section = "gestures",   key = "enabled",      value = to_bool(answers.use_gestures)  },
-	}
-end
-
---- Resolves a canonical boolean, falling back to the legacy migration value
---- only when the canonical key is absent.
---- @param canonical any Canonical value, nil when absent.
---- @param legacy_enabled boolean Legacy migration value.
---- @return boolean enabled
-local function canonical_boolean_or_legacy(canonical, legacy_enabled)
-	if canonical ~= nil then
-		return canonical == true or canonical == "true"
-	end
-	return legacy_enabled == true
-end
-
---- Extracts wizard answers from a decoded config.toml table.
---- Reads the canonical HS lowercase schema first ([hotstrings].enabled,
---- [hotstrings].trigger_char, [metrics].enabled, [gestures].enabled) so a
---- config written by commit() round-trips correctly. Falls back to the AHK
---- PascalCase schema (Layout.ErgoptiBase, Hotstrings.MagicKey, …) for users
---- migrating a Windows config file. Every key is read unconditionally, so the
---- keys marked for the unused-key cleanup never depend on another key's value.
---- @param parsed table Decoded TOML as a Lua table.
---- @param mark function|nil mark(...segments) for each key present and read.
---- @return table { use_ergopti, magic_key, use_metrics, use_gestures }
-function M._answers_from_config(parsed, mark)
-	if type(parsed) ~= "table" then return {} end
-	local function section(name)
-		local values = type(parsed[name]) == "table" and parsed[name] or {}
-		return function(key)
-			local value = values[key]
-			if value ~= nil and mark then mark(name, key) end
-			return value
-		end
-	end
-	-- Canonical lowercase sections (written by commit / _build_config_updates)
-	local hs_sec  = section("hotstrings")
-	local met_sec = section("metrics")
-	local ges_sec = section("gestures")
-	-- AHK PascalCase fallback (Windows config import)
-	local layout_ahk   = section("Layout")
-	local hotstr_ahk   = section("Hotstrings")
-	local metrics_ahk  = section("Metrics")
-	local gestures_ahk = section("Gestures")
-	local legacy_base  = layout_ahk("ErgoptiBase") == true
-	local legacy_altgr = layout_ahk("ErgoptiAltGr") == true
-	local legacy_plus  = layout_ahk("ErgoptiPlus") == true
-	local trigger_char = hs_sec("trigger_char")
-	local legacy_magic = hotstr_ahk("MagicKey")
-	-- Prefer canonical schema; fall back to AHK keys only when canonical absent
-	local use_ergopti = canonical_boolean_or_legacy(hs_sec("enabled"),
-		legacy_base or legacy_altgr or legacy_plus)
-	local magic_key = (type(trigger_char) == "string" and trigger_char ~= "" and trigger_char)
-		or (type(legacy_magic) == "string" and legacy_magic ~= "" and legacy_magic)
-		or nil
-	local use_metrics = canonical_boolean_or_legacy(met_sec("enabled"),
-		metrics_ahk("metrics_enabled") == true)
-	local use_gestures = canonical_boolean_or_legacy(ges_sec("enabled"),
-		gestures_ahk("Enabled") == true)
-	return {
-		use_ergopti  = use_ergopti  or false,
-		magic_key    = magic_key,
-		use_metrics  = use_metrics  or false,
-		use_gestures = use_gestures or false,
-	}
-end
-
---- Writes the wizard's answers, distinguishing a RAISE from a returned failure.
---- Extracted for the same reason as M._resolve_commit_path below: commit() is only
---- reachable through the webview callback and ends in hs.reload(), so the outcome
---- is untestable unless the write itself is injectable.
----
---- toml_codec's batch_write signals every I/O failure by RETURNING false plus a
---- reason and NEVER raises. Wrapping it in a bare pcall whose closure dropped the
---- return value therefore reported a failed write as a success: the wizard showed
---- its "done" notification, marked onboarding complete in hs.settings, and reloaded
---- with none of the user's answers on disk — the first-run choices were silently
---- lost and the wizard never offered itself again.
---- @param writer table The toml_writer module (or a test double).
---- @param path string Absolute path to config.toml.
---- @param updates table The key/value updates to persist.
---- @return boolean ok True only when the file was actually written.
---- @return string|nil err Failure reason, from either the raise or the return.
-function M._commit_write(writer, path, updates)
-	local _, read_status, read_detail = FileSystem.read_with_status(path)
-	if read_status ~= "ok" and read_status ~= "absent" then
-		return false, tostring(read_detail or "destination is not safely readable")
-	end
-	local ok, wrote, write_err = pcall(function()
-		return writer.batch_write(path, updates)
-	end)
-	if not ok then return false, tostring(wrote) end
-	-- nil is treated like false: a writer that returns nothing has not confirmed
-	-- the write, and this path must never assume success it was not told about.
-	if wrote ~= true then return false, tostring(write_err) end
-	return true
-end
 
 --- Persists the wizard's selected config directory and requires an explicit
 --- acknowledgement from the menu_paths bridge. pcall success is insufficient:
@@ -527,17 +412,60 @@ local function close_webview()
 	return true
 end
 
---- Writes all collected answers to config.toml and reloads Hammerspoon.
+--- Closes the wizard and tells the user why nothing was saved.
+--- @param title_key string Alert title key.
+--- @param body string Localised alert body.
+local function fail_commit(title_key, body)
+	close_webview()
+	require("infra.dialog_util").block_alert(i18n.get(title_key), body, i18n.get("onboarding.btn.ok"))
+end
+
+--- Versions a config.toml the wizard is about to write: the boot migration
+--- ran on the folder the session started with, and the wizard may target
+--- another one. A file this build cannot version is refused, never rewritten.
+--- @param path string Destination config.toml.
+--- @return boolean writable
+--- @return string|nil detail
+local function prepare_destination(path)
+	local ConfigMigrate = require("config_migrate")
+	local result = ConfigMigrate.boot({
+		path          = path,
+		driver        = MIGRATION_DRIVER,
+		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
+		file_adapter  = FileSystem,
+	})
+	if result.read_only then return false, result.detail end
+	return true
+end
+
+--- Validates the answers, persists the folder and the language, writes every
+--- answer to config.toml in one batch and reloads Hammerspoon.
 --- @param answers table The answers object from the JS "finish" message.
 local function commit(answers)
-	Logger.start(LOG, "Writing onboarding answers to config.toml…")
+	Logger.start(LOG, "Committing the onboarding answers…")
+
+	-- Validate the whole payload before any side effect: a refused answer must
+	-- not leave the folder or the language changed behind it.
+	local catalogue_ok, index = pcall(catalogue)
+	local rows, refusal
+	if catalogue_ok then
+		rows, refusal = Answers.rows(index, answers.operations, ManifestReader)
+	else
+		refusal = index
+	end
+	if not rows or not known_locale(answers.locale) or type(answers.config_dir) ~= "string" then
+		Logger.error(LOG, "Onboarding answers refused: %s.",
+			tostring(refusal or "the language or the folder is invalid"))
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.invalid_answers"))
+		return
+	end
 
 	-- Persist the chosen config dir to paths.toml BEFORE writing
 	-- config.toml: the path resolver picks the new location up on the
 	-- final reload, so subsequent saves go there straight away. An
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
-	if type(answers.config_dir) == "string" and answers.config_dir ~= "" then
+	if answers.config_dir ~= "" then
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		local persisted, persist_err = M._persist_config_dir(
 			ok_mp and menu_paths or nil,
@@ -545,13 +473,7 @@ local function commit(answers)
 		)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
-			close_webview()
-			local dialog = require("infra.dialog_util")
-			dialog.block_alert(
-				i18n.get("paths_editor.save_failed_title"),
-				i18n.get("paths_editor.save_failed"),
-				i18n.get("onboarding.btn.ok")
-			)
+			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
 			return
 		end
 		-- _config_path was captured in M.run() from the config dir as it stood
@@ -561,54 +483,39 @@ local function commit(answers)
 		_config_path = M._resolve_commit_path(menu_paths, _config_path)
 	end
 
-	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
-	-- Build the updates with the CANONICAL HS schema (see M._build_config_updates).
-	-- The wizard previously wrote AHK-style keys the macOS loader never reads, so
-	-- every choice was silently dropped on the post-wizard reload — the
-	-- "metrics + gestures not active after the wizard" bug. Locale is persisted
-	-- separately (hs.settings), not via config.toml, so it is handled below.
-	local updates = M._build_config_updates(answers)
-
 	-- Switch to the chosen locale before writing so success messages are translated,
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
-	i18n.set_locale_no_reload(locale)
+	i18n.set_locale_no_reload(answers.locale)
 	local locale_ok, locale_persisted = xpcall(function()
-		return i18n.persist_locale(locale)
+		return i18n.persist_locale(answers.locale)
 	end, debug.traceback)
 	if not locale_ok or locale_persisted ~= true then
 		Logger.error(LOG, "commit: locale persistence failed — %s.",
 			tostring(locale_persisted))
-		close_webview()
-		local dialog = require("infra.dialog_util")
-		dialog.block_alert(
-			i18n.get("onboarding.error.title"),
-			i18n.get("onboarding.error.locale_persist_failed"),
-			i18n.get("onboarding.btn.ok")
-		)
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
 		return
 	end
 
-	local ok, err = M._commit_write(toml_writer, _config_path, updates)
-
-	if not ok then
-		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
-		close_webview()
-		local dialog = require("infra.dialog_util")
-		dialog.block_alert(
-			i18n.get("onboarding.error.title"),
-			i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err),
-			i18n.get("onboarding.btn.ok")
-		)
+	local committed, err = Answers.commit({
+		index      = index,
+		operations = answers.operations,
+		manifest   = ManifestReader,
+		path       = _config_path,
+		prepare    = prepare_destination,
+		write      = function(path, batch) return toml_writer.batch_write(path, batch) end,
+	})
+	if not committed then
+		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
 		return
 	end
 
-	Logger.success(LOG, "Onboarding answers written successfully.")
-	Storage.set(SETTINGS_COMPLETED_KEY, true)
+	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
 	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-	DeferredWork.after(1.5, function()
+	DeferredWork.after(RELOAD_DELAY_SEC, function()
 		hs.reload()
 	end, "onboarding.reload")
 end
@@ -684,10 +591,14 @@ local function handle_message(body)
 		submit_data(owner, view, "setMetricsPath", { request = body.request, path = path })
 
 	elseif action == "loadExistingConfig" then
-		-- User confirmed a config directory on the config step. Check whether
-		-- ``<dir>/hammerspoon/config.toml`` already exists; if so, parse it and
-		-- ship the saved answers back to JS so steps 2-5 open pre-selected with
-		-- the user's previous choices instead of the bare defaults.
+		-- User confirmed another config directory on the config step. The pages
+		-- restart from ``<dir>/hammerspoon/config.toml``: its values when it
+		-- exists, the neutral ones when it does not. The request number is
+		-- echoed so the page drops a reply for a folder it has since left.
+		if type(body.request) ~= "number" then
+			Logger.error(LOG, "loadExistingConfig: request number missing.")
+			return
+		end
 		local chosen = type(body.config_dir) == "string" and body.config_dir or ""
 		if chosen == "" then
 			-- Empty input = "use the OS default" — read from the resolved
@@ -715,7 +626,7 @@ local function handle_message(body)
 				if owner.import_failures[label] then return end
 				owner.import_failures[label] = true
 				if label == "absent" then
-					Logger.debug(LOG, "Onboarding existing configuration absent; defaults retained (repeats suppressed).")
+					Logger.debug(LOG, "Onboarding existing configuration absent; neutral values shown (repeats suppressed).")
 					return
 				end
 				Logger.error(LOG, "Onboarding existing configuration import failed (%s; content withheld; repeats suppressed).", label)
@@ -723,21 +634,21 @@ local function handle_message(body)
 			local read_ok, content, status = pcall(FileSystem.read_with_status, cfg_path, import_failure)
 			if not publication_is_current(owner, view) then return false end
 			if not read_ok then import_failure("dependency"); return false end
+			if status == "absent" then
+				if not reported then import_failure("absent") end
+				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = {} })
+			end
 			if status ~= "ok" or type(content) ~= "string" then
-				if not reported then import_failure(status == "absent" and "absent" or "read") end
+				if not reported then import_failure("read") end
 				return false
 			end
 			local decoded, parsed = pcall(toml_codec.decode, content)
 			if not publication_is_current(owner, view) then return false end
 			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
-			local projected, answers = pcall(M._answers_from_config, parsed)
+			local projected, values = pcall(function() return Answers.current_values(catalogue(), parsed) end)
 			if not publication_is_current(owner, view) then return false end
-			if not projected or type(answers) ~= "table" then import_failure("answers"); return false end
-			local clean = {}
-			for key, value in pairs(answers) do
-				if value ~= nil then clean[key] = value end
-			end
-			return submit_data(owner, view, "applyExistingAnswers", clean)
+			if not projected or type(values) ~= "table" then import_failure("answers"); return false end
+			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values })
 		end
 
 	elseif action == "finish" then
@@ -782,13 +693,10 @@ function M.run(config_path)
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
-		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-		if ok_ui then
-			local view, focus_owner = _webview, _focus_owner
-			ui_builder.force_focus(view, false, { is_current = function()
-				return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
-			end })
-		else pcall(function() _webview:bringToFront() end) end
+		local view, focus_owner = _webview, _focus_owner
+		require("ui.ui_builder").force_focus(view, false, { is_current = function()
+			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
+		end })
 		return true
 	end
 	if _usercontent and close_webview() ~= true then
@@ -804,17 +712,25 @@ function M.run(config_path)
 		return false
 	end
 
-	local screen  = hs.screen.mainScreen()
-	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
-	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
-	-- small displays. See _shared/ui/apps.manifest.json (onboarding).
-	local geo     = ui_builder.get_app_geometry("onboarding")
-	if not geo then
-		Logger.error(LOG, "Onboarding window not opened — geometry unavailable.")
+	-- The catalogue is the page's whole content: without it the wizard can
+	-- neither ask its questions nor validate the answers, so no window opens.
+	local catalogue_ok, catalogue_error = pcall(catalogue)
+	if not catalogue_ok then
+		Logger.error(LOG, "Onboarding window not opened — %s.", tostring(catalogue_error))
 		return false
 	end
-	local win_h   = math.min(geo.height, math.floor(sf.h * 0.60))
-	local win_w   = math.min(geo.width, math.floor(sf.w * 0.35))
+
+	-- The manifest geometry bounded by the screen, like every configuration
+	-- window; the page scrolls inside it (_shared/ui/apps.manifest.json).
+	local screen = hs.screen.mainScreen()
+	local geo    = ui_builder.get_app_geometry("onboarding")
+	if not screen or type(screen.frame) ~= "function" or not geo then
+		Logger.error(LOG, "Onboarding window not opened — screen or geometry unavailable.")
+		return false
+	end
+	local sf    = screen:frame()
+	local win_w = math.min(geo.width, sf.w)
+	local win_h = math.min(geo.height, sf.h)
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsOnboarding")
 	if not ok_uc or not uc then

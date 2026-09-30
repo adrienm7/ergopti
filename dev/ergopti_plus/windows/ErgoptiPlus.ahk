@@ -377,6 +377,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/llm_nav_event_owner.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
+#Include adapters/system_control.ahk
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
@@ -461,6 +462,7 @@ if UIASW_IsWorkerInvocation()
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include ui/error_dialog/init.ahk
+#Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
@@ -600,13 +602,6 @@ BootProfile_Stamp("Module includes initialised")
 
 #Include infra/suspend_handoff.ahk
 #Include infra/boot.ahk
-
-; A pending trigger transaction belongs to the stable paths.toml locator, not
-; necessarily to the config directory selected for this boot. Resolve it before
-; onboarding or the first cached parse can observe and re-save split authority.
-if !LLM_TriggerJournalRecoverAtBoot()
-	throw Error("LLM trigger journal recovery failed before configuration boot")
-
 #Include infra/feature_state.ahk
 #Include infra/tray_bootstrap.ahk
 
@@ -837,47 +832,35 @@ global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
-; When Ergopti keyboard emulation is off, MagicKeySourceScan must point to
-; the physical key that produces MagicKeySourceChar ("j" by default) on the
-; user's active OS layout. On bépo, "j" lives on a different scancode than
-; SC02E (the Ergopti/QWERTY position), so we probe the layout at startup.
+; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
+; user's configured key always wins; then the key the active layout's extension
+; declares — the emulated registry layout, or the built-in Ergopti emulation;
+; then, with no layout emulated, the key that types MagicKeySourceChar ("j" by
+; default) on the user's own OS layout — on bépo not the SC02E Ergopti/QWERTY
+; position; then the shipped default. A layout is emulated only while the base
+; layer is on (_KLE_BaseCriterion): a layout left selected in the manager with
+; the base layer off types nothing, so the OS layout is still probed.
 ;
-; Strategy: enumerate scancodes 0x01→0x7F, call ToUnicodeEx on each with no
-; modifiers, and pick the one whose output matches MagicKeySourceChar.
-; VkKeyScanExW is not used here because it fails on layouts like bépo where
-; the target character ("j") sits behind a driver-level remapping that the
-; API cannot see.
-;
-; The layout is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read (through
-; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
-; the system default), so the scan and the AltGr family describe one layout and
-; the layout poll, seeded with the same HKL, reloads when the user switched.
-; The no-modifier scancode scan lives in adapters/key_state.ahk so the
-; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
-; this boot step only interprets the result and updates ScriptInformation.
-if !Features["layout"]["ergopti_base"] {
-	_HKL := _LAYOUT_REMAP_HKL
-	if _HKL != 0 {
-		_TargetChar := ScriptInformation["MagicKeySourceChar"]
-		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
-		if _Found["scan"] != 0 {
-			ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _Found["scan"])
-			LoggerInfo("ErgoptiPlus",
-				"Magic-key source resolved from layout: char='{1}', VK=0x{2:X}, scan={3} (HKL=0x{4:X}).",
-				_TargetChar, _Found["vk"], ScriptInformation["MagicKeySourceScan"], _HKL)
-		} else {
-			LoggerWarn("ErgoptiPlus",
-				"Magic-key source: char '{1}' not found on any base scancode of layout"
-				. " HKL=0x{2:X} — keeping default scan {3}.",
-				_TargetChar, _HKL, ScriptInformation["MagicKeySourceScan"])
-		}
-	} else {
-		LoggerWarn("ErgoptiPlus",
-			"Magic-key source resolution skipped: could not obtain a valid HKL at startup"
-			. " — keeping default scan {1}.",
-			ScriptInformation["MagicKeySourceScan"])
-	}
-}
+; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
+; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
+; thread, then the system default), so the scan and the AltGr family describe
+; one layout and the layout poll, seeded with the same HKL, reloads when the
+; user switched — only when the key follows the OS layout at all.
+_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
+	"chosen", ScriptInformation["MagicKeySourceScanChosen"],
+	"configured", ScriptInformation["MagicKeySourceScan"],
+	"declared", LayoutRegistry_DeclaredMagicKey(
+		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
+			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
+		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
+	"emulated", Features["layout"]["ergopti_base"],
+	"keycodes", LayoutRegistry_Keycodes(),
+	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"])))
+ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
+ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
+ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
+LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 
 ; Safe nested read
@@ -1088,10 +1071,15 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 	_GateCountsBefore["enabled"] - _GateCountsAfter["enabled"]))
 
 #Include modules/take_note.ahk
+; The touchpad registry table and its one owner (backup, write, restore).
+; Functions only: the first-run wizard above already calls them.
+#Include _generated/touchpad_registry.ahk
+#Include modules/gestures/touchpad_registry.ahk
 #Include modules/gestures/init.ahk
 #Include modules/gestures/click.ahk
 #Include modules/gestures/screenshots.ahk
 #Include modules/gestures/window_cycle.ahk
+#Include modules/gestures/virtual_desktops.ahk
 #Include modules/gestures/config.ahk
 BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()

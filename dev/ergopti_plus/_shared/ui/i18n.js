@@ -30,9 +30,17 @@
 //    only once the page has measured which keys it still needs.
 // 4. Global store — strings are saved in window._i18n_strings so page scripts
 //    can call _t(key) for dynamic content not reachable via DOM attributes.
-// 5. Direct injection — Lua backends can skip the fetch entirely by calling
-//    window.i18n_apply(strings) with a pre-loaded flat key→value map.
-// 6. Attribute variants:
+// 5. Direct injection — a host can deliver strings two ways: by seeding
+//    window._i18n_strings in the boot script it prepends to the page, or by
+//    calling window.i18n_apply(strings) at any time. A seeded store that
+//    resolves the page skips the fetch entirely.
+// 6. Host strings are never dropped. The store only grows: apply() merges,
+//    and the fetch cascade fills only the keys the store still lacks. An inline
+//    macOS page cannot fetch file:// at all, so its cascade always ends empty;
+//    when that empty result replaced the store after the host's injection, the
+//    diagnostics page and the error window showed every dynamic label as its
+//    raw key, depending only on which of the two landed last.
+// 7. Attribute variants:
 //    - data-i18n="key"             → element.textContent
 //    - data-i18n-title="key"       → element.title
 //    - data-i18n-placeholder="key" → element.placeholder (inputs)
@@ -103,10 +111,30 @@
 		});
 	}
 
+	/** The strings delivered so far, whoever delivered them. */
+	function current_store() {
+		var store = window._i18n_strings;
+		return store && typeof store === 'object' ? store : {};
+	}
+
+	/** A fresh map holding base, overwritten key by key by overlay. */
+	function overlaid(base, overlay) {
+		var out = {};
+		Object.keys(base).forEach(function (k) {
+			out[k] = base[k];
+		});
+		Object.keys(overlay).forEach(function (k) {
+			out[k] = overlay[k];
+		});
+		return out;
+	}
+
 	function apply(strings) {
-		// Store globally so page scripts can call _t(key) for dynamic content
-		window._i18n_strings = strings;
-		apply_to_dom(strings);
+		// Merged, never replaced: the newest delivery wins key by key, and a key
+		// a host already delivered survives a later, smaller map
+		var incoming = strings && typeof strings === 'object' ? strings : {};
+		window._i18n_strings = overlaid(current_store(), incoming);
+		apply_to_dom(window._i18n_strings);
 		announce_applied();
 	}
 
@@ -198,15 +226,25 @@
 						combined[k] = merged[k];
 					});
 				}
-				if (unresolved_keys(combined).length === 0) return finish(combined);
+				if (unresolved_keys(overlaid(combined, current_store())).length === 0) {
+					return finish(combined);
+				}
 				return step(index + 1, combined);
 			});
 		}
 
-		function finish(strings) {
-			// Pages extend this public hook to translate their dynamic content too.
-			window.i18n_apply(strings);
-			var missing = unresolved_keys(strings);
+		function finish(fetched) {
+			// A host may have delivered strings while the fetch was in flight; they
+			// outrank what the page fetched, so the fetch only fills the gaps. It is
+			// still applied when it adds nothing: pages extend this public hook to
+			// translate their dynamic content too, and wait for it to render.
+			var store = current_store();
+			var additions = {};
+			Object.keys(fetched).forEach(function (k) {
+				if (store[k] === undefined) additions[k] = fetched[k];
+			});
+			window.i18n_apply(additions);
+			var missing = unresolved_keys(current_store());
 			if (missing.length > 0) {
 				// Named, not counted: a key no locale in the chain resolves is a
 				// packaging bug, and the name is what makes it fixable.
@@ -222,6 +260,13 @@
 			}
 		}
 
+		// Strings the host seeded before the page ran are shown at once; when
+		// they resolve the whole page, nothing is fetched.
+		var seeded = current_store();
+		if (Object.keys(seeded).length > 0) {
+			window.i18n_apply({});
+			if (unresolved_keys(seeded).length === 0) return;
+		}
 		step(0, {});
 	}
 

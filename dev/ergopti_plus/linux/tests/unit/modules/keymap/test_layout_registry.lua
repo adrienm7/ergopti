@@ -153,14 +153,21 @@ helpers.describe("layout manager (Linux): installing", function()
 		local saved_config = package.loaded["infra.config_paths"]
 		package.loaded["modules.keymap.layout_registry"] = {
 			extension_roots = function() return { "/committed/layout/generation" } end,
+			shipped_extension_root = function() return { pack = "/driver/layouts/registry/ergopti" } end,
 		}
-		package.loaded["infra.config_paths"] = { home = function() return "/private/user" end }
+		package.loaded["infra.config_paths"] = {
+			home = function() return "/private/user" end,
+			get_config_dir = function() return "/private/xdg/ergopti" end,
+		}
 		local ok, roots = pcall(Paths.extension_roots)
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
 		package.loaded["infra.config_paths"] = saved_config
 		helpers.assert_true(ok, tostring(roots))
-		helpers.assert_eq(roots[#roots - 1], "/committed/layout/generation")
-		helpers.assert_eq(roots[#roots], "/private/user/.config/ergopti/extensions")
+		helpers.assert_eq(roots[#roots - 2], "/committed/layout/generation")
+		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" },
+			"the shipped Ergopti extension follows the installed generations (ergopti-hotstrings-ext)")
+		helpers.assert_eq(roots[#roots], "/private/xdg/ergopti/extensions",
+			"the user root follows the effective configuration folder, as on macOS and Windows")
 	end)
 
 	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()

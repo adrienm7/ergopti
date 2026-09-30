@@ -43,7 +43,13 @@ local function load_fixture()
 		end,
 	})
 	replace("ui.download_window.bridge", {
-		show = function(opts) shown = opts; return window.session end,
+		-- The real window refuses a session without a known kind; a model pull
+		-- must name its own
+		show = function(opts)
+			shown = opts
+			if opts.kind ~= "ollama_model" then return nil end
+			return window.session
+		end,
 		update = function(...)
 			window.updates[#window.updates + 1] = { ... }
 			return true

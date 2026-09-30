@@ -58,8 +58,11 @@ local QUICK_DELAY_CATEGORIES = {
 -- picker reads the sections of that pack rather than guessing at a spelling.
 local PERSONAL_CATEGORY = "personal"
 
--- Single source of the driver version.
+-- Single source of the driver version and of the build identity.
 local Version = require("infra.version")
+
+-- The shared wording of the About version row.
+local VersionLabel = require("updater.version_label")
 
 -- The shared automatic-check schedule (frequency presets and their snap).
 local Schedule = require("updater.schedule")
@@ -181,6 +184,12 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		value = picked
 	elseif type(ctx.prompt_action_parameter) == "function" then
 		value = ctx.prompt_action_parameter(binding, action, spec, prior)
+	elseif spec == "app" then
+		-- An application is picked among the desktop entries, never typed.
+		local chosen, why = require("ui.app_chooser").pick(require("adapters.shell_runner"),
+			gestures.get_action_parameter_prompt(action))
+		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
+		value = chosen
 	else
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action
@@ -503,6 +512,28 @@ local function _all_hotstring_groups_on(config)
 	return true
 end
 
+--- Restores or clears the Hotstrings scope after the user confirms it.
+---
+--- Shared by the Hotstrings rows and the Configuration « restore recommended »
+--- row, so both reach the one transaction that writes the manifest's recommended
+--- values after verified backups. Deleting the explicit choices instead yields the
+--- neutral state, where every catalogue is off: the opposite of the label.
+--- @param ctx table Menu context: paused, is_paused, dyn_hotstrings, tooltip_preview, on_menu_changed.
+--- @param mode string "recommended" or "clear".
+--- @param title string Confirmation dialog title.
+--- @return boolean committed
+local function _apply_hotstrings_scope(ctx, mode, title)
+	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+	local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+	if ask_yes_no(title, label, i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then
+		return false
+	end
+	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
+	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	return committed
+end
+
 --- Renders the rows of the hotstrings submenu that the manifest describes.
 ---
 --- Defined BEFORE its caller: a `local function` is not hoisted
@@ -699,6 +730,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
+				-- A section an extension binds is drawn in that extension's submenu.
+				if section and section.extension then goto continue_section end
 				-- CHECKED, not ENABLED. The two are different questions and answering
 				-- both with the effective state made a switched-off category untick
 				-- every section it holds — so the information "here is what comes back
@@ -721,6 +754,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						if config.toggle_section then config.toggle_section(id, name) end
 					end,
 				}
+				::continue_section::
 			end
 		end
 
@@ -1312,11 +1346,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			}
 			return rows
 		end,
-		["hotstring_categories_ergopti"]  = function()
-			local rows = {}
-			append_class(rows, "ergopti")
-			return rows
-		end,
 		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
 			local rows = {}
@@ -1404,13 +1433,24 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 		["hotstring_extensions"] = function()
 			local rows = {}
-			-- One submenu per installed extension, holding its packs. Grouped by
+			-- One « Hotstrings <extension> » submenu per installed extension, holding
+			-- its packs and the bundled categories it binds whole (Ergopti's SFB
+			-- reduction and rolls, which keep their historical ids). Grouped by
 			-- extension rather than listed flat because an extension is the unit the
 			-- user installed and the unit they will want to turn off; its individual
 			-- packs are an implementation detail of how its author organised them.
-			local by_extension, order = {}, {}
+			local by_extension, order, names = {}, {}, {}
 			for _, name in ipairs(groups) do
 				local extension_id = Extensions.parse_category_key(name)
+				local label = nil
+				if not extension_id then
+					local category = type(config.get_category) == "function" and config.get_category(name) or nil
+					local extension = category and category.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						extension_id = extension.id
+						label = extension.name
+					end
+				end
 				if extension_id then
 					if not by_extension[extension_id] then
 						by_extension[extension_id] = {}
@@ -1418,7 +1458,35 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 					local list = by_extension[extension_id]
 					list[#list + 1] = name
+					names[extension_id] = names[extension_id] or label
 				end
+			end
+
+			-- The sections an extension binds inside a bundled category (Ergopti's
+			-- repeat corrections in the magic key): a row each in its submenu.
+			local bound_sections = {}
+			for _, name in ipairs(groups) do
+				local category = type(config.get_category) == "function" and config.get_category(name) or nil
+				for _, section in ipairs(category and category.sections_order or {}) do
+					local record = (category.sections or {})[section]
+					local extension = record and record.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						if not by_extension[extension.id] then
+							by_extension[extension.id] = {}
+							order[#order + 1] = extension.id
+						end
+						names[extension.id] = names[extension.id] or extension.name
+						local list = bound_sections[extension.id] or {}
+						bound_sections[extension.id] = list
+						list[#list + 1] = { category = name, section = section, count = record.count or 0 }
+					end
+				end
+			end
+
+			-- The bound categories in the menu manifest's order, the one Windows
+			-- walks too, rather than in load order; the packs follow as loaded.
+			for extension_id, list in pairs(by_extension) do
+				by_extension[extension_id] = Extensions.menu_order(list, classes)
 			end
 
 			if #order == 0 then
@@ -1462,8 +1530,28 @@ local function _manifest_hotstring_rows(ctx, config)
 				for _, name in ipairs(packs) do
 					sub[#sub + 1] = group_row(name)
 				end
+				if bound_sections[extension_id] and #packs > 0 then sub[#sub + 1] = { separator = true } end
+				for _, bound in ipairs(bound_sections[extension_id] or {}) do
+					local category_on = config.is_group_enabled and config.is_group_enabled(bound.category)
+					local checked = config.is_section_checked
+						and config.is_section_checked(bound.category, bound.section)
+						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					sub[#sub + 1] = {
+						label    = string.format("%s (%d)", bound.section, bound.count),
+						checked  = checked and true or false,
+						-- Greyed while its category is off, like a section row there.
+						disabled = not category_on,
+						action   = function()
+							if config.toggle_section then config.toggle_section(bound.category, bound.section) end
+						end,
+					}
+				end
 
-				rows[#rows + 1] = { label = extension_label(extension_id), items = sub }
+				local name = names[extension_id] or extension_label(extension_id)
+				rows[#rows + 1] = {
+					label = string.format(i18n_safe("menu.extensions.hotstrings_of"), name),
+					items = sub,
+				}
 			end
 			return rows
 		end,
@@ -1539,7 +1627,16 @@ local function _manifest_hotstring_rows(ctx, config)
 	local function all_groups_on() return _all_hotstring_groups_on(config) end
 	local whole_tree = all_sections_row(all_category_ids())
 
+	--- Restores or clears the Hotstrings scope after the user confirms it.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean committed
+	local function apply_hotstrings_scope(mode)
+		return _apply_hotstrings_scope(ctx, mode, i18n_safe("menu.hotstrings.title"))
+	end
+
 	hs_ctx.commands = {
+		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
+		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
 		["hotstrings_all_sections"] = whole_tree.action,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
@@ -1917,28 +2014,6 @@ local function _build_llm(ctx)
 		}, "llm_profile")
 	end
 
-	dynamic_handlers["llm_num_predictions"] = function(target)
-		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
-		if not ok_profiles then return end
-		local current = ProfileSettings.get("num_predictions") or 1
-		local rows = {}
-		for value = 1, 10 do
-			rows[#rows + 1] = {
-				label = tostring(value),
-				checked = current == value,
-				action = function()
-					ProfileSettings.set("num_predictions", value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
-		end
-		append_rendered_row(target, {
-			label = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
-			items = rows,
-			disabled = not enabled or nil,
-		}, "llm_num_predictions")
-	end
-
 	dynamic_handlers["llm_display"] = function(target)
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
@@ -2057,10 +2132,42 @@ local function _build_llm(ctx)
 		}, ctx.on_menu_changed, ollama_model_rows)
 	end
 
-	-- Temperature and context length. The manifest has declared both as features
-	-- for as long as it has existed and this driver read them from the canonical
-	-- defaults with no way to change either — constants wearing the shape of
-	-- settings.
+	--- The suggestion count row: a generation parameter, the first one on every
+	--- driver, with one choice per count from 1 to 10.
+	--- @return table|nil row Nil, with the failure logged, when the profile settings cannot load.
+	local function suggestion_count_row()
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — the suggestion count row cannot be built: %s.",
+				tostring(ProfileSettings))
+			return nil
+		end
+		local current = ProfileSettings.get("num_predictions")
+		local choices = {}
+		for value = 1, 10 do
+			-- One key per plural form, the rows macOS and Windows draw.
+			local count_key = value == 1 and "menu.llm.prediction_count_label_one"
+				or "menu.llm.prediction_count_label_other"
+			choices[#choices + 1] = {
+				label = string.format(i18n_safe(count_key), value),
+				checked = current == value,
+				action = function()
+					ProfileSettings.set("num_predictions", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		return {
+			label = string.format(i18n_safe("menu.llm.num_predictions_label"), tostring(current)),
+			items = choices,
+			disabled = not enabled or nil,
+		}
+	end
+
+	-- The suggestion count, temperature and context length. The manifest has
+	-- declared the last two as features for as long as it has existed and this
+	-- driver read them from the canonical defaults with no way to change either —
+	-- constants wearing the shape of settings.
 	providers["llm_generation"] = function()
 		local ok_settings, Settings = pcall(require, "modules.llm.settings")
 		if not ok_settings then
@@ -2068,6 +2175,7 @@ local function _build_llm(ctx)
 			return {}
 		end
 		local rows = {}
+		rows[#rows + 1] = suggestion_count_row()
 		for _, setting in ipairs({
 			{ name = "temperature", key = "menu.llm.generation.temperature" },
 			{ name = "context_length", key = "menu.llm.generation.context_length" },
@@ -2914,13 +3022,13 @@ local function _build_shortcuts(ctx)
 	return { label = i18n_safe("menu.shortcuts.title"), checked = enabled, submenu = items }
 end
 
---- Display name of a tap-hold key, from the shared `tap_hold.group.*` labels
---- the Windows menu uses.
---- @param key_id string e.g. "caps_lock".
+--- Display name of a tap-hold key: the label key the shared key catalogue
+--- gives it, the one the Windows and macOS menus show.
+--- @param entry table One entry of the manager's key_catalog().
 --- @return string
-local function _tap_hold_key_label(key_id)
-	local label = i18n_safe("tap_hold.group." .. key_id)
-	if label == "tap_hold.group." .. key_id then return key_id end
+local function _tap_hold_key_label(entry)
+	local label = i18n_safe(entry.label_key)
+	if label == entry.label_key then return entry.id end
 	return label
 end
 
@@ -2969,7 +3077,7 @@ local function _build_tap_holds(ctx)
 	end
 	local Writer = require("platform.remap.tap_hold_writer")
 	local HoldOptions = require("tap_hold.hold_options")
-	local Engine = require("platform.remap.tap_hold_engine")
+	local KeyCatalog = require("tap_hold.key_catalog")
 
 	local function changed(ok)
 		if not ok then show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title")) end
@@ -2981,7 +3089,10 @@ local function _build_tap_holds(ctx)
 	local feature_on = th.file_enabled() and th.is_enabled()
 
 	--- Opens the searchable action picker for a key's tap.
-	local function pick_tap(key_id, current)
+	--- @param catalog_entry table The key's entry of the manager's key_catalog().
+	--- @param current string The key's tap now.
+	local function pick_tap(catalog_entry, current)
+		local key_id = catalog_entry.id
 		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
 			Logger.error(LOG, "Action picker is unavailable for the tap of '%s'.", key_id)
@@ -2993,7 +3104,7 @@ local function _build_tap_holds(ctx)
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
 		Picker.open({
-			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(key_id),
+			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
 			label = i18n_safe("dialog.action_picker.label"),
 			current = current == "" and "__native__" or current,
 			allow_native = true,
@@ -3021,61 +3132,70 @@ local function _build_tap_holds(ctx)
 		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
 	end
 
-	local providers = {
-		["tap_hold_keys"] = function()
-			local rows = {}
-			for _, key_id in ipairs(Engine.KEY_ORDER) do
-				local entry = keys[key_id] or {}
-				local active = keys[key_id] ~= nil and entry.enabled ~= false
-				local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
-				local hold = active and _tap_hold_current_hold(options, entry) or options[1]
-				local tap_label = _tap_hold_action_label(tap, ctx.gestures)
-				local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
-				local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
-				local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+	--- The rows of one hand: its keys in the shared catalogue's order, each
+	--- with its disable, tap, hold and delay rows. The manifest draws the two
+	--- hand headers and the separator between the hands around them.
+	--- @param hand string "left" or "right".
+	--- @return table
+	local function hand_rows(hand)
+		local rows = {}
+		for _, catalog_entry in ipairs(KeyCatalog.of_hand(th.key_catalog(), hand)) do
+			local key_id = catalog_entry.id
+			local entry = keys[key_id] or {}
+			local active = keys[key_id] ~= nil and entry.enabled ~= false
+			local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
+			local hold = active and _tap_hold_current_hold(options, entry) or options[1]
+			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
+			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
+			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
+			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
 
-				local hold_rows = {}
-				for _, option in ipairs(options) do
-					hold_rows[#hold_rows + 1] = {
-						label = HoldOptions.label(option, i18n_safe),
-						checked = (hold == option) or nil,
-						action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
-					}
-				end
+			local hold_rows = {}
+			for _, option in ipairs(options) do
+				hold_rows[#hold_rows + 1] = {
+					label = HoldOptions.label(option, i18n_safe),
+					checked = (hold == option) or nil,
+					action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
+				}
+			end
 
-				rows[#rows + 1] = {
-					label = _tap_hold_key_label(key_id) .. "  :  "
-						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
-					checked = configured or nil,
-					items = {
-						{
-							label = i18n_safe("tap_hold.action.disable"),
-							disabled = not configured or nil,
-							action = function() changed(Writer.set_native(key_id)) end,
-						},
-						{ separator = true },
-						{
-							label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
-							action = function() pick_tap(key_id, tap) end,
-						},
-						{
-							label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
-							items = hold_rows,
-						},
-						{
-							label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-							items = {
-								{
-									label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-									action = function() ask_delay(key_id, ms) end,
-								},
+			rows[#rows + 1] = {
+				label = _tap_hold_key_label(catalog_entry) .. "  :  "
+					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+				checked = configured or nil,
+				items = {
+					{
+						label = i18n_safe("tap_hold.action.disable"),
+						disabled = not configured or nil,
+						action = function() changed(Writer.set_native(key_id)) end,
+					},
+					{ separator = true },
+					{
+						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
+						action = function() pick_tap(catalog_entry, tap) end,
+					},
+					{
+						label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
+						items = hold_rows,
+					},
+					{
+						label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
+						items = {
+							{
+								label = i18n_safe("menu.tapholds.key_tap_delay_set"),
+								action = function() ask_delay(key_id, ms) end,
 							},
 						},
 					},
-				}
-			end
-			return rows
-		end,
+				},
+			}
+		end
+		return rows
+	end
+
+	local providers = {
+		["tap_hold_keys_left"] = function() return hand_rows("left") end,
+		["tap_hold_keys_right"] = function() return hand_rows("right") end,
 	}
 
 	local render_ctx = {}
@@ -3091,8 +3211,19 @@ local function _build_tap_holds(ctx)
 		if ok and want then ok = th.set_enabled(true) end
 		changed(ok)
 	end
-	render_ctx.commands["reset_defaults"] = function() changed(Writer.reset_all()) end
-	render_ctx.commands["disable_all"] = function() changed(Writer.disable_all()) end
+	-- The two whole-section rows run the shared scope transaction: both files
+	-- backed up, the engine acknowledging the candidate before it is published.
+	local function apply_scope(mode)
+		if ctx.paused == true then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.tapholds.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
+		changed(committed)
+		return committed
+	end
+	render_ctx.commands["reset_defaults"] = function() return apply_scope("recommended") end
+	render_ctx.commands["disable_all"] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
@@ -3304,31 +3435,38 @@ local function _build_configuration(ctx)
 		end
 	end
 
+	-- The global restore composes every category's own scope owner: one
+	-- default-No question, then all of them or none of them.
+	local function apply_global_scope(mode)
+		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+		if ask_yes_no(i18n_safe("menu.configuration.title"), label,
+			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		local GlobalScope = require("infra.global_scope")
+		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
+		-- « Reverted » is only said when it is true; a pending rollback is an
+		-- ERROR the composition logs, which the error window already reports.
+		if not committed and report.reverted ~= false then
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+
 	-- Every row is `type = "command"` in the manifest, and so is the separator
 	-- between them: labels, order and spacing declared once, with this driver
 	-- supplying only what each row does.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["restore_recommended"] = call_ctx("on_reset_defaults"),
+		-- Every category through its own scope owner, hotstrings included: the
+		-- recommended hotstrings, never the neutral state where every catalogue is off.
+		["restore_recommended"] = function() return apply_global_scope("recommended") end,
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
-		["uninstall"] = function()
-			require("ui.menu.uninstall").run({
-				title = i18n_safe("menu.global.uninstall"),
-				confirmation = i18n_safe("dialog.uninstall.confirm"),
-				failure = i18n_safe("dialog.uninstall.failed"),
-				confirm = function(title, text)
-					return ask_yes_no(title, zenity_plain(text),
-						i18n_safe("button.remove"), i18n_safe("button.cancel"))
-				end,
-				fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
-				quit = call_ctx("on_quit"),
-			})
 		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
@@ -3411,27 +3549,18 @@ local function _build_language(ctx)
 	return { label = i18n_safe("menu.global.language"), submenu = rows }
 end
 
---- The updater block of the About submenu, as provider DATA: the version, one
---- row per channel of the shared registry (ticked on the subscribed one) right
---- before the check row, then the check-frequency picker. It used to be a
---- Linux-only top-level "Updates" submenu with its own 'stable'/'dev' rows.
+--- The channel picker of the About submenu: one submenu titled with the
+--- subscribed channel's registry name, one row per registry channel in registry
+--- order, ticked on the subscribed one. A click subscribes through the updater,
+--- which persists the choice; the redraw it asks for retitles the picker.
 --- @param ctx table Menu context.
---- @return table rows
-local function _about_update_rows(ctx)
-	local up = ctx.updater
-	local version = up and up.current_version() or Version.VERSION
-	local out = {
-		{ label = "ErgoptiPlus " .. tostring(version), disabled = true },
-		{ separator = true },
-	}
-	if not up then
-		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
-		return out
-	end
-
+--- @param up table The updater module.
+--- @return table row A provider row with its items.
+local function _channel_picker(ctx, up)
 	local channel = up.get_channel()
+	local rows = {}
 	for _, id in ipairs(up.CHANNELS.ids()) do
-		out[#out + 1] = {
+		rows[#rows + 1] = {
 			label   = i18n_safe(up.CHANNELS.channel(id).menu_label_key),
 			checked = channel == id,
 			action  = function()
@@ -3448,6 +3577,39 @@ local function _about_update_rows(ctx)
 			end,
 		}
 	end
+	return {
+		label = _fill(i18n_safe("menu.about.channel_menu"), "{channel}",
+			i18n_safe(up.CHANNELS.channel(channel).label_key)),
+		items = rows,
+	}
+end
+
+--- The updater block of the About submenu, as provider DATA: the version, the
+--- channel picker right before the check row, then the check-frequency picker.
+--- It used to be a Linux-only top-level "Updates" submenu with its own
+--- 'stable'/'dev' rows.
+--- @param ctx table Menu context.
+--- @return table rows
+local function _about_update_rows(ctx)
+	local up = ctx.updater
+	-- The build and the commit it was built from, in the shared wording:
+	-- « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	-- (c3005e0b9) » for a source run. The identity is resolved once per daemon
+	-- by infra/version.lua, so a rebuild reads no file.
+	local identity = Version.identity()
+	local out = {
+		{
+			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
+			disabled = true,
+		},
+		{ separator = true },
+	}
+	if not up then
+		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
+		return out
+	end
+
+	out[#out + 1] = _channel_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
 	out[#out + 1] = {
@@ -3455,6 +3617,18 @@ local function _about_update_rows(ctx)
 		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
 			or up.get_state() == "installing",
 		action = function()
+			-- The answer is shown in the shared update-check window, with Update
+			-- and the other channels' newer releases
+			local opened = require("ui.update_check.bridge").open({
+				updater            = up,
+				on_menu_changed    = ctx.on_menu_changed,
+				on_update_finished = ctx.on_update_finished,
+				on_open_today_log  = ctx.on_open_today_log,
+			})
+			if opened then return end
+			-- Without a window (no WebKitGTK, no display) the answer is announced
+			-- by a notification instead
+			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
 			up.check_for_updates(nil, function(available, release, err)
 				if available and release then
 					Logger.info(LOG, "Update available: %s.", release.tag)
@@ -3522,11 +3696,41 @@ end
 
 M._about_update_rows = _about_update_rows
 
---- Builds the about item.
+--- The action of the Uninstall row: the confirmed removal transaction of
+--- ui/menu/uninstall.lua, which quits the daemon through ctx.on_quit once the
+--- removal worker owns the files.
+--- @param ctx table Menu context.
+--- @return function
+local function _uninstall_command(ctx)
+	return function()
+		require("ui.menu.uninstall").run({
+			title = i18n_safe("menu.global.uninstall"),
+			confirmation = i18n_safe("dialog.uninstall.confirm"),
+			failure = i18n_safe("dialog.uninstall.failed"),
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text),
+					i18n_safe("button.remove"), i18n_safe("button.cancel"))
+			end,
+			fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+			quit = function()
+				if type(ctx.on_quit) ~= "function" then
+					Logger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")
+					return
+				end
+				ctx.on_quit()
+			end,
+		})
+	end
+end
+
+--- Builds the about item: the updater block, Versions and its GitHub page, then
+--- Uninstall after a separator. Uninstall sat at the bottom of Configuration
+--- until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["uninstall"] = _uninstall_command(ctx),
 		-- Opens the release notes. It used to log one line to a file the user
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,
@@ -3730,7 +3934,6 @@ end
 ---   verbose        boolean  Verbose flag.
 ---   on_quit        function Called when Quit is selected.
 ---   webview        table    Webview manager; opens the folders editor.
----   on_reset_defaults function (optional) Reset.
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
 ---   on_healthcheck function (optional) Launch healthcheck.

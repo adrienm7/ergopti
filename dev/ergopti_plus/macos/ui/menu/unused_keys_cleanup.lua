@@ -43,7 +43,7 @@ function M.collect(decoded, mark)
 	require("infra.preferences").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
-	require("ui.onboarding")._answers_from_config(decoded, mark)
+	require("ui.onboarding").config_values(decoded, mark)
 end
 
 --- Lists the unused keys of a config file under the macOS rule.

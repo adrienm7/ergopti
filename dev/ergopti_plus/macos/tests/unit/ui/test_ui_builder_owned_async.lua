@@ -70,7 +70,7 @@ local function build_fixture(options)
 	local Builder = helpers.load_with_stubs("ui.ui_builder", {
 		timer = timer,
 		webview = webview_api,
-		drawing = { windowLevels = { floating = 1 } },
+		drawing = { windowLevels = { normal = 0, floating = 1 } },
 		focus = function() return true end,
 	})
 	return Builder, state, webview

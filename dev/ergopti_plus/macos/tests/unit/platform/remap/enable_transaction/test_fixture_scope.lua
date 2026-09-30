@@ -54,6 +54,7 @@ local OWNED_MODULES = {
 	"infra.fs_dir",
 	"adapters.event_provenance",
 	"adapters.storage",
+	"platform.remap.managed_rule_removal",
 }
 
 helpers.describe("remap transaction fixture scope", function()

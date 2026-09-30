@@ -124,8 +124,14 @@ _FeatureStateSmokeNeutral() {
 	ReadScriptConfig(Map())
 	ReadCategoryEnabled(Map())
 	_FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "empty repeat-key fallback")
-	for Category, Enabled in CategoryEnabled
+	for Category, Enabled in CategoryEnabled {
+		; The key-combinations gate only narrows its families, whose own switches
+		; are off here, so its open neutral value activates nothing.
+		if (Category == "KeyCombinations")
+			continue
 		_FeatureStateSmokeAssert(false, Enabled, "empty master: " . Category)
+	}
+	_FeatureStateSmokeAssert(true, CategoryEnabled["KeyCombinations"], "empty key-combinations sub-gate stays open")
 	CategoryEnabled.Delete("Hotstrings")
 	_FeatureStateSmokeAssert(false, IsCategoryGated("Hotstrings"), "missing master stays neutral")
 	_FeatureStateSmokeAssert(false, IsCategoryGated("Personal"), "missing inherited master stays neutral")

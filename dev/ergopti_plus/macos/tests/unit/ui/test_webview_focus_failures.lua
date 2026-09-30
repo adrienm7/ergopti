@@ -14,10 +14,11 @@ local helpers = require("tests.helpers")
 local function with_focus(mode, scenario)
 	local saved, prior_hs = {}, _G.hs
 	for key, value in pairs(package.loaded) do saved[key] = value end
-	local records = { errors = {}, successes = 0, app_focuses = 0, deferred = {} }
+	local records = { errors = {}, warnings = 0, successes = 0, app_focuses = 0, raises = 0, deferred = {} }
 	local ok, err = xpcall(function()
 		package.loaded["infra.logger"] = {
-			debug = function() end, warn = function() end,
+			debug = function() end,
+			warn = function() records.warnings = records.warnings + 1 end,
 			info = function() records.successes = records.successes + 1 end,
 			error = function(_, message, ...)
 				records.errors[#records.errors + 1] = string.format(message, ...)
@@ -44,6 +45,7 @@ local function with_focus(mode, scenario)
 		for _, method in ipairs({ "moveToScreen", "raise", "focus" }) do
 			window[method] = function(self)
 				if mode == method then error("private native error") end
+				if method == "raise" then records.raises = records.raises + 1 end
 				return self
 			end
 		end
@@ -65,10 +67,12 @@ local function with_focus(mode, scenario)
 				if mode:find("schedule", 1, true) or mode == "fallback" or mode == "async" then return nil end
 				return window
 			end,
-			bringToFront = function(self)
+			show = function(self)
 				if mode == "fallback" or mode == "async" then error("private native error") end
 				return self
 			end,
+			bringToFront = function() error("bringToFront sets a window level") end,
+			level = function() error("presentation must never change the window level") end,
 		}
 		package.loaded["ui.ui_builder"] = nil
 		local lifecycle = { is_current = function()
@@ -93,7 +97,7 @@ end
 helpers.describe("webview focus failure outcomes", function()
 	for _, mode in ipairs({ "lookup", "screen", "moveToScreen", "raise", "focus", "app",
 		"schedule throw", "schedule refusal", "custom schedule throw", "custom schedule refusal",
-		"owner validation", "space lookup", "space move", "space lookup refusal", "space move refusal" }) do
+		"owner validation", "space lookup", "space move", "space lookup refusal" }) do
 		helpers.it("rejects " .. mode .. " without false success (webview-focus-failure)", function()
 			with_focus(mode, function(result, records)
 				helpers.assert_eq(result, false)
@@ -123,6 +127,20 @@ helpers.describe("webview focus failure outcomes", function()
 			helpers.assert_eq(records.app_focuses, 1)
 			helpers.assert_eq(records.successes, 1)
 			helpers.assert_eq(#records.errors, 0)
+		end)
+	end)
+
+	helpers.it("still raises and focuses a window its Space move refused (webview-focus-failure)", function()
+		-- hs.spaces refuses to move a window into a full-screen app's Space. An
+		-- open window requested again from there must still be presented, not
+		-- left behind with only a log line.
+		with_focus("space move refusal", function(result, records)
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(records.raises, 1, "the window is raised on its own Space")
+			helpers.assert_eq(records.app_focuses, 1, "Hammerspoon is activated so the user reaches it")
+			helpers.assert_eq(records.successes, 1)
+			helpers.assert_eq(#records.errors, 0, "a documented refusal is not an error")
+			helpers.assert_eq(records.warnings, 1, "the refusal is reported once")
 		end)
 	end)
 

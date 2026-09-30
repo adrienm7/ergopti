@@ -60,7 +60,13 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 				"the real manifest must expose the Clear All command")
 			local action = row and (row.action or row.fn)
 			helpers.assert_type(action, "function")
-			helpers.assert_eq(action(), false,
+			-- The row asks first; the user answers yes, so the owner decides.
+			local saved_dialogs = package.loaded["infra.dialog_util"]
+			package.loaded["infra.dialog_util"] = { block_alert = function(_, _, _, yes) return yes end }
+			local ran, result = pcall(action)
+			package.loaded["infra.dialog_util"] = saved_dialogs
+			helpers.assert_true(ran, tostring(result))
+			helpers.assert_eq(result, false,
 				"the real command must propagate the uninitialized owner refusal")
 
 			local after = assert(io.open(corrupt_path, "r"))

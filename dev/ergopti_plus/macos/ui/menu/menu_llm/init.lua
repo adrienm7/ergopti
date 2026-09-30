@@ -45,12 +45,12 @@ local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 local MenuLayout       = require("ui.menu.menu_llm.menu_layout")
 local ManifestMenu     = require("infra.manifest_menu")
 
--- Deps checkers — kicked off on backend switch and on first menu activation
--- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
--- manual user action. Both checkers are idempotent and exit silently when
--- nothing needs doing, so the menu opens instantly in the nominal case.
+-- AI runtimes install only when their backend is selected (a backend row, or
+-- enabling the AI with that backend), through runtime_install_offer — never at
+-- startup, on menu build or after an update. Building the menu only reads
+-- stat-only presence, so it opens instantly whether or not a runtime exists.
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
 
 local LOG = "menu_llm"
@@ -81,23 +81,17 @@ local function pcall_log(name, fn, ...)
 	return ok, err
 end
 
---- Triggers the deps checker matching the given backend name. Designed to
---- be safe to call repeatedly: each underlying script is hash-gated /
---- liveness-gated and exits in milliseconds when the backend is already
---- ready, so this is effectively a no-op on a working system.
+--- Starts the runtime of the backend the AI is being enabled with. Enabling
+--- the AI is a selection of that backend, so this reuses an installed runtime
+--- and otherwise goes through the one consent-gated install path.
 --- @param backend string Either "mlx" or "ollama".
---- @return boolean completed True when dispatch returned without raising.
-local function check_backend_deps(backend)
-	if backend == "mlx" then
-		local ok, accepted = pcall_log("mlx_deps_checker.check_and_install_deps",
-			mlx_deps_checker.check_and_install_deps)
-		return ok == true and accepted == true
-	elseif backend == "ollama" then
-		local ok, accepted = pcall_log("ollama_deps_checker.check_and_install_deps",
-			ollama_deps_checker.check_and_install_deps)
-		return ok == true and accepted == true
-	end
-	return true
+--- @param on_complete function|nil Receives the terminal runtime result.
+--- @return boolean completed True when dispatch was accepted.
+local function check_backend_deps(backend, on_complete)
+	if backend ~= "mlx" and backend ~= "ollama" then return true end
+	local ok, accepted = pcall_log("runtime_install_offer.select",
+		runtime_install_offer.select, backend, on_complete)
+	return ok == true and accepted == true
 end
 
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
@@ -172,7 +166,6 @@ M.DEFAULT_STATE = {
 		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
-		llm_trigger_shortcut  = Manifest.default_for("llm.trigger.shortcut"),
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
 		llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
 		llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
@@ -778,8 +771,11 @@ local function create_menu(deps)
 				Logger.debug(LOG, "Building prediction count menu…")
 				local rows = {}
 				for i = 1, 10 do
+						-- One key per plural form: an injected "s" is French and English only.
+						local count_key = i == 1 and "menu.llm.prediction_count_label_one"
+							or "menu.llm.prediction_count_label_other"
 						table.insert(rows, {
-								label   = string.format(i18n.get("menu.llm.prediction_count_label"), i, i > 1 and "s" or ""),
+								label   = string.format(i18n.get(count_key), i),
 								checked = (state.llm_num_predictions == i),
 								action  = function()
 										Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
@@ -792,7 +788,7 @@ local function create_menu(deps)
 								end
 						})
 				end
-				return ManifestMenu.render_rows(rows, "llm_num_predictions")
+				return ManifestMenu.render_rows(rows, "llm_generation_settings")
 		end
 
 
@@ -801,13 +797,12 @@ local function create_menu(deps)
 		-- ===== 2.3) Hotkeys & Triggers =======
 		-- =====================================
 
-		local _llm_trigger_hk  = nil
+		-- Profile shortcuts only: a prediction on demand is the
+		-- llm_generate_prediction action, bound in a keyboard slot.
 		local _llm_profile_hks = {}
 		local _startup_silence = false
 		local function get_startup_silence() return _startup_silence end
 		local function set_startup_silence(v) _startup_silence = v end
-		local function get_trigger_hk() return _llm_trigger_hk end
-		local function set_trigger_hk(v) _llm_trigger_hk = v end
 		local function get_profile_hks() return _llm_profile_hks end
 		local function set_profile_hk(id, v) _llm_profile_hks[id] = v end
 
@@ -816,16 +811,11 @@ local function create_menu(deps)
 				keymap             = keymap,
 				save_prefs         = save_prefs,
 				update_menu        = update_menu,
-				get_startup_silence = get_startup_silence,
-				set_startup_silence = set_startup_silence,
-				get_trigger_hk     = get_trigger_hk,
-				set_trigger_hk     = set_trigger_hk,
 				get_profile_hks    = get_profile_hks,
 				set_profile_hk     = set_profile_hk,
 		})
 		local bind_hotkey                  = trigger_orch.bind_hotkey
 		local activate_hotkey              = trigger_orch.activate_hotkey
-		local apply_llm_shortcut           = trigger_orch.apply_llm_shortcut
 		local apply_llm_profile_shortcut   = trigger_orch.apply_llm_profile_shortcut
 
 		deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
@@ -1019,7 +1009,9 @@ local function create_menu(deps)
 						end
 				end
 
-				local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
+				-- The row's label is the manifest's own key (menu.llm.model_label), the
+				-- one Windows and Linux draw too: one wording in every driver.
+				local model_text
 				if state.llm_backend == "api" then
 						-- The local llm_model slot is stale on this backend: show the
 						-- active API entry's configured name instead, without
@@ -1028,13 +1020,13 @@ local function create_menu(deps)
 						if type(ApiPanel.active_entry_display_name) == "function" then
 							entry_name = ApiPanel.active_entry_display_name()
 						end
-						rich_model_title = rich_model_title
-							.. (entry_name or i18n.get("menu.llm.no_model_none"))
+						model_text = entry_name or i18n.get("menu.llm.no_model_none")
 				elseif not state.llm_model or state.llm_model == "" then
-						rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
+						model_text = i18n.get("menu.llm.no_model_none")
 				else
-						rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
+						model_text = string.format("%s%s%s", active_display_model, type_str, params_ram_str)
 				end
+				local rich_model_title = health_dot .. string.format(i18n.get("menu.llm.model_label"), model_text)
 
 				local model_submenu
 				if state.llm_backend == "api" then
@@ -1108,24 +1100,7 @@ local function create_menu(deps)
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				row_for("llm_profile", profiles_item)
-
-				row_for("llm_num_predictions", { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused), menu = build_num_pred_menu() })
-				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
-						row_for("llm_num_predictions", {
-								title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
-								disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused),
-								fn       = function()
-										return settings_mgr.apply_setting_transaction({
-												key = "llm_num_predictions",
-												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
-												runtime_fn = "set_llm_num_predictions",
-												publish_setting = false,
-										})
-								end
-						})
-				end
-
-				row_for("llm_num_predictions", { title = "-" })
+				row_for("llm_profile", { title = "-" })
 
 
 				-- ===== Trigger submenu =====
@@ -1137,7 +1112,6 @@ local function create_menu(deps)
 						save_prefs         = save_prefs,
 						update_menu        = update_menu,
 						settings_mgr       = settings_mgr,
-						apply_llm_shortcut = apply_llm_shortcut,
 				})
 
 				row_for("llm_trigger", { title = i18n.get("menu.llm.trigger_menu_title"), disabled = MenuLayout.row_disabled("llm_trigger", is_disabled, paused), menu = trigger_menu })
@@ -1161,6 +1135,29 @@ local function create_menu(deps)
 				-- ===== Generation settings submenu =====
 
 				local generation_rows = {}
+
+				-- The suggestion count is a generation parameter, the first one on
+				-- every driver; its choices are build_num_pred_menu's tree, handed over whole.
+				table.insert(generation_rows, {
+						label    = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)),
+						disabled = is_disabled or nil,
+						submenu  = build_num_pred_menu(),
+				})
+				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
+						table.insert(generation_rows, {
+								label    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
+								disabled = is_disabled or nil,
+								action   = function()
+										return settings_mgr.apply_setting_transaction({
+												key = "llm_num_predictions",
+												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
+												runtime_fn = "set_llm_num_predictions",
+												publish_setting = false,
+										})
+								end,
+						})
+				end
+				table.insert(generation_rows, { separator = true })
 
 				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
 				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
@@ -1503,7 +1500,7 @@ local function create_menu(deps)
 								if attempt.phase == "bootstrap" then
 										if attempt.bootstrap_result == nil then return true end
 										if attempt.bootstrap_result ~= true then
-												return compensate_activation("MLX bootstrap reported failure")
+												return compensate_activation("runtime bootstrap reported failure")
 										end
 										attempt.phase = "requirements"
 										return finish_activation(true)
@@ -1544,14 +1541,20 @@ local function create_menu(deps)
 										return false
 								end
 
-								if state.llm_backend == "mlx" then
+								-- Enabling the AI selects its backend: MLX always settles its
+								-- runtime first, and a missing Ollama is offered for download
+								-- before anything else runs. A decline keeps the AI off.
+								local runtime_backend = state.llm_backend
+								if runtime_backend == "mlx" or (runtime_backend == "ollama"
+									and not runtime_install_offer.is_installed("ollama")) then
 										attempt.phase = "bootstrap"
-										Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
+										Logger.info(LOG, "Activating LLM — settling the %s runtime first.",
+											tostring(runtime_backend))
 										local bootstrap_dispatching = true
 										local bootstrap_terminal = false
 										local bootstrap_ok, bootstrap_accepted = pcall_log(
-											"mlx_deps_checker.check_and_install_deps",
-											mlx_deps_checker.check_and_install_deps, function(ok)
+											"runtime_install_offer.select",
+											runtime_install_offer.select, runtime_backend, function(ok)
 													if bootstrap_terminal then return false end
 													bootstrap_terminal = true
 													attempt.bootstrap_result = ok == true
@@ -1564,7 +1567,7 @@ local function create_menu(deps)
 											end)
 										bootstrap_dispatching = false
 										if bootstrap_ok ~= true or bootstrap_accepted ~= true then
-												return compensate_activation("MLX bootstrap dispatch refused")
+												return compensate_activation("runtime selection refused or declined")
 										end
 										if bootstrap_terminal then
 												return resume_attempt(token, false)
@@ -1639,15 +1642,14 @@ local function create_menu(deps)
 				guarded_check_requirements = guarded_check_requirements,
 				save_prefs                 = save_prefs,
 				update_menu                = update_menu,
-				apply_llm_shortcut         = apply_llm_shortcut,
 				apply_llm_profile_shortcut = apply_llm_profile_shortcut,
 				activate_hotkey            = activate_hotkey,
 				mlx_deps_checker           = mlx_deps_checker,
+				runtime_installed          = runtime_install_offer.is_installed,
 				deps                       = deps,
 				prediction_locks           = prediction_locks,
 				get_startup_silence        = get_startup_silence,
 				set_startup_silence        = set_startup_silence,
-				get_trigger_hk             = get_trigger_hk,
 				get_profile_hks            = get_profile_hks,
 		})
 

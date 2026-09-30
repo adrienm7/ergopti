@@ -168,10 +168,25 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		record_failure("hotstrings", "keymap.apply_hotstring_preferences", "owner unavailable")
 	end
 
-	-- Sync terminators
-	if type(saved.terminator_states) == "table" then
+	-- Sync the built-in terminators only. A custom terminator's state is
+	-- re-applied below, once add_custom_terminator has re-created its key:
+	-- replaying it here first made the registry log an ERROR for every valid
+	-- custom terminator at each boot. Keys no owner knows never get here, the
+	-- loader drops them as outdated configuration.
+	if type(saved.terminator_states) == "table" and keymap
+		and type(keymap.set_terminator_enabled) == "function"
+		and type(keymap.get_terminator_defs) == "function" then
+		local builtin = {}
+		local defs = keymap.get_terminator_defs()
+		for _, def in ipairs(type(defs) == "table" and defs or {}) do
+			if type(def) == "table" and type(def.key) == "string" and def.custom ~= true then
+				builtin[def.key] = true
+			end
+		end
 		for key, enabled in pairs(saved.terminator_states) do
-			if keymap and type(keymap.set_terminator_enabled) == "function" then try("hotstrings", "keymap.set_terminator_enabled", keymap.set_terminator_enabled, key, enabled) end
+			if builtin[key] then
+				try("hotstrings", "keymap.set_terminator_enabled", keymap.set_terminator_enabled, key, enabled)
+			end
 		end
 	end
 
@@ -617,9 +632,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			for slot, sens in pairs(saved.gesture_sensitivities) do
 				if type(gestures.set_sensitivity) == "function" then try("gestures", "gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
 			end
-		end
-		if saved.gesture_space_wrap ~= nil then
-			if type(gestures.set_space_wrap) == "function" then try("gestures", "gestures.set_space_wrap", gestures.set_space_wrap, saved.gesture_space_wrap) end
 		end
 	end
 	-- Drive shortcuts with binding-only helpers so the script-control eventtap

@@ -305,6 +305,8 @@ function M.boot(opts)
 		reset_to_defaults = function() return true end,
 		get_tap_holds_enabled = function() return false end,
 		set_tap_holds_enabled = function() return true end,
+		get_mod_combos_enabled = function() return false end,
+		set_mod_combos_enabled = function() return true end,
 		regenerate = function(callback)
 			if type(callback) == "function" then callback(true) end
 			return true

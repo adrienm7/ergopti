@@ -46,9 +46,12 @@ local NavLayer = require("platform.remap.nav_layer")
 
 local LOG = "karabiner"
 
-local MANAGED_TAG_LABEL      = "ErgoptiPlus managed"
-local MANAGED_MODE_NORMAL    = "normal"
-local MANAGED_MODE_PAUSE     = "pause"
+-- The ownership marker is part of the pure lease contract: the integration
+-- switch removes exactly the rules that carry it, so there is one parser.
+local MANAGED_MODE_NORMAL    = LeaseContract.MANAGED_MODE_NORMAL
+local MANAGED_MODE_PAUSE     = LeaseContract.MANAGED_MODE_PAUSE
+local managed_description_prefix = LeaseContract.managed_description_prefix
+local parse_managed_description  = LeaseContract.parse_managed_description
 
 local LEGACY_PARAMETER_TAP = "basic.to_if_alone_timeout_milliseconds"
 local LEGACY_PARAMETER_SIMULTANEOUS = "basic.simultaneous_threshold_milliseconds"
@@ -216,32 +219,6 @@ end
 --- @return string|nil error_message Validation failure.
 function M.revoked_variable_name(token)
 	return LeaseContract.revoked_variable_name(token)
-end
-
---- Builds the exact rule-description prefix owned by ErgoptiPlus.
---- @param token string Canonical generation token.
---- @param mode string Managed mode (`normal` or `pause`).
---- @return string prefix Exact prefix including its trailing space.
-local function managed_description_prefix(token, mode)
-	return string.format("[%s:%s:%s] ", MANAGED_TAG_LABEL, token, mode)
-end
-
---- Parses only canonical ErgoptiPlus ownership markers.
---- Lua patterns have no alternation or fixed-count quantifier, so the broad
---- capture is followed by explicit length, mode, and prefix checks.
---- @param description any Rule description candidate.
---- @return string|nil token Canonical token when the prefix is exact.
---- @return string|nil mode Canonical managed mode when the prefix is exact.
-local function parse_managed_description(description)
-	if type(description) ~= "string" then return nil end
-	local token, mode = description:match(
-		"^%[ErgoptiPlus managed:([0-9a-f]+):([a-z]+)%] "
-	)
-	if not LeaseContract.is_valid_token(token) then return nil end
-	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then return nil end
-	local expected = managed_description_prefix(token, mode)
-	if description:sub(1, #expected) ~= expected then return nil end
-	return token, mode
 end
 
 local VARIABLE_CONDITION_TYPES = {
@@ -1464,6 +1441,91 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Returns the modifier flags a held key's rule keeps down: each held entry's
+--- modifier key and every modifier it carries (Cmd+Shift holds both), fn
+--- included.
+--- @param held table held_key_state of the key.
+--- @return table|nil flags Key codes, nil when the key holds none.
+local function held_flag_keys(held)
+	local flags = {}
+	for _, ev in ipairs(held.to) do
+		if ev.key_code and FLAG_KEY_CODES[ev.key_code] then
+			flags[#flags + 1] = ev.key_code
+			for _, modifier in ipairs(ev.modifiers or {}) do
+				if FLAG_KEY_CODES[modifier] then flags[#flags + 1] = modifier end
+			end
+		end
+	end
+	if #flags == 0 then return nil end
+	return flags
+end
+
+--- The key-combination rules of a graph whose Tap-Holds are off, as
+--- replacements for the rules built with the Tap-Holds on: every key whose own
+--- tap-hold rule is dropped is native again, so the chords restore and the
+--- hold slots consume what that native key holds, and a key 1 whose tap or
+--- hold slot reads its held variable gets, in place of its dropped rule, one
+--- that only tracks that variable and passes the key through.
+--- @param combo_builds table { rules, combo_def, k1, tap_action, hold_action, combo_action } per combo.
+--- @param dropped_keys table Key code → { rule, key_def } of each tap-hold rule the switch drops.
+--- @param key_held_state table Key code → held_key_state of its configured rule.
+--- @param none_action table The "none" action.
+--- @param combo_symmetric boolean Whether A+B == B+A for this config.
+--- @return table replaced Rule → the rules generated in its place (empty to drop it).
+local function combination_rules_without_tap_holds(combo_builds, dropped_keys, key_held_state, none_action,
+		combo_symmetric)
+	local held_of = {}
+	for key_code, held in pairs(key_held_state) do held_of[key_code] = held end
+	for key_code in pairs(dropped_keys) do
+		held_of[key_code] = held_key_state(key_code, none_action, none_action)
+	end
+	local replaced = {}
+	local reads_held_variable = {}
+	for _, build in ipairs(combo_builds) do
+		local held = build.k1 and held_of[build.k1]
+		local rebuilt = build_combo_rules(build.combo_def, build.tap_action, build.hold_action,
+			build.combo_action, held and held_flag_keys(held), combo_symmetric, held_of)
+		if #build.rules == 0 then
+			-- A combo with no rule has neither a tap/hold slot nor a chord its
+			-- first key's hold could make redundant: native keys add nothing.
+			if #rebuilt > 0 then
+				error("combination '" .. tostring(build.combo_def.id) .. "' has rules only with Tap-Holds off")
+			end
+		else
+			replaced[build.rules[1]] = rebuilt
+			for index = 2, #build.rules do replaced[build.rules[index]] = {} end
+		end
+		if build.k1 and (#(build.tap_action.karabiner_to or {}) > 0
+				or #(build.hold_action.karabiner_to or {}) > 0) then
+			reads_held_variable[build.k1] = true
+		end
+	end
+	for key_code in pairs(reads_held_variable) do
+		local own = dropped_keys[key_code]
+		if own then
+			replaced[own.rule] = { build_tap_hold_rule(own.key_def, none_action, none_action, nil) }
+		end
+	end
+	return replaced
+end
+
+--- Whether the key-combination rules are generated for a state.
+---
+--- The one place that rule lives: `mod_combos_enabled` is the persisted
+--- [mod_combos] enabled flag, the only switch the combinations follow, as on
+--- Windows (decision of 2026-09-29). Absent, it is on: a file that never set it
+--- keeps the combinations it generated with the Tap-Holds on.
+--- @param state table Remap state (mod_combos_enabled).
+--- @return boolean
+function M.key_combinations_enabled(state)
+	if type(state) ~= "table" then error("key_combinations_enabled needs a remap state", 2) end
+	if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
+	if state.mod_combos_enabled ~= nil then
+		error("mod_combos_enabled must be a boolean or absent, got " .. type(state.mod_combos_enabled), 2)
+	end
+	return true
+end
+
 --- Assembles the full Karabiner JSON structure from current state.
 ---
 --- Rule priority order (highest → lowest):
@@ -1524,6 +1586,15 @@ function M.build_karabiner_json(
 	-- script-control sentinels need, so switching Tap-Holds off (like a pause)
 	-- must never cost the user the way back.
 	local tap_hold_feature_rules = {}
+	-- Rules owned by the key-combinations switch (M.key_combinations_enabled).
+	-- They were Tap-Holds feature rules until the combinations got a switch
+	-- of their own, under Shortcuts.
+	local key_combination_rules = {}
+	-- What each combo was built from, and each per-key rule the Tap-Holds
+	-- switch owns, so the combinations can be rebuilt for native keys when the
+	-- Tap-Holds are off (combination_rules_without_tap_holds).
+	local combo_builds = {}
+	local tap_hold_rule_of = {}
 
 
 	-- CapsWord must be first — it must match before any modifier combo or
@@ -1554,18 +1625,7 @@ function M.build_karabiner_json(
 		local tap_act   = action_index[cfg.tap or "none"] or none_action
 		local held      = held_key_state(key_def.from.key_code, tap_act, hold_act)
 		key_held_state[key_def.from.key_code] = held
-		local held_mods = {}
-		for _, ev in ipairs(held.to) do
-			if ev.key_code and FLAG_KEY_CODES[ev.key_code] then
-				held_mods[#held_mods + 1] = ev.key_code
-				for _, modifier in ipairs(ev.modifiers or {}) do
-					if FLAG_KEY_CODES[modifier] then held_mods[#held_mods + 1] = modifier end
-				end
-			end
-		end
-		if #held_mods > 0 then
-			key_held_modifiers[key_def.from.key_code] = held_mods
-		end
+		key_held_modifiers[key_def.from.key_code] = held_flag_keys(held)
 	end
 
 
@@ -1608,9 +1668,13 @@ function M.build_karabiner_json(
 		)
 		for _, rule in ipairs(generated) do
 			all_rules[#all_rules + 1] = rule
-			tap_hold_feature_rules[rule] = true
+			key_combination_rules[rule] = true
 			Logger.debug(LOG, "  → rule: %s", rule.description)
 		end
+		combo_builds[#combo_builds + 1] = {
+			rules = generated, combo_def = combo_def, k1 = k1_key,
+			tap_action = tap_action, hold_action = hold_action, combo_action = combo_action,
+		}
 
 		::continue::
 	end
@@ -1697,6 +1761,7 @@ function M.build_karabiner_json(
 			all_rules[#all_rules + 1] = rule
 			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
 				tap_hold_feature_rules[rule] = true
+				tap_hold_rule_of[key_def.from.key_code] = { rule = rule, key_def = key_def }
 			end
 		end
 	end
@@ -1722,16 +1787,40 @@ function M.build_karabiner_json(
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end
 
-	-- Tap-Holds switched off: drop the feature's rules after the legacy capture
-	-- above, which must keep describing the complete historical graph. Keys then
-	-- behave natively while every stored assignment stays untouched.
-	if state.tap_holds_enabled == false then
+	-- Tap-Holds or key combinations switched off: drop that feature's rules
+	-- after the legacy capture above, which must keep describing the complete
+	-- historical graph. Keys then behave natively while every stored assignment
+	-- stays untouched. The two switches are independent: with the Tap-Holds
+	-- off, the combinations are rebuilt for native keys, and the var-based tap
+	-- and hold slots of a pair, which read key 1's held variable, get a rule
+	-- that sets it in place of key 1's own tap-hold rule.
+	local tap_holds_on = state.tap_holds_enabled ~= false
+	local combinations_on = M.key_combinations_enabled(state)
+	if not tap_holds_on or not combinations_on then
+		local replaced = {}
+		if not tap_holds_on and combinations_on then
+			local built_ok, built = pcall(combination_rules_without_tap_holds, combo_builds, tap_hold_rule_of,
+				key_held_state, none_action, state.combo_symmetric)
+			if not built_ok then
+				local err = "key combinations without Tap-Holds: " .. tostring(built)
+				Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+				return nil, err
+			end
+			replaced = built
+		end
 		local kept = {}
 		for _, rule in ipairs(all_rules) do
-			if not tap_hold_feature_rules[rule] then kept[#kept + 1] = rule end
+			local replacement = replaced[rule]
+			if replacement then
+				for _, replacement_rule in ipairs(replacement) do kept[#kept + 1] = replacement_rule end
+			else
+				local dropped = (not tap_holds_on and tap_hold_feature_rules[rule])
+					or (not combinations_on and key_combination_rules[rule])
+				if not dropped then kept[#kept + 1] = rule end
+			end
 		end
-		Logger.info(LOG, "Tap-Holds switched off: %d feature rule(s) not generated.",
-			#all_rules - #kept)
+		Logger.info(LOG, "Switched off (tap-holds %s, key combinations %s): %d feature rule(s) not generated.",
+			tap_holds_on and "on" or "off", combinations_on and "on" or "off", #all_rules - #kept)
 		all_rules = kept
 	end
 

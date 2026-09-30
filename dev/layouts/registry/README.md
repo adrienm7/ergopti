@@ -41,6 +41,43 @@ derived from it is stored here:
   python3 (3.8 or newer), like every Linux layout installer of this project.
   The package ships this folder, so its layouts install offline.
 
+## The extension a layout carries
+
+Each layout is also an extension in the existing format: the folder named by
+`extension_source` (the layout's own folder by default) holds a
+`manifest.toml` and may hold `hotstrings/*.toml` packs and
+`shortcuts/menu.{ahk,lua}`. Installing a layout makes that content available
+without enabling it. Two optional manifest tables describe the layout itself:
+
+```toml
+# The physical key (W3C KeyboardEvent.code, as named in
+# _shared/data/keycodes/physical_keys.json) that types the magic key on this
+# layout. The user's own choice of key always wins over it.
+[extension.magic_key]
+key = "KeyC"
+
+# A hotstrings file that supplies rules of a bundled category which only make
+# sense on this layout's geometry. The rules keep their historical category,
+# feature section and common priority tier, so existing preferences still
+# address them; without `sections` the file replaces the whole category.
+[extension.hotstring_bindings.repeatcorrections]
+category = "magickey"
+feature_section = "hotstrings.magic_key"
+sections = ["repeat_corrections"]
+source = "common"
+```
+
+The Ergopti extension (`ergopti/`) binds its SFB reduction, rolls and repeat
+corrections this way. A layout's extension is installed when the layout
+manager commits it (its generation under the configuration folder); the
+Ergopti family's extension also counts as installed wherever a driver ships
+this folder, because every driver types Ergopti from the shipped copy without
+an installation record. The shipped copy follows the installed generations in
+the discovery order, and the user's own `extensions` folder still overrides it.
+
+The index builder refuses a manifest the driver scanners would refuse, so a
+published layout can never make the drivers reject their extension catalogue.
+
 ## Adding a layout
 
 Adding a layout is a data-only change:

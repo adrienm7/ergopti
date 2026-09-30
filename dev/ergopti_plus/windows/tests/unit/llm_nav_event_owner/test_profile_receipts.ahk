@@ -275,7 +275,7 @@ _LNEO_DisabledRetiredTargetBlocksDurableDelete() {
 		AssertFalse(LLM_Menu_CommitMutation(
 			"the pending profile deletion", _LNEO_DeleteProfileB,
 			0, _LMT_Writer, _LMT_Notify, _LMT_Acquire,
-			_LMT_Settle, _LMT_Quiesce, _LMT_Collect),
+			_LMT_Settle, _LMT_Collect),
 			"retired receipt debt must refuse the complete menu transaction")
 		AssertEqual(0, _LMT_WriterCalls,
 			"pending-target refusal must precede durable config I/O")

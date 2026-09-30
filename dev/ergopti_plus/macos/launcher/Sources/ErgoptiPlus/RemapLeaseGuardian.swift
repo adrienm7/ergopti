@@ -1977,6 +1977,10 @@ enum RemapGuardianRegistrationStatus: String, Equatable {
 	case ready
 	case requiresApproval = "requires_approval"
 	case unavailable
+	/// Exported by the GUI launcher, which never registers the guardian: the
+	/// driver registers it only while « Ergopti uses Karabiner » is on. The
+	/// headless registration and status roles never answer this value.
+	case notRequested = "not_requested"
 }
 
 enum RemapGuardianSettingsResult: String, Equatable {

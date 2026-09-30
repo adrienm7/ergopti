@@ -43,6 +43,7 @@ helpers.describe("ui.webkit_host", function()
         "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
         "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
         "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge", "layer_editor_bridge", "layout_manager_bridge",
+        "update_check_bridge",
       }
       local set = {}
       for _, n in ipairs(names) do set[n] = true end
@@ -51,8 +52,8 @@ helpers.describe("ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 19 bridges", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 19)
+    helpers.it("has exactly 20 bridges", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 20)
     end)
   end)
 
@@ -362,6 +363,87 @@ helpers.describe("ui.webkit_host", function()
       local html = WH.build_app_html(DRIVER_ROOT, "metrics_apps", "fr")
       helpers.assert_true(html:find('window.__ergopti_host="linux"', 1, true) ~= nil,
         "metrics pages must select the Linux bridge instead of a file fetch")
+    end)
+
+    -- (page-carries-strings) WebKitGTK refuses the page's file:// locale fetch
+    -- unless a setting this driver never enables; the page must not depend on it
+    helpers.it("seeds the page's strings before any of its scripts (page-carries-strings)", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en",
+        { ["healthcheck.section.summary"] = "Summary", ["probe.unsafe"] = "a </script> b" })
+      local seed_at = html:find("window._i18n_strings=", 1, true)
+      local i18n_at = html:find("function resolve_locale_url", 1, true)
+      helpers.assert_true(seed_at ~= nil, "the healthcheck page must carry its strings")
+      helpers.assert_true(i18n_at ~= nil and seed_at < i18n_at,
+        "the strings must be in place before i18n.js runs")
+      helpers.assert_true(html:find('"healthcheck.section.summary":"Summary"', 1, true) ~= nil,
+        "the seed holds the catalogue")
+      helpers.assert_true(html:find("a </script> b", 1, true) == nil,
+        "a '<' inside a translation must be escaped so it cannot end the boot script")
+    end)
+
+    helpers.it("seeds nothing when the host supplies no strings", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en")
+      helpers.assert_true(html:find("window._i18n_strings=", 1, true) == nil,
+        "the tooling path builds pages without a catalogue")
+    end)
+  end)
+
+  helpers.describe("webview_manager.show()", function()
+    helpers.it("hands the page builder the locale catalogue (host-delivers-catalogue)", function()
+      local handle = io.open(DRIVER_ROOT .. "/ui/webview_manager.lua", "r")
+      local source = handle and handle:read("*a") or nil
+      if handle then handle:close() end
+      helpers.assert_true(type(source) == "string" and source ~= "", "webview_manager.lua must be readable")
+      helpers.assert_true(source:find('require("infra.locale").catalogue()', 1, true) ~= nil,
+        "show() must read the full catalogue, active over English over French")
+      helpers.assert_true(source:find("build_app_html(root, app_name, active_locale, catalogue)", 1, true) ~= nil,
+        "show() must pass that catalogue to the page builder")
+    end)
+  end)
+
+  -- (harness-loads-production-page) tests/hardware/run_page_errors.lua is the
+  -- only place a real WebKitGTK parses these pages. It built them itself,
+  -- without the catalogue, so the seeded boot script every window runs never
+  -- ran in a real engine and a seed WebKitGTK rejected would have stayed green.
+  helpers.describe("webview_manager.build_page_html()", function()
+    helpers.it("builds the page a window loads, with the whole catalogue seeded (harness-loads-production-page)", function()
+      local manager = require("ui.webview_manager")
+      helpers.assert_true(type(manager.build_page_html) == "function",
+        "webview_manager must expose the one builder show() loads")
+      local catalogue = require("infra.locale").catalogue()
+      local expected = 0
+      for _ in pairs(catalogue) do expected = expected + 1 end
+      helpers.assert_true(expected > 1000, "the locale catalogue must load for this check to mean anything")
+
+      local html = manager.build_page_html("healthcheck", "en")
+      local marker = "window._i18n_strings="
+      local seed_at = html:find(marker, 1, true)
+      local i18n_at = html:find("function resolve_locale_url", 1, true)
+      helpers.assert_true(seed_at ~= nil, "the page must carry its strings")
+      helpers.assert_true(i18n_at ~= nil and seed_at < i18n_at, "the strings must be in place before i18n.js runs")
+      -- "<" is escaped inside the seed, so the first "</script>" ends the boot script
+      local seed_end = html:find(";</script>", seed_at, true)
+      helpers.assert_true(seed_end ~= nil, "the seed statement must close the boot script")
+      local seeded = require("json").decode(html:sub(seed_at + #marker, seed_end - 1))
+      local count = 0
+      for _ in pairs(seeded) do count = count + 1 end
+      helpers.assert_eq(count, expected, "the page must carry every string of the catalogue")
+      helpers.assert_eq(seeded["healthcheck.toolbar.close"], catalogue["healthcheck.toolbar.close"],
+        "the page's labels must read as text, not as keys")
+    end)
+
+    helpers.it("is what the WebKitGTK page-error harness loads (harness-loads-production-page)", function()
+      local handle = io.open(DRIVER_ROOT .. "/tests/hardware/run_page_errors.lua", "r")
+      local source = handle and handle:read("*a") or nil
+      if handle then handle:close() end
+      helpers.assert_true(type(source) == "string" and source ~= "", "run_page_errors.lua must be readable")
+      local code = source:gsub("%-%-[^\n]*", "")
+      helpers.assert_true(code:find("build_page_html(", 1, true) ~= nil,
+        "the harness must build each page through webview_manager.build_page_html()")
+      helpers.assert_true(code:find("build_app_html(", 1, true) == nil,
+        "the harness must not build its own copy of a page")
+      helpers.assert_true(code:find('inspect("healthcheck"', 1, true) ~= nil,
+        "the harness must load the diagnostics page, the one a failed boot sends users to")
     end)
   end)
 

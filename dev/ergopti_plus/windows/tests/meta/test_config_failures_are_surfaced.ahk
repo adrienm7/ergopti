@@ -44,7 +44,6 @@ _CFAS_ResetReportsUndeletedFiles() {
 	Assert(Body != "" && NoticeBody != "",
 		"ReloadWithDefaultConfig() and its refusal presenter must exist")
 	AcquirePos := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(")
-	QuiescePos := InStr(Body, "LLM_Menu_QuiesceTriggerForLifecycle(")
 	BuildPos := InStr(Body, "_ConfigResetTransitionTargets(")
 	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
 	StrictPos := InStr(Body,
@@ -56,12 +55,12 @@ _CFAS_ResetReportsUndeletedFiles() {
 	RollbackPos := InStr(Body, "_ConfigResetRollbackRefusedReload(OwnerBundle)")
 	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
 	RollbackBody := _DriverFuncBody("_ConfigResetRollbackRefusedReload")
-	Assert(AcquirePos > 0 && QuiescePos > AcquirePos && BuildPos > QuiescePos
+	Assert(AcquirePos > 0 && BuildPos > AcquirePos
 		&& CommitPos > BuildPos && StrictPos > CommitPos && ReloadPos > StrictPos
 		&& RefusedPos > ReloadPos && RollbackPos > RefusedPos
 		&& ReleasePos > RollbackPos
 		&& InStr(RollbackBody, "ConfigTransitionRollbackOwned(") > 0,
-		"reset must hold one terminal owner from quiescence through strict commit, Reload, rollback, then release")
+		"reset must hold one terminal owner from acquisition through strict commit, Reload, rollback, then release")
 	Assert(InStr(Body, "ConfigTransitionLogFailure") > 0
 		&& InStr(Body, "_ConfigResetShowFailure(") > 0
 		&& InStr(NoticeBody, "MsgBox(") > 0
@@ -104,12 +103,10 @@ _CFAS_ResetFailureMessagesCarryPreciseReasons() {
 	Assert(Body != "" && Helper != "",
 		"reset and its localized failure helper must remain source-visible")
 	RegExReplace(Body, "_ConfigResetShowFailure\(", "", &FailureCallCount)
-	AssertEqual(6, FailureCallCount,
+	AssertEqual(4, FailureCallCount,
 		"the complete reset refusal class must remain enumerated")
 	for Key in [
 		"dialog.reset_defaults.reason.acquire",
-		"dialog.reset_defaults.reason.trigger_recovery",
-		"dialog.reset_defaults.reason.trigger_journal",
 		"dialog.reset_defaults.reason.commit",
 		"dialog.reset_defaults.reason.reload_refused",
 		"dialog.reset_defaults.reason.rollback"

@@ -4,7 +4,8 @@
 ; MODULE: Tooltip border GDI ownership tests
 ; DESCRIPTION:
 ; Injects selection and deletion failures into the layered-border receipt so
-; exceptional builds cannot leak selected bitmaps, pens, DCs, or screen DCs.
+; exceptional builds cannot leak selected bitmaps, DCs, or screen DCs. The ring
+; itself is framed from a region owned by the region receipt below.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -53,11 +54,6 @@ _TBGO_FullReceipt() {
 	Receipt["memory_dc"] := 103
 	Receipt["old_bitmap"] := 104
 	Receipt["bitmap_selected"] := true
-	Receipt["pen"] := 105
-	Receipt["old_pen"] := 106
-	Receipt["pen_selected"] := true
-	Receipt["old_brush"] := 107
-	Receipt["brush_selected"] := true
 	return Receipt
 }
 
@@ -69,10 +65,10 @@ _TBGO_CompleteReceiptReleasesInDependencyOrder() {
 	_TBGO_Native.Reset()
 	Receipt := _TBGO_FullReceipt()
 	AssertTrue(_TooltipBorderGdiRelease(Receipt, _TBGO_Native))
-	AssertEqual("select:103:107,select:103:106,delete-object:105,select:103:104,delete-object:102,delete-dc:103,release-screen:101",
+	AssertEqual("select:103:104,delete-object:102,delete-dc:103,release-screen:101",
 		_TBGO_Join(_TBGO_Native.Events),
-		"selected stock brush, pen, bitmap, DC, and screen DC must unwind in order")
-	AssertEqual(0, Receipt["pen"])
+		"selected bitmap, DC, and screen DC must unwind in order")
+	AssertFalse(Receipt["bitmap_selected"])
 	AssertEqual(0, Receipt["bitmap"])
 	AssertEqual(0, Receipt["memory_dc"])
 	AssertEqual(0, Receipt["screen_dc"])
@@ -81,22 +77,21 @@ Test("tooltip border GDI: complete receipts release in reverse dependency order 
 	_TBGO_CompleteReceiptReleasesInDependencyOrder)
 
 _TBGO_RefusedDeleteRetainsTheExactDependencyTail() {
-	_TBGO_Native.Reset("delete-object:105")
+	_TBGO_Native.Reset("delete-object:102")
 	Receipt := _TBGO_FullReceipt()
 	AssertFalse(_TooltipBorderGdiRelease(Receipt, _TBGO_Native))
-	AssertFalse(Receipt["brush_selected"])
-	AssertFalse(Receipt["pen_selected"])
-	AssertEqual(105, Receipt["pen"],
-		"the refused pen and every dependency below it must remain owned")
-	AssertTrue(Receipt["bitmap_selected"])
-	AssertEqual(102, Receipt["bitmap"])
+	AssertFalse(Receipt["bitmap_selected"])
+	AssertEqual(102, Receipt["bitmap"],
+		"the refused bitmap and every dependency below it must remain owned")
 	AssertEqual(103, Receipt["memory_dc"])
 	AssertEqual(101, Receipt["screen_dc"])
 	_TBGO_Native.FailAt := ""
 	AssertTrue(_TooltipBorderGdiRelease(Receipt, _TBGO_Native))
-	AssertEqual("select:103:107,select:103:106,delete-object:105,delete-object:105,select:103:104,delete-object:102,delete-dc:103,release-screen:101",
+	AssertEqual("select:103:104,delete-object:102,delete-object:102,delete-dc:103,release-screen:101",
 		_TBGO_Join(_TBGO_Native.Events),
 		"a retry must resume at the exact refused handle without re-restoring objects")
+	AssertEqual(0, Receipt["memory_dc"])
+	AssertEqual(0, Receipt["screen_dc"])
 }
 Test("tooltip border GDI: refused cleanup retains exact retry debt (tooltip-border-gdi-ownership)",
 	_TBGO_RefusedDeleteRetainsTheExactDependencyTail)

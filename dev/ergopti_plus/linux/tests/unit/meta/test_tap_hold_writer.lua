@@ -126,55 +126,66 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		os.remove(path)
 	end)
 
-	helpers.it("disables everything, and the defaults do not come back", function()
+	helpers.it("renders a clear that the defaults never come back through", function()
 		local writer, path = fresh_writer()
 		writer.set_tap("left_shift", "paste")
-		writer.disable_all()
+		local rows = { { section = "tap_holds", key = "enabled", delete = true } }
+		local candidate = writer.render_scope("clear", require("toml_codec").decode(read_file(path)), rows,
+			Loader.preset_keys(DEFAULTS))
+		write_file(path, candidate)
 		helpers.assert_nil(next(effective(path).keys), "no key at all")
+		helpers.assert_eq(effective(path).enabled, false)
 		os.remove(path)
 	end)
 
-	helpers.it("restores the shared preset explicitly and preserves unknown nested fields", function()
+	helpers.it("renders the shared preset explicitly and preserves unknown nested fields", function()
 		local writer, path, state = fresh_writer()
 		write_file(path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nenabled = false\n'
 			.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
 			.. '[other]\nvalue = 17\n')
-		helpers.assert_true(writer.reset_all())
+		local rows = { { section = "tap_holds", key = "enabled", value = true } }
+		local candidate = writer.render_scope("recommended", require("toml_codec").decode(read_file(path)), rows,
+			Loader.preset_keys(DEFAULTS))
+		write_file(path, candidate)
 		local stored = require("toml_codec").decode(read_file(path))
-		helpers.assert_eq(stored.tap_hold.inherit_defaults, true)
+		helpers.assert_nil(stored.tap_hold.inherit_defaults, "the preset is written, never inherited")
 		helpers.assert_eq(stored.tap_hold.keys.left_shift.custom.note, "keep")
 		helpers.assert_eq(stored.other.value, 17)
 		helpers.assert_eq(effective(path).enabled, true)
 		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "copy")
-		helpers.assert_eq(state.reloads, 1)
+		helpers.assert_eq(state.reloads, 0, "rendering publishes and reloads nothing")
 		os.remove(path)
 	end)
 
-	helpers.it("clears only owned tap-hold fields and leaves the engine neutral", function()
-		local writer, path, state = fresh_writer()
-		local ok, err = pcall(function()
-			write_file(path, '[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
-				.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
-				.. 'enabled = true\ntime_activation_seconds = 0.3\n'
-				.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
-				.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
-				.. '[tap_hold.keys.future_key]\ntap_action = "future"\nenabled = true\n'
-				.. '[other]\nvalue = 17\n')
-			helpers.assert_true(writer.disable_all())
-			local stored = require("toml_codec").decode(read_file(path))
-			helpers.assert_eq(stored.tap_hold.keys.left_shift, { custom = { note = "keep" } })
-			helpers.assert_nil(stored.tap_hold.keys.left_ctrl)
-			helpers.assert_eq(stored.tap_hold.keys.future_key, { tap_action = "future", enabled = true })
-			helpers.assert_nil(stored.tap_hold.enabled)
-			helpers.assert_nil(stored.tap_hold.inherit_defaults)
-			helpers.assert_eq(stored.tap_hold.future, "keep")
-			helpers.assert_eq(stored.other.value, 17)
-			helpers.assert_eq(effective(path).enabled, false)
-			helpers.assert_eq(state.reloads, 1)
+	helpers.it("renders a clear of only owned tap-hold fields", function()
+		local writer = fresh_writer()
+		local document = require("toml_codec").decode('[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
+			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
+			.. 'enabled = true\ntime_activation_seconds = 0.3\n'
+			.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
+			.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.future_key]\ntap_action = "future"\nenabled = true\n'
+			.. '[other]\nvalue = 17\n')
+		local rows = { { section = "tap_holds", key = "enabled", delete = true } }
+		local stored = require("toml_codec").decode(writer.render_scope("clear", document, rows, Loader.preset_keys(DEFAULTS)))
+		helpers.assert_eq(stored.tap_hold.keys.left_shift, { custom = { note = "keep" } })
+		helpers.assert_nil(stored.tap_hold.keys.left_ctrl)
+		helpers.assert_eq(stored.tap_hold.keys.future_key, { tap_action = "future", enabled = true })
+		helpers.assert_nil(stored.tap_hold.enabled)
+		helpers.assert_nil(stored.tap_hold.inherit_defaults)
+		helpers.assert_eq(stored.tap_hold.future, "keep")
+		helpers.assert_eq(stored.other.value, 17)
+	end)
+
+	helpers.it("refuses to render a row it does not own or a malformed tap_hold table", function()
+		local writer = fresh_writer()
+		local preset = Loader.preset_keys(DEFAULTS)
+		helpers.assert_throws(function()
+			writer.render_scope("clear", {}, { { section = "tap_holds", key = "future", delete = true } }, preset)
 		end)
-		os.remove(path)
-		if not ok then error(err, 0) end
+		helpers.assert_throws(function() writer.render_scope("clear", { tap_hold = "opaque" }, {}, preset) end)
+		helpers.assert_throws(function() writer.render_scope("factory", {}, {}, preset) end)
 	end)
 
 	helpers.it("switches the feature off in the file", function()

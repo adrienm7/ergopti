@@ -85,7 +85,7 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 
 ; The parameter kind the generated catalogue declares for an action ("url",
 ; "search_url", "wrap_pair", "text", "key", "shortcut", "llm_prompt",
-; "llm_vision", "llm_language"), or "" when it takes none.
+; "llm_vision", "llm_language", "app"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -118,6 +118,14 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				if LLM_Vision_IsValid(Value)
 						return true
 				ErrorText := t("dialog.gestures.param_err_llm_vision")
+				return false
+		}
+		; Syntax only, before the trim too: the shared rule refuses a padded value.
+		; Whether the application exists is checked when it opens.
+		if (Spec = "app") {
+				if GestureAppParameterIsValid(Value)
+						return true
+				ErrorText := t("dialog.gestures.param_err_app")
 				return false
 		}
 		; A closed list: "ui" or a shipped locale code, compared exactly.
@@ -165,6 +173,8 @@ GestureActionParameterPrompt(ActionName) {
 						return t("dialog.gestures.param_search_url")
 				case "url":
 						return t("dialog.gestures.param_link")
+				case "app":
+						return t("dialog.gestures.param_app")
 				case "wrap_pair":
 						return StrReplace(t("dialog.gestures.param_wrap_pair"), "{1}",
 								WrapPairDescribe(_WS_BUILTIN_PAIRS))
@@ -236,6 +246,8 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		}
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
+		if (Spec = "app")
+				return _GesturePickApplication(BindingId, ActionName, Prompt)
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
@@ -256,6 +268,36 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
 		}
+}
+
+; The shared app rule (_shared/tests/corpus/action_parameters/app_vectors.json):
+; not empty, no leading or trailing whitespace, no control character.
+; @param {Any} Value
+; @returns {Boolean}
+GestureAppParameterIsValid(Value) {
+		return (Value is String) && (Value != "") && !RegExMatch(Value, "^\s|\s$|[\x00-\x1F\x7F]")
+}
+
+; FileSelect: the file and its path must exist, and a Start-menu shortcut is
+; kept as the shortcut rather than resolved to its target.
+global GESTURE_APP_CHOOSER_OPTIONS := 1 + 2 + 32
+
+; Picks the application an open_app binding launches, starting in the
+; Start menu, instead of asking for a name to type.
+; @returns {Map|false} The parameter candidate, false when cancelled or refused.
+_GesturePickApplication(BindingId, ActionName, Prompt) {
+		global GESTURE_APP_CHOOSER_OPTIONS
+		Picked := FileSelect(GESTURE_APP_CHOOSER_OPTIONS, A_ProgramsCommon, Prompt,
+				t("dialog.gestures.param_app_filter") . " (*.exe; *.lnk)")
+		if (Picked = "")
+				return false
+		ErrorText := ""
+		if GestureValidateActionParameter(ActionName, Picked, &ErrorText)
+				return Map("has_value", true,
+						"key", GestureActionParameterKey(BindingId, ActionName),
+						"value", Picked)
+		MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+		return false
 }
 
 ; Commits an assignment and its optional parameter as one logical TOML batch,
@@ -334,10 +376,68 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 
 ; Preserve the zero-argument contract for ordinary actions (including user
 ; extensions) while passing binding context only to actions that declare it.
-GestureInvokeAction(ActionName, BindingId := "") {
+; An action the catalogue declares `confirm = true` (empty_trash,
+; unblock_file_selection, force_quit_frontmost) only asks here, off the hotkey
+; thread; it runs from the answer. Sys is the SystemControl adapter, a recording double in tests.
+GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
 		global GESTURE_ACTIONS
 		if !GESTURE_ACTIONS.Has(ActionName)
 				return
+		if GestureActionNeedsConfirm(ActionName) {
+				Sys := IsObject(Sys) ? Sys : SystemControl()
+				Active := Sys.ActiveWindow()
+				Sys.Defer(_GestureConfirmThenInvoke.Bind(ActionName, BindingId, IsObject(Active) ? Active.Hwnd : 0, Sys))
+				return
+		}
+		return _GestureRunAction(ActionName, BindingId)
+}
+
+; The actions that read the active window only once they run: its process
+; (quit, force quit) or its Explorer selection. Confirmed, each runs only when
+; the window the question was asked from got its focus back; an action outside
+; this set runs whichever window is active.
+global GESTURE_ACTIONS_ON_ACTIVE_WINDOW := Map("quit_frontmost_app", true, "force_quit_frontmost", true,
+		"unblock_file_selection", true)
+
+; Whether the generated catalogue asks to confirm an action before it runs.
+GestureActionNeedsConfirm(ActionName) {
+		global GESTURE_ACTION_CATALOGUE
+		return IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
+				&& GESTURE_ACTION_CATALOGUE.Actions[ActionName].Confirm
+}
+
+; Asks whether a destructive action may run (Cancel is the default button),
+; then gives the window the user acted on its focus back and runs it. The
+; question can outlive a Suspend, which disarms hotkeys and not this thread.
+; When that window cannot get its focus back, an action that reads the active
+; window does not run: the active window is then another one, which
+; force_quit_frontmost would kill. Any other action (empty_trash) still runs.
+_GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
+		global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
+		Label := _GestureActionLabel(ActionName)
+		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
+		if (Answer != "OK") {
+				LoggerInfo("gestures", "'{1}' was cancelled at its confirmation.", ActionName)
+				return
+		}
+		if A_IsSuspended {
+				LoggerInfo("gestures", "'{1}' was confirmed while the script was suspended — not run.", ActionName)
+				return
+		}
+		LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
+		if (PriorHwnd && !Sys.Activate(PriorHwnd)) {
+				if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
+						LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
+						return
+				}
+				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
+		}
+		_GestureRunAction(ActionName, BindingId)
+}
+
+; Runs one registered action, contained and timed.
+_GestureRunAction(ActionName, BindingId) {
+		global GESTURE_ACTIONS
 		; The single choke point all three dispatchers share (gesture, keyboard-shortcut
 		; slot, tap-hold), so one segment here covers every user-triggered action.
 		; A slow action was previously attributable to nothing: the gesture ended, the
@@ -411,56 +511,17 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 		return true
 }
 
-; Writes a single REG_DWORD value via RegistryLib, counting failures.
-GestureRegWriteDword(ValueName, Value, &ErrorsRef) {
-		global GESTURE_REG_PATH
-
-		if (!Reg_WriteDword(GESTURE_REG_PATH, ValueName, Value))
-				ErrorsRef += 1
-}
-
 ; Configures Windows touchpad gestures via the registry so that all 10 gesture
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
-; Writes the master enables, per-direction enables, Custom*Tap sentinels,
-; KeyParams (encoded as (VK<<16)|7), and resets the new-system *Action values
-; to 65535 so the old KeyParams system takes precedence.
-; Returns true on success, false if any registry write failed.
+; The values come from the generated touchpad table and are written by its one
+; owner (modules/gestures/touchpad_registry.ahk), which backs up the prior
+; values before the first write so « Restaurer les gestes du pavé tactile
+; Windows » can put them back.
+; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
-		global GESTURE_REG_PATH, GESTURE_REG_CUSTOM_VALUE
-		global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS, GESTURE_REG_KEY_PARAMS_NAMES
-		global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
-		global GESTURE_REG_CUSTOM_TAP_VALUE, GESTURE_REG_MASTER_ENABLES, GESTURE_SLOTS
-
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")
-		Errors := 0
-
-		; Master enables — turn the gesture families on
-		for _, Name in GESTURE_REG_MASTER_ENABLES {
-				GestureRegWriteDword(Name, GESTURE_REG_CUSTOM_VALUE, &Errors)
-		}
-
-		; Per-slot configuration
-		for _, Slot in GESTURE_SLOTS {
-				; Direction enables (swipes only)
-				if GESTURE_REG_ENABLE_NAMES.Has(Slot) {
-						GestureRegWriteDword(GESTURE_REG_ENABLE_NAMES[Slot],
-								GESTURE_REG_CUSTOM_VALUE, &Errors)
-				}
-				; Custom*Tap=7 sentinel for tap slots
-				if GESTURE_REG_CUSTOM_TAP_NAMES.Has(Slot) {
-						GestureRegWriteDword(GESTURE_REG_CUSTOM_TAP_NAMES[Slot],
-								GESTURE_REG_CUSTOM_TAP_VALUE, &Errors)
-				}
-				; KeyParams — actual shortcut encoding (Ctrl+Win+Shift+Fn)
-				GestureRegWriteDword(GESTURE_REG_KEY_PARAMS_NAMES[Slot],
-						GESTURE_REG_KEY_PARAMS[Slot], &Errors)
-				; New-system *Action — 65535 disables it so KeyParams takes precedence
-				GestureRegWriteDword(GESTURE_REG_ACTIONS[Slot],
-						GESTURE_REG_CUSTOM_VALUE, &Errors)
-		}
-
-		if (Errors > 0) {
-				LoggerError("gestures", "Auto-configuration failed with {1} error(s).", Errors)
+		if !TouchpadRegistryApply() {
+				LoggerError("gestures", "Auto-configuration failed: the touchpad values were not all written.")
 				return False
 		}
 
@@ -702,7 +763,7 @@ GestureBuildSetupInstructions() {
 ; Replaces the previous two-step ``Show instructions`` + ``Open touchpad
 ; settings`` menu items — the user only needs one path now.
 GestureShowManualTutorialDialog() {
-		tg := Gui("+AlwaysOnTop", t("onboarding.gestures.register_manual"))
+		tg := Gui("", t("onboarding.gestures.register_manual"))
 		tg.SetFont("s9", "Segoe UI")
 		tg.MarginX := 18
 		tg.MarginY := 14

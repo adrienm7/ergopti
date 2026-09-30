@@ -45,6 +45,7 @@ local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local CheckResult = require("updater.check_result")
 local Channels  = require("updater.channels")
 local Schedule  = require("updater.schedule")
 local Installer = require("modules.updater.installer")
@@ -493,18 +494,19 @@ M._build_fetch_request = _build_fetch_request
 local function _fetch_releases(channel, callback)
 	local count = tonumber(M.release_api_url():match("[?&]per_page=(%d+)"))
 	if not count or count < 1 or count % RELEASE_PAGE_SIZE ~= 0 then
-		callback(nil, 0, "release candidate count must be a multiple of the transport page size")
+		callback(nil, 0, "release candidate count must be a multiple of the transport page size", "unexpected")
 		return false
 	end
 	local chunks, terminal, all_unchanged = {}, false, true
 	local cancel
-	local function finish(body, status, err)
+	-- reason: the updater.check_result reason a failure is shown with
+	local function finish(body, status, err, reason)
 		if terminal then return end
 		terminal = true
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
-		callback(body, status, err)
+		callback(body, status, err, reason)
 	end
-	cancel = function() finish(nil, 0, "cancelled") end
+	cancel = function() finish(nil, 0, "cancelled", "unexpected") end
 	_release_fetch_cancel = cancel
 	local fetch_page
 	fetch_page = function(page)
@@ -520,13 +522,13 @@ local function _fetch_releases(channel, callback)
 				body = _list_cache[key]
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
-					finish(nil, status, "not modified, and no release page is cached")
+					finish(nil, status, "not modified, and no release page is cached", "unexpected")
 					return
 				end
 				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
 			elseif not result or result.ok ~= true then
 				if status == 403 then Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s page %d.", channel, page) end
-				finish(nil, status, result and result.error or "empty HTTP result")
+				finish(nil, status, result and result.error or "empty HTTP result", "no_connection")
 				return
 			else
 				all_unchanged = false
@@ -534,12 +536,12 @@ local function _fetch_releases(channel, callback)
 			local valid, decoded = pcall(Json.decode, body)
 			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
 				or type(decoded) ~= "table" then
-				finish(nil, status, "invalid release page JSON")
+				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
 			local entries = Parser.split_releases_array(body)
 			if #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
-				finish(nil, status, "invalid release page entries")
+				finish(nil, status, "invalid release page entries", "parse_failed")
 				return
 			end
 			_list_cache[key] = body
@@ -550,7 +552,7 @@ local function _fetch_releases(channel, callback)
 				fetch_page(page + 1)
 			end
 		end)
-		if sent ~= true and not answered then finish(nil, 0, "release page dispatch refused") end
+		if sent ~= true and not answered then finish(nil, 0, "release page dispatch refused", "no_connection") end
 		return sent == true
 	end
 	return fetch_page(1)
@@ -622,6 +624,8 @@ end
 --- @param body string Raw GitHub response body (the release list).
 --- @param channel string Registry channel id.
 --- @return boolean Whether a newer canonical Linux release is available.
+--- @return string|nil refusal "no_asset" when the offered release lacks the
+---   canonical Linux bundle or its checksum.
 local function _process_release_response(body, channel)
 	local release = _select_channel_release(body, channel)
 	if not release then
@@ -676,7 +680,7 @@ local function _process_release_response(body, channel)
 			latest_tag, LINUX_ASSET_NAME, LINUX_CHECKSUM_ASSET_NAME)
 		_cached_release = nil
 		_state = "idle"
-		return false
+		return false, "no_asset"
 	end
 
 	_cached_release = {
@@ -701,21 +705,25 @@ M._process_release_response = _process_release_response
 --- @param available boolean
 --- @param release table|nil
 --- @param err string|nil
-local function publish_check(callback, available, release, err)
+--- @param result table The updater.check_result answer the update-check window shows.
+local function publish_check(callback, available, release, err, result)
 	if type(callback) ~= "function" then return end
-	local ok, callback_error = pcall(callback, available, release, err)
+	local ok, callback_error = pcall(callback, available, release, err, result)
 	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
 end
 
 --- Checks the GitHub API for a newer release without blocking the event loop.
 --- @param channel string|nil Registry channel id; defaults to the active channel.
---- @param callback function|nil Receives available, release, error.
+--- @param callback function|nil Receives available, release, error and the
+---   updater.check_result answer (state, latest, other channels, reason).
 --- @return boolean Whether the asynchronous request was dispatched.
 function M.check_for_updates(channel, callback)
 	channel = channel or _channel
+	local base = { channel = channel, current = M.current_version() }
 	if _state == "checking" or _state == "downloading" or _state == "installing" then
 		Logger.info(LOG, "Update check skipped: updater busy (%s).", _state)
-		publish_check(callback, false, nil, "updater busy")
+		publish_check(callback, false, nil, "updater busy",
+			CheckResult.failure(base, "unexpected", "the updater is busy (" .. _state .. ")"))
 		return false
 	end
 	Logger.info(LOG, "Update check requested on channel '%s'.", tostring(channel))
@@ -726,30 +734,48 @@ function M.check_for_updates(channel, callback)
 	_state = "checking"
 	local published = false
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
-		function(body, status, fetch_error)
+		function(body, status, fetch_error, reason)
 			published = true
 			if not body then
 				_cached_release = known
 				_state = known and "available" or "idle"
 				Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
 					tostring(fetch_error or "empty body"))
-				publish_check(callback, known ~= nil, known, fetch_error or "empty body")
+				-- A failure the fetch did not classify is not claimed as a network one
+				if reason == nil then
+					Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
+				end
+				publish_check(callback, known ~= nil, known, fetch_error or "empty body",
+					CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
 				return
 			end
 			_cached_release = nil
-			local available = M._process_release_response(body, channel)
-			publish_check(callback, available, _cached_release, nil)
+			local available, refusal = M._process_release_response(body, channel)
+			local result = CheckResult.classify(body, {
+				registry = CHANNELS, channel = channel,
+				current = base.current, installed = M.installed_channel(),
+			})
+			if available then
+				-- A source checkout is offered the channel's latest release too.
+				result.state, result.latest = "available", _cached_release.tag
+			elseif refusal == "no_asset" then
+				result = CheckResult.failure({ channel = channel, current = base.current, latest = result.latest },
+					"no_asset", "the release lacks the canonical Linux bundle or its checksum")
+			end
+			publish_check(callback, available, _cached_release, nil, result)
 		end)
 	if not ok then
 		_state = known and "available" or "idle"
 		Logger.error(LOG, "Update request dispatch raised: %s.", tostring(dispatched_or_error))
-		publish_check(callback, false, nil, tostring(dispatched_or_error))
+		publish_check(callback, false, nil, tostring(dispatched_or_error),
+			CheckResult.failure(base, "unexpected", dispatched_or_error))
 		return false
 	end
 	local dispatched = dispatched_or_error == true
 	if not dispatched and not published then
 		_state = known and "available" or "idle"
-		publish_check(callback, false, nil, "update request was not dispatched")
+		publish_check(callback, false, nil, "update request was not dispatched",
+			CheckResult.failure(base, "no_connection", "the update request was not dispatched"))
 	end
 	return dispatched
 end

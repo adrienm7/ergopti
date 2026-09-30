@@ -566,6 +566,14 @@ local function main()
 		driver        = "linux",
 		registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
 	})
+	-- Hotstring choices earlier builds kept in storage.json become config.toml
+	-- leaves once, before any hotstring owner reads them: the canonical readers
+	-- resolve absence to off, which would silence an updated install.
+	require("infra.legacy_hotstring_storage").import({
+		path     = require("infra.config_paths").config("config.toml"),
+		storage  = require("adapters.storage"),
+		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
+	})
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
@@ -1605,6 +1613,9 @@ local function main()
 				-- hotstring_categories_dynamic used to resolve to: this driver's
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
+				-- The preview renderer's own copy of the four toggles, which a
+				-- hotstrings scope refreshes alongside their canonical leaves.
+				tooltip_preview = tooltip_preview,
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
@@ -1758,7 +1769,6 @@ local function main()
 					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
 				end
 			end,
-			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
@@ -1954,6 +1964,29 @@ local function main()
 			on_reload = function() perform_reload("the paths editor") end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			-- The setup wizard writes config.toml, which every module reads when
+			-- it starts: the daemon restarts on it, as the other drivers reload.
+			restart = function(reason)
+				local launch_args = {}
+				for index = 1, #arg do launch_args[index] = arg[index] end
+				local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args })
+				if how == "relay" then shutdown.request(reason) end
+				return how ~= nil
+			end,
+			notify_restart_required = function()
+				if notifier and ok_i18n and i18n_mod then
+					notifier.send(i18n_mod.get("onboarding.done.restart_required"), {
+						title = i18n_mod.get("onboarding.done.title"), level = "warning",
+					})
+				end
+			end,
+			notify_error = function(key)
+				if notifier and ok_i18n and i18n_mod then
+					notifier.send(i18n_mod.get(key), {
+						title = i18n_mod.get("onboarding.error.title"), level = "error",
+					})
+				end
 			end,
 		})
 		Logger.info(LOG, "WebView manager daemon state wired.")

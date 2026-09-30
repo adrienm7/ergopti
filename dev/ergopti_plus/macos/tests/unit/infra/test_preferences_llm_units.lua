@@ -61,9 +61,15 @@ helpers.describe("canonical LLM debounce persistence", function()
 		local after, next_writes = observed()
 		helpers.assert_eq(after, prior)
 		helpers.assert_eq(next_writes, writes)
-		local bad = fixture('[llm.trigger]\ndebounce_ms = "invalid"\n')
-		local _, status = bad.load("config")
-		helpers.assert_eq(status, "corrupt")
+	end)
+	helpers.it("ignores one invalid persisted duration without discarding the file (config-outdated-units)", function()
+		-- The unit conversion asserted inside the load: one bad leaf made the
+		-- whole config.toml load as corrupt and every setting revert to defaults.
+		local bad = fixture('[llm.trigger]\ndebounce_ms = "invalid"\n[llm.generation]\nmin_words = 3\n')
+		local loaded, status = bad.load("config")
+		helpers.assert_eq(status, "ok")
+		helpers.assert_nil(loaded.llm_debounce)
+		helpers.assert_eq(loaded.llm_min_words, 3)
 	end)
 end)
 package.loaded["adapters.file_system"] = FS

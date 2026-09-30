@@ -28,7 +28,7 @@ local function load_dashboard(scheduler, subscribe, controls)
 		return self
 	end
 	webview.hswindow = function() return controls.focused and native_window or nil end
-	webview.bringToFront = function() end
+	webview.bringToFront = function() error("bringToFront pins the dashboard above other apps") end
 
 	package.loaded["adapters.timer_scheduler"] = scheduler
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -37,7 +37,13 @@ local function load_dashboard(scheduler, subscribe, controls)
 		encode = function() return "{}" end,
 		decode = function() return {} end,
 	}
+	context.presented = 0
 	package.loaded["ui.ui_builder"] = {
+		force_focus = function(view, is_new, lifecycle)
+			if view ~= webview or is_new ~= false or lifecycle.is_current() ~= true then return false end
+			context.presented = context.presented + 1
+			return true
+		end,
 		show_webview = function(options)
 			context.webviews_created = context.webviews_created + 1
 			context.on_close = options.on_close

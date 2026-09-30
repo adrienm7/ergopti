@@ -846,47 +846,28 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("onboarding_bridge", function()
     local handler = helpers.load_module("ui.onboarding.bridge")
 
+		-- A folder name no test creates, so the pages start from neutral values
+		-- unless a case writes a configuration on purpose.
+		local function scratch_dir()
+			local path = os.tmpname()
+			os.remove(path)
+			return path
+		end
+
+		local function write_file(path, content)
+			local fh = assert(io.open(path, "w"))
+			fh:write(content)
+			fh:close()
+		end
+
 		local function onboarding_state()
-			local values = {
-				categories = { accents = true, code = false },
-				magic_key = "★", magic_custom = false,
-				metrics = false, gestures = false, locale = "en",
-				config_dir = "/tmp/ergopti-default",
-			}
-			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0, titles = {} }
+			local default_dir = scratch_dir()
+			local values = { locale = "en", config_dir = default_dir }
+			local captured = { pushes = {}, writes = {}, prepared = {}, hidden = 0, titles = {},
+				restarts = {}, notices = 0, errors = {} }
 			local state = {
 				layout = "qwerty",
-				config = {
-					get_categories = function() return { accents = {}, code = {} } end,
-					is_group_enabled = function(id) return values.categories[id] end,
-					enable_all = function()
-						values.categories.accents = true; values.categories.code = true
-						return 1
-					end,
-					disable_all = function()
-						values.categories.accents = false; values.categories.code = false
-						return 1
-					end,
-					enable_group = function(id) values.categories[id] = true; return true end,
-					disable_group = function(id) values.categories[id] = false; return true end,
-				},
-				magic_key = {
-					get = function() return values.magic_key end,
-					is_customised = function() return values.magic_custom end,
-					validate = function(value) return type(value) == "string" and value ~= "" end,
-					set = function(value)
-						values.magic_key = value; values.magic_custom = value ~= "★"; return true
-					end,
-					reset = function() values.magic_key = "★"; values.magic_custom = false; return true end,
-				},
-				keylogger = {
-					is_enabled = function() return values.metrics end,
-					set_enabled = function(value) values.metrics = value; return true end,
-				},
-				gestures = {
-					is_enabled = function() return values.gestures end,
-					set_enabled = function(value) values.gestures = value; return true end,
-				},
+				manifest = helpers.load_module("infra.manifest_reader"),
 				i18n = {
 					get_locale = function() return values.locale end,
 					list_locales = function() return { "en", "fr" } end,
@@ -894,9 +875,10 @@ helpers.describe("ui.bridge_handlers", function()
 					set_locale = function(value) values.locale = value; return true end,
 				},
 				config_paths = {
-					default_config_dir = function() return "/tmp/ergopti-default" end,
+					default_config_dir = function() return default_dir end,
 					get_config_dir = function() return values.config_dir end,
 					set_config_dir = function(value) values.config_dir = value; return true end,
+					config = function(rel) return values.config_dir .. "/" .. rel end,
 					data = function(rel) return "/tmp/data/" .. rel end,
 					metrics_path = function() return "/tmp/data/metrics.sqlite" end,
 				},
@@ -906,6 +888,10 @@ helpers.describe("ui.bridge_handlers", function()
 						return true
 					end,
 				},
+				prepare_destination = function(path)
+					captured.prepared[#captured.prepared + 1] = path
+					return true
+				end,
 				webview_manager = {
 					eval_js = function(app, code)
 						captured.pushes[#captured.pushes + 1] = { app = app, code = code }
@@ -920,9 +906,18 @@ helpers.describe("ui.bridge_handlers", function()
 						return true
 					end,
 				},
-				on_config_changed = function() captured.changed = captured.changed + 1 end,
+				restart = function(reason)
+					captured.restarts[#captured.restarts + 1] = reason
+					return true
+				end,
+				notify_restart_required = function() captured.notices = captured.notices + 1 end,
+				notify_error = function(key) captured.errors[#captured.errors + 1] = key end,
 			}
 			return state, values, captured
+		end
+
+		local function finish(state, answers)
+			return handler.on_message({ action = "finish", answers = answers }, state)
 		end
 
     helpers.it("has correct bridge_name", function()
@@ -936,11 +931,39 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(result.data.platform, "linux")
 			helpers.assert_eq(result.data.locale, "en")
 			helpers.assert_eq(result.data.system_layout, "qwerty")
-			helpers.assert_eq(result.data.answers.use_ergopti, false,
-				"one disabled category must preselect the global answer as off")
-			helpers.assert_eq(result.data.answers.magic_key, "★")
+			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")
+			helpers.assert_eq(result.data.current, {}, "an absent config.toml leaves every page neutral")
 			helpers.assert_true(#result.data.locales >= 21)
 			helpers.assert_contains(captured.pushes[1].code, "window.initData")
+		end)
+
+		helpers.it("(onboarding-rerun) initData shows the values config.toml holds", function()
+			local state = onboarding_state()
+			local path = os.tmpname()
+			write_file(path, '[gestures]\nenabled = false\n[hotstrings.modules.distancesreduction]\nqu = true\n'
+				.. '[unrelated]\nenabled = true\n')
+			state.config_paths.config = function(rel)
+				helpers.assert_eq(rel, "config.toml")
+				return path
+			end
+			local result = handler.on_message({ action = "ready" }, state)
+			os.remove(path)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.data.current, {
+				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
+			}, "a re-run shows the answers in force, an explicit false included")
+		end)
+
+		helpers.it("(onboarding-rerun) an unreadable config.toml never opens neutral pages", function()
+			local state, _, captured = onboarding_state()
+			local path = os.tmpname()
+			write_file(path, "[gestures\nenabled = \n")
+			state.config_paths.config = function() return path end
+			local result = handler.on_message({ action = "ready" }, state)
+			os.remove(path)
+			helpers.assert_eq(result.pushed, false,
+				"showing defaults over a broken file would overwrite it with answers the user never gave")
+			helpers.assert_eq(#captured.pushes, 0)
 		end)
 
 		helpers.it("uses the persisted locale in the shared initData contract", function()
@@ -1028,16 +1051,42 @@ helpers.describe("ui.bridge_handlers", function()
 				"retitling a window that is not open must report failure")
 		end)
 
-		helpers.it("preserves explicit false values while loading an existing config", function()
-			local answers = handler._answers_from_config({
-				hotstrings = { enabled = false, trigger_char = ";" },
-				metrics = { enabled = false },
+		helpers.it("(onboarding-rerun) projects a configuration onto wizard paths and marks what it reads", function()
+			local marked = {}
+			local values = handler.config_values({
 				gestures = { enabled = false },
-			}, "/tmp/existing")
-			helpers.assert_eq(answers, {
-				config_dir = "/tmp/existing", use_ergopti = false, magic_key = ";",
-				use_metrics = false, use_gestures = false,
-			})
+				hotstrings = { modules = { distancesreduction = { qu = true } }, trigger_char = ";" },
+				unrelated = { enabled = true },
+			}, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
+			helpers.assert_eq(values, {
+				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
+			}, "an explicit false is a configured value, not an absent one")
+			table.sort(marked)
+			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu" },
+				"the unused-key cleanup must never offer a key the wizard reads, and only those")
+		end)
+
+		helpers.it("(onboarding-rerun) a chosen folder reloads its own values under the request number", function()
+			local state, _, captured = onboarding_state()
+			local folder = scratch_dir()
+			local absent = handler.on_message({ action = "loadExistingConfig",
+				config_dir = folder .. "/", request = 3 }, state)
+			helpers.assert_true(absent.loaded)
+			helpers.assert_eq(absent.values, {}, "a folder without config.toml reloads neutral pages")
+			helpers.assert_contains(captured.pushes[1].code, "window.applyCurrentValues")
+			helpers.assert_contains(captured.pushes[1].code, '"request":3')
+
+			helpers.assert_true(os.execute("mkdir -p '" .. folder .. "'"))
+			write_file(folder .. "/config.toml", "[metrics]\nenabled = true\n")
+			local present = handler.on_message({ action = "loadExistingConfig",
+				config_dir = folder, request = 4 }, state)
+			os.remove(folder .. "/config.toml")
+			os.remove(folder)
+			helpers.assert_eq(present.values, { ["metrics.enabled"] = true })
+
+			local refused = handler.on_message({ action = "loadExistingConfig", config_dir = folder }, state)
+			helpers.assert_eq(refused.loaded, false, "an answer without its request number could land late")
+			helpers.assert_eq(#captured.pushes, 2)
 		end)
 
 		helpers.it("returns a native folder picker choice through setConfigDir", function()
@@ -1053,54 +1102,125 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_contains(captured.pushes[1].code, "window.setConfigDir")
 		end)
 
-		helpers.it("commits every answer and closes only after the canonical write", function()
+		helpers.it("commits the answered paths in one versioned write, then restarts the daemon", function()
 			local state, values, captured = onboarding_state()
-			local result = handler.on_message({ action = "finish", answers = {
-				locale = "fr", use_ergopti = true, magic_key = ";",
-				config_dir = "/tmp/ergopti-custom/", use_metrics = true, use_gestures = true,
-			} }, state)
-			helpers.assert_true(result.done)
-			helpers.assert_true(values.categories.accents and values.categories.code)
-			helpers.assert_eq(values.magic_key, ";")
-			helpers.assert_true(values.metrics and values.gestures)
-			helpers.assert_eq(values.locale, "fr")
-			helpers.assert_eq(values.config_dir, "/tmp/ergopti-custom")
-			helpers.assert_eq(captured.writes[1].path, "/tmp/ergopti-custom/config.toml")
-			helpers.assert_eq(captured.writes[1].updates[5], {
-				section = "script", key = "onboarding_done", value = true,
+			local target = scratch_dir()
+			local result = finish(state, {
+				locale = "fr", config_dir = target .. "/",
+				operations = {
+					{ path = "gestures.enabled", value = true },
+					{ path = "metrics.enabled", value = false },
+				},
 			})
+			helpers.assert_eq(result, { done = true, restarted = true })
+			helpers.assert_eq(values.locale, "fr")
+			helpers.assert_eq(values.config_dir, target)
+			helpers.assert_eq(captured.prepared, { target .. "/config.toml" },
+				"the destination is versioned before anything is written to it")
+			helpers.assert_eq(captured.writes, { {
+				path = target .. "/config.toml",
+				updates = {
+					{ section = "gestures", key = "enabled", value = true },
+					{ section = "metrics", key = "enabled", delete = true },
+				},
+			} }, "every answer lands in one atomic batch and a neutral answer stays sparse")
 			helpers.assert_eq(captured.hidden, 1)
-			helpers.assert_eq(captured.changed, 1)
+			helpers.assert_eq(captured.restarts, { "the setup wizard" },
+				"every module reads config.toml when it starts, so the daemon restarts once")
+			helpers.assert_eq(captured.notices, 0)
+			helpers.assert_eq(captured.errors, {})
+		end)
+
+		helpers.it("tells the user the answers apply at the next start when the daemon cannot restart", function()
+			local state, _, captured = onboarding_state()
+			state.restart = function() return false end
+			local result = finish(state, {
+				locale = "en", config_dir = "", operations = { { path = "gestures.enabled", value = true } },
+			})
+			helpers.assert_eq(result, { done = true, restarted = false })
+			helpers.assert_eq(#captured.writes, 1, "the answers are already saved")
+			helpers.assert_eq(captured.notices, 1)
+		end)
+
+		-- Category, section and magic-key choices are config.toml leaves of the
+		-- chosen folder: written before the switch, they stayed in the old one and
+		-- the next start switched every catalogue off.
+		helpers.it("writes the hotstring choices into the chosen configuration folder", function()
+			local state, values, captured = onboarding_state()
+			local target = scratch_dir()
+			local folder_at_write = nil
+			local batch_write = state.writer.batch_write
+			state.writer.batch_write = function(path, updates)
+				folder_at_write = values.config_dir
+				return batch_write(path, updates)
+			end
+			local result = finish(state, { locale = "en", config_dir = target,
+				operations = { { path = "hotstrings.groups.distancesreduction", value = true } } })
+			helpers.assert_true(result.done)
+			helpers.assert_eq(folder_at_write, target, "the folder switches before any choice is written")
+			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
 		end)
 
 		helpers.it("rejects malformed finish data without writing or closing", function()
-			local state, _, captured = onboarding_state()
-			local result = handler.on_message({ action = "finish", answers = {
-				locale = "en", use_ergopti = "false", magic_key = "★",
-				config_dir = "relative", use_metrics = false, use_gestures = false,
-			} }, state)
-			helpers.assert_eq(result.done, false)
-			helpers.assert_eq(#captured.writes, 0)
-			helpers.assert_eq(captured.hidden, 0)
+			for label, answers in pairs({
+				["string value"] = { locale = "en", config_dir = "",
+					operations = { { path = "gestures.enabled", value = "true" } } },
+				["relative folder"] = { locale = "en", config_dir = "relative",
+					operations = { { path = "gestures.enabled", value = true } } },
+				["unshipped locale"] = { locale = "xx", config_dir = "",
+					operations = { { path = "gestures.enabled", value = true } } },
+				["retired marker"] = { locale = "en", config_dir = "",
+					operations = { { path = "script.onboarding_done", value = true } } },
+				["duplicate path"] = { locale = "en", config_dir = "", operations = {
+					{ path = "gestures.enabled", value = true }, { path = "gestures.enabled", value = false },
+				} },
+				["legacy answers"] = { locale = "en", config_dir = "", use_ergopti = true },
+			}) do
+				local state, values, captured = onboarding_state()
+				local default_dir = values.config_dir
+				local result = finish(state, answers)
+				helpers.assert_eq(result.done, false, label)
+				helpers.assert_eq(#captured.writes, 0, label)
+				helpers.assert_eq(captured.hidden, 0, label)
+				helpers.assert_eq(#captured.restarts, 0, label)
+				helpers.assert_eq(values.locale, "en", label .. ": a refused payload changes nothing")
+				helpers.assert_eq(values.config_dir, default_dir, label)
+				helpers.assert_eq(captured.errors, { "onboarding.error.invalid_answers" },
+					label .. ": the user is told why nothing was saved")
+			end
 		end)
 
-		helpers.it("restores every live authority when the final config write fails", function()
-			local state, values, captured = onboarding_state()
-			state.writer.batch_write = function() return false, "disk full" end
-			local result = handler.on_message({ action = "finish", answers = {
-				locale = "fr", use_ergopti = true, magic_key = ";",
-				config_dir = "/tmp/ergopti-custom", use_metrics = true, use_gestures = true,
-			} }, state)
-			helpers.assert_eq(result.done, false)
-			helpers.assert_eq(values.categories, { accents = true, code = false })
-			helpers.assert_eq(values.magic_key, "★")
-			helpers.assert_eq(values.magic_custom, false)
-			helpers.assert_eq(values.metrics, false)
-			helpers.assert_eq(values.gestures, false)
-			helpers.assert_eq(values.locale, "en")
-			helpers.assert_eq(values.config_dir, "/tmp/ergopti-default")
-			helpers.assert_eq(captured.hidden, 0,
-				"a failed transaction must leave the wizard open for retry")
+		helpers.it("restores the language and folder and says what failed when a commit step fails", function()
+			for label, case in pairs({
+				["unversionable destination"] = { "onboarding.error.write_failed", function(state)
+					state.prepare_destination = function() return false, "written by a newer version" end
+				end },
+				["failed write"] = { "onboarding.error.write_failed", function(state)
+					state.writer.batch_write = function() return false, "disk full" end
+				end },
+				["refused language"] = { "onboarding.error.locale_persist_failed", function(state)
+					state.i18n.set_locale = function() return false end
+				end },
+				["refused folder"] = { "paths_editor.save_failed", function(state)
+					state.config_paths.set_config_dir = function() return false end
+				end },
+			}) do
+				local expected, arrange = case[1], case[2]
+				local state, values, captured = onboarding_state()
+				local default_dir = values.config_dir
+				arrange(state)
+				local result = finish(state, {
+					locale = "fr", config_dir = scratch_dir(),
+					operations = { { path = "gestures.enabled", value = true } },
+				})
+				helpers.assert_eq(result.done, false, label)
+				helpers.assert_eq(values.locale, "en", label)
+				helpers.assert_eq(values.config_dir, default_dir, label)
+				helpers.assert_eq(captured.hidden, 0, label .. ": a failed transaction leaves the wizard open for retry")
+				helpers.assert_eq(#captured.restarts, 0, label)
+				helpers.assert_eq(#captured.writes, 0, label)
+				helpers.assert_eq(captured.errors, { expected }, label .. ": the user is told what failed")
+			end
 		end)
 
 		helpers.it("covers every action the shared page posts", function()
@@ -1422,6 +1542,7 @@ helpers.describe("ui.bridge_handlers", function()
       }
       handler._reset()
       local session_id = handler.show({
+		kind = "ollama_model",
 		label = "Qwen fixture",
 		on_cancel = function() cancelled = cancelled + 1; return true end,
 		on_retry = function() retried = retried + 1; return true end,
@@ -1453,13 +1574,33 @@ helpers.describe("ui.bridge_handlers", function()
         eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
       }
       handler._reset()
-      local session_id = handler.show({ label = "Fast fixture" })
+      local session_id = handler.show({ kind = "ollama_model", label = "Fast fixture" })
       helpers.assert_true(handler.complete(session_id, true, "Installed"))
       helpers.assert_eq(#evaluated, 0)
       helpers.assert_true(handler.on_message("ready").pushed)
       helpers.assert_true(evaluated[1]:find("done(true", 1, true) ~= nil)
       helpers.assert_true(evaluated[1]:find("Installed", 1, true) ~= nil)
       package.loaded["ui.webview_manager"] = previous_manager
+    end)
+
+    helpers.it("titles the window by its kind and refuses a kind the page does not know", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated = {}
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+      }
+      handler._reset()
+      helpers.assert_nil(handler.show({ label = "No kind" }), "a producer must name its kind")
+      helpers.assert_nil(handler.show({ kind = "firmware", label = "Unknown kind" }))
+      local session_id = handler.show({ kind = "app_update", label = "ErgoptiPlus v0.0.0-dev.150" })
+      helpers.assert_true(type(session_id) == "number")
+      helpers.assert_true(handler.on_message("ready").pushed)
+      helpers.assert_true(evaluated[1]:find('setKind("app_update"', 1, true) ~= nil,
+        "the page shows the app-update heading: " .. tostring(evaluated[1]))
+      package.loaded["ui.webview_manager"] = previous_manager
+      handler._reset()
     end)
   end)
 

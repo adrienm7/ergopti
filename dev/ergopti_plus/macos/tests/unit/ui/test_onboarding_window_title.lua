@@ -23,6 +23,22 @@ local function locale_aware_i18n()
 	return i18n
 end
 
+-- The brand-less window title each locale file carries, read before any
+-- fixture scripts the file streams.
+local TITLES = {}
+for _, code in ipairs({ "en", "fr", "de" }) do
+	local fh = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+	TITLES[code] = require("json").decode(fh:read("*a"))["onboarding.window_title"]
+	fh:close()
+end
+
+--- The brand-less window title a locale file carries.
+--- @param code string Locale code.
+--- @return string
+local function window_title(code)
+	return assert(TITLES[code], "no title read for " .. code)
+end
+
 
 helpers.describe("onboarding window title", function()
 	helpers.it("(onboarding-window-title) opens with the brand-less window title key", function()
@@ -36,10 +52,10 @@ helpers.describe("onboarding window title", function()
 			locale_aware_i18n()
 			state.receiver({ body = { action = "previewLocale", locale = "fr" } })
 			helpers.assert_eq(#state.titles, 1)
-			helpers.assert_eq(state.titles[1].title, "fr:onboarding.window_title")
+			helpers.assert_eq(state.titles[1].title, window_title("fr"))
 			helpers.assert_true(state.titles[1].view == state.view)
 			state.receiver({ body = { action = "previewLocale", locale = "de" } })
-			helpers.assert_eq(state.titles[2].title, "de:onboarding.window_title")
+			helpers.assert_eq(state.titles[2].title, window_title("de"))
 		end)
 	end)
 
@@ -56,7 +72,7 @@ helpers.describe("onboarding window title", function()
 			locale_aware_i18n()
 			state.receiver({ body = { action = "ready" } })
 			pending[#pending]()
-			helpers.assert_eq(state.titles[#state.titles].title, "en:onboarding.window_title")
+			helpers.assert_eq(state.titles[#state.titles].title, window_title("en"))
 		end)
 	end)
 

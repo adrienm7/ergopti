@@ -93,12 +93,12 @@ _OEC_PublishStillFollowsPersistence() {
 ; ===========================================================
 
 ; Policed across every site that names the metrics folder to the user in the
-; wizard: the native step, the WebView2 initData and its setMetricsPath reply.
+; wizard: the WebView2 initData and its setMetricsPath reply.
 ; Reading _ConfigDir here is the bug; resolving the chosen field value is the fix.
 ; The WebView2 host once pre-formatted the warning while injecting the locale
 ; strings — before the config step — so it kept naming the boot folder.
 _OEC_MetricsWarningUsesTheChosenDir() {
-	for Name in ["_Onboarding_Step4", "_OnbWeb_InjectInitData", "_OnbWeb_MetricsPathJs"] {
+	for Name in ["_OnbWeb_InjectInitData", "_OnbWeb_MetricsPathJs"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . "() must exist")
 		Assert(InStr(Body, "_Onboarding_MetricsPathFor(") > 0,

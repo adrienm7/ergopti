@@ -38,7 +38,10 @@
 
 ; Bundled categories compiled into the cache. "personal" is excluded — its TOML
 ; can live outside the repo and always loads through the runtime TOML parser.
-global HS_BUNDLED_CATEGORIES := ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
+; SFB reduction and rolls moved into the Ergopti layout extension: a category or
+; section an extension binds (HotstringsBoundTomlPath) never enters the cache,
+; since its file lives outside this folder and follows the installed extension.
+global HS_BUNDLED_CATEGORIES := ["distancesreduction", "autocorrection", "magickey"]
 
 ; Language-pack gate name (PascalCase, e.g. "FrenchAutocorrection") → the
 ; category_enabled key it persists under (its group id). Filled by
@@ -72,6 +75,35 @@ global _HS_CACHE_LOADED := false
 ; ======= 2/ Paths and freshness =======
 ; ======================================
 ; ======================================
+
+; The file a layout extension supplies for a bundled category, or for one of its
+; sections: the whole-category file answers for every section, a section
+; binding only for its own sections. "" when the bundled file applies. The
+; routes are committed once per boot by HotstringExtensions_Prepare
+; (extension_packs.ahk); spellings fold like HotstringsBundledTomlPath's.
+HotstringsBoundTomlPath(Category, Section := "") {
+	global _HotstringBoundSources
+	if !IsSet(_HotstringBoundSources) || !(_HotstringBoundSources is Map)
+		return ""
+	Key := StrLower(StrReplace(Category, "_"))
+	if !_HotstringBoundSources.Has(Key)
+		return ""
+	Route := _HotstringBoundSources[Key]
+	if (Route["path"] != "")
+		return Route["path"]
+	Wanted := StrLower(Section)
+	return (Wanted != "" && Route["sections"].Has(Wanted)) ? Route["sections"][Wanted] : ""
+}
+
+; The sections of a bundled category that a layout extension supplies from its
+; own file, as Map(lowercase section → file); empty when none is bound.
+HotstringsBoundSections(Category) {
+	global _HotstringBoundSources
+	if !IsSet(_HotstringBoundSources) || !(_HotstringBoundSources is Map)
+		return Map()
+	Key := StrLower(StrReplace(Category, "_"))
+	return _HotstringBoundSources.Has(Key) ? _HotstringBoundSources[Key]["sections"] : Map()
+}
 
 ; Absolute path to the gitignored flat cache, beside the source TOML files so a
 ; read-only install (compiled bundle) and a dev checkout resolve it identically.
@@ -238,6 +270,10 @@ HotstringsLanguageName(Locale) {
 ; menu spellings of one group resolve to the same file.
 HotstringsBundledTomlPath(Category) {
 	global _SharedDir
+	; A category a layout extension binds whole loads from the extension's file.
+	Bound := HotstringsBoundTomlPath(Category)
+	if (Bound != "")
+		return Bound
 	Wanted := StrLower(StrReplace(Category, "_"))
 	for _, Pack in HotstringsLanguagePacks() {
 		for _, Stem in Pack["categories"] {

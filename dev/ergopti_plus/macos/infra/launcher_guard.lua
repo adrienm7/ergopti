@@ -19,6 +19,10 @@
 ---    from injected teardown is caught and persisted through the central logger.
 --- 5. Standalone development: a directly launched Hammerspoon without launcher
 ---    environment variables remains supported and does not invent a parent.
+--- 6. Reopen signal: opening ErgoptiPlus again while it runs only activates the
+---    running launcher, which has no window, so nothing appears. The same
+---    watcher reports that activation of the exact launcher PID to one
+---    listener, which lets a waiting boot show its instructions again.
 --- ==============================================================================
 
 local M = {}
@@ -68,6 +72,7 @@ local _emergency_quit = nil
 local _app_watcher = nil
 local _backstop_timer = nil
 local _backstop_committed = false
+local _activation_listener = nil
 
 
 
@@ -205,7 +210,7 @@ local function read_application_pid(app)
 	if not app then return nil end
 	local ok, pid_or_err = xpcall(function() return app:pid() end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "Failed to read terminated application PID: %s", tostring(pid_or_err))
+		Logger.error(LOG, "Failed to read a watched application PID: %s", tostring(pid_or_err))
 		return nil
 	end
 	return type(pid_or_err) == "number" and pid_or_err or nil
@@ -313,6 +318,15 @@ end
 --- @param app table|userdata|nil Native application object.
 local function handle_application_event(_, event_type, app)
 	if not _managed_launch or _emergency_requested then return end
+	if event_type == hs.application.watcher.activated then
+		local listener = _activation_listener
+		if listener == nil or read_application_pid(app) ~= _launcher_pid then return end
+		local ok, err = xpcall(listener, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Launcher activation listener raised: %s", tostring(err))
+		end
+		return
+	end
 	if event_type ~= hs.application.watcher.terminated then return end
 
 	local pid = read_application_pid(app)
@@ -488,6 +502,25 @@ function M.init(emergency_quit)
 	return true
 end
 
+--- Calls a listener each time the exact launcher is activated, which is what
+--- opening ErgoptiPlus again does while it runs. One listener at a time.
+--- @param listener function Called with no argument on each activation.
+--- @return function|nil stop Removes this listener; nil when refused.
+--- @return string|nil detail Exact refusal when stop is nil.
+function M.watch_activation(listener)
+	if type(listener) ~= "function" then return nil, "listener must be a function" end
+	if not _managed_launch or _emergency_requested then
+		return nil, "no launcher is being watched"
+	end
+	if _activation_listener ~= nil then
+		return nil, "a launcher activation listener is already registered"
+	end
+	_activation_listener = listener
+	return function()
+		if _activation_listener == listener then _activation_listener = nil end
+	end
+end
+
 --- Detaches native liveness resources before an ordinary Hammerspoon shutdown.
 --- Without this explicit transition, the launcher's normal termination event
 --- can race Hammerspoon's own shutdown callback and invoke teardown twice.
@@ -496,6 +529,7 @@ end
 function M.stop()
 	_managed_launch = false
 	_launcher_app = nil
+	_activation_listener = nil
 	return release_resources()
 end
 

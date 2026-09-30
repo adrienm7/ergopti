@@ -228,7 +228,6 @@ _MI_StageHotstrings() {
 		; handed over as a native Menu until that tree becomes data too.
 		"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),
 		"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),
-		"hotstring_categories_ergopti",  (*) => _HS_CategoryRowsErgopti(),
 		"hotstring_languages",           (*) => _HS_LanguageRows(),
 		"hotstring_personal",           (*) => _HS_PersonalRows(),
 		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
@@ -417,8 +416,8 @@ _MI_BuildConfigurationMenu() {
 		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
 		"config_folder",       FilePathsEditor,
 		"setup_wizard",        Onboarding_ShowFromMenu,
-		"uninstall",           ShowUninstallErgopti,
-		"start_at_login",      ToggleStartAtLogin
+		"start_at_login",      ToggleStartAtLogin,
+		"restore_touchpad_gestures", TouchpadRegistryRestoreFromMenu
 	)
 		Commands[Id] := Callback
 	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)
@@ -427,32 +426,39 @@ _MI_BuildConfigurationMenu() {
 
 
 ; Builds the About submenu (version, channels, update check, check frequency,
-; Versions and its GitHub page).
+; Versions and its GitHub page, then Uninstall after a separator).
 _MI_BuildAboutMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 
 	; The updater block is provider DATA since 2026-08-07: one row per entry,
 	; with the channel and frequency pickers handed over as the native Menus they
-	; already are. The changelog and releases rows are `command` declarations.
-	; Until then the whole submenu was assembled here and described nowhere — on
-	; all three drivers at once.
+	; already are. The changelog, releases and uninstall rows are `command`
+	; declarations. Until then the whole submenu was assembled here and described
+	; nowhere — on all three drivers at once.
 	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
 	Commands := Map(
 		"about_changelog",     Updater_ShowChangelog,
-		"about_releases_page", Updater_OpenReleasesPage
+		"about_releases_page", Updater_OpenReleasesPage,
+		"uninstall",           ShowUninstallErgopti
 	)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
 }
 
-; List provider: the version row, one row per channel of the shared registry
-; (ticked on the subscribed one) right before the check row, then the
-; update-frequency picker. A local checkout has neither the check row nor the
-; frequency picker: it has no release to update from.
-_MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel) {
+; List provider: the version row (the build and its commit), the channel picker
+; right before the check row, then the update-frequency picker. A local
+; checkout has neither the check row nor the frequency picker: it has no release
+; to update from.
+_MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel,
+		IdentityFn := Updater_BuildIdentity) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 	Rows := []
 
-	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
+	; The build and the commit it was built from, in the shared wording:
+	; « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	; (c3005e0b9) » for a source run. The identity is resolved once per script
+	; by Updater_BuildIdentity, so a rebuild reads no file.
+	Identity := IdentityFn.Call()
+	VerLabel := Updater_VersionRowLabel(Identity["kind"], Identity["version"], Identity["commit"])
 	if IsLocal {
 		; A local checkout has no release to open, so the version reads as a label.
 		Rows.Push(Map("label", VerLabel, "disabled", true))
@@ -461,11 +467,7 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	}
 	Rows.Push(Map("separator", true))
 
-	for _, Id in UpdateChannels_Ids()
-		Rows.Push(Map(
-			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
-			"action",  _MI_ChannelSetter(Id, SetChannelFn),
-			"checked", (Id == UPDATER_CHANNEL)))
+	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
 
 	if IsLocal {
 		return Rows
@@ -491,6 +493,24 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"label", t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode),
 		"items", FreqRows))
 	return Rows
+}
+
+; The channel picker: one submenu titled with the subscribed channel's registry
+; name, one row per registry channel in registry order, ticked on the subscribed
+; one. A click subscribes through the injected setter (Updater_SetChannel in
+; production), which persists the choice and rebuilds the tray, so the title
+; follows.
+_MI_ChannelPickerRow(SetChannelFn) {
+	global UPDATER_CHANNEL
+	ChannelRows := []
+	for _, Id in UpdateChannels_Ids()
+		ChannelRows.Push(Map(
+			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
+			"action",  _MI_ChannelSetter(Id, SetChannelFn),
+			"checked", (Id == UPDATER_CHANNEL)))
+	return Map(
+		"label", StrReplace(t("menu.about.channel_menu"), "{channel}", _Updater_ChannelLabel(UPDATER_CHANNEL)),
+		"items", ChannelRows)
 }
 
 ; Binds one channel id per row. A fat arrow written in the loop above would

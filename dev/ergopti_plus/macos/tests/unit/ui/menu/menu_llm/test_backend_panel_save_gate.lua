@@ -39,12 +39,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = function() effects.deps = effects.deps + 1 end,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = function() effects.deps = effects.deps + 1 end,
-		}
+		})
 		package.loaded["modules.llm.api_mlx"] = { get_port = function() return 3460 end }
 
 		local previous_execute = os.execute
@@ -146,8 +146,8 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				package.loaded["infra.manifest_menu"] = {
 					render_rows = function(rows) return rows end,
 				}
-				package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = noop }
-				package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = noop }
+				package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
+				package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
 				package.loaded["modules.llm.api_mlx"] = { get_port = function() return 3460 end }
 
 				local previous_execute = os.execute
@@ -277,12 +277,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
-			package.loaded["modules.llm.mlx_deps_checker"] = {
+			package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = noop,
-			}
-			package.loaded["modules.llm.ollama_deps_checker"] = {
+			})
+			package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = noop,
-			}
+			})
 
 			local previous_execute = os.execute
 			local previous_hs_execute = hs.execute
@@ -376,12 +376,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
-			package.loaded["modules.llm.mlx_deps_checker"] = {
+			package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
-			package.loaded["modules.llm.ollama_deps_checker"] = {
+			})
+			package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
+			})
 
 			local previous_execute = os.execute
 			local previous_hs_execute = hs.execute
@@ -472,12 +472,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
-			package.loaded["modules.llm.mlx_deps_checker"] = {
+			package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
-			package.loaded["modules.llm.ollama_deps_checker"] = {
+			})
+			package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
+			})
 			package.loaded["ui.menu.menu_llm.backend_panel"] = nil
 			local BackendPanel = require("ui.menu.menu_llm.backend_panel")
 			local _, rows = BackendPanel.build({
@@ -545,12 +545,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = function() return true end,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = function() return true end,
-		}
+		})
 		package.loaded["ui.menu.menu_llm.backend_panel"] = nil
 		local BackendPanel = require("ui.menu.menu_llm.backend_panel")
 		local _, rows = BackendPanel.build({
@@ -639,12 +639,12 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(items) return items end,
 			}
-			package.loaded["modules.llm.mlx_deps_checker"] = {
+			package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
-			package.loaded["modules.llm.ollama_deps_checker"] = {
+			})
+			package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() return true end,
-			}
+			})
 			package.loaded["ui.menu.menu_llm.backend_panel"] = nil
 			local BackendPanel = require("ui.menu.menu_llm.backend_panel")
 			local save_calls = 0
@@ -768,18 +768,18 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(items) return items end,
 			}
-			package.loaded["modules.llm.mlx_deps_checker"] = {
+			package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function()
 					effects.deps = effects.deps + 1
 					return exact_result("mlx_deps")
 				end,
-			}
-			package.loaded["modules.llm.ollama_deps_checker"] = {
+			})
+			package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function()
 					effects.deps = effects.deps + 1
 					return exact_result("ollama_deps")
 				end,
-			}
+			})
 
 			local previous_execute = os.execute
 			local previous_hs_execute = hs.execute

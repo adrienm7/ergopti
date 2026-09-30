@@ -66,6 +66,8 @@ local function fake_config(opts)
 				id = "rolls", path = "/tmp/rolls.toml", count = 17,
 				description = { en = "Rolls", fr = "Roulements" },
 				sections_order = ORDER, sections = sections,
+				-- Rolls come from the Ergopti layout extension, whose submenu lists them.
+				extension = { id = "ergopti", name = "Ergopti" },
 			}
 		end,
 		get_categories = function() return { rolls = config.get_category("rolls") } end,

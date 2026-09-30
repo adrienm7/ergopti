@@ -82,6 +82,8 @@ function M.new(options)
 		apply = function(mode) return transaction.apply("gestures", mode) end,
 		pending = transaction.pending,
 		retry_restore = transaction.retry_restore,
+		revert = transaction.revert,
+		release = transaction.release,
 	}
 end
 

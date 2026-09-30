@@ -3,8 +3,9 @@
 /* =========================================================================== */
 /* Onboarding Wizard Styles.                                                   */
 /*                                                                             */
-/* Multi-step first-run wizard, matching the macOS system design language      */
-/* used across all Ergopti webview windows.                                    */
+/* Multi-step first-run wizard, matching the system design language used by   */
+/* every Ergopti webview window: a fixed step bar, one scrollable content      */
+/* region and a permanently visible action footer.                             */
 /* =========================================================================== */
 
 /* =============================== */
@@ -26,14 +27,10 @@ body {
 body {
 	background: #f5f5f7;
 	color: #333;
-	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 	font-size: 14px;
-	/* Lock the outer page so the only scrollable region is each step's
-	   .step-body (and the .lang-list nested inside step 1). Without this,
-	   a tall step would push the .btns row below the fold and the user
-	   would have to scroll the whole window to reach the Next button — the
-	   step-body's internal scroll keeps .btns pinned at the natural bottom
-	   of every step. */
+	/* The outer page never scrolls: the step region does, so the footer
+	   buttons stay reachable on every page whatever its length. */
 	overflow: hidden;
 }
 
@@ -47,49 +44,28 @@ body {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
-	/* Bottom padding deliberately larger than the top so the Next button
-	   never sits flush against the window's bottom edge — gives the
-	   action row visual breathing room and matches macOS sheet spacing. */
-	padding: 20px 24px 26px;
+	/* A larger bottom padding keeps the buttons off the window's edge. */
+	padding: 20px 24px 22px;
+}
+
+/* The only scrollable region. The negative right margin moves the overlay
+   scrollbar next to the window edge while the padding keeps text clear of it. */
+.step-scroll {
+	flex: 1 1 auto;
+	margin-right: -14px;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 12px;
 }
 
 .step {
 	display: flex;
 	flex-direction: column;
-	flex-grow: 1;
-	/* Allows .step-body (flex-grow:1 inside) to actually shrink below its
-	   intrinsic content height so the scrollbar appears inside the body
-	   rather than on the outer window. */
-	min-height: 0;
 }
 
+.hidden,
 .step.hidden {
 	display: none;
-}
-
-/* Scrollable region that holds every step's title + form controls.
-   Sized by the parent .step's free space; opts into vertical scroll when
-   its content exceeds that space (e.g. the metrics step with a long
-   description + warning + radio cards on a short window). The sibling
-   .btns row sits outside this region and stays pinned at the bottom of
-   the step regardless of how far the body is scrolled — see § 8.
-
-   The negative margin-right + padding-right pair shifts the scrollbar
-   visually: it bleeds the step-body 14px past the wizard's 24px right
-   padding so the overlay scrollbar sits ~10px from the window edge
-   instead of being recessed by 24px, then reserves 12px of internal
-   right padding so text content keeps a clear gutter from the
-   scrollbar (otherwise the macOS overlay scrollbar covers the last
-   characters of every line, which looked broken in step 4). The .btns
-   and .step-bar siblings keep their original 24px alignment. */
-.step-body {
-	display: flex;
-	flex-direction: column;
-	flex-grow: 1;
-	margin-right: -14px;
-	min-height: 0;
-	overflow-y: auto;
-	padding-right: 12px;
 }
 
 /* =============================== */
@@ -101,6 +77,7 @@ body {
 .step-bar {
 	align-items: center;
 	display: flex;
+	flex-shrink: 0;
 	gap: 6px;
 	justify-content: center;
 	margin-bottom: 18px;
@@ -148,7 +125,7 @@ h1 {
 	color: #555;
 	font-size: 12.5px;
 	line-height: 1.55;
-	margin: 0 0 16px;
+	margin: 0 0 14px;
 	white-space: pre-line;
 }
 
@@ -165,8 +142,19 @@ h1 {
 	border: 1px solid #f0c040;
 	border-radius: 6px;
 	color: #7a5500;
-	font-size: 10.5px;
-	font-style: italic;
+	font-size: 11px;
+	line-height: 1.5;
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	white-space: pre-line;
+}
+
+.note {
+	background: #eef4ff;
+	border: 1px solid #c6d8f5;
+	border-radius: 6px;
+	color: #2a4a7a;
+	font-size: 12px;
 	line-height: 1.5;
 	margin: 0 0 12px;
 	padding: 8px 10px;
@@ -182,13 +170,11 @@ h1 {
 .lang-list {
 	border: 1px solid #e0e0e0;
 	border-radius: 8px;
-	flex-grow: 1;
-	min-height: 0;
-	overflow-y: auto;
 }
 
 .lang-item {
 	align-items: center;
+	background: #fff;
 	border-bottom: 1px solid #f0f0f0;
 	cursor: pointer;
 	display: flex;
@@ -198,8 +184,13 @@ h1 {
 	user-select: none;
 }
 
+.lang-item:first-child {
+	border-radius: 8px 8px 0 0;
+}
+
 .lang-item:last-child {
 	border-bottom: none;
+	border-radius: 0 0 8px 8px;
 }
 
 .lang-item:hover {
@@ -225,8 +216,7 @@ h1 {
 	width: 24px;
 }
 
-/* PNG flag (Windows path) — sized to sit on the emoji baseline without
-   distorting the source aspect ratio. */
+/* PNG flag (Windows path) sized to sit on the emoji baseline. */
 .lang-flag-img {
 	display: block;
 	height: auto;
@@ -239,35 +229,78 @@ h1 {
 	font-size: 13px;
 }
 
-/* =========================================== */
-/* =========================================== */
-/* ======= 5b/ Layout Preview Image ========== */
-/* =========================================== */
-/* =========================================== */
+/* ====================================== */
+/* ====================================== */
+/* ======= 6/ Folder Field ============== */
+/* ====================================== */
+/* ====================================== */
 
-/* Scales the layout JPG to the wizard's content width while keeping its
-   aspect ratio — so the visual cue does not push the radios off-screen
-   on a narrow window. */
-.layout-preview {
-	border: 1px solid #e0e0e0;
-	border-radius: 6px;
-	display: block;
-	height: auto;
-	margin: 0 0 12px;
-	max-width: 100%;
+.field-group {
+	display: flex;
+	margin-bottom: 4px;
+	width: 100%;
+}
+
+#config-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px 0 0 7px;
+	border-right: none;
+	color: #1d1d1f;
+	flex: 1;
+	font-family: inherit;
+	font-size: 12.5px;
+	min-width: 0;
+	outline: none;
+	padding: 7px 10px;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+#config-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	z-index: 1;
+}
+
+#config-browse {
+	border-radius: 0 7px 7px 0;
+	flex-shrink: 0;
+	padding: 7px 12px;
+	white-space: nowrap;
 }
 
 /* ====================================== */
 /* ====================================== */
-/* ======= 6/ Radio Cards ============== */
+/* ======= 7/ Question & Radio Cards ==== */
 /* ====================================== */
 /* ====================================== */
 
-.radio-group {
+.question {
+	margin: 0 0 12px;
+}
+
+.question-label {
+	color: #1d1d1f;
+	font-size: 13px;
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+.radio-row {
+	display: flex;
+	gap: 8px;
+}
+
+.radio-row .radio-card {
+	flex: 1 1 0;
+}
+
+.magic-options {
 	display: flex;
 	flex-direction: column;
-	flex-grow: 1;
-	gap: 8px;
+	gap: 6px;
 }
 
 .radio-card {
@@ -278,7 +311,7 @@ h1 {
 	cursor: pointer;
 	display: flex;
 	gap: 10px;
-	padding: 12px 14px;
+	padding: 10px 14px;
 	transition:
 		border-color 0.15s,
 		background 0.1s;
@@ -304,78 +337,101 @@ h1 {
 
 .radio-label {
 	color: #333;
+	flex: 1 1 auto;
 	font-size: 13px;
 	line-height: 1.4;
 }
 
-/* ====================================== */
-/* ====================================== */
-/* ======= 7/ Magic Key Input ========== */
-/* ====================================== */
-/* ====================================== */
-
-.field-group {
-	display: flex;
-	margin-bottom: 4px;
-	width: 100%;
+.magic-key {
+	margin: 0 0 12px;
 }
 
-#sc-input {
-	background: #fff;
-	border: 1.5px solid #d0d0d0;
-	border-radius: 7px 0 0 7px;
-	border-right: none;
-	color: #1d1d1f;
-	flex: 1;
-	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-	font-size: 12.5px;
-	min-width: 0;
-	outline: none;
-	padding: 7px 10px;
-	transition:
-		border-color 0.15s,
-		box-shadow 0.15s;
-}
-
-#sc-input:focus {
-	border-color: #007aff;
-	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
-	z-index: 1;
-}
-
-#sc-browse {
-	border-radius: 0 7px 7px 0;
-	flex-shrink: 0;
-	padding: 7px 12px;
-	white-space: nowrap;
-}
-
-#s3-input {
+.magic-input {
 	background: #fff;
 	border: 1.5px solid #d0d0d0;
 	border-radius: 7px;
 	color: #1d1d1f;
-	font-family: 'SF Mono', 'Monaco', monospace;
-	/* Matches the surrounding radio-label / desc text — the previous 22px
-	   made the field tower over its row's text and read as 1.5× the rest. */
+	font-family: 'SF Mono', Monaco, Consolas, monospace;
 	font-size: 13px;
 	outline: none;
 	padding: 5px 10px;
 	text-align: center;
-	transition:
-		border-color 0.15s,
-		box-shadow 0.15s;
 	width: 70px;
 }
 
-#s3-input:focus {
+.magic-input:focus {
 	border-color: #007aff;
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
+.magic-input.invalid {
+	border-color: #d11;
+	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 8/ Checklist ================= */
+/* ====================================== */
+/* ====================================== */
+
+.checklist {
+	background: #fff;
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	margin: 0 0 12px;
+	padding: 8px 12px;
+}
+
+.checklist summary {
+	color: #1d1d1f;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 600;
+	padding: 2px 0;
+	user-select: none;
+}
+
+.checklist-body {
+	margin-top: 6px;
+}
+
+.checklist-group.depth-1,
+.checklist-group.depth-2 {
+	margin-left: 18px;
+}
+
+.checklist-group-header .check-label {
+	font-weight: 600;
+}
+
+.check-row {
+	align-items: flex-start;
+	cursor: pointer;
+	display: flex;
+	gap: 8px;
+	padding: 3px 0;
+}
+
+.check-row input[type='checkbox'] {
+	accent-color: #007aff;
+	flex-shrink: 0;
+	margin: 2px 0 0;
+}
+
+.check-row input[type='checkbox']:disabled + .check-label {
+	color: #999;
+}
+
+.check-label {
+	color: #333;
+	font-size: 12.5px;
+	line-height: 1.4;
+}
+
 /* ===================================== */
 /* ===================================== */
-/* ======= 8/ Buttons ================= */
+/* ======= 9/ Buttons ================= */
 /* ===================================== */
 /* ===================================== */
 
@@ -385,7 +441,7 @@ h1 {
 	flex-shrink: 0;
 	gap: 8px;
 	justify-content: flex-end;
-	margin-top: 16px;
+	margin-top: 14px;
 }
 
 button {
@@ -412,24 +468,21 @@ button:hover {
 	color: #333;
 }
 
-/* General hide utility. The step show/hide uses ``.step.hidden`` specifically,
-   but the gestures step's warning, the Windows registration panel and its status
-   line are not ``.step`` elements and need a plain hide rule too. */
-.hidden {
-	display: none;
+/* The Back button sits on the left, Next / Finish on the right. */
+#btn-back {
+	margin-right: auto;
 }
 
 /* ============================================== */
 /* ============================================== */
-/* ======= 9/ Gesture Registration (Win) ======= */
+/* ======= 10/ Gesture Registration (Win) ====== */
 /* ============================================== */
 /* ============================================== */
 
-/* Windows-only touchpad-gesture registration panel on step 5 (auto/manual
-   buttons + result line). Hidden on macOS, which shows the warning box instead. */
+/* Windows touchpad registration panel of the gestures page. */
 .gesture-register {
 	border-top: 1px solid #e8e8e8;
-	margin-top: 14px;
+	margin: 0 0 12px;
 	padding-top: 12px;
 }
 
@@ -445,7 +498,6 @@ button:hover {
 	width: 100%;
 }
 
-/* Tighten the gap between each button and its explanatory hint. */
 .register-btn + .hint {
 	margin-bottom: 10px;
 }

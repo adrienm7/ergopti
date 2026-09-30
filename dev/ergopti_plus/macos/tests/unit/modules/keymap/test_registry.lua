@@ -406,6 +406,8 @@ helpers.describe("Registry collision priority", function()
 		helpers.assert_eq(Registry.source_priority("personal"), 50)
 		helpers.assert_eq(Registry.source_priority("PERSONAL"), 50)
 		helpers.assert_eq(Registry.source_priority("ext.demo"), 30)
+		helpers.assert_eq(Registry.source_priority("ext:ergopti-demo:demo-phrases"), 30,
+			"a registered extension pack group scores the package tier, as on Windows")
 		helpers.assert_eq(Registry.source_priority("autocorrection"), 10)
 		helpers.assert_eq(Registry.source_priority(nil), 10)
 	end)

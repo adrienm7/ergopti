@@ -70,12 +70,17 @@ helpers.describe("canonical Linux AI settings", function()
 		end)
 	end)
 
-	helpers.it("rejects malformed canonical values without a legacy fallback or overwrite", function()
+	helpers.it("ignores an old-shape canonical value without a legacy fallback or overwrite (config-outdated-llm)", function()
+		-- An outdated value is read as absent (the manifest value), never as the
+		-- legacy storage value, never raised on, and offered by the cleanup.
 		with_config('[llm.generation]\ntemperature = "bad"\n', function(path)
 			local before = Sandbox.read_bytes(path)
-			local ok = pcall(function() return require("modules.llm.settings").get("temperature") end)
-			helpers.assert_eq(ok, false)
+			helpers.assert_eq(require("modules.llm.settings").get("temperature"),
+				require("infra.manifest_reader").default_for("llm.generation.temperature"))
 			helpers.assert_eq(Sandbox.read_bytes(path), before)
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.generation", "temperature" })
 		end)
 	end)
 end)

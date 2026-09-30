@@ -389,7 +389,7 @@ KLWV_IsAlive(entry) {
 KLWV_Focus(which) {
 		if !KLWV.windows.Has(which)
 				return
-		try KLWV.windows[which]["gui"].Show()
+		WMPresentWindow(KLWV.windows[which]["gui"])
 }
 
 KLWV_Close(which) {

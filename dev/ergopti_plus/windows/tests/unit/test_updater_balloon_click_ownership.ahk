@@ -67,26 +67,19 @@ _UBCO_ForeignBalloonClickIsIgnored() {
 Test("Updater balloon: a click on any other balloon does not open the update prompt",
 	_UBCO_ForeignBalloonClickIsIgnored)
 
-; Every non-offer balloon the updater itself shows releases the claim first.
+; The manual check shows no balloon at all: every answer is in the update-check
+; window (ui/update_check), so no balloon of its can be read as an offer.
 _UBCO_UpdaterNonOfferBalloonsReleaseTheClaim() {
 	Body := _DriverFuncBody("_Updater_OneClickUpdateCallback")
 	Assert(Body != "", "_Updater_OneClickUpdateCallback must exist")
-	Count := 0
-	Pos := 1
-	while (Pos := InStr(Body, "TrayTip(", , Pos)) {
-		Before := SubStr(Body, Max(1, Pos - 200), 200)
-		Assert(InStr(Before, "_Updater_ReleaseBalloon()") > 0,
-			"every manual-check balloon must release the update claim before it is shown")
-		Count += 1
-		Pos += 8
-	}
-	AssertTrue(Count >= 3, "the manual check shows its no-connection, parse and up-to-date balloons: " . Count)
+	AssertEqual(0, InStr(Body, "TrayTip("), "the manual check answers in its window, never in a balloon")
+	AssertTrue(InStr(Body, "UpdateCheck_ShowResult(") > 0, "the manual check shows its answer in the window")
 	Offer := _DriverFuncBody("_Updater_HandleBackgroundResult")
 	ClaimAt := InStr(Offer, "_Updater_ClaimBalloon()")
 	TipAt := InStr(Offer, "TrayTip(", , ClaimAt)
 	Assert(ClaimAt > 0 and TipAt > ClaimAt, "the update offer claims the balloon right before its TrayTip")
 }
-Test("Updater balloon: the updater's other balloons release the claim", _UBCO_UpdaterNonOfferBalloonsReleaseTheClaim)
+Test("Updater balloon: the manual check shows no balloon, the offer claims its own", _UBCO_UpdaterNonOfferBalloonsReleaseTheClaim)
 
 _UBCO_RecordPrompt(State, Release, Request) {
 	State.Prompts.Push(Release.Tag)

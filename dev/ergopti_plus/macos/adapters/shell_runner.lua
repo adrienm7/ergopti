@@ -569,9 +569,9 @@ end
 -- ===============================================
 -- ===============================================
 
--- These two exist so the interactive layer — everything that runs in response to
--- a live keystroke or gesture — has a non-blocking way to do the two things it
--- used `hs.execute` and `hs.osascript.applescript` for. Both of those APIs are
+-- These exist so the interactive layer — everything that runs in response to
+-- a live keystroke or gesture — has a non-blocking way to do what it used
+-- `hs.execute` and `hs.osascript.applescript` for. Both of those APIs are
 -- synchronous: they hold the single Hammerspoon runloop until the child exits, so
 -- the keyboard tap receives nothing for the duration and macOS can disable it for
 -- missing its deadline. `hs.timer.doAfter(0, …)` does not help — the timer body
@@ -682,6 +682,49 @@ function M.applescript(script, on_done)
 		-- The completion callback never fires for a task that never launched, so
 		-- a caller waiting on it would hang forever on its "in flight" branch.
 		invoke_guarded("applescript.launch_failed", on_done, false, nil)
+	end
+	return started, handle
+end
+
+--- Runs one program with an argument vector without blocking, for the system
+--- actions whose native command is a plain binary (pmset, xattr, chmod, kill).
+---
+--- @param executable string Absolute path of the program.
+--- @param args table Argument vector; no shell ever sees it.
+--- @param on_done function|nil fn(ok, stdout, stderr) where ok is true on exit
+---        code 0 and stdout has its trailing whitespace stripped.
+--- @return boolean started True when the subprocess was started.
+--- @return table|nil handle Exact lifecycle handle; nil only before construction.
+function M.run(executable, args, on_done)
+	local refusal = M.validate_spawn_args(executable, args)
+	if refusal ~= "" then
+		Logger.error(LOG, "run(): refused for '%s' — %s.", tostring(executable), refusal)
+		invoke_guarded("run.reject", on_done, false, nil, nil)
+		return false, nil
+	end
+	local program = RuntimeLog.program_name(executable)
+	Logger.trace(LOG, "Running %s asynchronously…", program)
+	local handle = M.spawn(executable, args, function(exit_code, stdout, stderr)
+		local ok = (exit_code == 0)
+		local out = type(stdout) == "string" and stdout:gsub("%s+$", "") or nil
+		if ok then
+			Logger.done(LOG, "%s completed.", program)
+		else
+			Logger.warn(LOG, "%s failed (code %s): %s", program,
+				tostring(exit_code), (tostring(stderr):gsub("%s+$", "")))
+		end
+		invoke_guarded("run.done", on_done, ok, out, stderr)
+	end)
+	if handle.isSettled() then
+		Logger.error(LOG, "run(): could not construct %s.", program)
+		invoke_guarded("run.construct_failed", on_done, false, nil, nil)
+		return false, nil
+	end
+	local started = handle.start()
+	if not started then
+		Logger.error(LOG, "run(): could not start %s.", program)
+		-- A task that never launched never calls back.
+		invoke_guarded("run.launch_failed", on_done, false, nil, nil)
 	end
 	return started, handle
 end

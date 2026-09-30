@@ -565,14 +565,13 @@ helpers.describe("HS-012 MLX requirement-task pause joins", function()
 						guarded_check_requirements = manager.check_requirements,
 						save_prefs = function() return true end,
 						update_menu = function() return true end,
-						apply_llm_shortcut = function() return true end,
 						apply_llm_profile_shortcut = function() return true end,
 						activate_hotkey = function() return true end,
 						mlx_deps_checker = {},
+						runtime_installed = function() return true end,
 						deps = { script_control = script_control },
 						get_startup_silence = function() return false end,
 						set_startup_silence = function() return true end,
-						get_trigger_hk = function() return nil end,
 						get_profile_hks = function() return {} end,
 						prediction_locks = build_prediction_locks(),
 					})
@@ -660,17 +659,16 @@ helpers.describe("HS-012 MLX requirement-task pause joins", function()
 						guarded_check_requirements = manager.check_requirements,
 						save_prefs = function() return true end,
 						update_menu = function() return true end,
-						apply_llm_shortcut = function() return true end,
 						apply_llm_profile_shortcut = function() return true end,
 						activate_hotkey = function() return true end,
 						mlx_deps_checker = {},
+						runtime_installed = function() return true end,
 						deps = {
 							script_control = script_control,
 							update_menu = function() return true end,
 						},
 						get_startup_silence = function() return false end,
 						set_startup_silence = function() return true end,
-						get_trigger_hk = function() return nil end,
 						get_profile_hks = function() return {} end,
 						prediction_locks = startup_locks,
 					})
@@ -859,14 +857,13 @@ helpers.describe("HS-012 MLX activation requirement ownership", function()
 						guarded_check_requirements = manager.check_requirements,
 						save_prefs = function() return true end,
 						update_menu = function() return true end,
-						apply_llm_shortcut = function() return true end,
 						apply_llm_profile_shortcut = function() return true end,
 						activate_hotkey = function() return true end,
 						mlx_deps_checker = {},
+						runtime_installed = function() return true end,
 						deps = { script_control = script_control },
 						get_startup_silence = function() return false end,
 						set_startup_silence = function() return true end,
-						get_trigger_hk = function() return nil end,
 						get_profile_hks = function() return {} end,
 						prediction_locks = build_prediction_locks(),
 					})
@@ -1008,14 +1005,13 @@ helpers.describe("HS-012 MLX port requirement replay ownership", function()
 						guarded_check_requirements = manager.check_requirements,
 						save_prefs = function() return true end,
 						update_menu = function() return true end,
-						apply_llm_shortcut = function() return true end,
 						apply_llm_profile_shortcut = function() return true end,
 						activate_hotkey = function() return true end,
 						mlx_deps_checker = {},
+						runtime_installed = function() return true end,
 						deps = { script_control = script_control },
 						get_startup_silence = function() return false end,
 						set_startup_silence = function() return true end,
-						get_trigger_hk = function() return nil end,
 						get_profile_hks = function() return {} end,
 						prediction_locks = build_prediction_locks(),
 					})
@@ -1243,5 +1239,136 @@ helpers.describe("HS-012 MLX deletion pause ownership", function()
 					helpers.assert_true(script_control.stop())
 				end)
 			end)
+	end
+end)
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 5/ Import Probe Failure Messages =======
+-- ================================================
+-- ================================================
+
+helpers.describe("MLX import probe failure names a working action (mlx-runtime-broken)", function()
+	--- Runs one failed probe with the given runtime state and returns the record.
+	--- @param runtime table { installed, running, failed }
+	--- @return table record { notices, invalidations, probe_args }
+	local function run_failed_probe(runtime)
+		local record = { notices = {}, invalidations = 0 }
+		with_fixture(function(native)
+			install_subject_stubs(native)
+			package.loaded["infra.notifications"] = {
+				notify = function(title, body, kind)
+					record.notices[#record.notices + 1] = { title = title, body = body, kind = kind }
+					return true
+				end,
+			}
+			package.loaded["modules.llm.mlx_deps_checker"] = {
+				is_task_running = function() return runtime.running == true end,
+				runtime_installed = function() return runtime.installed == true end,
+				has_failed = function() return runtime.failed == true end,
+				get_failure_message = function() return "fixture failure" end,
+				reset_bootstrap_state = function() return true end,
+				invalidate_runtime = function()
+					record.invalidations = record.invalidations + 1
+					runtime.installed = false
+					return true
+				end,
+			}
+			local script_control = start_script_control()
+			local manager = build_manager(script_control)
+			local capability = manager.create_requirement_owner("activation")
+			local cancelled = nil
+			helpers.assert_true(manager.check_requirements("fixture-model",
+				function() return true end,
+				function(reason) cancelled = reason return true end, {
+					requirement_owner = capability,
+					is_current = function() return true end,
+				}))
+			helpers.assert_eq(#native.tasks, 1)
+			record.probe_args = native.tasks[1].args
+			native.tasks[1].on_done(1, "", "ModuleNotFoundError: No module named 'mlx_lm'")
+			helpers.assert_eq(cancelled, "dependency_probe_failed")
+			helpers.assert_eq(native.server_starts, {})
+			helpers.assert_true(script_control.stop())
+		end)
+		return record
+	end
+
+	helpers.it("invalidates an installed but broken runtime and says how to rebuild it", function()
+		local record = run_failed_probe({ installed = true })
+		helpers.assert_eq(record.invalidations, 1,
+			"an installed runtime that fails its imports must read as not installed")
+		helpers.assert_eq(#record.notices, 1)
+		helpers.assert_eq(record.notices[1].title, "mlx.runtime_broken_title")
+		helpers.assert_eq(record.notices[1].body, "mlx.runtime_broken_body",
+			"no bootstrap runs on its own, so the message must not claim one is in progress")
+	end)
+
+	helpers.it("keeps the in-progress message only while the selected install runs", function()
+		local record = run_failed_probe({ installed = false, running = true })
+		helpers.assert_eq(record.invalidations, 0)
+		helpers.assert_eq(record.notices[1].body, "mlx.deps_missing_body")
+	end)
+
+	helpers.it("points a missing runtime at the MLX selection without touching it", function()
+		local record = run_failed_probe({ installed = false })
+		helpers.assert_eq(record.invalidations, 0)
+		helpers.assert_eq(record.notices[1].title, "mlx.runtime_missing_title")
+	end)
+
+	helpers.it("probes every package the bootstrap fast path checks", function()
+		local record = run_failed_probe({ installed = true })
+		local command = record.probe_args[#record.probe_args]
+		for _, package_name in ipairs({ "mlx_lm", "huggingface_hub", "jinja2",
+			"safetensors", "truststore" }) do
+			helpers.assert_true(command:find("import " .. package_name, 1, true) ~= nil,
+				"the import probe must cover " .. package_name)
+		end
+	end)
+end)
+
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 6/ One Owner For The MLX Interpreter Path =======
+-- =========================================================
+-- =========================================================
+
+helpers.describe("MLX interpreter comes from the runtime owner (mlx-venv-single-owner)", function()
+	-- Neither location is one the manager could derive on its own, so only a
+	-- manager that asks mlx_deps_checker.venv_dir() probes them. The owner's
+	-- own launcher/checkout rule is covered in test_ai_runtime_selection_install.
+	for _, venv in ipairs({ "/fixture/owner/mlx-venv", "/fixture/other owner/.venv" }) do
+		helpers.it("probes the venv mlx_deps_checker names (" .. venv .. ")", function()
+			with_fixture(function(native)
+				install_subject_stubs(native)
+				package.loaded["modules.llm.mlx_deps_checker"] = {
+					venv_dir = function() return venv end,
+				}
+
+				local script_control = start_script_control()
+				local manager = build_manager(script_control)
+				local capability = manager.create_requirement_owner("activation")
+				helpers.assert_true(manager.check_requirements("fixture-model",
+					function() return true end, function() return true end, {
+						requirement_owner = capability,
+						is_current = function() return true end,
+					}))
+				helpers.assert_eq(#native.tasks, 1)
+				local command = native.tasks[1].args[#native.tasks[1].args]
+				local expected = "\"" .. venv .. "/bin/python\" -c "
+				helpers.assert_eq(command:sub(1, #expected), expected,
+					"the probed interpreter must live in the venv the installed verdict reads")
+				native.tasks[1].on_done(0, "", "")
+				helpers.assert_true(script_control.stop())
+			end)
+		end)
 	end
 end)

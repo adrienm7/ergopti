@@ -71,9 +71,20 @@ feature logic lives in the modules it loads.
 | `data/`              | Pure data + `generate_models.py` (MLX model-list codegen) and its `pyproject.toml` / `uv.lock` venv pins.                                                                                                 |
 | `tests/`             | `meta/` (source-introspection + port-coverage guards), `unit/`, `helpers/`, `stubs/`.                                                                                                                     |
 
-> MLX provisioning: `modules/llm/ensure-mlx-deps.sh` builds a `.venv` from the
-> pinned `pyproject.toml` on startup (hash-gated). `modules/llm/mlx_deps_checker.lua`
-> resolves that script relative to the Hammerspoon root, so moving these files
+> AI runtimes: neither is bundled, and neither is fetched at startup, when the
+> AI is enabled with another backend, or after an update. The first selection
+> of the MLX backend runs `modules/llm/ensure-mlx-deps.sh`, which builds the
+> venv from the pinned `pyproject.toml`; later selections reuse it. When its
+> packages stop importing (a `uv.lock` bump in an update, a partial venv), the
+> model check marks it not installed and the next MLX selection rebuilds it.
+> A backend row switches only after its runtime install succeeds. The first
+> selection of the Ollama backend reuses an installed Ollama
+> (`modules/llm/ollama_binary.lua`: Ollama.app, `~/Applications`, Homebrew,
+> Ergopti's Application Support copy, then `PATH`) or offers to download the
+> release pinned in `modules/llm/ollama-release.sh`.
+> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of either
+> checker's `install_for_selection()`. `modules/llm/mlx_deps_checker.lua`
+> resolves its script relative to the Hammerspoon root, so moving these files
 > requires updating their path resolution — the Lua unit suite does not exercise
 > the bash/venv runtime.
 

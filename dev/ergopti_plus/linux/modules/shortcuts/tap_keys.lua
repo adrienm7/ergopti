@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
@@ -139,18 +140,40 @@ end
 --- @param decoded table Decoded config.toml.
 --- @param consume function Consumer receiving key id and value.
 local function walk_assignments(decoded, consume)
-	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
-	local assignments = type(shortcuts.tap_keys) == "table" and shortcuts.tap_keys or {}
+	-- Another shape is outdated configuration: reported once, walked as empty.
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
+	local assignments = ConfigOutdated.settings_table(shortcuts.tap_keys, { "shortcuts", "tap_keys" }, Logger) or {}
 	for _, key in ipairs(M.keys()) do
 		if assignments[key.id] ~= nil then consume(key.id, assignments[key.id]) end
 	end
 end
 
---- Marks exactly the preferences read by the assignment loader.
+--- Whether a stored tap-key action still names something this build runs.
+--- A retired action is outdated configuration: warned about once, run as
+--- "none" and offered by the config cleanup, never an error or a refusal.
+--- @param id string Tap key id.
+--- @param value any Stored value.
+--- @param catalogue table Action catalogue owner.
+--- @return boolean known
+local function stored_action_known(id, value, catalogue)
+	if value == "none" or (type(value) == "string" and catalogue.is_assignable(value)) then return true end
+	ConfigOutdated.report({ "shortcuts", "tap_keys", id },
+		"action '" .. tostring(value) .. "' no longer exists", Logger)
+	return false
+end
+
+--- Marks exactly the preferences read by the assignment loader. A key whose
+--- action no longer exists is left unmarked, so the cleanup offers it.
 --- @param decoded table Decoded config.toml.
 --- @param mark function Segment-based ownership collector.
 function M.mark_config_reads(decoded, mark)
-	walk_assignments(decoded, function(id) mark("shortcuts", "tap_keys", id) end)
+	local catalogue = action_catalogue()
+	walk_assignments(decoded, function(id, value)
+		-- Without a catalogue nothing can be proved outdated: keep every key.
+		if not catalogue or stored_action_known(id, value, catalogue) then
+			mark("shortcuts", "tap_keys", id)
+		end
+	end)
 end
 
 --- Reads every assignment from config.toml, or the manifest default.
@@ -169,9 +192,12 @@ local function load_assignments()
 		end
 		decoded = parsed
 	end
-	local configured = {}
-	walk_assignments(decoded, function(id, value) configured[id] = value end)
 	local Gestures = action_catalogue()
+	local configured = {}
+	walk_assignments(decoded, function(id, value)
+		if Gestures and not stored_action_known(id, value, Gestures) then value = "none" end
+		configured[id] = value
+	end)
 	local loaded = {}
 	for _, key in ipairs(M.keys()) do
 		local value = configured[key.id]
@@ -331,14 +357,18 @@ end
 
 --- Resolves the exact tap-key catalogue against a detached configuration.
 --- @param document table Decoded configuration.
+--- @param written boolean|nil True for the document a scope just wrote: an
+---   unassignable key there is that write's failure and raises.
 --- @return table state
-function M.configuration_candidate(document)
-	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
-	local section = document.shortcuts or {}
-	assert(section.tap_keys == nil or type(section.tap_keys) == "table", "tap-key assignments are malformed")
+function M.configuration_candidate(document, written)
 	local values, assignments = {}, {}
-	walk_assignments(document, function(id, value) values[id] = value end)
 	local catalogue = assert(action_catalogue(), "tap-key action catalogue is unavailable")
+	walk_assignments(document, function(id, value)
+		assert(not written or value == "none" or (type(value) == "string" and catalogue.is_assignable(value)),
+			"invalid tap-key assignment: " .. id)
+		-- The loader's rule: an outdated action runs as "none".
+		values[id] = stored_action_known(id, value, catalogue) and value or "none"
+	end)
 	for _, key in ipairs(M.keys()) do
 		local action = values[key.id]
 		if action == nil then action = Manifest.default_for(PREF_PREFIX .. key.id) end

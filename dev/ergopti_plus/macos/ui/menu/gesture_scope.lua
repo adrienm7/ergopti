@@ -27,7 +27,6 @@ function M.new(options)
 		if row.section == "gestures.sensitivities" then return "get_sensitivity", "set_sensitivity", row.key end
 		assert(row.section == "gestures", "unexpected gesture scope owner: " .. row.section)
 		if row.key == "enabled" then return "is_enabled", nil end
-		if row.key == "space_wrap" then return "get_space_wrap", "set_space_wrap" end
 		-- Retired manifest action fields still have persisted ownership but no
 		-- native slot; clearing them must not create a new runtime assignment.
 		if not slots[row.key] then return nil end

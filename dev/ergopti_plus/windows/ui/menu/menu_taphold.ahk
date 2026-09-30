@@ -23,16 +23,24 @@
 ;   ☰ Tap-Hold
 ;     ↳ ✓ Activer les tap-holds        [the TapHolds master gate]
 ;     ↳ ---
-;     ↳ Réinitialiser les valeurs par défaut
-;     ↳ Tout désactiver
+;     ↳ ↺ Restaurer les valeurs conseillées
+;     ↳ ✕ Tout effacer (comportement du système)
 ;     ↳ ---
+;     ↳ — Main gauche — Tap / Hold —   [manifest header]
 ;     ↳ Tab  :  Alt-Tab / Alt          [checkmark when configured]
 ;       ↳ Rien (désactiver)
 ;       ↳ ---
 ;       ↳ Tap  → "Alt-Tab"             [opens modal action picker GUI]
 ;       ↳ Hold → "Alt"                 [opens hold picker submenu]
-;     ↳ CapsLock  :  Entrée / Ctrl
+;     ↳ …                              [down to Space]
+;     ↳ ---
+;     ↳ — Main droite — Tap / Hold —   [manifest header]
+;     ↳ AltGr  :  Tab / AltGr
 ;     ↳ …
+;
+; Which key goes under which hand is the shared key catalogue's
+; ([tap_hold.catalog], read by TapHoldKeyDefs); the headers and the separator
+; between the hands are the manifest's.
 ;
 ; Tap picker: full GESTURE_ACTIONS list in the searchable modal GUI (ShowActionPicker).
 ; Hold picker: fixed set from _TH_HoldOptions (modifiers + nav layer + none).
@@ -41,20 +49,23 @@
 _BuildTapHoldsSubmenu() {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
-	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
+	ListProviders := Map(
+		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
+		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
 }
 
-; List provider: one row per configurable key.
+; List provider: one row per configurable key of one hand.
 ;
 ; Row DATA since 2026-08-07. The tree is three levels — the key, its disable /
 ; tap / hold rows, and the hold picker's options — which is what the renderer
 ; allows, and none of it mutates a live menu: every action writes the user's
 ; tap_hold.toml and reloads the script, which rebuilds the tray from scratch.
-_TH_KeyRows() {
+; @param Hand {String} "left" or "right".
+_TH_KeyRows(Hand) {
 	global TapHold
 	Rows := []
-	for _, KeyDef in TapHoldKeyDefs() {
+	for _, KeyDef in TapHoldKeyDefsOfHand(Hand) {
 		KeyId    := KeyDef["id"]
 		KeyLabel := t(KeyDef["i18n"])
 		TapLbl   := TapHoldCurrentTapLabel(KeyId)

@@ -14,8 +14,7 @@ helpers.describe("empty tap-hold configuration is neutral", function()
 	end)
 
 	helpers.it("neutral-config: enabling the dynamic master does not import date families", function()
-		local previous = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = { get = function(_, fallback) return fallback end }
+		local restore = require("tests.support.dynamic_hotstrings_fixture").route()
 		local ok, detail = pcall(function()
 			local module = helpers.load_module("modules.dynamic_hotstrings.manager")
 			module.init({ personal_info_path = "/nonexistent/neutral-personal-info.toml" })
@@ -24,7 +23,7 @@ helpers.describe("empty tap-hold configuration is neutral", function()
 				if family.section then helpers.assert_eq(module.is_rule_enabled(nil, family.section), false) end
 			end
 		end)
-		package.loaded["adapters.storage"] = previous
+		restore()
 		assert(ok, detail)
 	end)
 

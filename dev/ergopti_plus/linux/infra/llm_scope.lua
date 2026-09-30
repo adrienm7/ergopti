@@ -71,6 +71,20 @@ function M.new(options)
 		if not owner.pending() then release() end
 		return committed, detail
 	end
+	--- Undoes the last commit under the same quiescent ownership as apply().
+	function owner.revert()
+		if acquired then return false, "AI configuration is already owned" end
+		if not Preferences.acquire(owner) then return false, "AI configuration is already owned" end
+		if not engine.acquire_configuration(owner) then Preferences.release(owner); return false, "AI work is active" end
+		acquired, stopping = true, true
+		local ok, settled = pcall(engine.quiesce_configuration, owner)
+		if not ok or settled ~= true then return false, "AI work cancellation remains pending" end
+		stopping = false
+		local reverted, detail = transaction.revert()
+		if not owner.pending() then release() end
+		return reverted, detail
+	end
+	function owner.release() transaction.release() end
 	function owner.retry_restore()
 		if not acquired then return true end
 		if stopping then
@@ -99,6 +113,16 @@ function M.apply(mode, is_paused)
 	if ok then Logger.success(LOG, "AI preference scope %s completed.", mode)
 	else Logger.error(LOG, "AI preference scope %s refused: %s.", mode, tostring(detail)) end
 	return ok == true
+end
+
+--- The AI participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused()) end,
+		owner = function() return _owner end,
+	})
 end
 
 return M

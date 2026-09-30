@@ -230,18 +230,6 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "llm_num_predictions",
-			"i18n": "menu.llm.num_predictions_label",
-			"disabled_when_off": true,
-			"health_dot": false,
-			"platforms": [
-				"ahk",
-				"hs",
-				"linux"
-			]
-		},
-		{
-			"type": "dynamic",
 			"id": "llm_trigger",
 			"i18n": "menu.llm.trigger_menu_title",
 			"disabled_when_off": true,
@@ -326,6 +314,14 @@
 			"type": "command",
 			"id": "about_releases_page",
 			"i18n": "menu.about.open_releases_page"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "uninstall",
+			"i18n": "menu.global.uninstall"
 		}
 	],
 	"agent_menu": [
@@ -404,12 +400,34 @@
 			]
 		},
 		{
-			"type": "---"
+			"type": "check",
+			"id": "karabiner_integration",
+			"i18n": "menu.global.karabiner_integration",
+			"checked_when": [
+				"karabiner_integration_enabled"
+			],
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
 			"type": "command",
-			"id": "uninstall",
-			"i18n": "menu.global.uninstall"
+			"id": "remove_from_karabiner",
+			"i18n": "menu.global.remove_from_karabiner",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "command",
+			"id": "restore_touchpad_gestures",
+			"i18n": "menu.global.restore_touchpad_gestures",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
 		}
 	],
 	"debug_menu": [
@@ -571,12 +589,16 @@
 		},
 		{
 			"type": "group",
-			"id": "modifier_combos",
-			"i18n": "menu.shortcuts.group_modifiers",
-			"platforms": [
-				"ahk"
+			"id": "key_combinations",
+			"i18n": "menu.shortcuts.key_combinations",
+			"checked_when": [
+				"key_combinations_enabled"
 			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
 			"type": "list",
@@ -609,14 +631,76 @@
 			"id": "extensions_shortcuts"
 		}
 	],
-	"modifier_combos_group": [
+	"key_combinations_group": [
+		{
+			"type": "toggle",
+			"id": "key_combinations_toggle",
+			"i18n": "menu.shortcuts.key_combinations_enable",
+			"checked_when": [
+				"key_combinations_enabled"
+			],
+			"category": "KeyCombinations",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			]
+		},
+		{
+			"type": "check",
+			"id": "combo_symmetric",
+			"i18n": "menu.tapholds.symmetric",
+			"checked_when": [
+				"combo_symmetric"
+			],
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "list",
+			"id": "combo_timings",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "command",
+			"id": "copy_tap_to_combo",
+			"i18n": "menu.tapholds.copy_tap_to_combo",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "key_combination_rows",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
 		{
 			"type": "feature",
 			"path": "shortcuts.alt_gr_lalt",
 			"group_label": "AltGrLAlt",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
 		{
 			"type": "feature",
@@ -624,7 +708,8 @@
 			"group_label": "AltGrCapsLock",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
 		{
 			"type": "feature",
@@ -632,7 +717,8 @@
 			"group_label": "LAltCapsLock",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		}
 	],
 	"metrics_menu": [
@@ -1110,17 +1196,6 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.header_ergopti"
-		},
-		{
-			"type": "list",
-			"id": "hotstring_categories_ergopti"
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "section_header",
 			"i18n": "menu.hotstrings.personal_header"
 		},
 		{
@@ -1260,27 +1335,6 @@
 			"type": "---"
 		},
 		{
-			"type": "check",
-			"id": "circular_spaces",
-			"i18n": "menu.gestures.circular_spaces",
-			"checked_when": [
-				"gesture_space_wrap"
-			],
-			"disabled_when": [
-				"gestures_enabled"
-			],
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
 			"type": "list",
 			"id": "gesture_slots_2",
 			"platforms": [
@@ -1385,15 +1439,6 @@
 			"i18n": "common.clear_to_system"
 		},
 		{
-			"type": "command",
-			"id": "copy_tap_to_combo",
-			"i18n": "menu.tapholds.copy_tap_to_combo",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -1411,30 +1456,23 @@
 			]
 		},
 		{
-			"type": "list",
-			"id": "tap_hold_keys"
+			"type": "section_header",
+			"i18n": "menu.tapholds.left_hand_tap_hold"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
+			"type": "list",
+			"id": "tap_hold_keys_left"
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.tapholds.header_shortcuts",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			"i18n": "menu.tapholds.right_hand_tap_hold"
 		},
 		{
 			"type": "list",
-			"id": "tap_hold_chords",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			"id": "tap_hold_keys_right"
 		},
 		{
 			"type": "---",

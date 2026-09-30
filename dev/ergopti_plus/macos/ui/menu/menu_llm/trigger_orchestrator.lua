@@ -13,8 +13,10 @@
 ---    (set active profile → fire prediction → restore previous profile).
 --- 3. Shortcut Application: normalises raw mods/key pairs via shortcut_ui,
 ---    tears down the old hotkey, and wires up the new one atomically.
---- 4. Getter/Setter Closures: exposes get_trigger_hk / get_profile_hks so
----    startup_controller can reattach hotkeys without holding stale refs.
+--- 4. Getter/Setter Closures: reads get_profile_hks so startup_controller can
+---    reattach hotkeys without holding stale refs.
+--- 5. Profile shortcuts only: a prediction on demand is the
+---    llm_generate_prediction action in a keyboard slot, not a hotkey of its own.
 --- ==============================================================================
 
 local M = {}
@@ -39,12 +41,11 @@ local LOG = "menu_llm.trigger_orchestrator"
 
 --- Creates a new trigger orchestrator bound to the given context.
 --- @param ctx table Required fields: state, keymap, save_prefs, update_menu,
----   get_startup_silence, set_startup_silence, get_trigger_hk, get_profile_hks.
----   The last four are closures into init.lua's locals so the orchestrator
----   never holds stale references to the hotkey objects.
+---   get_profile_hks, set_profile_hk. The last two are closures into
+---   init.lua's locals so the orchestrator never holds stale references to the
+---   hotkey objects.
 --- @return table Instance with: bind_hotkey, activate_hotkey,
----   trigger_prediction_with_profile, apply_llm_shortcut,
----   apply_llm_profile_shortcut.
+---   trigger_prediction_with_profile, apply_llm_profile_shortcut.
 function M.new(ctx)
 	if type(ctx) ~= "table" then
 		Logger.error(LOG, "M.new(): ctx must be a table — module non-functional.")
@@ -55,10 +56,7 @@ function M.new(ctx)
 	local keymap             = ctx.keymap
 	local save_prefs         = ctx.save_prefs
 	local update_menu        = ctx.update_menu
-	local get_startup_silence = ctx.get_startup_silence
-	local get_trigger_hk     = ctx.get_trigger_hk
 	local get_profile_hks    = ctx.get_profile_hks
-	local set_trigger_hk     = ctx.set_trigger_hk
 	local set_profile_hk     = ctx.set_profile_hk
 
 	local inst = {}
@@ -604,39 +602,7 @@ function M.new(ctx)
 		return true
 	end
 
-	--- Tears down or replaces the global LLM trigger as one exact transaction.
-	--- @param mods table|nil Modifier list.
-	--- @param key string|nil Key name.
-	--- @param opts table|nil Optional persistence controls.
-	--- @return boolean committed
-	function inst.apply_llm_shortcut(mods, key, opts)
-		opts = type(opts) == "table" and opts or {}
-		local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
-		local persist = opts.persist ~= false and not get_startup_silence()
-		return apply_shortcut_transition({
-			label = "Primary LLM shortcut",
-			disabled_value = false,
-			get_handle = get_trigger_hk,
-			set_handle = set_trigger_hk,
-			get_preference = function() return state.llm_trigger_shortcut end,
-			set_preference = function(value) state.llm_trigger_shortcut = value end,
-		}, normalized, function()
-			if keymap and type(keymap.trigger_prediction) == "function" then
-				local ok, result = xpcall(keymap.trigger_prediction, debug.traceback, true)
-				if not ok then
-					Logger.error(LOG, "Primary LLM shortcut callback raised: %s.", tostring(result))
-					return false
-				end
-				return result
-			end
-			return false
-		end, {
-			activate = opts.activate ~= false and not get_startup_silence(),
-			persist = persist,
-		})
-	end
-
-	--- Rebuilds both native hotkey sets from an acknowledged preference snapshot.
+	--- Rebuilds the profile hotkey set from an acknowledged preference snapshot.
 	--- @param snapshot table Last committed preference snapshot.
 	--- @return boolean restored
 	function inst.restore_shortcuts(snapshot)
@@ -648,16 +614,6 @@ function M.new(ctx)
 		end
 		if not settle_debts() then return false end
 		local restored = true
-		local trigger = snapshot.llm_trigger_shortcut
-		if type(trigger) == "table" then
-			if inst.apply_llm_shortcut(trigger.mods, trigger.key, {persist = false}) ~= true then
-				restored = false
-			end
-		else
-			if inst.apply_llm_shortcut(nil, nil, {persist = false}) ~= true then
-				restored = false
-			end
-		end
 
 		local desired = type(snapshot.llm_profile_shortcuts) == "table"
 			and snapshot.llm_profile_shortcuts or {}
@@ -845,9 +801,7 @@ function M.new(ctx)
 			if not record or record.handle == nil then return nil end
 			return { mods = clone_value(record.mods), key = record.key, enabled = record.committed == true }
 		end
-		local primary = capture(get_trigger_hk())
-		if primary == nil then return nil end
-		local result = { llm_trigger_shortcut = primary, llm_profile_shortcuts = {} }
+		local result = { llm_profile_shortcuts = {} }
 		for id, handle in pairs(get_profile_hks()) do
 			local entry = capture(handle)
 			if entry == nil then return nil end
@@ -863,11 +817,6 @@ function M.new(ctx)
 	function inst.apply_configuration(snapshot)
 		if type(snapshot) ~= "table" or type(snapshot.llm_profile_shortcuts) ~= "table"
 			or restore_fence > 0 or not settle_debts() then return false end
-		local primary = snapshot.llm_trigger_shortcut
-		if primary ~= false and type(primary) ~= "table" then return false end
-		local options = { persist = false, activate = type(primary) == "table" and primary.enabled ~= false }
-		if inst.apply_llm_shortcut(type(primary) == "table" and primary.mods or nil,
-			type(primary) == "table" and primary.key or nil, options) ~= true then return false end
 		local ids = {}
 		for id in pairs(get_profile_hks()) do ids[id] = true end
 		for id in pairs(snapshot.llm_profile_shortcuts) do ids[id] = true end

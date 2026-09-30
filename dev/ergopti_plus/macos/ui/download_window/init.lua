@@ -352,7 +352,6 @@ local function ensure_webview(title)
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
-				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = false,
 				allow_new_windows = false,
 				usercontent       = controller,
@@ -439,7 +438,9 @@ function M.focus()
 	if not require_active_operation() then return false end
 	local view, session = _wv, _session
 	local ok, focused = Logger.callback(LOG, "Download window focus", function()
-		if type(view.bringToFront) == "function" then view:bringToFront(true) end
+		-- show() orders the window front and makes it key; bringToFront() would
+		-- pin it at a level above every other application instead.
+		view:show()
 		if not operation_is_active() or _wv ~= view or _session ~= session then return false end
 		if type(view.hswindow) == "function" then
 			local win = view:hswindow()

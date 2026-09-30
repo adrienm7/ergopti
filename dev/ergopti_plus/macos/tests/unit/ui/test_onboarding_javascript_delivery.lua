@@ -19,20 +19,20 @@ helpers.describe("onboarding JavaScript delivery", function()
 				package.loaded["infra.i18n"].persist_locale = function() persists = persists + 1; return false end
 				local old_receiver = state.receiver
 				state.refused = true
-				old_receiver({ body = { action = "finish", answers = { locale = "en" } } })
+				old_receiver({ body = { action = "finish", answers = { locale = "en", config_dir = "", operations = {} } } })
 				helpers.assert_eq(persists, 1)
 				helpers.assert_eq(state.deleted, 1)
 				local error_count = #errors
 				old_receiver({ body = { action = "previewLocale", locale = "fr" } })
 				helpers.assert_eq(#evaluations, 0)
 				state.refused = false
-				old_receiver({ body = { action = action, answers = { locale = "en" } } })
+				old_receiver({ body = { action = action, answers = { locale = "en", config_dir = "", operations = {} } } })
 				helpers.assert_eq(state.deleted, 2)
 				helpers.assert_eq(persists, 1, "cleanup must not restart the configuration transaction")
 				helpers.assert_eq(#pending, 0, "cleanup must not schedule a reload")
 				helpers.assert_eq(#errors, error_count)
 				open()
-				old_receiver({ body = { action = action, answers = { locale = "en" } } })
+				old_receiver({ body = { action = action, answers = { locale = "en", config_dir = "", operations = {} } } })
 				helpers.assert_eq(state.deleted, 2, "retired cleanup bridge cannot delete the replacement")
 				helpers.assert_eq(persists, 1)
 			end)
@@ -52,12 +52,12 @@ helpers.describe("onboarding JavaScript delivery", function()
 					dispatch(route, state, pending)
 					helpers.assert_eq(#evaluations, 1)
 					local methods = { previewLocale = "applyStrings", ready = "initData",
-						pickConfigDir = "setConfigDir", loadExistingConfig = "applyExistingAnswers" }
+						pickConfigDir = "setConfigDir", loadExistingConfig = "applyCurrentValues" }
 					helpers.assert_true(evaluations[1].code:find("window." .. methods[route] .. "(", 1, true) ~= nil)
 					if route == "previewLocale" then helpers.assert_eq(state.payload.locale, "fr") end
-					if route == "ready" then helpers.assert_eq(state.payload.answers.locale, "en") end
+					if route == "ready" then helpers.assert_eq(state.payload.locale, "en") end
 					if route == "pickConfigDir" then helpers.assert_eq(state.payload, "/virtual/chosen/") end
-					if route == "loadExistingConfig" then helpers.assert_eq(state.payload.use_metrics, false) end
+					if route == "loadExistingConfig" then helpers.assert_eq(state.payload.request, 1) end
 					if mode == "success" or mode == "async" then
 						helpers.assert_eq(#errors, 0)
 						helpers.assert_type(evaluations[1].done, "function")

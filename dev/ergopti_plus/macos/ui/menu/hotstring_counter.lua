@@ -9,82 +9,25 @@
 --- FEATURES & RATIONALE:
 --- 1. Extracted from builder.lua to make the counting logic unit-testable.
 --- 2. Returns a single structured result consumed by the menu builder.
+--- 3. One source for every count: the sections the keymap registered. The
+---    extension packs used to be counted from a second walk of the bundled
+---    extensions folder that re-read and re-parsed every file, which could
+---    disagree with the loader and never saw the packs of installed layouts or
+---    of the user's folder. They are now counted from the boot's discovery
+---    catalogue and their loaded groups, like every other category.
 --- ==============================================================================
 
 local M = {}
-local hs     = hs
 local Logger = require("infra.logger")
-local fs_dir       = require("infra.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
-local FileSystem = require("adapters.file_system")
-local TomlReader = require("toml_codec.reader")
 local Extensions = require("hotstrings.extensions")
-local _manifest_failures = {}
-local _read_failures = {}
-local _attribute_failures = {}
-
---- Preserves stat's link-following semantics and proves absence before skipping.
---- @param path string Extension pathname.
---- @param category string Fixed inspection boundary.
---- @return table|nil attributes Nil only for proven optional absence.
-local function extension_attributes(path, category)
-	local ok, attributes = pcall(hs.fs.attributes, path)
-	if ok and type(attributes) == "table" then return attributes end
-	-- The classifier requires a basename; retain all dot/symlink components
-	local classification_path = path:gsub("/+$", "")
-	local classified, _, status = pcall(FileSystem.classify_no_follow, classification_path)
-	if classified and status == "absent" then return nil end
-	if not _attribute_failures[category] then
-		_attribute_failures[category] = true
-		Logger.error(LOG, "Extension attribute inspection failed (%s; details withheld; repeats suppressed).", category)
-	end
-	error("Extension attribute inspection failed; hotstring counts were not published", 0)
-end
-
-local function read_extension_file(path, kind)
-	local category = "dependency"
-	local ok, content, status = pcall(FileSystem.read_with_status, path, function(failure)
-		local known = { inspect = true, open = true, read = true, close = true,
-			path_changed = true, identity_changed = true, validation = true }
-		category = known[failure] and failure or "dependency"
-	end)
-	if not ok or status ~= "ok" or type(content) ~= "string" then
-		if ok and status == "absent" then category = "absent" end
-		local key = kind .. ":" .. category
-		if not _read_failures[key] then
-			_read_failures[key] = true
-			Logger.error(LOG, "Extension %s read failed (%s; content withheld; repeats suppressed).", kind, category)
-		end
-		error("Extension file transaction failed; hotstring counts were not published", 0)
-	end
-	return content
-end
-
--- Per-file TOML entry counts, keyed by absolute path.
--- Never cleared on toggle: TOML files do not change at runtime. The counts
--- reflect raw entries in the files, independent of the enabled/disabled state
--- that the menu builder applies when summing visible totals.
-local _count_cache    = {}
-
--- Extension directory metadata (names, paths, per-file counts).
--- Populated once on first use and kept for the session; extensions are
--- installed/removed only on disk changes that require hs.reload() anyway.
-local _ext_meta_cache = nil
-
-local function list_extension_directory(path)
-	local names, listed = fs_dir.try_entries(path)
-	if listed ~= true then error("Extension directory enumeration failed; hotstring counts were not published", 0) end
-	return names
-end
 
 --- Invalidates the hotstring count cache.
---- Preserved for API compatibility (called by save_prefs in init.lua).
---- Both caches are now session-stable: file content does not change on
---- toggles, and extensions are not installed/uninstalled at runtime.
---- A full hs.reload() resets the Lua state and thus implicitly clears them.
+--- Preserved for API compatibility (called by save_prefs in init.lua). Every
+--- count is read from the live keymap sections, so there is nothing to drop.
 function M.invalidate_cache()
-	-- Intentionally left empty: caches are stable for the session lifetime.
+	-- Intentionally left empty: counts are recomputed from live sections.
 end
 
 
@@ -107,60 +50,65 @@ end
 
 
 
--- =====================================
--- =====================================
+-- ======================================
+-- ======================================
 -- ======= 2/ Extension Counting ========
--- =====================================
--- =====================================
+-- ======================================
+-- ======================================
 
---- Counts canonical entries from the validated file snapshot.
---- @param path string Absolute path to the TOML file.
---- @return number total Total hotstring count.
---- @return table sections List of { name, count } per section.
-local function count_toml_hotstrings(path)
-	if _count_cache[path] then return _count_cache[path].total, _count_cache[path].sections end
-
-	local total = 0
-	local sections = {}
-	local content = read_extension_file(path, "hotstrings")
-	local parsed, committed = TomlReader.parse_text(content)
-	if not committed then
-		if not _read_failures.semantic then
-			_read_failures.semantic = true
-			Logger.error(LOG, "Extension TOML semantic parse failed (content withheld; repeats suppressed).")
-		end
-		error("Extension TOML semantic parse failed; hotstring counts were not published", 0)
-	end
-	local seen = {}
-	for _, name in ipairs(parsed.sections_order) do
-		local section = parsed.sections[name]
-		if section and not section.is_placeholder and not seen[name] then
-			seen[name] = true
-			local count = #section.entries
-			table.insert(sections, { name = name, count = count })
-			total = total + count
+--- Sums the enabled sections of one registered group.
+--- @param keymap table Keymap owner (get_sections, is_group_enabled, is_section_enabled).
+--- @param name string Group name.
+--- @return number total Entries of the enabled sections; 0 when the group is off.
+--- @return boolean active Whether at least one section is enabled.
+local function active_group_total(keymap, name)
+	local secs = keymap.get_sections(name)
+	local group_on = type(keymap.is_group_enabled) ~= "function" or keymap.is_group_enabled(name)
+	local total, active = 0, false
+	for _, sec in ipairs(type(secs) == "table" and secs or {}) do
+		if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder and sec.count ~= nil
+			and group_on
+			and (type(keymap.is_section_enabled) ~= "function" or keymap.is_section_enabled(name, sec.name)) then
+			total, active = total + tonumber(sec.count), true
 		end
 	end
-
-	_count_cache[path] = { total = total, sections = sections }
-	return total, sections
+	return total, active
 end
 
---- Reads the extension display name from its manifest.toml.
---- @param manifest_path string Absolute path to the manifest.toml file.
---- @return string|nil Parsed name, or nil if unavailable.
-local function read_ext_name(manifest_path)
-	local content = read_extension_file(manifest_path, "manifest")
-	local parsed, name = pcall(Extensions.parse_name, content)
-	if not parsed then
-		if not _manifest_failures[manifest_path] then
-			_manifest_failures[manifest_path] = true
-			Logger.error(LOG, "Extension manifest parsing failed; counts were not published (content withheld).")
-		end
-		error("Extension manifest parsing failed; hotstring counts were not published", 0)
+--- Counts the discovered extension packs from their registered groups.
+--- @param ctx table Menu context carrying `extension_packs` and `keymap`.
+--- @param group_counts table Per-group counts, filled for every pack group.
+--- @return number total, boolean has_count, table details
+local function count_extensions(ctx, group_counts)
+	-- A partial context without the catalogue counts no extension, as one
+	-- without hotfiles counts no category; the boot always supplies it.
+	local packs = type(ctx) == "table" and ctx.extension_packs or nil
+	if packs == nil then return 0, false, {} end
+	if type(packs) ~= "table" then
+		error("The menu context carries a malformed extension catalogue", 0)
 	end
-	_manifest_failures[manifest_path] = nil
-	return name
+	local total, has_count, details = 0, false, {}
+	for _, pack in ipairs(packs) do
+		-- A pack made only of bound geometry files supplies bundled categories
+		-- and has no group of its own to list here.
+		if #pack.toml_files > 0 then
+			local detail = { id = pack.id, name = pack.name, total = 0, groups = {} }
+			for _, file in ipairs(pack.toml_files) do
+				local name = Extensions.category_key(pack.id, file.stem)
+				local group_total, active = 0, false
+				if ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+					group_total, active = active_group_total(ctx.keymap, name)
+				end
+				group_counts[name] = group_total
+				detail.groups[#detail.groups + 1] = name
+				detail.total = detail.total + group_total
+				has_count = has_count or active
+			end
+			total = total + detail.total
+			details[#details + 1] = detail
+		end
+	end
+	return total, has_count, details
 end
 
 
@@ -173,11 +121,12 @@ end
 -- ==================================
 
 --- Counts all hotstrings across standard, ergopti, personal, and extension groups.
---- @param ctx table Menu context (hotfiles, keymap, get_group_name, base_dir).
+--- @param ctx table Menu context (hotfiles, keymap, get_group_name, extension_packs).
 --- @param ergopti_groups table<string,boolean> Set of group names specific to Ergopti layout.
---- @return table Counts: { common, ergopti, personal, ext, grand, has_common, has_ergopti, has_personal, has_ext, group_counts }.
+--- @return table Counts: { common, ergopti, personal, ext, ext_details, grand, has_common,
+---   has_ergopti, has_personal, has_ext, has_grand, group_counts }; each ext_details entry
+---   is { id, name, total, groups } with groups the pack's registered group names.
 function M.count_all(ctx, ergopti_groups)
-	local fmt_grand = M.fmt_grand
 	local group_counts = {}
 
 	-- Count hotstrings for common groups split into "communs" and "ergopti"
@@ -191,7 +140,9 @@ function M.count_all(ctx, ergopti_groups)
 			and ctx.keymap.is_group_enabled or nil
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
+			-- Extension packs are counted apart, under their extension, below.
+			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+				and not Extensions.parse_category_key(name) then
 				local secs = ctx.keymap.get_sections(name)
 				-- A gated-off group contributes 0 (the menu shows active hotstrings,
 				-- not "what would reactivate") — mirrors the per-section rule below.
@@ -267,80 +218,7 @@ function M.count_all(ctx, ergopti_groups)
 	local grand_total     = common_total + ergopti_total + personal_total
 	local grand_has_count = common_has_count or ergopti_has_count or personal_has_count
 
-	-- Count extension hotstrings
-	local ext_total, ext_has_count = 0, false
-	local ext_details = {}
-
-	if _ext_meta_cache then
-		ext_total     = _ext_meta_cache.total
-		ext_has_count = _ext_meta_cache.has_count
-		ext_details   = _ext_meta_cache.details
-	else
-		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
-		local attr = ext_root and extension_attributes(ext_root, "root")
-		if type(attr) == "table" and attr.mode == "directory" then
-			local ext_ids = {}
-			for _, fname in ipairs(list_extension_directory(ext_root)) do
-				if fname ~= "." and fname ~= ".." then
-					local fpath = ext_root .. fname
-					local a2 = extension_attributes(fpath, "child")
-					if type(a2) == "table" and a2.mode == "directory" then
-						table.insert(ext_ids, fname)
-					end
-				end
-			end
-			table.sort(ext_ids)
-
-			for _, ext_id in ipairs(ext_ids) do
-				local ext_dir    = ext_root .. ext_id .. "/"
-				local hs_dir     = ext_dir .. "hotstrings/"
-				local manifest   = ext_dir .. "manifest.toml"
-				local am = extension_attributes(manifest, "manifest")
-				if not (type(am) == "table" and am.mode == "file") then goto continue_ext end
-
-				local ahd = extension_attributes(hs_dir, "hotstrings")
-				if not (type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
-
-				local toml_stems = {}
-				for _, fname in ipairs(list_extension_directory(hs_dir)) do
-					if fname:match("%.toml$") and not fname:match("^_") then
-						local stem = fname:match("^(.-)%.toml$")
-						if stem and stem ~= "" then table.insert(toml_stems, stem) end
-					end
-				end
-				table.sort(toml_stems)
-
-				local ext_name = read_ext_name(manifest) or ext_id
-				local ext_hs_total = 0
-				local ext_files = {}
-
-				for _, stem in ipairs(toml_stems) do
-					local toml_path = hs_dir .. stem .. ".toml"
-					local total, sections = count_toml_hotstrings(toml_path)
-					ext_hs_total = ext_hs_total + total
-					table.insert(ext_files, {
-						stem     = stem,
-						path     = toml_path,
-						total    = total,
-						sections = sections
-					})
-				end
-
-				if ext_hs_total > 0 then
-					ext_has_count = true
-					table.insert(ext_details, {
-						id    = ext_id,
-						name  = ext_name,
-						total = ext_hs_total,
-						files = ext_files
-					})
-				end
-				ext_total = ext_total + ext_hs_total
-				::continue_ext::
-			end
-		end
-		_ext_meta_cache = { total = ext_total, has_count = ext_has_count, details = ext_details }
-	end
+	local ext_total, ext_has_count, ext_details = count_extensions(ctx, group_counts)
 
 	Logger.debug(LOG, "Counted: common=%d ergopti=%d personal=%d ext=%d.", common_total, ergopti_total, personal_total, ext_total)
 

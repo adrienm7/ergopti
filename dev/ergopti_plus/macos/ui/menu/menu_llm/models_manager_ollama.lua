@@ -1695,7 +1695,7 @@ function M.new(deps, presets, ram_getter)
 			end
 			return false
 		end
-		pcall(hs.urlevent.openURL, "https://ollama.com/download")
+		pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
 		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
 		return false
 	end

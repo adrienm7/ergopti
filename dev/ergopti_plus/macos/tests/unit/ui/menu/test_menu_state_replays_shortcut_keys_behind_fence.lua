@@ -22,6 +22,18 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 local DISABLED_ID = "ctrl_d"
+-- A registered binding with a raw factory the fixture can make refuse.
+local REFUSED_ID = "layer_scroll"
+
+-- A config.toml written by an older build: at_hash was removed from the
+-- binding registry and the manifest, and retired_off never existed.
+local OUTDATED_KEYS = table.concat({
+	"[shortcuts.keys]",
+	"at_hash = true",
+	DISABLED_ID .. " = false",
+	"retired_off = false",
+	"",
+}, "\n")
 
 -- menu_state requires these transitively; require() publishes them directly to
 -- the cache, so they are owned here to keep the suite order-independent.
@@ -87,18 +99,63 @@ end
 helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut-preference-vs-binding)", function()
 	helpers.it("reports a refused enable without replacing its saved preference (shortcut-replay-refusal)", function()
 		Fixture.with_bindings(function(bindings, ctx)
+			-- A REGISTERED binding whose native factory refuses: the fail-closed
+			-- contract of a real refusal. at_hash used to stand here, but it is no
+			-- longer registered, so the case pinned an unknown id instead.
 			helpers.assert_eq(bindings.start(), true)
-			helpers.assert_eq(bindings.disable("at_hash"), true)
-			ctx.refuse.at_hash = true
-			local committed, report = sync(bindings, true, { at_hash = true })
+			helpers.assert_eq(bindings.disable(REFUSED_ID), true)
+			ctx.refuse[REFUSED_ID] = true
+			local committed, report = sync(bindings, true, { [REFUSED_ID] = true })
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(#report.failures, 1)
 			helpers.assert_eq(report.demotions, {
-				{ feature = "shortcuts", key = "shortcut_keys", subkey = "at_hash",
+				{ feature = "shortcuts", key = "shortcut_keys", subkey = REFUSED_ID,
 					persisted = true, demoted = false },
 			})
 			helpers.assert_eq(#report.unsettled, 0)
-			helpers.assert_eq(bindings.is_enabled("at_hash"), false)
+			helpers.assert_eq(bindings.is_enabled(REFUSED_ID), false)
+			helpers.assert_true(#ctx.errors > 0, "a real native refusal stays an ERROR")
+		end)
+	end)
+
+	helpers.it("warns once about a removed saved key and never refuses the boot (config-outdated-at-hash)", function()
+		helpers.with_fresh_modules({ "logger.shim", "config_outdated", "infra.preferences" }, function()
+		Fixture.with_bindings(function(bindings, ctx)
+			local warnings = {}
+			local shim = helpers.make_logger_stub()
+			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+			shim.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
+			package.loaded["logger.shim"] = shim
+			helpers.load_with_stubs("config_outdated")
+			local Preferences = helpers.load_with_stubs("infra.preferences")
+			local decoded = require("toml_codec").decode(OUTDATED_KEYS)
+
+			-- The loader is the gate: the removed id never reaches the replay.
+			local saved = Preferences.flatten_document(decoded)
+			helpers.assert_eq(saved.shortcut_keys, { [DISABLED_ID] = false })
+			helpers.assert_eq(bindings.start(), true)
+			local committed, report = sync(bindings, true, saved.shortcut_keys)
+			helpers.assert_eq(committed, true, "an outdated key must not fail the boot sync")
+			helpers.assert_eq(#report.failures, 0)
+			helpers.assert_eq(report.demotions, {})
+			helpers.assert_eq(#ctx.errors, 0, table.concat(ctx.errors, " | "))
+			helpers.assert_eq(bindings.is_enabled(DISABLED_ID), false)
+
+			-- One WARNING per outdated entry, however often the file is read.
+			Preferences.flatten_document(require("toml_codec").decode(OUTDATED_KEYS))
+			table.sort(warnings)
+			helpers.assert_eq(#warnings, 2, table.concat(warnings, " | "))
+			helpers.assert_true(warnings[1]:find("'shortcuts.keys.at_hash'", 1, true) ~= nil, warnings[1])
+			helpers.assert_true(warnings[1]:find("offered for cleanup", 1, true) ~= nil, warnings[1])
+			helpers.assert_true(warnings[2]:find("'shortcuts.keys.retired_off'", 1, true) ~= nil, warnings[2])
+
+			-- Warned is offered: the cleanup lists exactly the outdated entries.
+			local scan = require("config_unused_keys").find_in_source(OUTDATED_KEYS, Preferences.mark_config_reads)
+			local offered = {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "shortcuts.keys.at_hash", "shortcuts.keys.retired_off" })
+		end)
 		end)
 	end)
 

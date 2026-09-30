@@ -123,7 +123,7 @@ _L4R_InstalledDiscovery() {
 	try {
 		LocalDir := LayoutRegistry_LocalDir(Directory)
 		Assert(_LCT_Install("ergol", LocalDir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())[1])
-		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled")
+		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", Directory . "missing-registry\")
 		AssertEqual(Roots.Length, 3, "bundled, committed generation, user root")
 		Target := ManifestBuildFeaturesMap()
 		Packs := HotstringExtensions_Prepare(Target, Roots)
@@ -131,7 +131,7 @@ _L4R_InstalledDiscovery() {
 		AssertEqual(Packs[1].id, "ergol")
 		AssertEqual(HotstringExtensions_RegistrationPlan(Target, Packs, true).Length, 0)
 		Assert(LayoutCatalogue_Uninstall("ergol", LocalDir)["ok"])
-		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled")
+		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", Directory . "missing-registry\")
 		AssertEqual(HotstringExtensions_Prepare(ManifestBuildFeaturesMap(), Roots).Length, 0,
 			"an unpublished generation left on disk is never discovered")
 	} finally DirDelete(Directory, true)

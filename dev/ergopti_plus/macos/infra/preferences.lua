@@ -36,6 +36,7 @@ local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
 local LOG       = "preferences"
 
 
@@ -53,7 +54,6 @@ local KEY_MAP = {
 	-- ── Gestures ──────────────────────────────────────────────────────────
 	-- Gesture slot scalars are merged into [gestures] via NESTED_KEY_MAP.
 	gestures                             = { sec = "gestures",   key = "enabled"                      },
-	gesture_space_wrap                   = { sec = "gestures",   key = "space_wrap"                   },
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
@@ -98,7 +98,6 @@ local KEY_MAP = {
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
-	llm_trigger_shortcut                 = { sec = "llm", path = "trigger", key = "shortcut"       },
 	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
@@ -181,6 +180,124 @@ local NESTED_KEY_MAP = {
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
 }
 
+--- Nested tables whose every child is a manifest-declared setting. A child the
+--- manifest no longer declares, or whose value it no longer accepts (the
+--- removed at_hash hotkey under [shortcuts.keys]), is outdated: it never
+--- reaches the state, so no replay can refuse it, and the shared rule warns
+--- once and leaves it for the config cleanup.
+local MANIFEST_CHILD_TABLES = {
+	shortcut_keys            = true,
+	script_control_shortcuts = true,
+	gesture_modes            = true,
+	gesture_sensitivities    = true,
+}
+
+--- Whether a persisted action id names an action this build no longer runs.
+--- The gesture action catalogue judges it once the gesture module has loaded
+--- it, which boot does before loading preferences; without it nothing can be
+--- proved retired. It is never loaded from here: its initialization belongs
+--- to its owner, not to a configuration reader.
+--- @param value any Persisted action id.
+--- @return boolean retired
+--- @return string|nil detail
+function M.action_is_retired(value)
+	if value == "none" then return false end
+	if type(value) ~= "string" then return true, "the value is not an action id" end
+	local catalogue = package.loaded["modules.gestures.actions"]
+	if type(catalogue) ~= "table" or type(catalogue.is_assignable) ~= "function" then return false end
+	if catalogue.is_assignable(value) == true then return false end
+	return true, "action '" .. value .. "' no longer exists"
+end
+
+--- Value rules of owners that accept more than the manifest's Lua type. The
+--- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
+--- edit or an AHK migration can persist "4.5"), so a numeric string is a value
+--- it applies, not an outdated one. A script-control slot takes an action id
+--- the catalogue still offers.
+local OWNER_VALUE_RULES = {
+	gesture_sensitivities = function(value)
+		local number = tonumber(value)
+		if type(number) == "number" and number > 0 then return true end
+		return false, "the value is not a positive number"
+	end,
+	script_control_shortcuts = function(value)
+		local retired, detail = M.action_is_retired(value)
+		return not retired, detail
+	end,
+}
+
+--- Whether a manifest-declared child of a nested table still holds a value
+--- this build accepts.
+--- @param nested_fk string Flat key of the nested table.
+--- @param path string Canonical dotted path of the child.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail Why the child is outdated.
+local function manifest_child_fits(nested_fk, path, value)
+	return ConfigOutdated.manifest_value_fits(Manifest.find_entry_by_path(path), value, "hs",
+		OWNER_VALUE_RULES[nested_fk])
+end
+
+-- Built-in terminator keys, from the generated catalogue the registry loads.
+local BUILTIN_TERMINATORS = {}
+for _, def in ipairs(require("keymap.terminators_catalogue")) do
+	if type(def.key) == "string" then BUILTIN_TERMINATORS[def.key] = true end
+end
+
+--- Builds the owner check of [hotstrings.terminator_states]: a state belongs to
+--- a built-in terminator or to a custom one the same file still defines.
+--- @param document table Decoded config.toml.
+--- @return function is_known `is_known(key, enabled)`.
+local function terminator_state_owner(document)
+	local custom = {}
+	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
+	local defs = type(hotstrings.terminators) == "table" and hotstrings.terminators or {}
+	for _, def in ipairs(defs) do
+		if type(def) == "table" and type(def.key) == "string" then custom[def.key] = true end
+	end
+	return function(key, enabled)
+		if not BUILTIN_TERMINATORS[key] and not custom[key] then
+			return false, "no built-in or custom delimiter has this key"
+		end
+		if type(enabled) ~= "boolean" then return false, "the value is not a boolean" end
+		return true
+	end
+end
+
+--- Owner check of one [hotstrings.groups] or [hotstrings.modules.<id>] choice:
+--- the hotstring projection applies true or false only.
+--- @param _ string Choice id.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function boolean_choice(_, value)
+	if type(value) == "boolean" then return true end
+	return false, "a hotstring choice takes true or false"
+end
+
+--- Partitions [hotstrings.modules]: each child is one category's table of
+--- section choices. A child of another shape (an older build's
+--- `magickey = true`) is outdated as a whole; inside a table, each section
+--- choice is kept only when it is a boolean.
+--- @param prefix table Path segments of the modules table.
+--- @param modules table Persisted children.
+--- @param mark function|nil Cleanup mark(...segments).
+--- @return table kept Well-formed section choices, by category.
+local function partition_section_choices(prefix, modules, mark)
+	local kept = {}
+	for id, sections in pairs(modules) do
+		local path = { prefix[1], prefix[2], id }
+		if type(id) ~= "string" or id == "" then
+			ConfigOutdated.report(path, "not a text key")
+		elseif type(sections) ~= "table" or #sections > 0 then
+			ConfigOutdated.report(path, "section choices are not a table")
+		else
+			kept[id] = ConfigOutdated.partition(path, sections, boolean_choice, mark)
+		end
+	end
+	return kept
+end
+
 --- Set of known top-level section names for fast lookup.
 local _known_sections = {}
 for _, s in ipairs(SECTIONS) do _known_sections[s] = true end
@@ -222,6 +339,20 @@ local function scalar_units(spec, value, reading)
 	local result = reading and value / spec.units_per_state or value * spec.units_per_state
 	assert(result < math.huge, "configuration duration overflows its canonical units")
 	return result
+end
+
+--- Whether a persisted value can cross its unit boundary (scalar_units asserts
+--- the same rule on every conversion).
+--- @param spec table|nil Scalar ownership declaration.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function persisted_units_fit(spec, value)
+	if not spec or not spec.units_per_state then return true end
+	if type(value) ~= "number" or value ~= value or value < 0 or value >= math.huge then
+		return false, "the value is not a finite non-negative number"
+	end
+	return true
 end
 
 --- Resolves canonical defaults/operations into the units used by their native owner.
@@ -367,6 +498,18 @@ local function flatten_from_disk(grouped, mark)
 	local function take(...)
 		if mark then mark(...) end
 	end
+	--- Takes one owned value, unless it cannot cross its unit boundary: such a
+	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
+	--- the whole file load as corrupt.
+	local function take_value(flat_key, value, ...)
+		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
+		if not fits then
+			ConfigOutdated.report({ ... }, detail)
+			return
+		end
+		flat[flat_key] = value
+		take(...)
+	end
 
 	for sec_name, sec_val in pairs(grouped) do
 		if _known_sections[sec_name] and type(sec_val) == "table" then
@@ -380,8 +523,7 @@ local function flatten_from_disk(grouped, mark)
 					-- the sub-path branch which iterates inner keys and finds nothing.
 					local top_scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key]
 					if top_scalar_fk then
-						flat[top_scalar_fk] = disk_val
-						take(sec_name, disk_key)
+						take_value(top_scalar_fk, disk_val, sec_name, disk_key)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
@@ -391,14 +533,28 @@ local function flatten_from_disk(grouped, mark)
 						for inner_key, inner_val in pairs(disk_val) do
 							local scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key .. "." .. inner_key]
 							if scalar_fk then
-								flat[scalar_fk] = inner_val
-								take(sec_name, disk_key, inner_key)
+								take_value(scalar_fk, inner_val, sec_name, disk_key, inner_key)
 							else
 								owned[inner_key] = inner_val
 							end
 						end
-						flat[nested_fk] = owned
-						take(sec_name, disk_key)
+						if MANIFEST_CHILD_TABLES[nested_fk] then
+							local prefix = sec_name .. "." .. disk_key .. "."
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								function(id, value) return manifest_child_fits(nested_fk, prefix .. id, value) end, mark)
+						elseif nested_fk == "terminator_states" then
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								terminator_state_owner(grouped), mark)
+						elseif nested_fk == "hotstrings" then
+							-- The hotstring projection asserts booleans: an old-shape
+							-- choice reaching it failed the boot hotstrings sync.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								boolean_choice, mark)
+						elseif nested_fk == "section_states" then
+							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
+						else
+							take_value(nested_fk, owned, sec_name, disk_key)
+						end
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
@@ -415,22 +571,19 @@ local function flatten_from_disk(grouped, mark)
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup] or _reverse_nested[lookup]
 									if fk then
-										flat[fk] = inner_val
-										take(sec_name, disk_key, inner_key)
+										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									end
 								else
-									-- Structured scalar (e.g. llm.trigger.shortcut = {mods,key})
+									-- Structured scalar (a table value mapped to one flat key)
 									-- or depth-3 nested maps (hotstrings.editor.*).
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup]
 									if fk then
-										flat[fk] = inner_val
-										take(sec_name, disk_key, inner_key)
+										take_value(fk, inner_val, sec_name, disk_key, inner_key)
 									else
 										local nfk = _reverse_nested[lookup]
 										if nfk then
-											flat[nfk] = inner_val
-											take(sec_name, disk_key, inner_key)
+											take_value(nfk, inner_val, sec_name, disk_key, inner_key)
 										end
 									end
 								end
@@ -438,8 +591,7 @@ local function flatten_from_disk(grouped, mark)
 								local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 								local fk     = _reverse_scalar[lookup]
 								if fk then
-									flat[fk] = inner_val
-									take(sec_name, disk_key, inner_key)
+									take_value(fk, inner_val, sec_name, disk_key, inner_key)
 								end
 							end
 						end
@@ -447,27 +599,36 @@ local function flatten_from_disk(grouped, mark)
 				else
 					-- Scalar value
 					if sec_name == "gestures" and disk_key ~= "enabled" then
-						-- Check the reverse map first: keys like space_wrap have a flat
-						-- state entry (gesture_space_wrap) via KEY_MAP and must not be
-						-- merged into gesture_actions — that would create a phantom slot
-						-- and leave the real state key un-restored on reload.
+						-- Check the reverse map first: a [gestures] scalar with its own
+						-- flat state entry in KEY_MAP must not be merged into
+						-- gesture_actions — that would create a phantom slot and leave
+						-- the real state key un-restored on reload.
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
 						if fk then
-							flat[fk] = disk_val
-							take(sec_name, disk_key)
+							take_value(fk, disk_val, sec_name, disk_key)
 						elseif Manifest.has_default("gestures." .. disk_key) then
-							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
-							if not flat.gesture_actions then flat.gesture_actions = {} end
-							flat.gesture_actions[disk_key] = disk_val
-							take(sec_name, disk_key)
+							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures].
+							-- A retired action is outdated: warned once and left for the
+							-- cleanup, instead of a refused set_action at every load.
+							local retired, detail = M.action_is_retired(disk_val)
+							if retired then
+								ConfigOutdated.report({ sec_name, disk_key }, detail)
+							else
+								if not flat.gesture_actions then flat.gesture_actions = {} end
+								flat.gesture_actions[disk_key] = disk_val
+								take(sec_name, disk_key)
+							end
 						end
 					else
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
 						if fk then
-							flat[fk] = disk_val
-							take(sec_name, disk_key)
+							take_value(fk, disk_val, sec_name, disk_key)
+						elseif _reverse_nested[lookup] then
+							-- A scalar where this build keeps a table of settings
+							-- (an older build's `groups = "…"`): nothing reads it.
+							ConfigOutdated.report({ sec_name, disk_key }, "a table of settings is expected here")
 						end
 					end
 				end
@@ -678,6 +839,16 @@ end
 function M.mark_config_reads(decoded, mark)
 	if type(mark) ~= "function" then error("Preferences.mark_config_reads needs a mark function", 2) end
 	flatten_from_disk(decoded, mark)
+end
+
+--- Flattens a decoded config.toml into menu-state keys through the walk load()
+--- uses, so a scope applies exactly what the next boot would read. Table values
+--- alias the decoded document, which the caller must not reuse.
+--- @param decoded table Decoded config.toml.
+--- @return table flat Flat preferences.
+function M.flatten_document(decoded)
+	if type(decoded) ~= "table" then error("Preferences.flatten_document needs a decoded document", 2) end
+	return flatten_from_disk(decoded)
 end
 
 --- Moves the save baseline past an unused-key cleanup. The cleanup removes
@@ -968,11 +1139,6 @@ function M.snapshot(state, hotfiles, core_mods)
 		(gestures and type(gestures.get_all_action_parameters) == "function")
 			and gestures.get_all_action_parameters() or {}
 	)
-	if gestures and type(gestures.get_space_wrap) == "function" then
-		existing.gesture_space_wrap = gestures.get_space_wrap()
-	else
-		existing.gesture_space_wrap = true
-	end
 
 	existing.shortcut_keys = {}
 	local shortcuts_mod = core_mods.shortcuts_mod

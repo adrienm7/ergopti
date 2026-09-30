@@ -13,7 +13,10 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu preference call sites fail closed", function()
 	helpers.it("guards every save_prefs call with exact success", function()
-		local source = helpers.read_driver_source("save_prefs(")
+		-- Every file that names the writer, not only those spelling a direct call:
+		-- a file whose only writes are xpcall(ctx.save_prefs, ...) has no
+		-- "save_prefs(" and would otherwise leave the scan unseen.
+		local source = helpers.read_driver_source("save_prefs")
 		helpers.assert_type(source, "string")
 		source = source:gsub("%-%-%[%[.-%]%]", ""):gsub("%-%-[^\n]*", "")
 
@@ -54,7 +57,8 @@ helpers.describe("menu preference call sites fail closed", function()
 		-- conservative floor high enough to reject token samples while tracking the
 		-- current direct-call class rather than its pre-refactor cardinality.
 		helpers.assert_true(calls >= 59,
-			"the class scan must enumerate the consolidated sibling set, not a token sample")
+			"the class scan must enumerate the consolidated sibling set, not a token sample (found "
+				.. calls .. ")")
 		helpers.assert_eq(guarded, calls,
 			"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
 				.. table.concat(unguarded, " | "))

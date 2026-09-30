@@ -32,7 +32,7 @@ function M.new(ctx)
 		llm_model_ollama = "llm_model_ollama", llm_active_profile = "active_profile_id",
 		llm_user_profiles = "user_profiles" }
 	local preference_only = { llm_user_models = true, llm_arrow_nav_enabled = true,
-		llm_trigger_shortcut = true, llm_enabled = true }
+		llm_enabled = true }
 	for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do
 		local path = row.section .. "." .. row.key
 		local key = assert(Preferences.flat_key_for(path), "LLM preference owner missing: " .. path)
@@ -124,8 +124,7 @@ function M.new(ctx)
 		values.llm_display_model_name = { value = ctx.display_model(model) }
 		values.llm_backend_name = { value = ctx.backend_label(configuration.backend) }
 		local enabled = active.enabled and desired.llm_enabled == true
-		local shortcuts = { llm_trigger_shortcut = clone(desired.llm_trigger_shortcut),
-			llm_profile_shortcuts = clone(active.shortcuts.llm_profile_shortcuts) }
+		local shortcuts = { llm_profile_shortcuts = clone(active.shortcuts.llm_profile_shortcuts) }
 		for id in pairs(profile_resets) do shortcuts.llm_profile_shortcuts[id] = nil end
 		if not apply_native(configuration, values, shortcuts, enabled) then return false end
 		for _, key in pairs(fields) do state[key] = clone(desired[key]) end

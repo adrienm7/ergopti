@@ -144,14 +144,54 @@ helpers.describe("Linux terminal shortcut scope", function()
 		end)
 	end)
 
-	helpers.it("rejects malformed owned values before backup without losing admission", function()
+	helpers.it("clears an outdated owned value instead of refusing (config-outdated-shortcuts)", function()
+		-- An old-shape or retired slot value is outdated configuration: the
+		-- reset that would remove it must never be refused because of it.
 		with_scope(function(scope, owners, controls, path)
 			local malformed = SOURCE:gsub('ctrl_j = "open_url"', 'ctrl_j = false')
 			Sandbox.write_bytes(path, malformed)
-			helpers.assert_eq(scope.apply("clear"), false)
-			helpers.assert_eq(Sandbox.read_bytes(path), malformed)
-			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(scope.apply("clear"), true)
+			helpers.assert_true(not Sandbox.read_bytes(path):find("ctrl_j = false", 1, true),
+				"the clear removes the outdated value")
+			helpers.assert_eq(#controls.backups, 1)
 			helpers.assert_true(owners.manager.configuration_admitted())
+		end)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("resets over a plain keyboard or tap_keys value instead of refusing: " .. mode
+			.. " (config-outdated-shortcut-shape)", function()
+			-- The candidate readers asserted a table, so a value an older build
+			-- left as `keyboard = "…"` refused Restore recommended and Clear.
+			with_scope(function(scope, owners, _, path)
+				local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
+				Sandbox.write_bytes(path, stale)
+				local ok, committed = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
+				helpers.assert_true(ok, tostring(committed))
+				helpers.assert_eq(scope.apply(mode), true)
+				helpers.assert_true(owners.manager.configuration_admitted())
+			end)
+		end)
+	end
+
+	helpers.it("refuses a reset whose own written action is unassignable (config-outdated-strict-candidate)", function()
+		-- Tolerance is for the user's pre-write values. After the write every
+		-- walked slot is the scope's own output, so an unassignable one there is
+		-- a real failure: the reset must be refused and compensated, never
+		-- committed with the slot silently unbound.
+		with_scope(function(scope, owners, _, path)
+			local refused = Manifest.recommended_for("shortcuts.keyboard.ctrl_g")
+			helpers.assert_true(refused ~= "none", "the fixture needs a recommended keyboard action")
+			local is_assignable = owners.gestures.is_assignable
+			owners.gestures.is_assignable = function(action)
+				if action == refused then return false end
+				return is_assignable(action)
+			end
+			local ok, committed = pcall(scope.apply, "recommended")
+			owners.gestures.is_assignable = is_assignable
+			helpers.assert_true(ok, tostring(committed))
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE, "the refused reset is compensated")
 		end)
 	end)
 
@@ -335,4 +375,21 @@ helpers.describe("Linux terminal shortcut scope", function()
 			end)
 		end)
 	end
+end)
+
+helpers.describe("Linux terminal shortcut scope revert", function()
+	helpers.it("reverts a committed clear under the same dispatch ownership", function()
+		with_scope(function(scope, owners, _, path, backup)
+			local before = Sandbox.read_bytes(path)
+			helpers.assert_true(scope.apply("clear"))
+			helpers.assert_eq(owners.manager.is_enabled(), false)
+			local reverted, detail = scope.revert()
+			helpers.assert_eq(reverted, true, detail)
+			helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(owners.manager.is_enabled(), true)
+			helpers.assert_eq(scope.pending(), false)
+			os.remove(backup)
+			helpers.assert_true(scope.apply("clear"), "every dispatch port is released after a revert")
+		end)
+	end)
 end)

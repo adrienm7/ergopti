@@ -60,6 +60,7 @@ local function remap_double(observed)
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		get_tap_holds_enabled = function() return observed.tapholds end,
+		get_mod_combos_enabled = function() return observed.tapholds end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "none" end,
 		get_hold_action = function() return "none" end,
@@ -85,7 +86,6 @@ local function gestures_double(observed)
 		get_action_parameter = function() return nil end,
 		get_mode = function() return "single" end,
 		get_sensitivity = function() return 1 end,
-		get_space_wrap = function() return false end,
 		enable_all = function() observed.gesture_calls[#observed.gesture_calls + 1] = "enable"; return true end,
 		disable_all = function() observed.gesture_calls[#observed.gesture_calls + 1] = "disable"; return true end,
 	}
@@ -237,6 +237,28 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 					and line:find("both an `action`", 1, true) == nil,
 					"the renderer reported an unreachable control: " .. line)
 			end
+		end)
+	end
+
+	-- The key combinations left the Tap-Holds submenu for a group under
+	-- Shortcuts that opens with a switch of its own, and whose title is ticked
+	-- while that switch is on.
+	for _, posture in ipairs({ true, false }) do
+		helpers.it("opens « Combinaisons de touches » with its own switch, ticked " .. tostring(posture), function()
+			local tray = build_tray(posture)
+			local i18n = require("infra.i18n")
+			local group = nil
+			for _, row in ipairs(top_row(tray, "menu.shortcuts.title").menu or {}) do
+				if row.title == i18n.get("menu.shortcuts.key_combinations") then group = row end
+			end
+			helpers.assert_not_nil(group, "the Shortcuts submenu holds the key-combinations group")
+			helpers.assert_eq(group.checked == true, posture, "the group title shows its switch")
+			local first = type(group.menu) == "table" and group.menu[1] or nil
+			helpers.assert_true(first ~= nil, "the group is not empty")
+			helpers.assert_eq(first.title, i18n.get("menu.shortcuts.key_combinations_enable"),
+				"the group opens with its own switch")
+			helpers.assert_eq(type(first.fn), "function", "the switch is clickable")
+			helpers.assert_eq(first.checked, posture, "the switch is a checkbox showing the state")
 		end)
 	end
 

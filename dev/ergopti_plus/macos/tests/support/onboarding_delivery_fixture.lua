@@ -28,6 +28,7 @@ local function with_delivery(callback)
 		}
 		package.loaded["infra.toml.codec"] = { decode = function() return {} end }
 		with_window("ui.onboarding", function(onboarding, state)
+			require("tests.support.onboarding_shared_data").install()
 			local pending, errors, evaluations = {}, {}, {}
 			local i18n = package.loaded["infra.i18n"]
 			i18n.get_locale = function() return "en" end
@@ -92,7 +93,7 @@ local function dispatch(route, state, pending)
 		previewLocale = { action = "previewLocale", locale = "fr" },
 		ready = { action = "ready" },
 		pickConfigDir = { action = "pickConfigDir", current = "/virtual/current" },
-		loadExistingConfig = { action = "loadExistingConfig", config_dir = "/virtual/chosen" },
+		loadExistingConfig = { action = "loadExistingConfig", config_dir = "/virtual/chosen", request = 1 },
 	}
 	state.receiver({ body = body[route] })
 	if route == "ready" then pending[#pending]() end

@@ -289,7 +289,12 @@ local function cpu_load(config)
 			step(nil)
 		end)
 		on_cancel(function()
-			if type(sampler) == "table" and type(sampler.stop) == "function" then sampler:stop() end
+			if type(sampler) ~= "table" then return end
+			-- hs.host.cpuUsage clears its timer before calling back, and its
+			-- stop() indexes that timer: stopping a sampler that already
+			-- answered raised on every successful run.
+			if type(sampler.finished) == "function" and sampler:finished() then return end
+			if type(sampler.stop) == "function" then sampler:stop() end
 		end)
 		run_task(PS, { "-o", "%cpu=,rss=", "-p", tostring(hs.processInfo.processID) }, on_cancel, function(stdout)
 			-- A decimal comma under some locales

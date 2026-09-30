@@ -17,7 +17,6 @@ local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
-local fs_dir       = require("infra.fs_dir")
 local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
@@ -717,73 +716,44 @@ function M.build(ctx)
 	-- declares for itself stays this driver's.
 	local function extension_shortcut_rows()
 		local items = {}
-		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
-		-- Same truncation as hotstring_counter: `and pcall() or false` keeps only
-		-- the status, so attr was always nil and this branch never ran.
-		local ok_attr, attr = false, nil
-		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
-		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return items end
-
-		local ext_ids = {}
-		for _, fname in ipairs(fs_dir.entries(ext_root)) do
-			if fname ~= "." and fname ~= ".." then
-				local ok_a2, a2 = pcall(hs.fs.attributes, ext_root .. fname)
-				if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
-					table.insert(ext_ids, fname)
-				end
-			end
-		end
-		table.sort(ext_ids)
-
 		local ext_menu_items = {}
-		for _, ext_id in ipairs(ext_ids) do
-			local ext_dir  = ext_root .. ext_id .. "/"
-			local menu_lua = ext_dir .. "shortcuts/menu.lua"
-			local manifest = ext_dir .. "manifest.toml"
+		-- The packs this boot discovered — the bundled ones, installed layouts and
+		-- the user's folder — so an extension's shortcuts come from the same roots
+		-- as its hotstrings, named by the shared manifest reader. A context without
+		-- the catalogue is a partial test fixture and lists none.
+		local packs = type(ctx.extension_packs) == "table" and ctx.extension_packs or {}
+		for _, pack in ipairs(packs) do
+			local menu_lua = pack.dir .. "/shortcuts/menu.lua"
 			local ok_ml, aml = pcall(hs.fs.attributes, menu_lua)
-			if not (ok_ml and type(aml) == "table" and aml.mode == "file") then goto continue_sc_ext end
+			if ok_ml and type(aml) == "table" and aml.mode == "file" then
+				local collected = {}
+				local sandbox = {
+					add_item = function(it) if type(it) == "table" then table.insert(collected, it) end end,
+					t        = function(k) return i18n.get(k) end,
+					ext_name = pack.name,
+					hs       = hs,
+				}
+				-- Fall through to the real global environment for standard builtins
+				-- (string, math, table, pairs, …) not explicitly listed above.
+				setmetatable(sandbox, { __index = _G })
+				sandbox._G = sandbox
 
-			local ext_name = ext_id
-			local ok_m, am = pcall(hs.fs.attributes, manifest)
-			if ok_m and type(am) == "table" and am.mode == "file" then
-				local fh = io.open(manifest, "r")
-				if fh then
-					for line in fh:lines() do
-						local v = line:match('^name%s*=%s*"(.-)"')
-						if v then ext_name = v; break end
+				-- Lua 5.4 receives a chunk environment at compile time; setfenv was
+				-- removed after Lua 5.1 and cannot safely retrofit this sandbox.
+				local ok_load, chunk_or_err = pcall(loadfile, menu_lua, "t", sandbox)
+				if ok_load and type(chunk_or_err) == "function" then
+					local ok_run, run_err = pcall(chunk_or_err)
+					if not ok_run then
+						Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", pack.id, tostring(run_err))
 					end
-					fh:close()
+				else
+					Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
+				end
+
+				if #collected > 0 then
+					table.insert(ext_menu_items, { title = pack.name, menu = collected })
 				end
 			end
-
-			local collected = {}
-			local sandbox = {
-				add_item = function(it) if type(it) == "table" then table.insert(collected, it) end end,
-				t        = function(k) return i18n.get(k) end,
-				ext_name = ext_name,
-				hs       = hs,
-			}
-			-- Fall through to the real global environment for standard builtins
-			-- (string, math, table, pairs, …) not explicitly listed above.
-			setmetatable(sandbox, { __index = _G })
-			sandbox._G = sandbox
-
-			-- Lua 5.4 receives a chunk environment at compile time; setfenv was
-			-- removed after Lua 5.1 and cannot safely retrofit this sandbox.
-			local ok_load, chunk_or_err = pcall(loadfile, menu_lua, "t", sandbox)
-			if ok_load and type(chunk_or_err) == "function" then
-				local ok_run, run_err = pcall(chunk_or_err)
-				if not ok_run then
-					Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))
-				end
-			else
-				Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
-			end
-
-			if #collected > 0 then
-				table.insert(ext_menu_items, { title = ext_name, menu = collected })
-			end
-			::continue_sc_ext::
 		end
 
 		if #ext_menu_items > 0 then
@@ -832,7 +802,14 @@ function M.build(ctx)
 	local dyn_handlers = {
 	}
 
-	local group_builders = {}
+	-- « Combinaisons de touches »: the Karabiner chords moved here from the
+	-- Tap-Holds submenu, with their own first-row switch. The remap menu owns
+	-- their rows, as it owns the engine they configure.
+	local group_builders = {
+		["key_combinations"] = function()
+			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
+		end,
+	}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own
 	-- assignments, so the manifest can name the section but not enumerate it. The
@@ -881,6 +858,12 @@ function M.build(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
+	-- Ticks the « Combinaisons de touches » title while its own switch is on.
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		local karabiner = ctx.karabiner
+		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
+			and karabiner.get_mod_combos_enabled() == true
+	end
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 

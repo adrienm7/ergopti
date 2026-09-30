@@ -53,6 +53,7 @@ local function setup(backend)
 	}
 	local llm = {
 		get_backend = function() return state.backend end,
+		get_current_model = function() return state.model end,
 		set_backend = function(kind)
 			state.backend = kind
 			state.backend_sets = (state.backend_sets or 0) + 1
@@ -107,6 +108,48 @@ helpers.describe("AI menu: the backend choice", function()
 		find(build(), "API 🌐").action()
 		restore()
 		helpers.assert_eq(state.backend, "api")
+	end)
+
+end)
+
+helpers.describe("AI menu: the selected-model row (menu.llm.model_label)", function()
+
+	local i18n = require("infra.i18n")
+
+	--- The label every driver gives the selected model.
+	--- @param model string
+	--- @return string
+	local function expected(model)
+		local template = i18n.get("menu.llm.model_label")
+		helpers.assert_true(template ~= "menu.llm.model_label" and template:find("%s", 1, true) ~= nil,
+			"the shared key must resolve to a template with one %s, got: " .. tostring(template))
+		return string.format(template, model)
+	end
+
+	helpers.it("heads the list with the selected Ollama model, not clickable", function()
+		local build, state, restore = setup("ollama")
+		state.model = "qwen3.5:0.8b"
+		local rows = build()
+		restore()
+		helpers.assert_eq(rows[1].label, expected("qwen3.5:0.8b"))
+		helpers.assert_eq(rows[1].disabled, true, "an information row, never an action")
+		helpers.assert_eq(rows[1].action, nil)
+	end)
+
+	helpers.it("names the active API entry under the API backend", function()
+		local build, state, restore = setup("api")
+		state.answers = { "k", "qwen" }
+		find(build(), "➕ Cerebras").action()
+		local rows = build()
+		restore()
+		helpers.assert_eq(rows[1].label, expected(state.active.label))
+	end)
+
+	helpers.it("says so when no model is selected", function()
+		local build, _, restore = setup("ollama")
+		local rows = build()
+		restore()
+		helpers.assert_eq(rows[1].label, expected(i18n.get("menu.llm.no_model_none")))
 	end)
 
 end)

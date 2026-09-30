@@ -182,6 +182,11 @@ _TomlWarmFileCounts(FilePath) {
 CountTomlSection(CategoryName, SectionName, FilePath := "") {
 		global ScriptInformation, _SharedDir
 		if (FilePath == "") {
+				; A section a layout extension binds is counted in the file that
+				; LoadHotstringsSection registers it from.
+				FilePath := HotstringsBoundTomlPath(CategoryName, SectionName)
+		}
+		if (FilePath == "") {
 				if (StrLower(CategoryName) == "personal"
 				and IsSet(ScriptInformation)
 				and ScriptInformation.Has("PersonalTomlPath")) {
@@ -200,6 +205,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
 ; Returns 0 when the file does not exist or contains no matching entries.
 CountTomlHotstrings(CategoryName, FilePath := "") {
 		global ScriptInformation, _SharedDir
+		BoundSections := Map()
 		if (FilePath == "") {
 				if (StrLower(CategoryName) == "personal"
 				and IsSet(ScriptInformation)
@@ -207,13 +213,20 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
 						FilePath := ScriptInformation["PersonalTomlPath"]
 				} else {
 						FilePath := HotstringsBundledTomlPath(CategoryName)
+						BoundSections := HotstringsBoundSections(CategoryName)
 				}
 		}
-		
+
 		Counts := _TomlWarmFileCounts(FilePath)
 		Total := 0
-		for _, Count in Counts {
-				Total += Count
+		for Section, Count in Counts {
+				; A section a layout extension binds is counted from its file below.
+				if !BoundSections.Has(Section)
+						Total += Count
+		}
+		for Section, BoundPath in BoundSections {
+				BoundCounts := _TomlWarmFileCounts(BoundPath)
+				Total += BoundCounts.Has(Section) ? BoundCounts[Section] : 0
 		}
 		return Total
 }
@@ -342,7 +355,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		; a cache miss leaves the map empty so we fall through to the TOML parse below.
 		HotstringsCacheEnsure()
 		LoaderKey := StrLower(CategoryName) . "." . StrLower(SectionName)
-		if (IsSet(_GENERATED_HOTSTRINGS)
+		; A category or section a layout extension binds (SFB reduction, rolls, the
+		; magic key's repeat corrections on Ergopti) loads from the extension's file
+		; and never from the cache, which only compiles the bundled folder.
+		BoundPath := HotstringsBoundTomlPath(CategoryName, SectionName)
+		if (BoundPath == ""
+		and IsSet(_GENERATED_HOTSTRINGS)
 		and StrLower(CategoryName) != "personal"
 		and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
 				try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
@@ -359,7 +377,9 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				return
 		}
 
-		if (StrLower(CategoryName) == "personal"
+		if (BoundPath != "") {
+				FilePath := BoundPath
+		} else if (StrLower(CategoryName) == "personal"
 		and IsSet(ScriptInformation)
 		and ScriptInformation.Has("PersonalTomlPath")) {
 				FilePath := ScriptInformation["PersonalTomlPath"]

@@ -3,24 +3,25 @@
 ; ==============================================================================
 ; MODULE: LLM Tray — Settings submenus
 ; DESCRIPTION:
-; Builds the five settings submenus that hang off the main tray entry — N
-; predictions, Trigger, Generation, Display, Navigation — and the InputBox
+; Builds the four settings submenus that hang off the main tray entry —
+; Trigger, Generation (headed by the suggestion count), Display, Navigation —
+; and the InputBox
 ; prompts that back every numeric / modifier / shortcut setting. Also owns
 ; the small set of cross-cutting helpers (``_LLM_DefaultFor``,
-; ``_LLM_AssignAndRebuild``, ``_LLM_MaybeAddReset``) that every settings
+; ``_LLM_AssignAndRebuild``, ``_LLM_MaybeResetRow``) that every settings
 ; submenu uses to surface "Reset to <default>" rows.
 ;
 ; FEATURES & RATIONALE:
-; 1. Reset-row hygiene: ``_LLM_MaybeAddReset`` appends a reset row ONLY when
+; 1. Reset-row hygiene: ``_LLM_MaybeResetRow`` appends a reset row ONLY when
 ;    the current value differs from the shared default — mirrors HS's pattern
 ;    of hiding the row when it would be a no-op so the menu stays compact.
 ; 2. Shared-defaults single source of truth: every "Reset" target reads from
 ;    ``LLM_Defaults`` (populated from defaults.json — the single source). The
 ;    loader fails fast if the file is missing, so there is no hardcoded mirror
 ;    map; a per-call default only covers keys the loader does not parse.
-; 3. Trigger shortcut: optional global hotkey that fires a prediction on
-;    demand. Default Ctrl+Space mirrors Copilot's "trigger inline suggestion"
-;    so muscle memory carries over.
+; 3. A prediction on demand is the llm_generate_prediction action
+;    (LLM_Menu_TriggerPrediction), bound in a keyboard slot (Win+Space
+;    recommended): the trigger submenu offers no hotkey of its own.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -31,30 +32,30 @@
 
 ; ================================
 ; ================================
-; ======= 1/ Count Submenu =======
+; ======= 1/ Count Choices =======
 ; ================================
 ; ================================
 
-/**
- * Builds the prediction count submenu (1 to 10).
- * The renderer materialises the rows; this only says what they are — see
- * ``_LLM_Menu_NRows``.
- * @returns {Menu} Populated count submenu.
- */
-LLM_Menu_BuildNMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_num_predictions", (*) => _LLM_Menu_NRows())
-}
+; Available prediction count choices (mirrors HS: for i = 1, 10 do). Declared
+; beside _LLM_Menu_NRows, its only reader, so any include graph that loads the
+; count rows also runs this assignment: the unit harness loads this file but
+; not the menu's _index.ahk.
+global LLM_MENU_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 /**
- * Row data for the prediction count submenu.
+ * Row data for the suggestion count choices (1 to 10), the submenu of the
+ * first generation row (``_LLM_Menu_GenerationRows``).
  * @returns {Array} One row per option, ticked on the active one.
  */
 _LLM_Menu_NRows() {
 	global _LLM_Menu
 	Rows := []
 	for n in LLM_MENU_N_OPTIONS {
+		; One key per plural form: an injected "s" is French and English only.
+		CountKey := (n == 1) ? "menu.llm.prediction_count_label_one"
+			: "menu.llm.prediction_count_label_other"
 		Rows.Push(Map(
-			"label",   StrReplace(StrReplace(t("menu.llm.prediction_count_label"), "%d", n), "%s", (n > 1 ? "s" : "")),
+			"label",   StrReplace(t(CountKey), "%d", n),
 			"checked", (n == _LLM_Menu["n_predictions"]),
 			"action",  _LLM_Menu_MakeSetNHandler(n)))
 	}
@@ -73,9 +74,8 @@ _LLM_Menu_NRows() {
 
 /**
  * Builds the trigger settings submenu.
- * Mirrors HS: trigger shortcut, debounce (dialog), instant-on-word-end,
- * after-hotstring, reset-on-nav, URL bar filter, password field filter,
- * and the app-exclusion picker.
+ * Mirrors HS: debounce (dialog), instant-on-word-end, after-hotstring,
+ * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
 LLM_Menu_BuildTriggerMenu() {
@@ -84,17 +84,11 @@ LLM_Menu_BuildTriggerMenu() {
 
 /**
  * Row data for the trigger submenu.
- * @returns {Array} Trigger shortcut, debounce, the four toggles, the app picker.
+ * @returns {Array} Debounce, the four toggles, the app picker.
  */
 _LLM_Menu_TriggerRows() {
 	global _LLM_Menu
 	Rows := []
-
-	; Trigger shortcut (fires prediction on demand)
-	sc_display := LLM_Menu_TriggerDisplayValue()
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.trigger_shortcut_label"), "%s", sc_display),
-		"action", (*) => LLM_Menu_PromptTriggerShortcut()))
 
 	; Debounce — dialog like HS (free numeric input)
 	Rows.Push(Map(
@@ -210,11 +204,25 @@ LLM_Menu_BuildGenerationMenu() {
 
 /**
  * Row data for the generation submenu.
- * @returns {Array} The four numeric prompts with their reset rows, plus the two toggles.
+ * @returns {Array} The suggestion count, the four numeric prompts with their
+ *     reset rows, plus the two toggles.
  */
 _LLM_Menu_GenerationRows() {
 	global _LLM_Menu
 	Rows := []
+
+	; Suggestion count — a generation parameter, the first one on every driver.
+	Rows.Push(Map(
+		"label", StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]),
+		"items", _LLM_Menu_NRows()))
+	; defaults.json always carries llm_num_predictions (the loader parses it), so
+	; no per-call fallback shadows the shared default here.
+	_LLM_MaybeResetRow(Rows,
+		_LLM_Menu["n_predictions"],
+		_LLM_DefaultFor("llm_num_predictions"),
+		(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions")))
+
+	Rows.Push(Map("separator", true))
 
 	; Context length — dialog
 	Rows.Push(Map(
@@ -541,26 +549,13 @@ _LLM_AssignAndRebuild(tray_key, value) {
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
-; Append a "Reset to <default>" row immediately below a setting when the
-; current value differs from the shared default. Mirrors HS's pattern of
-; surfacing the reset only when it would do something — a non-default value
-; means the user has customised the setting, so the reset is now useful;
-; an at-default value means the reset would be a no-op and we hide the row to
-; keep the menu compact. The label re-uses the existing ``menu.llm.reset_label``
-; i18n key which is already translated in every locale.
-_LLM_MaybeAddReset(menu, current, default_val, on_click) {
-	if (current = default_val)
-		return
-	label := StrReplace(t("menu.llm.reset_label"), "%s", default_val)
-	MenuRenderer_AppendRows(menu, "llm_menu", "reset_row",
-		[Map("label", label, "action", (*) => on_click())])
-}
-
 /**
- * The same conditional reset row, appended to a provider's row array instead of
- * added to a Menu. Two shapes because two callers are still native: the
- * top-level IA menu emits into the live tray handle, and the model submenu is
- * built by another subsystem.
+ * Appends a "Reset to <default>" row immediately below a setting when the
+ * current value differs from the shared default. Mirrors HS's pattern of
+ * surfacing the reset only when it would do something — a non-default value
+ * means the user has customised the setting, so the reset is now useful; an
+ * at-default value means the reset would be a no-op and the row is hidden to
+ * keep the menu compact. The label re-uses ``menu.llm.reset_label``.
  * @param {Array} Rows        Row array to append to.
  * @param {Any}   current     Current value.
  * @param {Any}   default_val Shared default.
@@ -598,7 +593,7 @@ LLM_Menu_PromptOllamaPort() {
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
 			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted,
-		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
 		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
@@ -607,7 +602,7 @@ LLM_Menu_ResetOllamaPort(default_port) {
 	return LLM_Menu_CommitMutation("the Ollama port reset",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
 			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted,
-		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
 		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
@@ -703,36 +698,11 @@ _LLM_Menu_ApplyNavCommitted(*) {
 
 
 
-; ===============================================
-; ===============================================
-; ======= 7/ Trigger Shortcut + Add Model =======
-; ===============================================
-; ===============================================
-
-/**
- * Opens an InputBox to set/clear the manual trigger shortcut.
- * Format expected: modifier(s) + key, e.g. "ctrl+alt+p" or "ctrl+space".
- * An empty input clears the shortcut.
- */
-LLM_Menu_PromptTriggerShortcut() {
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LLM_Menu_PromptTriggerShortcut()
-		finally Critical(InheritedCritical)
-	}
-	global _LLM_Menu
-	ib := InputBox(t("menu.llm.shortcut_prompt"), t("menu.llm.trigger_shortcut_title"), "w450 h140", _LLM_Menu["trigger_shortcut"])
-	if (ib.Result != "OK")
-		return
-	raw := Trim(ib.Value)
-	Committed := LLM_Menu_CommitTriggerShortcut(raw)
-	; A partial native cleanup failure returns false but publishes an explicit
-	; recovery projection. Rebuild that warning instead of leaving a stale label
-	if Committed || LLM_Menu_TriggerNeedsAttention()
-		LLM_Menu_RequestBuild("setting_committed")
-	return Committed
-}
+; ================================================
+; ================================================
+; ======= 7/ Manual Prediction + Add Model =======
+; ================================================
+; ================================================
 
 ; The reasons a manual prediction request is refused, each with the locale key
 ; of the notice that tells the user. LLM_Menu_ManualPredictionRefusal decides

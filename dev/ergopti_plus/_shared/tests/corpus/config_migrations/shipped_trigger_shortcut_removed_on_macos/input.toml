@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/shipped_trigger_shortcut_removed_on_macos/input.toml
+
+[_meta]
+schema_version = 3
+
+[llm]
+enabled = true
+
+[llm.trigger]
+debounce_ms = 200
+
+[llm.trigger.shortcut]
+mods = ["ctrl"]
+key = "space"
+
+[shortcuts.keyboard]
+hs_ctrl_space = "llm_generate_prediction"

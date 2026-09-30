@@ -1387,14 +1387,9 @@ input_altering = false
 type = "boolean"
 description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
-[[features.llm.trigger]]
-id = "shortcut"
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.llm.trigger.shortcut"
-platforms = ["hs"]
+# No dedicated trigger shortcut: a prediction on demand is the
+# llm_generate_prediction action, recommended on each OS's keyboard slot
+# (shortcuts.keyboard.hs_ctrl_space, win_space, super_space).
 
 
 
@@ -2396,10 +2391,8 @@ description_key = "menu.shortcuts.keyboard.win_x"
 # "Generate an AI prediction" on the chord each OS leaves for it; the key is
 # swallowed so the OS never sees it (Win+Space no longer switches the input
 # language on Windows; macOS warns when its own input-source shortcut still
-# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut.
-# TODO(recommended-defaults): these are Ergopti's recommended bindings; once the
-# manifest carries a separate recommended value per entry, move them there and
-# leave the default neutral ("none").
+# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut. The
+# binding is Ergopti's recommendation only: the default stays neutral ("none").
 [[features.shortcuts.keyboard]]
 id = "win_space"
 platforms = ["ahk"]
@@ -2586,20 +2579,6 @@ type = "action"
 description_key = "menu.gestures.tap_4"
 
 # --- 2-finger remaining directions ---
-[[features.gestures]]
-id = "space_wrap"
-platforms = ["hs"]
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-# The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
-# the menu label is the canonical "circular_spaces" i18n key — the menu manifest,
-# the locales and menu_gestures.lua all use it. The duplicate "space_wrap" locale
-# entry was dropped by the i18n canonicalization, so this description_key must
-# point at the surviving key or it resolves to nothing.
-description_key = "menu.gestures.circular_spaces"
-
 [[features.gestures]]
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
@@ -3708,6 +3687,24 @@ input_altering = true
 type = "boolean"
 description_key = "menu.category_enabled.tap_holds"
 
+# The « Combinaisons de touches » switch under Shortcuts: the only gate of the
+# AltGr / LAlt / CapsLock combination families, which the Shortcuts master no
+# longer reaches (decision of 2026-09-29), each family keeping its own choices.
+# macOS keeps the same switch as [mod_combos] enabled in config_karabiner.toml,
+# beside the rules it gates. Its neutral value is on: the gate can only narrow
+# what each family already enables, so it activates nothing alone. An absent
+# key must leave the families live, and the sparse writer deletes a value
+# equal to the default, so a default of off would both disable upgraded
+# configs and never persist.
+[[features.category_enabled]]
+id = "key_combinations"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.shortcuts.key_combinations"
+
 
 
 # ==================
@@ -4007,14 +4004,10 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.llm_menu]]
-type = "dynamic"
-id = "llm_num_predictions"
-i18n = "menu.llm.num_predictions_label"
-disabled_when_off = true
-health_dot = false
-platforms = ["ahk", "hs", "linux"]
-
+# The suggestion count ("Nombre de suggestions") is a generation parameter: it
+# is the first row of the generation settings on every driver (the
+# `llm_generation_settings` submenu, or Linux's inline `llm_generation` list),
+# not a row of this top level.
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_trigger"
@@ -4065,11 +4058,12 @@ platforms = ["ahk", "hs", "linux"]
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
 #
-# All three drivers show the same block: the version, one row per channel of the
-# shared update-channel registry right before the check row, the check
-# frequency (a `list`, because its rows come from the registry and the updater
-# state), then Versions and its GitHub page. Linux had its updater as a separate
-# top-level "Updates" entry until 2026-09.
+# All three drivers show the same block: the version, one channel submenu titled
+# with the subscribed channel and listing every channel of the shared
+# update-channel registry, right before the check row, the check frequency (a
+# `list`, because its rows come from the registry and the updater state), then
+# Versions and its GitHub page, and last, after a separator, Uninstall. Linux
+# had its updater as a separate top-level "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"
@@ -4086,6 +4080,17 @@ i18n = "menu.about.changelog"
 type = "command"
 id = "about_releases_page"
 i18n = "menu.about.open_releases_page"
+
+# Removing Ergopti closes the submenu that names the installed build, set apart
+# by a separator so it is never clicked on the way to Versions. It sat at the
+# bottom of Configuration until 2026-09, where it read as one more setting.
+[[menu.about_menu]]
+type = "---"
+
+[[menu.about_menu]]
+type = "command"
+id = "uninstall"
+i18n = "menu.global.uninstall"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the
@@ -4147,8 +4152,9 @@ id = "locales"
 # « Tout désactiver » were retired, and the two top-level rows that opened the
 # folders editor and the setup wizard.
 #
-# Restores Ergopti's recommended values: each driver's factory reset, the same
-# transaction the global actions ran under « Valeurs par défaut ».
+# Restores Ergopti's recommended values: each driver composes every category's
+# own scope owner in the [scopes.global] order, all or nothing, after one
+# confirmation. AI and metrics consent are never granted by it.
 [[menu.configuration_menu]]
 type = "command"
 id = "restore_recommended"
@@ -4185,13 +4191,34 @@ id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
 
+# « Ergopti uses Karabiner » (config_karabiner.toml [karabiner]
+# integration_enabled, default on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
+# rule removed from karabiner.json; Karabiner itself is never quit or
+# reconfigured. The command below turns it off, or only cleans the file when
+# it already is.
 [[menu.configuration_menu]]
-type = "---"
+type = "check"
+id = "karabiner_integration"
+i18n = "menu.global.karabiner_integration"
+checked_when = ["karabiner_integration_enabled"]
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.configuration_menu]]
 type = "command"
-id = "uninstall"
-i18n = "menu.global.uninstall"
+id = "remove_from_karabiner"
+i18n = "menu.global.remove_from_karabiner"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+# Puts back the Precision Touchpad registry values backed up before Ergopti's
+# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
+[[menu.configuration_menu]]
+type = "command"
+id = "restore_touchpad_gestures"
+i18n = "menu.global.restore_touchpad_gestures"
+platforms = ["ahk"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
@@ -4335,7 +4362,7 @@ id = "wrap_symbols_menu"
 # Restricted to linux, with the reason attached, because the same operations are
 # reached differently elsewhere: macOS binds them to ctrl chords and lists them
 # in the Ctrl group of `keyboard_slots`, and Windows exposes its own combinations under
-# `modifier_combos`. Declaring one shared row would put a second copy of these
+# `key_combinations`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
 type = "section_header"
@@ -4382,12 +4409,17 @@ id = "keyboard_slots"
 # default there and every general catalogue assignment remains opt-in.
 platforms = ["ahk", "hs", "linux"]
 
+# « Combinaisons de touches »: every modifier combination, moved out of the
+# Tap-Hold submenu (macOS) and out of the « Combinaison de modificateurs »
+# group (Windows) into one group with a first-row switch of its own. Its rows
+# are key_combinations_group. Linux's tap-hold engine binds no combination.
 [[menu.shortcuts_menu]]
 type = "group"
-id = "modifier_combos"
-i18n = "menu.shortcuts.group_modifiers"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+id = "key_combinations"
+i18n = "menu.shortcuts.key_combinations"
+checked_when = ["key_combinations_enabled"]
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 # `list` since 2026-08-08: the handler's whole body was one row with a static
 # label whose submenu another subsystem builds, which is what a provider
 # returning a single `submenu` row says.
@@ -4447,23 +4479,81 @@ id = "extensions_shortcuts"
 # something the handler-bijection ratchet would flag. That menu now dispatches
 # through the shared renderer, which is what let the restriction go.
 
-[[menu.modifier_combos_group]]
+# The « Combinaisons de touches » group under Shortcuts. Its first row is its
+# own switch, the only one the combinations follow on every OS: macOS
+# persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
+# [category_enabled] key_combinations; absent, it is on.
+[[menu.key_combinations_group]]
+type = "toggle"
+id = "key_combinations_toggle"
+i18n = "menu.shortcuts.key_combinations_enable"
+checked_when = ["key_combinations_enabled"]
+category = "KeyCombinations"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "---"
+platforms = ["ahk", "hs"]
+
+# macOS: the Karabiner chords' symmetry, their activation delay, and the
+# bulk copy of every pair's tap slot into its chord slot.
+[[menu.key_combinations_group]]
+type = "check"
+id = "combo_symmetric"
+i18n = "menu.tapholds.symmetric"
+checked_when = ["combo_symmetric"]
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "list"
+id = "combo_timings"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "command"
+id = "copy_tap_to_combo"
+i18n = "menu.tapholds.copy_tap_to_combo"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "---"
+
+# macOS: one row per ordered pair of keys, each with its three slots —
+# « Accord (simultané) → », « Maintenir 1 + taper 2 → » and « Maintenir 1 +
+# maintenir 2 → ».
+[[menu.key_combinations_group]]
+type = "list"
+id = "key_combination_rows"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+# Windows: its three AltGr / LAlt / CapsLock combination families. `path` is a
+# feature-manifest SECTION: each row expands to every feature under it, in one
+# submenu labelled by `group_label`, the key names (identical in every locale).
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.alt_gr_lalt"
 group_label = "AltGrLAlt"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
-[[menu.modifier_combos_group]]
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.alt_gr_caps_lock"
 group_label = "AltGrCapsLock"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
-[[menu.modifier_combos_group]]
+[[menu.key_combinations_group]]
 type = "feature"
 path = "shortcuts.lalt_caps_lock"
 group_label = "LAltCapsLock"
 platforms = ["ahk"]
+reason_key = "platform_reason.chord_families_are_each_platforms"
 
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
@@ -4941,17 +5031,6 @@ type = "---"
 
 [[menu.hotstrings_menu]]
 type = "section_header"
-i18n = "menu.hotstrings.header_ergopti"
-
-[[menu.hotstrings_menu]]
-type = "list"
-id = "hotstring_categories_ergopti"
-
-[[menu.hotstrings_menu]]
-type = "---"
-
-[[menu.hotstrings_menu]]
-type = "section_header"
 i18n = "menu.hotstrings.personal_header"
 
 [[menu.hotstrings_menu]]
@@ -4961,6 +5040,10 @@ id = "hotstring_personal"
 [[menu.hotstrings_menu]]
 type = "---"
 
+# The hotstrings an extension brings: one « Hotstrings <extension> » submenu
+# each, holding its packs and the bundled categories it binds. The Ergopti
+# layout extension binds SFB reduction and rolls there; they had a section of
+# their own, « Disposition Ergopti », until they moved into that extension.
 [[menu.hotstrings_menu]]
 type = "section_header"
 i18n = "menu.extensions.header"
@@ -5125,18 +5208,8 @@ platforms = ["hs", "ahk", "linux"]
 [[menu.gestures_menu]]
 type = "---"
 
-[[menu.gestures_menu]]
-type = "check"
-id = "circular_spaces"
-i18n = "menu.gestures.circular_spaces"
-checked_when = ["gesture_space_wrap"]
-disabled_when = ["gestures_enabled"]
-platforms = ["hs"]
-reason_key = "platform_reason.touchpad_stack_is_per_driver"
-[[menu.gestures_menu]]
-type = "---"
-platforms = ["hs"]
-
+# The circular Spaces checkbox that stood here is retired: the wrap is its own
+# pair of actions (space_prev_wrap / space_next_wrap), bindable like any other.
 [[menu.gestures_menu]]
 type = "list"
 id = "gesture_slots_2"
@@ -5211,8 +5284,10 @@ id = "tapholds_toggle"
 i18n = "menu.tapholds.enable"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
-# macOS switches the feature, not its remap engine (always on): off stops
-# generating the per-key rules while keeping every assignment, like a pause.
+# macOS switches the feature, not its remap engine: off stops generating the
+# per-key rules while keeping every assignment, like a pause. The engine has
+# its own switch, « Ergopti uses Karabiner » (on by default); while it is off
+# the key and chord rows are greyed under the karabiner_off_hint row.
 # Linux takes the engine out of its keyboard hook, keeping every assignment.
 
 [[menu.tap_holds_menu]]
@@ -5233,17 +5308,10 @@ type = "command"
 id = "disable_all"
 i18n = "common.clear_to_system"
 
-# macOS rows below: its engine also runs chords (two modifiers pressed
-# together), which have their own tap / hold / combo slots and timings.
-# Everything the Karabiner submenu held now lives here, under the name Windows
-# uses, and nothing says "Karabiner": the engine is an implementation detail.
-[[menu.tap_holds_menu]]
-type = "command"
-id = "copy_tap_to_combo"
-i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
-
+# macOS rows below: its engine takes one global tap / hold delay and a sticky
+# delay. Its modifier combinations (two keys pressed together or one held
+# while the other is tapped) moved to « Combinaisons de touches » under
+# Shortcuts, key_combinations_group, with their symmetry and chord delay.
 [[menu.tap_holds_menu]]
 type = "---"
 
@@ -5257,28 +5325,31 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "---"
 platforms = ["hs"]
 
-# `list` since 2026-08-07: one row per configurable key, each holding its
-# disable / tap-picker / hold-picker rows, and the hold picker holding its
-# options. The renderer builds all three levels from the provider's data.
+# The keys, one row each holding its disable / tap-picker / hold-picker rows,
+# under one header per hand and with a separator between the hands, so where
+# the left hand ends is visible at a glance. Which keys a driver lists, in which
+# order and under which hand comes from [tap_hold.catalog] in
+# _shared/tap_hold/defaults.toml; each provider returns its hand's rows only.
+# The hand headers replace a « — Tap / Hold — » header followed by « — Main
+# gauche — » and « — Main droite — », drawn by the macOS provider alone.
+[[menu.tap_holds_menu]]
+type = "section_header"
+i18n = "menu.tapholds.left_hand_tap_hold"
+
 [[menu.tap_holds_menu]]
 type = "list"
-id = "tap_hold_keys"
+id = "tap_hold_keys_left"
 
 [[menu.tap_holds_menu]]
 type = "---"
-platforms = ["hs"]
 
 [[menu.tap_holds_menu]]
 type = "section_header"
-i18n = "menu.tapholds.header_shortcuts"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+i18n = "menu.tapholds.right_hand_tap_hold"
 
 [[menu.tap_holds_menu]]
 type = "list"
-id = "tap_hold_chords"
-platforms = ["hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+id = "tap_hold_keys_right"
 
 # The layer a hold key enters (hold_layer = "nav") is edited key by key in the
 # shared layer editor (_shared/ui/layer_editor), last in the submenu.
@@ -5692,7 +5763,7 @@ restore_exclude = []
 
 [scopes.shortcuts]
 action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
-prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts"]
+prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations"]
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
 
@@ -5723,3 +5794,130 @@ restore_exclude = ["metrics.enabled", "metrics.metrics_enabled"]
 includes = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
 prefixes = ["script"]
 restore_exclude = []
+
+
+
+# =================================================
+# =================================================
+# ======= 6. First-run configuration wizard =======
+# =================================================
+# =================================================
+
+# The shared wizard (_shared/ui/onboarding) asks, after the language and
+# configuration-folder steps, one question per page in the approved menu order.
+# tools/codegen/codegen-onboarding-catalogue.cjs projects these declarations
+# into _shared/ui/_generated/onboarding_catalogue.{js,json}: the page renders
+# them and every host validates the finished answers against the same data.
+#
+# `order` lists the pages; each [onboarding.pages.<scope>] declares:
+#   master       Per-platform manifest path of the category switch the question
+#                sets. A platform without one keeps the question as the import
+#                decision only; nothing is persisted for the answer itself.
+#   checklist    "recommended": every input-altering feature of the page's scope
+#                whose recommendation differs from its neutral default.
+#                "hotstrings": every bundled section, language -> file ->
+#                section from _shared/modules/hotstrings/_index.toml.
+#                "none": the question alone (AI and metrics consent).
+#   exclude      Scope prefixes left out of a "recommended" checklist.
+#   labels       Label keys for recommended items whose manifest description
+#                key resolves to no locale entry.
+#   hint_key     Per-platform warning shown under the question.
+#   note_key     Per-platform explanation for a page without a question.
+#   consent      The answer is a privacy consent: never pre-selected.
+#   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
+# The wizard persists only manifest paths. A checklist's pre-selection is the
+# manifest `recommended` value, and every question starts at No.
+[onboarding]
+order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
+
+[onboarding.pages.tap_holds]
+title_key = "menu.tapholds.title"
+question_key = "menu.tapholds.enable"
+description_key = "onboarding.page.tap_holds.description"
+master = { ahk = "category_enabled.tap_holds" }
+checklist = "none"
+# macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
+# both written by their Tap-Holds menu: a config.toml answer would never be read.
+note_key = { hs = "onboarding.page.tap_holds.menu_note", linux = "onboarding.page.tap_holds.menu_note" }
+
+[onboarding.pages.shortcuts]
+title_key = "menu.shortcuts.title"
+question_key = "menu.shortcuts.enable"
+description_key = "onboarding.page.shortcuts.description"
+master = { ahk = "category_enabled.shortcuts", hs = "shortcuts.enabled", linux = "shortcuts.enabled" }
+checklist = "recommended"
+# The user's own shortcut toggles: their labels come from the personal file.
+exclude = ["shortcuts.personal"]
+
+[onboarding.pages.shortcuts.labels]
+"shortcuts.select_line" = "sg_actions.select_line"
+"shortcuts.script_control.script_altgr_backspace" = "sg_labels.script_altgr_backspace"
+"shortcuts.script_control.script_altgr_delete" = "sg_labels.script_altgr_delete"
+"shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
+"shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
+"shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
+"shortcuts.script_control.return_key" = "menu.shortcuts.right_opt_return"
+"shortcuts.script_control.backspace" = "menu.shortcuts.right_opt_back"
+"shortcuts.script_control.escape" = "menu.shortcuts.right_opt_escape"
+
+[onboarding.pages.gestures]
+title_key = "menu.gestures.title"
+question_key = "menu.gestures.enable"
+description_key = "onboarding.gestures.desc"
+master = { ahk = "gestures.enabled", hs = "gestures.enabled", linux = "gestures.enabled" }
+checklist = "recommended"
+hint_key = { hs = "dialog.gestures.warning_msg", linux = "gestures.system.warning" }
+
+[onboarding.pages.keyboard_layout]
+title_key = "menu.layout.title"
+question_key = "menu.layout.enable"
+description_key = "onboarding.page.keyboard_layout.description"
+master = { ahk = "category_enabled.layout" }
+checklist = "recommended"
+# The AltGr virtual-key compensation answers a custom layout detected at
+# runtime; it is not one of Ergopti's preferences to import.
+exclude = ["script.alt_gr_is_kana_remap"]
+# macOS installs the layout as a system input source and Linux through its
+# desktop: both are chosen in the keyboard-layout menu, not switched here.
+note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboarding.page.keyboard_layout.system_note" }
+
+[onboarding.pages.hotstrings]
+title_key = "menu.hotstrings.title"
+question_key = "menu.hotstrings.enable"
+description_key = "onboarding.page.hotstrings.description"
+master = { ahk = "category_enabled.hotstrings", hs = "hotstrings.enabled" }
+checklist = "hotstrings"
+# {group} is the manifest section id (distances_reduction, french_autocorrection);
+# {stem} is the loaded group id (distancesreduction, french_autocorrection).
+file_path = { ahk = "category_enabled.{group}", hs = "hotstrings.groups.{stem}", linux = "hotstrings.groups.{stem}" }
+section_path = { ahk = "hotstrings.{group}.{section}.enabled", hs = "hotstrings.modules.{stem}.{section}", linux = "hotstrings.modules.{stem}.{section}" }
+neutral_label_key = "onboarding.hotstrings.all_languages"
+
+[onboarding.pages.hotstrings.magic_key]
+path = "hotstrings.trigger_char"
+# Linux accepts only the symbols of keymap/terminators.validate_magic_key,
+# which refuses the proposed ; and ù: its tray chooses the trigger, which it
+# keeps as config.toml's hotstrings.trigger_char.
+platforms = ["ahk", "hs"]
+label_key = "onboarding.magic_key.desc"
+hint_key = "onboarding.magic_key.choose_freely"
+custom_label_key = "onboarding.magic_key.option_custom"
+# One code point, as config.schema.json and every runtime validate it: a longer
+# custom trigger would be saved, then stop the Windows driver at every start.
+max_characters = 1
+options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
+
+[onboarding.pages.llm]
+title_key = "menu.llm.title"
+question_key = "menu.llm.enable"
+description_key = "onboarding.page.llm.description"
+master = { ahk = "llm.enabled", hs = "llm.enabled", linux = "llm.enabled" }
+checklist = "none"
+
+[onboarding.pages.metrics]
+title_key = "menu.metrics.title"
+question_key = "menu.metrics.enable"
+description_key = "onboarding.metrics.desc"
+master = { ahk = "metrics.metrics_enabled", hs = "metrics.enabled", linux = "metrics.enabled" }
+checklist = "none"
+consent = true

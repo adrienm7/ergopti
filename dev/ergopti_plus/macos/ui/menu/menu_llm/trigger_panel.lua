@@ -6,15 +6,16 @@
 --- Builds the trigger-configuration submenu for the LLM tray menu.
 ---
 --- FEATURES & RATIONALE:
---- 1. Isolated panel: debounce, shortcut, field filters, and app exclusions are
----    cohesive and kept together, away from the rest of init.lua.
+--- 1. Isolated panel: debounce, field filters, and app exclusions are cohesive
+---    and kept together, away from the rest of init.lua.
 --- 2. App exclusions delegate to AppPickerLib so the picker logic stays DRY.
+--- 3. No shortcut row: a prediction on demand is the llm_generate_prediction
+---    action, bound like any other in a keyboard slot (Ctrl+Space recommended).
 --- ==============================================================================
 
 local M = {}
 
 local llm_mod      = require("modules.llm")
-local shortcut_ui  = require("ui.menu.shortcut_utils")
 local AppPickerLib = require("infra.app_picker")
 local i18n         = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
@@ -57,39 +58,18 @@ end
 --- Builds the trigger submenu: this panel answers what the rows ARE, and the
 --- shared renderer materialises every one of them.
 --- @param ctx table Context with fields: state, keymap, is_disabled,
----   save_prefs, update_menu, settings_mgr, apply_llm_shortcut.
+---   save_prefs, update_menu, settings_mgr.
 --- @return table menu Populated trigger_menu table.
 function M.build(ctx)
 	local state               = ctx.state
 	local is_disabled         = ctx.is_disabled
 	local settings_mgr        = ctx.settings_mgr
-	local apply_llm_shortcut  = ctx.apply_llm_shortcut
 
 	local rows = {}
 
 
 	-- =====================================================
-	-- ===== 1.1) Trigger shortcut =====
-	-- =====================================================
-
-	local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, i18n.get("common.none"))
-	rows[#rows + 1] = {
-		label    = string.format(i18n.get("menu.llm.trigger_shortcut_label"), sc_label),
-		disabled = is_disabled or nil,
-		action   = function()
-			return shortcut_ui.prompt_shortcut({
-				title            = i18n.get("menu.llm.trigger_shortcut_title"),
-				message          = i18n.get("menu.llm.shortcut_prompt"),
-				current_shortcut = state.llm_trigger_shortcut,
-				default_mods     = {"ctrl"},
-				on_apply         = apply_llm_shortcut,
-			})
-		end
-	}
-
-
-	-- =====================================================
-	-- ===== 1.2) Debounce =====
+	-- ===== 1.1) Debounce =====
 	-- =====================================================
 
 	local debounce_val     = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
@@ -110,7 +90,7 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.3) Instant triggers =====
+	-- ===== 1.2) Instant triggers =====
 	-- =====================================================
 
 	rows[#rows + 1] = {
@@ -141,7 +121,7 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.4) Field filters =====
+	-- ===== 1.3) Field filters =====
 	-- =====================================================
 
 	rows[#rows + 1] = {
@@ -170,7 +150,7 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.5) App exclusions =====
+	-- ===== 1.4) App exclusions =====
 	-- =====================================================
 
 	local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})

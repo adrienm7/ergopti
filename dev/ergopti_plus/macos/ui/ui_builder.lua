@@ -18,6 +18,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -140,6 +141,22 @@ end)()
 -- ===================================
 -- ===================================
 
+--- Builds the boot-script statement that hands a page its strings: the whole
+--- catalogue, active locale over English over French, so a key the active
+--- locale lacks shows English rather than its name.
+--- @param html_path string Page being built, named in the error log.
+--- @return string The statement, or "" when the strings are unavailable.
+local function strings_seed(html_path)
+	local ok_cat, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	local statement, seed_err = nil, catalogue
+	if ok_cat then statement, seed_err = I18nSeed.statement(catalogue) end
+	if not statement then
+		Logger.error(LOG, "Page '%s' is built without its strings: %s.", html_path, tostring(seed_err))
+		return ""
+	end
+	return statement
+end
+
 --- Reads a file from disk and returns its raw content.
 --- Drops a cache-busting query or fragment from an asset reference.
 ---
@@ -173,7 +190,11 @@ end
 --- @return string The complete self-contained HTML string.
 function M.build_injected_html(assets_dir, html_name)
 	html_name = html_name or "index.html"
-	local cache_key = assets_dir .. "|" .. html_name
+	-- The locale is part of the key: the page carries its strings, so a page
+	-- built before a language switch must not be served after it.
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
+	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale
 	if _html_cache[cache_key] then
 		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
 		return _html_cache[cache_key]
@@ -190,15 +211,13 @@ function M.build_injected_html(assets_dir, html_name)
 	local html = fh:read("*a")
 	fh:close()
 
-	-- Inject window.__i18n_base and window._i18n_locale right after <head> so
-	-- that i18n.js fetch() resolves locale JSON files correctly even when HTML
-	-- is loaded inline (no file:// base URL).  The locale is read at build time
-	-- from lib.i18n so the page renders in the user's active language.
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
-	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
+	-- Inject window.__i18n_base, window._i18n_locale and the page's strings
+	-- right after <head>, before any page script runs. The page is inline, so
+	-- its own fetch of a file:// locale is refused: the seeded strings are what
+	-- it shows, from its first render, whatever state the boot is in.
 	local i18n_boot = string.format(
-		'<script>window.__i18n_base="%s";window._i18n_locale="%s";</script>',
-		_locales_base_url, active_locale
+		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
+		_locales_base_url, active_locale, strings_seed(html_path)
 	)
 	-- Use a function replacement to avoid gsub interpreting % in the boot script
 	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. i18n_boot end, 1)
@@ -418,7 +437,10 @@ function M.get_centered_frame(w, h)
 	}
 end
 
---- Forces a webview window to the front, teleports it to the current space natively, and gives it focus cleanly.
+--- Presents a webview window: teleports it to the current space, raises it and
+--- gives it focus. This is the driver's one "present window" helper, used when a
+--- window opens and when an open window is requested again. It never changes the
+--- window level: an Ergopti window is focused, never kept above other apps.
 --- @param wv userdata The hs.webview object.
 --- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
 ---   flicker where the window appears briefly hidden before the HTML finishes loading.
@@ -479,9 +501,14 @@ function M.force_focus(wv, is_new, lifecycle)
 				if ok_active and active_space then
 					local ok_move, moved = pcall(function() return hs_spaces.moveWindowToSpace(win, active_space) end)
 					if not current() then return false end
-					if not ok_move or moved ~= true then return fail("space move") end
-					if ok_move then
+					if not ok_move then return fail("space move") end
+					if moved == true then
 						Logger.debug(LOG, "Window teleported via hs.spaces.")
+					else
+						-- A documented refusal, e.g. the active Space belongs to a
+						-- full-screen app. Presenting still has to happen: raising and
+						-- focusing below switch the user to the window's own Space.
+						Logger.warn(LOG, "The Space refused the window; presenting it on its own Space.")
 					end
 				end
 			end
@@ -525,19 +552,39 @@ function M.force_focus(wv, is_new, lifecycle)
 			attempts = attempts + 1
 			return schedule(0.05, try_focus, "webview focus retry")
 		else
-			-- Final fallback: if no window handle after 1s, use the webview-level bringToFront.
-			local brought = pcall(function() wv:bringToFront(true) end)
+			-- Final fallback when no window handle appeared within 1 s: order the
+			-- webview front again (show() makes it key) and activate Hammerspoon.
+			-- Never bringToFront(): it sets a floating or screen-saver LEVEL instead
+			-- of raising the window, which then stays above every other app.
+			local shown = pcall(function() wv:show() end)
 			if not current() then return false end
-			if not brought then return fail("fallback window focus") end
+			if not shown then return fail("fallback window focus") end
 			local activated = pcall(function() hs.focus(true) end)
 			if not current() then return false end
 			if not activated then return fail("fallback application focus") end
-			Logger.warn(LOG, "Window focus applied via bringToFront fallback after %d attempts.", max_attempts)
+			Logger.warn(LOG, "Window focus applied via show fallback after %d attempts.", max_attempts)
 			return current()
 		end
 	end
 
 	return try_focus()
+end
+
+--- True when the webview's window is the focused window. A shortcut or menu
+--- entry that toggles a window closes it only when the user is looking at it;
+--- a covered window is presented instead, since no window floats any more. A
+--- failed lookup reads as not focused, so the toggle presents rather than
+--- closing a window the user may not see.
+--- @param wv userdata|nil The hs.webview object.
+--- @return boolean
+function M.is_window_focused(wv)
+	if not wv then return false end
+	local ok_win, win = pcall(function() return wv:hswindow() end)
+	if not ok_win or not win then return false end
+	local ok_focused, focused = pcall(function() return hs.window.focusedWindow() end)
+	if not ok_focused or not focused then return false end
+	local ok_same, same = pcall(function() return win:id() == focused:id() end)
+	return ok_same and same == true
 end
 
 --- Composes a native window title. The product name is added here and only
@@ -564,11 +611,33 @@ function M.set_window_title(view, title)
 	return true
 end
 
+--- The one window kept above other apps: the Accessibility steps of the macOS
+--- permission dialog (ui/permission_dialog; its other kinds are focused like
+--- any window). It is shown only while ErgoptiPlus is not trusted for
+--- Accessibility, where force_focus cannot find it (hswindow() is an
+--- Accessibility lookup), and its steps are followed in System Settings, the
+--- active app, whose first click would bury a window at the normal level. It
+--- floats, never activates the app (it requires focus = false) and its owner
+--- closes it as soon as the grant arrives. No other window may name this chrome.
+M.PERMISSION_DIALOG_CHROME = "permission_dialog"
+
 --- Centralized factory to create a webview window with consistent properties.
---- @param opts table The configuration options for the webview.
+--- @param opts table The configuration options for the webview; focus = false
+---        shows the window without activating the app or changing its level;
+---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	if opts.level ~= nil then
+		-- Refused before the native window exists, so nothing is left to clean up.
+		Logger.error(LOG, "WebView factory refused a window level: windows are focused, never kept on top.")
+		return nil
+	end
+	if opts.chrome ~= nil and (opts.chrome ~= M.PERMISSION_DIALOG_CHROME or opts.focus ~= false) then
+		Logger.error(LOG, "WebView factory refused chrome '%s': only the permission dialog floats, unfocused.",
+			tostring(opts.chrome))
+		return nil
+	end
 	if _factory_build_owner then
 		Logger.warn(LOG, "WebView factory construction re-entry refused; candidate still in progress.")
 		return nil
@@ -718,7 +787,7 @@ function M.show_webview(opts)
 					if not wv or not wv2 or not webview_current() then return end
 					local ok_mod, locale_mod = pcall(require, "infra.locale")
 					if not ok_mod or not locale_mod then return end
-					local all_strings = locale_mod.all()
+					local all_strings = locale_mod.catalogue()
 					if type(all_strings) ~= "table" then return end
 					local ok_enc, json = pcall(hs.json.encode, all_strings)
 					if not ok_enc or not json then
@@ -759,17 +828,24 @@ function M.show_webview(opts)
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
-	-- force_focus is called with is_new=true so it skips the hide/show flicker path
-	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
-	-- UI opened through this factory automatically comes to the foreground and receives
-	-- keyboard focus without each caller having to remember to call it.
+	-- force_focus is called with is_new=true so it skips the space teleport and
+	-- goes straight to raise + focus. This means every UI opened through this
+	-- factory automatically comes to the foreground and receives keyboard focus
+	-- without each caller having to remember to call it.
+	-- A window opened with focus = false is shown and left where it is, without
+	-- activating Hammerspoon. The forced focus finds the window through
+	-- Accessibility, so it always fails in an untrusted process: a window meant
+	-- to sit beside another app (System Settings) must not be focused.
 	if not apply_required_webview_mutation(function() wv:show() end, "show") then
 		return abandon_required_mutation()
 	end
-	local focused = M.force_focus(wv, true, {
-		schedule_after = opts.schedule_after,
-		is_current = opts.is_current,
-	})
+	local focused = true
+	if opts.focus ~= false then
+		focused = M.force_focus(wv, true, {
+			schedule_after = opts.schedule_after,
+			is_current = opts.is_current,
+		})
+	end
 	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
 	if not webview_current() then return abandon_required_mutation() end
 	if _factory_build_owner == wv then _factory_build_owner = nil end
@@ -780,18 +856,35 @@ end
 
 --- The window chrome every Ergopti webview window gets: a native title bar and
 --- close button, the drop shadow that gives it a visible edge over a white page
---- (Hammerspoon webviews have none by default), and the floating level that keeps
---- it above other apps. Every window applies these steps, in this order, and a
---- window that skips this function is caught by test_window_chrome_everywhere.
+--- (Hammerspoon webviews have none by default), and the normal window level.
+--- An Ergopti window is raised and focused when it opens (force_focus), never
+--- kept above other apps: at the floating level the diagnostics window stayed
+--- over every window the user opened afterwards. The level step runs after the
+--- style because a utility panel mask can make an NSPanel float on its own.
+--- Every window applies these steps, in this order, and a window that skips this
+--- function is caught by test_window_chrome_everywhere.
 --- @param wv table The hs.webview window.
---- @param opts table|nil { style_masks?, level? } overrides for the mask and level.
+--- @param opts table|nil { style_masks?, chrome? } override for the mask; a level
+---        is refused, and chrome = M.PERMISSION_DIALOG_CHROME floats (see there).
 --- @return table Array of { name = string, apply = function } mutation steps.
 function M.window_chrome_steps(wv, opts)
 	opts = opts or {}
+	if opts.level ~= nil then
+		error("window_chrome_steps: windows take no level; they are focused, never kept on top", 2)
+	end
+	if opts.chrome ~= nil and opts.chrome ~= M.PERMISSION_DIALOG_CHROME then
+		error("window_chrome_steps: unknown chrome '" .. tostring(opts.chrome) .. "'", 2)
+	end
+	local level = hs.drawing.windowLevels.normal
+	if opts.chrome == M.PERMISSION_DIALOG_CHROME then
+		level = hs.drawing.windowLevels.floating
+	end
+	if type(level) ~= "number" then
+		error("window_chrome_steps: the window level is unavailable", 2)
+	end
 	local masks = hs.webview.windowMasks
 	local style = opts.style_masks
 		or ((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16))
-	local level = opts.level or hs.drawing.windowLevels.floating
 	return {
 		{ name = "windowStyle", apply = function() wv:windowStyle(style) end },
 		{ name = "shadow",      apply = function() wv:shadow(true) end },

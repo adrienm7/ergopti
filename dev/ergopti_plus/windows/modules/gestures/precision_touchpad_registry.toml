@@ -1,0 +1,129 @@
+# modules/gestures/precision_touchpad_registry.toml
+#
+# The Windows Precision Touchpad registry values Ergopti writes so that each
+# gesture slot sends Ctrl + Win + Shift + F1..F10 without a manual trip through
+# Settings > Bluetooth & devices > Touchpad > Advanced gestures.
+#
+# ONE SOURCE. tools/codegen/codegen-touchpad-registry.cjs turns this file into
+# windows/_generated/touchpad_registry.ahk, and both writers read that data:
+# the in-process registry writer (modules/gestures/config.ahk) and the elevated
+# PowerShell script of the first-run wizard
+# (ui/onboarding/gesture_registration.ahk).
+# modules/gestures/touchpad_registry.ahk owns every write: it backs up the
+# prior values before the first one, and restores them on request.
+#
+# Values were confirmed by reading the registry after a manual configuration
+# in Windows Settings. Every value is a REG_DWORD.
+
+key = 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
+powershell_key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
+
+# "Custom keyboard shortcut" for the family and direction enables, and "off"
+# for the new-system *Action values, so the older KeyParams take precedence.
+custom_value = 65535
+
+# Custom*Tap sentinel meaning "user-defined shortcut" for a tap slot.
+custom_tap_value = 7
+
+# KeyParams = (virtual key << 16) | modifiers, with Ctrl (1) | Shift (2) |
+# Win (4). F1 is virtual key 0x70; function_key n is 0x6F + n.
+key_params_modifiers = 7
+
+# Gesture families, turned on before any slot is written.
+[[families]]
+id = "three_finger_slide"
+enable = "ThreeFingerSlideEnabled"
+
+[[families]]
+id = "three_finger_tap"
+enable = "ThreeFingerTapEnabled"
+
+[[families]]
+id = "four_finger_slide"
+enable = "FourFingerSlideEnabled"
+
+[[families]]
+id = "four_finger_tap"
+enable = "FourFingerTapEnabled"
+
+# One entry per gesture slot, in menu order. A tap slot carries its Custom*Tap
+# sentinel, a swipe slot its direction enable.
+[[slots]]
+id = "tap_3"
+family = "three_finger_tap"
+function_key = 1
+custom_tap = "CustomThreeFingerTap"
+key_params = "CustomThreeFingerTapKeyParams"
+action = "ThreeFingerTapAction"
+
+[[slots]]
+id = "swipe_3_up"
+family = "three_finger_slide"
+function_key = 2
+enable = "ThreeFingerUp"
+key_params = "ThreeFingerUpKeyParams"
+action = "ThreeFingerSlideUpAction"
+
+[[slots]]
+id = "swipe_3_down"
+family = "three_finger_slide"
+function_key = 3
+enable = "ThreeFingerDown"
+key_params = "ThreeFingerDownKeyParams"
+action = "ThreeFingerSlideDownAction"
+
+[[slots]]
+id = "swipe_3_left"
+family = "three_finger_slide"
+function_key = 4
+enable = "ThreeFingerLeft"
+key_params = "ThreeFingerLeftKeyParams"
+action = "ThreeFingerSlideLeftAction"
+
+[[slots]]
+id = "swipe_3_right"
+family = "three_finger_slide"
+function_key = 5
+enable = "ThreeFingerRight"
+key_params = "ThreeFingerRightKeyParams"
+action = "ThreeFingerSlideRightAction"
+
+[[slots]]
+id = "tap_4"
+family = "four_finger_tap"
+function_key = 6
+custom_tap = "CustomFourFingerTap"
+key_params = "CustomFourFingerTapKeyParams"
+action = "FourFingerTapAction"
+
+[[slots]]
+id = "swipe_4_up"
+family = "four_finger_slide"
+function_key = 7
+enable = "FourFingerUp"
+key_params = "FourFingerUpKeyParams"
+action = "FourFingerSlideUpAction"
+
+[[slots]]
+id = "swipe_4_down"
+family = "four_finger_slide"
+function_key = 8
+enable = "FourFingerDown"
+key_params = "FourFingerDownKeyParams"
+action = "FourFingerSlideDownAction"
+
+[[slots]]
+id = "swipe_4_left"
+family = "four_finger_slide"
+function_key = 9
+enable = "FourFingerLeft"
+key_params = "FourFingerLeftKeyParams"
+action = "FourFingerSlideLeftAction"
+
+[[slots]]
+id = "swipe_4_right"
+family = "four_finger_slide"
+function_key = 10
+enable = "FourFingerRight"
+key_params = "FourFingerRightKeyParams"
+action = "FourFingerSlideRightAction"

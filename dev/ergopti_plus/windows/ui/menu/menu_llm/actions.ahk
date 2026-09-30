@@ -564,15 +564,6 @@ LLM_Menu_OnResume() {
 	global _LLM_Menu
 	if A_IsSuspended
 		return
-	; A trigger cleanup/rollback timer consumes its scheduled ownership before
-	; observing suspend. Transfer the retained record now that native Suspend no
-	; longer bypasses the callback guard.
-	if IsSet(LLM_Menu_ServiceTriggerRecovery) {
-		try LLM_Menu_ServiceTriggerRecovery()
-		catch as Err
-			try LoggerError("LLM",
-				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
-	}
 	_LLM_Menu_ServiceDeleteReconcile()
 	LLM_Menu_ServiceBuilds()
 	if _LLM_Menu["bootstrap_pending"] {

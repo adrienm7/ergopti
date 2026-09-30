@@ -258,14 +258,13 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			guarded_check_requirements = function() return true end,
 			save_prefs = function() return true end,
 			update_menu = function() return true end,
-			apply_llm_shortcut = function() return true end,
 			apply_llm_profile_shortcut = function() return true end,
 			activate_hotkey = function() return true end,
 			mlx_deps_checker = {},
+			runtime_installed = function() return true end,
 			deps = { script_control = shortcuts },
 			get_startup_silence = function() return false end,
 			set_startup_silence = function() return true end,
-			get_trigger_hk = function() return nil end,
 			get_profile_hks = function() return {} end,
 		})
 
@@ -383,7 +382,6 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = noop,
 				}
@@ -398,8 +396,8 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			render_rows = function(rows) return rows end,
 			build = function() return {} end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = noop }
-		package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = noop }
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({ check_and_install_deps = noop })
 		reset_module("ui.menu.menu_llm")
 		local MenuLLM = require("ui.menu.menu_llm")
 		local handler = MenuLLM.create({

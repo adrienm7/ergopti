@@ -15,6 +15,7 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
+local Extensions    = require("hotstrings.extensions")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
@@ -122,7 +123,10 @@ end
 --- @return string
 local function groupLabel(ctx, name)
 	local meta = ctx.keymap and type(ctx.keymap.get_meta_description) == "function" and ctx.keymap.get_meta_description(name)
-	local lbl = (type(meta) == "string" and meta ~= "") and meta or tostring(name):gsub("_", " ")
+	-- An extension pack without a description is named by its file, not by the
+	-- namespaced key the registry files it under.
+	local _, stem = Extensions.parse_category_key(name)
+	local lbl = (type(meta) == "string" and meta ~= "") and meta or tostring(stem or name):gsub("_", " ")
 	return ctx.applyTriggerChar(lbl)
 end
 
@@ -320,6 +324,61 @@ local function buildPersonalInfoItems(ctx, description)
 	}
 end
 
+--- The sections each installed extension binds inside a bundled category
+--- (Ergopti's repeat corrections in the magic key category), from the boot's
+--- discovery catalogue.
+--- @param ctx table Menu context carrying `extension_packs`.
+--- @return table Map of extension id to array of { group, section }.
+--- @return table Map of group to set of bound section names.
+function M.bound_sections(ctx)
+	local by_extension, by_group = {}, {}
+	for _, pack in ipairs(type(ctx.extension_packs) == "table" and ctx.extension_packs or {}) do
+		for _, file in ipairs(pack.bound_files or {}) do
+			for _, section in ipairs(file.binding.sections or {}) do
+				local list = by_extension[pack.id] or {}
+				by_extension[pack.id] = list
+				list[#list + 1] = { group = file.binding.category, section = section }
+				by_group[file.binding.category] = by_group[file.binding.category] or {}
+				by_group[file.binding.category][section] = true
+			end
+		end
+	end
+	return by_extension, by_group
+end
+
+--- The rows of the sections an extension binds, drawn in its « Hotstrings
+--- <extension> » submenu rather than in their category's: each keeps its
+--- category, so its switch and its preference are the category's section.
+--- @param ctx table Context.
+--- @param bound table Array of { group, section } from M.bound_sections().
+--- @return table rows
+--- @return number total Entries of the sections that are on.
+function M.build_bound_section_rows(ctx, bound)
+	local rows, total = {}, 0
+	for _, entry in ipairs(bound) do
+		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function"
+			and ctx.keymap.get_sections(entry.group) or {}
+		for _, sec in ipairs(type(sections) == "table" and sections or {}) do
+			if type(sec) == "table" and sec.name == entry.section then
+				local enabled = groupEnabled(ctx, entry.group)
+				local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
+					and ctx.keymap.is_section_enabled(entry.group, sec.name) or false
+				local lbl = resolve_desc(sec.description) ~= "" and resolve_desc(sec.description)
+					or tostring(sec.name):gsub("_", " ")
+				lbl = ctx.applyTriggerChar(lbl)
+				rows[#rows + 1] = {
+					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
+					checked  = sec_on or nil,
+					action   = (enabled and not ctx.paused) and toggleSectionFn(ctx, entry.group, sec.name, lbl) or nil,
+					disabled = not enabled or ctx.paused or nil,
+				}
+				if enabled and sec_on and sec.count ~= nil then total = total + tonumber(sec.count) end
+			end
+		end
+	end
+	return rows, total
+end
+
 --- Builds the main hotstring groups menu.
 --- @param ctx table Context.
 --- @param only table|nil Optional set of group names to include (nil = all common groups).
@@ -333,6 +392,8 @@ function M.build_groups(ctx, only, counts)
 	if #top_names == 0 then return {} end
 
 	local items = {}
+	-- A section an extension binds is drawn in that extension's submenu instead.
+	local _, bound_by_group = M.bound_sections(ctx)
 	for _, name in ipairs(top_names) do
 		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_" then goto continue_group end
 		if type(only) == "table" and not only[name] then goto continue_group end
@@ -424,6 +485,8 @@ function M.build_groups(ctx, only, counts)
 						end
 					elseif name == "magic_key" and sec.name == "replace" then
 						-- Skip: shown in Disposition Ergopti
+					elseif bound_by_group[name] and bound_by_group[name][sec.name] then
+						-- Skip: shown in the « Hotstrings <extension> » submenu
 					elseif sec.is_module_placeholder then
 						local ms       = type(ctx.module_sections) == "table" and ctx.module_sections[name]
 						local ms_entry = type(ms) == "table" and ms[sec.name]

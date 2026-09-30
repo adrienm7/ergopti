@@ -286,7 +286,11 @@ function M.stop_watchers()
 	return false
 end
 
-function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
+--- Builds the menubar and wires its owners.
+--- @param extension_packs table|nil The boot's extension discovery catalogue, whose
+---   loaded packs the Hotstrings menu lists under their extension.
+function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths,
+	extension_packs)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
@@ -502,6 +506,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local preference_checkpoint = nil
 	local llm_handler = nil
 	local apply_preference_scope
+	local apply_global_scope
 	-- Features whose runtime refused the saved value this session: their state
 	-- shows the real posture while saves keep the value config.toml holds.
 	local session_demotions = SessionDemotions.new()
@@ -529,12 +534,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk_box = {}
 
 	--- Delegates an open dashboard close to the module that owns its full runtime.
+	--- Only a dashboard the user is looking at is closed: a covered one answers
+	--- nil, so the caller opens it and the module presents the open window.
 	--- @param module_name string Canonical loaded-module name.
 	--- @param label string Diagnostic dashboard label.
-	--- @return boolean|nil settled False on refused close, nil when not open.
+	--- @return boolean|nil settled False on refused close, nil when not open or covered.
 	local function close_loaded_dashboard(module_name, label)
 		local dashboard = package.loaded[module_name]
 		if not dashboard or not dashboard._wv then return nil end
+		if not require("ui.ui_builder").is_window_focused(dashboard._wv) then return nil end
 		if type(dashboard.close) ~= "function" then
 			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
 			return false
@@ -551,8 +559,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
-				-- Toggle: close the dashboard if already open, otherwise open it.
-				-- Using package.loaded so we don't accidentally trigger require() on close.
+				-- Toggle: close the dashboard if it is open and focused, otherwise
+				-- open or present it. Using package.loaded so we don't accidentally
+				-- trigger require() on close.
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
@@ -578,7 +587,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk = nil
 	local function apply_apps_time_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
-				-- Toggle behaviour: close if open, else open
+				-- Toggle behaviour: close if open and focused, else open or present
 				local closed = close_loaded_dashboard(
 					"ui.metrics_apps", "Apps dashboard")
 				if closed ~= nil then return closed end
@@ -702,6 +711,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 	})
 
+	-- The factory reset moves both configuration files aside and reloads. No
+	-- menu row runs it since Configuration › « Restore recommended values »
+	-- composes the category scopes (apply_global_scope); it stays exported as
+	-- actions.factory_reset until it is retired or given an approved row.
+	local function reset_all_defaults()
+		if not global_actions_owner then
+			Logger.error(LOG, "Factory reset transaction owner is unavailable.")
+			return false
+		end
+		return global_actions_owner.reset_defaults()
+	end
+
 	run_global_exclusive = function(action_label, callback, retained_owner)
 		if not global_actions_owner
 			or type(global_actions_owner.run_exclusive) ~= "function" then
@@ -712,13 +733,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return global_actions_owner.run_exclusive(action_label, callback, retained_owner)
 	end
 
-	local function reset_all_defaults()
-		if not global_actions_owner then
-			Logger.error(LOG, "Factory reset transaction owner is unavailable.")
-			return false
-		end
-		return global_actions_owner.reset_defaults()
-	end
 
 
 
@@ -1059,9 +1073,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end, "menu.open_personal_toml")
 			end,
 			add_hotstring = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it.
+				-- A covered editor may hold typed text: bring it back, never close it.
 				if hotstring_editor then
-					if type(hotstring_editor.is_open) == "function" and hotstring_editor.is_open() then
+					if type(hotstring_editor.is_open) == "function" and hotstring_editor.is_open()
+						and type(hotstring_editor.is_editor_focused) == "function"
+						and hotstring_editor.is_editor_focused()
+					then
 						if type(hotstring_editor.close) == "function" then pcall(hotstring_editor.close) end
 						return
 					end
@@ -1069,14 +1087,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 			end,
 			show_metrics = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
 				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
 			end,
 			show_apps_time = function()
-				-- Toggle: close if already open, otherwise open
+				-- Toggle: close if open and focused, otherwise open or present it
 				local closed = close_loaded_dashboard(
 					"ui.metrics_apps", "Apps dashboard")
 				if closed ~= nil then return closed end
@@ -1147,7 +1165,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return require("ui.menu.uninstall").run()
 			end)
 		end,
-		reset_defaults            = function() return reset_all_defaults() end,
+		-- Configuration › « Restore recommended values »: every category's own
+		-- scope owner, composed all or nothing (ui.menu.global_scope).
+		reset_defaults            = function()
+			return type(apply_global_scope) == "function" and apply_global_scope("recommended") == true
+		end,
+		factory_reset             = function() return reset_all_defaults() end,
 		clean_unused_keys         = function()
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
@@ -1240,8 +1263,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- reads current values without rebuilding the table on every click.
 	local gesture_scope = nil
 	local scope_generation = 0
-	local function apply_gesture_scope(mode)
-		if read_only_reason ~= nil then return false end
+	local function gesture_scope_owner()
+		if read_only_reason ~= nil or type(gestures) ~= "table" then return nil end
 		if not gesture_scope then
 			gesture_scope = require("ui.menu.gesture_scope").new({
 				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1266,7 +1289,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end,
 			})
 		end
-		local committed = gesture_scope.apply(mode)
+		return gesture_scope
+	end
+	local function apply_gesture_scope(mode)
+		local owner = gesture_scope_owner()
+		if not owner then return false end
+		local committed = owner.apply(mode)
 		if committed == true then
 			Builder.invalidate_cache()
 			updateMenu()
@@ -1277,11 +1305,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local layout_scope = nil
 	local llm_scope = nil
 	local shortcuts_scope = nil
-	apply_preference_scope = function(scope, mode)
+	--- The scoped owner of one config.toml category, created on first use, or
+	--- nil when this session cannot own it (read-only, or its runtime absent).
+	--- @param scope string Manifest scope id.
+	--- @return table|nil owner
+	local function preference_scope_owner(scope)
 		if scope == "shortcuts" then
 			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
 				or type(menu_mods.shortcuts) ~= "table"
-				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return false end
+				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return nil end
 			if not shortcuts_scope then
 				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1313,12 +1345,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end,
 				})
 			end
-			local committed = shortcuts_scope.apply(mode)
-			if committed == true then Builder.invalidate_cache(); updateMenu() end
-			return committed
+			return shortcuts_scope
 		end
 		if scope == "llm" then
-			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return false end
+			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return nil end
 			if not llm_scope then
 				llm_scope = require("ui.menu.llm_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1341,12 +1371,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end,
 				})
 			end
-			local committed = llm_scope.apply(mode)
-			if committed == true then Builder.invalidate_cache(); updateMenu() end
-			return committed
+			return llm_scope
 		end
 		if scope == "metrics" then
-			if read_only_reason ~= nil then return false end
+			if read_only_reason ~= nil then return nil end
 			if not metrics_scope then
 				metrics_scope = require("ui.menu.metrics_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1392,12 +1420,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end,
 				})
 			end
-			local committed = metrics_scope.apply(mode)
-			if committed == true then Builder.invalidate_cache(); updateMenu() end
-			return committed
+			return metrics_scope
 		end
-		if scope ~= "keyboard_layout" then return false end
-		if read_only_reason ~= nil then return false end
+		if scope ~= "keyboard_layout" then return nil end
+		if read_only_reason ~= nil then return nil end
 		if not layout_scope then
 			layout_scope = require("ui.menu.scoped_preferences").new({
 				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1426,12 +1452,54 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end,
 			})
 		end
-		local committed = layout_scope.apply(mode)
+		return layout_scope
+	end
+	apply_preference_scope = function(scope, mode)
+		local owner = preference_scope_owner(scope)
+		if not owner then return false end
+		local committed = owner.apply(mode)
 		if committed == true then
 			Builder.invalidate_cache()
 			updateMenu()
 		end
 		return committed
+	end
+	local global_scope = nil
+	apply_global_scope = function(mode)
+		if read_only_reason ~= nil then return false end
+		if not global_scope then
+			local owners = { gestures = gesture_scope_owner }
+			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "llm", "metrics" }) do
+				owners[scope] = function() return preference_scope_owner(scope) end
+			end
+			global_scope = require("ui.menu.global_scope").new({
+				owners = owners,
+				remap = karabiner,
+				backup_path = function(scope)
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				defer = function(continuation)
+					return DeferredWork.after(0, continuation, "menu.global_scope") == true
+				end,
+				paused = function()
+					if type(core_mods.shortcuts_mod) ~= "table"
+						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+					return core_mods.shortcuts_mod.is_paused()
+				end,
+				confirm = function(selected_mode)
+					local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+					local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+					return require("infra.dialog_util").block_alert(i18n.get("menu.configuration.title"), label, no, yes, "warning") == yes
+				end,
+				refresh = function()
+					Builder.invalidate_cache()
+					updateMenu()
+				end,
+			})
+		end
+		return global_scope.apply(mode)
 	end
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
@@ -1446,6 +1514,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		keymap                   = keymap,
 		hotfiles                 = hotfiles,
 		hotfile_paths            = type(hotfile_paths) == "table" and hotfile_paths or {},
+		-- The packs this boot discovered and registered; the counter groups their
+		-- loaded categories under each extension from it.
+		extension_packs          = extension_packs,
 		module_sections          = module_sections,
 		hotstring_editor         = hotstring_editor,
 		personal_info            = core_mods.dyn_hot_mod,

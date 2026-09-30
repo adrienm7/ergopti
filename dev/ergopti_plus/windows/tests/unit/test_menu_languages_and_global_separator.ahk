@@ -9,7 +9,8 @@
 ; sit under their own header, behind a separator, and carry their locale's flag
 ; (an icon here, since Win32 menus cannot render flag emoji). The Configuration
 ; submenu draws the two rows that rewrite the configuration, a separator, then
-; the two that open a window.
+; the rows that open a window and login startup, and ends there: Uninstall
+; closes the Version / Updates submenu, after a separator, since 2026-09.
 ; ============================================================================
 
 ; Index of the first manifest entry of ``Key`` whose ``Field`` equals ``Value``.
@@ -48,15 +49,22 @@ _MLG_LanguageRowCarriesItsFlag() {
 Test("menu layout: each hotstring language row carries its locale's flag (menu-languages-flag)",
 	_MLG_LanguageRowCarriesItsFlag)
 
-; The Configuration submenu: the two rows that rewrite the configuration, a
-; separator, then configuration windows and the installation controls.
-_MLG_ConfigurationRowsInOrder() {
-	Entries := _MM_GetManifestRoot()["configuration_menu"]
+; The rows of one manifest menu, ids and separators, joined in order.
+_MLG_Order(MenuName) {
 	Order := ""
-	for _, Entry in Entries
+	for _, Entry in _MM_GetManifestRoot()[MenuName]
 		Order .= (Order == "" ? "" : ", ") . (Entry.Get("type", "") == "---" ? "---" : Entry["id"])
-	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard, start_at_login, ---, uninstall", Order,
-		"configuration_menu must declare its rows in this order")
+	return Order
+}
+
+; The Configuration submenu: the two rows that rewrite the configuration, a
+; separator, then configuration windows, login startup, the macOS-only
+; Karabiner rows and the Windows-only touchpad restore, with no separator left
+; dangling at its end.
+_MLG_ConfigurationRowsInOrder() {
+	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard, start_at_login, "
+		. "karabiner_integration, remove_from_karabiner, restore_touchpad_gestures",
+		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
 	; Global Restore now composes every persistence owner at its terminal boundary.
@@ -69,9 +77,25 @@ _MLG_ConfigurationRowsInOrder() {
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
 			["start_at_login", "ToggleStartAtLogin"],
-			["uninstall", "ShowUninstallErgopti"]]
+			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
+	AssertEqual(0, InStr(Body, "ShowUninstallErgopti"), "Configuration no longer offers Uninstall")
 }
 Test("menu layout: the Configuration rows rewrite first, then open windows (menu-configuration)",
 	_MLG_ConfigurationRowsInOrder)
+
+; Uninstall closes the Version / Updates submenu, after a separator, and keeps
+; its label key and its action owner.
+_MLG_UninstallClosesTheAboutMenu() {
+	AssertEqual("about_updates, ---, about_changelog, about_releases_page, ---, uninstall",
+		_MLG_Order("about_menu"), "about_menu must end with a separator and Uninstall")
+	Entries := _MM_GetManifestRoot()["about_menu"]
+	AssertEqual("menu.global.uninstall", Entries[Entries.Length]["i18n"], "Uninstall keeps its label key")
+	Body := _DriverFuncBody("_MI_BuildAboutMenu")
+	Assert(Body != "", "the About builder must exist before checking its commands")
+	AssertTrue(RegExMatch(Body, '"uninstall",\s+ShowUninstallErgopti') > 0,
+		"the About menu must dispatch uninstall to ShowUninstallErgopti")
+}
+Test("menu layout: Uninstall closes the Version / Updates submenu (menu-about-uninstall)",
+	_MLG_UninstallClosesTheAboutMenu)

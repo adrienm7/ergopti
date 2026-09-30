@@ -125,6 +125,9 @@ TOML_UnreadableFile(Path) {
 ; untrustworthy until the driver is restarted.
 global _ConfigBootReadFailed := false
 global _ConfigBootRejectedOverrides := 0
+; "Section`nKey" -> reason, for each value the boot load ignored as outdated
+; configuration. Full saves leave these on disk for the configuration cleanup.
+global _ConfigBootOutdatedEntries := Map()
 
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more

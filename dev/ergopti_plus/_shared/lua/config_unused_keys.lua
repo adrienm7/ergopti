@@ -26,6 +26,10 @@
 ---    array-of-tables records are never offered: removing them by text alone
 ---    cannot be proven exact. Metadata tables ([_meta] and any other [_*]) are
 ---    never offered either, as on Windows.
+--- 5. Outdated members of an inline table. An owner can report one member of
+---    `keys = { at_hash = true, ctrl_s = true }` as outdated while another is
+---    live. That member is offered on its own, and its removal rewrites only
+---    that record, without the member, so what is warned is what is offered.
 --- ==============================================================================
 
 local M = {}
@@ -39,7 +43,9 @@ end
 local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
+local ConfigOutdated = require("config_outdated")
 local LOG           = "config_unused_keys"
+local BOM           = string.char(0xEF, 0xBB, 0xBF)
 
 --- The confirmation dialog lists at most this many keys; the rest are counted.
 --- Pinned to CONFIG_UNUSED_KEYS_DISPLAY_LIMIT of the Windows driver by test.
@@ -142,6 +148,66 @@ local function read_file(opts, path)
 	return TomlWriter.read_classified(path, opts.file_adapter)
 end
 
+--- Reads the value at a path of a decoded document.
+--- @param document table
+--- @param segments table
+--- @return any
+local function lookup(document, segments)
+	local value = document
+	for _, segment in ipairs(segments) do
+		if type(value) ~= "table" then return nil end
+		value = value[segment]
+	end
+	return value
+end
+
+--- The bare-key segments of a dotted outdated path, nil for a path holding a
+--- quoted segment (never offered: config_outdated says so in its warning).
+--- @param path string
+--- @return table|nil segments
+local function bare_path(path)
+	local segments = {}
+	for segment in (path .. "."):gmatch("([^.]*)%.") do
+		if not segment:match("^[A-Za-z0-9_%-]+$") then return nil end
+		segments[#segments + 1] = segment
+	end
+	return segments
+end
+
+--- The outdated members strictly below one inline-table record, as offered
+--- entries sorted by path.
+--- @param record table Addressable record whose value is an inline table.
+--- @param outdated table Set of dotted outdated paths.
+--- @param decoded table Decoded document.
+--- @return table entries
+local function inline_members(record, outdated, decoded)
+	local prefix = table.concat(record.path, ".") .. "."
+	local paths = {}
+	for path in pairs(outdated) do
+		if path:sub(1, #prefix) == prefix then paths[#paths + 1] = path end
+	end
+	table.sort(paths)
+	local entries = {}
+	for _, path in ipairs(paths) do
+		local segments = bare_path(path)
+		local value = segments and lookup(decoded, segments)
+		if value ~= nil then
+			local section = {}
+			for index = 1, #segments - 1 do section[index] = segments[index] end
+			entries[#entries + 1] = {
+				section = table.concat(section, "."),
+				key     = segments[#segments],
+				value   = TomlCodec.encode_value(value),
+				kind    = "leaf",
+				path    = segments,
+				-- The record whose inline value the removal rewrites.
+				inline  = { section = record.section, key = record.key },
+			}
+		end
+	end
+	return entries
+end
+
 --- Lists the unused keys of already-read content.
 --- @param source string Exact file content.
 --- @param collect function `collect(decoded, mark)`: the driver's readers.
@@ -158,7 +224,9 @@ function M.find_in_source(source, collect)
 	if not scan then return { status = "malformed", keys = {} } end
 
 	local consumption = M.new_consumption()
-	collect(decoded, consumption.mark)
+	-- An entry its owner reports as outdated is offered even when another
+	-- reader also reads it: warned and offered are one set.
+	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark) end)
 
 	local keys = {}
 	for _, record in ipairs(scan.records) do
@@ -166,7 +234,8 @@ function M.find_in_source(source, collect)
 		-- stamp the boot migration reads before any reader runs. The Windows
 		-- loader skips the same tables.
 		local metadata = record.addressable and record.path[1]:sub(1, 1) == "_"
-		if record.addressable and not metadata and not consumption.touches(record.path) then
+		local stale = record.addressable and outdated[table.concat(record.path, ".")] == true
+		if record.addressable and not metadata and (stale or not consumption.touches(record.path)) then
 			keys[#keys + 1] = {
 				section = record.section,
 				key     = record.key,
@@ -176,6 +245,8 @@ function M.find_in_source(source, collect)
 				kind    = consumption.touches(record.header.segments) and "leaf" or "section",
 				path    = record.path,
 			}
+		elseif record.addressable and not metadata and type(lookup(decoded, record.path)) == "table" then
+			for _, entry in ipairs(inline_members(record, outdated, decoded)) do keys[#keys + 1] = entry end
 		end
 	end
 	return { status = "ok", keys = keys }
@@ -276,26 +347,56 @@ end
 function M.remove_from_source(source, keys)
 	local scan, scan_err = M.scan_records(source)
 	if not scan then return nil, scan_err end
-	local listed, unknown_sections = {}, {}
+	local listed, unknown_sections, members = {}, {}, {}
 	for _, entry in ipairs(keys) do
-		listed[entry.section .. "\n" .. entry.key] = true
-		if entry.kind == "section" then unknown_sections[entry.section] = true end
+		if type(entry.inline) == "table" then
+			-- An inline-table member: its record is rewritten, never cut.
+			local id = entry.inline.section .. "\n" .. entry.inline.key
+			members[id] = members[id] or {}
+			members[id][#members[id] + 1] = entry.path
+		else
+			listed[entry.section .. "\n" .. entry.key] = true
+			if entry.kind == "section" then unknown_sections[entry.section] = true end
+		end
 	end
 
-	local dropped, touched = {}, {}
+	local dropped, touched, replaced = {}, {}, {}
 	local removed = 0
+	local decoded = nil
 	for _, record in ipairs(scan.records) do
-		if record.addressable and listed[record.section .. "\n" .. record.key] then
+		local id = record.addressable and (record.section .. "\n" .. record.key) or nil
+		if id and listed[id] then
 			for index = record.first, record.last do dropped[index] = true end
 			removed = removed + 1
 			touched[record.header] = true
+		elseif id and members[id] then
+			if decoded == nil then
+				local decoded_ok, value = pcall(TomlCodec.decode, source)
+				if not decoded_ok or type(value) ~= "table" then return nil, "the source would not parse" end
+				decoded = value
+			end
+			local reduced, cut = M.without_members(lookup(decoded, record.path), record.path, members[id])
+			if cut > 0 then
+				removed = removed + cut
+				for index = record.first, record.last do dropped[index] = true end
+				if next(reduced) ~= nil then
+					-- The rewritten record takes the place of its first line.
+					local text = scan.lines[record.first].text
+					local lead = text:sub(1, 3) == BOM and BOM or ""
+					local indent = text:sub(#lead + 1):match("^[ \t]*")
+					replaced[record.first] = {
+						text = lead .. indent .. record.key .. " = " .. TomlCodec.encode_value(reduced),
+						eol = scan.lines[record.last].eol,
+					}
+				end
+			end
 		end
 	end
 	for _, header in ipairs(scan.headers) do
 		if touched[header] and unknown_sections[header.section] then
 			local remaining = false
 			for _, record in ipairs(scan.records) do
-				if record.header == header and not dropped[record.first] then
+				if record.header == header and (not dropped[record.first] or replaced[record.first]) then
 					remaining = true
 					break
 				end
@@ -305,17 +406,18 @@ function M.remove_from_source(source, keys)
 	end
 
 	local lines = scan.lines
-	local bom = lines[1] and lines[1].text:sub(1, 3) == string.char(0xEF, 0xBB, 0xBF)
-	local chunks, bom_pending = {}, bom and dropped[1]
+	local bom = lines[1] and lines[1].text:sub(1, 3) == BOM
+	local chunks, bom_pending = {}, bom and dropped[1] and not replaced[1]
 	for index, line in ipairs(lines) do
-		if not dropped[index] then
+		local kept = replaced[index] or (not dropped[index] and line) or nil
+		if kept then
 			if bom_pending then
 				-- The first line went; the file keeps its byte-order mark.
-				chunks[#chunks + 1] = string.char(0xEF, 0xBB, 0xBF)
+				chunks[#chunks + 1] = BOM
 				bom_pending = false
 			end
-			chunks[#chunks + 1] = line.text
-			chunks[#chunks + 1] = line.eol
+			chunks[#chunks + 1] = kept.text
+			chunks[#chunks + 1] = kept.eol
 		end
 	end
 	local candidate = table.concat(chunks)
@@ -324,6 +426,41 @@ function M.remove_from_source(source, keys)
 		return nil, "the cleaned content would not parse"
 	end
 	return candidate, removed
+end
+
+--- Copies an inline table without the listed member paths, pruning tables
+--- the removal leaves empty.
+--- @param value table Decoded inline table.
+--- @param prefix table Path segments of its record.
+--- @param paths table Member paths (full segments) to remove.
+--- @return table reduced
+--- @return number cut Members actually removed.
+function M.without_members(value, prefix, paths)
+	local function clone(node)
+		if type(node) ~= "table" then return node end
+		local copy = {}
+		for key, child in pairs(node) do copy[key] = clone(child) end
+		return copy
+	end
+	local reduced, cut = clone(value), 0
+	for _, path in ipairs(paths) do
+		local parents, node = {}, reduced
+		for index = #prefix + 1, #path - 1 do
+			if type(node) ~= "table" then node = nil; break end
+			parents[#parents + 1] = { node = node, key = path[index] }
+			node = node[path[index]]
+		end
+		if type(node) == "table" and node[path[#path]] ~= nil then
+			node[path[#path]] = nil
+			cut = cut + 1
+			for index = #parents, 1, -1 do
+				local parent = parents[index]
+				if next(parent.node[parent.key]) ~= nil then break end
+				parent.node[parent.key] = nil
+			end
+		end
+	end
+	return reduced, cut
 end
 
 --- Removes keys (as returned by find) from a config file after a verified

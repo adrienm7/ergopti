@@ -63,7 +63,10 @@ _PrefixWatcherTomlPath(Category) {
 global HS_PREFIX_ENTRY_PATTERN :=
 	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
-_RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
+; OnlySection / PathOverride index one section a layout extension binds from
+; its own file (HotstringsBoundSections); without them, the category's file is
+; indexed minus those bound sections, as LoadHotstringsSection registers them.
+_RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOverride := "", OnlySection := "") {
 	global ScriptInformation, Features, _V1CatToV2CatMap, _PrefixIndex, _TriggerSet
 	global HS_PREFIX_ENTRY_PATTERN
 	if !IsObject(IndexTarget)
@@ -76,7 +79,8 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 		return 0
 	}
 
-	Path := _PrefixWatcherTomlPath(Category)
+	Path := (PathOverride != "") ? PathOverride : _PrefixWatcherTomlPath(Category)
+	BoundSections := (OnlySection != "") ? Map() : HotstringsBoundSections(Category)
 	if !FileExist(Path) {
 		if (StrLower(Category) == "personal")
 			try LoggerWarn("PrefixWatcher", "Personal TOML not found at configured path: {1}.", Path)
@@ -116,6 +120,9 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 			continue
 		}
 		if (CurrentSection == "") {
+			continue
+		}
+		if (OnlySection != "" ? CurrentSection != StrLower(OnlySection) : BoundSections.Has(CurrentSection)) {
 			continue
 		}
 
@@ -355,6 +362,10 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 		; name that itself contains a dot survives — matches _HsCacheRegisterSection).
 		Parts := StrSplit(Key, ".", , 2)
 		SecId := Parts.Length >= 2 ? Parts[2] : ""
+		; A bound section is indexed from its extension file by the caller.
+		if HotstringsBoundSections(Category).Has(SecId) {
+			continue
+		}
 		; 3. Section-enabled gate — only index sections whose Features flag is set,
 		;    identical to the TOML path so a live toggle adds/removes them in lockstep.
 		if !Features["hotstrings"][V2Cat].Has(SecId) {

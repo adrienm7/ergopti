@@ -4,10 +4,11 @@
 # ==============================================================================
 # SCRIPT: Ensure Hammerspoon Python Dependencies
 # DESCRIPTION:
-# Provisions the project-local virtualenv at static/ergopti_plus/macos/.venv
-# from the pinned pyproject.toml on every Hammerspoon startup so a freshly
-# cloned repo on a brand-new Mac becomes runnable WITHOUT any manual setup —
-# no Homebrew, no pre-installed Python, no pre-installed uv required.
+# Provisions the MLX virtualenv (static/ergopti_plus/macos/.venv in a
+# checkout, Application Support under the launcher) from the pinned
+# pyproject.toml. mlx_deps_checker.lua runs it only when the user selects the
+# MLX backend, never at startup or after an update, and then no manual setup
+# is needed — no Homebrew, no pre-installed Python, no pre-installed uv.
 #
 # FEATURES & RATIONALE:
 # 1. Self-bootstrapping uv: when 'uv' is missing from PATH and from the usual

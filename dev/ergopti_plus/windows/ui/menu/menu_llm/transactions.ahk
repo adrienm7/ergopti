@@ -150,20 +150,19 @@ _LLM_Menu_ApplyStandardCommitted(*) {
 
 ; Runs one detached config.toml transaction. Optional callables are narrow test
 ; seams; production uses the terminal bundle, pending-generation settlement,
-; trigger quiescence, full collector and strict TOML writer.
+; full collector and strict TOML writer.
 LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
-		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, QuiesceFn := 0,
-		CollectFn := 0, PrepareFn := 0, PublishFn := 0) {
+		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, CollectFn := 0,
+		PrepareFn := 0, PublishFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
-		WriterFn, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn,
-		PrepareFn, PublishFn)
+		WriterFn, NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn,
+		PublishFn)
 	finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
-		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn, PrepareFn,
-		PublishFn) {
+		NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn, PublishFn) {
 	global ConfigurationFile, Features, _LLM_Menu
 	if !ConfigFullStateCanPersist()
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -182,7 +181,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 	}
 	try Bundle := HasMethod(AcquireFn, "Call")
 		? AcquireFn.Call([ConfigurationFile])
-		: LLM_Menu_AcquireLifecycleBundle([ConfigurationFile])
+		: ConfigWriteAcquireLifecycleBundle([ConfigurationFile])
 	catch as Err {
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"terminal configuration admission raised: " . Err.Message)
@@ -204,17 +203,6 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		if !((Settled is Integer) && Settled == 1) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"an older accepted full save could not be made durable")
-		}
-		try Quiesced := HasMethod(QuiesceFn, "Call")
-			? QuiesceFn.Call(Bundle)
-			: LLM_Menu_QuiesceTriggerForLifecycle(Bundle)
-		catch as Err {
-			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"LLM trigger quiescence raised: " . Err.Message)
-		}
-		if !((Quiesced is Integer) && Quiesced == 1) {
-			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"LLM trigger recovery is incomplete")
 		}
 
 		CandidateFeatures := LLM_Menu_DeepClone(Features)
@@ -348,18 +336,18 @@ _LLM_Menu_ReportApiTransitionFailure(Context, Result, NotifyFn := 0,
 ; and the committed-new journal has been verified and removed.
 LLM_Menu_CommitApiEntriesMutation(Context, MutateFn, ApplyFn := 0,
 		Port := 0, NotifyFn := 0, AcquireFn := 0, SettleFn := 0,
-		QuiesceFn := 0, CollectFn := 0, BuildConfigFn := 0,
-		SerializeFn := 0, PauseFn := 0) {
+		CollectFn := 0, BuildConfigFn := 0, SerializeFn := 0,
+		PauseFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _LLM_Menu_CommitApiEntriesMutationNonCritical(Context,
-		MutateFn, ApplyFn, Port, NotifyFn, AcquireFn, SettleFn, QuiesceFn,
-		CollectFn, BuildConfigFn, SerializeFn, PauseFn)
+		MutateFn, ApplyFn, Port, NotifyFn, AcquireFn, SettleFn, CollectFn,
+		BuildConfigFn, SerializeFn, PauseFn)
 	finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
-		Port, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn,
-		BuildConfigFn, SerializeFn, PauseFn) {
+		Port, NotifyFn, AcquireFn, SettleFn, CollectFn, BuildConfigFn,
+		SerializeFn, PauseFn) {
 	global _PathsFile, ConfigurationFile, Features, _LLM_Menu
 	if !ConfigFullStateCanPersist()
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -396,18 +384,6 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 	Bundle := AcquireResult["bundle"]
 	ReleaseBundle := true
 	try {
-		try Quiesced := HasMethod(QuiesceFn, "Call")
-			? QuiesceFn.Call(Bundle)
-			: LLM_Menu_QuiesceTriggerForLifecycle(Bundle)
-		catch as Err {
-			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"LLM trigger quiescence raised: " . Err.Message)
-		}
-		if !((Quiesced is Integer) && Quiesced == 1) {
-			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"LLM trigger recovery is incomplete")
-		}
-
 		CandidateFeatures := LLM_Menu_DeepClone(Features)
 		CandidateMenu := LLM_Menu_DeepClone(_LLM_Menu)
 		try Mutated := MutateFn.Call(CandidateMenu)

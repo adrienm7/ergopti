@@ -1,0 +1,167 @@
+--- tests/unit/platform/remap/enable_transaction/test_scope_owner.lua
+
+--- ==============================================================================
+--- MODULE: Remap Scope Transaction
+--- DESCRIPTION:
+--- The remap part of a manifest scope runs as one exact bulk transaction: the
+--- tap_holds scope owns the keys, their master and timings, the shortcuts scope
+--- owns the chords. Each request backs up the exact file bytes first, saves only
+--- over those bytes, and claims success only on the Karabiner terminal.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local with_fixture = require("tests.support.remap_transaction_fixture")
+
+local KEY, COMBO = "left_shift", "left_shift+right_shift"
+local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+
+--- Loads an enabled remap whose persistence and backup file are observable.
+--- @param fixture table remap_transaction_fixture constructors.
+--- @return table remap, table calls, table disk
+local function scoped_remap(fixture)
+	local remap, calls = fixture.load_enabled_remap()
+	local Config = package.loaded["platform.remap.config"]
+	local disk = { files = { ["/remap/config_karabiner.toml"] = SOURCE }, expected = {}, regenerations = 0 }
+	local neutral_combo = { tap = "none", hold = "none", combo = "none" }
+	Config.build_default_state = function()
+		return { tap_holds_enabled = false, tap_hold_config = { [KEY] = { tap = "none", hold = "none" } },
+			mod_combos_config = { [COMBO] = neutral_combo }, tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000,
+			simultaneous_threshold_ms = 50, combo_symmetric = false }
+	end
+	Config.build_recommended_state = function()
+		return { tap_holds_enabled = true, tap_hold_config = { [KEY] = { tap = "copy", hold = "shift" } },
+			mod_combos_config = { [COMBO] = { tap = "paste", hold = "none", combo = "none" } },
+			tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000, simultaneous_threshold_ms = 50, combo_symmetric = false }
+	end
+	local save = Config.save_user_config
+	Config.save_user_config = function(state, path, overwrite, expected)
+		disk.expected[#disk.expected + 1] = expected or false
+		return save(state, path, overwrite, expected)
+	end
+	package.loaded["infra.config_paths"].get = function(key)
+		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/config_karabiner.toml"
+	end
+	local files = require("adapters.file_system")
+	files.read_with_status = function(path)
+		local content = disk.files[path]
+		return content, content and "ok" or "absent"
+	end
+	files.write_if_unchanged = function(path, content, expected)
+		if disk.refuse == path then return false, "refused by the test" end
+		local current = disk.files[path]
+		if (expected.status == "absent" and current ~= nil)
+			or (expected.status == "ok" and current ~= expected.content) then return false, "changed" end
+		disk.files[path] = content
+		return true
+	end
+	remap.regenerate = function(on_done)
+		disk.regenerations = disk.regenerations + 1
+		disk.terminal = on_done
+		return true
+	end
+	helpers.assert_true(remap.set_tap_action(KEY, "escape"))
+	helpers.assert_true(remap.set_combo_tap_action(COMBO, "escape"))
+	calls.save, calls.saved_payloads = 0, {}
+	disk.expected = {}
+	return remap, calls, disk
+end
+
+--- Requests one scope and returns its settlement record.
+local function request(remap, scope, mode, backup_path)
+	local settled = {}
+	local accepted = remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path },
+		function(ok, reason) settled[#settled + 1] = { ok = ok, reason = reason } end)
+	return accepted, settled
+end
+
+helpers.describe("remap scope transaction", function()
+	helpers.it("restores the recommended keys over a verified backup, leaving the chords", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-1")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(disk.files["/remap/backup-1"], SOURCE, "the exact bytes are backed up first")
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+				"the save may only replace the backed-up bytes")
+			local saved = calls.saved_payloads[1]
+			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))
+			helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "copy", hold = "shift" })
+			helpers.assert_eq(saved.mod_combos_config[COMBO].tap, "escape", "the chords belong to the shortcuts scope")
+			helpers.assert_eq(#settled, 0, "no success before the Karabiner terminal")
+			disk.terminal(true, "ready")
+			helpers.assert_eq(settled, { { ok = true, reason = "ready" } })
+			helpers.assert_eq(remap.get_tap_action(KEY), "copy")
+			helpers.assert_eq(remap.get_tap_holds_enabled(), true)
+		end)
+	end)
+
+	helpers.it("clears the keys and the master to the neutral state", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			helpers.assert_true(request(remap, "tap_holds", "clear", "/remap/backup-2"))
+			disk.terminal(true, "ready")
+			local saved = calls.saved_payloads[1]
+			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").default_for("tap_holds.enabled"))
+			helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "none", hold = "none" })
+			helpers.assert_eq(remap.get_tap_action(KEY), "none")
+			helpers.assert_eq(remap.get_combo_tap_action(COMBO), "escape")
+		end)
+	end)
+
+	helpers.it("lets the shortcuts scope own only the chords", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			helpers.assert_true(request(remap, "shortcuts", "clear", "/remap/backup-3"))
+			disk.terminal(true, "ready")
+			local saved = calls.saved_payloads[1]
+			helpers.assert_eq(saved.mod_combos_config[COMBO], { tap = "none", hold = "none", combo = "none" })
+			helpers.assert_eq(saved.tap_hold_config[KEY].tap, "escape", "the keys belong to the tap_holds scope")
+		end)
+	end)
+
+	helpers.it("refuses before any write when the backup cannot be made", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			disk.files["/remap/backup-4"] = "an earlier backup"
+			local accepted, settled = request(remap, "tap_holds", "clear", "/remap/backup-4")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(settled, { { ok = false, reason = "backup-refused" } })
+			helpers.assert_eq(calls.save, 0)
+			helpers.assert_eq(disk.files["/remap/backup-4"], "an earlier backup")
+			helpers.assert_eq(disk.regenerations, 0)
+			helpers.assert_eq(remap.get_tap_action(KEY), "escape")
+		end)
+	end)
+
+	helpers.it("restores the prior settings on a negative Karabiner terminal", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			local _, settled = request(remap, "tap_holds", "recommended", "/remap/backup-5")
+			disk.terminal(false, "activation-failed")
+			helpers.assert_eq(calls.save, 2, "the inverse is persisted")
+			helpers.assert_eq(calls.saved_payloads[2].tap_hold_config[KEY].tap, "escape")
+			helpers.assert_eq(remap.settings_pending(), true, "the inverse regeneration is still owed")
+			disk.terminal(true, "ready")
+			helpers.assert_eq(settled[1].ok, false)
+			helpers.assert_eq(remap.get_tap_action(KEY), "escape")
+			helpers.assert_eq(remap.settings_pending(), false)
+			helpers.assert_eq(remap.retry_settings_recovery(), true, "nothing is left to settle")
+		end)
+	end)
+
+	helpers.it("refuses an unknown scope, mode or backup before touching anything", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = scoped_remap(fixture)
+			for _, bad in ipairs({ { "gestures", "clear", "/b" }, { "tap_holds", "factory", "/b" }, { "tap_holds", "clear", "" } }) do
+				local accepted, settled = request(remap, bad[1], bad[2], bad[3])
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(settled, { { ok = false, reason = "invalid-scope-request" } })
+			end
+			helpers.assert_eq(calls.save, 0)
+			helpers.assert_eq(disk.regenerations, 0)
+		end)
+	end)
+end)
+
+return true

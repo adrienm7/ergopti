@@ -178,8 +178,8 @@ _RBL_TheAutomaticReloadStaysWithinBounds() {
 	Assert(Core != "", "the reload core must be source-visible")
 	AssertEqual(0, _RBL_Count(Core, "_SuspendHandoffFailure("),
 		"every stage refused before launch must go through the caller's reporter, not the notice directly")
-	AssertEqual(3, _RBL_Count(Core, "ReportStage.Call("),
-		"the lease, owner and trigger-recovery refusals must each be reported")
+	AssertEqual(2, _RBL_Count(Core, "ReportStage.Call("),
+		"the lease and owner refusals must each be reported")
 	Assert(InStr(Core, "ReadyFn, ReportStage,") > 0,
 		"the suspended hand-off's own stages must use the same reporter")
 }

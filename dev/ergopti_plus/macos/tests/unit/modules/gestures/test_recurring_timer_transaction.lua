@@ -281,12 +281,14 @@ helpers.describe("gestures recurring timers are exact lifecycle transactions", f
 		end)
 	end)
 
-	helpers.it("retries an engine that refused module-load initialization", function()
+	helpers.it("defers engine acquisition until explicit startup and retries a refusal", function()
 		with_fixture({ initial_engine_init_refuses = true }, function(gestures, scheduler)
-			helpers.assert_eq(scheduler.engine_init_calls, 1,
-				"the fixture must refuse the eager module-load engine initialization")
+			helpers.assert_eq(scheduler.engine_init_calls, 0,
+				"loading the module before onboarding must not request an event tap")
+			helpers.assert_eq(gestures.start(), false,
+				"native refusal must reject the first explicit startup")
 			helpers.assert_eq(gestures.start(), true,
-				"runtime startup must retry an engine that never committed at module load")
+				"a later explicit startup must retry the refused engine")
 			helpers.assert_eq(scheduler.engine_init_calls, 2,
 				"the retry must occur before gesture runtime ownership is published")
 			helpers.assert_eq(gestures.stop(), true)

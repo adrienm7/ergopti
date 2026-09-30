@@ -19,9 +19,10 @@ local TomlWriter = require("toml_codec.writer")
 
 local Sandbox = Contract.sandbox
 
--- One key of each shape the macOS readers take, and five they never read: an
--- unknown leaf in three known sections and an unknown section holding a
--- multiline string whose text looks like a header.
+-- One key of each shape the macOS readers take, and seven they never read: an
+-- unknown leaf in three known sections, two outdated children of a known
+-- table, and an unknown section holding a multiline string whose text looks
+-- like a header.
 local FIXTURE = table.concat({
 	"# ErgoptiPlus configuration",
 	"[script]",
@@ -47,6 +48,11 @@ local FIXTURE = table.concat({
 	"enabled = false",
 	"tap_3 = \"open_url\"",
 	"",
+	"[gestures.modes]",
+	"swipe_2_left = \"incremental\"",
+	"tap_3 = \"x1\"",
+	"swipe_2_up = \"x9\"",
+	"",
 	"[llm.trigger]",
 	"debounce_ms = 300",
 	"disabled_apps = [",
@@ -65,6 +71,10 @@ local EXPECTED = {
 	"hotstrings.stale_toggle=leaf",
 	"hotstrings.dynamic.obsolete_rule=leaf",
 	"metrics.metrics_encrypt=leaf",
+	-- Outdated children of a known table (config-outdated-entries): a slot
+	-- with no mode and a retired mode value.
+	"gestures.modes.tap_3=leaf",
+	"gestures.modes.swipe_2_up=leaf",
 	"stale.section.label=section",
 	"stale.section.note=section",
 }
@@ -76,12 +86,18 @@ local SURVIVORS = {
 	{ { "hotstrings", "dynamic", "date" }, true },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
+	{ { "gestures", "modes", "swipe_2_left" }, "incremental" },
 	{ { "llm", "trigger", "debounce_ms" }, 300 },
 }
 
 -- A plain io adapter with the macOS FileSystem contract the cleanup needs.
 local IoAdapter = {
 	read_with_status = function(path) return TomlWriter.read_classified(path, nil) end,
+	-- Shipped data: the setup wizard's catalogue names the keys it reads.
+	read = function(path)
+		local content, status = TomlWriter.read_classified(path, nil)
+		return status == "ok" and content or nil
+	end,
 	write_if_unchanged = function(path, content, expected_source)
 		return TomlWriter.publish_if_unchanged(path, content, nil, expected_source)
 	end,
@@ -139,7 +155,7 @@ helpers.with_stub_scope(MODULES, function()
 			overrides = overrides,
 			flat = flat,
 			status = status,
-			answers = Onboarding._answers_from_config(decoded),
+			answers = Onboarding.config_values(decoded),
 		}
 	end
 
@@ -181,6 +197,170 @@ helpers.with_stub_scope(MODULES, function()
 				"every used record of the fixture must be exercised")
 		end)
 
+		helpers.it("unused keys: a removed [shortcuts.keys] hotkey is offered alone (config-outdated-at-hash)", function()
+			local source = "[shortcuts.keys]\nctrl_s = true\nat_hash = true\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path, IoAdapter).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].kind },
+					{ "shortcuts.keys", "at_hash", "leaf" })
+				helpers.assert_eq(before.flat.shortcut_keys, { ctrl_s = true })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
+					file_adapter = IoAdapter })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(driver_state(path), before,
+					"the removed hotkey must be one no macOS reader applies")
+			end)
+		end)
+
+		helpers.it("unused keys: an empty [shortcuts.keys] key never discards the file (config-outdated-empty-key)", function()
+			-- Reporting "" raised inside the loader's pcall: the whole config.toml
+			-- was declared corrupt and the session ran on defaults.
+			local source = "[shortcuts.keys]\n\"\" = true\nctrl_s = true\n"
+			Sandbox.with_config(source, function(path)
+				local flat, status = Preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_eq(flat.shortcut_keys, { ctrl_s = true })
+				local scan = Cleanup.find(path, IoAdapter)
+				helpers.assert_eq(scan.status, "ok", "the preview must not fail on the entry it reports")
+				helpers.assert_eq(#scan.keys, 0, "a quoted key has no line the cleanup can cut")
+			end)
+		end)
+
+		helpers.it("unused keys: a numeric-string sensitivity is the owner's value, not outdated (config-outdated-owner-rule)", function()
+			-- set_sensitivity coerces "4.5" with tonumber; a strict Lua type check
+			-- dropped it, reset the swipe to the default and offered to delete it.
+			local source = "[gestures.sensitivities]\nswipe_3_left = \"4.5\"\nswipe_3_right = \"fast\"\n"
+			local flat = Preferences.flatten_document(TomlCodec.decode(source))
+			helpers.assert_eq(flat.gesture_sensitivities, { swipe_3_left = "4.5" })
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },
+				{ "gestures.sensitivities", "swipe_3_right" })
+		end)
+
+		helpers.it("unused keys: an old-shape hotstring choice never reaches the projection (config-outdated-hotstrings)", function()
+			-- The projection asserts booleans, so one `magickey = "on"` failed the
+			-- boot hotstrings sync with an ERROR at every start; the cleanup never
+			-- listed it because the loader took both tables whole.
+			local source = table.concat({
+				"[hotstrings.groups]",
+				"magickey = \"on\"",
+				"rolls = false",
+				"",
+				"[hotstrings.modules]",
+				"magickey = true",
+				"",
+				"[hotstrings.modules.rolls]",
+				"hc = \"yes\"",
+				"sfb = true",
+				"",
+			}, "\n")
+			local flat = Preferences.flatten_document(TomlCodec.decode(source))
+			helpers.assert_eq(flat.hotstrings, { rolls = false })
+			helpers.assert_eq(flat.section_states, { rolls = { sfb = true } })
+			local desired = Preferences.project_hotstring_preferences(flat, { magickey = true, rolls = true },
+				function(name) return name == "rolls" and { { name = "hc" }, { name = "sfb" } } or {} end)
+			helpers.assert_eq(desired.hotstrings.rolls, false)
+			helpers.assert_eq(desired.section_states.rolls.sfb, true)
+			local offered = {}
+			for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+				offered[#offered + 1] = key.section .. "." .. key.key
+			end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "hotstrings.groups.magickey", "hotstrings.modules.magickey",
+				"hotstrings.modules.rolls.hc" })
+		end)
+
+		helpers.it("unused keys: an invalid duration is offered alone, its neighbours kept (config-outdated-units)", function()
+			local source = "[llm.trigger]\ndebounce_ms = \"fast\"\ninstant_on_word_end = true\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
+		end)
+
+		helpers.it("unused keys: plain keyboard and tap_keys values are offered (config-outdated-shortcut-shape)", function()
+			local source = "[shortcuts]\nkeyboard = \"x\"\ntap_keys = \"y\"\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			local offered = {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "shortcuts.keyboard", "shortcuts.tap_keys" })
+		end)
+
+		helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)", function()
+			-- The inline table was one record kept by its live member, so the
+			-- warned at_hash was never offered: warned and offered differed.
+			local source = "[shortcuts]\nkeys = { at_hash = true, layer_scroll = true }\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path, IoAdapter).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].value }, { "shortcuts.keys", "at_hash", "true" })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
+					file_adapter = IoAdapter })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(result.removed, 1)
+				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { layer_scroll = true }\n")
+				helpers.assert_eq(driver_state(path), before, "the live member keeps its value")
+				helpers.assert_eq(#Cleanup.find(path, IoAdapter).keys, 0)
+			end)
+		end)
+
+		helpers.it("unused keys: retired actions are never replayed and are offered (config-outdated-actions)", function()
+			-- A retired action id was kept silently in [shortcuts.script_control],
+			-- and warned about at every load but never offered in gesture,
+			-- keyboard and tap-key slots.
+			local source = table.concat({
+				"[gestures]",
+				"tap_3 = \"retired_action_xyz\"",
+				"tap_4 = \"open_url\"",
+				"",
+				"[shortcuts.script_control]",
+				"backspace = \"retired_action_xyz\"",
+				"escape = \"script_quit\"",
+				"",
+				"[shortcuts.keyboard]",
+				"cmd_k = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.tap_keys]",
+				"number_row_left = \"retired_action_xyz\"",
+				"",
+			}, "\n")
+			-- The catalogue itself has its own parity test; here it only has to
+			-- refuse the retired id.
+			local saved = package.loaded["modules.gestures.actions"]
+			package.loaded["modules.gestures.actions"] = {
+				is_assignable = function(action) return action ~= "retired_action_xyz" end,
+			}
+			local ok, err = pcall(function()
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_eq(flat.gesture_actions, { tap_4 = "open_url" })
+				helpers.assert_eq(flat.script_control_shortcuts, { escape = "script_quit" })
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.cmd_k",
+					"shortcuts.script_control.backspace", "shortcuts.tap_keys.number_row_left" })
+			end)
+			package.loaded["modules.gestures.actions"] = saved
+			if not ok then error(err, 0) end
+		end)
+
+		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
+			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
+			-- must still win, or the warned entry could never be removed.
+			local source = "[shortcuts.keys]\nlayer_scroll = \"yes\"\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "layer_scroll" })
+		end)
+
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()
 			local source = "[script]\nlocale = \"fr\"\nbroken = [1, 2]\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
@@ -188,11 +368,13 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq(scan.keys[1].key, "broken")
 		end)
 
-		helpers.it("unused keys: the Windows import keys the wizard reads are kept", function()
-			local source = "[Layout]\nErgoptiBase = true\nStale = 1\n"
+		helpers.it("unused keys: the wizard keeps its manifest paths and no Windows import key", function()
+			-- The wizard reads the manifest paths of its pages, never the former
+			-- Windows PascalCase import keys, so those are offered like any stale key.
+			local source = "[Layout]\nErgoptiBase = true\n[gestures]\nenabled = true\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
 			helpers.assert_eq(#scan.keys, 1)
-			helpers.assert_eq(scan.keys[1].key, "Stale")
+			helpers.assert_eq(scan.keys[1].key, "ErgoptiBase")
 		end)
 	end)
 

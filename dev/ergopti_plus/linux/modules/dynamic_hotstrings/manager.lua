@@ -24,6 +24,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
+local Preferences = require("infra.hotstring_preferences")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
@@ -71,7 +72,9 @@ local PERSONAL_SECTION = "personal_info"
 -- is the only place the default lives — and overridden by init() when the user
 -- has chosen another one.
 local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
-local _desired_enabled = ManifestReader.default_for("hotstrings.dynamic.enabled")
+-- The canonical master leaf; its desired value is read at init() and refresh().
+local MASTER_PATH = "hotstrings.dynamic.enabled"
+local _desired_enabled = ManifestReader.default_for(MASTER_PATH)
 local _enabled      = false        -- native availability and desired master
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
@@ -232,6 +235,7 @@ function M.init(opts)
 	local info_field_count = 0
 	for _ in pairs(_info) do info_field_count = info_field_count + 1 end
 
+	_desired_enabled = Preferences.get(MASTER_PATH)
 	_enabled = _desired_enabled and _rules_count > 0
 	Logger.info(LOG, "Dynamic hotstrings initialised: %d rule(s), trigger='%s', info=%d field(s).",
 		_rules_count, _trigger_char, info_field_count)
@@ -316,16 +320,30 @@ function M.is_enabled()
 	return _enabled
 end
 
---- Enables/disables the module at runtime.
+--- Enables/disables the module, persisting the canonical master leaf first.
 --- @param state boolean
+--- @return boolean True when the runtime reached the requested state.
 function M.set_enabled(state)
 	if type(state) ~= "boolean" then
 		Logger.error(LOG, "Dynamic hotstring activation requires a boolean preference.")
 		return false
 	end
+	if not Preferences.set(MASTER_PATH, state) then
+		Logger.error(LOG, "The dynamic hotstring master was not persisted; the runtime was not changed.")
+		return false
+	end
 	_desired_enabled = state
 	_enabled = state and _rules_count > 0
 	return _enabled == state
+end
+
+--- Adopts the master's canonical value after another owner published it.
+--- The family switches are read from the same owner at match time.
+--- @return boolean True when the runtime reached the desired state.
+function M.refresh()
+	_desired_enabled = Preferences.get(MASTER_PATH)
+	_enabled = _desired_enabled and _rules_count > 0
+	return _enabled == _desired_enabled
 end
 
 
@@ -729,9 +747,11 @@ local RULE_FAMILIES = {
 	  label_key = "dynamichotstrings.textexpansionpersonalinformation" },
 }
 
--- Family preference keys match the macOS preferences owner. Only a departure
--- from the manifest's neutral leaf needs an explicit stored value.
-local RULE_PREF_PREFIX = "hotstrings.dynamic."
+-- Each family's canonical leaf is `hotstrings.dynamic.<id>.enabled`, the path
+-- its manifest row declares. Only a departure from the neutral leaf is stored.
+local function family_path(family_id)
+	return "hotstrings.dynamic." .. family_id .. ".enabled"
+end
 
 -- Which live date each label's "{date}" placeholder stands for. The label
 -- promises what the rule inserts, so it must be resolved from the same engine
@@ -831,13 +851,7 @@ function M.is_rule_enabled(_group, section)
 		if family.section == section then family_id = family.id; break end
 	end
 	if not family_id then return false end
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then
-		Logger.error(LOG, "Dynamic rule preferences are unavailable; activation refused.")
-		return false
-	end
-	local neutral = ManifestReader.default_for("hotstrings.dynamic." .. family_id .. ".enabled")
-	return Storage.get(RULE_PREF_PREFIX .. section, neutral) == true
+	return Preferences.get(family_path(family_id)) == true
 end
 
 --- Turns one family on or off, persisting the choice.
@@ -854,18 +868,7 @@ function M.set_rule_enabled(section, enabled)
 		return false
 	end
 
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then
-		Logger.error(LOG, "set_rule_enabled(): no storage adapter — '%s' not persisted.", section)
-		return false
-	end
-	local persisted
-	if enabled == ManifestReader.default_for("hotstrings.dynamic." .. family_id .. ".enabled") then
-		persisted = Storage.delete(RULE_PREF_PREFIX .. section)
-	else
-		persisted = Storage.set(RULE_PREF_PREFIX .. section, enabled)
-	end
-	if not persisted then
+	if not Preferences.set(family_path(family_id), enabled) then
 		Logger.error(LOG, "set_rule_enabled(): could not persist '%s'.", section)
 		return false
 	end

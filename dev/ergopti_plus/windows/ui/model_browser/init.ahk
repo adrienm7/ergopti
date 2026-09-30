@@ -367,8 +367,7 @@ _LLM_ModelBrowser_ShowWeb() {
 
 	; Singleton: reuse the open window and just refresh the catalogue.
 	if IsSet(_LLM_MBW_Gui) {
-		try _LLM_MBW_Gui.Restore()
-		try WinActivate(_LLM_MBW_Gui.Hwnd)
+		WMPresentWindow(_LLM_MBW_Gui)
 		_LLM_MBW_InjectCatalogue()
 		return _LLM_MBW_Gui
 	}

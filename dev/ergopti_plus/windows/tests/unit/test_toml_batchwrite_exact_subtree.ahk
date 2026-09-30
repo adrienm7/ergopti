@@ -76,15 +76,15 @@ _TBES_DeleteOperationIsTypedNotStringSentinel() {
 	Path := A_Temp . "\ergopti_toml_typed_delete_" . A_ScriptHwnd
 		. "_" . A_TickCount . ".toml"
 	try {
-		Body := "[llm]`n" . 'trigger_shortcut = "Ctrl+L"' . "`n"
+		Body := "[llm]`n" . 'model = "qwen"' . "`n"
 		FileAppend(Body, Path, "UTF-8-RAW")
 		AssertTrue(TOML_BatchWrite(Path, [{ Section: "llm",
-			Key: "trigger_shortcut", Value: "_DELETE_" }]))
-		AssertEqual("_DELETE_", TOML_Read(Path, "llm", "trigger_shortcut", ""),
+			Key: "model", Value: "_DELETE_" }]))
+		AssertEqual("_DELETE_", TOML_Read(Path, "llm", "model", ""),
 			"ordinary values must never be interpreted as deletion commands")
 		AssertTrue(TOML_BatchWrite(Path, [{ Section: "llm",
-			Key: "trigger_shortcut", Delete: true }]))
-		AssertEqual("missing", TOML_Read(Path, "llm", "trigger_shortcut", "missing"),
+			Key: "model", Delete: true }]))
+		AssertEqual("missing", TOML_Read(Path, "llm", "model", "missing"),
 			"only the typed Delete operation may remove a key")
 	} finally {
 		if FileExist(Path)

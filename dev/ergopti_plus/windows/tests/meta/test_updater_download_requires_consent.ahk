@@ -6,9 +6,10 @@
 ; The updater may check for releases in the background and on demand, but it
 ; must download only after the user explicitly chose to install. A "Check for
 ; updates" click used to download, swap and restart on a newer release at once
-; (updater-consent-2026-09-25). Two consent points remain: the update prompt's
-; Install button, and the tray row that already names the release it installs
-; ("Update to vX", the "available" state of Updater_OneClickUpdate).
+; (updater-consent-2026-09-25). Three consent points remain: the update prompt's
+; Install button, the tray row that already names the release it installs
+; ("Update to vX", the "available" state of Updater_OneClickUpdate), and the
+; update-check window's Update button, which installs the release it shows.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,12 +42,15 @@ _UDRC_DownloadStartsOnlyFromConsent() {
 
 	Publish := _DriverFuncBody("_Updater_PublishOneClickRelease")
 	Assert(Publish != "", "_Updater_PublishOneClickRelease must exist")
-	Assert(_UDRC_CountCalls(Publish, "Updater_ShowUpdatePrompt") > 0,
-		"a check that finds a newer release must open the consent prompt")
+	Assert(_UDRC_CountCalls(Publish, "UpdateCheck_ShowAvailable") > 0,
+		"a check that finds a newer release must offer it in the update-check window")
 	AssertEqual(0, _UDRC_CountCalls(Publish, "_Updater_ActivateCachedRelease"),
 		"a check must never activate the release it found")
-	AssertEqual(1, _UDRC_CountCalls(Code, "_Updater_ActivateCachedRelease"),
-		"only the named 'Update to vX' row may activate a cached release")
+	Install := _DriverFuncBody("_UpdateCheck_Install")
+	AssertEqual(1, _UDRC_CountCalls(Install, "_Updater_ActivateCachedRelease"),
+		"the update-check window's Update button activates the release it shows")
+	AssertEqual(2, _UDRC_CountCalls(Code, "_Updater_ActivateCachedRelease"),
+		"only the named 'Update to vX' row and the window's Update button may activate a cached release")
 }
 Test("updater: a download starts only from an explicit consent (updater-consent-2026-09-25)",
 	_UDRC_DownloadStartsOnlyFromConsent)

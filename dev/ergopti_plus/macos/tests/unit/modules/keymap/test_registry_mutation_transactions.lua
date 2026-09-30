@@ -314,13 +314,14 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_ext:demo:test_info"))
 	end)
 
-	helpers.it("rejects malformed owned values before changing a setting or group", function()
+	helpers.it("reads an old-shape owned value as neutral absence, never a refused projection (config-outdated-hotstrings)", function()
+		-- An outdated choice is never an ERROR or a failed boot sync, and never
+		-- guessed on: "yes" is not a switch, so the section keeps its neutral value.
 		local _, registry, preferences = fixture('[hotstrings]\nmodules = { rolls = { hc = "yes" } }\n')
 		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
 		local saved = preferences.load("config")
-		helpers.assert_eq(registry.apply_hotstring_preferences(saved), false)
-		helpers.assert_true(registry.is_group_enabled("rolls"))
-		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_hc"), true)
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
 	end)
 
 	helpers.it("refuses a cache write whose native readback did not commit", function()

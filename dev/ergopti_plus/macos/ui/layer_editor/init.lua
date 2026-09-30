@@ -231,7 +231,12 @@ function M.open(opts)
 	end
 	if _session then
 		_session.karabiner = karabiner
-		if _session.webview then pcall(function() _session.webview:bringToFront() end) end
+		local session, view = _session, _session.webview
+		if view then
+			ui_builder.force_focus(view, false, { is_current = function()
+				return _session == session and session.webview == view
+			end })
+		end
 		return true
 	end
 	local geo = ui_builder.get_app_geometry("layer_editor")

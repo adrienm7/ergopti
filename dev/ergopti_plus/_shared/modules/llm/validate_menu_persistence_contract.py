@@ -71,7 +71,7 @@ def _check_ahk_persist_source(entries: list[dict], errors: list[str]) -> None:
         if not any(n in sync or n in append for n in needles):
             errors.append(f"{entry['id']}: tray_key {tk} missing from persist sync/append")
         if ahk.get("persist") != "extra" and f'opts["{tk}"]' not in build:
-            if entry["id"] not in ("nav_modifiers", "disabled_apps", "trigger_shortcut"):
+            if entry["id"] not in ("nav_modifiers", "disabled_apps"):
                 errors.append(f'{entry["id"]}: BuildSavedOpts missing opts["{tk}"]')
 
 

@@ -1016,9 +1016,6 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
 	CandidatePlan := HasMethod(KeyResolverFn, "Call")
 		? _LLM_Menu_BuildProfileHotkeyPlan(SelectFn, KeyResolverFn) : false
-	TriggerConflict := CandidatePlan is Array
-		? _LLM_Menu_RuntimeTriggerPlanCollision(CandidatePlan, KeyResolverFn)
-		: Map("ok", false, "identity", "")
 
 	PreviousCritical := Critical("On")
 	OpenAttempted := false
@@ -1030,10 +1027,6 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 		try {
 			if !(CandidatePlan is Array)
 				throw Error("Profile hotkey physical ownership could not be resolved")
-			if !TriggerConflict["ok"]
-				throw Error("Profile hotkey collision ownership is malformed")
-			if TriggerConflict["identity"] != ""
-				throw Error("Profile hotkey chord is owned by the prediction trigger")
 			OpenAttempted := true
 			HotIfFn.Call(_LLM_PROFILE_HOTKEY_PRED)
 			for Entry in CandidatePlan

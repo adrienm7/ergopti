@@ -21,8 +21,7 @@ local Logger   = require("infra.logger")
 
 local LOG = "backend_panel"
 
-local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 
 -- Survives menu rebuilds so a deferred settlement callback from an older row
 -- cannot publish a backend after a newer selection has taken ownership.
@@ -38,6 +37,9 @@ local _backend_boundary_depth = 0
 -- A rejected setter may still have changed the runtime identity. Keep the exact
 -- prior state/runtime pair until every compensating boundary returns true.
 local _backend_recovery_debt = nil
+-- Every backend row click takes a new generation. A runtime install settles
+-- minutes later, so its deferred switch must yield to any newer selection.
+local _runtime_selection_generation = 0
 
 --- Runs an opaque callback while nested backend selections are fenced.
 --- @param callback function
@@ -235,18 +237,80 @@ local function is_apple_silicon()
 end
 M.is_apple_silicon = is_apple_silicon
 
---- Triggers the deps checker matching the given backend name.
---- Safe to call repeatedly — each script is hash-gated and silent on the fast path.
+--- Starts the runtime of the backend the user just selected. This is the
+--- menu's only install path: an installed runtime is reused, and a missing one
+--- is installed (Ollama after its offer). A row switching to a backend whose
+--- runtime is missing goes through switch_after_install() instead.
 --- @param backend string Either "mlx" or "ollama".
 local function check_backend_deps(backend)
 	if backend == "mlx" then
 		return invoke_backend_boundary(
-			"MLX dependency bootstrap", mlx_deps_checker.check_and_install_deps)
+			"MLX runtime selection", runtime_install_offer.select_mlx)
 	elseif backend == "ollama" then
 		return invoke_backend_boundary(
-			"Ollama dependency bootstrap", ollama_deps_checker.check_and_install_deps)
+			"Ollama runtime selection", runtime_install_offer.select_ollama)
 	end
 	return false
+end
+
+--- Claims the newest backend selection, fencing any older deferred switch.
+--- @return integer generation
+local function claim_runtime_selection()
+	_runtime_selection_generation = _runtime_selection_generation + 1
+	return _runtime_selection_generation
+end
+
+--- Installs a missing runtime first and switches the backend only after the
+--- install succeeded, so the model check never races the download: a switch
+--- dispatched while the runtime is still absent fails and is never retried.
+--- @param backend string Either "mlx" or "ollama".
+--- @param select_runtime function Selection entry receiving the terminal callback.
+--- @param switch function Starts the backend transition once the runtime exists.
+---   It receives true: the install just settled the runtime (the Ollama one
+---   also started its daemon), so the transition must not select it again —
+---   the checker still holds its intent while delivering this completion and
+---   would refuse a nested check.
+--- @return boolean accepted True when the install (or its offer) was accepted.
+local function switch_after_install(backend, select_runtime, switch)
+	local generation = claim_runtime_selection()
+	local dispatching = true
+	local early_result = nil
+	local function on_installed(ok)
+		if dispatching then
+			early_result = ok == true
+			return true
+		end
+		if generation ~= _runtime_selection_generation then
+			Logger.info(LOG, "The %s runtime settled after a newer backend selection; not switching.",
+				tostring(backend))
+			return false
+		end
+		if ok ~= true then
+			Logger.warn(LOG, "The %s runtime install did not succeed; the backend stays unchanged.",
+				tostring(backend))
+			return false
+		end
+		Logger.info(LOG, "The %s runtime is installed; switching the backend now.", tostring(backend))
+		return switch(true) == true
+	end
+	local accepted = invoke_backend_boundary(backend .. " runtime selection",
+		select_runtime, on_installed)
+	dispatching = false
+	if not accepted then return false end
+	-- A synchronous terminal is replayed outside the selection boundary, which
+	-- refuses reentrant backend publications.
+	if early_result ~= nil then return on_installed(early_result) end
+	return true
+end
+
+--- Labels a local backend row, flagging a runtime that is not installed yet.
+--- Stat-only, so building the menu never spawns a process.
+--- @param base string Row label.
+--- @param backend string Backend identifier.
+--- @return string label
+local function runtime_row_label(base, backend)
+	if runtime_install_offer.is_installed(backend) then return base end
+	return base .. " (" .. i18n.get("menu.llm.backend_runtime_missing") .. ")"
 end
 
 
@@ -523,14 +587,23 @@ function M.build(ctx)
 	-- =====================================================
 
 	table.insert(rows, {
-		label    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
+		label    = runtime_row_label("MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"), "mlx"),
 		checked  = (state.llm_backend == "mlx"),
 		disabled = (not is_apple_silicon()) or paused or nil,
 		action       = not paused and function()
-			if state.llm_backend ~= "mlx" then
+			if state.llm_backend == "mlx" then
+				-- Selecting the current backend again is how a missing runtime
+				-- is installed; an installed one is reused without any work.
+				claim_runtime_selection()
+				if runtime_install_offer.is_installed("mlx") then return true end
+				return check_backend_deps("mlx")
+			end
+			local function activate_mlx(runtime_settled)
 				Logger.info(LOG, "Activating MLX backend…")
 				local committed = publish_backend("mlx", function(debt)
-					if check_backend_deps("mlx") ~= true then return false end
+					if runtime_settled ~= true and check_backend_deps("mlx") ~= true then
+						return false
+					end
 					if not publish_backend_label(debt, "mlx") then return false end
 					local model_ok, target_model = resolve_backend_model(
 						state.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_mlx or "")
@@ -551,6 +624,11 @@ function M.build(ctx)
 				end
 				return committed
 			end
+			if not runtime_install_offer.is_installed("mlx") then
+				return switch_after_install("mlx", runtime_install_offer.select_mlx, activate_mlx)
+			end
+			claim_runtime_selection()
+			return activate_mlx()
 		end or nil
 	})
 
@@ -560,14 +638,21 @@ function M.build(ctx)
 	-- =====================================================
 
 	table.insert(rows, {
-		label    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
+		label    = runtime_row_label("Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"), "ollama"),
 		checked  = (state.llm_backend == "ollama"),
 		disabled = paused or nil,
 		action       = not paused and function()
-			if state.llm_backend ~= "ollama" then
+			if state.llm_backend == "ollama" then
+				claim_runtime_selection()
+				if runtime_install_offer.is_installed("ollama") then return true end
+				return check_backend_deps("ollama")
+			end
+			local function activate_ollama(runtime_settled)
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				local function finish_ollama_switch(debt)
-					if check_backend_deps("ollama") ~= true then return false end
+					if runtime_settled ~= true and check_backend_deps("ollama") ~= true then
+						return false
+					end
 					if not publish_backend_label(debt, "ollama") then return false end
 					local model_ok, target_model = resolve_backend_model(
 						state.llm_model_ollama or llm_mod.DEFAULT_STATE.llm_model_ollama or "")
@@ -588,6 +673,17 @@ function M.build(ctx)
 				end
 				return publish_backend("ollama", finish_ollama_switch)
 			end
+			-- A missing Ollama is offered before any backend state changes: a
+			-- decline leaves the current backend untouched, and an accepted
+			-- download switches only once the executable exists.
+			if not runtime_install_offer.is_installed("ollama") then
+				return switch_after_install("ollama", function(on_installed)
+					return runtime_install_offer.select_ollama(on_installed,
+						{ keeps_current_backend = true })
+				end, activate_ollama)
+			end
+			claim_runtime_selection()
+			return activate_ollama()
 		end or nil
 	})
 
@@ -604,6 +700,7 @@ function M.build(ctx)
 		checked  = (state.llm_backend == "api"),
 		disabled = paused or nil,
 		action       = not paused and function()
+			claim_runtime_selection()
 			if state.llm_backend ~= "api" then
 				Logger.info(LOG, "Activating remote API backend…")
 				local function finish_api_switch(debt)

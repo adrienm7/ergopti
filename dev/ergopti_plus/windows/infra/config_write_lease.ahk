@@ -123,6 +123,26 @@ _ConfigWriteTerminalTryAcquire(Paths) {
 	} finally Critical(PreviousCritical)
 }
 
+; Builds the dry terminal barrier an ordinary reload, exit or configuration
+; transition needs: the active config.toml plus the caller's declared targets
+; (a path or an array of paths; 0 for none). It fails closed during
+; Bundle_Init's parse-time #HotIf message pump, before ConfigurationFile exists.
+ConfigWriteAcquireLifecycleBundle(AdditionalPaths := 0) {
+	global ConfigurationFile
+	if !IsSet(ConfigurationFile)
+		return false
+	Paths := [ConfigurationFile]
+	if (AdditionalPaths is Array) {
+		for Path in AdditionalPaths
+			Paths.Push(Path)
+	} else if (AdditionalPaths is String) && AdditionalPaths != "" {
+		Paths.Push(AdditionalPaths)
+	} else if !((AdditionalPaths is Integer) && AdditionalPaths == 0) {
+		return false
+	}
+	return _ConfigWriteTerminalTryAcquire(Paths)
+}
+
 _ConfigWriteTerminalIsActive() {
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")

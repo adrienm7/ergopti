@@ -265,6 +265,24 @@ _ErrorDialog_BuildReport(Record) {
 }
 
 
+; Reports one failure on GitHub exactly as this window's Report button does,
+; for a window that shows a failure of its own (the update-check window): the
+; same diagnostics report, redacted, the same prefilled issue form.
+; @param Record {Map} { kind: "error", module, message, time }
+; @param PerformFn {Func|Integer} Replacement of HealthCheck_PerformAction (tests only).
+; @returns {Boolean} reported
+ErrorDialog_Report(Record, PerformFn := 0) {
+	try Fields := _ErrorDialog_BuildReport(Record)
+	catch as Err {
+		LoggerError("ErrorDialog", "The report of '{1}' could not be built: {2}", Record["module"], Err.Message)
+		return false
+	}
+	Report := Fields["report"]
+	Perform := HasMethod(PerformFn, "Call") ? PerformFn : HealthCheck_PerformAction
+	Outcome := Perform.Call(Map("action", "report", "text", Report["text"], "fields", Report["fields"]),
+		Fields["paths"], Fields["config"])
+	return Outcome["ok"] ? true : false
+}
 
 
 
@@ -304,7 +322,7 @@ _ErrorDialog_Present(Record) {
 
 ; Keep native title construction independently testable without reporting a real error.
 _ErrorDialog_NewWindow() {
-	return Gui_Create("+Resize +AlwaysOnTop +MinSize440x320", t("common.error_title"))
+	return Gui_Create("+Resize +MinSize440x320", t("common.error_title"))
 }
 
 ; Opens the window for one error, without taking the keyboard.

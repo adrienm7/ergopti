@@ -276,7 +276,7 @@ _LNHT_TransactionPort() {
 	return Map("apply", _LNHT_TransactionApply,
 		"writer", _LNHT_TransactionWriter,
 		"notify", _LNHT_TransactionNotify, "acquire", _LMT_Acquire,
-		"settle", _LMT_Settle, "quiesce", _LMT_Quiesce,
+		"settle", _LMT_Settle,
 		"collect", _LMT_Collect, "hotkey", _LNHT_Hotkey,
 		"hotif", _LNHT_HotIf, "log", _LNHT_Log,
 		"reset", _LNHT_ForceHotIfReset)

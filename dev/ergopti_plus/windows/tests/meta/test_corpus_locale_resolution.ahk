@@ -109,6 +109,41 @@ _LclCorpus_PopulateCaches(Vec) {
 	}
 }
 
+; Runs one test of this file and puts back every locale global it replaces.
+; These tests install fixture caches with the loaded and warmed flags set, and
+; the last one left {"empty.key": ""} as the active locale with an English
+; fallback of one key: every later t() of a real key returned the raw key for
+; the rest of the run, until a test asserting a real sentence failed.
+; @param TestFn {Func} The test body.
+_LclCorpus_Isolated(TestFn) {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, ScriptInformation
+	Saved := {
+		Locale: _I18nLocale, Cache: _I18nCache, Loaded: _I18nCacheLoaded,
+		En: _I18nCacheEn, EnLoaded: _I18nCacheEnLoaded,
+		Fr: _I18nCacheFr, FrLoaded: _I18nCacheFrLoaded,
+		Warmed: _I18nFallbacksWarmed,
+		HasMagicKey: ScriptInformation.Has("MagicKey"),
+		MagicKey: ScriptInformation.Get("MagicKey", "")
+	}
+	try TestFn.Call()
+	finally {
+		_I18nLocale := Saved.Locale
+		_I18nCache := Saved.Cache
+		_I18nCacheLoaded := Saved.Loaded
+		_I18nCacheEn := Saved.En
+		_I18nCacheEnLoaded := Saved.EnLoaded
+		_I18nCacheFr := Saved.Fr
+		_I18nCacheFrLoaded := Saved.FrLoaded
+		_I18nFallbacksWarmed := Saved.Warmed
+		if Saved.HasMagicKey
+			ScriptInformation["MagicKey"] := Saved.MagicKey
+		else if ScriptInformation.Has("MagicKey")
+			ScriptInformation.Delete("MagicKey")
+	}
+}
+
 ; Reset the locale globals to their defaults so each vector runs clean.
 _LclCorpus_ResetState() {
 	global _I18nLocale, _I18nCache, _I18nCacheLoaded
@@ -165,7 +200,8 @@ _LclCorpus_TestAllVectors() {
 	}
 	_LclCorpus_ResetState()
 }
-Test("[corpus:locale] all vectors resolve to expected golden values", _LclCorpus_TestAllVectors)
+Test("[corpus:locale] all vectors resolve to expected golden values",
+	_LclCorpus_Isolated.Bind(_LclCorpus_TestAllVectors))
 
 
 
@@ -179,7 +215,7 @@ Test("[corpus:locale] all vectors resolve to expected golden values", _LclCorpus
 
 ; Test: t() returns raw key when all caches are empty
 Test("[locale:regression] t() returns raw key when no locale loaded",
-	() => _LclCorpus_TestRawKeyFallback())
+	_LclCorpus_Isolated.Bind(_LclCorpus_TestRawKeyFallback))
 
 _LclCorpus_TestRawKeyFallback() {
 	_LclCorpus_ResetState()
@@ -194,7 +230,7 @@ _LclCorpus_TestRawKeyFallback() {
 
 ; Test: t() lazy-loads fallbacks on first miss
 Test("[locale:regression] t() lazy-loads fallback from .json on first miss",
-	() => _LclCorpus_TestLazyFallbackFromJson())
+	_LclCorpus_Isolated.Bind(_LclCorpus_TestLazyFallbackFromJson))
 
 _LclCorpus_TestLazyFallbackFromJson() {
 	_LclCorpus_ResetState()
@@ -217,7 +253,7 @@ _LclCorpus_TestLazyFallbackFromJson() {
 
 ; Test: t() checks fr after en
 Test("[locale:regression] t() fallback order: active → en → fr → raw key",
-	() => _LclCorpus_TestFallbackOrder())
+	_LclCorpus_Isolated.Bind(_LclCorpus_TestFallbackOrder))
 
 _LclCorpus_TestFallbackOrder() {
 	_LclCorpus_ResetState()
@@ -240,7 +276,7 @@ _LclCorpus_TestFallbackOrder() {
 ; Test: an empty-string value in the active locale is treated as MISSING and
 ; falls through to en — cross-driver parity with the golden corpus + macOS.
 Test("[locale:regression] t() treats an empty active value as missing and falls through to en",
-	() => _LclCorpus_TestEmptyValueInActive())
+	_LclCorpus_Isolated.Bind(_LclCorpus_TestEmptyValueInActive))
 
 _LclCorpus_TestEmptyValueInActive() {
 	_LclCorpus_ResetState()
@@ -255,3 +291,14 @@ _LclCorpus_TestEmptyValueInActive() {
 	; Empty value in the active locale → missing → falls through to the en fallback.
 	AssertEqual("from_en", Result, "t() falls through to en when the active value is empty")
 }
+
+; Registered after every fixture test above, so it runs once they have all
+; replaced the locale caches: a real key must still resolve through the real
+; locale files. It returned the raw key while the fixtures outlived their tests.
+_LclCorpus_TestRealLocaleSurvives() {
+	Result := t("common.close")
+	AssertTrue(Result != "" && Result != "common.close",
+		"the fixture caches must not outlive their tests, got '" . Result . "'")
+}
+Test("[locale:regression] the fixture caches do not outlive their tests",
+	_LclCorpus_TestRealLocaleSurvives)

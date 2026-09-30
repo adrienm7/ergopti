@@ -237,52 +237,27 @@ final class LauncherEnvironmentTests: XCTestCase {
 			"the managed bootstrap must never resolve inside signed app resources")
 	}
 
-	/// The composed startup cannot create the child before registration resolves.
-	func testManagedHammerspoonWaitsForGuardianRegistrationResultBeforeChildStart() {
-		let entered = DispatchSemaphore(value: 0)
-		let release = DispatchSemaphore(value: 0)
-		let childStarted = expectation(description: "managed Hammerspoon child started")
-		let stateLock = NSLock()
+	/// The GUI launcher starts Hammerspoon at once and never registers the
+	/// guardian: the driver registers it only after reading « Ergopti uses
+	/// Karabiner » = on, so nothing is registered while that switch is off.
+	func testManagedHammerspoonStartsWithoutRegisteringTheGuardian() {
 		var childStartCount = 0
 		var childEnvironment: [String: String] = [:]
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
 			applicationLauncher: { _, configuration, _ in
-				stateLock.lock()
 				childStartCount += 1
 				childEnvironment = configuration.environment
-				stateLock.unlock()
-				childStarted.fulfill()
-			},
-			guardianRegistrar: { _ in
-				entered.signal()
-				guard release.wait(timeout: .now() + 2) == .success
-				else { return .unavailable }
-				return .requiresApproval
 			},
 			loggerWorkerFactory: { loggerWorker }
 		)
 
-		withExtendedLifetime(delegate) {
-			delegate.startManagedHammerspoon(
-				at: testEmbeddedHammerspoonBinary,
-				launcherPath: "/tmp/ErgoptiPlus"
-			)
-			XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
-			stateLock.lock()
-			let startsBeforeRegistration = childStartCount
-			stateLock.unlock()
-			XCTAssertEqual(startsBeforeRegistration, 0)
-			release.signal()
-			wait(for: [childStarted], timeout: 2)
-			stateLock.lock()
-			let finalStartCount = childStartCount
-			let exportedStatus = childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"]
-			stateLock.unlock()
-			XCTAssertEqual(finalStartCount, 1)
-			XCTAssertEqual(exportedStatus, "requires_approval")
-		}
+		delegate.startManagedHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertEqual(childStartCount, 1,
+			"no registration result may gate the child any more")
+		XCTAssertEqual(childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"], "not_requested")
 	}
 
 	/// A bound endpoint replaces inherited credentials before the child runner fires.
@@ -485,6 +460,8 @@ final class LauncherEnvironmentTests: XCTestCase {
 				"The independent remap guardian requires user approval; ErgoptiPlus rules remain inert."),
 			(.unavailable,
 				"The independent remap guardian is unavailable; ErgoptiPlus rules remain inert."),
+			(.notRequested,
+				"The remap guardian is registered by the driver only while Ergopti uses Karabiner."),
 		]
 
 		for (guardianStatus, suffix) in cases {
@@ -624,39 +601,6 @@ final class LauncherEnvironmentTests: XCTestCase {
 		wait(for: [staleTerminal], timeout: 0.05)
 	}
 
-	/// A blocked legacy launchctl path cannot park AppKit's startup callback.
-	func testGuardianRegistrationRunsOffTheMainThread() {
-		let entered = DispatchSemaphore(value: 0)
-		let release = DispatchSemaphore(value: 0)
-		let resultLock = NSLock()
-		var registrarObservedRelease = false
-		let completed = expectation(description: "registration delivered on main")
-		let delegate = AppDelegate(guardianRegistrar: { _ in
-			entered.signal()
-			let result = release.wait(timeout: .now() + 1)
-			resultLock.lock()
-			registrarObservedRelease = result == .success
-			resultLock.unlock()
-			return .ready
-		})
-
-		delegate.beginRemapGuardianRegistration(executablePath: "/tmp/ErgoptiPlus") {
-			status in
-			XCTAssertTrue(Thread.isMainThread)
-			XCTAssertEqual(status, .ready)
-			resultLock.lock()
-			let ranAsynchronously = registrarObservedRelease
-			resultLock.unlock()
-			XCTAssertTrue(ranAsynchronously,
-				"a synchronous registrar would time out before this test can release it")
-			completed.fulfill()
-		}
-
-		XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
-		release.signal()
-		wait(for: [completed], timeout: 2)
-	}
-
 
 
 
@@ -753,6 +697,28 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(childEnvironment[kFatalReportEnvironment], store.path)
 		XCTAssertEqual(childEnvironment[kLauncherLogEnvironment], LauncherLog.filePath)
 		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ergopti_plus/launcher.log"))
+	}
+
+	/// The app no longer ships Ollama, so the child gets no bundled path to
+	/// trust: the Lua resolver finds an installed Ollama on its own.
+	func testLaunchExportsNoBundledOllamaPath() throws {
+		let store = try temporaryFatalReportStore()
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertNotNil(childEnvironment["ERGOPTI_CONFIG_DIR"])
+		XCTAssertNil(childEnvironment["ERGOPTI_OLLAMA_BIN"])
+		XCTAssertFalse(childEnvironment.values.contains { $0.contains("/Resources/Tools/Ollama") })
 	}
 
 	/// The startup trail names every exported key but never logs the token value.

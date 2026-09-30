@@ -123,6 +123,26 @@ local function flatten(id)
 	return (tostring(id):gsub("_", ""))
 end
 
+--- The manifest feature row declaring one bundled section.
+---
+--- The one matcher between a runtime group and the manifest's category
+--- spelling. Answers nil when the manifest has no row for it: personal and
+--- extension packs are user-owned and carry none.
+--- @param features table The generated manifest's `features` array.
+--- @param group string Hotstring group (file stem or language group id).
+--- @param section string Section name.
+--- @return table|nil entry The generated feature row, never copied.
+function M.section_feature(features, group, section)
+	local wanted = flatten(group)
+	for _, entry in ipairs(features or {}) do
+		local category = type(entry.section) == "string" and entry.section:match("^hotstrings%.(.+)$") or nil
+		if category and entry.id == section and flatten(category) == wanted and type(entry.default) == "table" then
+			return entry
+		end
+	end
+	return nil
+end
+
 --- The manifest's shipped `enabled` for one bundled section.
 ---
 --- Answers nil when the manifest has no row for it — personal and extension
@@ -133,15 +153,8 @@ end
 --- @param section string Section name.
 --- @return boolean|nil
 function M.section_default(features, group, section)
-	local wanted = flatten(group)
-	for _, entry in ipairs(features or {}) do
-		local category = type(entry.section) == "string" and entry.section:match("^hotstrings%.(.+)$") or nil
-		if category and entry.id == section and flatten(category) == wanted
-			and type(entry.default) == "table" and type(entry.default.enabled) == "boolean"
-		then
-			return entry.default.enabled
-		end
-	end
+	local entry = M.section_feature(features, group, section)
+	if entry and type(entry.default.enabled) == "boolean" then return entry.default.enabled end
 	return nil
 end
 

@@ -177,7 +177,8 @@ end)
 
 --- Draws the shortcuts menu over a stubbed keyboard slot (ctrl_k), gestures
 --- manager and picker bridge, then clicks the slot's picker row.
---- @param prompt function The zenity prompt test boundary.
+--- @param prompt function|nil The zenity prompt test boundary; nil draws the
+---   menu without it, so the production choosers run.
 --- @return table { picker, events, prompt_args, items, editor }
 local function open_keyboard_slot_picker(prompt)
 	local keyboard_binding = require("modules.shortcuts.keyboard_shortcuts").binding_id
@@ -205,8 +206,9 @@ local function open_keyboard_slot_picker(prompt)
 			return action == "open_url" and "Open URL" or "None"
 		end,
 		get_action_parameter_spec = function(action)
-			return ({ open_url = "url", send_key = "key" })[action]
+			return ({ open_url = "url", send_key = "key", open_app = "app" })[action]
 		end,
+		get_action_parameter_prompt = function(action) return "prompt:" .. action end,
 		get_action_parameter = function(binding, action)
 			events[#events + 1] = "prior:" .. binding .. ":" .. action
 			return "https://old.example"
@@ -214,6 +216,7 @@ local function open_keyboard_slot_picker(prompt)
 		validate_action_parameter = function(action, value)
 			return (action == "open_url" and value == "https://new.example")
 				or (action == "send_key" and value == "enter")
+				or (action == "open_app" and value == "firefox")
 		end,
 		set_action_parameter = function(binding, action, value)
 			events[#events + 1] = "parameter:" .. binding .. ":" .. action .. ":" .. value
@@ -234,12 +237,12 @@ local function open_keyboard_slot_picker(prompt)
 	}
 
 	local ok, rows = pcall(function()
-		local built = shortcuts_menu({
+		local built = shortcuts_menu(prompt and {
 			prompt_action_parameter = function(binding, action, spec, prior)
 				scene.prompt_args = { binding, action, spec, prior }
 				return prompt(binding, action, spec, prior)
 			end,
-		})
+		} or {})
 		local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
 		-- Searched under the slot's own row: the number-row tap keys above it
 		-- open the same picker.
@@ -293,6 +296,27 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		helpers.assert_eq(scene.prompt_args, nil, "no prompt for a value the page collected")
 		helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__ctrl_k:send_key:enter")
 		helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:send_key")
+	end)
+
+	helpers.it("picks an open_app application in the desktop-entry chooser, never a text prompt", function()
+		local prior_chooser = package.loaded["ui.app_chooser"]
+		local chooser_titles = {}
+		package.loaded["ui.app_chooser"] = {
+			pick = function(shell, title)
+				helpers.assert_eq(type(shell.exec_line), "function", "the chooser runs through the shell runner")
+				chooser_titles[#chooser_titles + 1] = title
+				return "firefox"
+			end,
+		}
+		local ok, err = pcall(function()
+			local scene = open_keyboard_slot_picker(nil)
+			helpers.assert_true(scene.picker.on_confirm("open_app"))
+			helpers.assert_eq(chooser_titles, { "prompt:open_app" })
+			helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__ctrl_k:open_app:firefox")
+			helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:open_app")
+		end)
+		package.loaded["ui.app_chooser"] = prior_chooser
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("renders the Linux ChatGPT URL editor declared by the manifest", function()

@@ -495,7 +495,8 @@ Test("ApplyConfigToml: TOML booleans and integers cannot alias (AHK-131)",
 ; every later save - including the toggle that would have canonicalized the
 ; file. The menu toggle could never stick (llm-toggle-deadlock). Legacy 0/1
 ; for a boolean key must therefore apply with user intent and count as
-; migrated, while every other confusion direction stays rejected.
+; migrated, while every other confusion direction stays unapplied as outdated
+; configuration: one warning naming it, never an ERROR or a latched refusal.
 TestFMv2_LegacyZeroOneBooleansMigrate() {
 	OldFeatures := _FM_BeginIsolated()
 	Captured := []
@@ -515,11 +516,13 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 			. "locale = " . '"' . "es" . '"' . "`r`n"
 			. "[hotstrings.autocorrection.caps]`r`n"
 			. "time_activation_seconds = true`r`n")
-		Applied := ApplyConfigToml(Features, Path, &Rejected)
+		Applied := ApplyConfigToml(Features, Path, &Rejected, , &Outdated)
 		AssertEqual(6, Applied,
 			"four legacy 0/1 booleans plus two valid controls must apply")
-		AssertEqual(1, Rejected,
-			"only the boolean-for-number confusion must still reject")
+		AssertEqual(0, Rejected,
+			"an outdated value is never a rejected override (config-outdated-windows)")
+		AssertEqual(1, Outdated.Count,
+			"only the boolean-for-number confusion is left unapplied as outdated")
 		AssertEqual(true, Features["llm"]["enabled"],
 			"legacy enabled = 1 must switch the feature on, not fall back to default")
 		AssertEqual(true, Features["llm"]["onboarding_seen"])
@@ -537,25 +540,19 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 		AssertEqual("es", Features["script"]["locale"])
 		Errors := []
 		Migrated := []
+		LeafNamed := false
 		for Line in Captured {
 			if InStr(Line, "[ERROR]", true)
 				Errors.Push(Line)
 			if InStr(Line, "legacy", true)
 				Migrated.Push(Line)
+			LeafNamed := LeafNamed || (InStr(Line, "[WARNING]", true)
+				&& InStr(Line, "outdated configuration value(s)", true)
+				&& InStr(Line, "time_activation_seconds", true))
 		}
-		AssertEqual(2, Errors.Length,
-			"the confused leaf plus the partial-apply summary must log errors")
-		LeafNamed := false
-		SummaryLogged := false
-		for Line in Errors {
-			LeafNamed := LeafNamed
-				|| InStr(Line, "time_activation_seconds", true) > 0
-			SummaryLogged := SummaryLogged
-				|| InStr(Line, "partially applied", true) > 0
-		}
-		AssertTrue(LeafNamed, "the error must name the confused leaf")
-		AssertTrue(SummaryLogged,
-			"one genuine rejection must still latch the partial-apply summary")
+		AssertEqual(0, Errors.Length,
+			"the confused leaf is outdated configuration, never an ERROR or a partial apply")
+		AssertTrue(LeafNamed, "the outdated-value warning must name the confused leaf")
 		AssertTrue(Migrated.Length >= 1,
 			"legacy migration must say so in the log, or the next save looks unexplained")
 	} finally {
@@ -779,8 +776,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. "[llm]`r`n"
 			. 'api_entry_id = "api-a"' . "`r`n"
 			. "ollama_port = 11434`r`n"
-			. 'trigger_shortcut = "Ctrl+Space"' . "`r`n"
-			. 'trigger_shortcut_typo = "Ctrl+T"' . "`r`n"
+			. "ollama_port_typo = 11435`r`n"
 			. "[llm.navigation]`r`n"
 			. "nav_modifiers = []`r`n"
 			. "[llm.trigger]`r`n"
@@ -799,7 +795,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		for Line in Captured
 			Joined .= Line . "`n"
 		_FM_AssertUnusedWarning(Captured, Path,
-			["category_enabled.autocorrectoin", "llm.trigger_shortcut_typo", "shortcuts.keyboard.win_cc"])
+			["category_enabled.autocorrectoin", "llm.ollama_port_typo", "shortcuts.keyboard.win_cc"])
 		AssertEqual("ConfigIO",
 			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
 			"a picker-created keyboard slot must name its real config owner")

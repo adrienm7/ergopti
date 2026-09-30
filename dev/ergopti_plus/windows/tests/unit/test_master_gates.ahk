@@ -119,6 +119,76 @@ TestMasterGates_RequiresCategoryGateCallback() {
 }
 Test("master gates: explicit category-gate callback contract fails fast", TestMasterGates_RequiresCategoryGateCallback)
 
+; « Combinaisons de touches » is the only gate of the AltGr / LAlt / CapsLock
+; families: off, it turns only them off, each keeping its parameters, while
+; every other shortcut stays live; the Shortcuts master no longer reaches them
+; (decision of 2026-09-29, as on macOS). Its families are the Windows feature
+; rows of key_combinations_group, the rows the menu draws.
+_MGKC_Families() {
+	return ["alt_gr_lalt", "alt_gr_caps_lock", "lalt_caps_lock"]
+}
+
+; A shortcuts candidate with every key-combination family set.
+_MGKC_Candidate() {
+	Result := Map("shortcuts", Map("gpt", Map("enabled", true, "link", "https://example.test")))
+	for Family in _MGKC_Families()
+		Result["shortcuts"][Family] := Map("backspace", true, "tab", false)
+	return Result
+}
+
+; A category-gate callback answering the two switches, every other gate on.
+_MGKC_Gates(ShortcutsGate, CombinationsGate) {
+	GateValues := Map("Shortcuts", ShortcutsGate, "KeyCombinations", CombinationsGate)
+	return (Name) => GateValues.Get(Name, true)
+}
+
+TestMasterGates_KeyCombinationsSubGate() {
+	SwitchedOff := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(SwitchedOff, Map(), _MGKC_Gates(true, false))
+	for Family in _MGKC_Families()
+		AssertFalse(SwitchedOff["shortcuts"][Family]["backspace"], Family . " goes off with its switch")
+	AssertTrue(SwitchedOff["shortcuts"]["gpt"]["enabled"], "the other shortcuts stay live")
+
+	SwitchedOn := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(SwitchedOn, Map(), _MGKC_Gates(true, true))
+	for Family in _MGKC_Families()
+		AssertTrue(SwitchedOn["shortcuts"][Family]["backspace"], Family . " stays as chosen with its switch on")
+
+	MasterOff := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(MasterOff, Map(), _MGKC_Gates(false, true))
+	for Family in _MGKC_Families() {
+		AssertTrue(MasterOff["shortcuts"][Family]["backspace"], Family . " does not follow the Shortcuts master")
+		AssertFalse(MasterOff["shortcuts"][Family]["tab"], Family . " keeps its own choices")
+	}
+	AssertFalse(MasterOff["shortcuts"]["gpt"]["enabled"], "the Shortcuts master still gates the other shortcuts")
+	AssertEqual("https://example.test", MasterOff["shortcuts"]["gpt"]["link"], "and keeps their parameters")
+
+	BothOff := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(BothOff, Map(), _MGKC_Gates(false, false))
+	for Family in _MGKC_Families()
+		AssertFalse(BothOff["shortcuts"][Family]["backspace"], Family . " goes off with its own switch")
+	AssertFalse(BothOff["shortcuts"]["gpt"]["enabled"])
+}
+Test("master gates: the key-combinations switch gates only its families (key-combinations-gate)",
+	TestMasterGates_KeyCombinationsSubGate)
+
+; A config.toml written before the switch existed has Shortcuts on and no
+; [category_enabled] key_combinations: its families must stay as chosen. The
+; switch turned off must also reach the disk, which the sparse writer only does
+; for a value that differs from the manifest default.
+TestMasterGates_KeyCombinationsAbsentKeyKeepsFamilies() {
+	Upgraded := Map("Shortcuts", true)
+	Candidate := _MGKC_Candidate()
+	ApplyMasterGatesToFeatures(Candidate, Map(),
+		(Name) => _ConfigCandidateCategoryEnabled(Upgraded, Name))
+	for Family in _MGKC_Families()
+		AssertTrue(Candidate["shortcuts"][Family]["backspace"], Family . " survives an absent switch")
+	SwitchedOff := _ConfigSparseOperation("category_enabled", "key_combinations", false)
+	AssertFalse(SwitchedOff.HasOwnProp("Delete"), "the switch turned off is written, not dropped as neutral")
+}
+Test("master gates: an absent key-combinations switch keeps the families (key-combinations-gate)",
+	TestMasterGates_KeyCombinationsAbsentKeyKeepsFamilies)
+
 TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	global _SharedDir, CategoryEnabled
 	FixtureRoot := A_Temp . "\ergopti_master_gates_invalid_" . A_TickCount

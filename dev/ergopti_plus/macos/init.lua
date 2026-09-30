@@ -239,24 +239,6 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 end
 
 local config_paths       = require("infra.config_paths")
-local gestures           = require("modules.gestures")
-local keymap             = require("modules.keymap")
-local ManifestReader     = require("infra.manifest_reader")
--- Wire keymap → locale so trigger-character substitutions (★) use the live char.
--- Read from the manifest rather than from the `magic_key` local: that one is
--- declared ~500 lines below, so naming it here would capture the GLOBAL of the
--- same name — nil — and every ★ substitution would silently render empty. Same
--- trap as project-lua-closure-before-local-nil-global.
-locale_mod.set_trigger_provider(function()
-	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for("hotstrings.trigger_char")
-end)
--- Expose keymap in the global table so the Hammerspoon console can call
--- keymap.perf_report_all() / perf_enable() / perf_reset() without
--- having to type out require("modules.keymap") each time.
-_G.keymap = keymap
-local shortcuts          = require("modules.shortcuts")
-local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 Boot.mark("Core module requires")
 Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 
@@ -283,6 +265,26 @@ if config_paths_ready ~= true then
 	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
+-- Configuration consumers may perform reads during require; path ownership comes first.
+local gestures           = require("modules.gestures")
+local keymap             = require("modules.keymap")
+local ManifestReader     = require("infra.manifest_reader")
+-- Wire keymap → locale so trigger-character substitutions (★) use the live char.
+-- Read from the manifest rather than from the `magic_key` local: that one is
+-- declared ~500 lines below, so naming it here would capture the GLOBAL of the
+-- same name — nil — and every ★ substitution would silently render empty. Same
+-- trap as project-lua-closure-before-local-nil-global.
+locale_mod.set_trigger_provider(function()
+	return keymap.get_trigger_char and keymap.get_trigger_char()
+		or ManifestReader.default_for("hotstrings.trigger_char")
+end)
+-- Expose keymap in the global table so the Hammerspoon console can call
+-- keymap.perf_report_all() / perf_enable() / perf_reset() without
+-- having to type out require("modules.keymap") each time.
+_G.keymap = keymap
+local shortcuts          = require("modules.shortcuts")
+local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+
 boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),
 	BootJournal.describe_path(config_paths.get_config_dir()))
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
@@ -1055,16 +1057,35 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
---- Shows the on-screen banner naming the exact switch to turn on.
---- @return function close Removes the banner.
+--- Opens the native dialog that names the exact switch to turn on. It used to
+--- be a one-line banner along the Dock; the dialog has steps and buttons and
+--- the wait closes it when the grant arrives. Loaded here, not at the top, so a
+--- UI failure can never stop the boot; guide_accessibility itself never raises.
+--- @return function close Closes the dialog.
 local function show_accessibility_guidance()
-	local shown, alert_id = pcall(hs.alert.show, i18n.get("startup.accessibility_waiting"),
-		{ atScreenEdge = 2 }, hs.screen.mainScreen(), AccessibilityWait.DEADLINE_SECONDS)
-	if not shown then
-		Logger.warn(LOG, "Accessibility guidance banner could not be shown: %s.", tostring(alert_id))
+	local ok, close = xpcall(function()
+		return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Accessibility dialog unavailable: %s.", tostring(close))
 		return function() end
 	end
-	return function() pcall(hs.alert.closeSpecific, alert_id, 0) end
+	return close
+end
+
+--- Calls on_reopen each time the user opens ErgoptiPlus again during the wait.
+--- There is no menu yet and the launcher has no window, so without this a
+--- closed dialog could not come back. A refusal only costs that shortcut.
+--- @param on_reopen function Called on each reopen.
+--- @return function|nil stop Stops watching; nil when refused.
+--- @return string|nil detail Exact refusal when stop is nil.
+local function watch_launcher_reopen(on_reopen)
+	local ok, stop, detail = xpcall(function()
+		if LauncherGuard == nil then return nil, "the launcher guard is not loaded" end
+		return LauncherGuard.watch_activation(on_reopen)
+	end, debug.traceback)
+	if not ok then return nil, tostring(stop) end
+	return stop, detail
 end
 
 -- Pre-start the keyboard input owners so they are active before menu.lua reads
@@ -1109,6 +1130,7 @@ if accessibility_trusted ~= true then
 		cancel = TimerScheduler.cancel,
 		show_guidance = function() close_guidance = show_accessibility_guidance() end,
 		close_guidance = function() close_guidance() end,
+		watch_reopen = watch_launcher_reopen,
 		-- Same guard as the first run below: a raise ends in the named exit.
 		on_trusted = function()
 			local resumed_ok, resumed_error = xpcall(finish_boot_after_onboarding, debug.traceback)
@@ -1286,14 +1308,28 @@ local function start_llm_bootstrap()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
 	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and
-	-- does not create a new resume intent.
-	local selected_checker = active_backend == backend_detector.BACKEND_MLX
-		and mlx_deps_checker or ollama_deps_checker
-	local schedule_ok, scheduled = xpcall(
-		selected_checker.schedule_initial_check, debug.traceback)
-	if not schedule_ok or scheduled ~= true then
-		Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
-			tostring(scheduled))
+	-- does not create a new resume intent. The boot check only reuses an
+	-- installed runtime: it never downloads, and a remote API backend has no
+	-- local runtime to check at all.
+	local selected_checker = nil
+	if active_backend == backend_detector.BACKEND_MLX then
+		selected_checker = mlx_deps_checker
+	elseif active_backend == backend_detector.BACKEND_OLLAMA then
+		selected_checker = ollama_deps_checker
+	end
+	if selected_checker then
+		local notice_ok, notice_err = xpcall(function()
+			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing(active_backend)
+		end, debug.traceback)
+		if not notice_ok then
+			Logger.error(LOG, "Missing AI runtime notice failed: %s", tostring(notice_err))
+		end
+		local schedule_ok, scheduled = xpcall(
+			selected_checker.schedule_initial_check, debug.traceback)
+		if not schedule_ok or scheduled ~= true then
+			Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
+				tostring(scheduled))
+		end
 	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
@@ -1386,6 +1422,24 @@ local function language_pack_path(language, stem)
 	return nil
 end
 
+--- Whether a category file is the user's own copy: the configured hotstrings
+--- folder is in use and holds it. An extension binding replaces the bundled
+--- file of a category, never that copy (ExtensionPacks.route).
+--- @param path string|nil
+--- @return boolean
+local function is_user_hotstrings_copy(path)
+	return type(path) == "string" and hotstrings_dir ~= bundled_hotstrings_dir
+		and path:sub(1, #hotstrings_dir) == hotstrings_dir
+end
+
+-- Discover the extension packs once for this boot — the bundled ones, the
+-- committed generations of installed layouts, then the user's folder — before
+-- the override resolver, the loader and the menu read them, so all three
+-- describe the same packs. A pack, root or installed-layouts record that cannot
+-- be read is logged and left out: one optional folder never costs the keymap.
+local ExtensionPacks = require("infra.extension_packs")
+ExtensionPacks.discover()
+
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override
 -- file. The resolver routes the personal category through the (possibly
@@ -1399,6 +1453,18 @@ do
 		override_path = override_path,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
+			-- A namespaced extension pack names its own discovered file, and a
+			-- category an extension binds whole reads its metadata from it,
+			-- unless the user's folder holds their own copy, which is what loads.
+			local bound = ExtensionPacks.source(category)
+			if bound then
+				local own = hotstrings_dir .. category .. ".toml"
+				local ok_attr, attr = pcall(hs.fs.attributes, own)
+				if is_user_hotstrings_copy(own) and ok_attr and type(attr) == "table" and attr.mode == "file" then
+					return own
+				end
+				return bound
+			end
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
@@ -1416,6 +1482,12 @@ do
 				end
 			end
 			return hotstrings_dir .. category .. ".toml"
+		end,
+		-- The sections a layout extension supplies for a category, exactly as the
+		-- keymap loads them, so the settings window lists and resets them too.
+		section_sources_resolver = function(category, path)
+			local _, sources = ExtensionPacks.route(category, path, is_user_hotstrings_copy(path))
+			return sources
 		end,
 	})
 
@@ -1585,6 +1657,14 @@ for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstring
 	hotfile_paths[g.name] = g.path
 end
 
+-- Extension packs next: the package tier sits between the personal groups and
+-- the bundled ones. Each pack registers under its namespaced ext: key and stays
+-- off until the canonical preferences applied before keymap.start say otherwise.
+for _, group in ipairs(ExtensionPacks.load(ExtensionPacks.catalogue(), keymap)) do
+	table.insert(hotfiles, group.name)
+	hotfile_paths[group.name] = group.path
+end
+
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
@@ -1602,14 +1682,20 @@ end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
+-- A layout extension may bind a category, or some of its sections, to its own
+-- file: the bound rules keep the category and its common tier.
 Logger.debug(LOG, "Loading common TOML hotstring files…")
 local _toml_load_t0 = hs.timer.secondsSinceEpoch()
+local carried_categories = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
+	local own = hotstrings_dir .. fname
+	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
-	keymap.load_toml(name, hotstrings_dir .. fname)
+	keymap.load_toml(name, path, section_sources)
 	table.insert(hotfiles, name)
-	hotfile_paths[name] = hotstrings_dir .. fname
+	hotfile_paths[name] = path
+	carried_categories[name] = true
 end
 -- Language packs after the neutral files. A declared pack whose file is missing
 -- is a broken install: it is logged as an error rather than silently absent from
@@ -1618,16 +1704,31 @@ local language_file_count = 0
 for _, pack in ipairs(language_packs) do
 	for _, stem in ipairs(pack.categories) do
 		local name = HotstringLanguages.group_id(pack.id, stem)
-		local path = language_pack_path(pack.id, stem)
+		local own = language_pack_path(pack.id, stem)
+		local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 		if path then
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
-			keymap.load_toml(name, path)
+			keymap.load_toml(name, path, section_sources)
 			table.insert(hotfiles, name)
 			hotfile_paths[name] = path
+			carried_categories[name] = true
 			language_file_count = language_file_count + 1
 		else
 			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
 		end
+	end
+end
+-- A category an extension binds whole is its file even when no bundled file
+-- carries it. Sections bound into a category this driver does not carry have
+-- no metadata to join, so they are reported instead of guessed.
+for _, route in ipairs(ExtensionPacks.unbundled_routes(carried_categories)) do
+	if route.path then
+		keymap.load_toml(route.category, route.path, route.section_sources)
+		table.insert(hotfiles, route.category)
+		hotfile_paths[route.category] = route.path
+	else
+		Logger.error(LOG, "An extension binds sections of '%s', a category this driver does not carry.",
+			route.category)
 	end
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
@@ -1685,6 +1786,20 @@ boot_note("Remap guardian status reported by the launcher: %s.",
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
 end
+-- Tap-holds stay off until the remap guardian is allowed in the background,
+-- which nothing told the user: its first requires_approval answer now opens
+-- the numbered Login Items steps. A failure here only costs those steps (the
+-- approval notice keeps its banner), never the boot.
+do
+	local presenter_ok, registered = xpcall(function()
+		return karabiner.set_approval_presenter(function()
+			return require("ui.permission_dialog.login_items_guide").offer(karabiner)
+		end)
+	end, debug.traceback)
+	if presenter_ok ~= true or registered ~= true then
+		Logger.error(LOG, "Login Items steps unavailable; the approval banner remains: %s.", tostring(registered))
+	end
+end
 Boot.mark("UI: karabiner.init")
 Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
@@ -1692,7 +1807,7 @@ Logger.debug(LOG, "Starting user interface components…")
 local menubar = menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
-	karabiner, hotfile_paths
+	karabiner, hotfile_paths, ExtensionPacks.catalogue()
 )
 -- nil means no tray: the menubar, its native menu or the preference rollback
 -- could not settle. Ignoring it still logged "boot SUCCESSFUL" with no menu.

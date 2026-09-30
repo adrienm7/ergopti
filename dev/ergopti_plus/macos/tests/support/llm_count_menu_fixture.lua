@@ -28,7 +28,8 @@ return function(callback)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.i18n"] = { get = function(key)
-			if key == "menu.llm.prediction_count_label" then return "%d prediction%s" end
+			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
+			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
 			return key
 		end, section = function(key) return key end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
@@ -62,7 +63,7 @@ return function(callback)
 		end }
 		package.loaded["ui.menu.menu_llm.startup_controller"] = { new = function() return noop end }
 		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = { new = function()
-			return { bind_hotkey = noop, activate_hotkey = noop, apply_llm_shortcut = noop,
+			return { bind_hotkey = noop, activate_hotkey = noop,
 				apply_llm_profile_shortcut = noop, restore_shortcuts = accept }
 		end }
 		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = accept }
