@@ -199,4 +199,8 @@ Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
 OS layouts already type the magic key on KeyC. Action: add a candidate only
 through the manifest enum and mac_keycodes.json (test-magic-key-source.cjs
 pins both and the v4_to_v5 map); never make a Lua driver remap `auto`, which
-would take KeyC from every QWERTY user who turned the replace section on.
+would take KeyC from every QWERTY user who turned the replace section on. A
+key the user chose is another key of their layout: every driver remaps its
+plain press only. Windows' every-level RemapKey (Shift gives "J"), Ctrl+★ save
+and Win+★ editor belong to the layout's own position alone
+(`LayoutRegistry_MagicKeyHotkeys`).

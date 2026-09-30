@@ -580,6 +580,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
 #Include unit/test_magic_key_source_menu.ahk
+#Include unit/test_magic_key_source_hotkeys.ahk
 #Include unit/test_layout_catalogue.ahk
 #Include unit/test_layout_extension_runtime.ahk
 #Include unit/test_layout_extension_menu.ahk

@@ -20,8 +20,8 @@
 --- 3. Data in, decisions out. The manifest entry and the decoded registry are
 ---    passed in, so this module reads no file and needs no driver API.
 --- 4. Only a plain press is remapped. Shift, AltGr, Option and every shortcut
----    chord keep the key's own character and shortcuts, as the Windows remap
----    does (modules/keymap/layout.ahk RemapKey).
+---    chord keep the key's own character and shortcuts, as Windows does for a
+---    key the user chose (layout_registry.ahk LayoutRegistry_MagicKeyHotkeys).
 --- ==============================================================================
 
 local M = {}
@@ -193,7 +193,7 @@ end
 --- Builds the rows of the `magic_key_source` list: one row naming the key in
 --- effect, whose submenu captures a key, restores the automatic key or lists
 --- every candidate with the one in effect ticked. Windows draws the same rows
---- (windows/ui/menu/menu_layout.ahk _LAY_MagicKeySourceRows).
+--- (windows/ui/editors.ahk MagicKeySourceMenuRows).
 --- @param resolver table From M.new.
 --- @param opts table {
 ---   t        fn(key) -> string        Translator.
