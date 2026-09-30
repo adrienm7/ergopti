@@ -267,7 +267,8 @@ end
 --- @param backend table What resolve_backend returned.
 --- @param payload table { system, text, max_tokens }.
 --- @param on_text function Receives the answer.
---- @param on_fail function Receives a short reason.
+--- @param on_fail function Receives a short reason, and { model } when the local
+---        server does not hold the model (modules/llm/local_model_offer.lua).
 local function chat(backend, payload, on_text, on_fail, use)
 	if backend.format == "backboard" then
 		local Remote = dependency("modules.llm.api_remote", "request_backboard")
@@ -393,8 +394,11 @@ function M.system1_transport(backend, sentence, ctx, on_triage)
 		system = Agent.system1_prompt(config, ctx), text = sentence, max_tokens = config.system1.max_tokens,
 	}, function(raw)
 		on_triage(Agent.parse_system1(config, raw))
-	end, function(reason)
+	end, function(reason, detail)
 		Logger.warn(LOG, "System 1 gave no answer (%s).", tostring(reason))
+		local Offer = require("modules.llm.local_model_offer")
+		-- System 1 triages what is being typed: a notification, never a dialog
+		if Offer.is_missing(reason, detail) then Offer.offer(detail.model, { automatic = true }) end
 		on_triage(nil)
 	end, ProviderUses.SYSTEM1)
 end
@@ -599,10 +603,16 @@ local function run_agent(generation, source, text, focus, backend, learning)
 			if not still_current() then return end
 			offer_actions(generation, engine, session, raw, tools, learning)
 		end
-		local function on_fail(reason)
+		local function on_fail(reason, detail)
 			if not still_current() then return end
 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
 			if session then engine.close_answer_surface(session) end
+			local Offer = require("modules.llm.local_model_offer")
+			if Offer.is_missing(reason, detail) then
+				-- Named, with its Download button, instead of the vague failure
+				Offer.offer(detail.model, { automatic = learning ~= nil })
+				return
+			end
 			if not learning then show_notice("llm.agent.failed") end
 		end
 		M.system2_transport(backend, {

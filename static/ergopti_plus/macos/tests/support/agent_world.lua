@@ -71,6 +71,10 @@ function M.build_world(options)
 		posts = {}, notices = {}, renders = {}, loadings = 0, hides = 0, runs = {}, dialogs = {},
 		selection = options.selection == nil and SELECTION or options.selection,
 		dialog_answer = { "OK", "" },
+		-- The local server's listing requests, the alerts and the button the
+		-- user presses ("first" or the second), the notifications, the
+		-- downloads the local-model owner asked for, and every log line
+		gets = {}, alerts = {}, alert_answer = nil, notifications = {}, installs = {}, logs = {},
 	}
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
@@ -81,7 +85,14 @@ function M.build_world(options)
 	local _gestures = helpers.load_with_stubs("modules.gestures")
 	world.actions = require("modules.gestures.actions")
 	world.actions.init({ action_params = {} })
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	for _, level in ipairs({ "debug", "info", "start", "success", "warn", "error" }) do
+		logger[level] = function(_, message, ...)
+			local ok, text = pcall(string.format, tostring(message), ...)
+			world.logs[#world.logs + 1] = { level = level, text = ok and text or tostring(message) }
+		end
+	end
+	package.loaded["infra.logger"] = logger
 
 	local hs_stub = _G.hs
 	local front_app = {
@@ -130,6 +141,19 @@ function M.build_world(options)
 			local button = world.dialog_answer[1] == "OK" and ok_label or cancel_label
 			return button, world.dialog_answer[2]
 		end,
+		block_alert = function(title, message, first, second, style)
+			world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second },
+				style = style }
+			return world.alert_answer == "first" and first or second
+		end,
+	}
+	package.loaded["infra.notifications"] = {
+		notify = function(title, body, kind, on_click)
+			world.notifications[#world.notifications + 1] = { title = title, body = body, kind = kind,
+				on_click = on_click }
+			return true
+		end,
+		debugLog = function() end,
 	}
 	package.loaded["modules.llm.agent_connectors"] = {
 		run = function(action, on_done)
@@ -208,6 +232,18 @@ function M.build_world(options)
 		world.posts[#world.posts + 1] = { url = url, headers = headers, body = json.decode(body), callback = callback }
 		return true
 	end
+	local_client.get = function(url, headers, callback)
+		world.gets[#world.gets + 1] = { url = url, headers = headers, callback = callback }
+		return true
+	end
+	-- The AI menu registers the owner of model downloads; this world records them
+	local ok_offer, offer = pcall(require, "modules.llm.local_model_offer")
+	if ok_offer and type(offer) == "table" and type(offer.set_installer) == "function" then
+		offer.set_installer(function(model, on_done)
+			world.installs[#world.installs + 1] = { model = model, on_done = on_done }
+			return true
+		end)
+	end
 
 	local engine = require("modules.llm.prediction_engine")
 	world.engine = engine
@@ -257,6 +293,33 @@ function M.trigger(world, id)
 	local started = world.actions.execute_single(id, "tap_3")
 	M.settle(world)
 	return started
+end
+
+--- Answers the local server's pending model listing, if a request asked for
+--- one, with these installed models.
+--- @param world table
+--- @param names table Installed model names.
+--- @return boolean answered
+function M.list_local_models(world, names)
+	local pending = world.gets[#world.gets]
+	if not pending or pending.answered then return false end
+	pending.answered = true
+	local models = {}
+	for index, name in ipairs(names) do models[index] = { name = name, model = name } end
+	pending.callback({ ok = true, status = 200, body = json.encode({ models = models }), headers = {} })
+	return true
+end
+
+--- Tells whether a log line of a level holds a text.
+--- @param world table
+--- @param level string|nil nil for any level.
+--- @param text string
+--- @return boolean
+function M.logged(world, level, text)
+	for _, line in ipairs(world.logs) do
+		if (level == nil or line.level == level) and line.text:find(text, 1, true) then return true end
+	end
+	return false
 end
 
 --- Answers one captured request as the provider would.

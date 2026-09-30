@@ -20,6 +20,12 @@
 ---    another; an empty answer returns to the default.
 --- 4. The automatic mode needs System 1: choosing it without one shows the
 ---    notice and changes nothing.
+--- 5. A local model is shown installed or not, as the local server listed it
+---    last, with a Download row when it is missing. Building the menu asks for
+---    a new listing, which refreshes the menu only when it changes what a row
+---    shows (a refresh on every listing would rebuild in a loop). Choosing the
+---    local backend or naming a local model asks the server at once and offers
+---    the download of a missing one, so no request names a model nobody pulled.
 --- ==============================================================================
 
 local M = {}
@@ -90,6 +96,42 @@ local function resolved_model(parsed)
 	local Remote = require("modules.llm.api_remote")
 	local Runner = require("modules.llm.agent_runner")
 	return Agent.resolve_model(parsed, Runner.config(), { providers = Remote.PROVIDERS })
+end
+
+--- The local model a System setting runs with.
+--- @param value string The setting.
+--- @return string|nil model nil for an off or remote System.
+local function local_model_of(value)
+	local parsed = type(value) == "string" and value ~= "" and Vision.parse(value) or nil
+	if parsed == nil or parsed.backend ~= Vision.LOCAL_BACKEND then return nil end
+	return resolved_model(parsed)
+end
+
+--- Refreshes the menu, whose rows show what the local server listed.
+--- @param ctx table Panel context.
+local function refresh_menu(ctx)
+	if type(ctx.update_menu) ~= "function" then return end
+	local ok, err = pcall(ctx.update_menu)
+	if not ok then Logger.error(LOG, "Menu refresh after a local model listing raised: %s.", tostring(err)) end
+end
+
+--- Asks the local server whether it holds the local model a setting names,
+--- and offers the download of a missing one.
+--- @param ctx table Panel context.
+--- @param value string The setting just applied.
+local function offer_missing_local_model(ctx, value)
+	local model = local_model_of(value)
+	if model == nil then return end
+	local Ollama = require("modules.llm.api_ollama")
+	local before = Ollama.local_model_installed(model)
+	Ollama.verify_local_model(model, function(installed, reason)
+		if installed ~= before then refresh_menu(ctx) end
+		if installed == false then
+			require("modules.llm.local_model_offer").offer(model)
+		elseif installed == nil then
+			Logger.warn(LOG, "Whether local model '%s' is installed is unknown (%s).", model, tostring(reason))
+		end
+	end)
 end
 
 
@@ -166,7 +208,9 @@ local function prompt_model(ctx, system, parsed)
 		Logger.warn(LOG, "Agent model refused: '%s' is not a model name.", model)
 		return false
 	end
-	return apply(ctx, system.key, value, system.setter)
+	if not apply(ctx, system.key, value, system.setter) then return false end
+	offer_missing_local_model(ctx, value)
+	return true
 end
 
 --- Rows of one System's submenu.
@@ -188,16 +232,34 @@ local function system_rows(ctx, system)
 		items[#items + 1] = {
 			label = choice.label,
 			checked = parsed ~= nil and parsed.backend == id,
-			action = function() return apply(ctx, system.key, id, system.setter) end,
+			action = function()
+				if not apply(ctx, system.key, id, system.setter) then return false end
+				offer_missing_local_model(ctx, id)
+				return true
+			end,
 		}
 	end
 	items[#items + 1] = { separator = true }
 	local model = parsed and resolved_model(parsed) or nil
+	-- nil while the local server has not listed its models (or for a remote System)
+	local installed = nil
+	if model ~= nil and parsed.backend == Vision.LOCAL_BACKEND then
+		installed = require("modules.llm.api_ollama").local_model_installed(model)
+	end
+	local model_key = "menu.agent.model"
+	if installed == true then model_key = "menu.agent.model_installed" end
+	if installed == false then model_key = "menu.agent.model_missing" end
 	items[#items + 1] = {
-		label = i18n.format("menu.agent.model", model or i18n.get("menu.agent.off")),
+		label = i18n.format(model_key, model or i18n.get("menu.agent.off")),
 		disabled = parsed == nil or nil,
 		action = parsed and function() return prompt_model(ctx, system, parsed) end or nil,
 	}
+	if installed == false then
+		items[#items + 1] = {
+			label = i18n.format("menu.agent.download_model", model),
+			action = function() return require("modules.llm.local_model_offer").install(model) end,
+		}
+	end
 	local current = parsed and backend_label(parsed.backend) or i18n.get("menu.agent.off")
 	return { { label = i18n.format(system.title, current), items = items } }
 end
@@ -226,7 +288,8 @@ end
 -- =====================================
 
 --- Builds the top-level AI agent row.
---- @param ctx table { state, settings_mgr }.
+--- @param ctx table { state, settings_mgr, update_menu }; update_menu (optional)
+---        redraws the menu once a local model listing changed a row.
 --- @return table row { label, submenu }.
 function M.build(ctx)
 	if type(ctx) ~= "table" or type(ctx.state) ~= "table" or type(ctx.settings_mgr) ~= "table"
@@ -237,6 +300,26 @@ function M.build(ctx)
 	local Runner = require("modules.llm.agent_runner")
 	local ok_tools, tools_error = pcall(Runner.refresh_tools, false, nil)
 	if not ok_tools then Logger.error(LOG, "Shortcuts refresh raised: %s.", tostring(tools_error)) end
+	-- A local System shows whether its model is installed: list the models
+	-- again, and refresh the menu only if that changes what a row shows
+	-- An array, not a map: an unlisted model's state is nil
+	local shown = {}
+	for _, key in ipairs({ "llm_agent_system1", "llm_agent_system2" }) do
+		local model = local_model_of(ctx.state[key])
+		if model then
+			shown[#shown + 1] = { model = model, before = require("modules.llm.api_ollama").local_model_installed(model) }
+		end
+	end
+	if #shown > 0 then
+		local Ollama = require("modules.llm.api_ollama")
+		local ok_list, list_error = pcall(Ollama.refresh_local_models, function(listed)
+			if listed ~= true then return end
+			for _, row in ipairs(shown) do
+				if Ollama.local_model_installed(row.model) ~= row.before then return refresh_menu(ctx) end
+			end
+		end)
+		if not ok_list then Logger.error(LOG, "Local model listing raised: %s.", tostring(list_error)) end
+	end
 
 	--- Wraps a row provider as a dynamic handler of the renderer.
 	--- @param id string Row id, for the warnings.

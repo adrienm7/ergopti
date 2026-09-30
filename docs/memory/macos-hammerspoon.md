@@ -103,6 +103,20 @@ ggml/MLX libraries it loads from its own folder, as in
 new runtime trigger through the router, and extend
 `test_ai_runtime_selection_install.lua` (`ai-runtime-*`).
 
+### project-macos-local-model-defaults-are-never-pulled
+
+The AI menu pulls only its own prediction model. A "local" agent System or
+screen reading without `|model` names `default_models.local` of `agent.json`
+or `vision.json`, which nothing downloads; Ollama 0.24 answers `/api/chat`
+with 404 `{"error":"model 'X' not found"}` (or `model "X" not found, try
+pulling it first`). `api_ollama.request_prebuilt` therefore posts a model only
+after `/api/tags` listed it (exact name, implicit `:latest`), fails both cases
+with `MODEL_MISSING` and the name, and `modules/llm/local_model_offer.lua`
+names it with a Download button that the AI menu's installer
+(`models_mgr.pull_ollama_model`) serves; the automatic mode notifies instead of
+opening a modal. Route any new local-model consumer through that transport and
+offer (`ai-agent-local-model`).
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units

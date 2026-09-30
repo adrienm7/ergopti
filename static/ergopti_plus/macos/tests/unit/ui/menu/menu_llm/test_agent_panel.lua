@@ -16,6 +16,9 @@
 ---    in order), the current one checked, and the model row shows the model in
 ---    force and stores "<backend>" or "<backend>|<model>".
 --- 3. The automatic mode needs System 1: the menu refuses it without one.
+--- 4. A local model nobody pulled must be visible and downloadable from the
+---    menu, and choosing the local backend offers its download at once
+---    (ai-agent-local-model).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,7 +26,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
 	"infra.dialog_util", "ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
-	"infra.logger", "infra.locale",
+	"infra.logger", "infra.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
 }
 
 --- Builds the panel over a state and faked owners.
@@ -31,12 +34,35 @@ local OWNED = {
 --- @param scenario function Receives (build, world).
 local function with_panel(state, scenario)
 	helpers.with_fresh_modules(OWNED, function()
-		local world = { applied = {}, dialogs = {}, notices = {}, dialog_answer = { "OK", "" }, pickers = {} }
+		local world = { applied = {}, dialogs = {}, notices = {}, dialog_answer = { "OK", "" }, pickers = {},
+			-- What the local server listed (nil: not yet), the listings and
+			-- verifications asked for, the alerts and the downloads
+			listed = nil, refreshes = 0, verifications = {}, alerts = {}, alert_answer = nil, installs = {},
+			listing_done = nil, menu_updates = 0 }
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(title, message, default, ok_label, cancel_label)
 				world.dialogs[#world.dialogs + 1] = { title = title, message = message, default = default }
 				return world.dialog_answer[1] == "OK" and ok_label or cancel_label, world.dialog_answer[2]
 			end,
+			block_alert = function(title, message, first, second)
+				world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second } }
+				return world.alert_answer == "first" and first or second
+			end,
+		}
+		package.loaded["modules.llm.api_ollama"] = {
+			MODEL_MISSING = "model_missing",
+			local_model_installed = function(model)
+				if world.listed == nil then return nil end
+				return world.listed[model] == true
+			end,
+			refresh_local_models = function(on_done)
+				world.refreshes = world.refreshes + 1
+				world.listing_done = on_done
+			end,
+			verify_local_model = function(model, on_result)
+				world.verifications[#world.verifications + 1] = { model = model, on_result = on_result }
+			end,
+			forget_local_models = function() end,
 		}
 		package.loaded["ui.tooltip"] = {
 			show = function(text) world.notices[#world.notices + 1] = text; return true end,
@@ -68,6 +94,10 @@ local function with_panel(state, scenario)
 			return text
 		end
 		world.i18n = i18n
+		require("modules.llm.local_model_offer").set_installer(function(model)
+			world.installs[#world.installs + 1] = model
+			return true
+		end)
 		local settings_mgr = {
 			apply_setting_transaction = function(options)
 				world.applied[#world.applied + 1] = options
@@ -75,7 +105,10 @@ local function with_panel(state, scenario)
 				return true
 			end,
 		}
-		local function build() return Panel.build({ state = state, settings_mgr = settings_mgr }) end
+		local function build()
+			return Panel.build({ state = state, settings_mgr = settings_mgr,
+				update_menu = function() world.menu_updates = world.menu_updates + 1 end })
+		end
 		local ok, err = pcall(scenario, build, world)
 		Locale.set_locale(previous_locale)
 		if not ok then error(err, 0) end
@@ -219,6 +252,61 @@ helpers.describe("AI agent menu (macOS)", function()
 			helpers.assert_eq(world.applied[1].runtime_fn, "set_llm_agent_disabled_apps")
 			helpers.assert_eq(#world.applied[1].value, 0)
 			helpers.assert_true((world.tool_lists or 0) >= 1, "opening the menu refreshes the Shortcuts list")
+		end)
+	end)
+	helpers.it("(ai-agent-local-model) shows whether the local model is installed and downloads a missing one", function()
+		local state = base_state()
+		state.llm_agent_system2 = "local"
+		with_panel(state, function(build, world)
+			local function system2_rows() return row_starting(build().submenu, "🧠").menu end
+			-- Unknown until the local server listed its models: the menu asks for a listing
+			helpers.assert_eq(row_starting(system2_rows(), "Model…").title, "Model… (qwen2.5:7b)")
+			helpers.assert_true(world.refreshes >= 1, "the menu asks the local server for its models")
+			-- The listing redraws the (cached) menu only when it changes a row:
+			-- a redraw per listing would rebuild in a loop
+			world.listed = { ["qwen2.5:7b"] = true }
+			world.listing_done(true)
+			helpers.assert_eq(world.menu_updates, 1, "the new install state is drawn")
+			local rows = system2_rows()
+			world.listing_done(true)
+			helpers.assert_eq(world.menu_updates, 1, "an unchanged listing redraws nothing")
+			helpers.assert_eq(row_starting(rows, "Model…").title, "Model… (qwen2.5:7b, installed)")
+			helpers.assert_eq(row_starting(rows, "⬇️"), nil, "nothing to download")
+
+			world.listed = { ["llama3.2:3b"] = true }
+			rows = system2_rows()
+			helpers.assert_eq(row_starting(rows, "Model…").title, "Model… (qwen2.5:7b, not installed)")
+			local download = row_starting(rows, "⬇️")
+			helpers.assert_eq(download.title, "⬇️ Download qwen2.5:7b")
+			download.fn()
+			helpers.assert_eq(world.installs[1], "qwen2.5:7b", "the row hands the model to the download owner")
+
+			-- Choosing the local backend asks the server at once, and offers a missing model
+			row_starting(row_starting(build().submenu, "⚡").menu, "Local").fn()
+			helpers.assert_eq(state.llm_agent_system1, "local")
+			local verification = world.verifications[#world.verifications]
+			helpers.assert_eq(verification.model, "qwen2.5:7b")
+			world.alert_answer = "first"
+			verification.on_result(false)
+			helpers.assert_eq(#world.alerts, 1)
+			helpers.assert_eq(world.alerts[1].title, "AI model not installed")
+			helpers.assert_eq(world.alerts[1].message, "The model “qwen2.5:7b” is not installed on this computer, "
+				.. "so the local server (Ollama) cannot answer with it. Download it now?")
+			helpers.assert_eq(world.alerts[1].buttons[1], "Download")
+			helpers.assert_eq(world.installs[2], "qwen2.5:7b", "its Download button pulls it")
+			verification.on_result(true)
+			helpers.assert_eq(#world.alerts, 1, "an installed model asks nothing")
+
+			-- Naming another local model verifies that one
+			world.dialog_answer = { "OK", "qwen3:14b" }
+			row_starting(system2_rows(), "Model…").fn()
+			helpers.assert_eq(world.verifications[#world.verifications].model, "qwen3:14b")
+
+			-- A remote System shows no install state and verifies nothing
+			local count = #world.verifications
+			row_starting(system2_rows(), "Cerebras").fn()
+			helpers.assert_eq(#world.verifications, count)
+			helpers.assert_eq(row_starting(system2_rows(), "Model…").title, "Model… (qwen-3.8-27b)")
 		end)
 	end)
 end)
