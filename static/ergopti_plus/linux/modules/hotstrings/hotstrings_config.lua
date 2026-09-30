@@ -365,6 +365,27 @@ local function overrides_path()
 	return override_config_dir() .. "/" .. OVERRIDES_FILE
 end
 
+--- Reports the override-file entries naming a category or section this build
+--- no longer loads: ignored at runtime and kept by every save, they are named
+--- once so the user can fix them in hotstrings_overrides.toml, the one place
+--- they live (the config cleanup only covers config.toml). A single explicit
+--- hotstring file loads its own categories only, so nothing is judged there.
+local function report_retired_overrides()
+	if type(_config_dir) == "string" and _config_dir:match("%.toml$") then return end
+	for id, entry in pairs(_overrides) do
+		if id ~= GLOBAL_CATEGORY and choice_is_retired(id) then
+			ConfigOutdated.report_in_file(overrides_path(), { id }, "no loaded hotstring category has this id")
+		elseif id ~= GLOBAL_CATEGORY then
+			for name in pairs(entry.sections or {}) do
+				if choice_is_retired(id, name) then
+					ConfigOutdated.report_in_file(overrides_path(), { id, name },
+						"no loaded hotstring section has this name")
+				end
+			end
+		end
+	end
+end
+
 --- Interprets override file bytes, raising when they are not valid TOML.
 --- @param content string Exact file bytes.
 --- @return table overrides { [category] = { delay, color, show_tooltip, priority, sections } }
@@ -1283,6 +1304,7 @@ function M.load_all()
 	_published = true
 	_resolve_cache = {}
 	report_retired_choices(choices)
+	report_retired_overrides()
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#filtered, _count_groups(filtered), _parse_errors)
