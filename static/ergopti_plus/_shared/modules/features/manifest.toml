@@ -4007,15 +4007,13 @@ checked_when = ["llm_enabled"]
 disabled_when = ["llm_toggle_ready"]
 category = "LLM"
 
+# The restore alone: the maintainer retired the AI menu's « Tout effacer » on
+# 2026-09-30, because clearing the AI section leaves nothing the system would
+# do in its place. The AI scope still takes part in the global composition.
 [[menu.llm_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-
-[[menu.llm_menu]]
-type = "command"
-id = "scope_clear"
-i18n = "common.clear_to_system"
 
 [[menu.llm_menu]]
 type = "---"
@@ -5100,7 +5098,7 @@ i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
 
-# The Hotstrings scope, beside its switch like the IA and Metrics ones. Each
+# The Hotstrings scope, beside its switch like the Metrics one. Each
 # driver registers both commands on its scope owner, which changes config.toml
 # and the override file as one transaction: recommended delays are written
 # where the corpus inheritance differs, and the Ergopti extension's bound

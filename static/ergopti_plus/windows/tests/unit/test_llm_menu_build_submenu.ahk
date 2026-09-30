@@ -66,6 +66,53 @@ _LBMS_BuildSubmenuBehavior() {
 Test("llm menu: submenu builder has no publish side effects (llm-menu-build-submenu)",
 	_LBMS_BuildSubmenuBehavior)
 
+; The text of every row of a native menu, top to bottom.
+_LBMS_Labels(TargetMenu) {
+	static MF_BYPOSITION := 0x400
+	Labels := []
+	Count := DllCall("GetMenuItemCount", "ptr", TargetMenu.Handle, "int")
+	Assert(Count > 0, "the staged submenu must have rows to read")
+	Loop Count {
+		Position := A_Index - 1
+		Length := DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+			"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
+		Text := Buffer((Max(Length, 0) + 1) * 2, 0)
+		DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+			"ptr", Text, "int", Max(Length, 0) + 1, "uint", MF_BYPOSITION, "int")
+		Labels.Push(StrGet(Text, "UTF-16"))
+	}
+	return Labels
+}
+
+; ai-menu-no-clear. The drawn AI submenu keeps « Restaurer les valeurs
+; conseillées » under its switch and no longer shows « Tout effacer
+; (comportement du système) », whose row the maintainer retired.
+_LBMS_NoClearRow() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
+	_LLM_Menu_Handle := Menu()
+	try {
+		Sub := LLM_Menu_BuildSubmenu()
+		Labels := _LBMS_Labels(Sub)
+		Restores := 0
+		for Label in Labels {
+			AssertFalse(Label == t("common.clear_to_system"), "the AI submenu draws no clear row")
+			if (Label == t("common.restore_recommended"))
+				Restores += 1
+		}
+		AssertEqual(1, Restores, "the AI submenu keeps its restore row")
+		AssertEqual(t("common.restore_recommended"), Labels[2], "the restore row follows the switch")
+		AssertEqual("", Labels[3], "a separator closes the switch's group")
+	} finally {
+		_LLM_Menu := SavedMenu
+		if (SavedHandle != "")
+			_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("ai-menu-no-clear: the drawn AI submenu has a restore row and no clear row",
+	_LBMS_NoClearRow)
+
 ; LLM_Menu_Build must construct rows through the extractor — one row
 ; construction site, not two drifting copies.
 _LBMS_BuildCallsExtractor() {

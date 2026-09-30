@@ -171,11 +171,6 @@
 			"i18n": "common.restore_recommended"
 		},
 		{
-			"type": "command",
-			"id": "scope_clear",
-			"i18n": "common.clear_to_system"
-		},
-		{
 			"type": "---"
 		},
 		{

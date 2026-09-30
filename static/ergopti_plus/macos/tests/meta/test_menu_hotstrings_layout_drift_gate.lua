@@ -61,7 +61,7 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- to build `toggle` rows: the signature keys on the id when there is one, and
 	-- an id is what lets a driver register the command that asks for the row.
 	"toggle:hotstrings_toggle",
-	-- The Hotstrings scope beside its switch since 2026-09-30, as under IA and
+	-- The Hotstrings scope beside its switch since 2026-09-30, as under
 	-- Metrics: every driver registers both on its scope owner.
 	"command:scope_restore",
 	"command:scope_clear",

@@ -2322,15 +2322,13 @@ local function _build_llm(ctx)
 	for key, value in pairs(ctx) do llm_ctx[key] = value end
 	llm_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
-	local function apply_llm_scope(mode)
+	-- The restore alone: the AI menu's clear row was retired.
+	llm_ctx.commands["scope_restore"] = function()
 		if ctx.paused == true then return false end
-		if mode == "clear" and not confirm_clear(i18n_safe("menu.llm.title")) then return false end
-		local committed = require("infra.llm_scope").apply(mode, ctx.paused)
+		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	llm_ctx.commands["scope_restore"] = function() return apply_llm_scope("recommended") end
-	llm_ctx.commands["scope_clear"] = function() return apply_llm_scope("clear") end
 	llm_ctx.commands["llm_toggle"] = function()
 		if llm.toggle then llm.toggle() end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

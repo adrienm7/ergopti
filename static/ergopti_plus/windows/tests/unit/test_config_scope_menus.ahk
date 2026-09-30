@@ -23,7 +23,9 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 	Fixture.options["reload"] := Launch
 	try {
 		Commands := %Factory%(Fixture.options)
-		for Mode in ["recommended", "clear"] {
+		; The AI menu offers the restore alone (ai-menu-no-clear).
+		Modes := Scope == "llm" ? ["recommended"] : ["recommended", "clear"]
+		for Mode in Modes {
 			Fixture.options["stamp"] := Mode
 			Id := Mode == "clear" ? "scope_clear" : "scope_restore"
 			Rendered := Menu()
@@ -108,3 +110,26 @@ _ScopeMenuAbsentConsent() {
 	}
 }
 Test("config-scope-menu: recommendations never create LLM or metrics consent", _ScopeMenuAbsentConsent)
+
+; ai-menu-no-clear. The AI menu showed « Tout effacer (comportement du
+; système) » under its switch, which leaves nothing the system would do in
+; the AI's place; the maintainer retired it on 2026-09-30. The declaration and
+; the command factory both lose it, while the restore row stays.
+_ScopeMenuLlmHasNoClear() {
+	Commands := _LLM_ScopeCommands()
+	Assert(Commands.Has("scope_restore"), "the AI menu keeps its restore command")
+	AssertFalse(Commands.Has("scope_clear"), "the AI menu registers no clear command")
+	Declared := _MR_GetMenuDef("llm_menu")
+	Assert(Declared is Array && Declared.Length > 0, "the AI menu declaration must be readable")
+	Restores := 0
+	for Row in Declared {
+		Id := _MR_Get(Row, "id", "")
+		AssertFalse(Id == "scope_clear", "the AI menu declares no clear row")
+		AssertFalse(_MR_Get(Row, "i18n", "") == "common.clear_to_system",
+			"no AI row reads the clear label")
+		if Id == "scope_restore"
+			Restores += 1
+	}
+	AssertEqual(1, Restores, "the AI menu declares its restore row once")
+}
+Test("ai-menu-no-clear: the AI menu declares and registers the restore alone", _ScopeMenuLlmHasNoClear)
