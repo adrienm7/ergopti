@@ -813,14 +813,27 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 	}
 }
 
+; The physical magic key's hotkeys (LayoutRegistry_MagicKeyHotkeys): the layout's
+; own magic-key position takes every level of the source character, a key the
+; user chose only its plain press.
+_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],
+	ScriptInformation["MagicKeySourceChosen"], Features["layout"]["ctrl_magic_save"])
 if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
-	MagicSrcScan := ScriptInformation["MagicKeySourceScan"]
-	MagicSrcChar := ScriptInformation["MagicKeySourceChar"]
-	RemapKey(MagicSrcScan, MagicSrcChar, ScriptInformation["MagicKey"])
-	if Features["layout"]["ctrl_magic_save"] {
-		; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
-		; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
-		Hotkey("^" . MagicSrcScan, (*) => SendFinalResult("^s"), "I3")
+	for _MagicKeyHotkey in _MagicKeyHotkeys {
+		switch _MagicKeyHotkey["kind"] {
+			case "remap":
+				RemapKey(_MagicKeyHotkey["hotkey"], ScriptInformation["MagicKeySourceChar"],
+					ScriptInformation["MagicKey"])
+			case "magic":
+				; The plain press alone: Shift, AltGr and every chord find the
+				; emulated layout's hotkeys, or none and the OS layout.
+				Hotkey(_MagicKeyHotkey["hotkey"], _RemapEmit.Bind("{Text}" . ScriptInformation["MagicKey"],
+					ScriptInformation["MagicKey"]), "I2")
+			case "ctrl_save":
+				; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
+				; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
+				Hotkey(_MagicKeyHotkey["hotkey"], (*) => SendFinalResult("^s"), "I3")
+		}
 	}
 }
 
@@ -831,9 +844,15 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 ; OS Win+<key> combo even with every Ergopti feature disabled, so "all features off"
 ; did not mean "no keyboard interception". The criterion is re-evaluated per press, so
 ; a tray toggle applies without a reload.
-HotIf((*) => Features["hotstrings"]["magic_key"]["replace"]["enabled"])
-Hotkey("#" . ScriptInformation["MagicKeySourceScan"], (*) => OpenPersonalEditor(), "I3")
-HotIf()
+try {
+	HotIf((*) => Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+	for _MagicKeyHotkey in _MagicKeyHotkeys {
+		if (_MagicKeyHotkey["kind"] == "editor")
+			Hotkey(_MagicKeyHotkey["hotkey"], (*) => OpenPersonalEditor(), "I3")
+	}
+} finally {
+	HotIf()
+}
 
 
 

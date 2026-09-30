@@ -512,6 +512,32 @@ LayoutRegistry_MagicKeySource(Inputs) {
 }
 
 /**
+ * The hotkeys that make the physical magic key type the magic key
+ * (modules/keymap/layout.ahk registers them). The key a layout declares,
+ * detected or shipped, is the layout's own magic-key position: its other levels
+ * follow the source character (Shift types its capital, Ctrl and Alt its
+ * shortcuts), Ctrl+★ may save and Win+★ opens the personal editor. A key the
+ * user chose is a key of the layout they type on: only its plain press becomes
+ * the magic key, and every level and chord stays the layout's, as on macOS and
+ * Linux (_shared/lua/keymap/magic_key_source.lua).
+ * @param {String} Scan - "SCnnn" of the physical magic key.
+ * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
+ * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
+ * @returns {Array} Maps of "kind" ("remap": every level through RemapKey,
+ *   "magic": the plain press alone, "ctrl_save": Ctrl+S, "editor": the personal
+ *   editor, registered under the replace section's criterion) and "hotkey".
+ */
+LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
+	if Chosen
+		return [Map("kind", "magic", "hotkey", Scan)]
+	Hotkeys := [Map("kind", "remap", "hotkey", Scan)]
+	if CtrlSave
+		Hotkeys.Push(Map("kind", "ctrl_save", "hotkey", "^" . Scan))
+	Hotkeys.Push(Map("kind", "editor", "hotkey", "#" . Scan))
+	return Hotkeys
+}
+
+/**
  * The KeyboardEvent.code of a scan code, among the keys registry layouts define:
  * the reverse of LayoutRegistry_KeyScan, for a key the user just pressed.
  * @param {String} Scan - "SCnnn", any case.
