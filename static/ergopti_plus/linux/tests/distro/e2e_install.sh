@@ -100,11 +100,13 @@ fi
 echo "${E2E_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${E2E_USER}"
 chmod 0440 "/etc/sudoers.d/${E2E_USER}"
 E2E_HOME="$(getent passwd "${E2E_USER}" | cut -d: -f6)"
-# Only what the installer reads from a checkout: the product tree and the
-# version source. The whole repository would drag node_modules along.
+# Only what the installer reads from a checkout: the product tree, the layout
+# registry it installs beside the driver and the version source. The whole
+# repository would drag node_modules along.
 rm -rf "${E2E_HOME}/ergopti"
-mkdir -p "${E2E_HOME}/ergopti/static"
+mkdir -p "${E2E_HOME}/ergopti/static/layouts"
 cp -r "${SRC}/static/ergopti_plus" "${E2E_HOME}/ergopti/static/"
+cp -r "${SRC}/static/layouts/registry" "${E2E_HOME}/ergopti/static/layouts/"
 cp "${SRC}/package.json" "${E2E_HOME}/ergopti/"
 chown -R "${E2E_USER}" "${E2E_HOME}/ergopti"
 
