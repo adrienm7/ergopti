@@ -237,6 +237,16 @@ application. Action: bind a key the driver already binds by scan code through
 that scan code, and let variant order decide precedence
 (`test_llm_tab_accepts_visible_prediction.ahk`). The registrar resolves named
 keys on the VK axis, so a user chord on Tab is exposed to the same shadow.
+Any SC hotkey counts, whatever its modifiers or criterion (`^SC02F`, a combo
+suffix `SC138 & SC017`), and the AltGr layer declares every character key, so
+a hook hotkey named by a character (`~^v`, `$^x`, one under #HotIf or a
+nonzero #InputLevel) is dead on every layout: the keylogger's paste hotkey
+never fired. A plain global `^!+i::` at #InputLevel 0 is a RegisterHotKey
+hotkey, matched by the OS on its VK once the hook passes the key, and works.
+Action: observe a chord through the HookDispatcher InputHook, which runs after
+every hotkey decision (`KL_Clip_OnKeyDown`); an SC variant would compete with
+the emulation's and the navigation layer's hotkeys of the key. The
+hardening-c guard walks the include graph for each label's context.
 
 ### project-ahk-sendinput-puts-its-hook-first
 
