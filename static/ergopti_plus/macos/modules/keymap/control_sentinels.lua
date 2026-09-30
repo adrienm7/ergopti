@@ -16,8 +16,9 @@
 ---    other Ergopti tap passes the reserved code through without acting on it,
 ---    which makes the outcome independent of Quartz tap insertion order.
 --- 2. In-process fan-out: consumers that need the signal (the LLM tooltip idle
----    deadline) register a named listener instead of decoding the key in their
----    own tap, which may run after the owner deleted the event.
+---    deadline, the navigation layer's wheel bindings) register a named
+---    listener instead of decoding the key in their own tap, which may run after
+---    the owner deleted the event.
 --- 3. Bounded hot path: claim_key() is one table lookup on an already-read
 ---    keycode; no additional native event field is read for ordinary keys.
 --- ==============================================================================
@@ -33,12 +34,16 @@ local LOG = "keymap.control_sentinels"
 
 --- Signal published when Karabiner enters the navigation layer (F20 sentinel).
 M.NAV_LAYER_ENTERED = "nav_layer_entered"
+--- Signal published when Karabiner leaves the navigation layer (F19 sentinel).
+M.NAV_LAYER_EXITED = "nav_layer_exited"
 M.ONE_SHOT_SHIFT = "one_shot_shift"
 
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
--- that activates the navigation layer (platform/remap/generator.lua).
+-- that activates the navigation layer and appends F19 to every one that turns
+-- it off (platform/remap/generator.lua).
 local SIGNAL_BY_KEYCODE = {
 	[Keycodes.F20_LAYER_NAV_ENTERED] = M.NAV_LAYER_ENTERED,
+	[Keycodes.F19_LAYER_NAV_EXITED]  = M.NAV_LAYER_EXITED,
 }
 
 -- name → callback(signal). Keyed slots, so a module reload replaces its own
@@ -105,7 +110,9 @@ end
 function M.claim_key(keycode, is_down, flags)
 	local signal = SIGNAL_BY_KEYCODE[keycode]
 	if signal == nil then return false end
-	if ControlSignals.is_one_shot(flags) then signal = M.ONE_SHOT_SHIFT end
+	-- Only F20 carries the one-shot tag; the exit sentinel may come with whatever
+	-- modifiers the hand still holds when the layer key is released.
+	if signal == M.NAV_LAYER_ENTERED and ControlSignals.is_one_shot(flags) then signal = M.ONE_SHOT_SHIFT end
 	if is_down then publish(signal) end
 	return true
 end

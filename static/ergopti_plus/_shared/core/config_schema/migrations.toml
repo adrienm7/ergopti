@@ -48,7 +48,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 6
+current_version = 7
 unstamped_version = 2
 
 
@@ -207,4 +207,18 @@ ops = [
 	{ op = "map_value", section = "shortcuts.script_control", key = "backspace", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
 	{ op = "map_value", section = "shortcuts.script_control", key = "escape", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
 	{ op = "map_value", section = "shortcuts.script_control", key = "return_key", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
+]
+
+[steps.v6_to_v7]
+from = 6
+to = 7
+drivers = ["hs"]
+reason = "Layer + Scroll is retired on macOS: the navigation layer's wheel bindings (layers.toml WheelUp and WheelDown, edited from Tap-Holds > Edit the layer) replace it."
+# The switch had no effect left: it armed on an F19 key that only the retired
+# legacy Karabiner rules sent. An existing layers.toml gains no wheel binding
+# (a loader never falls back to the preset), so the wheel keeps scrolling while
+# the layer is held until the user binds it in the layer editor or restores the
+# recommended layer, whose wheel is volume up and down.
+ops = [
+	{ op = "delete", section = "shortcuts.keys", key = "layer_scroll" },
 ]

@@ -1130,9 +1130,6 @@ M.unavailable = {
 		path = "shortcuts.script_control.escape", section = "shortcuts.script_control", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.layer_scroll", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
-	},
-	{
 		path = "shortcuts.keys.wrap_text_if_selected", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
 	},
 	{

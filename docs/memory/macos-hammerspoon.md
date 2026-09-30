@@ -416,7 +416,25 @@ every other tap passes them through untouched, and consumers subscribe with
 `set_listener`. Do not claim in `EventProvenance.classify_with_fence`: an extra
 keycode read there breaks the per-tap read budgets pinned by the tooltip and
 ignored-window tests. The generator emits F20 only inside the ACTIVE lease
-graph, so a paused or revoked driver never produces it.
+graph, so a paused or revoked driver never produces it. Its pair F19 marks the
+layer's exit: inserted right before every `layer_active = 0` write, as F20
+precedes the `= 1` one, never as the last `to` entry, which Karabiner holds
+until the key is released and which then takes the place of the first key's
+held modifiers after a chord. Watchers that ignore F20 by keycode (the tooltip
+dismiss lists) must ignore F19 too.
+
+### project-hs-layer-wheel-is-a-derived-owner
+
+Karabiner takes no wheel input, so the navigation layer's wheel bindings
+(layers.toml `WheelUp`/`WheelDown`/…, volume by default) run in Hammerspoon:
+`NavLayer.wheel_slots` turns them into strokes, and
+`system.bind_layer_wheel` consumes a turn only between the F20 and F19
+sentinels, in a bound direction. The owner (`layer_wheel` in
+`modules/shortcuts/bindings.lua`) is derived from layers.toml like `tap_keys`
+from its assignments: no `[shortcuts.keys]` preference, nothing bound for a
+layer without a wheel binding, and every layers.toml writer calls
+`reconcile_layer_wheel` (a hand edit applies at the next start). It replaced the
+Layer + Scroll shortcut, whose held F19 no generated rule emitted any more.
 
 ### project-hs-screen-capture-needs-own-grant
 

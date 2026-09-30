@@ -1,0 +1,11 @@
+# _shared/tests/corpus/config_migrations/shipped_layer_scroll_removed_on_macos/input.toml
+
+[_meta]
+schema_version = 6
+
+[shortcuts]
+enabled = true
+
+[shortcuts.keys]
+layer_scroll = true
+wrap_text_if_selected = true

@@ -82,12 +82,15 @@ platforms = ["macos"]
 reason_key = "platform_reason.layer_fn_modifier_is_macos"
 
 # A kind of physical input (physical_keys.json "kind") that some OS cannot take
-# as a layer key. Karabiner-Elements, which carries the macOS layer, takes no
-# wheel input at all, so a wheel binding there would be a key that never fires;
-# the Layer + Scroll shortcut keeps the volume on the wheel on macOS instead.
+# as a layer key. Karabiner-Elements, which carries the rest of the macOS
+# layer, takes no wheel input: Hammerspoon runs the macOS wheel bindings
+# instead, consuming a turn of the wheel only while the layer is held
+# (macos/modules/shortcuts/actions/system.lua, bind_layer_wheel). The native
+# Linux hook observes the pointer without grabbing it, so it cannot suppress
+# the turn a binding would replace.
 [source_kinds.wheel]
-platforms = ["windows"]
-reason_key = "platform_reason.layer_wheel_source_is_windows_only"
+platforms = ["windows", "macos"]
+reason_key = "platform_reason.layer_wheel_source_is_not_linux"
 
 # The native Linux hook observes pointer activity without grabbing the pointer,
 # so it cannot suppress a button's original event when a layer remaps it.

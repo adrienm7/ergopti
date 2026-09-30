@@ -14,8 +14,9 @@
 ---    or binds something one of the three OSes cannot resolve.
 --- 3. End to end: the page's scripted session (_shared/tests/corpus/
 ---    layer_editor/edited_layers.toml) is published through the atomic
----    adapter, the Karabiner rules are regenerated, the window closes, and the
----    navigation layer then generated from the folder carries every macOS edit.
+---    adapter, the Karabiner rules are regenerated, the wheel's owner reads the
+---    file, the window closes, and the navigation layer then generated from the
+---    folder carries every macOS edit, its wheel slots included.
 --- 4. A refused regeneration keeps the window open; Cancel closes it, and a
 ---    message from a closed window does nothing.
 --- 5. Legends (layer-editor-current-layout-legends): init() carries what the
@@ -78,12 +79,13 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
-		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes" }
+		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
+		"modules.shortcuts.bindings" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local prior_hs = _G.hs
 	local world = { dir = make_config_dir(), bridges = {}, views = {}, writes = {}, regenerations = 0,
-		regenerate_accepts = true, logs = {}, keymap = {} }
+		regenerate_accepts = true, logs = {}, keymap = {}, wheel_reconciles = 0 }
 	local ok, err = xpcall(function()
 		local logger = {}
 		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
@@ -99,6 +101,11 @@ local function with_editor(scenario)
 			shared = function(rel) return helpers.shared(rel) end,
 		}
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return world.dir end }
+		-- The owner of the layer's wheel bindings, which Hammerspoon runs.
+		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+			world.wheel_reconciles = world.wheel_reconciles + 1
+			return true
+		end }
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(path)
 				local fh = io.open(path, "rb")
@@ -245,6 +252,7 @@ helpers.describe("macOS navigation layer editor host", function()
 			end
 			helpers.assert_eq(#world.writes, 0, "a refused save writes nothing")
 			helpers.assert_eq(world.regenerations, 0, "a refused save regenerates nothing")
+			helpers.assert_eq(world.wheel_reconciles, 0, "a refused save leaves the wheel as it was")
 			helpers.assert_eq(world.views[1].deleted, false, "a refused save keeps the window open")
 			helpers.assert_nil(io.open(world.dir .. "/layers.toml", "rb"), "no layers.toml was created")
 		end)
@@ -263,6 +271,7 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(world.writes[1].expected, "absent", "published against the absent file it read")
 			helpers.assert_eq(read_file(world.dir .. "/layers.toml"), text)
 			helpers.assert_eq(world.regenerations, 1)
+			helpers.assert_eq(world.wheel_reconciles, 1, "the wheel's owner reads the saved file (layer-wheel-slots)")
 			helpers.assert_eq(world.views[1].deleted, true, "a saved and applied layer closes the window")
 
 			local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
@@ -281,6 +290,8 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(sent.t, "z[command,shift]", "KeyT: the macOS edit, ⌘⇧Z")
 			helpers.assert_eq(sent.g ~= nil and sent.g:match("^f12") ~= nil, true, "KeyG keeps F12 on macOS")
 			helpers.assert_eq(sent.q, "up_arrow[command,shift]", "an untouched key keeps its recommended binding")
+			helpers.assert_eq(layer.wheel.vertical[1], { code = "WheelUp", strokes = { { system = "SOUND_UP" } } },
+				"the page's wheel slot reaches the wheel bindings Hammerspoon runs")
 		end)
 	end)
 

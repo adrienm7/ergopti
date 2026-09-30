@@ -70,11 +70,10 @@ M.DEFAULT_STATE = {
 -- ====================================
 
 --- Translates a shortcut identifier into a human-readable trigger label.
---- @param id string The shortcut identifier (e.g. "ctrl_a", "layer_scroll").
+--- @param id string The shortcut identifier (e.g. "ctrl_a", "wrap_text_if_selected").
 --- @param state table The current state table (used for trigger_char substitution).
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
-	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
 	-- Any symbol the layout types wraps the selection, AltGr or not: Ergopti puts
 	-- them on AltGr, other layouts elsewhere, so the trigger names no key.
 	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.selection_symbol") end
@@ -547,8 +546,8 @@ function M.build(ctx)
 	-- ==============================================
 
 	-- Build shortcut item buckets by iterating the shortcuts module list once.
-	local TOP_ORDER = { "layer_scroll" }
-	local top_map   = {}
+	-- The navigation layer's wheel is no shortcut: it is edited with the layer
+	-- (Tap-Holds › Edit the layer) and never listed here.
 	local wrap_item = nil
 	local ctrl_items = {}
 	local cmd_items  = {}
@@ -559,9 +558,7 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-					if s.id == "layer_scroll" then
-						top_map[s.id] = mi
-					elseif s.id == "wrap_text_if_selected" then
+					if s.id == "wrap_text_if_selected" then
 						wrap_item = mi
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
@@ -782,17 +779,13 @@ function M.build(ctx)
 		end
 	end
 
-	-- The feature toggles (layer_scroll, the wrap-text toggle) open the
-	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
-	-- which the manifest places first, so the renderer draws them like every
-	-- other row: prepended after rendering, the wrap-text toggle reached the tray
-	-- with no title and hs.menubar drew nothing.
+	-- The feature toggle (the wrap-text toggle) opens the submenu. It is row
+	-- DATA handed over by the wrap-symbols list provider, which the manifest
+	-- places first, so the renderer draws it like every other row: prepended
+	-- after rendering, the wrap-text toggle reached the tray with no title and
+	-- hs.menubar drew nothing.
 	local top_items = {}
-	for _, id in ipairs(TOP_ORDER) do
-		if top_map[id] then table.insert(top_items, top_map[id]) end
-	end
 	if wrap_item then
-		if #top_items > 0 then table.insert(top_items, { separator = true }) end
 		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
 		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
 		-- have always shown it — the same feature was sitting in two different

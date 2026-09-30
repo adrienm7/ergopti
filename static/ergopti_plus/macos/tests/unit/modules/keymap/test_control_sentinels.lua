@@ -5,10 +5,11 @@
 ---         (sentinel-never-reaches-app)
 --- DESCRIPTION:
 --- Karabiner prepends an F20 key event to every action that enters the
---- navigation layer so Hammerspoon can tell layer entry from typing. Every
---- Ergopti eventtap let that F20 pass through, so the frontmost application
---- received it: in a QSpace rename field it replaced the selected file name the
---- moment the user held left Command for the navigation layer.
+--- navigation layer so Hammerspoon can tell layer entry from typing, and
+--- appends an F19 one to every action that leaves it. Every Ergopti eventtap
+--- let that F20 pass through, so the frontmost application received it: in a
+--- QSpace rename field it replaced the selected file name the moment the user
+--- held left Command for the navigation layer.
 ---
 --- ROOT CAUSE ENCODED: the sentinel had observers but no owner. The production
 --- keymap taps now delete it (test_synthetic_provenance_interleaving.lua); these
@@ -21,6 +22,7 @@ local helpers = require("tests.helpers")
 local TooltipSupport = require("tests.support.tooltip_watcher_fixture")
 
 local KEYCODE_A = 0
+local KEYCODE_F19 = 80
 local KEYCODE_F20 = 90
 
 
@@ -75,6 +77,20 @@ helpers.describe("control sentinels: one owner claims the Karabiner F20", functi
 		helpers.assert_eq(#signals, 1, "ordinary keys publish nothing")
 	end)
 
+	helpers.it("(layer-wheel-slots) claims the F19 exit sentinel and publishes the layer's exit once per press", function()
+		local Sentinels = load_owner()
+		local signals = {}
+		Sentinels.set_listener("test.observer", function(signal) signals[#signals + 1] = signal end)
+
+		helpers.assert_true(Sentinels.is_sentinel(KEYCODE_F19), "F19 is a control sentinel")
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F19, true, {}), "F19 key-down must be deleted")
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F19, false), "F19 key-up must be deleted")
+		-- The hand may still hold the one-shot tag's modifiers when it leaves the
+		-- layer: only F20 carries the tag, so the exit stays the exit.
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F19, true, { ctrl = true, alt = true }))
+		helpers.assert_eq(signals, { Sentinels.NAV_LAYER_EXITED, Sentinels.NAV_LAYER_EXITED })
+	end)
+
 	helpers.it("(sentinel-never-reaches-app) isolates a failing listener and reports it off the tap", function()
 		local Sentinels, deferred, logs = load_owner()
 		local healthy = 0
@@ -116,6 +132,11 @@ helpers.describe("control sentinels: tooltip watchers defer to the owner", funct
 				"entering the navigation layer must not dismiss the tooltip")
 			helpers.assert_true(first_deadline.running,
 				"the raw key must not be what renews the deadline")
+			helpers.assert_eq(key_watcher.fn(TooltipSupport.hardware_key_event(KEYCODE_F19)), false,
+				"the tooltip watcher must leave the exit sentinel to its owner")
+			TooltipSupport.drain_deferred_actions(context.timers)
+			helpers.assert_true(context.tooltip.is_visible(),
+				"leaving the navigation layer must not dismiss the tooltip (layer-wheel-slots)")
 
 			helpers.assert_true(require("modules.keymap.control_sentinels").claim_key(KEYCODE_F20, true))
 			TooltipSupport.drain_deferred_actions(context.timers)
@@ -137,6 +158,11 @@ helpers.describe("control sentinels: tooltip watchers defer to the owner", funct
 			TooltipSupport.drain_deferred_actions(context.timers)
 			helpers.assert_true(context.renderer.visible,
 				"the navigation-layer sentinel is not a dismissing keystroke")
+			helpers.assert_eq(key_watcher.fn(TooltipSupport.hardware_key_event(KEYCODE_F19)), false,
+				"the hotstring watcher must leave the exit sentinel to its owner")
+			TooltipSupport.drain_deferred_actions(context.timers)
+			helpers.assert_true(context.renderer.visible,
+				"the exit sentinel is not a dismissing keystroke (layer-wheel-slots)")
 		end)
 	end)
 end)

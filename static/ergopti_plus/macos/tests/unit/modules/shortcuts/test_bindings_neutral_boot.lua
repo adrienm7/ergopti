@@ -83,3 +83,46 @@ helpers.describe("tap-key dispatcher ownership", function()
 		end)
 	end)
 end)
+
+helpers.describe("layer wheel ownership (layer-wheel-slots)", function()
+	local VOLUME_UP = { code = "WheelUp", strokes = { { system = "SOUND_UP" } } }
+	local MUTE = { code = "WheelUp", strokes = { { system = "MUTE" } } }
+
+	helpers.it("holds a scroll tap only while layers.toml binds a wheel direction", function()
+		Fixture.with_bindings(function(bindings, ctx)
+			helpers.assert_eq(bindings.start(), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), false, "a layer without a wheel binding owns no input")
+			ctx.wheel.vertical[1] = VOLUME_UP
+			helpers.assert_eq(bindings.reconcile_layer_wheel(), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), true, "a saved wheel binding binds its owner")
+			local slot = ctx.factory_args.layer_wheel[2]
+			helpers.assert_eq(slot("vertical", 1), VOLUME_UP)
+			helpers.assert_nil(slot("vertical", -1), "an unbound direction scrolls")
+
+			ctx.wheel = { vertical = { [1] = MUTE }, horizontal = {} }
+			helpers.assert_eq(bindings.reconcile_layer_wheel(), true)
+			helpers.assert_eq(ctx.created, 1, "an edited binding keeps the same native owner")
+			helpers.assert_eq(slot("vertical", 1), MUTE, "the bound owner runs the edited binding")
+
+			ctx.wheel = { vertical = {}, horizontal = {} }
+			helpers.assert_eq(bindings.reconcile_layer_wheel(), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), false, "removing the last wheel binding releases the owner")
+			helpers.assert_eq(bindings.enable("layer_wheel"), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), false, "the wheel owner is no preference to switch on")
+		end)
+	end)
+
+	helpers.it("derives the owner at start and retains an edit made behind pause", function()
+		Fixture.with_bindings(function(bindings, ctx)
+			ctx.wheel.vertical[1] = VOLUME_UP
+			helpers.assert_eq(bindings.start(), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), true, "the start reads layers.toml")
+			helpers.assert_eq(bindings.pause(), true)
+			ctx.wheel = { vertical = {}, horizontal = {} }
+			helpers.assert_eq(bindings.reconcile_layer_wheel(), true)
+			helpers.assert_eq(Fixture.live_count(ctx), 0, "an edit behind pause owns no input")
+			helpers.assert_eq(bindings.resume_after_pause(), true)
+			helpers.assert_eq(bindings.is_bound("layer_wheel"), false, "the resume reads the edited file")
+		end)
+	end)
+end)

@@ -3082,22 +3082,6 @@
 										]
 									},
 									{
-										"path": "shortcuts.keys.layer_scroll",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.shortcuts.key_layer_scroll"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_layer_scroll"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.keys.wrap_text_if_selected",
 										"value": true,
 										"default": false,

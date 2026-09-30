@@ -67,9 +67,13 @@ M.F17_CYCLE_WINDOWS = 64
 --- the OS-wake keystroke for the keep-awake jiggler. Free for reassignment.
 M.F18_WAKE_OS = 79
 
---- F19 (keycode 80) — physical "layer" key whose hold-and-scroll combination is
---- mapped to system volume up/down by modules/shortcuts/actions/system.lua.
-M.F19_VOLUME_SCROLL_MODIFIER = 80
+--- F19 (keycode 80) — Karabiner-emitted "nav layer left" sentinel, the pair of
+--- F20: tapped by every action that turns the navigation layer off (the hold's
+--- release, an explicit layer off). Between F20 and F19 the macOS driver runs
+--- the layer's wheel bindings, which Karabiner cannot take
+--- (modules/shortcuts/actions/system.lua bind_layer_wheel). Deleted like F20
+--- by modules/keymap/control_sentinels.lua.
+M.F19_LAYER_NAV_EXITED = 80
 
 --- F20 (keycode 90) — Karabiner-emitted "nav layer entered" sentinel. Fired
 --- as the first action of any tap-hold that activates the navigation layer

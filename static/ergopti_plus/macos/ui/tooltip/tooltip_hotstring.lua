@@ -361,6 +361,7 @@ local function start_watchers()
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
 			Keycodes.F20_LAYER_NAV_ENTERED,
+			Keycodes.F19_LAYER_NAV_EXITED,
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,

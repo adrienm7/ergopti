@@ -89,6 +89,7 @@ helpers.with_fresh_modules({
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE    = 113,
 		F20_LAYER_NAV_ENTERED   = 90,
+		F19_LAYER_NAV_EXITED    = 80,
 	}
 	-- The native TOML codec is absent from the headless runner; the catalogues
 	-- read here are JSON and the shared defaults use the pure-Lua reader.

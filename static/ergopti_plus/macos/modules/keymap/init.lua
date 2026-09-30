@@ -1092,12 +1092,12 @@ end
 --- @param e table The macOS keystroke event payload.
 --- @return boolean True to consume the event, false to pass it through.
 -- Keycodes that must exit the callback immediately with no side-effects.
--- Merges synthetic OS-signals (F18/F19/F20) and Karabiner/layer sentinels
--- (F13–F17, LAYER_SYN_1–3) into a single O(1) set tested once at the very
--- top of onKeyDownRaw, eliminating the old 12-branch `or` chain.
+-- Merges synthetic OS-signals and Karabiner/layer sentinels (F13–F17,
+-- LAYER_SYN_1–3) into a single O(1) set tested once at the very top of
+-- onKeyDownRaw, eliminating the old 12-branch `or` chain.
 local FAST_EXIT_KEYCODES = {
-	[80]  = true,  -- F19 volume-scroll modifier
-	-- F20 (keycode 90) is absent: ControlSentinels consumes it just above.
+	-- F19 (keycode 80) and F20 (keycode 90) are absent: ControlSentinels
+	-- consumes them just above.
 	[105] = true,  -- F13 Karabiner Return sentinel
 	[107] = true,  -- F14 Karabiner Backspace sentinel
 	[113] = true,  -- F15 Karabiner Escape sentinel

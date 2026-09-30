@@ -842,8 +842,8 @@ local function start_watchers()
 			return finish(false)
 		end
 		
-		-- The F20 navigation-layer sentinel is listed below: the keymap tap owns
-		-- and deletes it, and publishes it to the listener registered at load.
+		-- The F20 and F19 navigation-layer sentinels are listed below: the keymap
+		-- tap owns and deletes them, and publishes them to the listeners.
 
 		-- Ignored system modifier keys (preventing unintended dismissals).
 		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
@@ -863,6 +863,7 @@ local function start_watchers()
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
 			Keycodes.F20_LAYER_NAV_ENTERED,
+			Keycodes.F19_LAYER_NAV_EXITED,
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,

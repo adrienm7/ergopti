@@ -28,6 +28,7 @@ package.loaded["infra.keycodes"] = {
 	F14_KARABINER_BACKSPACE = 107,
 	F15_KARABINER_ESCAPE    = 113,
 	F20_LAYER_NAV_ENTERED   = 90,
+	F19_LAYER_NAV_EXITED    = 80,
 }
 
 local Generator = helpers.load_with_stubs("platform.remap.generator")

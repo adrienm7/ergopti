@@ -4,8 +4,8 @@
 --- MODULE: Shortcuts — System Actions
 --- DESCRIPTION:
 --- Implements system-level shortcuts: keep-awake (mouse jiggler), pixel color
---- copy, interactive screenshot, instant window screenshot, volume control via
---- layer key + scroll wheel, mouse teleport, display mirror toggle, and mouse
+--- copy, interactive screenshot, instant window screenshot, the navigation
+--- layer's wheel bindings, mouse teleport, display mirror toggle, and mouse
 --- spotlight (yellow ring indicator).
 ---
 --- FEATURES & RATIONALE:
@@ -65,6 +65,10 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- ====================================
 
 local Keycodes               = require("infra.keycodes")
+local ControlSentinels       = require("modules.keymap.control_sentinels")
+
+-- The control-sentinel listener slot the wheel bindings track the layer with.
+local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
 
 -- Keep-awake jitter parameters. The tick interval bounds + return delay come
 -- from the shared cross-driver registry ([keep_awake]); the pixel offsets are
@@ -920,106 +924,117 @@ local function post_system_key_phase(key, is_down)
 end
 
 
---- Maps F19 + scroll wheel to system volume up/down.
---- F19 is the physical "layer" key; holding it while scrolling bypasses page scroll.
---- @return table Fake-hotkey object with :delete().
-function M.bind_layer_scroll(admission_guard)
-	local layer_held  = false
-	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
+--- The direction of one turn of the wheel, and how many notches it moved.
+--- A zero delta is a scroll-PHASE event (phase began / phase ended / momentum
+--- ended), which macOS brackets every gesture with — not movement: it gives no
+--- direction, so it passes through instead of running a binding with a
+--- manufactured notch (shortcuts-layer-scroll-zero-delta).
+--- @param event table The scrollWheel event.
+--- @return string|nil axis "vertical" or "horizontal".
+--- @return number|nil direction 1 (up, right) or -1 (down, left).
+--- @return number|nil notches At least 1.
+local function wheel_turn(event)
+	local properties = eventtap.event.properties
+	local ok_y, dy = pcall(event.getProperty, event, properties.scrollWheelEventDeltaAxis1)
+	if ok_y and type(dy) == "number" and dy ~= 0 then
+		return "vertical", dy > 0 and 1 or -1, math.max(1, math.floor(math.abs(dy)))
+	end
+	-- Quartz counts a turn to the left as a positive horizontal delta.
+	local ok_x, dx = pcall(event.getProperty, event, properties.scrollWheelEventDeltaAxis2)
+	if ok_x and type(dx) == "number" and dx ~= 0 then
+		return "horizontal", dx > 0 and -1 or 1, math.max(1, math.floor(math.abs(dx)))
+	end
+	return nil
+end
 
-	local key_owner = acquire_tap(
-		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
-		function(event)
-			if not raw_binding_admitted(admission_guard) then return false end
-			local is_physical, fence_events = classify_physical_event(
-				event, "shortcuts.f19_layer")
-			if not is_physical then return finish_tap(false, fence_events) end
+--- Posts the strokes of one wheel binding once per notch.
+--- @param strokes table From NavLayer.wheel_slots: { system } or { mods, keycode }.
+--- @param notches number How many times.
+--- @return boolean all_posted
+local function post_wheel_strokes(strokes, notches)
+	local all_posted = true
+	for _ = 1, notches do
+		for _, stroke in ipairs(strokes) do
+			if stroke.system then
+				-- NX system-defined media events are not keyDown/keyUp events, so they
+				-- do not enter keymap/keylogger keyboard callbacks and stay native here.
+				if post_system_key_phase(stroke.system, true) ~= true then all_posted = false end
+				if post_system_key_phase(stroke.system, false) ~= true then all_posted = false end
+			elseif SyntheticInput.emit_key_stroke(stroke.mods, stroke.keycode, KEYSTROKE_NO_DELAY_US) ~= true then
+				all_posted = false
+			end
+		end
+	end
+	return all_posted
+end
 
-			local ok_key, keycode = pcall(event.getKeyCode, event)
-			if not ok_key or keycode ~= f19_keycode then
-				return finish_tap(false, fence_events)
-			end
-			local ok_type, event_type = pcall(event.getType, event)
-			if not ok_type then return finish_tap(false, fence_events) end
-			local should_hold = event_type == hs.eventtap.event.types.keyDown
-			if not should_hold and event_type ~= hs.eventtap.event.types.keyUp then
-				return finish_tap(false, fence_events)
-			end
-
-			-- This O(1) state write must be visible before the first following scroll;
-			-- deferring it creates a down -> scroll race where the first notch leaks to
-			-- the application. Only gesture cleanup is deferred off the HID callback.
-			layer_held = should_hold
-			if should_hold then
-				SyntheticInput.defer_after_callback("F19 gesture cleanup", function()
-					if not raw_binding_admitted(admission_guard) then return false end
-					if gestures and type(gestures.isRightClickHeld) == "function"
-						and gestures.isRightClickHeld() then
-						pcall(function() gestures.forceCleanup() end)
-					end
-				end)
-			end
-			return finish_tap(false, fence_events)
-		end,
-		"F19 layer key"
-	)
-	if not key_owner then return nil end
+--- Runs the navigation layer's wheel bindings. Karabiner-Elements, which
+--- carries the rest of the layer, takes no wheel input: while the layer is held
+--- (from the F20 sentinel Karabiner taps on entering it to the F19 one it taps
+--- on leaving it, both claimed and published by modules/keymap/control_sentinels
+--- whichever tap sees them first), a turn of the wheel in a direction the layer
+--- binds is consumed and runs the binding's strokes instead of scrolling. A
+--- direction the layer leaves unbound, and every turn outside the layer,
+--- scrolls as usual.
+--- @param admission_guard function|nil The owning layer's delivery admission.
+--- @param wheel_slot function(axis, direction) -> { code, strokes }|nil: the
+---   loaded layer's binding (platform/remap/nav_layer.lua wheel_slots, read by
+---   modules/shortcuts/bindings.lua). Asked inside the callback, so it may only
+---   consult memory.
+--- @return table|nil Fake-hotkey object with :delete().
+function M.bind_layer_wheel(admission_guard, wheel_slot)
+	if type(wheel_slot) ~= "function" then
+		error("shortcuts.actions.system.bind_layer_wheel: wheel_slot must be a function")
+	end
+	-- This O(1) state write runs inside the claiming tap, so it is visible
+	-- before the first following turn of the wheel; deferring it would let the
+	-- first notch after entering the layer leak to the application.
+	local layer_held = false
+	ControlSentinels.set_listener(LAYER_WHEEL_LISTENER, function(signal)
+		if signal == ControlSentinels.NAV_LAYER_ENTERED then
+			layer_held = true
+		elseif signal == ControlSentinels.NAV_LAYER_EXITED then
+			layer_held = false
+		end
+	end)
 
 	local scroll_owner = acquire_tap({hs.eventtap.event.types.scrollWheel}, function(event)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
-			event, "shortcuts.f19_scroll")
+			event, "shortcuts.layer_wheel")
 		if not is_physical or not layer_held then
 			return finish_tap(false, fence_events)
 		end
-
-		local ok_delta, delta = pcall(event.getProperty, event,
-			hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
-		-- A zero delta is a scroll-PHASE event (phase began / phase ended / momentum
-		-- ended), which macOS brackets every gesture with — not actual movement.
-		-- Falling through would classify it as "down" (delta > 0 is false) while
-		-- math.max(1, …) manufactures a real repetition, so every upward scroll ended
-		-- one or more notches LOWER than it started (shortcuts-layer-scroll-zero-delta).
-		-- Returning false also lets the phase event pass through instead of consuming it.
-		if not ok_delta or type(delta) ~= "number" or delta == 0 then
+		local axis, direction, notches = wheel_turn(event)
+		local slot = axis and wheel_slot(axis, direction) or nil
+		if type(slot) ~= "table" or type(slot.strokes) ~= "table" then
 			return finish_tap(false, fence_events)
 		end
 
-		local key  = delta > 0 and "SOUND_UP" or "SOUND_DOWN"
-		local reps = math.max(1, math.floor(math.abs(delta)))
-		local scheduled = SyntheticInput.defer_after_callback("F19 volume scroll", function()
+		local scheduled = SyntheticInput.defer_after_callback("layer wheel " .. tostring(slot.code), function()
 			if not raw_binding_admitted(admission_guard) then return false end
 			if gestures and type(gestures.isRightClickHeld) == "function"
 				and gestures.isRightClickHeld() then
 				pcall(function() gestures.forceCleanup() end)
 			end
-			-- NX system-defined media events are not keyDown/keyUp events, so they do
-			-- not enter keymap/keylogger keyboard callbacks and stay native here.
-			local all_posted = true
-			for _ = 1, reps do
-				if post_system_key_phase(key, true) ~= true then all_posted = false end
-				if post_system_key_phase(key, false) ~= true then all_posted = false end
-			end
-			return all_posted
+			return post_wheel_strokes(slot.strokes, notches)
 		end)
 		return finish_tap(scheduled, fence_events)
-	end, "F19 layer scroll")
+	end, "layer wheel")
 	if not scroll_owner then
-		if key_owner:delete() ~= true then _failed_tap_cleanup[key_owner] = true end
+		ControlSentinels.set_listener(LAYER_WHEEL_LISTENER, nil)
 		return nil
 	end
 
 	return {
 		delete = function()
 			layer_held = false
-			local settled = true
-			if key_owner then
-				if key_owner:delete() == true then key_owner = nil else settled = false end
-			end
+			ControlSentinels.set_listener(LAYER_WHEEL_LISTENER, nil)
 			if scroll_owner then
-				if scroll_owner:delete() == true then scroll_owner = nil else settled = false end
+				if scroll_owner:delete() ~= true then return false end
+				scroll_owner = nil
 			end
-			return settled
+			return true
 		end
 	}
 end

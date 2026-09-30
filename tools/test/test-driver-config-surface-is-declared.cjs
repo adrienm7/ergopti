@@ -185,7 +185,7 @@ assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. n
 assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys.")'), [
 	'shortcuts.keys.'
 ]);
-const declaredProbe = new Set(['shortcuts.keys.layer_scroll']);
+const declaredProbe = new Set(['shortcuts.keys.ctrl_s']);
 assert.equal(isDeclaredSurface('shortcuts.keys.*', declaredProbe), true);
 assert.equal(isDeclaredSurface('shortcuts.keys.', declaredProbe), false);
 assert.equal(isDeclaredSurface('shortcuts.keys.unknown', declaredProbe), false);

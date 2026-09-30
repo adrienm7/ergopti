@@ -5098,6 +5098,17 @@ function M.apply_scope(request, on_done)
 	end
 	local function settle(ok, reason, change_count)
 		if ok ~= true then NavLayer.undo_import(layer) end
+		if ok == true and layer then
+			-- The imported layer binds the wheel, which Hammerspoon runs rather
+			-- than Karabiner: its owner reads the new file.
+			local reconciled, committed = pcall(function()
+				return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+			end)
+			if not reconciled or committed ~= true then
+				Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",
+					label, tostring(reconciled and "a start is in progress" or committed))
+			end
+		end
 		if on_done then return on_done(ok, reason, change_count) end
 	end
 	return apply_bulk_settings_transaction(label, function(candidate)

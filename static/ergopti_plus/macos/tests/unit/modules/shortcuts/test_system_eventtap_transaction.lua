@@ -274,23 +274,31 @@ end)
 -- ==============================================
 -- ==============================================
 
-helpers.describe("layer-scroll dual eventtap acquisition is atomic", function()
-	helpers.it("rolls both native taps back when the second start returns false", function()
+helpers.describe("layer-wheel eventtap acquisition leaves nothing behind", function()
+	helpers.it("rolls the native tap back and drops its layer listener when the start returns false", function()
 		local fixture = load_fixture({
-			{},
 			{ start_result = false, enable_on_start = true },
 		})
-		local call_ok, owner = pcall(fixture.system.bind_layer_scroll)
+		-- The same module table system.lua holds, so the spy sees its calls.
+		local Sentinels = require("modules.keymap.control_sentinels")
+		local real_set_listener = Sentinels.set_listener
+		local listener_calls = {}
+		Sentinels.set_listener = function(name, callback)
+			listener_calls[#listener_calls + 1] = { name = name, registered = callback ~= nil }
+			return real_set_listener(name, callback)
+		end
+		local call_ok, owner = pcall(fixture.system.bind_layer_wheel, nil, function() return nil end)
+		Sentinels.set_listener = real_set_listener
 		helpers.assert_true(call_ok)
-		helpers.assert_nil(owner,
-			"the pair cannot publish when only the key tap committed")
-		helpers.assert_eq(#fixture.taps, 2)
+		helpers.assert_nil(owner, "a tap that did not start cannot publish its owner")
+		helpers.assert_eq(#fixture.taps, 1)
 		helpers.assert_true(not fixture.taps[1].enabled,
-			"the first committed tap must be rolled back with the failed pair")
-		helpers.assert_true(not fixture.taps[2].enabled,
-			"the activate-then-false second tap must be rolled back")
+			"the activate-then-false tap must be rolled back")
 		helpers.assert_eq(fixture.taps[1].stop_calls, 1)
-		helpers.assert_eq(fixture.taps[2].stop_calls, 1)
+		helpers.assert_eq(#listener_calls, 2, "the listener is registered, then dropped with the failed tap")
+		helpers.assert_eq(listener_calls[1].name, listener_calls[2].name)
+		helpers.assert_true(listener_calls[1].registered and not listener_calls[2].registered,
+			"a failed binding leaves no layer listener behind")
 	end)
 end)
 

@@ -72,7 +72,7 @@ local function load_bindings_with_system_spy(options)
 			return controlled(options.resume_awake_mode)
 		end,
 		bind_tap_keys              = fake_factory,
-		bind_layer_scroll          = fake_factory,
+		bind_layer_wheel           = fake_factory,
 		bind_wrap_text_if_selected = fake_factory,
 		bind_cmd_star              = fake_factory,
 		-- Plain actions referenced by the ctrl_* hotkey defs. They are only passed
