@@ -840,9 +840,16 @@ same physical key, so history and the heatmap keep one identity:
 (`npm run codegen:hid-key-identity:hs`). Keep HID data out of
 `physical_keys.json`: Windows parses the registry at boot whenever a
 layers.toml exists, and only macOS needs it. A usage names a position by the
-USB HID usage tables, so only 0x35 (left of 1) and 0x64 (left of Z)
-depend on the device's keyboard type (the ISO swap); a JIS device, which the
-registry has no form for, leaves only those two uncounted. That raw usages follow
+USB HID usage tables, so only 0x35 (left of 1) and 0x64 (left of Z) depend on
+the device's keyboard type (the ISO swap). Further usages real keyboards send
+for a known key are `aliases` there (Non-US # 0x32 is Backslash, kVK 42, as on
+Linux), and keys no layer can bind (F13 to F20, PrintScreen/ScrollLock/Pause as
+F13 to F15, keypad =, the JIS Yen, Ro, Eisu, Kana and keypad comma) are its
+`unregistered` keys with the macOS keycode; add a usage there before it can
+reach `uncounted()`. On a JIS device every JIS key resolves, but 0x35 and 0x64
+stay uncounted with `unsupported_keyboard_type`: the registry has no JIS form
+and what macOS reports for those two positions on JIS is unverified. That raw
+usages follow
 the standard positions on Apple ISO hardware, while Karabiner rules name the key
 left of 1 `non_us_backslash` there, is an assumption: check it on the
 maintainer's internal keyboard in WP9 by comparing the stream's usage with the

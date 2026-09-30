@@ -34,8 +34,10 @@
  * 5. HID usages (hid_usages.json, beside the registry and read only by the macOS
  *    codegen): every key carries exactly one USB HID usage, no two keys share
  *    one, each agrees with the USB HID Usage Tables, and a raw usage resolves to
- *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only. The
- *    registry itself carries no HID column: Windows parses it at boot.
+ *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only.
+ *    Aliases (Non-US # on Backslash) and the unregistered keys (F13 to F20,
+ *    keypad =, the JIS keys) agree with the same tables and with macOS keycodes.
+ *    The registry itself carries no HID column: Windows parses it at boot.
  * ==============================================================================
  */
 
@@ -580,34 +582,74 @@ for (const [code, hid] of Object.entries(hidKeys)) {
 		continue;
 	}
 	const page = k.group === 'media' ? HID_PAGE_CONSUMER : HID_PAGE_KEYBOARD;
-	if (
-		!hid ||
-		typeof hid !== 'object' ||
-		JSON.stringify(Object.keys(hid).sort()) !== '["page","usage"]'
-	)
-		fail(`hid_usages.json: ${code} must be one {page, usage} object`);
+	const fields = hid && typeof hid === 'object' ? Object.keys(hid).sort() : [];
+	const shape = JSON.stringify(fields.filter((f) => f !== 'aliases'));
+	if (shape !== '["page","usage"]')
+		fail(`hid_usages.json: ${code} must be one {page, usage} object with optional aliases`);
 	else if (hid.page !== page)
 		fail(`hid_usages.json: ${code} page must be ${page} for group ${k.group}, found ${hid.page}`);
 	else if (!isInt(hid.usage) || hid.usage < 1 || hid.usage > HID_USAGE_MAX[page])
 		fail(`hid_usages.json: ${code} usage ${hid.usage} is outside page ${page}`);
 	if (k.karabiner && 'consumer_key_code' in k.karabiner !== (page === HID_PAGE_CONSUMER))
 		fail(`hid_usages.json: ${code}: the Karabiner event and the hid page disagree on the page`);
+	const aliases = hid && hid.aliases;
+	if (aliases !== undefined && (!Array.isArray(aliases) || aliases.length === 0))
+		fail(`hid_usages.json: ${code}: aliases must be a non-empty array when present`);
+	for (const alias of aliases || []) {
+		const aliasPage = alias && alias.page;
+		if (
+			!alias ||
+			JSON.stringify(Object.keys(alias).sort()) !== '["page","usage"]' ||
+			HID_USAGE_MAX[aliasPage] === undefined ||
+			!isInt(alias.usage) ||
+			alias.usage < 1 ||
+			alias.usage > HID_USAGE_MAX[aliasPage]
+		)
+			fail(`hid_usages.json: ${code}: alias ${JSON.stringify(alias)} is not a key-page usage`);
+	}
+}
+
+// Keys real keyboards send that no layer can bind: named like registry keys but
+// absent from it, each with the macOS keycode macOS reports for its usage.
+const unregistered = hidUsages.unregistered || {};
+for (const [code, entry] of Object.entries(unregistered)) {
+	if (!/^[A-Z][A-Za-z0-9]*$/.test(code))
+		fail(`hid_usages.json: unregistered ${code} is not a KeyboardEvent.code-shaped identifier`);
+	if (keys[code] !== undefined)
+		fail(`hid_usages.json: ${code} is a registry key; list its usage under keys instead`);
+	if (
+		!entry ||
+		JSON.stringify(Object.keys(entry).sort()) !== '["hs","page","usage"]' ||
+		entry.page !== HID_PAGE_KEYBOARD ||
+		!isInt(entry.usage) ||
+		entry.usage < 1 ||
+		entry.usage > HID_USAGE_MAX[HID_PAGE_KEYBOARD] ||
+		!isInt(entry.hs) ||
+		entry.hs < 0 ||
+		entry.hs > 127
+	)
+		fail(`hid_usages.json: unregistered ${code} must be {page: 7, usage, hs: kVK}`);
 }
 
 // --- 5.2 Total and unique: one usage per key, one key per usage.
 {
 	const seen = new Map();
-	for (const code of byKind.key) {
-		const hid = hidOf(code);
-		if (!hid) continue;
+	const claim = (code, hid) => {
 		const id = hid.page + ':' + hid.usage;
 		if (seen.has(id)) fail(`hid: ${code} and ${seen.get(id)} share usage ${id}`);
 		else seen.set(id, code);
+	};
+	let main = 0;
+	for (const code of byKind.key) {
+		const hid = hidOf(code);
+		if (!hid) continue;
+		claim(code, hid);
+		main++;
+		for (const alias of hid.aliases || []) claim(code, alias);
 	}
-	if (seen.size !== byKind.key.length)
-		fail(
-			`hid: ${seen.size} distinct usages for ${byKind.key.length} keys — the mapping is not total`
-		);
+	for (const [code, entry] of Object.entries(unregistered)) claim(code, entry);
+	if (main !== byKind.key.length)
+		fail(`hid: ${main} keys of ${byKind.key.length} have a usage — the mapping is not total`);
 }
 
 // --- 5.3 The USB HID Usage Tables 1.21 (section 10, Keyboard/Keypad page, and
@@ -716,7 +758,53 @@ for (const [code, hid] of Object.entries(hidKeys)) {
 		fail(`hid: the form-dependent usages are ${JSON.stringify(formDependent)}, expected [53, 100]`);
 }
 
-// --- 5.5 fn/globe has no registry position, so the macOS keycode it resolves to
+// --- 5.5 Aliases and unregistered keys against the HID usage tables and the
+// macOS keycodes (HIToolbox kVK_*) macOS reports for them. A PC keyboard's
+// PrintScreen, ScrollLock and Pause are F13, F14 and F15 on macOS, and the
+// function keys past F12 agree with the sentinel keycodes keycodes/init.lua names.
+{
+	const ALIASES = {
+		Backslash: [[7, 0x32]],
+		AudioVolumeMute: [[7, 0x7f]],
+		AudioVolumeUp: [[7, 0x80]],
+		AudioVolumeDown: [[7, 0x81]]
+	};
+	for (const code of byKind.key) {
+		const got = ((hidOf(code) || {}).aliases || []).map((a) => [a.page, a.usage]);
+		if (JSON.stringify(got) !== JSON.stringify(ALIASES[code] || []))
+			fail(
+				`hid: ${code} aliases are ${JSON.stringify(got)}, expected ${JSON.stringify(ALIASES[code] || [])}`
+			);
+	}
+	const fKeys = {};
+	for (const m of read('_shared/lua/keycodes/init.lua').matchAll(/^M\.F(\d+)_\w+\s*=\s*(\d+)/gm))
+		fKeys['F' + m[1]] = Number(m[2]);
+	const UNREGISTERED = {
+		PrintScreen: [0x46, fKeys.F13],
+		ScrollLock: [0x47, fKeys.F14],
+		Pause: [0x48, fKeys.F15],
+		NumpadEqual: [0x67, 81],
+		NumpadComma: [0x85, 95],
+		IntlRo: [0x87, 94],
+		IntlYen: [0x89, 93],
+		Lang1: [0x90, 104],
+		Lang2: [0x91, 102]
+	};
+	for (let i = 13; i <= 20; i++) UNREGISTERED['F' + i] = [0x68 + i - 13, fKeys['F' + i]];
+	for (const [code, [usage, hs]] of Object.entries(UNREGISTERED)) {
+		const entry = unregistered[code];
+		if (!isInt(hs)) fail(`hid: no macOS keycode known for ${code} (keycodes/init.lua)`);
+		else if (!entry || entry.usage !== usage || entry.hs !== hs)
+			fail(
+				`hid: unregistered ${code} is ${JSON.stringify(entry)}, expected usage 0x${usage.toString(16)} and kVK ${hs}`
+			);
+	}
+	for (const code of Object.keys(unregistered))
+		if (!UNREGISTERED[code])
+			fail(`hid: unregistered ${code} is not in this test's oracle — extend it`);
+}
+
+// --- 5.6 fn/globe has no registry position, so the macOS keycode it resolves to
 // is the shared keycodes constant, which must be the heatmap's fn keycode.
 {
 	const src = read('_shared/lua/keycodes/init.lua');

@@ -1,6 +1,8 @@
 {
 	"_description": "HID usage of each physical key, by the key ids of physical_keys.json. Read only by the macOS key-identity codegen (tools/codegen/codegen-hid-key-identity-hs.cjs), which turns the raw usages of the physical-key stream into the macOS keycodes the metrics store; the other drivers never parse it, which is why it is not a column of the registry every driver loads. tools/test/test-physical-keys-registry.cjs validates it against the registry and the USB HID Usage Tables.",
 	"_fields": {
+		"aliases": "Optional, on a key: further {page, usage} a keyboard may send for the same position, such as Keyboard Non-US # (0x32), the PC ISO key left of Return that macOS and Linux report as Backslash.",
+		"unregistered": "Keys real keyboards send that no layer can bind, so the registry has no position for them, by KeyboardEvent.code: {page, usage, hs}, hs being the macOS virtual keycode (kVK_*) macOS reports for that usage. A PC keyboard's PrintScreen, ScrollLock and Pause are F13, F14 and F15 on macOS.",
 		"keys": "Registry key id -> {page, usage}: the USB HID usage of the key's position (page 7 Keyboard/Keypad, page 12 Consumer), the same on every OS and form. macOS reports the keys at usages 0x35 and 0x64 with swapped keycodes on an ISO keyboard (macos_iso in the registry), so a raw usage resolves to a keycode through the device's form."
 	},
 	"schema_version": 1,
@@ -45,7 +47,7 @@
 		"KeyP": { "page": 7, "usage": 19 },
 		"BracketLeft": { "page": 7, "usage": 47 },
 		"BracketRight": { "page": 7, "usage": 48 },
-		"Backslash": { "page": 7, "usage": 49 },
+		"Backslash": { "page": 7, "usage": 49, "aliases": [{ "page": 7, "usage": 50 }] },
 		"CapsLock": { "page": 7, "usage": 57 },
 		"KeyA": { "page": 7, "usage": 4 },
 		"KeyS": { "page": 7, "usage": 22 },
@@ -107,8 +109,27 @@
 		"NumpadEnter": { "page": 7, "usage": 88 },
 		"Numpad0": { "page": 7, "usage": 98 },
 		"NumpadDecimal": { "page": 7, "usage": 99 },
-		"AudioVolumeMute": { "page": 12, "usage": 226 },
-		"AudioVolumeDown": { "page": 12, "usage": 234 },
-		"AudioVolumeUp": { "page": 12, "usage": 233 }
+		"AudioVolumeMute": { "page": 12, "usage": 226, "aliases": [{ "page": 7, "usage": 127 }] },
+		"AudioVolumeDown": { "page": 12, "usage": 234, "aliases": [{ "page": 7, "usage": 129 }] },
+		"AudioVolumeUp": { "page": 12, "usage": 233, "aliases": [{ "page": 7, "usage": 128 }] }
+	},
+	"unregistered": {
+		"PrintScreen": { "page": 7, "usage": 70, "hs": 105 },
+		"ScrollLock": { "page": 7, "usage": 71, "hs": 107 },
+		"Pause": { "page": 7, "usage": 72, "hs": 113 },
+		"NumpadEqual": { "page": 7, "usage": 103, "hs": 81 },
+		"F13": { "page": 7, "usage": 104, "hs": 105 },
+		"F14": { "page": 7, "usage": 105, "hs": 107 },
+		"F15": { "page": 7, "usage": 106, "hs": 113 },
+		"F16": { "page": 7, "usage": 107, "hs": 106 },
+		"F17": { "page": 7, "usage": 108, "hs": 64 },
+		"F18": { "page": 7, "usage": 109, "hs": 79 },
+		"F19": { "page": 7, "usage": 110, "hs": 80 },
+		"F20": { "page": 7, "usage": 111, "hs": 90 },
+		"NumpadComma": { "page": 7, "usage": 133, "hs": 95 },
+		"IntlRo": { "page": 7, "usage": 135, "hs": 94 },
+		"IntlYen": { "page": 7, "usage": 137, "hs": 93 },
+		"Lang1": { "page": 7, "usage": 144, "hs": 104 },
+		"Lang2": { "page": 7, "usage": 145, "hs": 102 }
 	}
 }
