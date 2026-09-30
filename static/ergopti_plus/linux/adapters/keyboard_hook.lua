@@ -279,7 +279,6 @@ local function _reset_capture_state()
 	if _test_capture_event then return true end
 	return XkbCapture.reset_state()
 end
-
 --- Seeds the capture state's CapsLock from the keyboard's LED.
 ---
 --- A fresh XKB state starts unlocked, and the capture state learns CapsLock only
@@ -330,6 +329,18 @@ local function _xkb_answered()
 	if not _xkb_failure_reported then return end
 	_xkb_failure_reported = false
 	Logger.info(LOG, "XKB answers again: the keys' roles and text come from the layout.")
+end
+
+--- Forgets a dead key the capture state holds for a key press a consumer kept
+--- from the application: the application's own Compose never saw it, so the
+--- next key must read here as it types there, not composed with it.
+local function _cancel_capture_compose()
+	if _test_capture_event then return end
+	local ok, err = XkbCapture.cancel_compose()
+	if not ok then
+		_xkb_failed("XKB Compose could not be cancelled after a consumed key (%s) — the next key may read composed.",
+			tostring(err))
+	end
 end
 
 --- The role a physical key has in the ACTIVE layout, asked of XKB before its
@@ -726,6 +737,9 @@ local function _dispatch_event(ev, source)
 			return
 		elseif consume == true then
 			_consumed_down[consumed_key] = true
+			-- A dead key consumed here (a tap key or the physical magic key on
+			-- a French ^ or a US-international ') would otherwise stay pending.
+			_cancel_capture_compose()
 			return
 		end
 	end

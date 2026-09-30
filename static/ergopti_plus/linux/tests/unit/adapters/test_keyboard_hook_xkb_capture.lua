@@ -355,3 +355,74 @@ helpers.describe("keyboard_hook: a modifier the XKB options put on another key",
 		helpers.assert_eq(#errors, 1, "three presses, one error: " .. table.concat(errors, " | "))
 	end)
 end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 5/ A consumed key composes nothing =======
+-- ==================================================
+-- ==================================================
+
+-- A consumer (the physical magic key, a tap key) keeps a press from the
+-- application, but XKB had already read it: a dead key chosen as the magic key
+-- (French ^, US-international ') left Compose pending here, so the next "e"
+-- entered the buffer as "é" while the application typed "e".
+helpers.describe("keyboard_hook: a consumed dead key leaves no Compose pending", function()
+	local XKB = 8
+	local KEY_DEAD, KEY_E = 26, 18
+
+	--- A keymap double whose KEY_DEAD is dead_circumflex and composes ê with E.
+	local function backend()
+		return {
+			create = function() return { held = {}, compose = "nothing" } end,
+			destroy = function() end,
+			key_sym = function(_, keycode)
+				local code = keycode - XKB
+				if code == KEY_DEAD then return "dead_circumflex" end
+				if code == KEY_E then return "e" end
+				return nil
+			end,
+			key_utf8 = function(_, keycode) return keycode - XKB == KEY_E and "e" or nil end,
+			sym_utf8 = function(_, sym) return sym == "e" and "e" or nil end,
+			update_key = function(session, keycode, direction) session.held[keycode] = direction == 1 or nil end,
+			compose_feed = function(session, sym)
+				if sym == "dead_circumflex" then
+					session.compose = "composing"
+				elseif session.compose == "composing" then
+					session.compose = sym == "e" and "composed" or "cancelled"
+				else
+					session.compose = "nothing"
+				end
+			end,
+			compose_status = function(session) return session.compose end,
+			compose_utf8 = function(session) return session.compose == "composed" and "ê" or nil end,
+			compose_reset = function(session) session.compose = "nothing" end,
+		}
+	end
+
+	local function drive(consume)
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(backend())
+		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local chars = {}
+		local ok, err = pcall(hook._test_drive,
+			{ key(KEY_DEAD, 1), key(KEY_DEAD, 0), key(KEY_E, 1), key(KEY_E, 0) }, {
+			liveXkb = true,
+			onConsume = function(detail) return consume and detail.code == KEY_DEAD end,
+			onChar = function(char) chars[#chars + 1] = char end,
+			onEmitRaw = function() return true end,
+		}, true)
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+		return chars
+	end
+
+	helpers.it("(magic-key-source) reads the next key plain after a consumed dead key", function()
+		helpers.assert_eq(drive(false), { "ê" }, "a dead key the application received still composes")
+		helpers.assert_eq(drive(true), { "e" }, "the application never saw the dead key: E is plain there")
+	end)
+end)

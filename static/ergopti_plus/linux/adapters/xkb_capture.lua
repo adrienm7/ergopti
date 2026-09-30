@@ -533,6 +533,17 @@ local function resolve_press(keycode)
 	return text, identity
 end
 
+--- Ends a pending Compose sequence, leaving the key state as it is. For a press
+--- the application never received: the dead key it fed must not compose with
+--- the next key here while the application types that key plain.
+--- @return boolean ok, string|nil error
+function M.cancel_compose()
+	if not _session then return false, "XKB capture state is not ready" end
+	local ok, err = pcall(_backend.compose_reset, _session)
+	if not ok then return false, tostring(err) end
+	return true, nil
+end
+
 --- The text a key would type in the live keymap and state, without pressing
 --- it: nothing is committed and no Compose sequence is fed. "" for a key that
 --- types nothing (an arrow, a function key, a keypad key with NumLock off).
