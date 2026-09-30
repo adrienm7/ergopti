@@ -94,6 +94,16 @@ World.flush_logs()
 -- ==================================
 -- ==================================
 
+-- The user, back at the Mac, moves and clicks the pointer: the pointer
+-- watchers probe Karabiner (the CapsWord probe exited 2 on every movement,
+-- 7919cf8e9). Spaced by more than their throttle.
+local pointer_taps = 0
+for _, event_type in ipairs({ "mouseMoved", "leftMouseDown", "mouseMoved" }) do
+	pointer_taps = pointer_taps + World.pointer_event(hs, event_type)
+	idle(2)
+end
+World.record("FACT", "pointer_taps=" .. pointer_taps)
+
 if ACTION == "restore_recommended" then
 	-- The user's click on Configuration › « Restore recommended values », the
 	-- row that restores every category at once.

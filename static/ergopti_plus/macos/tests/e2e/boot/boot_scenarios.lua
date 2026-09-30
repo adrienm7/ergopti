@@ -248,7 +248,8 @@ local function judge(output, action, marker)
 			local kind = line:match("^E2E_([%u_]+) ")
 			if kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"
 				or kind == "OPEN_MISSING"
-				or kind == "TIMER_RAISED" or kind == "BOOT_RAISED" or kind == "SCENARIO_FAILED" then
+				or kind == "TIMER_RAISED" or kind == "TAP_RAISED" or kind == "BOOT_RAISED"
+				or kind == "SCENARIO_FAILED" then
 				problems[#problems + 1] = line
 			end
 		end
@@ -265,9 +266,10 @@ end
 --- The navigation layer the recommended preset deployed: Karabiner
 --- manipulators that need the layer, and those that enter it.
 --- @param home string
+--- @param json table The shared JSON codec.
 --- @return integer layer_rows, integer entering_rows
-local function navigation_layer(home)
-	local decoded = require("json").decode(read(home .. "/.config/karabiner/karabiner.json") or "{}")
+local function navigation_layer(home, json)
+	local decoded = json.decode(read(home .. "/.config/karabiner/karabiner.json") or "{}")
 	local layer_rows, entering = 0, 0
 	local function is_layer(name) return type(name) == "string" and name:find("^ergopti_layer_active") ~= nil end
 	local function walk(node, in_manipulator)
@@ -284,6 +286,32 @@ local function navigation_layer(home)
 	return layer_rows, entering
 end
 
+--- The keys the shipped recommended layer binds on one OS: its `all` table
+--- and that OS's table (_shared/keymap/layers.recommended.toml).
+--- @param shared string The _shared folder.
+--- @param os_name string "macos" or "linux".
+--- @return integer keys
+local function recommended_layer_keys(shared, os_name)
+	local fh = assert(io.open(shared .. "/keymap/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
+	local keys, count, scope = {}, 0, nil
+	for line in fh:lines() do
+		local header = line:match("^%[layers%.[%w_]+%.([%w_]+)%]")
+		if header then
+			scope = header
+		elseif line:match("^%[") then
+			scope = nil
+		elseif scope == "all" or scope == os_name then
+			local key = line:match('^"([^"]+)"%s*=')
+			if key and not keys[key] then
+				keys[key] = true
+				count = count + 1
+			end
+		end
+	end
+	fh:close()
+	return count
+end
+
 --- Runs every scenario through `check`.
 --- @param check table { pass(label), fail(label, expected, actual), skip(label) }
 --- @param options table { driver, interpreter }
@@ -293,6 +321,8 @@ function M.run(check, options)
 		return
 	end
 	local world = dofile(options.driver .. "/tests/e2e/boot/world.lua")
+	-- Loaded by path: the scenarios make no assumption on the caller's package.path.
+	local json = dofile(options.driver .. "/../_shared/lua/json.lua")
 	local repo = options.driver:gsub("/static/ergopti_plus/macos/?$", "")
 	local scratch = os.tmpname()
 	os.remove(scratch)
@@ -332,13 +362,17 @@ function M.run(check, options)
 				table.concat(problems, "\n        ", 1, math.min(#problems, 12)))
 		end
 		if scenario.recommended then
-			local layer_rows, entering = navigation_layer(ctx.home)
-			if layer_rows > 0 and entering > 0 then
+			-- Every key the preset binds on macOS has at least one manipulator gated
+			-- on the layer; the layer was empty before db71c39bf.
+			local layer_rows, entering = navigation_layer(ctx.home, json)
+			local preset_keys = recommended_layer_keys(repo .. "/static/ergopti_plus/_shared", "macos")
+			if layer_rows >= preset_keys and preset_keys > 0 and entering > 0 then
 				check.pass(string.format("hardening-e-presets: the recommended navigation layer is deployed "
-					.. "(%d rows) and a key enters it (%d)", layer_rows, entering))
+					.. "(%d rows for %d preset keys) and a key enters it (%d)", layer_rows, preset_keys, entering))
 			else
 				check.fail("hardening-e-presets: the recommended navigation layer is deployed and entered",
-					"rows > 0 and an entering key", string.format("%d rows, %d entering", layer_rows, entering))
+					string.format("at least %d rows and an entering key", preset_keys),
+					string.format("%d rows, %d entering", layer_rows, entering))
 			end
 		end
 		run("rm -rf " .. q(root))

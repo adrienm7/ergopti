@@ -662,6 +662,34 @@ function M.find_row(items, path)
 	return row
 end
 
+--- Delivers one pointer event to every started event tap that watches its
+--- type, as the window server does when the user moves or clicks.
+--- @param hs table The hs stub.
+--- @param type_name string hs.eventtap.event.types key, e.g. "mouseMoved".
+--- @return integer delivered Number of taps that received it.
+function M.pointer_event(hs, type_name)
+	local event_type = hs.eventtap.event.types[type_name]
+	local delivered = 0
+	for _, tap in ipairs(hs.eventtap.__taps) do
+		local watched = false
+		for _, watched_type in ipairs(tap.enabled and tap.types or {}) do
+			if watched_type == event_type then watched = true end
+		end
+		if watched then
+			local event = {
+				getType = function() return event_type end,
+				getProperty = function() return 0 end,
+				getFlags = function() return {} end,
+				location = function() return { x = 400, y = 300 } end,
+			}
+			local ok, err = xpcall(tap.fn, debug.traceback, event)
+			if not ok then record("TAP_RAISED", err) end
+			delivered = delivered + 1
+		end
+	end
+	return delivered
+end
+
 --- Installs `require("hs.x")` for the native extensions the stub provides.
 --- @param hs table The hs stub.
 local function install_extension_searcher(hs)
