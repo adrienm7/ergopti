@@ -327,8 +327,8 @@ the shown slots reach the application. macOS has two consumers, the tooltip's
 per-render keyDown watcher and the keymap fallback `handle_llm_keys`, and tap
 restarts decide which runs first; the fallback must match the watcher (Up is
 the previous slot) and run before the keymap's idle word wipe, which resets the
-predictions. Windows swallows in AHK what the native owner cycles
-(`project-llm-nav-cycle-routes-pass-through`). The validation digit is the
+predictions. Windows cycles and consumes the arrows in AHK, never natively
+(`project-llm-nav-cycle-is-ahk-owned`). The validation digit is the
 digit-row key on every driver: macOS keycodes, Linux `EvdevCodes.DIGIT_ROW_SLOT`
 (the typed character made Shift+2 an `@` that never matched) and Windows
 `_LLM_Menu_NavDigitRowKey`. A tap-hold whose tap is Tab is the user's Tab

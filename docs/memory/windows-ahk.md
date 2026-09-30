@@ -238,17 +238,34 @@ that scan code, and let variant order decide precedence
 (`test_llm_tab_accepts_visible_prediction.ahk`). The registrar resolves named
 keys on the VK axis, so a user chord on Tab is exposed to the same shadow.
 
-### project-llm-nav-cycle-routes-pass-through
+### project-ahk-sendinput-puts-its-hook-first
 
-The native navigation owner's plan validation (NavPlanIsValid) requires every
-cycle route to pass its key on, and changing that means rebuilding
-`ergopti_nav_owner.dll` with MSVC. Up and Down therefore moved the caret behind
-the tooltip while cycling it. The AutoHotkey hook, next in the chain, now
-consumes the chord (`*Up`/`*Down` in `menu_llm/tab_accept.ahk`, criterion
-`LLM_Menu_NavCycleChordIsOwned`). Action: keep that criterion in lockstep with
-the native route (same committed plan entry, #InputLevel 1, exact modifiers,
-owner routing a multi-slot record); when the DLL is next rebuilt, suppress cycle
-routes natively and retire the AHK swallowers.
+Windows calls the most recently installed low-level keyboard hook first, and
+AutoHotkey unhooks and rehooks its keyboard hook around every SendInput
+(keyboard_mouse.cpp SendEventArray, `sHooksToRemoveDuringSendInput`; the rehook
+calls SetWindowsHookEx again). A hook installed after AutoHotkey's, such as
+`ergopti_nav_owner.dll` at boot, therefore runs first only until the driver's
+next SendInput (TextSender, hotstrings). The SendEvent fallback detects only
+other AutoHotkey hooks, through their mutex. Action: never let correctness
+depend on the order of the AutoHotkey hook and a native hook; give each
+decision to one hook outright.
+
+### project-llm-nav-cycle-is-ahk-owned
+
+The native owner's plan validation (NavPlanIsValid) requires one Up and one
+Down cycle route that passes its key on, and changing it means rebuilding
+`ergopti_nav_owner.dll` with MSVC. A first fix let the native owner cycle and
+swallowed the passed arrow in AutoHotkey; once AutoHotkey's hook ran first
+(`project-ahk-sendinput-puts-its-hook-first`), it swallowed every arrow before
+any cycle. The `*Up`/`*Down` hotkeys in `menu_llm/tab_accept.ahk` now cycle
+(`LLM_TooltipCycleActiveIdx`, whose repaint republishes the slot to the owner)
+and consume the chord under `LLM_Menu_NavCycleChordIsOwned` (#InputLevel 1,
+exact modifiers, owner routing a multi-slot record). The adapter parks both
+native cycle routes on extended scan code zero
+(`LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES`), so no hook order cycles twice or
+never (`test_llm_nav_cycle_windows.ahk`, `test-windows-llm-nav-cycle.cjs`).
+Action: when the DLL is next rebuilt, drop the cycle routes from its contract
+together with the parked table.
 
 ### project-llm-tap-hold-tab-is-the-users-tab
 
