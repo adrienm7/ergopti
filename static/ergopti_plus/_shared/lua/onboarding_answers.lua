@@ -22,7 +22,9 @@
 --- 3. Neutral values are deletions: the manifest reader's sparse operation
 ---    decides, so a declined feature leaves the file as empty as a fresh one.
 --- 4. A re-run starts from the values in force, read from the decoded file by
----    the same paths.
+---    the same paths, and from the tap-hold keys and switch the host's
+---    tap-hold owner reports: a configured key is shown as kept, never
+---    imported over.
 --- ==============================================================================
 
 local M = {}
@@ -64,7 +66,8 @@ end
 --- Indexes one driver's writable paths.
 --- @param text string The catalogue JSON.
 --- @param driver string "macos", "linux" or "windows".
---- @return table index `{ driver, pages, entries = { [path] = entry } }`.
+--- @return table index `{ driver, pages, entries = { [path] = entry },
+---   tap_hold_state = { path, default }|nil }`.
 function M.load(text, driver)
 	assert(type(text) == "string", "the onboarding catalogue must be text")
 	local catalogue = Json.decode(text)
@@ -74,27 +77,30 @@ function M.load(text, driver)
 	assert(type(platform) == "table" and type(platform.pages) == "table",
 		"the onboarding catalogue has no pages for " .. tostring(driver))
 	local entries = {}
+	local tap_hold_state = nil
 	local function claim(path, entry)
 		assert(type(path) == "string" and path ~= "", "the onboarding catalogue has an unnamed row")
 		assert(entries[path] == nil, "the onboarding catalogue writes " .. path .. " twice")
 		entries[path] = entry
 	end
-	local function walk(groups)
+	local function walk(groups, page)
 		for _, group in ipairs(groups or {}) do
 			if group.path ~= nil then
 				claim(group.path, { kind = "choice", value = group.value, default = group.default })
 			end
 			for _, item in ipairs(group.items or {}) do
 				if item.tap_hold_key ~= nil then
-					assert(type(item.tap_hold_key) == "string" and item.tap_hold_key ~= "",
-						"the onboarding catalogue names a tap-hold key without an id")
+					assert(type(item.tap_hold_key) == "string" and item.tap_hold_key ~= ""
+						and type(item.customised_value) == "string" and item.customised_value ~= "",
+						"the onboarding catalogue names a tap-hold key without an id or a customised value")
 					claim(item.path, { kind = "tap_hold_key", key = item.tap_hold_key,
-						value = item.value, default = item.default })
+						value = item.value, default = item.default, customised = item.customised_value })
+					if type(page.state) == "table" then tap_hold_state = page.state end
 				else
 					claim(item.path, { kind = "choice", value = item.value, default = item.default })
 				end
 			end
-			walk(group.groups)
+			walk(group.groups, page)
 		end
 	end
 	for _, page in ipairs(platform.pages) do
@@ -110,9 +116,9 @@ function M.load(text, driver)
 			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default,
 				max_characters = limit })
 		end
-		walk(page.groups)
+		walk(page.groups, page)
 	end
-	return { driver = driver, pages = platform.pages, entries = entries }
+	return { driver = driver, pages = platform.pages, entries = entries, tap_hold_state = tap_hold_state }
 end
 
 
@@ -306,6 +312,33 @@ function M.current_values(index, decoded, mark)
 				if mark then mark((table.unpack or unpack)(segments)) end
 			end
 		end
+	end
+	return values
+end
+
+--- The wizard values of what the host's tap-hold owner reports: each key it
+--- configures, as its recommendation or as customised, and on a platform
+--- without a config.toml switch, the Tap-Holds switch in its own file.
+--- @param index table From M.load.
+--- @param report table `{ enabled = boolean|nil, keys = { [key id] =
+---   "recommended"|"customised" } }`.
+--- @return table values `{ [path] = value }`.
+function M.tap_hold_values(index, report)
+	assert(type(index) == "table" and type(index.entries) == "table", "no catalogue index")
+	assert(type(report) == "table" and type(report.keys) == "table", "the tap-hold report has no keys")
+	local values = {}
+	for path, entry in pairs(index.entries) do
+		if entry.kind == "tap_hold_key" then
+			local state = report.keys[entry.key]
+			assert(state == nil or state == "recommended" or state == "customised",
+				"unknown tap-hold key state " .. tostring(state))
+			if state == "recommended" then values[path] = entry.value end
+			if state == "customised" then values[path] = entry.customised end
+		end
+	end
+	local state = index.tap_hold_state
+	if state and type(report.enabled) == "boolean" and report.enabled ~= state.default then
+		values[state.path] = report.enabled
 	end
 	return values
 end

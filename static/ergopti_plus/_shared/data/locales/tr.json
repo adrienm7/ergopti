@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Hayır",
 	"onboarding.btn.ok": "Tamam",
 	"onboarding.btn.yes": "Evet",
+	"onboarding.checklist.customised": "{1} — kendi ayarınız, korunur",
 	"onboarding.checklist.inactive": "Neyin içe aktarılacağını seçmek için Evet yanıtını verin.",
 	"onboarding.checklist.summary": "İçe aktarılacak öğeler: {2} öğeden {1} seçildi",
 	"onboarding.done.body": "Yapılandırma kaydedildi. Komut dosyası şimdi yeniden yüklenecek.",

@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Нет",
 	"onboarding.btn.ok": "ОК",
 	"onboarding.btn.yes": "Да",
+	"onboarding.checklist.customised": "{1} — ваша собственная настройка, сохраняется",
 	"onboarding.checklist.inactive": "Ответьте «Да», чтобы выбрать, что импортировать.",
 	"onboarding.checklist.summary": "Элементы для импорта: выбрано {1} из {2}",
 	"onboarding.done.body": "Конфигурация сохранена. Скрипт будет перезагружен.",

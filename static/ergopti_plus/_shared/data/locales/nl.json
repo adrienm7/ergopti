@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Nee",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Ja",
+	"onboarding.checklist.customised": "{1} — uw eigen instelling, blijft behouden",
 	"onboarding.checklist.inactive": "Antwoord Ja om te kiezen wat er wordt geïmporteerd.",
 	"onboarding.checklist.summary": "Te importeren items: {1} van {2} geselecteerd",
 	"onboarding.done.body": "Configuratie opgeslagen. Het script wordt nu opnieuw geladen.",

@@ -41,6 +41,9 @@ M.FALLBACK_THRESHOLD_SECONDS = 0.2
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 
+-- The per-key fields that decide what a key does, compared by key_report().
+local BEHAVIOUR_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "time_activation_seconds" }
+
 --- Reads and decodes one TOML file.
 --- @param path string
 --- @return table|nil parsed, string|nil err ("absent" when the file does not exist)
@@ -196,6 +199,43 @@ function M.load_document(defaults_path, user, user_err)
 		-- Shipped data like the hold picker: a user file cannot move a key.
 		catalog = KeyCatalog.for_platform(defaults, "linux"),
 	}
+end
+
+--- Whether a loaded key does exactly what the recommendation does.
+--- @param fields table Validated fields of the key.
+--- @param recommended table|nil Validated fields of its recommendation.
+--- @return boolean
+local function behaves_as(fields, recommended)
+	if type(recommended) ~= "table" or (fields.enabled ~= false) ~= (recommended.enabled ~= false) then
+		return false
+	end
+	for _, field in ipairs(BEHAVIOUR_FIELDS) do
+		if fields[field] ~= recommended[field] then return false end
+	end
+	return true
+end
+
+--- The first-run wizard's view of a folder's tap_hold.toml: the Tap-Holds
+--- switch in force and each key it configures, as the shipped recommendation or
+--- as the user's own setting, compared through the same validation the engine
+--- runs. A key the file leaves to the keyboard is absent, so the wizard may
+--- import it; it never imports over another one.
+--- @param defaults_path string The shared defaults.toml.
+--- @param user_path string The folder's tap_hold.toml.
+--- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
+--- @return string|nil err Why the file could not be read.
+function M.key_report(defaults_path, user_path)
+	local user, user_err = read_toml(user_path)
+	if user_err == "absent" then user, user_err = nil, nil end
+	if user_err then return nil, "'" .. tostring(user_path) .. "' is " .. user_err end
+	local loaded = M.load_document(defaults_path, user, nil)
+	local recommended = M.load_document(defaults_path,
+		{ tap_hold = { keys = M.preset_keys(defaults_path) } }, nil).keys
+	local keys = {}
+	for key_id, fields in pairs(loaded.keys) do
+		keys[key_id] = behaves_as(fields, recommended[key_id]) and "recommended" or "customised"
+	end
+	return { enabled = loaded.enabled, keys = keys }
 end
 
 return M

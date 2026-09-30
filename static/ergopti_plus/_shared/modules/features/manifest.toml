@@ -5874,6 +5874,9 @@ restore_exclude = []
 #                The answer writes it only where it changes what is in force:
 #                off when it turns the category switch from Yes to No, on when
 #                it imports one of those items that was off.
+#   state        Per-platform switch a page without a category switch starts
+#                its question from: its host reads it from its own file and
+#                reports it with the values in force; the page never writes it.
 # The wizard persists only manifest paths, except the tap-hold keys: no driver
 # keeps those in config.toml, so each host imports a checked key's shipped
 # recommendation through its own tap-hold writer. A checklist's pre-selection is
@@ -5888,8 +5891,9 @@ description_key = "onboarding.page.tap_holds.description"
 # macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
 # where a config.toml answer would never be read: there, importing a checked
 # key switches the Tap-Holds on in that file, and a No or an empty list writes
-# nothing.
+# nothing. The question starts from that switch, which the host reports.
 master = { ahk = "category_enabled.tap_holds" }
+state = { hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
 checklist = "tap_holds"
 
 [onboarding.pages.shortcuts]

@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Nein",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Ja",
+	"onboarding.checklist.customised": "{1} — Ihre eigene Einstellung, bleibt erhalten",
 	"onboarding.checklist.inactive": "Antworten Sie mit Ja, um auszuwählen, was importiert wird.",
 	"onboarding.checklist.summary": "Zu importierende Elemente: {1} von {2} ausgewählt",
 	"onboarding.done.body": "Konfiguration gespeichert. Das Skript wird jetzt neu geladen.",

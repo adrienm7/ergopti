@@ -322,13 +322,13 @@ end)
 -- ===============================================
 
 --- Splits a call's argument list on top-level commas so nested calls such as
---- `resolve_user_config()` do not inflate the count.
+--- `resolve_user_config()` stay one argument.
 --- @param args string The `(...)` slice of a call, parentheses included.
---- @return number Number of top-level arguments.
-local function count_arguments(args)
+--- @return table Top-level arguments, trimmed.
+local function call_arguments(args)
 	local inner = args:sub(2, -2)
-	if inner:match("^%s*$") then return 0 end
-	local depth, count = 0, 1
+	if inner:match("^%s*$") then return {} end
+	local depth, start, list = 0, 1, {}
 	for i = 1, #inner do
 		local c = inner:sub(i, i)
 		if c == "(" or c == "{" or c == "[" then
@@ -336,10 +336,12 @@ local function count_arguments(args)
 		elseif c == ")" or c == "}" or c == "]" then
 			depth = depth - 1
 		elseif c == "," and depth == 0 then
-			count = count + 1
+			list[#list + 1] = inner:sub(start, i - 1):match("^%s*(.-)%s*$")
+			start = i + 1
 		end
 	end
-	return count
+	list[#list + 1] = inner:sub(start):match("^%s*(.-)%s*$")
+	return list
 end
 
 helpers.describe("karabiner setters — only the reset bypasses the corruption guard", function()
@@ -364,7 +366,10 @@ helpers.describe("karabiner setters — only the reset bypasses the corruption g
 			if name_pos < pos then owner = name else break end
 		end
 		owners[#owners + 1] = owner
-		if count_arguments(args) >= 3 then bypassing[#bypassing + 1] = owner end
+		-- The third argument is overwrite_corrupt; a direct call may still name
+		-- the exact bytes it replaces (the fourth), which only narrows the write.
+		local overwrite_corrupt = call_arguments(args)[3]
+		if overwrite_corrupt ~= nil and overwrite_corrupt ~= "nil" then bypassing[#bypassing + 1] = owner end
 	end
 	table.sort(owners)
 

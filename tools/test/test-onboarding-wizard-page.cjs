@@ -818,6 +818,7 @@ function recommendedTapHoldKeys(driver) {
 				default: false,
 				recommended: true,
 				tap_hold_key: key.id,
+				customised_value: 'customised',
 				label: [{ key: key.label_key }]
 			})),
 			`${driver}: one item per recommended key, in tray order, named by the catalogue`
@@ -855,6 +856,11 @@ function recommendedTapHoldKeys(driver) {
 		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
 		assert.equal(described.master, undefined, `${driver}: no config.toml tap-hold switch`);
 		assert.ok(!cataloguePaths(driver).has('tap_holds.enabled'), `${driver}: no config.toml row`);
+		assert.deepEqual(
+			described.state,
+			{ path: 'tap_holds.enabled', default: false },
+			`${driver}: the question starts from the switch its host reports`
+		);
 	}
 	const windows = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'tap_holds');
 	assert.equal(windows.master.path, 'category_enabled.tap_holds', 'Windows reads its switch there');
@@ -895,6 +901,79 @@ function recommendedTapHoldKeys(driver) {
 			finish(declined).answers.operations.filter((op) => op.path.startsWith('tap_holds.')),
 			[],
 			`${driver}: answering No imports no key, even after a Yes`
+		);
+	}
+})();
+
+(function aRerunKeepsTheConfiguredTapHoldKeys() {
+	// A re-run answered Yes pre-checked every key and imported over the user's
+	// own settings; on macOS and Linux it even opened at No with Tap-Holds on.
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
+		const keys = described.groups.flatMap((group) => group.items);
+		const [imported, customised, ...free] = keys;
+		const current = {
+			[imported.path]: imported.value,
+			[customised.path]: customised.customised_value,
+			[described.master ? described.master.path : described.state.path]: true
+		};
+		const page = openWizard({ platform: driver, current });
+		page.platform = driver;
+		goToPage(page, 'tap_holds');
+		assert.equal(
+			page.el('page-yes').checked,
+			true,
+			`${driver}: the page opens at the Yes in force`
+		);
+		const text = (item) => locale('en')[item.label[0].key];
+		const rowOf = (item) =>
+			checkRows(page).find(
+				(row) =>
+					row.text === text(item) ||
+					row.text === locale('en')['onboarding.checklist.customised'].split('{1}').join(text(item))
+			);
+		assert.equal(rowOf(imported).box.checked, true, `${driver}: an imported key shows checked`);
+		assert.equal(rowOf(imported).box.disabled, true, `${driver}: and is kept as it is`);
+		assert.equal(
+			rowOf(customised).box.checked,
+			false,
+			`${driver}: a customised key is not the recommendation`
+		);
+		assert.equal(rowOf(customised).box.disabled, true, `${driver}: and cannot be imported over`);
+		assert.notEqual(rowOf(customised).text, text(customised), `${driver}: its row says it is kept`);
+		assert.ok(
+			free.every((item) => rowOf(item).box.checked === false && rowOf(item).box.disabled === false),
+			`${driver}: a configured page pre-checks nothing, and the free keys stay choosable`
+		);
+		answer(page, false);
+		answer(page, true);
+		assert.ok(
+			free.every((item) => rowOf(item).box.checked === false),
+			`${driver}: turning the answer back to Yes still pre-checks nothing`
+		);
+		const header = checkRows(page).find(
+			(row) => row.text === locale('en')[described.groups[0].label[0].key]
+		);
+		toggle(header);
+		assert.equal(
+			rowOf(customised).box.checked,
+			false,
+			`${driver}: a group checkbox skips a customised key`
+		);
+		const operations = finish(page).answers.operations;
+		assert.ok(
+			!operations.some((op) => op.path === imported.path || op.path === customised.path),
+			`${driver}: neither configured key is written`
+		);
+		assert.ok(
+			!operations.some((op) => described.state && op.path === described.state.path),
+			`${driver}: the reported switch is never written`
+		);
+		const leftFree = described.groups[0].items.filter((item) => free.includes(item));
+		assert.deepEqual(
+			operations.filter((op) => op.path.startsWith('tap_holds.keys.')),
+			leftFree.map((item) => ({ path: item.path, value: true })),
+			`${driver}: only the free keys the user checked are imported`
 		);
 	}
 })();

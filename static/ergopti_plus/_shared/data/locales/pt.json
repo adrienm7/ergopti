@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Não",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Sim",
+	"onboarding.checklist.customised": "{1} — a sua própria definição, mantida",
 	"onboarding.checklist.inactive": "Responda Sim para escolher o que importar.",
 	"onboarding.checklist.summary": "Itens a importar: {1} de {2} selecionados",
 	"onboarding.done.body": "Configuração salva. O script será recarregado agora.",

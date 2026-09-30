@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Ne",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Ano",
+	"onboarding.checklist.customised": "{1} — vaše vlastní nastavení, zůstane zachováno",
 	"onboarding.checklist.inactive": "Odpovězte Ano a vyberte, co importovat.",
 	"onboarding.checklist.summary": "Položky k importu: vybráno {1} z {2}",
 	"onboarding.done.body": "Konfigurace uložena. Skript se nyní znovu načte.",

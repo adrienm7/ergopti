@@ -149,9 +149,14 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 			TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig,
 				CandidateResult["content"], ExpectedCandidateOld)]
 			if (TapHoldPath != "") {
-				try TapHoldImage := TapHoldImportImage(TapHoldPath,
-					_SharedDir . "\tap_hold\defaults.toml", TapHoldKeys)
-				catch as Err {
+				try {
+					TapHoldImage := TapHoldImportImage(TapHoldPath,
+						_SharedDir . "\tap_hold\defaults.toml", TapHoldKeys)
+					TapHoldBackup := TapHoldImportBackup(TapHoldPath, TapHoldImage)
+					if (TapHoldBackup != "")
+						try LoggerInfo("Onboarding", "Backed up '{1}' to '{2}' before the tap-hold import.",
+							TapHoldPath, TapHoldBackup)
+				} catch as Err {
 					try LoggerError("Onboarding",
 						"Could not render the tap-hold import into '{1}': {2}.",
 						TapHoldPath, Err.Message)

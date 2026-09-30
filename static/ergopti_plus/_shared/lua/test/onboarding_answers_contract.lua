@@ -153,9 +153,12 @@ function M.register(helpers, opts)
 					helpers.assert_true(not Manifest.has_default(path), path .. " must never read as config.toml")
 					helpers.assert_eq(entry.value, true)
 					helpers.assert_eq(entry.default, false)
+					helpers.assert_eq(entry.customised, "customised")
 				end
 			end
 			helpers.assert_true(count >= 7, "the Tap-Holds page lists the recommended keys")
+			helpers.assert_eq(index.tap_hold_state, { path = "tap_holds.enabled", default = false },
+				"the page starts from the switch this host keeps in its own file")
 		end)
 
 		-- The Windows Shortcuts page writes the key-combinations switch its master
@@ -197,6 +200,31 @@ function M.register(helpers, opts)
 			helpers.assert_contains(tostring(why), "no wizard path")
 			local values = Answers.current_values(index, { tap_holds = { keys = { [first.tap_hold_key] = true } } })
 			helpers.assert_nil(values[first.path], "a tap-hold key is never read back from config.toml")
+			local refused = Answers.rows(index, { { path = first.path, value = first.customised_value } }, Manifest)
+			helpers.assert_nil(refused, "the customised marker is shown, never answered")
+		end)
+
+		-- A re-run answered Yes imported over the user's own keys: the page only
+		-- keeps them if the host says which keys are configured, and how.
+		helpers.it("reports the tap-hold keys and switch the tap-hold owner reads", function()
+			local items = {}
+			for _, group in ipairs(page(index, "tap_holds").groups) do
+				for _, item in ipairs(group.items) do items[#items + 1] = item end
+			end
+			local imported, customised = items[1], items[2]
+			local values = Answers.tap_hold_values(index, { enabled = true, keys = {
+				[imported.tap_hold_key] = "recommended", [customised.tap_hold_key] = "customised",
+			} })
+			helpers.assert_eq(values, {
+				[imported.path] = true,
+				[customised.path] = "customised",
+				["tap_holds.enabled"] = true,
+			}, "an imported key reads as on, a customised one as kept, the switch as in force")
+			helpers.assert_eq(Answers.tap_hold_values(index, { enabled = false, keys = {} }), {},
+				"a folder without tap-holds reports nothing, as a neutral page")
+			helpers.assert_throws(function()
+				Answers.tap_hold_values(index, { keys = { [imported.tap_hold_key] = "half" } })
+			end)
 		end)
 
 		helpers.it("turns declined and accepted answers into sparse manifest rows", function()

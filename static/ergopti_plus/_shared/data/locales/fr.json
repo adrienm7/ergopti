@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "Non",
 	"onboarding.btn.ok": "OK",
 	"onboarding.btn.yes": "Oui",
+	"onboarding.checklist.customised": "{1} — votre propre réglage, conservé",
 	"onboarding.checklist.inactive": "Répondez Oui pour choisir ce qu’il faut importer.",
 	"onboarding.checklist.summary": "Éléments à importer : {1} sur {2} sélectionnés",
 	"onboarding.done.body": "Configuration enregistrée. Le script va maintenant se recharger.",

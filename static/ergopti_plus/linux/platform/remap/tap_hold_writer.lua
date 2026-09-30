@@ -13,7 +13,9 @@
 ---    clears both. The scope restore and clear render through render_scope()
 ---    and publish through infra/tap_hold_scope.lua, never through commit().
 ---    The first-run wizard imports its checked keys through import_recommended(),
----    into the folder it configures, before the daemon restarts on it.
+---    into the folder it configures, before the daemon restarts on it: it only
+---    adds keys, refuses to overwrite one the user configured, and backs the
+---    file up first.
 --- 2. Only the keys the user changed are written: every other key keeps
 ---    inheriting the shared default.
 --- 3. The file is decoded by the shared TOML codec, not by a line scanner, and
@@ -60,6 +62,7 @@ local _path = nil
 local _reload = nil
 local _is_tap_action = nil
 local _canonical_hold = nil
+local _backup_sequence = 0    -- Keeps the wizard import's backups unique.
 
 
 -- =========================================
@@ -70,7 +73,7 @@ local _canonical_hold = nil
 
 --- Reads a tap_hold.toml; an absent file is an empty document.
 --- @param path string
---- @return table|nil document, string|nil err
+--- @return table|nil document, string|nil err, string|nil text The file's bytes.
 local function read_document(path)
 	local fh = io.open(path, "r")
 	if not fh then return {} end
@@ -78,7 +81,29 @@ local function read_document(path)
 	fh:close()
 	local parsed = TomlCodec.decode(text)
 	if type(parsed) ~= "table" then return nil, "malformed" end
-	return parsed
+	return parsed, nil, text
+end
+
+--- Copies a file's bytes to a new backup beside it, then reads them back.
+--- @param path string The file being replaced.
+--- @param text string Its bytes.
+--- @return string|nil backup The backup path, nil when it could not be made.
+local function back_up(path, text)
+	_backup_sequence = _backup_sequence + 1
+	local backup = string.format("%s.tap_holds-%s-%d.bak", path, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
+	local existing = io.open(backup, "r")
+	if existing then
+		existing:close()
+		return nil
+	end
+	local fh = io.open(backup, "w")
+	if not fh then return nil end
+	fh:write(text)
+	fh:close()
+	local check = io.open(backup, "r")
+	local copied = check and check:read("*a")
+	if check then check:close() end
+	return copied == text and backup or nil
 end
 
 --- The TOML spelling of one scalar or array.
@@ -376,11 +401,33 @@ function M.render_scope(mode, document, rows, preset)
 	return render_document(document)
 end
 
+--- Whether a key's entry holds a setting of the user's: any owned field, unless
+--- together they are exactly the shipped preset's (an explicit `enabled = true`
+--- is the preset's too). A partial entry is the user's: whether it behaves as
+--- the preset depends on inheritance, and the wizard never guesses.
+--- @param entry any The key's table in the user's document.
+--- @param fields table The key's preset fields.
+--- @return boolean
+local function customised(entry, fields)
+	if type(entry) ~= "table" then return false end
+	local owned = false
+	for _, field in ipairs(OWNED_KEY_FIELDS) do
+		if entry[field] ~= nil then owned = true end
+	end
+	if not owned then return false end
+	for _, field in ipairs(OWNED_KEY_FIELDS) do
+		local value, recommended = entry[field], fields[field]
+		if field == "enabled" then value, recommended = value ~= false, recommended ~= false end
+		if value ~= recommended then return true end
+	end
+	return false
+end
+
 --- Imports Ergopti's recommendation for the given keys into a tap_hold.toml
 --- and switches the feature on ([tap_hold] enabled): the first-run wizard's
---- Tap-Holds answer. Each key's owned fields become exactly the shipped
---- preset's; every other key, section and field stays as it was, so a key the
---- user left unchecked keeps whatever it had. The wizard may configure another
+--- Tap-Holds answer. It only adds keys: a key holding the user's own setting
+--- refuses the whole import, and every other key, section and field stays as it
+--- was. The replaced file is backed up first. The wizard may configure another
 --- folder than the running one and restarts the daemon on it, so the file is
 --- named by the caller and no engine is reloaded here.
 --- @param path string The tap_hold.toml of the folder being configured.
@@ -388,6 +435,7 @@ end
 --- @param preset table key id -> fields of the shipped preset (loader.preset_keys).
 --- @return boolean imported
 --- @return string|nil err Why nothing was written.
+--- @return string|nil backup The copy of the replaced file, nil for a new one.
 function M.import_recommended(path, key_ids, preset)
 	if type(path) ~= "string" or path == "" or type(key_ids) ~= "table" or #key_ids == 0
 		or type(preset) ~= "table" then
@@ -405,7 +453,7 @@ function M.import_recommended(path, key_ids, preset)
 		seen[key_id] = true
 	end
 	Logger.start(LOG, "Importing %d recommended tap-hold key(s) into '%s'…", #key_ids, path)
-	local document, err = read_document(path)
+	local document, err, text = read_document(path)
 	if not document then
 		Logger.error(LOG, "'%s' is %s — the import is refused rather than overwrite it.", path, tostring(err))
 		return false, "'" .. path .. "' is " .. tostring(err)
@@ -417,6 +465,22 @@ function M.import_recommended(path, key_ids, preset)
 		Logger.error(LOG, "[tap_hold] of '%s' is not a table of keys — the import is refused.", path)
 		return false, "[tap_hold] of '" .. path .. "' is not a table of keys"
 	end
+	local keys = type(tap_hold) == "table" and tap_hold.keys or {}
+	for _, key_id in ipairs(key_ids) do
+		if customised(keys[key_id], preset[key_id]) then
+			Logger.error(LOG, "Tap-hold key '%s' of '%s' holds the user's own setting — the import is refused.",
+				key_id, path)
+			return false, "'" .. key_id .. "' holds the user's own setting"
+		end
+	end
+	local backup = nil
+	if text then
+		backup = back_up(path, text)
+		if not backup then
+			Logger.error(LOG, "'%s' could not be backed up — the import is refused.", path)
+			return false, "'" .. path .. "' could not be backed up"
+		end
+	end
 	section(document).enabled = true
 	for _, key_id in ipairs(key_ids) do
 		local entry = key_entry(document, key_id)
@@ -426,8 +490,9 @@ function M.import_recommended(path, key_ids, preset)
 	if not write_document(path, document) then
 		return false, "'" .. path .. "' could not be written"
 	end
-	Logger.success(LOG, "Imported %d recommended tap-hold key(s) into '%s'.", #key_ids, path)
-	return true
+	Logger.success(LOG, "Imported %d recommended tap-hold key(s) into '%s' (backup: %s).",
+		#key_ids, path, tostring(backup or "none, the file is new"))
+	return true, nil, backup
 end
 
 --- Whether the user's file names this key.

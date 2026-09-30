@@ -1778,6 +1778,7 @@
 	"onboarding.btn.no": "否",
 	"onboarding.btn.ok": "确定",
 	"onboarding.btn.yes": "是",
+	"onboarding.checklist.customised": "{1} — 你自己的设置，保持不变",
 	"onboarding.checklist.inactive": "选择“是”即可挑选要导入的项目。",
 	"onboarding.checklist.summary": "要导入的项目：已选择 {1} 项，共 {2} 项",
 	"onboarding.done.body": "配置已保存。脚本现在将重新加载。",
