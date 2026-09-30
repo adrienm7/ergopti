@@ -54,6 +54,10 @@ local CAPTURE_TIMEOUT_MS = Timings.ms("ui", "magic_key_capture_timeout_ms")
 -- automatic value is in effect and no menu asks for the candidates.
 local _resolver = nil
 
+-- The evdev code in effect and the preference generation it was derived from.
+local _code = nil
+local _code_generation = nil
+
 -- The daemon's collaborators, set once by M.init.
 local _deps = nil
 
@@ -95,13 +99,19 @@ function M.get()
 end
 
 --- The evdev code remapped to the magic key, nil while automatic. Asked on
---- every grabbed key-down: the automatic value answers before the registry is
---- ever read.
+--- every grabbed key-down, so it is derived once per preference document
+--- (infra/hotstring_preferences.lua generation): a write, a refresh or a
+--- scope's adoption derives it again, a keystroke only compares two numbers.
+--- The automatic value answers before the registry is ever read.
 --- @return number|nil
 function M.evdev_code()
+	local generation = Preferences.generation()
+	if generation == _code_generation then return _code end
 	local value = M.get()
-	if value == AUTOMATIC then return nil end
-	return M.resolver().native(value)
+	_code = value ~= AUTOMATIC and M.resolver().native(value) or nil
+	-- Read after the value: the first read of the document is itself a change.
+	_code_generation = Preferences.generation()
+	return _code
 end
 
 --- Stores a new value; the next press follows it, nothing is re-registered.
@@ -255,6 +265,7 @@ function M._reset_for_test()
 	_deps = nil
 	_resolver = nil
 	_capture = nil
+	_code, _code_generation = nil, nil
 end
 
 return M
