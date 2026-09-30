@@ -45,14 +45,16 @@ const APPROVED = {
 	// ONE row for the macOS menubar icon, its variants beneath it.
 	'menu.layout.menubar_icon': { fr: 'Icône de la barre des menus', en: 'Menu bar icon' },
 	// The Tap-Hold keys are listed under one header per hand (A4), replacing a
-	// « Tap / Hold » header above « Main gauche » and « Main droite ».
+	// « Tap / Hold » header above « Main gauche » and « Main droite ». The
+	// maintainer dropped the inner dash on 2026-09-30: the menu frames every
+	// section header in dashes already.
 	'menu.tapholds.left_hand_tap_hold': {
-		fr: 'Main gauche — Tap / Hold',
-		en: 'Left hand — Tap / Hold'
+		fr: 'Main gauche (tap/hold)',
+		en: 'Left hand (tap/hold)'
 	},
 	'menu.tapholds.right_hand_tap_hold': {
-		fr: 'Main droite — Tap / Hold',
-		en: 'Right hand — Tap / Hold'
+		fr: 'Main droite (tap/hold)',
+		en: 'Right hand (tap/hold)'
 	},
 	// The modifier combinations moved to their own group under Shortcuts (A4),
 	// with a first-row switch and slots that say what each one waits for.
