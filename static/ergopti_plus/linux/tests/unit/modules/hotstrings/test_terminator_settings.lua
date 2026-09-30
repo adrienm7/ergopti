@@ -71,6 +71,7 @@ end
 helpers.describe("word-delimiter settings: config.toml leaves", function()
 	helpers.it("keeps a menu change across a restart, sparsely and beside unknown entries", function()
 		with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
 			helpers.assert_eq(shipped(Terminators, "space"), true)
 			helpers.assert_eq(shipped(Terminators, "slash"), false)
 			helpers.assert_true(Terminators.set_terminators_enabled({ space = false, slash = true }))
@@ -123,6 +124,7 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 
 	helpers.it("writes nothing when the file already holds the catalogue's settings", function()
 		with_settings(nil, function(Settings, path, sandbox)
+			helpers.assert_true(Settings.load())
 			helpers.assert_true(Settings.persist())
 			helpers.assert_nil(sandbox.read_bytes(path), "the defaults create no configuration")
 		end)
@@ -130,6 +132,7 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 
 	helpers.it("waits while a hotstrings scope holds the preferences", function()
 		with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
 			local Preferences = require("infra.hotstring_preferences")
 			local owner = {}
 			helpers.assert_true(Preferences.acquire(owner))
@@ -149,6 +152,7 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 				sandbox.write_bytes(target, SOURCE .. "external = 1\n")
 				return original(target, rows, files, expected)
 			end
+			helpers.assert_true(Settings.load())
 			local passed, err = pcall(function()
 				helpers.assert_true(Terminators.set_terminator_enabled("space", false))
 				helpers.assert_eq(Settings.persist(), false)
@@ -156,6 +160,62 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 			end)
 			Writer.batch_write = original
 			if not passed then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("refuses a save before the first read, when it cannot know what changed", function()
+		with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Terminators.set_terminator_enabled("space", false))
+			helpers.assert_eq(Settings.persist(), false)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+
+	-- A save rewrote every delimiter leaf from memory: an unusable record or
+	-- state the owner had warned about vanished on an unrelated change, and a
+	-- hand edit made since the start was reverted.
+	helpers.it("writes only what the menu changed, keeping outdated entries and hand edits", function()
+		local stored = '[hotstrings]\nunknown = "kept"\n'
+			.. 'terminators = [{ key = "custom_¤", char = "¤", label = "¤", consume = true }, '
+			.. '{ key = "custom_comma", char = ",", label = ",", consume = false }]\n'
+			.. '\n[hotstrings.terminator_states]\nspace = "no"\nretired = true\n"custom_¤" = false\n'
+		with_settings(stored, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
+			-- A hand edit after the start: comma switched off, the label renamed.
+			local edited = sandbox.read_bytes(path):gsub('label = "¤"', 'label = "hand"')
+				:gsub("retired = true\n", "retired = true\ncomma = false\n")
+			sandbox.write_bytes(path, edited)
+			helpers.assert_true(Terminators.set_terminator_enabled("slash", true))
+			helpers.assert_true(Settings.persist())
+			local document = Codec.decode(sandbox.read_bytes(path))
+			local states = document.hotstrings.terminator_states
+			helpers.assert_eq(states.slash, true, "the menu's change is written")
+			helpers.assert_eq(states.comma, false, "a hand edit survives an unrelated change")
+			helpers.assert_eq(states.space, "no", "an outdated state stays for the cleanup")
+			helpers.assert_eq(states.retired, true)
+			helpers.assert_eq(states["custom_¤"], false)
+			helpers.assert_eq(document.hotstrings.terminators, {
+				{ key = "custom_¤", char = "¤", label = "hand", consume = true },
+				{ key = "custom_comma", char = ",", label = ",", consume = false },
+			}, "the list is not rewritten for a state change")
+
+			helpers.assert_true(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false))
+			helpers.assert_true(Settings.persist())
+			helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).hotstrings.terminators, {
+				{ key = "custom_¤", char = "¤", label = "hand", consume = true },
+				{ key = "custom_comma", char = ",", label = ",", consume = false },
+				{ key = "custom_µ", char = "µ", label = "µ", consume = false },
+			}, "an added delimiter joins the records as written")
+
+			helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+			helpers.assert_true(Settings.persist())
+			document = Codec.decode(sandbox.read_bytes(path))
+			helpers.assert_eq(document.hotstrings.terminators, {
+				{ key = "custom_comma", char = ",", label = ",", consume = false },
+				{ key = "custom_µ", char = "µ", label = "µ", consume = false },
+			}, "a removed delimiter leaves, an unusable record stays")
+			helpers.assert_nil(document.hotstrings.terminator_states["custom_¤"])
+			helpers.assert_eq(document.hotstrings.terminator_states.comma, false)
 		end)
 	end)
 end)
@@ -201,7 +261,9 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 			helpers.assert_nil(marked["hotstrings.terminator_states.space"])
 			helpers.assert_true(outdated["hotstrings.terminator_states.retired"])
 			helpers.assert_true(outdated["hotstrings.terminator_states.space"])
-			helpers.assert_true(outdated["hotstrings.terminators"])
+			helpers.assert_nil(outdated["hotstrings.terminators"], "the usable delimiters are not offered")
+			helpers.assert_true(outdated["hotstrings.terminators.2"], "each unusable record is named")
+			helpers.assert_true(outdated["hotstrings.terminators.3"])
 			helpers.assert_true(Settings.adopt_configuration(document))
 			helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
 			helpers.assert_eq(Terminators.is_terminator_enabled("space"), shipped(Terminators, "space"))
@@ -221,6 +283,20 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 			for _, key in ipairs(scan.keys) do offered[table.concat(key.path, ".")] = true end
 			helpers.assert_nil(offered["hotstrings.terminator_states.slash"], "a read delimiter is kept")
 			helpers.assert_true(offered["hotstrings.terminator_states.retired"], "an unknown one is offered")
+		end)
+	end)
+
+	helpers.it("keeps a list holding one unusable delimiter out of the cleanup", function()
+		local stored = '[hotstrings]\nterminators = [{ key = "custom_¤", char = "¤", label = "¤", consume = true }, '
+			.. '{ key = "custom_comma", char = ",", label = ",", consume = false }]\n'
+		with_settings(stored, function(_, path)
+			package.loaded["ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			for _, key in ipairs(scan.keys) do
+				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.terminators",
+					"the cleanup would delete the usable delimiter with the unusable one")
+			end
 		end)
 	end)
 end)

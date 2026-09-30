@@ -20,10 +20,14 @@
 --- 2. Sparse against the catalogue. A delimiter back on its default leaves no
 ---    key, so a catalogue default changed by a later build reaches every user
 ---    who never touched that delimiter.
---- 3. Outdated entries warn, never refuse. A state for an unknown key, a
+--- 3. Only what the menu changed is written. A save compares the catalogue with
+---    its state at the last read or write of config.toml and touches only the
+---    leaves that differ, so a hand edit since then and an outdated entry left
+---    for the cleanup survive an unrelated change.
+--- 4. Outdated entries warn, never refuse. A state for an unknown key, a
 ---    non-boolean value or an unusable custom record is reported once through
 ---    the shared rule, read as absent and left for the config cleanup.
---- 4. Scope ownership. The hotstrings scope adopts its candidate document here
+--- 5. Scope ownership. The hotstrings scope adopts its candidate document here
 ---    and restores the exact runtime snapshot on rollback; ordinary writes wait
 ---    while it holds the hotstring preferences.
 --- ==============================================================================
@@ -47,6 +51,13 @@ local CUSTOM_PATH = { "hotstrings", "terminators" }
 
 -- A delimiter the user adds is on when created (add_custom_terminator).
 local CUSTOM_DEFAULT = true
+
+-- The fields of one custom delimiter record, in the order they are compared.
+local RECORD_FIELDS = { "key", "char", "label", "consume" }
+
+-- The catalogue's settings at the last read or write of config.toml; nil until
+-- the first read, when no save can know what the menu changed.
+local _synced = nil
 
 
 
@@ -104,7 +115,9 @@ local function keep_usable(states, custom, reject, mark)
 	for index, record in ipairs(custom or {}) do
 		local detail = custom_refusal(record, shipped, keys, chars)
 		if detail then
-			reject(CUSTOM_PATH, "delimiter " .. index .. ": " .. detail)
+			-- The record alone: reporting the list would offer every delimiter in
+			-- it, the usable ones included, to the cleanup.
+			reject({ CUSTOM_PATH[1], CUSTOM_PATH[2], index }, detail)
 		else
 			keys[record.key], chars[record.char] = true, true
 			settings.custom[#settings.custom + 1] = { key = record.key, char = record.char, label = record.label,
@@ -210,6 +223,11 @@ local function apply(settings)
 	return Terminators.set_terminators_enabled(changes) == true
 end
 
+--- Records the catalogue as config.toml now holds it, for the next save.
+local function mark_synced()
+	_synced = M.snapshot()
+end
+
 --- The catalogue's current settings, every delimiter's state included.
 --- @return table snapshot { states = key -> boolean, custom = records }
 function M.snapshot()
@@ -233,12 +251,15 @@ function M.load()
 	local called, settings = pcall(function() return resolve((read())) end)
 	if not called then
 		Logger.error(LOG, "Word-delimiter settings were not loaded: %s.", tostring(settings))
+		mark_synced()
 		return false
 	end
 	if not apply(settings) then
 		Logger.error(LOG, "The word-delimiter catalogue refused the configured settings.")
+		mark_synced()
 		return false
 	end
+	mark_synced()
 	local count = 0
 	for _ in pairs(settings.states) do count = count + 1 end
 	Logger.info(LOG, "Loaded %d word-delimiter state(s) and %d custom delimiter(s).", count, #settings.custom)
@@ -258,6 +279,7 @@ function M.adopt_configuration(document)
 		Logger.error(LOG, "The word-delimiter catalogue refused the candidate settings.")
 		return false
 	end
+	mark_synced()
 	return true
 end
 
@@ -268,7 +290,9 @@ function M.restore_configuration(snapshot)
 	if type(snapshot) ~= "table" or type(snapshot.states) ~= "table" or type(snapshot.custom) ~= "table" then
 		return false
 	end
-	return apply(snapshot)
+	if not apply(snapshot) then return false end
+	mark_synced()
+	return true
 end
 
 --- Marks the delimiter settings the owner reads, for the unused-key cleanup.
@@ -308,42 +332,64 @@ end
 -- =========================================
 -- =========================================
 
---- Whether two custom lists hold the same records in the same order.
---- @param left any Stored value.
---- @param right table Records.
+--- Whether two custom delimiter records are the same.
+--- @param left any
+--- @param right any
 --- @return boolean
-local function same_records(left, right)
-	if type(left) ~= "table" or #left ~= #right then return false end
-	for index, record in ipairs(right) do
-		local other = left[index]
-		if type(other) ~= "table" then return false end
-		for _, field in ipairs({ "key", "char", "label", "consume" }) do
-			if other[field] ~= record[field] then return false end
-		end
+local function same_record(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then return false end
+	for _, field in ipairs(RECORD_FIELDS) do
+		if left[field] ~= right[field] then return false end
 	end
 	return true
 end
 
---- The leaf operations that make a document hold the catalogue's settings.
---- @param document table Decoded config.toml.
---- @return table operations LeafRows operations.
-local function plan(document)
-	local current, shipped = M.snapshot(), builtins()
-	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
-	local stored = type(hotstrings.terminator_states) == "table" and hotstrings.terminator_states or {}
-	local owned, operations = {}, {}
-	for key in pairs(current.states) do owned[key] = true end
-	-- A custom delimiter the user removed still owns the state it left behind.
-	for _, record in ipairs(type(hotstrings.terminators) == "table" and hotstrings.terminators or {}) do
-		if type(record) == "table" and type(record.key) == "string" and record.key ~= "" then owned[record.key] = true end
+--- Whether a stored custom list already holds these entries, in order.
+--- @param stored any Stored value.
+--- @param list table Entries to write.
+--- @return boolean
+local function same_list(stored, list)
+	if type(stored) ~= "table" or #stored ~= #list then return false end
+	for index, entry in ipairs(list) do
+		if stored[index] ~= entry and not same_record(stored[index], entry) then return false end
 	end
-	local keys = {}
-	for key in pairs(owned) do keys[#keys + 1] = key end
+	return true
+end
+
+--- Indexes custom delimiter records by key.
+--- @param records table
+--- @return table
+local function by_key(records)
+	local out = {}
+	for _, record in ipairs(records) do out[record.key] = record end
+	return out
+end
+
+--- The leaf operations that write what changed in the catalogue since config.toml
+--- was last read or written, and nothing else.
+--- @param document table Decoded config.toml as it is now.
+--- @param current table The catalogue now (M.snapshot()).
+--- @param synced table The catalogue at the last sync.
+--- @return table operations LeafRows operations.
+local function plan(document, current, synced)
+	local shipped = builtins()
+	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
+	local stored_states = type(hotstrings.terminator_states) == "table" and hotstrings.terminator_states or {}
+	local operations, keys, seen = {}, {}, {}
+	for _, states in ipairs({ current.states, synced.states }) do
+		for key in pairs(states) do
+			if not seen[key] and current.states[key] ~= synced.states[key] then
+				seen[key] = true
+				keys[#keys + 1] = key
+			end
+		end
+	end
 	table.sort(keys)
 	for _, key in ipairs(keys) do
+		-- A removed user delimiter takes its state with it; a default leaves no key.
 		local wanted = current.states[key]
 		if wanted == default_for(key, shipped) then wanted = nil end
-		if stored[key] ~= wanted then
+		if stored_states[key] ~= wanted then
 			local path = { STATES_PATH[1], STATES_PATH[2], key }
 			if wanted == nil then
 				operations[#operations + 1] = { path = path, delete = true }
@@ -352,16 +398,43 @@ local function plan(document)
 			end
 		end
 	end
-	if #current.custom == 0 then
-		if hotstrings.terminators ~= nil then operations[#operations + 1] = { path = CUSTOM_PATH, delete = true } end
-	elseif not same_records(hotstrings.terminators, current.custom) then
-		operations[#operations + 1] = { path = CUSTOM_PATH, value = current.custom }
+	local was, now = by_key(synced.custom), by_key(current.custom)
+	local changed = #synced.custom ~= #current.custom
+	for _, record in ipairs(current.custom) do
+		if not same_record(was[record.key], record) then changed = true end
+	end
+	if not changed then return operations end
+	local stored = hotstrings.terminators
+	local listed = type(stored) == "table" and (next(stored) == nil or #stored > 0)
+	local list, placed = {}, {}
+	for _, entry in ipairs(listed and stored or {}) do
+		local key = type(entry) == "table" and entry.key or nil
+		if type(key) == "string" and was[key] then
+			-- A delimiter the catalogue holds: dropped if the menu removed it,
+			-- rewritten if the menu changed it, otherwise kept as written.
+			if now[key] and not placed[key] then
+				list[#list + 1] = same_record(was[key], now[key]) and entry or now[key]
+				placed[key] = true
+			end
+		else
+			-- An unusable record, or one added by hand since, stays as written.
+			list[#list + 1] = entry
+			if type(key) == "string" then placed[key] = true end
+		end
+	end
+	for _, record in ipairs(current.custom) do
+		if not placed[record.key] and not same_record(was[record.key], record) then list[#list + 1] = record end
+	end
+	if #list == 0 then
+		if stored ~= nil then operations[#operations + 1] = { path = CUSTOM_PATH, delete = true } end
+	elseif not same_list(stored, list) then
+		operations[#operations + 1] = { path = CUSTOM_PATH, value = list }
 	end
 	return operations
 end
 
---- Publishes the catalogue's current settings to config.toml, sparsely and
---- only over the exact bytes they were prepared from.
+--- Publishes what the menu changed in the catalogue since config.toml was last
+--- read or written, sparsely and only over the exact bytes it was prepared from.
 --- @return boolean committed
 function M.persist()
 	-- The hotstrings scope owns these leaves while it holds the preferences.
@@ -369,9 +442,14 @@ function M.persist()
 		Logger.error(LOG, "Word-delimiter settings refused: a hotstring configuration scope is still pending.")
 		return false
 	end
+	if _synced == nil then
+		Logger.error(LOG, "Word-delimiter settings refused: they were never read from config.toml.")
+		return false
+	end
+	local current = M.snapshot()
 	local called, committed, detail = pcall(function()
 		local document, source = read()
-		local operations = plan(document)
+		local operations = plan(document, current, _synced)
 		if #operations == 0 then return true end
 		local rows = LeafRows.prepare(source.content or "", operations)
 		local directory = file():match("^(.*)/[^/]+$")
@@ -384,6 +462,7 @@ function M.persist()
 		Logger.error(LOG, "Word-delimiter settings were not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
+	_synced = current
 	return true
 end
 
