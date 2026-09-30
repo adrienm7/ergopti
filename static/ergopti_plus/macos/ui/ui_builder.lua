@@ -633,6 +633,10 @@ function M.show_webview(opts)
 		Logger.error(LOG, "WebView factory refused a window level: windows are focused, never kept on top.")
 		return nil
 	end
+	if opts.allow_text_entry ~= nil then
+		Logger.error(LOG, "WebView factory refused allow_text_entry: every window must become key when clicked.")
+		return nil
+	end
 	if opts.chrome ~= nil and (opts.chrome ~= M.PERMISSION_DIALOG_CHROME or opts.focus ~= false) then
 		Logger.error(LOG, "WebView factory refused chrome '%s': only the permission dialog floats, unfocused.",
 			tostring(opts.chrome))
@@ -735,8 +739,11 @@ function M.show_webview(opts)
 	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
 		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
 	end
+	-- Hammerspoon's webview window becomes key only while it allows text entry
+	-- (libwebview.m canBecomeKeyWindow): without it a click never brings the
+	-- window of the inactive app in front, and the window stays buried.
 	if not apply_webview_mutation(function()
-		wv:allowTextEntry(opts.allow_text_entry ~= false)
+		wv:allowTextEntry(true)
 	end) then return abandon_required_mutation() end
 	
 	if not apply_webview_mutation(function()

@@ -269,6 +269,17 @@ lease ACK timeout fenced the live lease ("timeout waiting for PONG 159") until
 a timeout that fires late got one grace of running time to read the pipe
 (`lease-parked-run-loop`).
 
+### project-hs-webview-becomes-key-only-with-text-entry
+
+A Hammerspoon webview window becomes key only while it allows text entry
+(`libwebview.m`: `canBecomeKeyWindow` returns `allowKeyboardEntry`, off by
+default). A window that cannot become key does not activate the app when
+clicked, so a window of the inactive Hammerspoon app stays behind the user's
+windows however often it is clicked: the error window "never came to the
+front". Every window allows text entry; the factory refuses
+`allow_text_entry` and `tests/meta/test_windows_become_key.lua` forbids
+turning it off (`windows-become-key`).
+
 ### project-karabiner-cli-reads-no-user-variables
 
 `karabiner_cli` can set variables (`--set-variables`) but has no option to
