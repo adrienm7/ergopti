@@ -233,6 +233,18 @@ that scan code, and let variant order decide precedence
 (`test_llm_tab_accepts_visible_prediction.ahk`). The registrar resolves named
 keys on the VK axis, so a user chord on Tab is exposed to the same shadow.
 
+### project-llm-nav-cycle-routes-pass-through
+
+The native navigation owner's plan validation (NavPlanIsValid) requires every
+cycle route to pass its key on, and changing that means rebuilding
+`ergopti_nav_owner.dll` with MSVC. Up and Down therefore moved the caret behind
+the tooltip while cycling it. The AutoHotkey hook, next in the chain, now
+consumes the chord (`*Up`/`*Down` in `menu_llm/tab_accept.ahk`, criterion
+`LLM_Menu_NavCycleChordIsOwned`). Action: keep that criterion in lockstep with
+the native route (same committed plan entry, #InputLevel 1, exact modifiers,
+owner routing a multi-slot record); when the DLL is next rebuilt, suppress cycle
+routes natively and retire the AHK swallowers.
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a
