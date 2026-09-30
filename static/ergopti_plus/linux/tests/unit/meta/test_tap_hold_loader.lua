@@ -73,6 +73,35 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_eq(loaded.keys.left_shift.enabled, false)
 	end)
 
+	helpers.it("warns once about a key or field it does not have, and applies the rest (config-outdated-tap-hold)", function()
+		local Logger = require("logger.shim")
+		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local path = os.tmpname()
+		local ok, err = pcall(function()
+			local fh = assert(io.open(path, "w"))
+			fh:write(require("tests.support.tap_hold_fixture").with_preset(
+				'[tap_hold.keys.retired_key]\nhold_layer = "nav"\n'
+					.. '[tap_hold.keys.left_shift]\nretired_field = 1\ntime_activation_seconds = 0.3\n'))
+			fh:close()
+			local loaded = Config.load(DEFAULTS, path)
+			helpers.assert_nil(loaded.keys.retired_key, "a key the engine cannot remap is left out")
+			helpers.assert_nil(loaded.keys.left_shift.retired_field, "an unknown field is left out")
+			helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.3, "the rest of the key applies")
+			helpers.assert_eq(errors, {}, "outdated entries are never an ERROR")
+			local text = table.concat(warnings, "\n")
+			helpers.assert_eq(#warnings, 2, text)
+			helpers.assert_contains(text, "'tap_hold.keys.retired_key' in '" .. path .. "'")
+			helpers.assert_contains(text, "'tap_hold.keys.left_shift.retired_field' in '" .. path .. "'")
+			Config.load(DEFAULTS, path)
+			helpers.assert_eq(#warnings, 2, "a reload does not name them again")
+		end)
+		Logger.error, Logger.warn = real_error, real_warn
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
@@ -102,13 +131,15 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 		return codes
 	end
 
-	--- Loads `hold_modifier = value` on AltGr and captures the errors logged.
+	--- Loads `hold_modifier = value` on AltGr and captures the errors and
+	--- warnings logged.
 	local function load_hold(field, value)
 		local Logger = require("logger.shim")
-		local real_error, errors = Logger.error, {}
+		local real_error, real_warn, errors = Logger.error, Logger.warn, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		Logger.warn = Logger.error
 		local ok, loaded = pcall(load, '[tap_hold.keys.alt_gr]\n' .. field .. ' = "' .. value .. '"\n')
-		Logger.error = real_error
+		Logger.error, Logger.warn = real_error, real_warn
 		if not ok then error(loaded, 0) end
 		return loaded, errors
 	end
@@ -169,24 +200,27 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 	-- Windows (ResolveHoldModifierKey) drops such a hold and keeps the tap: a
 	-- CapsLock with an unknown hold still types Enter there, and here it went
 	-- back to toggling Caps Lock (unknown-hold-keeps-tap).
-	helpers.it("refuses an unknown modifier or layer loudly, and keeps the key's tap (unknown-hold-keeps-tap)", function()
+	helpers.it("warns once about an unknown modifier or layer, and keeps the key's tap (unknown-hold-keeps-tap)", function()
 		for _, case in ipairs({
 			{ "hold_modifier", "hyper" }, { "hold_modifier", "ctrl+alt gr" }, { "hold_modifier", "none" },
 			{ "hold_layer", "sym" },
 		}) do
 			local Logger = require("logger.shim")
-			local real_error, errors = Logger.error, {}
+			local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			local ok, loaded = pcall(load, '[tap_hold.keys.caps_lock]\n' .. case[1] .. ' = "' .. case[2] .. '"\n')
-			Logger.error = real_error
+			Logger.error, Logger.warn = real_error, real_warn
 			if not ok then error(loaded, 0) end
 			local caps = loaded.keys.caps_lock
 			helpers.assert_true(caps.enabled ~= false, case[2] .. " leaves the key on")
 			helpers.assert_eq(caps.tap_action, "enter", case[2] .. " keeps the tap")
 			helpers.assert_nil(caps.hold_modifier, case[2] .. " holds no modifier")
 			helpers.assert_nil(caps.hold_layer, case[2] .. " holds no layer")
-			helpers.assert_eq(#errors, 1, case[2] .. " is reported")
-			helpers.assert_contains(errors[1], case[2])
+			helpers.assert_eq(errors, {}, case[2] .. " is an outdated value, never an ERROR")
+			helpers.assert_eq(#warnings, 1, case[2] .. " is reported")
+			helpers.assert_contains(warnings[1], case[2])
+			helpers.assert_contains(warnings[1], "tap_hold.keys.caps_lock." .. case[1])
 			local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, one_shot_timeout_ms = 2000,
 				key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end, })
 			-- A tap and no hold: Enter at key-down (tap-no-hold-instant), no Ctrl.
