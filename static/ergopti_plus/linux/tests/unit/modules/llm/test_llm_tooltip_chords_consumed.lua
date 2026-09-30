@@ -357,3 +357,59 @@ helpers.describe("prediction tooltip: the validation chord (llm-tooltip-chords-c
 		end
 	end)
 end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 5/ A Tap-Hold's Tab Is The User's Tab =======
+-- =====================================================
+-- =====================================================
+
+--- Every consume decision the hook asks for while typing `events` with the
+--- tap-hold engine holding `keys`.
+--- @return table details { code, mods }
+local function consumed_details(keys, events)
+	local Engine = require("platform.remap.tap_hold_engine")
+	local hook = helpers.load_module("adapters.keyboard_hook")
+	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, one_shot_timeout_ms = 2000 }))
+	local details = {}
+	local ok, err = pcall(hook._test_drive, events, {
+		onConsume = function(detail)
+			details[#details + 1] = { code = detail.code, mods = detail.mods }
+			return false
+		end,
+		onEmitRaw = function() return true end,
+	}, true)
+	hook.set_remapper(nil)
+	if not ok then error(err, 0) end
+	return details
+end
+
+helpers.describe("prediction tooltip: a tap-hold's Tab (llm-accept-inserts)", function()
+	helpers.it("(llm-accept-inserts) the engine's AltGr Tab tap asks the tooltip as a bare physical Tab does", function()
+		-- The shipped tap-holds tap Tab with AltGr. The engine dispatches its tap
+		-- as the key it emits, so the tooltip receives the same bare Tab and
+		-- accepts or leaves it exactly as it does the Tab key's.
+		local KEYS = { alt_gr = { tap_action = "tab", hold_modifier = "alt_gr",
+			time_activation_seconds = 10 } }
+		local from_tap = consumed_details(KEYS, {
+			{ type = EV_KEY, code = EvdevCodes.KEY_RIGHTALT, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_RIGHTALT, value = 0 },
+		})
+		local tabs = {}
+		for _, detail in ipairs(from_tap) do
+			if detail.code == EvdevCodes.KEY_TAB then tabs[#tabs + 1] = detail end
+		end
+		helpers.assert_eq(#tabs, 1, "the AltGr tap must reach the tooltip as one Tab press")
+		local from_key = consumed_details({}, {
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 },
+		})
+		helpers.assert_eq(#from_key, 1)
+		helpers.assert_eq(tabs[1].mods, from_key[1].mods,
+			"with nothing held, the tapped Tab carries the physical Tab's (empty) modifiers")
+	end)
+end)
