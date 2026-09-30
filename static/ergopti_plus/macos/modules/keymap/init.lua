@@ -1194,9 +1194,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- The physical magic key: a plain press of the chosen key types the magic key.
 	-- The event itself carries it from here, so the one-shot Shift, the buffer and
 	-- the application all see the magic key, in ignored and secure windows too,
-	-- like a key of the layout. Every other key pays one integer compare: the
-	-- flags are read only for the chosen key.
-	if keyCode == MagicKeySource.keycode()
+	-- like a key of the layout. Every other key pays one table lookup: the flags
+	-- are read only for the chosen key (either keycode of an ISO-swapped key).
+	if MagicKeySource.owns(keyCode)
 		and MagicKeySource.remaps(keyCode, e:getFlags(), magic_key_replace_on) then
 		e:setUnicodeString(CoreState.magic_key)
 	end

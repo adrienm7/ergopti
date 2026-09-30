@@ -193,7 +193,10 @@ injection. Menus and bridges consume those defaults rather than redeclaring them
 
 `hotstrings.magic_key_source` names the physical magic key on every driver by
 its KeyboardEvent.code, resolved through the physical-key tables (scan code,
-macOS keycode in nav_layer's ISO form, evdev code). Its default `auto` means
+macOS keycode as the tap sees it behind Karabiner's ANSI virtual keyboard,
+evdev code). Backquote and IntlBackslash answer to both keycodes a bare ISO
+board swaps them to, as the tap keys do; never read the tap in nav_layer's ISO
+form, which names Karabiner's input side. Its default `auto` means
 the layout owns the key: Windows keeps its declared, detected, then shipped
 Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
 OS layouts already type the magic key on KeyC. Action: add a candidate only
