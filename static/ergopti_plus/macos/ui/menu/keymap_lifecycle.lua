@@ -71,6 +71,32 @@ function M.ensure_started(ctx, reason)
 	return true
 end
 
+--- Stops key capture, the Hotstrings master's off posture: no hotstring of any
+--- category, personal or dynamic, can expand without the engine's taps. The
+--- switch is published off only after modules.keymap.stop() returned exact
+--- true; a refused teardown keeps it on, since the engine may still type.
+--- @param ctx table Context containing `state` and `keymap`.
+--- @param reason string|nil Diagnostic action label.
+--- @return boolean committed True only after keymap.stop() returned true.
+function M.ensure_stopped(ctx, reason)
+	if type(ctx) ~= "table" or type(ctx.state) ~= "table"
+		or type(ctx.keymap) ~= "table" or type(ctx.keymap.stop) ~= "function" then
+		Logger.error(LOG, "Keymap stop refused (%s): keymap.stop is unavailable.",
+			tostring(reason or "menu action"))
+		notify_mutation_failure()
+		return false
+	end
+	local ok, result = xpcall(ctx.keymap.stop, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Keymap stop refused (%s): stop did not commit (%s).",
+			tostring(reason or "menu action"), tostring(result))
+		notify_mutation_failure()
+		return false
+	end
+	ctx.state.keymap = false
+	return true
+end
+
 --- Runs a registry mutation and publishes UI state only after exact true.
 --- @param ctx table Menu context.
 --- @param reason string|nil Diagnostic action label.
