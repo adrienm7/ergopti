@@ -202,7 +202,6 @@ function M.open(ctx)
 		title = i18n.get("update_check.window_title"),
 		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
 		usercontent = uc,
-		allow_text_entry = false,
 		allow_new_windows = false,
 		assets_dir = (Paths.shared("ui/update_check") or "") .. "/",
 		on_close = function()

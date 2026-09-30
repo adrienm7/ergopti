@@ -20,8 +20,9 @@
 --- 3. The window is presented like every Ergopti window (ui_builder.force_focus):
 ---    raised and focused when it opens, never given a level (maintainer rule,
 ---    2026-09-29). AppKit keeps a window of the inactive Hammerspoon app behind
----    the user's key window, so show() alone left the error invisible. The page
----    still never takes text entry (allowTextEntry is off).
+---    the user's key window, so show() alone left the error invisible. It
+---    allows text entry because a Hammerspoon webview becomes key only then:
+---    with it off, a click never brought the buried window back in front.
 --- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
@@ -383,7 +384,7 @@ local function open_window(record)
 	end
 	local i18n = require("infra.i18n")
 	pcall(function() webview:windowTitle(ui_builder.window_title(i18n.get("common.error_title"))) end)
-	pcall(function() webview:allowTextEntry(false) end)
+	pcall(function() webview:allowTextEntry(true) end)
 	pcall(function() webview:allowNewWindows(false) end)
 	pcall(function() webview:allowGestures(false) end)
 	pcall(function()
