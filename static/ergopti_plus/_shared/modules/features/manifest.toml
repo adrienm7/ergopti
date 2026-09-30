@@ -4959,6 +4959,15 @@ type = "feature"
 path = "hotstrings.magic_key.replace"
 i18n = "menu.layout.replace"
 
+# The physical key the replace switch above turns into the magic key
+# (hotstrings.magic_key_source), on every driver: one row naming the key in
+# effect, whose submenu captures the next key pressed, restores the automatic
+# key or lists every candidate. A `list`, because each candidate is labelled
+# with what the user's own layout types on it, which only the driver can ask.
+[[menu.layout_menu]]
+type = "list"
+id = "magic_key_source"
+
 [[menu.layout_menu]]
 type = "feature"
 path = "layout.ctrl_magic_save"

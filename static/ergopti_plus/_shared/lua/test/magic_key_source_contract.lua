@@ -48,6 +48,49 @@ return function(helpers, Source, fixture)
 			end
 		end)
 
+		helpers.it("(magic-key-source) the menu rows capture, restore automatic and list every candidate", function()
+			local calls = {}
+			local function t(key) return "<" .. key .. ">" end
+			local rows = Source.menu_rows(resolver, {
+				t = t,
+				current = "KeyJ",
+				key_text = function(code) return code == "KeyJ" and "j" or nil end,
+				choose = function(value) calls[#calls + 1] = value end,
+				capture = function() calls[#calls + 1] = "capture" end,
+			})
+			helpers.assert_eq(#rows, 1, "one row names the key in effect")
+			helpers.assert_eq(rows[1].label, "<menu.layout.magic_key_source> : j   (KeyJ)")
+			local items = rows[1].items
+			helpers.assert_eq(items[1].label, "<menu.layout.magic_key_source.capture>")
+			helpers.assert_true(items[2].separator)
+			helpers.assert_eq(items[3].label, "<menu.layout.magic_key_source.auto>")
+			helpers.assert_eq(items[3].checked, false)
+			helpers.assert_true(items[4].separator)
+			local codes = resolver.candidates()
+			helpers.assert_eq(#items, #codes + 4, "every candidate is listed once")
+			for index, code in ipairs(codes) do
+				local item = items[index + 4]
+				helpers.assert_eq(item.checked, code == "KeyJ", code)
+				helpers.assert_eq(item.label, code == "KeyJ" and "j   (KeyJ)" or code, code)
+			end
+			items[1].action()
+			items[3].action()
+			items[5].action()
+			helpers.assert_eq(calls, { "capture", resolver.automatic, codes[1] })
+
+			local idle = Source.menu_rows(resolver, {
+				t = t,
+				current = resolver.automatic,
+				key_text = function() error("the layout cannot answer") end,
+				choose = function() end,
+			})
+			helpers.assert_eq(idle[1].label, "<menu.layout.magic_key_source> : <menu.layout.magic_key_source.auto>")
+			helpers.assert_true(idle[1].items[1].disabled, "no capture: its row is greyed")
+			helpers.assert_nil(idle[1].items[1].action)
+			helpers.assert_true(idle[1].items[3].checked, "the automatic key is ticked")
+			helpers.assert_eq(idle[1].items[5].label, codes[1], "a layout that cannot answer shows the code")
+		end)
+
 		helpers.it("(magic-key-source) refuses a manifest or registry it cannot trust", function()
 			local function refused(opts)
 				return not pcall(Source.new, opts)
