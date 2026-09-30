@@ -96,6 +96,24 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		helpers.assert_eq(calls.toggle, 1, "the row must reach llm.toggle")
 		helpers.assert_eq(changed.count, 1, "the tray must be rebuilt so the label follows the state")
 	end)
+
+	-- ai-menu-no-clear: « Tout effacer (comportement du système) » sat under the
+	-- switch and cleared a section with nothing for the system to do in its
+	-- place; the maintainer retired it. « Restaurer les valeurs conseillées »
+	-- stays the one row between the switch and the separator.
+	helpers.it("draws the restore row under the switch and no clear row", function()
+		local i18n = require("infra.i18n")
+		local rows = submenu_of(build(fake_llm(true)), "menu.llm.title")
+		helpers.assert_true(rows ~= nil and #rows > 3, "the AI submenu must be drawn")
+		helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"), "the restore row follows the switch")
+		helpers.assert_eq(type(rows[2].fn), "function", "the restore row must act")
+		helpers.assert_eq(rows[3].title, "-", "a separator closes the switch's group")
+		local clear = i18n.get("common.clear_to_system")
+		helpers.assert_true(clear ~= "common.clear_to_system", "the clear label must be translated to be looked for")
+		for index, row in ipairs(rows) do
+			helpers.assert_true(row.title ~= clear, "row " .. index .. " of the AI submenu is a clear row")
+		end
+	end)
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()

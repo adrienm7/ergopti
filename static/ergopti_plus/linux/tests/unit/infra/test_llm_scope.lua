@@ -250,62 +250,61 @@ helpers.describe("Linux terminal LLM scope", function()
 		end)
 	end)
 
-	for _, mode in ipairs({ "clear", "recommended" }) do
-		helpers.it("dispatches the real rendered " .. mode .. " command into the terminal owner", function()
-			with_scope(function(owner, engine, _, path)
-				local renderer = require("infra.manifest_menu")
-				local root = renderer.get_root()
-				local old_rows = root.llm_menu
-				local old_top = root.top_level
-				local old_builder = package.loaded["ui.menu.menu_builder"]
-				local execute = os.execute
-				local scope = require("infra.llm_scope")
-				local old_apply = scope.apply
-				local key = mode == "clear" and "common.clear_to_system" or "common.restore_recommended"
-				local id = mode == "clear" and "scope_clear" or "scope_restore"
-				local changed, questions = 0, 0
-				local ok, err = pcall(function()
-					-- Pending common declarations stay private to this renderer test.
-					root.llm_menu = {{ type = "command", id = id, i18n = key }}
-					root.top_level = {{ id = "llm" }}
-					os.execute = function(command)
-						if command:find("zenity --question", 1, true) then
-							questions = questions + 1
-							helpers.assert_contains(command, require("infra.i18n").get("menu.llm.title"))
-							return 0
-						end
-						if command:find("command -v zenity", 1, true) then return 0 end
-						return execute(command)
+	-- The AI menu offers the restore alone: its clear row was retired
+	-- (ai-menu-no-clear, test_llm_menu_toggle_row.lua).
+	helpers.it("dispatches the real rendered restore command into the terminal owner", function()
+		with_scope(function(owner, engine, _, path)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local old_rows = root.llm_menu
+			local old_top = root.top_level
+			local old_builder = package.loaded["ui.menu.menu_builder"]
+			local execute = os.execute
+			local scope = require("infra.llm_scope")
+			local old_apply = scope.apply
+			local key = "common.restore_recommended"
+			local changed, questions = 0, 0
+			local ok, err = pcall(function()
+				-- Pending common declarations stay private to this renderer test.
+				root.llm_menu = {{ type = "command", id = "scope_restore", i18n = key }}
+				root.top_level = {{ id = "llm" }}
+				os.execute = function(command)
+					if command:find("zenity --question", 1, true) then
+						questions = questions + 1
+						helpers.assert_contains(command, require("infra.i18n").get("menu.llm.title"))
+						return 0
 					end
-					scope.apply = function(selected) return owner.apply(selected) end
-					package.loaded["ui.menu.menu_builder"] = nil
-					local rows = require("ui.menu.menu_builder").build({ llm = engine,
-						on_menu_changed = function() changed = changed + 1 end })
-					local action
-					local function find(items)
-						for _, row in ipairs(items) do
-							if row.title == require("infra.i18n").get(key) then action = row.fn end
-							if row.menu then find(row.menu) end
-						end
+					if command:find("command -v zenity", 1, true) then return 0 end
+					return execute(command)
+				end
+				scope.apply = function(selected) return owner.apply(selected) end
+				package.loaded["ui.menu.menu_builder"] = nil
+				local rows = require("ui.menu.menu_builder").build({ llm = engine,
+					on_menu_changed = function() changed = changed + 1 end })
+				local action
+				local function find(items)
+					for _, row in ipairs(items) do
+						if row.title == require("infra.i18n").get(key) then action = row.fn end
+						if row.menu then find(row.menu) end
 					end
-					local llm_label = require("infra.i18n").get("menu.llm.title")
-					for _, row in ipairs(rows) do
-						if row.menu and row.title:find(llm_label, 1, true) then find(row.menu) end
-					end
-					helpers.assert_eq(type(action), "function")
-					action()
-					helpers.assert_eq(changed, 1)
-					-- Only the clear asks (restore-recommended-no-confirm).
-					helpers.assert_eq(questions, mode == "clear" and 1 or 0)
-					helpers.assert_eq(engine.is_enabled(), mode == "recommended")
-					helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.unknown, "keep")
-				end)
-				root.llm_menu, root.top_level, scope.apply, os.execute = old_rows, old_top, old_apply, execute
-				package.loaded["ui.menu.menu_builder"] = old_builder
-				if not ok then error(err, 0) end
+				end
+				local llm_label = require("infra.i18n").get("menu.llm.title")
+				for _, row in ipairs(rows) do
+					if row.menu and row.title:find(llm_label, 1, true) then find(row.menu) end
+				end
+				helpers.assert_eq(type(action), "function")
+				action()
+				helpers.assert_eq(changed, 1)
+				-- A restore never asks (restore-recommended-no-confirm).
+				helpers.assert_eq(questions, 0)
+				helpers.assert_eq(engine.is_enabled(), true)
+				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.unknown, "keep")
 			end)
+			root.llm_menu, root.top_level, scope.apply, os.execute = old_rows, old_top, old_apply, execute
+			package.loaded["ui.menu.menu_builder"] = old_builder
+			if not ok then error(err, 0) end
 		end)
-	end
+	end)
 end)
 
 helpers.describe("Linux terminal LLM scope revert", function()
