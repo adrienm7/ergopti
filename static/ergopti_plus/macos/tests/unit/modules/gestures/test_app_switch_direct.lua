@@ -14,67 +14,18 @@
 --- nothing and a quick double tap left the switcher open on screen. The action
 --- must focus the previous application's window itself, with no keystroke, and
 --- the screen-scoped twin must keep to the screen under the cursor. A posted
---- Cmd+Shift+Tab (cmd_shift_tab) failed the same way.
+--- Cmd+Shift+Tab (cmd_shift_tab) failed the same way, and a posted Cmd+`
+--- (the active application's windows) needs a layout carrying a backquote.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.gesture_actions_fixture")
 local it = Fixture.it
 
--- Stable process ids of the desk. OWN is this runtime.
-local FRONT, OTHER, THIRD, OWN = 101, 202, 303, 909
-local LEFT_SCREEN, RIGHT_SCREEN = 1, 2
-
-local INJECTED = {
-	"adapters.window_manager",
-	"adapters.mouse_control",
-	"modules.gestures.app_switch",
-}
-
---- Serves a desk of windows to the switch and records every focus request.
---- @param desk table { front, cursor_screen, windows = { record... } }, front to back.
---- @param body function body(focused) runs with the desk installed.
-local function with_desk(desk, body)
-	local saved = {}
-	for _, name in ipairs(INJECTED) do saved[name] = package.loaded[name] end
-	local focused = {}
-	package.loaded["adapters.window_manager"] = {
-		ordered_windows = function()
-			local copy = {}
-			for index, record in ipairs(desk.windows) do copy[index] = record end
-			return copy
-		end,
-		frontmost_pid = function() return desk.front end,
-		own_pid = function() return OWN end,
-		focus_window = function(record)
-			focused[#focused + 1] = record.id
-			return record.refuses_focus ~= true
-		end,
-	}
-	package.loaded["adapters.mouse_control"] = {
-		screen_id_under_cursor = function() return desk.cursor_screen end,
-	}
-	package.loaded["modules.gestures.app_switch"] = nil
-	local ok, err = xpcall(body, debug.traceback, focused)
-	for _, name in ipairs(INJECTED) do package.loaded[name] = saved[name] end
-	if not ok then error(err, 0) end
-end
-
---- @return table A standard, visible window record.
-local function window(id, pid, screen_id, extra)
-	local record = { id = id, pid = pid, screen_id = screen_id, standard = true, minimized = false }
-	for key, value in pairs(extra or {}) do record[key] = value end
-	return record
-end
-
---- Dispatches one action like a tap and fires what it scheduled.
---- @return boolean accepted, table calls
-local function tap(fresh_actions, action, binding)
-	local actions, calls = fresh_actions()
-	local accepted = actions.execute_single(action, binding or "tap_3")
-	for _, entry in ipairs(calls.after) do calls.fire(entry.token) end
-	return accepted, calls
-end
+local Desk = require("tests.support.app_switch_desk")
+local with_desk, window, tap = Desk.with_desk, Desk.window, Desk.tap
+local FRONT, OTHER, THIRD, OWN = Desk.FRONT, Desk.OTHER, Desk.THIRD, Desk.OWN
+local LEFT_SCREEN, RIGHT_SCREEN = Desk.LEFT_SCREEN, Desk.RIGHT_SCREEN
 
 --- The desk of the maintainer's report: the frontmost application on the left
 --- screen, the previous one on the right screen, an older one on the left.
@@ -103,15 +54,8 @@ helpers.describe("previous application switches directly (app-switch-direct)", f
 			end)
 		end)
 
-	it("(app-switch-direct) app_switcher takes the same direct path, with no synthetic Cmd+Tab",
-		function(fresh_actions)
-			with_desk(two_screen_desk(LEFT_SCREEN), function(focused)
-				local accepted, calls = tap(fresh_actions, "app_switcher")
-				helpers.assert_eq(accepted, true)
-				helpers.assert_eq(#calls.keys, 0, "app_switcher posted the same dead Cmd+Tab")
-				helpers.assert_eq(focused, { 22 })
-			end)
-		end)
+	-- app_switcher posted the same Cmd+Tab; macOS no longer offers it, and a
+	-- stored one becomes app_previous (test_app_switch_labels.lua).
 
 	it("(app-switch-direct) app_previous_screen keeps to the screen under the cursor",
 		function(fresh_actions)
@@ -192,6 +136,49 @@ helpers.describe("previous application switches directly (app-switch-direct)", f
 				helpers.assert_eq(#calls.keys, 0, "a posted Cmd+Shift+Tab switched nothing either")
 				helpers.assert_eq(focused, { 33 },
 					"the least recent application, through its frontmost window")
+			end)
+		end)
+
+	--- Three windows of the active application, the middle one focused.
+	local function app_windows_desk(focused)
+		return {
+			front = FRONT,
+			focused = focused,
+			cursor_screen = LEFT_SCREEN,
+			windows = {
+				window(52, FRONT, LEFT_SCREEN),
+				window(22, OTHER, LEFT_SCREEN),
+				window(51, FRONT, LEFT_SCREEN),
+				window(55, FRONT, RIGHT_SCREEN, { minimized = true }),
+				window(53, FRONT, LEFT_SCREEN, { standard = false }),
+				window(54, FRONT, RIGHT_SCREEN),
+			},
+		}
+	end
+
+	it("(app-switch-direct) win_app_next and win_app_prev cycle the active app's windows with no keystroke",
+		function(fresh_actions)
+			with_desk(app_windows_desk(52), function(focused)
+				local accepted, calls = tap(fresh_actions, "win_app_next")
+				helpers.assert_eq(accepted, true)
+				helpers.assert_eq(#calls.keys, 0, "a posted Cmd+` depends on the layout carrying a backquote")
+				helpers.assert_eq(focused, { 54 }, "creation order, passing over minimised and non-standard windows")
+			end)
+			with_desk(app_windows_desk(52), function(focused)
+				tap(fresh_actions, "win_app_prev")
+				helpers.assert_eq(focused, { 51 })
+			end)
+		end)
+
+	it("(app-switch-direct) the window cycle wraps around and starts at an edge from a panel",
+		function(fresh_actions)
+			with_desk(app_windows_desk(54), function(focused)
+				tap(fresh_actions, "win_app_next")
+				helpers.assert_eq(focused, { 51 }, "past the last window comes the first")
+			end)
+			with_desk(app_windows_desk(53), function(focused)
+				tap(fresh_actions, "win_app_prev")
+				helpers.assert_eq(focused, { 54 }, "a focused panel is no listed window")
 			end)
 		end)
 

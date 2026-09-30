@@ -148,6 +148,19 @@ The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never
 in a read-only session.
 
+### project-action-id-migration-is-per-key
+
+Retiring an action id stored in config.toml needs one `map_value` op per key
+that can hold it, since the op set has no section-wide map. Every driver
+parses the whole registry at every boot: measured with the pure-Lua
+`toml_codec` (Lua 5.4), the 17 KB registry took 36 ms and v5_to_v6's 42 ops
+of six pairs doubled it to 77 ms; listing macOS's 200 keyboard-slot keys as
+well would have added about 250 ms. v5_to_v6 therefore covers gesture slots,
+tap keys and script-control keys only, and a keyboard slot naming a retired
+id is reported as outdated. Action: before retiring more stored ids, add a
+section-wide map op to all three interpreters (with Windows runtime tests)
+rather than enumerating keys.
+
 ### project-outdated-config-entries-warn-never-refuse
 
 An unknown, retired or outdated config.toml entry (a removed key, a value

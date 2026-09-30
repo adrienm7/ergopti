@@ -247,6 +247,41 @@ function M.ordered_windows()
 	return result
 end
 
+--- Lists every window of one application, including minimised ones.
+--- @param pid number Process id of the application.
+--- @return table records Array of window records, in the application's order.
+function M.application_windows(pid)
+	if type(pid) ~= "number" then error("application_windows: pid must be a number", 2) end
+	local ok, result = pcall(function()
+		local records = {}
+		local app = hs.application.applicationForPID(pid)
+		if not app then return records end
+		for _, win in ipairs(app:allWindows() or {}) do
+			local record = window_record(win)
+			if record then records[#records + 1] = record end
+		end
+		return records
+	end)
+	if not ok then
+		Logger.error(LOG, "application_windows(): error — %s", tostring(result))
+		return {}
+	end
+	return result
+end
+
+--- @return number|nil id The id of the focused window, nil when none has focus.
+function M.focused_window_id()
+	local ok, result = pcall(function()
+		local win = hs.window.focusedWindow()
+		return win and win:id() or nil
+	end)
+	if not ok then
+		Logger.error(LOG, "focused_window_id(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
 --- @return number|nil pid Process id of the frontmost application.
 function M.frontmost_pid()
 	local ok, result = pcall(function()

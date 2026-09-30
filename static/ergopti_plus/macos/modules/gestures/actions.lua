@@ -433,12 +433,17 @@ local function switch_to_least_recent_application()
 	return scheduled == true
 end
 
---- Switch to the previous window of the frontmost application.
---- This used to share cmd+tab with switch_to_previous_application, so the
---- "Prev. window" gesture silently performed an app switch. cmd+grave is the
---- macOS binding that actually cycles windows within the front app.
-local function switch_to_previous_window_precise()
-	postKeyStroke({"cmd"}, "`")
+--- Cycles the windows of the frontmost application directly. A posted Cmd+`
+--- depends on the keyboard layout carrying a backquote, which several non-US
+--- layouts do not; the remapped cycle_windows_in_app key (F17, watchers.lua)
+--- focuses windows itself for the same reason, but only with the remap layer.
+--- @param step number 1 for the next window, -1 for the previous one.
+--- @return boolean scheduled
+local function switch_application_window(step)
+	local scheduled = AuxOwner.after(0, "application window", function()
+		return require("modules.gestures.app_switch").app_window(step)
+	end, current_action_parent())
+	return scheduled == true
 end
 
 --- Triggers a macOS system-wide dictionary lookup/definition.
@@ -815,13 +820,12 @@ sg("right_click_toggle",   M.toggle_right_click)
 sg("lookup", function()
 	return M.trigger_lookup(current_action_parent())
 end)
--- app_switcher posted the same Cmd+Tab as app_previous, with the same dead
--- single tap; both switch directly until the duplicate leaves the catalogue.
-sg("app_switcher",      function() return switch_to_previous_application("all_screens") end)
+-- One action per target and scope. app_switcher, alt_tab_apps (Alt+F17),
+-- app_window_previous, win_prev and win_next did the same thing as one of
+-- these on macOS; config migration step v5_to_v6 maps a stored one to its twin.
 sg("app_previous",      function() return switch_to_previous_application("all_screens") end)
 sg("app_previous_screen", function() return switch_to_previous_application("this_screen") end)
 sg("cmd_shift_tab",     switch_to_least_recent_application)
-sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys
 -- ── Actions the shared catalogue describes for macOS ────────────────────────
@@ -987,8 +991,8 @@ sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "c
 -- Tabs
 
 -- Windows & Spaces
-sg("win_prev",            function() winNav(false) end)
-sg("win_next",              function() winNav(true) end)
+sg("win_app_prev",        function() return switch_application_window(-1) end)
+sg("win_app_next",        function() return switch_application_window(1) end)
 sg("snap_left",              function()
 	return apply_focused_window_action("Snap left", function(win)
 		return win:moveToUnit(hs.layout.left50)

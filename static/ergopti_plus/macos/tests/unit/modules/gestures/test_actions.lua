@@ -126,7 +126,7 @@ helpers.describe("gestures.actions: SG_NAMES contents", function()
 		for _, id in ipairs({
 			"right_click_toggle", "lookup",
 			"tab_new", "tab_close", "tab_prev", "tab_next",
-			"win_prev", "win_next", "space_prev", "space_next",
+			"win_app_prev", "win_app_next", "space_prev", "space_next",
 			"mission_control", "app_expose",
 		}) do
 			helpers.assert_true(contains(Actions.SG_NAMES, id), "missing SG id: " .. id)
@@ -265,6 +265,9 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 			"a registered successful action must report handled to its caller")
 	end)
 
+	-- The single win_prev/win_next actions left macOS for win_app_prev and
+	-- win_app_next, which focus windows directly (test_app_switch_direct.lua);
+	-- the windows axis still posts Cmd+`, so its previous direction keeps Shift.
 	helpers.it("uses an explicit Shift modifier for previous-window navigation", function()
 		local SyntheticInput = require("adapters.synthetic_input")
 		local original_emit = SyntheticInput.emit_key_stroke
@@ -275,8 +278,8 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		end
 
 		local ok, err = xpcall(function()
-			helpers.assert_eq(Actions.execute_single("win_next"), true)
-			helpers.assert_eq(Actions.execute_single("win_prev"), true)
+			helpers.assert_eq(Actions.execute_axis("windows", true), true)
+			helpers.assert_eq(Actions.execute_axis("windows", false), true)
 		end, debug.traceback)
 		SyntheticInput.emit_key_stroke = original_emit
 		if not ok then error(err) end

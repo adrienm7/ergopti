@@ -36,7 +36,7 @@ helpers.describe("gestureInProgress dead flag is fully removed", function()
 	end)
 
 	helpers.it("actions no longer re-exports set_gesture_in_progress", function()
-		helpers.assert_true(read("local function switch_to_previous_window_precise"):find("set_gesture_in_progress", 1, true) == nil,
+		helpers.assert_true(read("local function switch_to_least_recent_application"):find("set_gesture_in_progress", 1, true) == nil,
 			"actions must not re-export the removed setter")
 	end)
 end)
