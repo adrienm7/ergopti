@@ -625,7 +625,7 @@ const CHECKS = [
 		repro: 'npm run test:ahk-runner-arguments'
 	},
 	{
-		name: 'AHK loop capture (no inline closure over a loop variable in a Test registration)',
+		name: 'AHK loop capture (no closure over a for-loop variable, no looped Test registration closing over the loop)',
 		cmd: 'node',
 		args: ['tools/test/test-ahk-loop-capture.cjs'],
 		repro: 'node tools/test/test-ahk-loop-capture.cjs'

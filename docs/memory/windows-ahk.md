@@ -108,6 +108,13 @@ step logs; the `windows-launch-evidence` artifact expires after 7 days.
 Copying a loop variable into another outer local does not freeze it for a
 closure. Bind the current value as an argument with `.Bind()`.
 
+A closure never sees the `for` variable itself either, even when it runs inside
+the same iteration: AutoHotkey 2.0 backs the loop variable up and rebinds it
+away from the captured cell, so the closure reads the pre-loop value, usually
+unset. Inside `AssertThrows` that UnsetError passes whatever the product does.
+Move the loop body into a helper whose closure reads a parameter, or use
+`.Bind()`. `tools/test/test-ahk-loop-capture.cjs` rejects both shapes.
+
 ### project-ahk-settimer-reenters-during-file-io
 
 AHK pumps messages during some blocking file operations. A timer that schedules
