@@ -564,6 +564,24 @@ Turning it off removes only marked rules by byte-span surgery proven by decoded
 equality; never re-serialize `karabiner.json`, which would rewrite personal
 rules.
 
+### project-hs-layout-name-forms
+
+One macOS layout has two names: `hs.keycodes.currentLayout()` returns its
+localised name (`Ergopti+`, `Français`), `defaults read com.apple.HIToolbox
+AppleSelectedInputSources` its KeyboardLayout Name (`Ergopti_v2_2_2_plus`,
+`French`), quoted only when not purely alphanumeric. The remap input-source
+watcher seeded its baseline with the first and compared the poll's second
+with it. Every boot of an Ergopti layout therefore reported a layout change at
+the first poll, 2 s after the remap init. When that change landed during the
+boot's lease activation, it fenced the RESUME in flight, and dev.155 opened
+the error window with « prepared lease RESUME failed: lease-stopping ». Its
+parser also missed the bare form, so the poll never resolved ABC or French.
+Compare a layout name only with a name of its own form
+(`platform/remap/watchers.lua`). The E2E world boots that user on the
+`ergopti_layout_slow_worker` machine. Windows compares HKL values and Linux
+reads the keymap only at start and on the menu's switch, so neither driver
+has this class.
+
 ### project-hs-karabiner-legacy-conflicts-are-offered-for-removal
 
 Untagged rules carrying a historical ErgoptiPlus signature

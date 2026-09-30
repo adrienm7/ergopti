@@ -28,6 +28,11 @@
 ---    started the Ollama it never installed, with the AI off, and logged an
 ---    ERROR that arm64 boots could not show. A boot that turns the AI on
 ---    without its runtime must tell the user so, naming that runtime.
+--- 5. The boot's Karabiner lease (layout-name-forms): an Ergopti layout, whose
+---    localised and HIToolbox names differ, made the first layout poll report a
+---    change that fenced the boot's RESUME in flight, logged « prepared lease
+---    RESUME failed: lease-stopping » and opened the error window. The boot of
+---    that layout keeps its one lease worker.
 --- ==============================================================================
 
 local M = {}
@@ -259,6 +264,10 @@ local function scenarios(repo)
 		{ name = "the recommended preset imported from the menu boots and opens its windows",
 			setup = neutral_defaults, steps = { "restore_recommended", "open_windows" }, marker = BOOTED_MARKER,
 			recommended = true },
+		-- world.MACHINES: the machine each boot runs on, and the lease facts it ends with.
+		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
+			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			machine = "ergopti_layout_slow_worker", facts = { lease_workers = "1", lease_phase = "active" } },
 	}
 	for _, case in ipairs(older_release_cases(repo)) do
 		list[#list + 1] = {
@@ -296,6 +305,7 @@ end
 --- @param action string boot_child action.
 --- @return string command
 local function child_command(ctx, action)
+	local machine = ctx.machine or "standard"
 	local settings_file = ctx.root .. "/settings.lua"
 	local fh = assert(io.open(settings_file, "w"))
 	fh:write("return {\n")
@@ -311,7 +321,7 @@ local function child_command(ctx, action)
 		"XDG_CONFIG_HOME=", "XDG_STATE_HOME=", "XDG_DATA_HOME=", "XDG_CACHE_HOME=",
 		q(ctx.interpreter), q(ctx.driver .. "/tests/e2e/boot/boot_child.lua"),
 		q(ctx.driver), q(ctx.app_root), q(ctx.root .. "/machine"), q(ctx.home), q(action), q(ctx.arch),
-		q(settings_file),
+		q(settings_file), q(machine),
 	}, " ")
 end
 
@@ -360,6 +370,27 @@ local function judge(output, action, marker)
 	end
 	if marker and not output:find(marker, 1, true) then
 		problems[#problems + 1] = "the boot never logged « " .. marker .. " »"
+	end
+	return problems
+end
+
+--- What one boot's facts contradict of the facts its scenario expects, as
+--- failure lines; the last E2E_FACT line of a key wins.
+--- @param output string Child output.
+--- @param expected table|nil key -> value.
+--- @return table problems
+local function judge_facts(output, expected)
+	local problems = {}
+	local actual = {}
+	for key, value in output:gmatch("E2E_FACT ([%w_]+)=([^\n]*)") do actual[key] = value end
+	local keys = {}
+	for key in pairs(expected or {}) do keys[#keys + 1] = key end
+	table.sort(keys)
+	for _, key in ipairs(keys) do
+		if actual[key] ~= expected[key] then
+			problems[#problems + 1] = string.format("fact %s is %s, expected %s", key, tostring(actual[key]),
+				expected[key])
+		end
 	end
 	return problems
 end
@@ -449,6 +480,7 @@ function M.run(check, options)
 			local ctx = {
 				root = root, home = root .. "/home", repo = repo, driver = options.driver, app_root = app_root,
 				interpreter = options.interpreter, world = world, arch = arch, problems = {},
+				machine = scenario.machine,
 			}
 			run("mkdir -p " .. q(ctx.home) .. " " .. q(root .. "/tmp"))
 			if scenario.setup then scenario.setup(ctx) end
@@ -460,6 +492,9 @@ function M.run(check, options)
 			for context_index, ctx in ipairs(contexts) do
 				local output = outputs[context_index]
 				for _, problem in ipairs(judge(output, action, marker)) do
+					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+				end
+				for _, problem in ipairs(judge_facts(output, scenario.facts)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 				end
 				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
@@ -486,7 +521,7 @@ function M.run(check, options)
 			if #ctx.problems == 0 then
 				check.pass(label)
 			else
-				check.fail(label, "no ERROR, dialog or bundle write, and any missing AI runtime named",
+				check.fail(label, "no ERROR, dialog or bundle write, any missing AI runtime named, and its facts",
 					table.concat(ctx.problems, "\n        ", 1, math.min(#ctx.problems, 12)))
 			end
 			if scenario.recommended then
