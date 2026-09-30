@@ -283,6 +283,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-menu-reset-terminology.cjs'
 	},
 	{
+		name: 'restoring the recommended values asks no question on any driver (restore-recommended-no-confirm)',
+		cmd: 'node',
+		args: ['tools/test/test-restore-recommended-no-confirm.cjs'],
+		repro: 'npm run test:restore-recommended-no-confirm'
+	},
+	{
 		name: 'approved menu labels keep their wording and are translated in every locale',
 		cmd: 'node',
 		args: ['tools/test/test-approved-menu-labels.cjs'],

@@ -331,6 +331,7 @@ return {
 	"tests.unit.ui.test_menu_pause_greys_features",
 	"tests.unit.ui.test_menu_uninstall",
 	"tests.unit.ui.test_onboarding_startup",
+	"tests.unit.ui.test_restore_recommended_no_confirm",
 	"tests.unit.ui.test_start_at_login",
 	"tests.unit.ui.test_paths_editor_logs_dir",
 	"tests.unit.ui.test_unused_keys_cleanup",

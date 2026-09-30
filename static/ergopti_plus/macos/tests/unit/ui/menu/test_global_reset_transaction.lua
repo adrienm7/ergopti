@@ -1112,7 +1112,7 @@ end)
 
 
 helpers.describe("gesture scope menu composition", function()
-	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No question before a clear", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
 			package.loaded["infra.dialog_util"] = { block_alert = function(...)
@@ -1125,7 +1125,9 @@ helpers.describe("gesture scope menu composition", function()
 					return options.admission("gesture scope fixture", function()
 						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
 							"ordinary save must not enter an owned scope")
-						return options.confirm(mode)
+						-- The owners ask before a clear only (restore-recommended-no-confirm).
+						if mode == "clear" then return options.confirm(mode) end
+						return true
 					end)
 				end }
 			end }
@@ -1137,15 +1139,15 @@ helpers.describe("gesture scope menu composition", function()
 			helpers.assert_type(received.checkpoint.capture, "function")
 			helpers.assert_type(received.checkpoint.replace, "function")
 			helpers.assert_eq(received.path, "/virtual/config.toml")
-			selected = "onboarding.btn.yes"
+			dialog_args = nil
 			helpers.assert_eq(observations.builder_ctx.apply_gesture_scope("recommended"), true)
-			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+			helpers.assert_nil(dialog_args, "restoring the recommended values asks nothing")
 		end)
 	end)
 end)
 
 helpers.describe("layout scope menu composition", function()
-	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No question before a clear", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
 			package.loaded["infra.dialog_util"] = { block_alert = function(...)
@@ -1158,7 +1160,9 @@ helpers.describe("layout scope menu composition", function()
 					return options.admission("layout scope fixture", function()
 						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
 							"ordinary save must not enter an owned scope")
-						return options.confirm(mode)
+						-- The owners ask before a clear only (restore-recommended-no-confirm).
+						if mode == "clear" then return options.confirm(mode) end
+						return true
 					end)
 				end }
 			end }
@@ -1172,15 +1176,15 @@ helpers.describe("layout scope menu composition", function()
 			helpers.assert_type(received.checkpoint.capture, "function")
 			helpers.assert_type(received.checkpoint.replace, "function")
 			helpers.assert_eq(received.path, "/virtual/config.toml")
-			selected = "onboarding.btn.yes"
+			dialog_args = nil
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("keyboard_layout", "recommended"), true)
-			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+			helpers.assert_nil(dialog_args, "restoring the recommended values asks nothing")
 		end)
 	end)
 end)
 
 helpers.describe("metrics scope menu composition", function()
-	helpers.it("wires exact scope modes, the shared fence and a default-No confirmation", function()
+	helpers.it("wires exact scope modes, the shared fence and a default-No question before a clear", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
 			package.loaded["infra.dialog_util"] = { block_alert = function(...)
@@ -1193,7 +1197,9 @@ helpers.describe("metrics scope menu composition", function()
 					return options.admission("metrics scope fixture", function()
 						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
 							"ordinary save must not enter an owned scope")
-						return options.confirm(mode)
+						-- The owners ask before a clear only (restore-recommended-no-confirm).
+						if mode == "clear" then return options.confirm(mode) end
+						return true
 					end)
 				end }
 			end }
@@ -1215,15 +1221,15 @@ helpers.describe("metrics scope menu composition", function()
 			helpers.assert_type(received.checkpoint.capture, "function")
 			helpers.assert_type(received.checkpoint.replace, "function")
 			helpers.assert_eq(received.path, "/virtual/config.toml")
-			selected = "onboarding.btn.yes"
+			dialog_args = nil
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("metrics", "recommended"), true)
-			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+			helpers.assert_nil(dialog_args, "restoring the recommended values asks nothing")
 		end)
 	end)
 end)
 
 helpers.describe("hotstrings scope menu composition", function()
-	helpers.it("wires the running keymap, both files, the shared fence and a default-No confirmation", function()
+	helpers.it("wires the running keymap, both files, the shared fence and a default-No question before a clear", function()
 		with_menu_fixture({}, function(observations)
 			local received, selected, dialog_args
 			package.loaded["infra.dialog_util"] = { block_alert = function(...)
@@ -1239,7 +1245,9 @@ helpers.describe("hotstrings scope menu composition", function()
 					return options.admission("hotstrings scope fixture", function()
 						helpers.assert_eq(observations.builder_ctx.save_prefs(), false,
 							"ordinary save must not enter an owned scope")
-						return options.confirm(mode)
+						-- The owners ask before a clear only (restore-recommended-no-confirm).
+						if mode == "clear" then return options.confirm(mode) end
+						return true
 					end)
 				end }
 			end }
@@ -1265,9 +1273,9 @@ helpers.describe("hotstrings scope menu composition", function()
 			helpers.assert_eq(config_backup:find("/virtual/config.toml.hotstrings-", 1, true), 1)
 			helpers.assert_eq(override_backup:find("/virtual/hotstrings_config.toml.hotstrings-", 1, true), 1)
 			helpers.assert_true(received.backup_path() ~= config_backup, "every backup path is new")
-			selected = "onboarding.btn.yes"
+			dialog_args = nil
 			helpers.assert_eq(observations.builder_ctx.apply_preference_scope("hotstrings", "recommended"), true)
-			helpers.assert_eq(dialog_args[2], "common.restore_recommended")
+			helpers.assert_nil(dialog_args, "restoring the recommended values asks nothing")
 			helpers.assert_eq(constructions, 1, "one owner per session keeps its retained inverse")
 		end)
 	end)

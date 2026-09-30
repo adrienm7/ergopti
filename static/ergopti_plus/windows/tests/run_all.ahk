@@ -437,6 +437,7 @@ InstallSendNoOps()
 #Include unit/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk
 #Include unit/test_tap_hold_scope.ahk
+#Include unit/test_restore_recommended_no_confirm.ahk
 #Include unit/test_tap_hold_hand_sections.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk

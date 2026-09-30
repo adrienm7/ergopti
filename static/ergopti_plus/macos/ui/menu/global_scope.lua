@@ -5,9 +5,10 @@
 --- DESCRIPTION:
 --- Restores Ergopti's recommended values, or clears every category to the
 --- system's own behaviour, by composing the per-scope owners through the shared
---- composition in the manifest's `[scopes.global]` order. One confirmation
---- covers every category; each owner keeps its own backup, conflict detection
---- and runtime acknowledgement, and a refusal reverts every committed one.
+--- composition in the manifest's `[scopes.global]` order. The restore applies
+--- at once; a clear asks one question that covers every category. Each owner
+--- keeps its own backup, conflict detection and runtime acknowledgement, and a
+--- refusal reverts every committed one.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Existing Owners: the config.toml categories are the scoped owners the
@@ -75,7 +76,8 @@ end
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), backup_path(scope),
----   defer(fn), confirm(mode), paused() and refresh(committed, report).
+---   defer(fn), confirm(mode) (asked before a clear only), paused() and
+---   refresh(committed, report).
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
@@ -105,7 +107,8 @@ function M.new(options)
 	local composition = Composition.new({ manifest = Manifest, scope = "global", logger = Logger, log = LOG,
 		participants = participants })
 	local owner = { pending = composition.pending, retry_restore = composition.retry_restore }
-	--- Asks once, then applies one mode to every available category.
+	--- Applies one mode to every available category. A clear asks once first;
+	--- restoring the recommended values does not ask.
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean accepted True once the composition started.
 	function owner.apply(mode)
@@ -118,9 +121,11 @@ function M.new(options)
 				return false
 			end
 		end
-		if options.confirm(mode) ~= true then return false end
-		-- The modal runs a native event loop; pause may start while it is open.
-		if options.paused() ~= false then return false end
+		if mode == "clear" then
+			if options.confirm(mode) ~= true then return false end
+			-- The modal runs a native event loop; pause may start while it is open.
+			if options.paused() ~= false then return false end
+		end
 		return composition.apply(mode, function(committed, report)
 			options.refresh(committed == true, report)
 		end)

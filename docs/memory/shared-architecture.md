@@ -169,7 +169,11 @@ Every row that puts a section back to Ergopti's preset reads
 so the OS behaves as without Ergopti reads `common.clear_to_system`, whatever
 the menu. A new reset or clear row takes one of the two keys, never a per-menu
 label; `test-menu-reset-terminology.cjs` holds the manifest rows, the rows
-drivers build by hand and the retired keys.
+drivers build by hand and the retired keys. A restore applies at once, because
+its owner backs up first; only a clear asks, default No. The macOS owners call
+their `confirm` port for a clear only, and the maintainer retired the restore
+question on 2026-09-30: `test-restore-recommended-no-confirm.cjs` rejects a
+question whose function names the restore label or runs for every mode.
 
 ### project-a-composite-scope-composes-revertible-owners
 

@@ -180,29 +180,29 @@ helpers.describe("Linux global scope: the Configuration row", function()
 		return nil
 	end
 
-	for _, case in ipairs({ { answer = 0, runs = true }, { answer = 1, runs = false } }) do
-		helpers.it("asks first, default No, and " .. (case.runs and "composes on Yes" or "does nothing on No"), function()
-			local saved_builder, saved_global = package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"]
-			local execute, asked, calls = os.execute, {}, {}
-			local ok, err = pcall(function()
-				local row = restore_row({ _version = "test", on_quit = function() end,
-					is_paused = function() return false end }, calls)
-				helpers.assert_not_nil(row, "the Configuration restore row")
-				os.execute = function(command)
-					if command:find("command -v zenity", 1, true) then return 0 end
-					if command:find("zenity --question", 1, true) then asked[#asked + 1] = command; return case.answer end
-					return execute(command)
-				end
-				row.fn()
-			end)
-			os.execute = execute
-			package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
-			if not ok then error(err, 0) end
-			helpers.assert_eq(#asked, 1)
-			helpers.assert_contains(asked[1], "--default-cancel")
-			helpers.assert_eq(calls, case.runs and { "participants", "recommended" } or {})
+	-- The restore used to ask a default-No question first; the maintainer
+	-- retired it (restore-recommended-no-confirm). Zenity answers No here, so a
+	-- question that came back would also stop the composition.
+	helpers.it("composes at once and asks nothing", function()
+		local saved_builder, saved_global = package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"]
+		local execute, asked, calls = os.execute, {}, {}
+		local ok, err = pcall(function()
+			local row = restore_row({ _version = "test", on_quit = function() end,
+				is_paused = function() return false end }, calls)
+			helpers.assert_not_nil(row, "the Configuration restore row")
+			os.execute = function(command)
+				if command:find("command -v zenity", 1, true) then return 0 end
+				if command:find("zenity --question", 1, true) then asked[#asked + 1] = command; return 1 end
+				return execute(command)
+			end
+			row.fn()
 		end)
-	end
+		os.execute = execute
+		package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"] = saved_builder, saved_global
+		if not ok then error(err, 0) end
+		helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
+		helpers.assert_eq(calls, { "participants", "recommended" })
+	end)
 
 	helpers.it("refuses while paused without asking", function()
 		local saved_builder, saved_global = package.loaded["ui.menu.menu_builder"], package.loaded["infra.global_scope"]

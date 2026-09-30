@@ -309,6 +309,16 @@ local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
 	return succeeded(Modal.run(function() return os.execute(command) end))
 end
 
+--- Asks the default-No question a clear needs before it removes a section's
+--- settings. Restoring the recommended values asks nothing: it applies at once,
+--- after the scope owner's verified backup.
+--- @param title string Already-translated dialog title.
+--- @return boolean confirmed False for No, and when nobody could be asked.
+local function confirm_clear(title)
+	return ask_yes_no(title, i18n_safe("common.clear_to_system"),
+		i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) == true
+end
+
 local function gesture_slot_label(slot)
 	local fingers, direction = tostring(slot):match("^swipe_(%d+)_(.+)$")
 	if fingers and direction then
@@ -553,7 +563,7 @@ local function _hotstrings_on(ctx)
 	return type(dyn) == "table" and type(dyn.is_enabled) == "function" and dyn.is_enabled() == true
 end
 
---- Restores or clears the Hotstrings scope after the user confirms it.
+--- Restores the Hotstrings scope at once, or clears it once the user confirms.
 ---
 --- Shared by the Hotstrings rows and the Configuration « restore recommended »
 --- row, so both reach the one transaction that writes the manifest's recommended
@@ -561,14 +571,11 @@ end
 --- neutral state, where every catalogue is off: the opposite of the label.
 --- @param ctx table Menu context: paused, is_paused, dyn_hotstrings, tooltip_preview, on_menu_changed.
 --- @param mode string "recommended" or "clear".
---- @param title string Confirmation dialog title.
+--- @param title string Title of the question a clear asks.
 --- @return boolean committed
 local function _apply_hotstrings_scope(ctx, mode, title)
 	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-	local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-	if ask_yes_no(title, label, i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then
-		return false
-	end
+	if mode == "clear" and not confirm_clear(title) then return false end
 	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
 		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1668,7 +1675,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	local function hotstrings_on() return _hotstrings_on(ctx) end
 	local whole_tree = all_sections_row(all_category_ids())
 
-	--- Restores or clears the Hotstrings scope after the user confirms it.
+	--- Restores the Hotstrings scope at once, or clears it once the user confirms.
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean committed
 	local function apply_hotstrings_scope(mode)
@@ -2299,9 +2306,7 @@ local function _build_llm(ctx)
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
 	local function apply_llm_scope(mode)
 		if ctx.paused == true then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.llm.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.llm.title")) then return false end
 		local committed = require("infra.llm_scope").apply(mode, ctx.paused)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -2533,9 +2538,7 @@ local function _manifest_metrics_rows(ctx, k)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	local function apply_metrics_scope(mode)
 		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.metrics.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.metrics.title")) then return false end
 		local committed = require("infra.metrics_scope").apply(mode, ctx.is_paused)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -3004,9 +3007,7 @@ local function _build_shortcuts(ctx)
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	local function apply_shortcuts_scope(mode)
 		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.shortcuts.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.shortcuts.title")) then return false end
 		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -3263,9 +3264,7 @@ local function _build_tap_holds(ctx)
 	-- backed up, the engine acknowledging the candidate before it is published.
 	local function apply_scope(mode)
 		if ctx.paused == true then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.tapholds.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.tapholds.title")) then return false end
 		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
 		changed(committed)
 		return committed
@@ -3311,9 +3310,7 @@ local function _build_gestures(ctx)
 	local gesture_rows = {}
 	local function apply_scope(mode)
 		if ctx.paused == true then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.gestures.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.gestures.title")) then return false end
 		local committed = ge.apply_scope(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
@@ -3483,13 +3480,12 @@ local function _build_configuration(ctx)
 		end
 	end
 
-	-- The global restore composes every category's own scope owner: one
-	-- default-No question, then all of them or none of them.
+	-- The global restore composes every category's own scope owner, all of
+	-- them or none of them. It applies at once; the global clear asks one
+	-- default-No question first.
 	local function apply_global_scope(mode)
 		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
-		local label = i18n_safe(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
-		if ask_yes_no(i18n_safe("menu.configuration.title"), label,
-			i18n_safe("onboarding.btn.yes"), i18n_safe("onboarding.btn.no"), true) ~= true then return false end
+		if mode == "clear" and not confirm_clear(i18n_safe("menu.configuration.title")) then return false end
 		local GlobalScope = require("infra.global_scope")
 		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
 		-- « Reverted » is only said when it is true; a pending rollback is an
