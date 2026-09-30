@@ -18,12 +18,21 @@
 ---    navigation layer then generated from the folder carries every macOS edit.
 --- 4. A refused regeneration keeps the window open; Cancel closes it, and a
 ---    message from a closed window does nothing.
+--- 5. Legends (layer-editor-current-layout-legends): init() carries what the
+---    current input source types on every character key (the shared corpus
+---    _shared/tests/corpus/layer_editor/legends.json fed through
+---    hs.keycodes.map, ISO form), leaves out and reports once the keys it
+---    types nothing printable on, names the key whose hold enters the layer in
+---    the shipped tap-hold defaults, and answers "legends" with the input
+---    source in use then.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
 local Json      = require("json")
+local TomlCodec = require("toml_codec")
 
 local FIXTURE = helpers.shared("tests/corpus/layer_editor/edited_layers.toml")
+local LEGENDS = helpers.shared("tests/corpus/layer_editor/legends.json")
 
 
 
@@ -69,12 +78,12 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
-		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer" }
+		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local prior_hs = _G.hs
 	local world = { dir = make_config_dir(), bridges = {}, views = {}, writes = {}, regenerations = 0,
-		regenerate_accepts = true, logs = {} }
+		regenerate_accepts = true, logs = {}, keymap = {} }
 	local ok, err = xpcall(function()
 		local logger = {}
 		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
@@ -127,16 +136,26 @@ local function with_editor(scenario)
 				return view
 			end,
 		}
-		_G.hs = { webview = { usercontent = { new = function(name)
+		-- The input source: hs.keycodes.map, macOS keycode -> what the key types.
+		_G.hs = { keycodes = { map = world.keymap }, webview = { usercontent = { new = function(name)
 			local bridge = { name = name }
 			function bridge:setCallback(callback) self.callback = callback end
 			world.bridges[#world.bridges + 1] = bridge
 			return bridge
 		end } } }
-		world.karabiner = { regenerate = function()
-			world.regenerations = world.regenerations + 1
-			return world.regenerate_accepts
-		end }
+		-- The remap facade, holding the shipped tap-hold keys and defaults.
+		local defaults = TomlCodec.decode(read_file(helpers.shared("tap_hold/defaults.toml")))
+		world.karabiner = {
+			regenerate = function()
+				world.regenerations = world.regenerations + 1
+				return world.regenerate_accepts
+			end,
+			TAP_HOLD_KEYS = Json.decode(read_file(helpers.driver_root() .. "/platform/remap/data/tap_hold_keys.json")),
+			get_hold_action = function(id)
+				local slot = defaults.hs_tap_hold[id]
+				return slot and slot.hold or "none"
+			end,
+		}
 		package.loaded["ui.layer_editor"] = nil
 		scenario(require("ui.layer_editor"), world)
 	end, debug.traceback)
@@ -286,6 +305,57 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(#world.views[1].scripts, before, "a closed window's messages do nothing")
 			helpers.assert_eq(world.regenerations, 1)
 		end)
+	end)
+
+	helpers.it("sends the current input source's legends and the layer key (layer-editor-current-layout-legends)", function()
+		local corpus = Json.decode(read_file(LEGENDS))
+		local registry = Json.decode(read_file(helpers.shared("data/keycodes/physical_keys.json")))
+		for _, case in ipairs(corpus.cases) do
+			with_editor(function(editor, world)
+				-- The layout, by the keycode macOS reports on Ergopti's ISO board.
+				for code, text in pairs(case.layout) do
+					local entry = registry.keys[code]
+					local iso = type(entry.macos_iso) == "table" and entry.macos_iso.hs or nil
+					world.keymap[type(iso) == "number" and iso or entry.hs] = text
+				end
+				editor.open({ karabiner = world.karabiner })
+				post(world, "ready")
+				local init = last_call(world, "init")
+				helpers.assert_not_nil(init.legends, "init() must carry the legends of the input source")
+				helpers.assert_eq(init.legends.source, case.source)
+				local count = 0
+				for code, text in pairs(case.expected) do
+					count = count + 1
+					helpers.assert_eq(init.legends.keys[code], text, case.name .. ": " .. code)
+				end
+				for code in pairs(init.legends.keys) do
+					helpers.assert_not_nil(case.expected[code], case.name .. ": " .. code .. " must not have a legend")
+				end
+				helpers.assert_true(count >= 40, "only " .. count .. " legends compared")
+				helpers.assert_eq(table.concat(init.layer_keys, ","), table.concat(corpus.recommended_layer_keys.macos, ","),
+					"the key whose hold enters the layer")
+				local warned = {}
+				for _, line in ipairs(world.logs) do
+					if line:match("^warn: ") and line:match("registry code") then warned[#warned + 1] = line end
+				end
+				helpers.assert_eq(#warned, 1, "the keys without a legend are reported")
+				helpers.assert_true(warned[1]:match(table.concat(case.unresolved, ", ")) ~= nil, warned[1])
+				post(world, "ready")
+				local again = 0
+				for _, line in ipairs(world.logs) do
+					if line:match("^warn: ") and line:match("registry code") then again = again + 1 end
+				end
+				helpers.assert_eq(again, 1, "the same keys are reported once")
+
+				-- Another input source, then the window comes back to the front.
+				world.keymap[registry.keys.KeyQ.hs] = "q"
+				post(world, { action = "legends" })
+				local refreshed = last_call(world, "setLegends")
+				helpers.assert_not_nil(refreshed, '"legends" must answer with setLegends()')
+				helpers.assert_eq(refreshed.keys.KeyQ, "q")
+				helpers.assert_eq(refreshed.source, "os")
+			end)
+		end
 	end)
 
 	helpers.it("refuses to open without a remap facade to apply the layer", function()

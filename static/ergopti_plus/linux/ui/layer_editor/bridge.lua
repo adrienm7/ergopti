@@ -6,12 +6,20 @@
 --- Bridge name: "layer_editor_bridge"
 ---
 --- The page asks for the user's layers.toml ("ready"), saves the text it built
---- ({action = "save", text}) or closes ({action = "cancel"}). The shared host
---- logic (_shared/lua/keymap/layer_editor.lua) checks a saved text against every
+--- ({action = "save", text}), closes ({action = "cancel"}) or, back in front,
+--- asks for the legends again ({action = "legends"}). The shared host logic
+--- (_shared/lua/keymap/layer_editor.lua) checks a saved text against every
 --- OS's loader and publishes it atomically; the remap manager then regenerates
 --- its configuration, which reads layers.toml again, so the layer applies.
 --- The Linux part stays this thin on purpose: only the apply call knows which
 --- engine carries the layer.
+---
+--- Legends: each key that types a character shows what the keymap the daemon
+--- loaded (adapters/keyboard_layout, the session's own XKB keymap, which it
+--- reloads on a layout switch) types on its evdev code at level 1. Linux
+--- emulates no layout: an installed Ergopti is the XKB layout itself. The
+--- layer key is the tap-hold key whose hold enters the edited layer in the
+--- remap manager's keys, found in the registry by its evdev code.
 --- ==============================================================================
 
 local M = {}
@@ -22,6 +30,7 @@ local Logger      = require("logger.shim")
 local TomlCodec   = require("toml_codec")
 local Layers      = require("keymap.layers")
 local LayerEditor = require("keymap.layer_editor")
+local LayerPreset = require("keymap.layer_preset")
 
 local LOG = "bridge.layer_editor"
 local APP_NAME = "layer_editor"
@@ -90,6 +99,53 @@ local function load_context(shared_root)
 	})
 end
 
+--- The legends of the keymap the daemon loaded.
+--- @param state table Daemon state.
+--- @param ctx table The loader context.
+--- @return table legends The page's `legends`.
+local function current_legends(state, ctx)
+	local layout = dependency(state, "keyboard_layout", "adapters.keyboard_layout")
+	if not layout then error("the keyboard layout adapter is unavailable", 0) end
+	local legends, unresolved = LayerEditor.legends({
+		ctx       = ctx,
+		source    = LayerEditor.LEGEND_SOURCE_OS,
+		character = function(_, entry)
+			local symbol = type(entry.evdev) == "number" and layout.base_symbol(entry.evdev) or nil
+			return type(symbol) == "table" and symbol.text or nil
+		end,
+	})
+	LayerEditor.report_unresolved(unresolved,
+		layout.is_ready() and "the loaded keymap types nothing printable there" or "no keymap is loaded",
+		function(message) Logger.warn(LOG, "%s", message) end)
+	return legends
+end
+
+--- The registry codes of the keys whose hold enters the edited layer.
+--- @param state table Daemon state.
+--- @param ctx table The loader context.
+--- @param shared_root string The _shared folder.
+--- @return table codes
+local function layer_keys(state, ctx, shared_root)
+	local manager = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
+	local engine = dependency(state, "tap_hold_engine", "platform.remap.tap_hold_engine")
+	local ok, keys = pcall(function() return manager.keys() end)
+	if not ok or type(keys) ~= "table" or not engine then
+		Logger.warn(LOG, "The tap-hold keys are unknown, so no layer key is marked: %s.", tostring(keys))
+		return {}
+	end
+	local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
+	local codes = {}
+	for id, entry in pairs(keys) do
+		if type(entry) == "table" and entry.hold_layer == layer_id then
+			local evdev = engine.KEY_CODES[id]
+			local code = evdev and LayerEditor.code_of(ctx, function(key) return key.evdev end, evdev) or nil
+			if code then codes[#codes + 1] = code end
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
 --- Asks the remap manager to regenerate and reload its configuration.
 --- @return boolean applied
 local function apply(state)
@@ -134,6 +190,7 @@ function M.on_message(payload, state, context)
 		local data = LayerEditor.init_payload({
 			os = OS, ctx = ctx, config_dir = config_dir,
 			read_file = LayerEditor.read_file, toml_decode = TomlCodec.decode,
+			legends = current_legends(state, ctx), layer_keys = layer_keys(state, ctx, shared_root),
 		})
 		local manager = dependency(state, "webview_manager", "ui.webview_manager")
 		local i18n = dependency(state, "i18n", "infra.i18n")
@@ -182,6 +239,17 @@ function M.on_message(payload, state, context)
 	end
 	if payload.action == "cancel" then
 		return { cancelled = true, closed = close_page(state, context) }
+	end
+	if payload.action == "legends" then
+		local ok, shared_root = pcall(folders, state)
+		local ok_ctx, ctx = false, shared_root
+		if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
+		if not ok or not ok_ctx then
+			Logger.error(LOG, "The layer editor cannot read the layer data: %s.", tostring(ctx))
+			return { pushed = false }
+		end
+		local legends = current_legends(state, ctx)
+		return { pushed = call_page(state, "setLegends", legends), legends = legends }
 	end
 	Logger.warn(LOG, "Ignored the unknown layer editor action '%s'.", tostring(payload.action))
 	return nil
