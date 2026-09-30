@@ -249,6 +249,14 @@ function M.build(ctx, actions)
 		-- reported by the renderer and draws no row that would do nothing.
 		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
+	-- A local version run from source has nothing to uninstall: the row stays,
+	-- greyed, and says why (the manifest's disabled_reason_key).
+	local getters = {}
+	for key, getter in pairs(type(render_ctx.state_getters) == "table" and render_ctx.state_getters or {}) do
+		getters[key] = getter
+	end
+	getters["installed_build"] = function() return not is_local_source() end
+	render_ctx.state_getters = getters
 
 	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
 		["about_updates"] = function() return menu_items end,

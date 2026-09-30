@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Ніколи",
 	"menu.about.frequency_menu": "Частота перевірки",
 	"menu.about.open_releases_page": "Версії — GitHub",
+	"menu.about.source_run_reason": "Локальна версія (з вихідного коду): встановлення й видалення потребують установленого ErgoptiPlus",
 	"menu.about.title": "Версія / Оновлення",
 	"menu.about.update_checking": "Перевірка…",
 	"menu.about.update_downloading": "Downloading…",

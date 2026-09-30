@@ -1896,6 +1896,12 @@ const CHECKS = [
 		repro: 'npm run test:release-install-contract'
 	},
 	{
+		name: 'one installed-build-or-source-run owner per driver; Uninstall greyed on a source run',
+		cmd: 'node',
+		args: ['tools/test/test-source-run-single-owner.cjs'],
+		repro: 'npm run test:source-run-single-owner'
+	},
+	{
 		name: 'download actions retain their operation session across native reuse',
 		cmd: 'node',
 		args: ['tools/test/test-download-window-session.cjs'],

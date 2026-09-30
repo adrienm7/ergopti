@@ -344,11 +344,26 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	end)
 
 	-- Uninstall moved from the bottom of Configuration to the bottom of the
-	-- Version / Updates submenu, after a separator.
+	-- Version / Updates submenu, after a separator. On a source run, which is
+	-- what the suite is unless it stubs the updater, the row stays there greyed
+	-- and names why: « label — head of the reason ».
 	helpers.it("about: Uninstall closes the submenu, after a separator", function()
 		local rows = top_submenu("menu.about.title")
 		helpers.assert_true(type(rows) == "table" and #rows >= 2, "the tray must carry the About submenu")
-		helpers.assert_eq(rows[#rows].title, require("infra.i18n").get("menu.global.uninstall"))
+		local i18n = require("infra.i18n")
+		local source_run = require("modules.updater").is_local_source()
+		local label = i18n.get("menu.global.uninstall")
+		if source_run then
+			local reason = i18n.get("menu.about.source_run_reason")
+			local cut = nil
+			for _, mark in ipairs({ ":", "\239\188\154" }) do
+				local at = reason:find(mark, 1, true)
+				if at and (cut == nil or at < cut) then cut = at end
+			end
+			label = label .. " — " .. ((cut and reason:sub(1, cut - 1) or reason):gsub("^%s+", ""):gsub("%s+$", ""))
+		end
+		helpers.assert_eq(rows[#rows].title, label)
+		helpers.assert_eq(rows[#rows].disabled == true, source_run, "greyed exactly on a source run")
 		helpers.assert_eq(rows[#rows - 1].title, "-", "a separator sets Uninstall apart")
 	end)
 end)

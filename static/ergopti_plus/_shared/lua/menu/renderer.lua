@@ -352,7 +352,8 @@ function M.new(deps)
 	--- and nested rows, and knows nothing about `title`, `fn` or `menu`. A row
 	--- missing a label is dropped with a warning rather than rendered blank — an
 	--- untitled row is a row the user cannot identify and cannot report.
-	--- @param rows table Array of { label, action?, items?, checked?, disabled?, separator? }.
+	--- @param rows table Array of { label, action?, items?, checked?, disabled?,
+	---   disabled_reason_key?, separator? }.
 	--- @param list_id string The provider's id, for the warning.
 	--- @param depth number|nil Current nesting depth, guarded against a cyclic table.
 	--- @return table Array of menu item tables.
@@ -375,6 +376,11 @@ function M.new(deps)
 			else
 				report_driver_dialect(row, list_id)
 				local entry = { title = row.label, disabled = row.disabled or nil }
+				-- A greyed row that names why (`disabled_reason_key`) reads like every
+				-- greyed row with a reason, « label — head of the reason », and has
+				-- nothing to run.
+				local greyed = row.disabled == true and type(row.disabled_reason_key) == "string"
+				if greyed then entry.title = row.label .. " — " .. reason_head(i18n.get(row.disabled_reason_key)) end
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
 				-- An optional per-row image, the Lua twin of the AutoHotkey renderer's
 				-- `icon`. Without it a provider had to choose between reaching the
@@ -397,7 +403,7 @@ function M.new(deps)
 					-- it is handing over, so a finished menu passed where row data was
 					-- expected fails visibly instead of rendering an empty submenu.
 					entry.menu = row.submenu
-				elseif type(row.action) == "function" then
+				elseif type(row.action) == "function" and not greyed then
 					entry.fn = row.action
 				end
 				out[#out + 1] = entry
@@ -703,10 +709,24 @@ function M.new(deps)
 				end
 
 				flush_sep()
+				local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
+				-- Greyed by `disabled_when` with the reason it declares, the row is
+				-- drawn as the same stand-in as a row this platform has not yet
+				-- ported, « label — head of the reason », with nothing to run: the
+				-- two differ only in how the condition is evaluated.
+				if disabled and type(item.disabled_reason_key) == "string" then
+					local stand_in = greyed_stand_in(manifest_key,
+						{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
+					if stand_in then
+						table.insert(result, stand_in)
+						item_count = item_count + 1
+					end
+					goto continue
+				end
 				local built = {
 					title    = i18n.get(i18n_key),
 					fn       = fn,
-					disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
+					disabled = disabled or nil,
 				}
 				-- Only "check" carries a tick. A "command" is a plain action row, and
 				-- giving it `checked = false` would draw an empty checkbox next to a

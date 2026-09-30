@@ -4139,10 +4139,19 @@ i18n = "menu.about.open_releases_page"
 [[menu.about_menu]]
 type = "---"
 
+# A local version run from source has nothing to remove: the row stays in place,
+# greyed by `disabled_when`, and says why. A row greyed with a reason is drawn
+# as « label — head of the reason » (the reason's text before its first colon,
+# 1 to 40 characters in every locale), with nothing to run: `reason_key` where
+# the row's platforms leave it out (`unavailable = "grey"`), `disabled_reason_key`
+# on a `command` row where its `disabled_when` greys it. Each driver answers
+# `installed_build` from its one installed-build-or-source-run owner.
 [[menu.about_menu]]
 type = "command"
 id = "uninstall"
 i18n = "menu.global.uninstall"
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the

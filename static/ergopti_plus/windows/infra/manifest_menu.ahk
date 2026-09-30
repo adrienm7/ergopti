@@ -342,6 +342,12 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			try LoggerWarn("MenuRenderer", "List '{1}' produced a row with no label — skipped.", ListId)
 			continue
 		}
+		; A greyed row that names why (disabled_reason_key) reads like every greyed
+		; row with a reason, « label — head of the reason », and has nothing to run.
+		Greyed := Row.Has("disabled") && Row["disabled"] && Row.Has("disabled_reason_key")
+			&& Row["disabled_reason_key"] != ""
+		if Greyed
+			Label := Label . " — " . _MR_ReasonHead(t(Row["disabled_reason_key"]))
 		; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
 		Label := StrReplace(Label, "&", "&&")
 
@@ -364,7 +370,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			; is handing over, so a Menu passed where row data was expected fails
 			; here instead of rendering an empty submenu.
 			TargetMenu.Add(Label, Row["submenu"])
-		} else if (Row.Has("action") and Row["action"] is Func) {
+		} else if (Row.Has("action") and Row["action"] is Func and !Greyed) {
 			RegisterMenuItem(TargetMenu, Label, Row["action"])
 		} else {
 			; A row with neither a submenu nor an action is a label; AHK needs a
@@ -405,8 +411,17 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		try LoggerError("MenuRenderer", "Missing declaration or command for '{1}.{2}'.", ManifestKey, Id)
 		return 0
 	}
+	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+	; Greyed by disabled_when with the reason it declares, the row is drawn as
+	; the same stand-in as a row this platform has not yet ported, « label —
+	; head of the reason », with nothing to run: the two differ only in how the
+	; condition is evaluated.
+	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if Disabled && ReasonKey != ""
+		return _MR_RenderGreyedStandIn(ResultMenu,
+			Map("id", Id, "i18n", I18nKey, "reason_key", ReasonKey), ManifestKey)
 	Row := Map("label", t(I18nKey), "action", Commands[CmdId])
-	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+	if Disabled
 		Row["disabled"] := true
 	if ItemType == "check"
 		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)

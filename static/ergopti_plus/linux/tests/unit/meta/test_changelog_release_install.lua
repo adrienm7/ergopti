@@ -46,7 +46,7 @@ local LIST = Json.encode({
 })
 
 --- Builds the real bridge over the real manager with every effect recorded.
---- @param opts table|nil { version, kind, digest, feed, backup_fails }
+--- @param opts table|nil { version, source_run, kind, digest, feed, backup_fails }
 --- @return table ctx
 local function harness(opts)
 	opts = opts or {}
@@ -59,6 +59,10 @@ local function harness(opts)
 	local RealVersion = require("infra.version")
 	package.loaded["infra.version"] = setmetatable({ VERSION = opts.version or "0.0.0-dev.140" },
 		{ __index = RealVersion })
+	-- The suite runs from a checkout, which is a source run: each case says.
+	local Installation = require("infra.installation")
+	local real_is_source_run = Installation.is_source_run
+	Installation.is_source_run = function() return opts.source_run == true end
 	local manager = helpers.load_module("modules.updater.manager")
 	local Installer = require("modules.updater.installer")
 	ctx.real_install = Installer.install
@@ -132,6 +136,7 @@ local function harness(opts)
 	ctx.bridge = bridge
 	function ctx.restore_modules()
 		Installer.install = ctx.real_install
+		Installation.is_source_run = real_is_source_run
 		for name, value in pairs(saved) do package.loaded[name] = value end
 	end
 	-- The window opens and loads the list (feed-only when opts.feed: the stub
@@ -235,7 +240,7 @@ helpers.describe("changelog_bridge: one-click release install", function()
 	end)
 
 	helpers.it("greys a source run and refuses its request without a backup", function()
-		local ctx = harness({ version = "local" })
+		local ctx = harness({ version = "local", source_run = true })
 		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
 		ctx.restore_modules()
 		helpers.assert_eq(ctx.initial.install.blocked_key, "changelog_window.install_blocked_source")

@@ -355,8 +355,9 @@ for (const menuKey of MENU_KEYS) {
 
 // A menu row whose key is missing from a locale renders the raw key. Checked in
 // every shipped locale rather than in the reference one, because the reference
-// is the one that never has the gap.
-const LABEL_FIELDS = ['i18n', 'reason_key'];
+// is the one that never has the gap. `disabled_reason_key` is why
+// `disabled_when` greys a row, which the greyed row shows.
+const LABEL_FIELDS = ['i18n', 'reason_key', 'disabled_reason_key'];
 
 const namedKeys = [];
 for (const menuKey of MENU_KEYS) {

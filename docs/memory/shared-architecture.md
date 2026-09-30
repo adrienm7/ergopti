@@ -246,8 +246,13 @@ not applicable there (never drawn, no `reason_key`), `unavailable = "grey"`
 when it is not yet ported there (drawn disabled as its label plus the head of
 its translated reason, the text before the first colon, so the tray stays
 narrow). An undeclared restriction stays hidden, its reason read by the health
-check only. The generator, both renderers and `test-menu-unavailable-rows.cjs`
-hold the pair; a greyed reason's head must stay short in all 21 locales.
+check only. A `command` row its `disabled_when` greys where it is drawn says
+why the same way through `disabled_reason_key` (the Uninstall row of a local
+version run from source), drawn by the same stand-in with nothing to run;
+`reason_key` cannot carry that reason, since a restricted row keeps it for the
+platforms it leaves out. Provider rows take `disabled_reason_key` too. The
+generator, both renderers and `test-menu-unavailable-rows.cjs` hold the rule; a
+greyed reason's head must stay short in all 21 locales.
 Action: classify a restriction you add or touch, never with a long reason head.
 
 ### project-a-composite-scope-composes-revertible-owners

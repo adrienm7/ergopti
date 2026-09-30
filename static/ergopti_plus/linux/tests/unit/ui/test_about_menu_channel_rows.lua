@@ -51,13 +51,17 @@ end
 local CHANNEL_AT = 3
 
 -- The build the version row names, fixed so the row does not depend on the
--- checkout the suite runs from.
+-- checkout the suite runs from. It is an installed build, as the release it
+-- names is: the checkout itself is a source run, whose Update row is greyed.
 local IDENTITY = { kind = "release", version = "0.0.0-dev.140", commit = "c3005e0b9" }
 
 local function build(up, changed)
 	local Version = require("infra.version")
+	local Installation = require("infra.installation")
 	local real_identity = Version.identity
+	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
+	Installation.is_source_run = function() return false end
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	local ok, items = pcall(mb.build, {
 		_version = "0.0.0-dev.140",
@@ -66,6 +70,7 @@ local function build(up, changed)
 		on_menu_changed = function() if changed then changed.count = changed.count + 1 end end,
 	})
 	Version.identity = real_identity
+	Installation.is_source_run = real_is_source_run
 	if not ok then error(items, 0) end
 	return items
 end

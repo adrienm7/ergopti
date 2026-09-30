@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Nikdy",
 	"menu.about.frequency_menu": "Frekvence kontroly",
 	"menu.about.open_releases_page": "Verze — GitHub",
+	"menu.about.source_run_reason": "Místní verze (ze zdrojového kódu): instalace a odinstalace vyžadují nainstalovaný ErgoptiPlus",
 	"menu.about.title": "Verze / Aktualizace",
 	"menu.about.update_checking": "Kontroluji…",
 	"menu.about.update_downloading": "Downloading…",

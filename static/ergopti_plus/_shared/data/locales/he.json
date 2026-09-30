@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "אף פעם",
 	"menu.about.frequency_menu": "תדירות בדיקה",
 	"menu.about.open_releases_page": "גרסאות — GitHub",
+	"menu.about.source_run_reason": "גרסה מקומית (מקוד המקור): התקנה והסרה דורשות ErgoptiPlus מותקן",
 	"menu.about.title": "גרסה / עדכונים",
 	"menu.about.update_checking": "בודק…",
 	"menu.about.update_downloading": "Downloading…",

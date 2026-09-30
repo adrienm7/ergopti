@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "안 함",
 	"menu.about.frequency_menu": "확인 빈도",
 	"menu.about.open_releases_page": "릴리스 — GitHub",
+	"menu.about.source_run_reason": "로컬 버전(소스에서 실행): 설치와 제거에는 설치된 ErgoptiPlus가 필요합니다",
 	"menu.about.title": "버전 / 업데이트",
 	"menu.about.update_checking": "확인 중…",
 	"menu.about.update_downloading": "Downloading…",

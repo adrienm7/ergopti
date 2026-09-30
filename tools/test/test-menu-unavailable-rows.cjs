@@ -12,15 +12,21 @@
  *     elsewhere, so the row is drawn disabled with its label and the short
  *     form of its translated reason (the text before its first colon).
  * A restricted row without the field is hidden, as before the field existed.
+ * A row its `disabled_when` greys where it is drawn can say why in the same
+ * form (`disabled_reason_key`, on a command row): the Uninstall row of a local
+ * version run from source. One rule for both, which differ only in how the
+ * condition is evaluated.
  *
  * WHAT THIS HOLDS:
  *   1. Every declaration is one of the two values, on a row whose platforms
  *      leave some platform out; a hidden row has no reason_key; a greyed row
- *      has an i18n label and a reason_key (the generator refuses the same).
- *   2. A greyed row's reason opens with a short head in every locale, so the
- *      stand-in label stays narrow on every tray.
- *   3. Both renderers draw the stand-in (shared Lua and AutoHotkey); each
- *      driver's suite renders one.
+ *      has an i18n label and a reason_key; a disabled_reason_key sits on a
+ *      command row with an i18n label and the disabled_when that greys it
+ *      (the generator refuses the same).
+ *   2. Every greyed row's reason opens with a short head in every locale, so
+ *      the stand-in label stays narrow on every tray.
+ *   3. Both renderers draw the stand-in (shared Lua and AutoHotkey), for both
+ *      conditions; each driver's suite renders one.
  * ==============================================================================
  */
 
@@ -62,6 +68,15 @@ function reasonHead(text) {
  */
 function rowErrors(where, row) {
 	const errors = [];
+	if (row.disabled_reason_key !== undefined) {
+		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
+			errors.push(`${where}: disabled_reason_key must name a locale key.`);
+		if (row.type !== 'command')
+			errors.push(`${where}: disabled_reason_key is read on command rows only.`);
+		if (!Array.isArray(row.disabled_when) || row.disabled_when.length === 0)
+			errors.push(`${where}: disabled_reason_key needs the disabled_when that greys the row.`);
+		if (typeof row.i18n !== 'string') errors.push(`${where}: a greyed row needs an i18n label.`);
+	}
 	if (row.unavailable === undefined) return errors;
 	if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
 		errors.push(`${where}: unavailable must be "hide" or "grey".`);
@@ -92,6 +107,15 @@ function rowErrors(where, row) {
 	assert.equal(rowErrors('f', { ...base, platforms: undefined, unavailable: 'hide' }).length, 1);
 	assert.equal(rowErrors('f', { ...base, platforms: PLATFORMS, unavailable: 'hide' }).length, 1);
 	assert.equal(rowErrors('f', { ...base, unavailable: 'greyed' }).length, 1);
+	const drawn = { type: 'command', id: 'y', i18n: 'menu.y', disabled_when: ['installed_build'] };
+	assert.deepEqual(rowErrors('f', { ...drawn, disabled_reason_key: 'r' }), []);
+	assert.equal(rowErrors('f', { ...drawn, disabled_reason_key: '' }).length, 1);
+	assert.equal(rowErrors('f', { ...drawn, type: 'check', disabled_reason_key: 'r' }).length, 1);
+	assert.equal(
+		rowErrors('f', { ...drawn, disabled_when: undefined, disabled_reason_key: 'r' }).length,
+		1
+	);
+	assert.equal(rowErrors('f', { ...drawn, i18n: undefined, disabled_reason_key: 'r' }).length, 1);
 	assert.equal(reasonHead('Not on macOS yet: its key combinations…'), 'Not on macOS yet');
 	assert.equal(reasonHead('暂不适用于 macOS：在'), '暂不适用于 macOS');
 	assert.equal(reasonHead('Catalogue reload — Linux only'), 'Catalogue reload — Linux only');
@@ -105,37 +129,66 @@ const locales = fs
 	.map((file) => ({ file, table: JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8')) }));
 if (locales.length !== 21) errors.push(`read ${locales.length} locale file(s), expected 21.`);
 
+/**
+ * Holds a greyed row's reason to a short head in every locale.
+ * @param {string} where Row name for the messages.
+ * @param {string} key The reason's locale key.
+ */
+function checkReasonHead(where, key) {
+	for (const { file, table } of locales) {
+		const text = table[key];
+		if (typeof text !== 'string' || text === '') {
+			errors.push(`${where}: ${file} has no text for ${key}.`);
+		} else if (reasonHead(text).length === 0 || reasonHead(text).length > MAX_HEAD) {
+			errors.push(
+				`${where}: ${file} opens ${key} with "${reasonHead(text)}", ` +
+					`which must be 1 to ${MAX_HEAD} characters before its colon.`
+			);
+		}
+	}
+}
+
 let declared = 0;
 let greyed = 0;
+let disabledWithReason = 0;
 for (const [menu, rows] of Object.entries(manifest)) {
 	if (!Array.isArray(rows)) continue;
 	for (const row of rows) {
-		if (!row || typeof row !== 'object' || row.unavailable === undefined) continue;
-		declared += 1;
+		if (!row || typeof row !== 'object') continue;
+		if (row.unavailable === undefined && row.disabled_reason_key === undefined) continue;
 		const where = `${menu}.${row.id || row.i18n || row.type}`;
 		errors.push(...rowErrors(where, row));
+		if (typeof row.disabled_reason_key === 'string') {
+			disabledWithReason += 1;
+			checkReasonHead(where, row.disabled_reason_key);
+		}
+		if (row.unavailable === undefined) continue;
+		declared += 1;
 		if (row.unavailable !== 'grey' || typeof row.reason_key !== 'string') continue;
 		greyed += 1;
-		for (const { file, table } of locales) {
-			const text = table[row.reason_key];
-			if (typeof text !== 'string' || text === '') {
-				errors.push(`${where}: ${file} has no text for ${row.reason_key}.`);
-			} else if (reasonHead(text).length === 0 || reasonHead(text).length > MAX_HEAD) {
-				errors.push(
-					`${where}: ${file} opens ${row.reason_key} with "${reasonHead(text)}", ` +
-						`which must be 1 to ${MAX_HEAD} characters before its colon.`
-				);
-			}
-		}
+		checkReasonHead(where, row.reason_key);
 	}
 }
 if (declared < 4) errors.push(`found ${declared} declared row(s), expected at least 4.`);
 if (greyed < 1) errors.push('found no greyed row — the stand-in is untested by the manifest.');
+if (disabledWithReason < 1)
+	errors.push('found no disabled_reason_key — the runtime stand-in is untested by the manifest.');
 
+// One stand-in for both conditions: each renderer draws the row its
+// disabled_when greys through the same greyed stand-in as a row not yet ported.
+const STAND_IN = {
+	'renderer.lua': /greyed_stand_in\(manifest_key,\s*\{[^}]*reason_key = item\.disabled_reason_key/,
+	'manifest_menu.ahk': /_MR_RenderGreyedStandIn\(ResultMenu,\s*Map\([^)]*"reason_key", ReasonKey\)/
+};
 for (const file of RENDERERS) {
 	const text = fs.readFileSync(file, 'utf8');
 	if (!/unavailable/.test(text) || !/"grey"/.test(text))
 		errors.push(`${path.relative(ROOT, file)} does not draw a greyed stand-in.`);
+	if (!STAND_IN[path.basename(file)].test(text))
+		errors.push(
+			`${path.relative(ROOT, file)} does not draw a row its disabled_when greys with a reason ` +
+				'through the greyed stand-in.'
+		);
 }
 
 if (errors.length > 0) {
@@ -146,5 +199,6 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] ${declared} row(s) declare how a platform lacks them (${greyed} greyed with a ` +
-		`short reason in all 21 locales); both renderers draw the stand-in.\x1b[0m`
+		`short reason in all 21 locales), ${disabledWithReason} greyed by disabled_when with one; ` +
+		`both renderers draw the stand-in for both.\x1b[0m`
 );

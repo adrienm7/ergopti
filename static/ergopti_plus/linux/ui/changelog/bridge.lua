@@ -34,6 +34,7 @@ local LOG = "bridge.changelog"
 
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
+local Installation = require("infra.installation")
 local Shell = require("adapters.shell_runner")
 local Json = require("json")
 local Base64 = require("compat.base64")
@@ -337,7 +338,7 @@ end
 --- @param manager table|nil
 --- @return string|nil key Locale key the page shows.
 local function install_blocked(manager)
-	if Version.VERSION == Version.LOCAL then return "changelog_window.install_blocked_source" end
+	if Installation.is_source_run() then return "changelog_window.install_blocked_source" end
 	if manager and type(manager.installation_kind) == "function" and manager.installation_kind() == "package" then
 		return "changelog_window.install_blocked_package"
 	end

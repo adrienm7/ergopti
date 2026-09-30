@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "从不",
 	"menu.about.frequency_menu": "检查频率",
 	"menu.about.open_releases_page": "版本 — GitHub",
+	"menu.about.source_run_reason": "本地版本（从源码运行）：安装和卸载需要已安装的 ErgoptiPlus",
 	"menu.about.title": "版本 / 更新",
 	"menu.about.update_checking": "检查中…",
 	"menu.about.update_downloading": "Downloading…",
