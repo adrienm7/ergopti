@@ -319,9 +319,11 @@ intentional because native compositors blend differently.
 ### project-llm-tooltip-chords-are-exact
 
 Maintainer rule (2026-09-30), every OS: while predictions are shown, the exact
-navigation chord (`nav_modifiers` + Up/Down) moves the active slot and the
-exact validation chord (`val_modifiers` + digit N) inserts slot N, and the
-application receives neither. Any other modifier set, an arrow over a single
+navigation chord (`nav_modifiers` + an arrow: ↑/← the previous slot, ↓/→ the
+next, as `menu.llm.nav_label` says), Shift+Tab (the left Shift back, the right
+one forward, whatever `nav_modifiers`) moves the active slot and the exact
+validation chord (`val_modifiers` + digit N) inserts slot N, and the
+application receives none of them. Any other modifier set, an arrow over a single
 prediction (macOS, the reference, passes it and dismisses) and a digit beyond
 the shown slots reach the application. macOS has two consumers, the tooltip's
 per-render keyDown watcher and the keymap fallback `handle_llm_keys`, and tap
@@ -332,9 +334,16 @@ predictions. Windows cycles and consumes the arrows in AHK, never natively
 digit-row key on every driver: macOS keycodes, Linux `EvdevCodes.DIGIT_ROW_SLOT`
 (the typed character made Shift+2 an `@` that never matched) and Windows
 `_LLM_Menu_NavDigitRowKey`. A tap-hold whose tap is Tab is the user's Tab
-(`project-llm-tap-hold-tab-is-the-users-tab`). Only macOS also navigates with
-←/→ and Shift+Tab. Action: change the rule on all three drivers with the
-`llm-tooltip-chords-consumed` and `llm-accept-inserts` tests.
+(`project-llm-tap-hold-tab-is-the-users-tab`), and so is its Tab under one
+Shift. The footer strings of `_shared/modules/tooltip/constants.toml`
+(`hint_nav_left` "⇧G + Tab", `hint_arrow_left` "↑/←") are the advertised
+contract: Windows and Linux cycled on ↑/↓ only, so ←/→ and Shift+Tab reached
+the application behind a tooltip that named them, and the Windows footer hid
+the bare arrows. `test-llm-nav-chord-contract.cjs` parses those strings and
+every driver's tables; the Linux keyboard hook names the Shift side
+(`held_shift_side`) because its modifier set does not. Action: change the rule
+on all three drivers with the `llm-tooltip-chords-consumed`,
+`llm-nav-left-right-windows` and `llm-accept-inserts` tests.
 
 ## Logging and observability
 

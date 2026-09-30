@@ -1698,6 +1698,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-llm-nav-cycle'
 	},
 	{
+		name: 'every driver cycles a visible prediction on each chord its tooltip advertises: the arrows and either Shift+Tab',
+		cmd: 'node',
+		args: ['tools/test/test-llm-nav-chord-contract.cjs'],
+		repro: 'npm run test:llm-nav-chord-contract'
+	},
+	{
 		name: 'Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation',
 		cmd: 'node',
 		args: ['tools/test/test-windows-hotstring-preview-shows.cjs'],
