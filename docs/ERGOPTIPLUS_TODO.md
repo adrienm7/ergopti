@@ -331,11 +331,6 @@ checked on a real machine moves to item 51 (Windows) or its macOS twin.
 Releases: push to `dev` without a release until every item below is
 integrated, then publish one grouped release.
 
-- [ ] **52.** AI menu: no « Tout effacer » row; the Backend row shows the
-      selected option's label up to its em dash, emoji included (« 🌐 API »), on
-      every driver; each API entry is named `provider/model` automatically (for
-      example `cerebras/llama-3.3-70b`) and the configuration no longer asks for a
-      name. Branch `feat/llm-menu-cleanup`.
 - [ ] **53.** Every menu and submenu opens with the same group: its master
       toggle, « Restaurer les valeurs conseillées », « ✕ Tout effacer (comportement
       du système) », then a separator. AI and Metrics keep only the restore. No
