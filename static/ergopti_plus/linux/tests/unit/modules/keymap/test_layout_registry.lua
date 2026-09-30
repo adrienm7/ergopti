@@ -188,7 +188,10 @@ helpers.describe("layout manager (Linux): installing", function()
 		}
 		package.loaded["logger.shim"] = recorder
 		local Fresh = helpers.load_module("infra.paths")
-		local ok, roots = pcall(Fresh.extension_roots)
+		local ok, roots = pcall(function()
+			Fresh.extension_roots()
+			return Fresh.extension_roots()
+		end)
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
 		package.loaded["infra.config_paths"] = saved_config
 		package.loaded["logger.shim"] = saved_logger
@@ -196,7 +199,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
 		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" })
 		helpers.assert_eq(roots[#roots], "/private/xdg/ergopti/extensions")
-		helpers.assert_eq(#errors, 1, "the skipped record is reported, never a silent success")
+		helpers.assert_eq(#errors, 1, "the skipped record is reported once, never a silent success")
 		helpers.assert_true(errors[1]:find("not valid JSON", 1, true) ~= nil, errors[1])
 	end)
 
