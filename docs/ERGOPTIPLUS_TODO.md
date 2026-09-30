@@ -323,6 +323,15 @@ These are software implementations; final hardware verification remains below.
         `adapters/json_codec.lua`, which returns a tree, and lower the
         baseline. Audit the other hs stubs for the same kind of divergence from
         the native behaviour.
+42. [ ] config.toml batch writer follow-ups (`toml-batch-existing-key`): an old
+        build's scalar where a table is now expected (`[hotstrings.modules]
+    magickey = true`, `groups = "x"`) still makes a menu save fail with
+        « the batch cannot address the destination without ambiguous TOML
+        keys » — maintainer decision: may an ordinary save overwrite a value
+        flagged outdated? Hand-written dotted keys (`a.b = 1`) are read by the
+        shared decoder as one key named "a.b", so the app ignores them. Linux
+        still refuses to save over a `[[hotstrings.terminators]]` list
+        (`terminator_settings.lua`) although the writer now can.
 
 ## Time estimate
 
