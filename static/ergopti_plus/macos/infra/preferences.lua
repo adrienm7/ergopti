@@ -832,6 +832,12 @@ end
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
 local _owned_publications = {}
+-- Paths load() judged outdated, per destination: never read into the state,
+-- which holds their default instead. An ordinary save must not turn that
+-- default into a delete of the outdated value, which belongs to the config
+-- cleanup that offers it (as Windows full saves keep boot-outdated entries);
+-- a value the user sets there replaces it and ends the exemption.
+local _load_outdated = {}
 
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
@@ -958,13 +964,17 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
-	local flattened, values = pcall(flatten_from_disk, tbl)
+	local values
+	local flattened, outdated = pcall(ConfigOutdated.collect_reports, function()
+		values = flatten_from_disk(tbl)
+	end)
 	if not flattened then
 		_source_snapshots[prefs_file] = nil
 		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
 		return {}, "corrupt"
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	_load_outdated[prefs_file] = outdated
 	return values, "ok"
 end
 
@@ -1361,8 +1371,20 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
+	-- A value load() judged outdated is left for the cleanup: the state holds
+	-- its default, whose sparse delete must not erase it (see _load_outdated).
+	local outdated = _load_outdated[prefs_file] or {}
+	local replaced = {}
 	local ok, updates = pcall(function()
-		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))))
+		local leaves = {}
+		for _, row in ipairs(sparse_updates(existing)) do
+			local path = row.section .. "." .. row.key
+			if not (row.delete and outdated[path]) then
+				leaves[#leaves + 1] = row
+				if outdated[path] then replaced[#replaced + 1] = path end
+			end
+		end
+		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
 	end)
 	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
@@ -1389,6 +1411,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
+	-- The user's own value replaced the outdated one: its later default is a
+	-- real choice again, saved sparsely like any other.
+	for _, path in ipairs(replaced) do outdated[path] = nil end
 	return true, existing, runtime
 end
 

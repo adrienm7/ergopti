@@ -663,6 +663,31 @@ helpers.with_stub_scope(MODULES, function()
 				end)
 			end)
 
+		helpers.it("unused keys: an ordinary save keeps values judged outdated at load (config-outdated-save-keeps-scalars)",
+			function()
+				-- The state held their default, and the first save turned it into a
+				-- delete: the values were gone before the cleanup could offer them.
+				local source = "[llm]\nagent_mode = \"suggest\"\n[llm.profiles]\nactive = \"deleted_profile\"\n"
+					.. "[ui]\nmenubar_icon = \"v9\"\n"
+				local state = { llm_agent_mode = "off", llm_active_profile = "basic", menubar_icon = "v1" }
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(select(2, Preferences.load(path)), "ok")
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					local saved = TomlCodec.decode(Sandbox.read_bytes(path))
+					helpers.assert_eq(saved.llm.agent_mode, "suggest")
+					helpers.assert_eq(saved.llm.profiles.active, "deleted_profile")
+					helpers.assert_eq(saved.ui.menubar_icon, "v9")
+					-- A value the user sets replaces the outdated one; its later
+					-- default is saved sparsely again.
+					state.llm_agent_mode = "auto"
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					helpers.assert_eq(TomlCodec.decode(Sandbox.read_bytes(path)).llm.agent_mode, "auto")
+					state.llm_agent_mode = "off"
+					helpers.assert_eq(Preferences.save(path, state, {}, {}), true)
+					helpers.assert_nil(TomlCodec.decode(Sandbox.read_bytes(path)).llm.agent_mode)
+				end)
+			end)
+
 		helpers.it("unused keys: the next preference save succeeds after a cleanup", function()
 			Sandbox.with_config(FIXTURE, function(path)
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")
