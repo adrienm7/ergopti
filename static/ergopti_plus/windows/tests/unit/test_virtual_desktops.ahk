@@ -53,12 +53,20 @@ _VDT_ReplayCorpus() {
 }
 Test("desktop navigation: the index maths replay the shared corpus", _VDT_ReplayCorpus)
 
+; One invalid vector per call, so the refused call reads a parameter. A
+; closure never sees a for-loop variable: built in the loop, it threw an
+; UnsetError that AssertThrows accepted whatever DesktopNavigationTarget did.
+; @param Vector {Map} One entry of the corpus "invalid" list.
+_VDT_RefusesInvalidRead(Vector) {
+	AssertThrows(() => DesktopNavigationTarget(Vector["index"], Vector["count"],
+		Vector["direction"], Vector["wrap"]), Vector["id"] . " must be refused")
+}
+
 _VDT_RefusesInvalidReads() {
 	Corpus := _VDT_Corpus()
 	Refused := 0
 	for _, Vector in Corpus["invalid"] {
-		AssertThrows(() => DesktopNavigationTarget(Vector["index"], Vector["count"],
-			Vector["direction"], Vector["wrap"]), Vector["id"] . " must be refused")
+		_VDT_RefusesInvalidRead(Vector)
 		Refused += 1
 	}
 	AssertTrue(Refused >= 7, "expected at least 7 invalid inputs, found " . Refused)

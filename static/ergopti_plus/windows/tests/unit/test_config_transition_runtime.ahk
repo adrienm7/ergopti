@@ -51,6 +51,16 @@ Test("config transition runtime: result predicate is type and case strict "
 	. "(config-transition-runtime-strict-result)",
 	_CTRT_ResultPredicateIsStrict)
 
+; One malformed authority per call, so the refused call reads a parameter. A
+; closure never sees a for-loop variable: built in the loop, it threw an
+; UnsetError that AssertThrows accepted whatever the builder did.
+; @param InvalidExpected {Any} Neither a Map nor the integer sentinel 0.
+_CTRT_MalformedExpectedOldIsRefused(InvalidExpected) {
+	AssertThrows(() => ConfigTransitionPresentTarget(
+		"C:\cfg\invalid.toml", "new", InvalidExpected),
+		"malformed expected-old authority must fail fast: " . Type(InvalidExpected))
+}
+
 _CTRT_TargetBuildersUseExactSchema() {
 	Present := ConfigTransitionPresentTarget("C:\cfg\config.toml", "new")
 	Guarded := ConfigTransitionPresentTarget("C:\cfg\guarded.toml", "new",
@@ -69,9 +79,7 @@ _CTRT_TargetBuildersUseExactSchema() {
 		&& Absent["new_present"] == 0)
 	AssertEqual("", Absent["new_content"])
 	for InvalidExpected in ["0", 1, []]
-		AssertThrows(() => ConfigTransitionPresentTarget(
-			"C:\cfg\invalid.toml", "new", InvalidExpected),
-			"malformed expected-old authority must fail fast")
+		_CTRT_MalformedExpectedOldIsRefused(InvalidExpected)
 }
 Test("config transition runtime: target builders match strict core schema "
 	. "(config-transition-runtime-target-schema)",
@@ -97,6 +105,17 @@ Test("config transition runtime: reset declares placeholder then two deletes "
 	. "(config-transition-runtime-reset-specs)",
 	_CTRT_ResetSpecsAreCompleteAndOrdered)
 
+; One invalid directory per call, so the refused call reads a parameter, for
+; the same reason as _CTRT_MalformedExpectedOldIsRefused.
+; @param Invalid {String} A directory the absolute Windows-path grammar rejects.
+_CTRT_InvalidConfigDirIsRefused(Invalid) {
+	AssertFalse(ConfigTransitionNormalizeConfigDir(Invalid) is String,
+		"invalid config directory unexpectedly accepted: " . Invalid)
+	AssertThrows(() => ConfigTransitionPathsTomlContent(Invalid,
+		"C:\Default\"),
+		"invalid config directory must never reach paths.toml bytes: " . Invalid)
+}
+
 _CTRT_ConfigDirValidationIsCanonicalAndStrict() {
 	AssertEqual("C:\Config\",
 		ConfigTransitionNormalizeConfigDir("C:/Config"))
@@ -109,11 +128,7 @@ _CTRT_ConfigDirValidationIsCanonicalAndStrict() {
 		'C:\bad"quote', "C:\bad" . Chr(10) . "line",
 		"C:\CON", "C:\trailing.", "C:\trailing "
 	] {
-		AssertFalse(ConfigTransitionNormalizeConfigDir(Invalid) is String,
-			"invalid config directory unexpectedly accepted: " . Invalid)
-		AssertThrows(() => ConfigTransitionPathsTomlContent(Invalid,
-			"C:\Default\"),
-			"invalid config directory must never reach paths.toml bytes")
+		_CTRT_InvalidConfigDirIsRefused(Invalid)
 	}
 	Content := ConfigTransitionPathsTomlContent("C:\Config",
 		"C:\Default\")

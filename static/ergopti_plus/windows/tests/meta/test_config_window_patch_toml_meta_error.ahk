@@ -36,13 +36,20 @@ _PTME_PatchTomlMetaHasCatch() {
 Test("hotstrings_config_window: delegated metadata publication logs failures",
 	_PTME_PatchTomlMetaHasCatch)
 
+; One invalid value per call, so the formatter closure reads a parameter. A
+; closure never sees a for-loop variable: built in the loop, it threw an
+; UnsetError that AssertThrows accepted whatever _HCW_TomlValue did.
+; @param Invalid {Any} A priority outside the integers 0 through 100.
+_PTME_InvalidPriorityCase(Invalid) {
+	AssertFalse(_HCW_SetOverride({}, "", "priority", Invalid),
+		"the HCW boundary must reject an invalid priority before reading its backend entry: " . String(Invalid))
+	AssertThrows(() => _HCW_TomlValue("priority", Invalid),
+		"the personal TOML formatter must fail closed on an invalid priority: " . String(Invalid))
+}
+
 _PTME_InvalidPriorityCannotReachPersonalBackend() {
-	for Invalid in [-1, 101, 1.5, "50", 1.0e300] {
-		AssertFalse(_HCW_SetOverride({}, "", "priority", Invalid),
-			"the HCW boundary must reject an invalid priority before reading its backend entry")
-		AssertThrows(() => _HCW_TomlValue("priority", Invalid),
-			"the personal TOML formatter must fail closed on an invalid priority")
-	}
+	for Invalid in [-1, 101, 1.5, "50", 1.0e300]
+		_PTME_InvalidPriorityCase(Invalid)
 	AssertEqual("0", _HCW_TomlValue("priority", 0),
 		"the lower priority boundary must remain serialisable")
 	AssertEqual("100", _HCW_TomlValue("priority", 100),
@@ -51,13 +58,18 @@ _PTME_InvalidPriorityCannotReachPersonalBackend() {
 Test("hotstrings_config_window: invalid priority cannot reach personal persistence",
 	_PTME_InvalidPriorityCannotReachPersonalBackend)
 
+; One invalid value per call, for the same reason as _PTME_InvalidPriorityCase.
+; @param Invalid {Any} A tooltip value other than the integers 0 and 1.
+_PTME_InvalidTooltipBooleanCase(Invalid) {
+	AssertFalse(_HCW_SetOverride({}, "", "show_tooltip", Invalid),
+		"the HCW boundary must reject an invalid tooltip Boolean before reading its backend entry: " . String(Invalid))
+	AssertThrows(() => _HCW_TomlValue("show_tooltip", Invalid),
+		"the personal TOML formatter must fail closed on an invalid tooltip Boolean: " . String(Invalid))
+}
+
 _PTME_InvalidTooltipBooleanCannotReachPersonalBackend() {
-	for Invalid in ["false", "true", 2, -1, 0.5] {
-		AssertFalse(_HCW_SetOverride({}, "", "show_tooltip", Invalid),
-			"the HCW boundary must reject an invalid tooltip Boolean before reading its backend entry")
-		AssertThrows(() => _HCW_TomlValue("show_tooltip", Invalid),
-			"the personal TOML formatter must fail closed on an invalid tooltip Boolean")
-	}
+	for Invalid in ["false", "true", 2, -1, 0.5]
+		_PTME_InvalidTooltipBooleanCase(Invalid)
 	AssertEqual("false", _HCW_TomlValue("show_tooltip", false),
 		"the false Boolean must remain serialisable")
 	AssertEqual("true", _HCW_TomlValue("show_tooltip", true),
