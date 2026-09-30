@@ -101,15 +101,30 @@ for (const op of maps) {
 		mapped.set(pair.from, pair.to);
 	}
 }
+// The Windows reader matched ^SC[0-9A-F]{3}$ without regard to case, so every
+// letter-case spelling of a candidate's scan code was a working key: "Sc024" and
+// "SC02e" as much as "SC024" and "sc024".
+const caseSpellings = (text) =>
+	[...text].reduce(
+		(spellings, ch) => {
+			const forms = [...new Set([ch.toUpperCase(), ch.toLowerCase()])];
+			return spellings.flatMap((prefix) => forms.map((form) => prefix + form));
+		},
+		['']
+	);
+assert.deepStrictEqual(
+	caseSpellings('SC02E').length,
+	8,
+	'S, C and the hex letter each take two cases'
+);
 const wanted = new Map();
 for (const code of expected) {
-	wanted.set(scanOf.get(code), code);
-	wanted.set(scanOf.get(code).toLowerCase(), code);
+	for (const spelling of caseSpellings(scanOf.get(code))) wanted.set(spelling, code);
 }
 assert.deepStrictEqual(
 	[...mapped.entries()].sort(),
 	[...wanted.entries()].sort(),
-	'both spellings the Windows reader accepted map every candidate scan code to its code'
+	'every letter case the Windows reader accepted maps every candidate scan code to its code'
 );
 
 // 4. Last resort.
