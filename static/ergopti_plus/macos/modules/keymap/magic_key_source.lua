@@ -33,13 +33,14 @@ local NavLayer   = require("platform.remap.nav_layer")
 
 local LOG = "keymap.magic_key_source"
 
--- The canonical configuration path of the setting.
+-- The canonical configuration path of the setting, and its automatic value.
 M.PATH = "hotstrings.magic_key_source"
+local AUTOMATIC = Manifest.default_for(M.PATH)
 
 -- Built on first use: the registry is 37 KB of JSON nobody needs while the
 -- automatic value is in effect and no menu asks for the candidates.
 local _resolver = nil
-local _value = Manifest.default_for(M.PATH)
+local _value = AUTOMATIC
 local _keycode = nil
 
 
@@ -84,6 +85,13 @@ end
 --- @param value any Stored value, nil when absent.
 --- @return string value The value now in effect.
 function M.set(value)
+	-- Every boot applies the stored value: the automatic one, by far the most
+	-- common, remaps nothing and needs no registry.
+	if value == nil or value == AUTOMATIC then
+		_value, _keycode = AUTOMATIC, nil
+		Logger.info(LOG, "Physical magic key: %s.", AUTOMATIC)
+		return AUTOMATIC
+	end
 	local resolver = M.resolver()
 	local applied, outdated = resolver.normalize(value)
 	-- The preference reader already named an outdated entry with its one
