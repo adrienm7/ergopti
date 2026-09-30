@@ -9,7 +9,8 @@
 --- (layout-catalogue). These tests replay the shared vectors every driver
 --- replays (_shared/tests/corpus/layouts/catalogue_vectors.json), then pin the
 --- refresh's conditional request, the installed record's refusal of damaged
---- data, and the offline installation of a shipped layout.
+--- data (an entry it cannot use is left out alone), and the offline
+--- installation of a shipped layout.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -187,14 +188,37 @@ helpers.describe("layout catalogue: the installed-layouts record", function()
 			"{ damaged",
 			'{"schema_version": 2, "layouts": {}}',
 			'{"schema_version": 1}',
-			'{"schema_version": 1, "layouts": {"sample": {"id": "other", "sha256": "x", "version": "1"}}}',
-			'{"schema_version": 1, "layouts": {"../evil": {"id": "../evil", "sha256": "x", "version": "1"}}}',
 		}
 		for _, text in ipairs(cases) do
 			local record, err = Catalogue.decode_installed(text, Json.decode)
 			helpers.assert_nil(record, "accepted: " .. text)
 			helpers.assert_type(err, "string")
 		end
+	end)
+
+	helpers.it("leaves out an entry it cannot use, keeps the rest and never erases it (config-outdated-installed)", function()
+		local entry = vectors.indexes.fresh.layouts[1]
+		local layouts = {
+			[entry.id] = entry,
+			renamed = { id = "other", sha256 = "x", version = "1" },
+			["../evil"] = { id = "../evil", sha256 = "x", version = "1" },
+			ergopti_v1 = { id = "ergopti_v1", version = "1.0" },
+		}
+		local record, err = Catalogue.decode_installed(Json.encode({ schema_version = 1, layouts = layouts }),
+			Json.decode)
+		helpers.assert_nil(err, tostring(err))
+		helpers.assert_eq(#Catalogue.installed_list(record), 1, "only the valid layout is installed")
+		helpers.assert_eq(Catalogue.installed_list(record)[1].id, entry.id)
+		for _, id in ipairs({ "renamed", "../evil", "ergopti_v1" }) do
+			helpers.assert_type(record.outdated[id] and record.outdated[id].detail, "string", id .. " is reported")
+		end
+		local written = Json.decode(Json.encode(Catalogue.without_installed(record, entry.id)))
+		helpers.assert_eq(written.layouts.ergopti_v1, layouts.ergopti_v1,
+			"writing the record keeps what the user was told to fix")
+		helpers.assert_nil(written.layouts[entry.id])
+		local rewritten = Json.decode(Json.encode(Catalogue.with_installed(record, entry)))
+		helpers.assert_eq(rewritten.layouts["../evil"], layouts["../evil"])
+		helpers.assert_eq(rewritten.layouts[entry.id].sha256, entry.sha256)
 	end)
 
 	helpers.it("tells the Ergopti family apart (layout-catalogue)", function()

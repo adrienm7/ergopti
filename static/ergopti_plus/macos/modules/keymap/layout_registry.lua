@@ -33,6 +33,7 @@ local Crypto       = require("adapters.crypto")
 local Json         = require("json")
 local Registry     = require("layouts.registry")
 local Catalogue    = require("layouts.catalogue")
+local Outdated     = require("config_outdated")
 local Extension    = require("layouts.extension")
 
 local M = {}
@@ -217,7 +218,8 @@ local function bundled_index(deps)
 	return index
 end
 
---- Reads the installed-layouts record.
+--- Reads the installed-layouts record. An entry this build cannot use is
+--- warned once and left out; the other layouts stay installed.
 --- @param deps table
 --- @return table|nil record
 --- @return string|nil error
@@ -225,7 +227,11 @@ local function read_installed(deps)
 	local path = deps.local_dir .. deps.settings.installed_file
 	local text = deps.exists(path) and deps.read(path) or nil
 	if deps.exists(path) and type(text) ~= "string" then return nil, "cannot read " .. path end
-	return Catalogue.decode_installed(text, deps.decode_json)
+	local record, err = Catalogue.decode_installed(text, deps.decode_json)
+	for id, item in pairs(record and record.outdated or {}) do
+		Outdated.report_in_file(path, { "layouts", id }, item.detail)
+	end
+	return record, err
 end
 
 --- Writes the installed-layouts record.
