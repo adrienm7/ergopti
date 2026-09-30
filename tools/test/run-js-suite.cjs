@@ -1848,6 +1848,12 @@ const CHECKS = [
 		repro: 'npm run test:physical-keys-registry'
 	},
 	{
+		name: 'HS-274 native run refuses a Hammerspoon consumer on Linux while the producer and consumer baseline versions differ',
+		cmd: 'node',
+		args: ['tools/test/test-hs274-baseline-contract.cjs'],
+		repro: 'npm run test:hs274-baseline-contract'
+	},
+	{
 		name: 'layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends',
 		cmd: 'node',
 		args: ['tools/test/test-layer-actions-vocabulary.cjs'],

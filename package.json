@@ -32,6 +32,7 @@
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
 		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",
 		"test:physical-keys-registry": "node ./tools/test/test-physical-keys-registry.cjs",
+		"test:hs274-baseline-contract": "node ./tools/test/test-hs274-baseline-contract.cjs",
 		"test:layer-actions-vocabulary": "node ./tools/test/test-layer-actions-vocabulary.cjs",
 		"test:layer-editor-data": "node ./tools/test/test-layer-editor-data.cjs",
 		"test:layer-editor-model": "node ./tools/test/test-layer-editor-model.cjs",
