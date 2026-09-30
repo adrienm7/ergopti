@@ -9,9 +9,18 @@
 local helpers = require("tests.helpers")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
+--- Counts the in-memory projection resets the dashboard commits.
+local function spy_projection_resets()
+	local projection = package.loaded["ui.metrics_typing.projection"]
+	local counter = { resets = 0 }
+	projection.reset = function() counter.resets = counter.resets + 1 end
+	return counter
+end
+
 helpers.describe("typing cache reset transaction", function()
 	helpers.it("(typing-cache-reset) repeated refusal remains bounded and explicit retry can commit", function()
-		with_delivery(function(dashboard, context, _, errors, _, evaluations)
+		with_delivery(function(_, context, _, errors, _, evaluations)
+			local projection = spy_projection_resets()
 			local infos, removed = 0, false
 			package.loaded["infra.logger"].info = function(_, template)
 				if template == "Caches cleared by user reset." then infos = infos + 1 end
@@ -30,7 +39,7 @@ helpers.describe("typing cache reset transaction", function()
 				end
 				helpers.assert_eq(#errors, 1)
 				helpers.assert_eq(infos, 1)
-				helpers.assert_nil(dashboard._last_query)
+				helpers.assert_eq(projection.resets, 1, "only the committed retry drops memory")
 			end, debug.traceback)
 			os.remove = original_remove
 			if not ok then error(err, 0) end
@@ -38,9 +47,8 @@ helpers.describe("typing cache reset transaction", function()
 	end)
 	for _, mode in ipairs({ "refused", "false", "nil", "truthy", "throw", "absent", "success", "reentry", "log_reentry" }) do
 		helpers.it("(typing-cache-reset) " .. mode, function()
-			with_delivery(function(dashboard, context, _, errors, _, evaluations)
-				local range, manifest, query = {}, {}, {}
-				dashboard._range_cache, dashboard._manifest_cache, dashboard._last_query = range, manifest, query
+			with_delivery(function(_, context, _, errors, _, evaluations)
+				local projection = spy_projection_resets()
 				local infos, removals = 0, 0
 				package.loaded["infra.logger"].info = function(_, template)
 					if template == "Caches cleared by user reset." then infos = infos + 1 end
@@ -71,19 +79,13 @@ helpers.describe("typing cache reset transaction", function()
 					evaluations[1].done("request", nil)
 					helpers.assert_eq(#evaluations, 2)
 					evaluations[2].done(true, nil)
-					helpers.assert_eq(removals, 1)
+					-- The snapshot and an interrupted partial save are both unlinked
+					helpers.assert_eq(removals, 2)
 					local committed = mode == "success" or mode == "absent"
 					helpers.assert_eq(infos, committed and 1 or 0)
 					helpers.assert_eq(#errors, (not committed and mode ~= "reentry") and 1 or 0)
-					if committed then
-						helpers.assert_true(dashboard._range_cache ~= range)
-						helpers.assert_nil(dashboard._manifest_cache)
-						helpers.assert_nil(dashboard._last_query)
-					else
-						helpers.assert_eq(dashboard._range_cache, range)
-						helpers.assert_eq(dashboard._manifest_cache, manifest)
-						helpers.assert_eq(dashboard._last_query, query)
-					end
+					helpers.assert_eq(projection.resets, committed and 1 or 0,
+						"memory is dropped only after the disk snapshot is gone")
 					for _, message in ipairs(errors) do
 						helpers.assert_eq(message, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
 					end

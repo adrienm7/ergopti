@@ -9,25 +9,44 @@
 local helpers = require("tests.helpers")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
+local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
+local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
+
+--- Returns the index of the last readiness probe for one page capability.
+local function last_probe(evaluations, capability)
+	for index = #evaluations, 1, -1 do
+		if evaluations[index].code == "typeof window." .. capability then return index end
+	end
+	return nil
+end
+
 helpers.describe("typing publication delivery", function()
 	for _, route in ipairs({ "manifest", "cache", "live", "reopen" }) do
 		for _, outcome in ipairs({ "success", "error", "retired" }) do
 			helpers.it("(typing-publication-delivery) " .. route .. " " .. outcome, function()
 				with_delivery(function(dashboard, context, timers, errors, successes, evaluations, filesystem)
+					local probe
 					if route == "manifest" then
-						timers[1](); timers[2]()
-					elseif route == "cache" then
-						filesystem.read_with_status = function() return "cached", "ok" end
-						package.loaded["hs.json"].decode = function() return { manifest = "{}" } end
 						timers[1]()
+						context.settle_jobs()
+						probe = last_probe(evaluations, "publishTypingMetricsData")
+					elseif route == "cache" then
+						filesystem.read_with_status = function() return SNAPSHOT, "ok" end
+						timers[1]()
+						probe = last_probe(evaluations, "publishTypingMetricsData")
 					elseif route == "live" then
 						helpers.assert_eq(dashboard.push_live_update(), true)
 						timers[#timers]()
-					else helpers.assert_eq(dashboard.show(), true) end
-					helpers.assert_eq(#evaluations, 1)
+						context.settle_jobs()
+						probe = last_probe(evaluations, "publishTypingMetricsData")
+					else
+						helpers.assert_eq(dashboard.show(), true)
+						probe = #evaluations
+					end
+					helpers.assert_eq(probe, #evaluations, "the publication is the latest native call")
 					if route ~= "reopen" then
-						evaluations[1].done("function", nil)
-						helpers.assert_eq(#evaluations, 2)
+						evaluations[probe].done("function", nil)
+						helpers.assert_eq(#evaluations, probe + 1)
 					end
 					helpers.assert_eq(#successes, 0)
 					local completion = evaluations[#evaluations].done
@@ -55,12 +74,12 @@ helpers.describe("typing request response delivery", function()
 						return self
 					end
 					if route == "cache" then
-						filesystem.read_with_status = function() return "cached", "ok" end
-						package.loaded["hs.json"].decode = function() return { manifest = "{}" } end
+						filesystem.read_with_status = function() return SNAPSHOT, "ok" end
 					end
 					timers[1]()
-					if route == "manifest" then timers[2]() end
-					helpers.assert_eq(#errors, 1)
+					if route == "manifest" then context.settle_jobs() end
+					-- The loading notice and the publication each report their own refusal
+					helpers.assert_eq(#errors, route == "manifest" and 2 or 1, table.concat(errors, " | "))
 					helpers.assert_eq(#successes, 0)
 					helpers.assert_eq(#evaluations, 0)
 				end)
@@ -79,6 +98,8 @@ helpers.describe("typing request response delivery", function()
 				helpers.assert_true(evaluations[2].code:find("window._lua_request", 1, true) ~= nil)
 				if site == "range" then
 					evaluations[2].done(true)
+					helpers.assert_eq(#evaluations, 2, "range data is projected off the request callback")
+					context.settle_jobs()
 					helpers.assert_eq(#evaluations, 3)
 					helpers.assert_true(evaluations[3].code:find("receive_range_data", 1, true) ~= nil)
 					evaluations[3].done(nil, {})

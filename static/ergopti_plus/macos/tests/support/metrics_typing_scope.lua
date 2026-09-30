@@ -14,6 +14,7 @@ local OWNERS = {
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
 	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",
 	"modules.keylogger.log_manager", "modules.keylogger.sqlite_reader",
+	"infra.paced_job", "infra.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
 }
 
 --- Runs construction and every callback within the same native and cache scope.
