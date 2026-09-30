@@ -213,6 +213,24 @@ local function build_report(record)
 	}
 end
 
+--- Reports one failure on GitHub exactly as this window's Report button does,
+--- for a window that shows a failure of its own (the update-check window): the
+--- same diagnostics report, redacted, the same prefilled issue form.
+--- @param record table { kind = "error", module, message, time }
+--- @return boolean reported
+function M.report(record)
+	local ok_report, fields = pcall(build_report, record)
+	if not ok_report then
+		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module),
+			tostring(fields))
+		return false
+	end
+	local result = require("ui.healthcheck.report").perform(
+		{ action = "report", text = fields.report.text, fields = fields.report.fields },
+		fields.paths, fields.documents, fields.context)
+	return result.ok == true
+end
+
 --- The page's first message: the error and its report, already redacted.
 --- @param session table
 --- @return table

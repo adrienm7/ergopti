@@ -38,6 +38,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Manifest = require("infra.manifest_reader")
@@ -289,22 +290,45 @@ local function manifest_defaults()
 	return defaults
 end
 
---- Visits canonical assignments whose chord belongs to this owner.
+--- Visits canonical assignments whose chord belongs to this owner. A
+--- [shortcuts] or keyboard value of another shape is outdated configuration:
+--- reported once and walked as empty, so the cleanup offers it.
 --- @param decoded table Decoded configuration.
 --- @param consume function Consumer receiving slot and stored value.
 local function walk_assignments(decoded, consume)
-	local shortcuts = type(decoded.shortcuts) == "table" and decoded.shortcuts or {}
-	local assignments = type(shortcuts.keyboard) == "table" and shortcuts.keyboard or {}
+	local shortcuts = ConfigOutdated.settings_table(decoded.shortcuts, { "shortcuts" }, Logger) or {}
+	local assignments = ConfigOutdated.settings_table(shortcuts.keyboard, { "shortcuts", "keyboard" }, Logger) or {}
 	for slot, value in pairs(assignments) do
 		if owns_slot(slot) then consume(slot, value) end
 	end
 end
 
---- Marks the same recognized entries that the runtime reader consumes.
+--- Whether a stored assignment still names something this build runs. An
+--- action retired by an update is outdated configuration: ignored, warned
+--- about once and offered by the config cleanup, never an error or a refusal.
+--- @param slot string Keyboard slot id.
+--- @param action any Stored value.
+--- @param catalogue table Action catalogue owner.
+--- @return boolean known
+local function stored_assignment_known(slot, action, catalogue)
+	if action == "none" or (type(action) == "string" and catalogue.is_assignable(action)) then return true end
+	ConfigOutdated.report({ "shortcuts", "keyboard", slot },
+		"action '" .. tostring(action) .. "' no longer exists", Logger)
+	return false
+end
+
+--- Marks the same recognized entries that the runtime reader consumes. A slot
+--- whose action no longer exists is left unmarked, so the cleanup offers it.
 --- @param decoded table Decoded configuration.
 --- @param mark function Segment-based ownership collector.
 function M.mark_config_reads(decoded, mark)
-	walk_assignments(decoded, function(slot) mark("shortcuts", "keyboard", slot) end)
+	local catalogue = action_catalogue()
+	walk_assignments(decoded, function(slot, action)
+		-- Without a catalogue nothing can be proved outdated: keep every slot.
+		if not catalogue or stored_assignment_known(slot, action, catalogue) then
+			mark("shortcuts", "keyboard", slot)
+		end
+	end)
 end
 
 --- Reads the manifest defaults, then every stored assignment over them: a
@@ -343,13 +367,10 @@ local function load_assignments()
 		end
 	end
 	walk_assignments(decoded, function(slot, action)
-		if action == "none" then
-			loaded[slot] = nil
-		elseif type(action) == "string" and Gestures.is_assignable(action) then
+		if stored_assignment_known(slot, action, Gestures) and action ~= "none" then
 			loaded[slot] = action
 		else
 			loaded[slot] = nil
-			Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — left unbound.", slot, tostring(action))
 		end
 	end)
 	_assignments = loaded
@@ -622,11 +643,11 @@ end
 
 --- Resolves a detached candidate with the same slot catalogue as the reader.
 --- @param document table Decoded configuration.
+--- @param written boolean|nil True for the document a scope just wrote: every
+---   walked slot is then its own output, so an unassignable one is a real
+---   failure and raises instead of being read as outdated configuration.
 --- @return table state
-function M.configuration_candidate(document)
-	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
-	local section = document.shortcuts or {}
-	assert(section.keyboard == nil or type(section.keyboard) == "table", "keyboard assignments are malformed")
+function M.configuration_candidate(document, written)
 	local catalogue = assert(action_catalogue(), "keyboard action catalogue is unavailable")
 	local assignments = {}
 	for slot, action in pairs(manifest_defaults()) do
@@ -634,8 +655,11 @@ function M.configuration_candidate(document)
 		if action ~= "none" then assignments[slot] = action end
 	end
 	walk_assignments(document, function(slot, action)
-		assert(type(action) == "string" and (action == "none" or catalogue.is_assignable(action)), "invalid keyboard assignment: " .. slot)
-		assignments[slot] = action ~= "none" and action or nil
+		assert(not written or action == "none" or (type(action) == "string" and catalogue.is_assignable(action)),
+			"invalid keyboard assignment: " .. slot)
+		-- The loader's rule: an outdated action leaves the slot unbound.
+		local known = stored_assignment_known(slot, action, catalogue)
+		assignments[slot] = known and action ~= "none" and action or nil
 	end)
 	return { assignments = assignments }
 end

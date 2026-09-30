@@ -31,6 +31,7 @@ local function with_classification(callback)
 				"/root/hotstrings/autocorrection.toml",
 			},
 			get_group_name = preferences.get_group_name,
+			extension_packs = {},
 			keymap = {
 				get_sections = function(name) return sections[name] or {} end,
 				is_group_enabled = function() return true end,

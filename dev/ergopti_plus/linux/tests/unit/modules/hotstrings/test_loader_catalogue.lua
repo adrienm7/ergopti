@@ -28,11 +28,18 @@
 
 local helpers = require("tests.helpers")
 
---- The absolute path of a shared hotstring pack.
+-- The packs the Ergopti layout extension carries since they moved out of the
+-- shared folder (static/layouts/registry/ergopti/manifest.toml).
+local ERGOPTI_PACKS = { ["rolls.toml"] = true, ["sfbsreduction.toml"] = true }
+
+--- The absolute path of a shipped hotstring pack.
 --- @param name string File name.
 --- @return string
 local function pack(name)
 	local Paths = require("infra.paths")
+	if ERGOPTI_PACKS[name] then
+		return Paths.shared_root() .. "/../../layouts/registry/ergopti/hotstrings/" .. name
+	end
 	return Paths.shared("modules/hotstrings/" .. name)
 end
 

@@ -38,16 +38,13 @@ local M = {}
 local UP, DOWN, REPEAT = 0, 1, 2
 
 -- evdev codes of the keys a tap-hold can be configured on (the Windows set).
+-- Their order in the tray and their hand are the shared key catalogue's
+-- ([tap_hold.catalog] in _shared/tap_hold/defaults.toml, its `linux` column),
+-- which the manager holds to exactly these keys.
 M.KEY_CODES = {
 	escape = 1, tab = 15, caps_lock = 58, left_shift = 42, left_ctrl = 29,
 	win = 125, left_alt = 56, space = 57, alt_gr = 100, right_ctrl = 97,
 	right_shift = 54, enter = 28, backspace = 14, delete = 111,
-}
-
--- The keys in the order the tray lists them (the Windows order).
-M.KEY_ORDER = {
-	"escape", "tab", "caps_lock", "left_shift", "left_ctrl", "win", "left_alt",
-	"space", "alt_gr", "right_ctrl", "right_shift", "enter", "backspace", "delete",
 }
 
 -- evdev codes of the holdable modifiers.

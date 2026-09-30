@@ -70,7 +70,6 @@ local function with_fixture(callback)
 			llm_reset_on_nav = true,
 			llm_active_profile = "basic",
 			llm_profile_shortcuts = {},
-			llm_trigger_shortcut = false,
 		}
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -212,7 +211,6 @@ local function with_fixture(callback)
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = function() return true end,
 				}
@@ -233,12 +231,12 @@ local function with_fixture(callback)
 				return items
 			end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = accept,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = accept,
-		}
+		})
 
 		local previous_async_get = hs.http.asyncGet
 		local previous_hs_execute = hs.execute
@@ -343,7 +341,7 @@ end
 
 local function build_and_assert_red(fixture)
 	local item = fixture.handler.build_item()
-	local model_row = find_row(item.submenu, "menu.llm.active_model_label")
+	local model_row = find_row(item.submenu, "menu.llm.model_label")
 	helpers.assert_type(model_row, "table")
 	helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1,
 		"an invalidated health cache must render the current backend as unprobed")
@@ -394,7 +392,7 @@ helpers.describe("LLM health probe ownership", function()
 
 		with_fixture(function(fixture)
 			local item = build_and_assert_red(fixture)
-			local model_row = find_row(item.submenu, "menu.llm.active_model_label")
+			local model_row = find_row(item.submenu, "menu.llm.model_label")
 			helpers.assert_type(model_row, "table")
 			helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1)
 			local updates_before_current = fixture.updates()
@@ -403,7 +401,7 @@ helpers.describe("LLM health probe ownership", function()
 				"the current MLX probe must commit and repaint exactly once")
 			local refreshed = fixture.handler.build_item()
 			local refreshed_model = find_row(
-				refreshed.submenu, "menu.llm.active_model_label")
+				refreshed.submenu, "menu.llm.model_label")
 			helpers.assert_type(refreshed_model, "table")
 			helpers.assert_true(refreshed_model.title:find("🟡 ", 1, true) == 1,
 				"a committed current MLX response must render the reachable state")
@@ -473,7 +471,7 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
 			local port_action = find_nested_action(
-				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
+				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
 			local backend_action = find_nested_action(
 				item, "menu.llm.backend_title", "API 🌐")
 			helpers.assert_eq(type(port_action), "function")
@@ -500,7 +498,7 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
 			local port_action = find_nested_action(
-				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
+				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
 			local backend_action = find_nested_action(
 				item, "menu.llm.backend_title", "API 🌐")
 

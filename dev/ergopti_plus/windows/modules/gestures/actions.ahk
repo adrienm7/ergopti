@@ -70,6 +70,15 @@ global GESTURE_ACTIONS := Map(
 		"win_app_next", {
 				Fn: (*) => GestureCycleAppWindows(True),
 		},
+		; desktop_prev / desktop_next are the catalogue's Ctrl+Win+Arrow rows,
+		; which stop at the first and last desktop as Windows does; these two
+		; wrap to the other end (modules/gestures/virtual_desktops.ahk).
+		"desktop_prev_wrap", {
+				Fn: (*) => GestureDesktopNavigateWrap("prev"),
+		},
+		"desktop_next_wrap", {
+				Fn: (*) => GestureDesktopNavigateWrap("next"),
+		},
 		; --- Cursor movement ---
 		; --- Arrows ---
 		; --- Selection ---

@@ -144,8 +144,8 @@ end)
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
 		helpers.with_fresh_modules({ "infra.toml.writer", "adapters.file_system", "ui.menu.menu_paths",
-			"adapters.storage", "infra.notifications" }, function()
-			local destination, persisted, writes, completed, notified = OLD_CONFIG_PATH, 0, {}, 0, 0
+			"infra.notifications" }, function()
+			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
 			package.loaded["ui.menu.menu_paths"] = {
 				persist_config_dir_for_wizard = function(directory)
 					helpers.assert_eq(directory, NEW_DIR)
@@ -168,24 +168,20 @@ helpers.describe("onboarding commit() honours the retarget", function()
 					return true
 				end,
 			}
-			package.loaded["adapters.storage"] = { set = function(key, value)
-				helpers.assert_eq(key, "onboarding.completed")
-				helpers.assert_eq(value, true)
-				completed = completed + 1
-				return true
-			end }
 			package.loaded["infra.notifications"] = { notify = function() notified = notified + 1; return true end }
 			require("tests.support.dashboard_window_fixture")("ui.onboarding", function(onboarding, state)
+				require("tests.support.onboarding_shared_data").install()
 				package.loaded["infra.i18n"].persist_locale = function() return true end
 				helpers.assert_true(onboarding.run(OLD_CONFIG_PATH))
 				state.receiver({ body = { action = "finish", answers = {
-					locale = "en", config_dir = NEW_DIR, magic_key = "X", use_metrics = false,
+					locale = "en", config_dir = NEW_DIR,
+					operations = { { path = "hotstrings.trigger_char", value = "X" } },
 				} } })
 				helpers.assert_eq(#writes, 1)
 				helpers.assert_eq(writes[1].path, NEW_CONFIG_PATH,
 					"the real finish handler must not write through its pre-wizard capture")
-				helpers.assert_eq(writes[1].updates[2].value, "X", "the selected answers must reach the writer")
-				helpers.assert_eq(completed, 1)
+				helpers.assert_eq(writes[1].updates, { { section = "hotstrings", key = "trigger_char", value = "X" } },
+					"the selected answers must reach the writer as manifest rows")
 				helpers.assert_eq(notified, 1)
 				helpers.assert_eq(state.deleted, 1)
 			end)

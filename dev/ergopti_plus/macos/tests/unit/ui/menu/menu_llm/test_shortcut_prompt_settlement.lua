@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: LLM Shortcut Prompt Settlement
 --- DESCRIPTION:
---- Exercises the primary/profile shortcut owner and the real confirmed profile
---- Delete action through refusal-capable registrar seams. Real Hammerspoon-shaped
+--- Exercises the profile shortcut prompt and the real confirmed profile Delete
+--- action through refusal-capable registrar seams, and pins the retirement of
+--- the trigger submenu's dedicated shortcut row. Real Hammerspoon-shaped
 --- doubles keep enable=self|nil, disable=self, and delete=void|throw contracts.
 --- Tests preserve handle identity and invoke retained callbacks so a
 --- bookkeeping-only rollback cannot pass.
@@ -74,7 +75,10 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			end)
 	end)
 
-	helpers.it("HS-033 primary shortcut menu action propagates prompt refusal", function()
+	-- The dedicated trigger shortcut is retired: a prediction on demand is the
+	-- llm_generate_prediction action in a keyboard slot (Ctrl+Space recommended),
+	-- so the trigger submenu opens on its debounce row and prompts for no chord.
+	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
 		local saved_app_picker = package.loaded["infra.app_picker"]
 		local saved_i18n = package.loaded["infra.i18n"]
 		local saved_logger = package.loaded["infra.logger"]
@@ -82,6 +86,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local saved_llm = package.loaded["modules.llm"]
 		local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
 		local saved_panel = package.loaded["ui.menu.menu_llm.trigger_panel"]
+		local prompts = 0
 		local ok, err = xpcall(function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
 			package.loaded["infra.i18n"] = {get = function(key) return key end}
@@ -91,18 +96,26 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 				DEFAULT_STATE = {llm_debounce = 0.2},
 			}
 			package.loaded["ui.menu.shortcut_utils"] = {
-				prompt_shortcut = function() return false end,
+				prompt_shortcut = function() prompts = prompts + 1 return false end,
 				shortcut_to_label = function() return "None" end,
 			}
 			package.loaded["ui.menu.menu_llm.trigger_panel"] = nil
 			local rows = require("ui.menu.menu_llm.trigger_panel").build({
-				state = {},
+				state = {llm_debounce = 0.2},
 				is_disabled = false,
 				settings_mgr = {},
-				apply_llm_shortcut = function() return false end,
 			})
-			helpers.assert_type(rows[1] and rows[1].action, "function")
-			helpers.assert_eq(rows[1].action(), false)
+			helpers.assert_true(#rows > 0, "the trigger submenu must still draw its rows")
+			helpers.assert_eq(rows[1].label, "menu.llm.debounce_label",
+				"the debounce row now opens the trigger submenu")
+			for _, row in ipairs(rows) do
+				helpers.assert_true(row.label ~= "menu.llm.trigger_shortcut_label",
+					"no row may prompt for a dedicated trigger shortcut")
+				if type(row.action) == "function" and row.label ~= "menu.llm.debounce_label" then
+					row.action()
+				end
+			end
+			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")
 		end, debug.traceback)
 		package.loaded["infra.app_picker"] = saved_app_picker
 		package.loaded["infra.i18n"] = saved_i18n

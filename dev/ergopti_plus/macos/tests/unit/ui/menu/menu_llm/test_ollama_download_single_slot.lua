@@ -205,7 +205,7 @@ local function with_fixture(options, callback)
 		_G.hs.screen = { mainScreen = function()
 			return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
 		end }
-		_G.hs.drawing = { windowLevels = { floating = 1 } }
+		_G.hs.drawing = { windowLevels = { normal = 0, floating = 1 } }
 		package.loaded["ui.download_window"] = nil
 		real_window = require("ui.download_window")
 	end

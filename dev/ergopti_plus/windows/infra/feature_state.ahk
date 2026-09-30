@@ -29,6 +29,16 @@ global ScriptInformation := Map(
 			"hotstrings.magic_key_source_scan"),
 		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
 			"hotstrings.magic_key_source_char"),
+		; Whether config.toml names the source scan code: the user's choice then
+		; wins over the active layout's declared key and over any detection.
+		"MagicKeySourceScanChosen", false,
+		; Whether the boot took the source key from the OS layout, so a switch of
+		; OS layout can move it (LayoutRemapSignature); decided at boot.
+		"MagicKeySourceFollowsOsLayout", false,
+		; Whether an emulated layout yields the magic key's unshifted level to it:
+		; only for a key the user chose or the active layout declares, so an
+		; emulated layout declaring none keeps its own character; decided at boot.
+		"MagicKeySourceOverridesEmulation", false,
 		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
 		; false here is overwritten by HotstringEngineInit() which auto-detects via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
@@ -125,6 +135,9 @@ global CategoryEnabled := Map(
 		"Shortcuts", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Shortcuts")),
 		"Hotstrings", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Hotstrings")),
 		"TapHolds", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("TapHolds")),
+		; « Combinaisons de touches », the only gate of the AltGr / LAlt / CapsLock
+		; combination families, whatever Shortcuts says (ApplyMasterGatesToFeatures).
+		"KeyCombinations", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("KeyCombinations")),
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
 		; Hotstrings master above: a category file can be switched off while the
 		; rest of the hotstrings stay live. The parent menu checkmark for each
@@ -186,6 +199,7 @@ ReadScriptConfig(Cache) {
 		if RawScan != "_"
 				ScriptInformation["MagicKeySourceScan"] :=
 					_FeatureStateValidateSourceScan(RawScan)
+		ScriptInformation["MagicKeySourceScanChosen"] := RawScan != "_"
 		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
 		if RawChar != "_"
 				ScriptInformation["MagicKeySourceChar"] :=

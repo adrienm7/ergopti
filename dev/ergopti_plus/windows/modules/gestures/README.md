@@ -20,13 +20,14 @@ Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/
 
 ## Public API
 
-| File               | Description                                             |
-| ------------------ | ------------------------------------------------------- |
-| `init.ahk`         | Module entry: reads slot assignments, registers hotkeys |
-| `config.ahk`       | `GestureGetAction(slot)` accessor; slot-name constants  |
-| `click.ahk`        | Left-button click-lock (long-press drag simulation)     |
-| `screenshots.ahk`  | GDI+ region capture and clipboard copy                  |
-| `window_cycle.ahk` | Alt-Tab-style window cycle guarded by HWND fence        |
+| File                   | Description                                             |
+| ---------------------- | ------------------------------------------------------- |
+| `init.ahk`             | Module entry: reads slot assignments, registers hotkeys |
+| `config.ahk`           | `GestureGetAction(slot)` accessor; slot-name constants  |
+| `click.ahk`            | Left-button click-lock (long-press drag simulation)     |
+| `screenshots.ahk`      | GDI+ region capture and clipboard copy                  |
+| `window_cycle.ahk`     | Alt-Tab-style window cycle guarded by HWND fence        |
+| `virtual_desktops.ahk` | Wrapping previous/next desktop from Explorer's registry |
 
 ## Init pattern
 

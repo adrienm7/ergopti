@@ -13,11 +13,15 @@
 ---    switch as checked while macOS refuses the new binary. The entry is reset
 ---    before the prompt so the switch the user turns on is the current one.
 --- 2. Everything is opened for the user: the macOS prompt, the exact Settings
----    pane, and an on-screen banner naming the entry to turn on. The banner
----    needs no notification permission, which a fresh install may not have.
+---    pane, and a native dialog naming the entry to turn on. The dialog needs
+---    no notification permission, which a fresh install may not have, and the
+---    wait closes it as soon as the grant arrives.
 --- 3. No relaunch: trust is polled, and the boot continues as soon as it is
 ---    granted. A bounded deadline keeps an ignored request from leaving a
 ---    process with no input and no menu running forever.
+--- 4. Never a dead end: the dialog can be closed, and there is no menu yet to
+---    bring it back. Opening ErgoptiPlus again while the wait runs shows the
+---    steps again instead of doing nothing.
 --- ==============================================================================
 
 local M = {}
@@ -48,7 +52,8 @@ local function validate(opts)
 			error("accessibility_wait.start: permission." .. name .. " must be a function", 3)
 		end
 	end
-	for _, name in ipairs({ "every", "cancel", "show_guidance", "close_guidance", "on_trusted", "on_timeout" }) do
+	for _, name in ipairs({ "every", "cancel", "show_guidance", "close_guidance", "watch_reopen",
+		"on_trusted", "on_timeout" }) do
 		if type(opts[name]) ~= "function" then
 			error("accessibility_wait.start: " .. name .. " must be a function", 3)
 		end
@@ -104,6 +109,7 @@ local function finish(state, opts, continuation)
 	if opts.cancel(state.timer) ~= true then
 		Logger.warn(LOG, "Accessibility poll timer did not settle on cancel.")
 	end
+	if state.stop_reopen_watch ~= nil then state.stop_reopen_watch() end
 	opts.close_guidance()
 	continuation()
 end
@@ -118,7 +124,9 @@ end
 --- Starts waiting for Accessibility trust.
 --- @param opts table {permission, every(seconds, fn) -> handle, committed,
 ---        cancel(handle) -> settled, show_guidance(), close_guidance(),
----        on_trusted(), on_timeout(elapsed_seconds), poll_seconds?, deadline_seconds?}.
+---        watch_reopen(fn) -> stop|nil, detail (calls fn each time the user
+---        opens ErgoptiPlus again), on_trusted(), on_timeout(elapsed_seconds),
+---        poll_seconds?, deadline_seconds?}.
 --- @return boolean started True when the poll timer is armed.
 --- @return string|nil detail Exact refusal when started is false.
 function M.start(opts)
@@ -152,6 +160,16 @@ function M.start(opts)
 
 	Logger.info(LOG, "Waiting for the Accessibility permission (up to %d s)…", deadline_seconds)
 	opts.show_guidance()
+	local stop_watch, watch_err = opts.watch_reopen(function()
+		if state.finished then return end
+		Logger.info(LOG, "ErgoptiPlus was opened again while waiting; showing the steps again.")
+		opts.show_guidance()
+	end)
+	if type(stop_watch) == "function" then
+		state.stop_reopen_watch = stop_watch
+	else
+		Logger.warn(LOG, "Reopening ErgoptiPlus will not show the steps again: %s.", tostring(watch_err))
+	end
 	reset_then_prompt(opts.permission, state)
 	return true
 end

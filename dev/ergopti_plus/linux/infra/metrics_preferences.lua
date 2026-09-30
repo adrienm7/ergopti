@@ -14,6 +14,7 @@ local ConfigPaths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local LOG = "infra.metrics_preferences"
 local _scope_owner = nil
 
@@ -47,19 +48,33 @@ local function owned(path)
 end
 
 --- Resolves owned booleans from one parsed configuration without file effects.
+--- A leaf an older build or a hand edit left in another shape is outdated
+--- configuration for that leaf alone: warned once, read as its neutral
+--- default (never as consent) and left unmarked for the cleanup.
 --- @param config table Parsed canonical configuration.
 --- @param mark function|nil Exact consumed-key collector.
+--- @param written table|nil Set of paths the caller's own transaction wrote:
+---   those must hold a boolean, since a wrong one is that write's failure.
 --- @return table values Canonical path to effective boolean.
-function M.resolve(config, mark)
+function M.resolve(config, mark, written)
 	assert(type(config) == "table", "metrics preferences contain malformed TOML")
-	assert(config.metrics == nil or type(config.metrics) == "table", "metrics preferences require a table")
-	local values, metrics = {}, config.metrics or {}
+	local metrics = config.metrics
+	if metrics ~= nil and type(metrics) ~= "table" then
+		ConfigOutdated.report({ "metrics" }, "a table of settings is expected here", Logger)
+		metrics = nil
+	end
+	local values = {}
+	metrics = metrics or {}
 	for _, entry in ipairs(Manifest.features()) do
 		if entry.path:match("^metrics%.[^.]+$") and entry.type == "boolean" then
 			local key = owned(entry.path)
 			local value = metrics[key]
+			if value ~= nil and type(value) ~= "boolean" then
+				assert(not (written and written[entry.path]), "invalid boolean metrics preference: " .. entry.path)
+				ConfigOutdated.report({ "metrics", key }, "the value is not a boolean", Logger)
+				value = nil
+			end
 			if mark and value ~= nil then mark("metrics", key) end
-			assert(value == nil or type(value) == "boolean", "invalid boolean metrics preference: " .. entry.path)
 			if value == nil then value = Manifest.default_for(entry.path) end
 			values[entry.path] = value
 		end

@@ -26,9 +26,13 @@ local cases = {
 	{ id = "spaces next axis", axis = true, next = true, key = 124, mods = "ctrl" },
 	{ id = "space_prev", key = 123, mods = "ctrl" },
 	{ id = "space_next", key = 124, mods = "ctrl" },
-	{ id = "mission_control", key = 160, mods = "" },
-	{ id = "app_expose", key = 125, mods = "ctrl" },
+	-- Command + Mission Control is macOS's Show Desktop: without the modifier
+	-- the binding would open Mission Control instead.
+	{ id = "show_desktop", key = 160, mods = "cmd" },
 }
+-- mission_control and app_expose left this table when they stopped posting the
+-- F3 key and Ctrl+Down: they ask the Dock directly now and emit no key at all
+-- (test_space_navigation_actions.lua).
 
 
 helpers.describe("gestures.actions: context navigation has exact action provenance", function()
@@ -37,7 +41,7 @@ helpers.describe("gestures.actions: context navigation has exact action provenan
 			package.loaded["modules.gestures.actions"] = nil
 			local fixture = Fixture.load("modules.gestures.actions")
 			local actions = fixture.subject
-			actions.init({ space_wrap = true })
+			actions.init({})
 			local epoch_before = fixture.synthetic.current_action_epoch()
 
 			if case.axis then

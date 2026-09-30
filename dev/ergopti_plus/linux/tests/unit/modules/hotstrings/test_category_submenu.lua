@@ -60,6 +60,8 @@ local function fake_config(opts)
 				sections_order = { "hc", "sx" },
 				sections = { hc = { count = 12 }, sx = { count = 3 } },
 				count = 15,
+				-- Rolls come from the Ergopti layout extension, whose submenu lists them.
+				extension = { id = "ergopti", name = "Ergopti" },
 			}
 		end,
 		reload = function() end,

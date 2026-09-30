@@ -7,8 +7,9 @@
  * Canonical interpreter of the shared update-channel registry
  * (_shared/modules/updater/channels.json): which channel a release tag belongs
  * to, how a persisted value maps to a channel, which releases a channel's
- * Versions view lists, whether an update check offers a candidate, and which
- * release is a channel's latest.
+ * Versions view lists, whether an update check offers a candidate, which
+ * release is a channel's latest, and which other channels published a newer
+ * release than the installed build.
  *
  * FEATURES & RATIONALE:
  * 1. Data, not dialect: a channel's tag rule is structured data (a core and an
@@ -35,6 +36,9 @@
 	var COUNTER = /^[1-9][0-9]*$/;
 	var LOCALE_KEY = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/;
 	var SPARKLE_FEED = /^appcast-[a-z0-9_-]+\.xml$/;
+	// A publish time exactly as GitHub writes it (UTC, whole seconds), so text
+	// order is time order in every runtime without a date parser.
+	var PUBLISHED_AT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
 	// ASCII blanks only: the Lua and AHK ports trim the same set, so a tag padded
 	// with a Unicode space cannot match in one runtime and not in another.
 	var EDGE_BLANKS = /^[ \t\r\n]+|[ \t\r\n]+$/g;
@@ -297,6 +301,45 @@
 			return best;
 		}
 
+		/**
+		 * Lists, in registry order, every channel other than the checked one
+		 * whose latest release was published strictly after the installed build.
+		 * The installed build's time is that of the first listed release of the
+		 * same version; a build that is not listed (older than the list, or a
+		 * source checkout), or listed without a valid time, predates the list.
+		 * @param {{tag: string, published_at: string}[]} releases - The release list.
+		 * @param {string} selected - The checked channel.
+		 * @param {string} installed - The installed build's version.
+		 * @param {Function} compare - Shared semver comparison (version.js).
+		 * @return {{channel: string, tag: string}[]}
+		 */
+		function newerElsewhere(releases, selected, installed, compare) {
+			if (!known(selected) || !Array.isArray(releases)) return [];
+			var tags = releases.map(function (release) {
+				return release && typeof release.tag === 'string' ? release.tag : '';
+			});
+			var installedAt = null;
+			if (channelForTag(installed) !== null) {
+				for (var i = 0; i < releases.length; i += 1) {
+					if (channelForTag(tags[i]) === null || compare(tags[i], installed) !== 0) continue;
+					var own = releases[i].published_at;
+					installedAt = typeof own === 'string' && PUBLISHED_AT.test(own) ? own : null;
+					break;
+				}
+			}
+			var found = [];
+			tables.order.forEach(function (record) {
+				if (record.id === selected) return;
+				var index = pickLatest(tags, record.id, compare);
+				if (index === -1) return;
+				var at = releases[index].published_at;
+				if (typeof at !== 'string' || !PUBLISHED_AT.test(at)) return;
+				if (installedAt !== null && at <= installedAt) return;
+				found.push({ channel: record.id, tag: tags[index] });
+			});
+			return found;
+		}
+
 		return Object.freeze({
 			ids: Object.freeze(
 				tables.order.map(function (record) {
@@ -313,7 +356,8 @@
 			channelForTag: channelForTag,
 			visibleIn: visibleIn,
 			shouldOffer: shouldOffer,
-			pickLatest: pickLatest
+			pickLatest: pickLatest,
+			newerElsewhere: newerElsewhere
 		});
 	}
 

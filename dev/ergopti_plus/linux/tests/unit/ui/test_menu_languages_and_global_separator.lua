@@ -99,9 +99,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			i18n.get("menu.global.config_folder"),
 			i18n.get("menu.global.setup_wizard"),
 			i18n.get("menu.global.start_at_login"),
-			"-",
-			i18n.get("menu.global.uninstall"),
-		}, " | "))
+		}, " | "), "Uninstall moved to the Version / Updates submenu; no separator is left dangling")
 		-- The folders editor, as on the other two drivers, not the file manager.
 		local folder = rows[4]
 		local fn = folder.fn or folder.action

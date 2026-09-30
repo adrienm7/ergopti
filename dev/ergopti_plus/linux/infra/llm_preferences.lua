@@ -7,6 +7,7 @@ local Paths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local LOG = "infra.llm_preferences"
 local _scope_owner = nil
 local _detached = nil
@@ -60,12 +61,29 @@ local function validate(definition, value)
 	end
 end
 
+--- Reads one declared leaf. A value an older build or a hand edit left in
+--- another shape, or a scalar its path crosses, is outdated configuration for
+--- that leaf alone: reported once and read as absent (its manifest value),
+--- while every other AI preference keeps its value.
+--- @param document table Decoded configuration.
+--- @param path string Declared canonical path.
+--- @return any value
 local function lookup(document, path)
-	local value = document
+	local value, walked = document, {}
 	for key in path:gmatch("[^.]+") do
 		if value == nil then return nil end
-		assert(type(value) == "table", "AI preference path crosses a scalar: " .. path)
+		if type(value) ~= "table" then
+			ConfigOutdated.report(table.concat(walked, "."), "a table of settings is expected here", Logger)
+			return nil
+		end
+		walked[#walked + 1] = key
 		value = value[key]
+	end
+	if value == nil then return nil end
+	local definition = Manifest.find_entry_by_path(path)
+	if definition and not pcall(validate, definition, value) then
+		ConfigOutdated.report(path, "the value no longer fits its " .. tostring(definition.type) .. " setting", Logger)
+		return nil
 	end
 	return value
 end
@@ -76,11 +94,9 @@ local function read()
 	assert(status == "ok" or status == "absent", "AI configuration is unreadable: " .. tostring(detail))
 	local document = Codec.decode(bytes or "")
 	assert(type(document) == "table", "AI configuration contains malformed TOML")
-	for _, definition in ipairs(Manifest.features()) do
-		if definition.path:sub(1, 4) == "llm." then validate(definition, lookup(document, definition.path)) end
-	end
 	return document, { status = status, content = bytes }
 end
+
 
 --- Reads one override; the caller resolves absence through its manifest owner.
 --- @param path string Declared preference path.
@@ -109,13 +125,21 @@ function M.get_many(paths)
 	return values, source
 end
 
---- Marks exactly one declared leaf through the same lookup as its reader.
+--- Marks exactly one declared leaf through the same lookup as its reader. A
+--- value the lookup or the owner's rule refuses is reported and left
+--- unmarked, so the cleanup offers what the reader ignores.
 --- @param document table Parsed configuration.
 --- @param path string Reader-owned canonical path.
 --- @param mark function Consumed-key collector.
-function M.mark_config_read(document, path, mark)
+--- @param accepts function|nil The owner's value rule, `accepts(value) -> boolean`.
+function M.mark_config_read(document, path, mark, accepts)
 	entry(path)
-	if lookup(document, path) == nil then return end
+	local value = lookup(document, path)
+	if value == nil then return end
+	if accepts and not accepts(value) then
+		ConfigOutdated.report(path, ConfigOutdated.REFUSED, Logger)
+		return
+	end
 	local segments = {}
 	for key in path:gmatch("[^.]+") do segments[#segments + 1] = key end
 	mark((table.unpack or unpack)(segments))

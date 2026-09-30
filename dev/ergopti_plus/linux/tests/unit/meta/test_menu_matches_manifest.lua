@@ -161,6 +161,11 @@ local function full_context()
 			-- The shared builder, so every hold picker holds at least « none ».
 			hold_options  = function() return require("tap_hold.hold_options").build({}) end,
 			tap_actions   = function() return {} end,
+			-- The shipped catalogue, so both hand lists have their rows.
+			key_catalog   = function()
+				return require("tap_hold.key_catalog").load(
+					require("infra.paths").shared("tap_hold/defaults.toml"), "linux")
+			end,
 		},
 		dyn_hotstrings = {
 			is_enabled      = function() return true end,

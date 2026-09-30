@@ -9,11 +9,18 @@
 --- never sees, so no label here names it.
 ---
 --- FEATURES & RATIONALE:
---- 1. Tap/Hold section: each key shows "Label : tap / hold" inline. Items are
----    grayed out while the remap engine is not initialised.
---- 2. Chords section: modifier combos grouped by key, also grayed then.
+--- 1. Tap/Hold section: each key shows "Label : tap / hold" inline, under the
+---    header of its hand. Which keys, in which order and under which hand is
+---    the shared key catalogue's ([tap_hold.catalog]). Items are grayed out
+---    while the remap engine is not initialised.
+--- 2. Key combinations: the modifier chords, grouped by key, are the
+---    « Combinaisons de touches » group of the Shortcuts submenu, built here
+---    (M.build_key_combinations) because this engine runs them. Their own
+---    first-row switch is the persisted [mod_combos] enabled.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
+--- 5. Restore recommended / clear run the remap engine's tap_holds scope: a
+---    default-No confirmation, a verified backup, then the exact terminal.
 --- ==============================================================================
 
 local M = {}
@@ -21,6 +28,8 @@ local M = {}
 local Logger      = require("infra.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
+local Paths       = require("infra.paths")
+local KeyCatalog  = require("tap_hold.key_catalog")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -106,6 +115,61 @@ local function commit_menu_setting(karabiner, source, mutate, update_menu)
 	return accepted
 end
 
+-- The saved-edit notice for each guardian status Login Items can fix. The
+-- guardian registers once per launch, so allowing an unregistered helper
+-- changes nothing until ErgoptiPlus is reopened; only an approval applies at
+-- once.
+local SAVED_UNTIL_GUARDIAN_KEYS = {
+	requires_approval = "menu.tapholds.saved_until_guardian",
+	unavailable       = "menu.tapholds.saved_until_guardian_restart",
+}
+-- Every other wait (a failed or timed-out probe, a helper that could not be
+-- launched) says nothing of the user's settings: sending them to a Login
+-- Items pane where everything may already be allowed would mislead.
+local SAVED_UNTIL_HELPER_KEY = "menu.tapholds.saved_until_helper"
+
+--- Tells the user a Login Items pane did not open, as the guardian's own
+--- notice does: one localized notice. A launch the system refused is already
+--- logged as an error by the runner, and every error line raises a developer
+--- notification of its own, so this side records the detail as a warning.
+--- @param opened boolean Whether the pane opened.
+--- @param detail any Opener failure detail.
+local function report_login_items_opened(opened, detail)
+	if opened == true then return end
+	Logger.warn(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
+	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+		i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
+	if not ok or sent_or_err ~= true then
+		Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))
+	end
+end
+
+--- Tells the user a bulk edit is saved but waits for the remap guardian: the
+--- menu shows the new settings, yet nothing applies them until the guardian
+--- is ready, and the notice says what makes it ready. When Login Items can,
+--- the click opens that pane.
+--- @param karabiner table Remap facade.
+--- @param method_name string Facade method name, for the log.
+--- @param reason string `persisted-guardian-<status>` terminal detail.
+local function announce_saved_until_guardian(karabiner, method_name, reason)
+	Logger.info(LOG, "Karabiner bulk command '%s' saved; its rules deploy once the guardian is ready (%s).",
+		method_name, tostring(reason))
+	local key = SAVED_UNTIL_GUARDIAN_KEYS[reason:match("^persisted%-guardian%-(.+)$")]
+	local on_click = nil
+	if key == nil then
+		key = SAVED_UNTIL_HELPER_KEY
+	elseif type(karabiner.open_login_items) == "function" then
+		on_click = function()
+			return karabiner.open_login_items(report_login_items_opened) == true
+		end
+	end
+	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+		i18n.get(key), nil, "info", on_click)
+	if not ok or sent_or_err ~= true then
+		Logger.error(LOG, "Saved-until-guardian notice was not delivered: %s.", tostring(sent_or_err))
+	end
+end
+
 --- Runs one manifest bulk command and publishes success only after both exact
 --- request acceptance and the transaction's terminal callback are true.
 --- @param karabiner table Remap facade.
@@ -155,6 +219,9 @@ local function run_bulk_menu_command(
 			else
 				Logger.success(LOG, success_message)
 			end
+			if type(reason) == "string" and reason:find("^persisted%-guardian%-") then
+				announce_saved_until_guardian(karabiner, method_name, reason)
+			end
 		else
 			Logger.error(LOG, "Karabiner bulk command '%s' failed: %s.",
 				method_name, tostring(reason))
@@ -176,8 +243,13 @@ local function run_bulk_menu_command(
 	end, debug.traceback)
 	dispatching = false
 	if not call_ok or accepted_or_err ~= true then
+		-- A refusal names its cause (bulk-settings-busy, script-paused...)
+		-- through the terminal it already fired; only a request that fired
+		-- none falls back to the generic detail.
+		local refusal = call_ok and callback_seen and pending_ok ~= true
+			and pending_reason ~= nil and pending_reason or nil
 		callback_seen = false
-		finish(false, call_ok and "request-refused" or accepted_or_err, 0)
+		finish(false, refusal or (call_ok and "request-refused" or accepted_or_err), 0)
 		return false
 	end
 	if callback_seen then
@@ -185,6 +257,36 @@ local function run_bulk_menu_command(
 		finish(pending_ok, pending_reason, pending_count)
 	end
 	return true
+end
+
+-- Makes each scope backup path unique within the session.
+local _scope_generation = 0
+
+--- Asks, then applies one tap_holds scope mode through the remap transaction.
+--- The chords belong to the shortcuts scope and are not part of this request.
+--- @param karabiner table Remap facade.
+--- @param mode string "recommended" or "clear".
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean accepted
+local function run_scope(karabiner, mode, update_menu)
+	local label = i18n.get(mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+	local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+	if require("infra.dialog_util").block_alert(i18n.get("menu.tapholds.title"), label, no, yes, "warning") ~= yes then
+		Logger.info(LOG, "Tap-hold scope %s declined.", mode)
+		return false
+	end
+	_scope_generation = _scope_generation + 1
+	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. ".tap_holds-"
+		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
+	return run_bulk_menu_command(
+		karabiner,
+		"apply_scope",
+		"Applying the tap-hold scope (" .. mode .. ")…",
+		"Tap-hold scope " .. mode .. " applied.",
+		false,
+		update_menu,
+		{ scope = "tap_holds", mode = mode, backup_path = backup_path }
+	)
 end
 
 --- Builds an index of action id → action definition for fast lookup.
@@ -305,68 +407,26 @@ end
 -- =========================================
 -- =========================================
 
---- Reads tap_hold_keys_catalog from the shared menu manifest and returns a
---- lookup table of key_id -> true for keys with hand="left" and platforms
---- including "hs". Falls back to the hardcoded set on any load failure.
----
---- Defined BEFORE the LEFT_HAND_IDS call site below: a `local function` is not
---- hoisted, so calling it above its definition would bind the nil global and
---- crash the module at load time (project-lua-closure-before-local-nil-global).
---- @return table
-local function _load_left_hand_from_catalog()
-	local fallback = {
-		escape        = true,
-		tab           = true,
-		caps_lock     = true,
-		left_shift    = true,
-		action            = true,
-		left_control  = true,
-		left_option   = true,
-		left_command  = true,
-		spacebar      = true,
-	}
-	-- The one reader of menu_manifest.json (infra/manifest_menu, cached).
-	--
-	-- This used to fall back to opening and decoding the file right here, "in case
-	-- manifest_menu is not loaded yet". require is synchronous in Lua: if the module
-	-- resolves, its accessor works, and if it does not resolve then a second copy of
-	-- the same io.open would not help either. What the guard actually did was keep a
-	-- third reader of this file alive on a path nothing could reach — which is how
-	-- the driver came to have three of them.
-	local ok_mm, mm = pcall(require, "infra.manifest_menu")
-	if not ok_mm or type(mm) ~= "table" or type(mm.get_root) ~= "function" then
-		Logger.error(LOG, "infra.manifest_menu unavailable — left-hand catalogue uses the built-in set.")
-		return fallback
-	end
-	local data = mm.get_root()
-	if type(data) ~= "table" then return fallback end
-	local catalog = data.tap_hold_keys_catalog
-	if type(catalog) ~= "table" then return fallback end
-	local result = {}
-	for _, key_def in ipairs(catalog) do
-		if type(key_def) ~= "table" then goto continue end
-		if key_def.hand ~= "left" then goto continue end
-		local plats = key_def.platforms
-		if type(plats) ~= "table" then goto continue end
-		for _, p in ipairs(plats) do
-			if p == "hs" then
-				result[key_def.id] = true
-				break
-			end
-		end
-		::continue::
-	end
-	if next(result) == nil then return fallback end
-	return result
-end
-
--- Keys belonging to the left hand (including spacebar, typically thumb-left).
--- Right-hand keys are everything else.
+-- The macOS column of the shared key catalogue ([tap_hold.catalog] in
+-- _shared/tap_hold/defaults.toml): which keys this submenu lists, in which
+-- order, under which hand and with which label. Read once, on first use.
 --
--- **Derived from _shared/modules/menu/menu_manifest.json tap_hold_keys_catalog
--- (MENU-4).** Keys with hand="left" and platforms including "hs" are left-hand;
--- everything else is right-hand. The catalog is the single source of truth.
-local LEFT_HAND_IDS = _load_left_hand_from_catalog()
+-- It replaces a reader of a `tap_hold_keys_catalog` menu-manifest key that
+-- never existed, so its built-in fallback always won — and that fallback said
+-- `action = true` where `fn = true` was meant, which listed Fn under the right
+-- hand.
+local _key_catalog = nil
+
+--- Returns this driver's keys from the shared tap-hold key catalogue.
+--- Raises when the catalogue is unreadable or malformed: the list providers
+--- calling it are isolated by the renderer, which logs the failure.
+--- @return table Array of { id, key, hand, label_key } in tray order.
+local function key_catalog()
+	if _key_catalog == nil then
+		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/defaults.toml"), "hs")
+	end
+	return _key_catalog
+end
 
 --- Builds a single tap / hold menu item for one key definition.
 --- @param karabiner   table    The karabiner module.
@@ -374,8 +434,9 @@ local LEFT_HAND_IDS = _load_left_hand_from_catalog()
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
 --- @param key_def     table    Entry from TAP_HOLD_KEYS.
+--- @param key_label   string   Translated key name, from the shared catalogue.
 --- @return table hs.menubar menu item.
-local function build_one_tap_hold_item(karabiner, action_index, update_menu, enabled, key_def)
+local function build_one_tap_hold_item(karabiner, action_index, update_menu, enabled, key_def, key_label)
 	local kid = key_def.id
 
 	local ok_tap,  current_tap  = pcall(karabiner.get_tap_action,  kid)
@@ -480,45 +541,53 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	}
 
 	return {
-		label    = string.format("%s  :  %s", key_def.label, combo_label),
+		label    = string.format("%s  :  %s", key_label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
 		items     = enabled and key_submenu or nil,
 	}
 end
 
---- Builds all tap / hold entries split into "Main gauche" / "Main droite" sections.
+--- Builds the tap / hold rows of one hand, in catalogue order.
+---
+--- The manifest owns the two hand headers and the separator between the hands;
+--- this returns only the key rows beneath one header. A key the remap engine
+--- knows and the shared catalogue does not list gets no row, and
+--- build_picker_trees reports it.
 --- Items are grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
+--- @param hand        string   "left" or "right".
 --- @return table List of hs.menubar menu item tables.
-local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
+local function build_hand_items(karabiner, action_index, update_menu, enabled, hand)
+	local engine_keys = {}
+	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do engine_keys[key_def.id] = key_def end
 	local items = {}
-
-	-- `label`, not `title`: these three go into the `tap_hold_keys` provider
-	-- array, and a row the renderer finds no label on is dropped — so all three
-	-- headers were missing and the two hands ran together in one undivided list.
-	items[#items + 1] = { label = i18n.section("menu.tapholds.header_taps_holds"), disabled = true }
-	items[#items + 1] = { label = i18n.section("menu.tapholds.left_hand"),         disabled = true }
-	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-		if LEFT_HAND_IDS[key_def.id] then
+	for _, entry in ipairs(KeyCatalog.of_hand(key_catalog(), hand)) do
+		local key_def = engine_keys[entry.id]
+		if key_def then
 			items[#items + 1] = build_one_tap_hold_item(
-				karabiner, action_index, update_menu, enabled, key_def)
+				karabiner, action_index, update_menu, enabled, key_def, i18n.get(entry.label_key))
 		end
 	end
-
-	items[#items + 1] = { label = i18n.section("menu.tapholds.right_hand"), disabled = true }
-	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-		if not LEFT_HAND_IDS[key_def.id] then
-			items[#items + 1] = build_one_tap_hold_item(
-				karabiner, action_index, update_menu, enabled, key_def)
-		end
-	end
-
 	return items
+end
+
+--- Reports every key the remap engine can bind that the shared catalogue does
+--- not list: such a key would silently have no row in the submenu.
+--- @param karabiner table The karabiner module.
+local function report_uncatalogued_keys(karabiner)
+	local listed = {}
+	for _, entry in ipairs(key_catalog()) do listed[entry.id] = true end
+	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+		if not listed[key_def.id] then
+			Logger.error(LOG, "Tap-hold key '%s' is missing from [tap_hold.catalog] — it has no menu row.",
+				tostring(key_def.id))
+		end
+	end
 end
 
 
@@ -576,7 +645,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		},
 		{ separator = true },
 		{
-			label = string.format(i18n.get("menu.tapholds.combo_arrow"), combo_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_chord"), combo_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_combo_action(cid, action_id) end,
@@ -586,7 +655,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.tapholds.tap_colon"), tap_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_hold_tap"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_tap_action(cid, action_id) end,
@@ -596,7 +665,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.tapholds.hold_colon"), hold_slbl),
+			label = string.format(i18n.get("menu.shortcuts.key_combinations_hold_hold"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_hold_action(cid, action_id) end,
@@ -764,24 +833,18 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	}
 end
 
---- Builds the symmetric-shortcut toggle item.
---- When on, "touche 1 + touche 2" and "touche 2 + touche 1" fire the same action;
---- the reverse half of each pair is hidden from the Raccourcis section to avoid duplicates.
+--- Toggles symmetric combinations: when on, "touche 1 + touche 2" and "touche 2
+--- + touche 1" fire the same chord, and the reverse half of each pair is hidden
+--- from the pair rows to avoid duplicates. The row is the manifest's `check`
+--- combo_symmetric; this is only what a click does.
 --- @param karabiner   table    The karabiner module.
 --- @param update_menu function Callback to refresh the menu bar.
---- @return table hs.menubar menu item.
-local function build_combo_symmetric_item(karabiner, update_menu)
-	local is_symmetric = karabiner.get_combo_symmetric()
-
-	return {
-		label   = i18n.get("menu.tapholds.symmetric"),
-		checked = is_symmetric,
-		action      = function()
-			commit_menu_setting(karabiner, "Combo symmetry", function()
-				return karabiner.set_combo_symmetric(not is_symmetric)
-			end, update_menu)
-		end,
-	}
+--- @return boolean accepted
+local function toggle_combo_symmetric(karabiner, update_menu)
+	local is_symmetric = karabiner.get_combo_symmetric() == true
+	return commit_menu_setting(karabiner, "Combo symmetry", function()
+		return karabiner.set_combo_symmetric(not is_symmetric)
+	end, update_menu)
 end
 
 
@@ -838,7 +901,7 @@ end
 
 --- Returns the (memoised) tap/hold and raccourcis picker trees, rebuilding only
 --- when the binding fingerprint changes. See _picker_cache rationale above.
---- @return table tap_hold, table raccourcis
+--- @return table tap_hold { left, right } key rows per hand, table raccourcis
 local function build_picker_trees(karabiner, update_menu, enabled)
 	local fp = picker_fingerprint(karabiner, enabled)
 	if _picker_cache and _picker_cache.fp == fp then
@@ -846,18 +909,92 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 		return _picker_cache.tap_hold, _picker_cache.raccourcis
 	end
 	Logger.debug(LOG, "Picker trees rebuilt (binding fingerprint changed).")
+	report_uncatalogued_keys(karabiner)
 	local action_index = build_action_index(karabiner)
-	local tap_hold   = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
+	local tap_hold = {
+		left  = build_hand_items(karabiner, action_index, update_menu, enabled, "left"),
+		right = build_hand_items(karabiner, action_index, update_menu, enabled, "right"),
+	}
 	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
 	_picker_cache = { fp = fp, tap_hold = tap_hold, raccourcis = raccourcis }
 	return tap_hold, raccourcis
+end
+
+--- Leads a greyed group of rows with the reason they are unavailable.
+--- @param rows table Cached rows, shared with later builds and never mutated.
+--- @param enabled boolean « Ergopti uses Karabiner ».
+--- @return table rows The cached rows when on, or a fresh list led by the hint.
+local function with_karabiner_off_hint(rows, enabled)
+	if enabled then return rows end
+	local hinted = { { label = i18n.get("menu.tapholds.karabiner_off_hint"), disabled = true } }
+	for _, row in ipairs(rows) do hinted[#hinted + 1] = row end
+	return hinted
+end
+
+-- The guardian states that leave every tap-hold inert, each with the reason
+-- row it shows and the facade opener its Login Items row calls: the approval
+-- opener rechecks that approval is still what is missing, while an
+-- unregistered helper is fixed from the same pane without that precondition.
+-- An approval also offers its numbered steps again: the dialog shows them by
+-- itself once per launch, and this row is where they stay afterwards.
+local GUARDIAN_STATUS_ROWS = {
+	requires_approval = { key = "menu.tapholds.guardian_requires_approval", opener = "open_guardian_settings",
+		steps = true },
+	unavailable       = { key = "menu.tapholds.guardian_unavailable",       opener = "open_login_items" },
+}
+
+--- The row that shows the Login Items steps again, on the user's request.
+--- @param karabiner table Remap facade.
+--- @return table row
+local function login_items_steps_row(karabiner)
+	return {
+		label = i18n.get("menu.tapholds.show_login_items_steps"),
+		action = function()
+			Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
+			local ok, shown = xpcall(function()
+				return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
+			end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "The Login Items steps could not be shown: %s.", tostring(shown))
+				return false
+			end
+			return shown == true
+		end,
+	}
+end
+
+--- The rows that say why switched-on tap-holds do nothing: the remap guardian
+--- is not ready, so no rule deploys, and before these rows only the log said so.
+--- @param karabiner table Remap facade.
+--- @param tap_holds_on boolean Tap-Holds feature switch.
+--- @return table rows Empty unless the rules wait on the guardian.
+local function guardian_status_rows(karabiner, tap_holds_on)
+	if not tap_holds_on or karabiner.get_enabled() ~= true
+		or type(karabiner.guardian_state) ~= "function" then return {} end
+	local ok, state = pcall(karabiner.guardian_state)
+	local spec = ok and GUARDIAN_STATUS_ROWS[state] or nil
+	if not spec then return {} end
+	local opener = karabiner[spec.opener]
+	local rows = { { label = i18n.get(spec.key), disabled = true } }
+	if spec.steps then rows[#rows + 1] = login_items_steps_row(karabiner) end
+	if type(opener) == "function" then
+		rows[#rows + 1] = {
+			label = i18n.get("menu.tapholds.open_login_items"),
+			action = function()
+				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
+				return opener(report_login_items_opened) == true
+			end,
+		}
+	end
+	return rows
 end
 
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
 --- same declaration Windows renders: the bulk commands, then this engine's
---- timings, the per-key tap/hold bindings, and the modifier chords. This module
+--- timings and the per-key tap/hold bindings under one header per hand. The
+--- modifier chords are M.build_key_combinations', under Shortcuts. This module
 --- supplies only the provider rows and the command capabilities.
 ---
 --- The manifest's `tapholds_toggle` row is the Tap-Holds feature switch. It
@@ -875,64 +1012,47 @@ function M.build(ctx)
 	end
 
 	local enabled = karabiner.get_enabled()
-	local tap_hold, chords = build_picker_trees(karabiner, update_menu, enabled)
+	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
+		and karabiner.get_tap_holds_enabled() == true
 
+	-- The key lists build their trees on demand, inside the renderer's isolated
+	-- provider call: an unreadable key catalogue then costs the key rows and is
+	-- logged, not the whole Tap-Holds submenu.
 	local providers = {
+		-- The first engine-specific rows: while the guardian is not ready,
+		-- they open with why nothing applies and the way to fix it.
 		["tap_hold_timings"] = function()
-			return {
-				build_delay_item(karabiner, update_menu),
-				build_simultaneous_threshold_item(karabiner, update_menu),
-				build_combo_symmetric_item(karabiner, update_menu),
-				build_sticky_delay_item(karabiner, update_menu),
-			}
+			local rows = guardian_status_rows(karabiner, tap_holds_on)
+			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
+			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
+			return rows
 		end,
-		["tap_hold_keys"]   = function() return tap_hold end,
-		["tap_hold_chords"] = function() return chords end,
+		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
+		-- can deploy them. Say why right above the first of them, at the top of
+		-- the left hand; the chord rows, under Shortcuts, get the same hint
+		-- (M.build_key_combinations). The cached trees are shared, so the hint
+		-- goes into a fresh list.
+		["tap_hold_keys_left"] = function()
+			return with_karabiner_off_hint((build_picker_trees(karabiner, update_menu, enabled)).left, enabled)
+		end,
+		["tap_hold_keys_right"] = function()
+			return (build_picker_trees(karabiner, update_menu, enabled)).right
+		end,
 	}
 
 	-- The two bulk commands are the ids Windows declares for its own tap-holds:
 	-- the same row, the same label, this engine's implementation behind it.
-	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
-		and karabiner.get_tap_holds_enabled() == true
-
+	-- Like there, they leave the key combinations of the Shortcuts group alone.
 	local commands = {
 		["tapholds_toggle"] = function()
 			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
 		end,
-		["disable_all"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"clear_all_bindings",
-				"Clearing every tap/hold and combo slot…",
-				"Cleared %d changed entry/entries — all slots are now 'none'.",
-				true,
-				update_menu
-			)
-		end,
-		["reset_defaults"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"reset_to_defaults",
-				"Restoring every tap-hold setting to defaults…",
-				"All tap-hold settings restored to defaults.",
-				false,
-				update_menu
-			)
-		end,
+		["disable_all"] = function() return run_scope(karabiner, "clear", update_menu) end,
+		["reset_defaults"] = function() return run_scope(karabiner, "recommended", update_menu) end,
 		-- Required on the click: the editor loads the layer data and its window
 		-- stack, which a menu build has no use for.
 		["edit_nav_layer"] = function()
 			return require("ui.layer_editor").open({ karabiner = karabiner })
-		end,
-		["copy_tap_to_combo"] = function()
-			return run_bulk_menu_command(
-				karabiner,
-				"copy_tap_actions_to_combos",
-				"Propagating tap → combo for all modifier combos…",
-				"Tap → combo propagation done (%d combo(s) updated).",
-				true,
-				update_menu
-			)
 		end,
 	}
 
@@ -982,6 +1102,100 @@ function M.set_feature_enabled(karabiner, enabled, update_menu)
 		end
 	end
 	if type(update_menu) == "function" then update_menu() end
+	return true
+end
+
+--- Builds the « Combinaisons de touches » group of the Shortcuts submenu: the
+--- rows `key_combinations_group` declares, answered by this engine's chords.
+---
+--- It opens with its own switch (persisted [mod_combos] enabled; on while the
+--- user never set it, whatever the Tap-Holds switch says), then the symmetry
+--- check, the chord delay, the tap → chord copy, and
+--- one row per ordered pair of keys with its three slots.
+--- @param ctx table Global UI context (must contain ctx.karabiner).
+--- @return table|nil The rendered rows of the group's submenu, or nil.
+function M.build_key_combinations(ctx)
+	local karabiner   = ctx and ctx.karabiner
+	local update_menu = ctx and ctx.updateMenu
+
+	if not karabiner then
+		Logger.warn(LOG, "Remap module absent from context — key-combinations group skipped.")
+		return nil
+	end
+
+	local enabled = karabiner.get_enabled()
+	local providers = {
+		["combo_timings"] = function()
+			return { build_simultaneous_threshold_item(karabiner, update_menu) }
+		end,
+		-- Greyed with « Ergopti uses Karabiner » off, and led by the reason.
+		["key_combination_rows"] = function()
+			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
+			return with_karabiner_off_hint(chords, enabled)
+		end,
+	}
+
+	local combos_on = karabiner.get_mod_combos_enabled() == true
+	local commands = {
+		["key_combinations_toggle"] = function()
+			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
+		end,
+		["combo_symmetric"] = function()
+			return toggle_combo_symmetric(karabiner, update_menu)
+		end,
+		["copy_tap_to_combo"] = function()
+			return run_bulk_menu_command(
+				karabiner,
+				"copy_tap_actions_to_combos",
+				"Propagating tap → combo for all modifier combos…",
+				"Tap → combo propagation done (%d combo(s) updated).",
+				true,
+				update_menu
+			)
+		end,
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = commands
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["key_combinations_enabled"] = function() return combos_on end
+	render_ctx.state_getters["combo_symmetric"] = function() return karabiner.get_combo_symmetric() == true end
+
+	-- The rows ManifestMenu.build returns are already rendered: the group row
+	-- takes them as its finished submenu.
+	return ManifestMenu.build("key_combinations_group", "KeyCombinations", nil, nil, render_ctx, providers)
+end
+
+--- Switches the key combinations, persists the choice, then redeploys the
+--- rules. Like the Tap-Holds switch, a refused deploy is logged and does not
+--- undo the user's choice.
+--- @param karabiner table Remap module.
+--- @param enabled boolean Desired switch state.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean committed
+function M.set_key_combinations_enabled(karabiner, enabled, update_menu)
+	if type(karabiner) ~= "table" or type(karabiner.set_mod_combos_enabled) ~= "function" then
+		Logger.error(LOG, "Key-combinations switch is unavailable.")
+		return false
+	end
+	Logger.start(LOG, "Switching the key combinations %s…", enabled and "on" or "off")
+	if karabiner.set_mod_combos_enabled(enabled == true) ~= true then
+		Logger.error(LOG, "Key-combinations switch did not persist.")
+		return false
+	end
+	_picker_cache = nil
+	local ok_call, accepted = pcall(karabiner.regenerate, function(ok, reason)
+		if ok ~= true then
+			Logger.warn(LOG, "Key-combination rules not redeployed yet: %s.", tostring(reason))
+		end
+	end)
+	if not ok_call then
+		Logger.error(LOG, "Key-combination redeploy raised: %s.", tostring(accepted))
+	end
+	if type(update_menu) == "function" then update_menu() end
+	Logger.success(LOG, "Key combinations switched %s.", enabled and "on" or "off")
 	return true
 end
 

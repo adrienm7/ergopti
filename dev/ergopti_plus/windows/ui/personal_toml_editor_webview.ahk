@@ -93,7 +93,7 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 
 	; Singleton — bring the existing editor to the front.
 	if (_HsEdWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _HsEdWeb_Gui.Hwnd)
+		WMPresentWindow(_HsEdWeb_Gui)
 		return true
 	}
 	_HsEdWeb_SessionEpoch += 1

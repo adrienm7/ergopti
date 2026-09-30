@@ -10,6 +10,7 @@ Run the corresponding npm script to regenerate.
 | `personal_shortcuts.ahk` | generated at runtime by `PersonalTomlEditor` | ✅ Wired — loaded dynamically                                     |
 | `prompt_builder.ahk`     | `npm run codegen:prompt-builder:ahk`         | ✅ Wired — `#Include`'d in tests, used by `prediction_engine.ahk` |
 | `llm_profiles_data.ahk`  | `npm run codegen:llm-profiles-data:ahk`      | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/llm/profiles.ahk` (DL-2/DL-3) |
+| `touchpad_registry.ahk`  | `npm run codegen:touchpad-registry`          | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/gestures/touchpad_registry.ahk` |
 
 > **Removed (audit 2026-06-26, GEN-1/2):** `registry.ahk` and `expander.ahk` were
 > orphaned codegen ports of the `Registry.spec.js` / `Expander.spec.js` domain

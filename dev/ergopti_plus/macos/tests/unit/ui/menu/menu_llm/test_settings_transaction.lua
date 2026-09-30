@@ -106,7 +106,6 @@ local function with_fixture(options, callback)
 		llm_model_ollama = "",
 		llm_active_profile = "basic",
 		llm_profile_shortcuts = {},
-		llm_trigger_shortcut = false,
 		llm_debounce = 0.5,
 		llm_max_words = 7,
 		llm_min_words = 2,
@@ -277,7 +276,6 @@ local function with_fixture(options, callback)
 		build = function(_, _, handlers)
 			local items = {}
 			for _, id in ipairs({
-				"llm_num_predictions",
 				"llm_generation_settings",
 				"llm_navigation",
 			}) do
@@ -410,7 +408,6 @@ local function with_fixture(options, callback)
 				return {
 					bind_hotkey = noop,
 					activate_hotkey = noop,
-					apply_llm_shortcut = noop,
 					apply_llm_profile_shortcut = noop,
 					restore_shortcuts = function() return true end,
 				}
@@ -419,7 +416,6 @@ local function with_fixture(options, callback)
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
 			row_ids = function()
 				return {
-					"llm_num_predictions",
 					"llm_generation_settings",
 					"llm_navigation",
 				}
@@ -427,12 +423,12 @@ local function with_fixture(options, callback)
 			row_disabled = function() return false end,
 			has_health_dot = function() return false end,
 		}
-		package.loaded["modules.llm.mlx_deps_checker"] = {
+		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
-		}
-		package.loaded["modules.llm.ollama_deps_checker"] = {
+		})
+		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
-		}
+		})
 
 		package.loaded["ui.menu.menu_llm"] = nil
 		local MenuLLM = require("ui.menu.menu_llm")
@@ -444,9 +440,9 @@ local function with_fixture(options, callback)
 			active_tasks = {},
 		})
 		local submenu = handler.build_item().submenu
-		local predictions = find_item(submenu, "menu.llm.num_predictions_label")
 		local generation = find_item(submenu, "menu.llm.generation_menu_title")
-		local reset_predictions = find_item(submenu, "menu.llm.reset_label")
+		local predictions = find_item(generation.menu, "menu.llm.num_predictions_label")
+		local reset_predictions = find_item(generation.menu, "menu.llm.reset_label")
 		local reset_on_nav = find_item(generation.menu, "menu.llm.reset_on_nav")
 		reset_observations()
 		return {
@@ -499,7 +495,6 @@ local function with_fixture(options, callback)
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
-				apply_llm_shortcut = function() return true end,
 			})
 		end,
 		app_change = function(value) return app_change(value) end,

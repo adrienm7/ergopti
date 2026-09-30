@@ -9,6 +9,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 
 local LOG = "modules.llm.navigation_settings"
@@ -48,7 +49,8 @@ function M.get()
 	local stored = ok and Storage and Storage.get(KEY, nil) or nil
 	_value = normalise(stored) or fallback
 	if stored ~= nil and not normalise(stored) then
-		Logger.warn(LOG, "Stored validation modifiers are invalid; using the manifest default.")
+		-- Outdated configuration: named once, offered by the cleanup.
+		ConfigOutdated.report(KEY, ConfigOutdated.REFUSED, Logger)
 	end
 	return _value
 end
@@ -94,7 +96,8 @@ end
 --- @param document table Parsed canonical configuration.
 --- @param mark function Consumed-key collector.
 function M.mark_config_reads(document, mark)
-	require("infra.llm_preferences").mark_config_read(document, KEY, mark)
+	require("infra.llm_preferences").mark_config_read(document, KEY, mark,
+		function(value) return normalise(value) ~= nil end)
 end
 
 --- Captures the resolved modifier chord without file effects.

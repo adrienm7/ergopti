@@ -316,6 +316,8 @@ helpers.describe("menu metric shortcuts preserve dashboard close ownership", fun
 		package.loaded["ui.metrics_typing.init"] = nil
 		package.loaded["ui.metrics_apps"] = apps
 		package.loaded["ui.metrics_apps.init"] = nil
+		-- Both dashboards are the focused window: the toggle closes them.
+		package.loaded["ui.ui_builder"] = { is_window_focused = function() return true end }
 
 		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "ctrl" }, "m", false), true)
 		local metrics_handle = only_handle(fixture.bindings)
@@ -340,5 +342,29 @@ helpers.describe("menu metric shortcuts preserve dashboard close ownership", fun
 			"a refused typing close must retain its exact owner")
 		helpers.assert_eq(apps._wv, apps_owner,
 			"a refused apps close must retain its exact owner")
+	end)
+end)
+
+helpers.describe("menu metric shortcuts present a covered dashboard (ui-focus-not-topmost)", function()
+	helpers.it("brings a covered dashboard back instead of closing it (ui-focus-not-topmost)", function()
+		local fixture = load_fixture()
+		local closes, shows = 0, 0
+		local apps = {
+			_wv = {},
+			close = function() closes = closes + 1; return true end,
+			show = function() shows = shows + 1; return true end,
+		}
+		package.loaded["ui.metrics_apps"] = apps
+		package.loaded["ui.metrics_apps.init"] = nil
+		-- The dashboard is open but another app's window is in front of it.
+		package.loaded["ui.ui_builder"] = { is_window_focused = function() return false end }
+
+		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "ctrl" }, "a", false), true)
+		local handle = only_handle(fixture.bindings)
+		helpers.assert_not_nil(handle)
+		fixture.bindings[handle].callback()
+
+		helpers.assert_eq(closes, 0, "a covered dashboard must not be closed by its shortcut")
+		helpers.assert_eq(shows, 1, "a covered dashboard must be presented through its open path")
 	end)
 end)

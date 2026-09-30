@@ -283,6 +283,7 @@ InstallHotstringHooks()
 #Include ../adapters/crypto.ahk
 #Include ../adapters/network_info.ahk
 #Include ../adapters/window_manager.ahk
+#Include ../adapters/system_control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
 #Include ../ui/spotlight/ownership.ahk
@@ -320,6 +321,7 @@ InstallSendNoOps()
 ; top-level ExitApp would end the suite.
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_window_manager_present_window.ahk
 #Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
@@ -352,6 +354,8 @@ InstallSendNoOps()
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
+#Include unit/test_tooltip_border_zorder.ahk
+#Include unit/test_tooltip_border_ring_region.ahk
 #Include unit/test_tooltip_latency_diagnostics.ahk
 #Include unit/test_tooltip_border_gdi_ownership.ahk
 #Include unit/test_tooltip_measure_gdi_ownership.ahk
@@ -432,6 +436,7 @@ InstallSendNoOps()
 #Include unit/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk
 #Include unit/test_tap_hold_scope.ahk
+#Include unit/test_tap_hold_hand_sections.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
@@ -457,6 +462,7 @@ InstallSendNoOps()
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk
+#Include unit/test_version_label_vectors.ahk
 #Include unit/test_updater_check_interval_snap.ahk
 #Include unit/test_updater_check_schedule.ahk
 #Include unit/test_updater_balloon_click_ownership.ahk
@@ -464,6 +470,7 @@ InstallSendNoOps()
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/test_about_menu_channel_rows.ahk
+#Include unit/test_about_menu_version_row.ahk
 #Include unit/test_changelog_subscribe_channel.ahk
 #Include unit/test_updater_release_notes.ahk
 #Include unit/test_updater_staging_transport.ahk
@@ -540,6 +547,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_api_test_entry.ahk
 #Include unit/test_llm_menu_backend_model_labels.ahk
 #Include unit/test_llm_menu_build_submenu.ahk
+#Include unit/test_llm_menu_prediction_count.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk
@@ -575,6 +583,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_layout_extension_runtime.ahk
 #Include unit/test_layout_extension_menu.ahk
 #Include unit/test_layout_extension_refresh.ahk
+#Include unit/test_ergopti_extension_hotstrings.ahk
 #Include ../ui/layout_manager/init.ahk
 #Include unit/test_layout_manager_host.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk
@@ -609,14 +618,12 @@ global _LLM_Menu := Map(
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
-	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false,
+	"inline_autotype", false,
 	"ollama_port", 11434
 )
 global _LLM_Menu_Loaded := false
-; Definitions-only trigger transaction. The fake registrar in its unit suite
-; owns every native transition; this include registers no real hotkey.
-#Include ../ui/menu/menu_llm/trigger_journal.ahk
-#Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+; Definitions-only chord translation and hotkey identities; registers no hotkey.
+#Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
@@ -666,24 +673,32 @@ _LogBootProgress("menu_llm persist + tests included")
 ; RunTests() calls ExitApp immediately after completion.
 _LogBootProgress("loading gestures modules")
 #Include ../modules/take_note.ahk
+#Include ../_generated/touchpad_registry.ahk
+#Include ../modules/gestures/touchpad_registry.ahk
 #Include ../modules/gestures/init.ahk
 #Include ../modules/gestures/click.ahk
 #Include ../modules/gestures/screenshots.ahk
 #Include ../modules/gestures/window_cycle.ahk
+#Include ../modules/gestures/virtual_desktops.ahk
 #Include ../modules/gestures/config.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
-#Include ../ui/onboarding/steps_metrics.ahk
-; The WebView host is definitions-only until _Onboarding_TryWeb is called.
-; Include it so malformed finish payloads are rejected before they reach the
-; persistence/reload boundary.
+#Include ../ui/onboarding/gesture_registration.ahk
+; The answers contract, the commit and the WebView host are definitions-only
+; until _Onboarding_TryWeb is called. Include them so the finish payload is
+; followed to the candidate config.toml without the persistence/reload boundary.
+#Include ../ui/onboarding/answers.ahk
+#Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
 #Include unit/test_screenshot_worker_ownership.ahk
 #Include unit/test_onboarding_finish_payload.ahk
+#Include unit/test_onboarding_answers.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
+#Include unit/test_system_actions.ahk
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
@@ -745,6 +760,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_runtime_decision_generation.ahk
 #Include meta/test_wpm_global_barrier_behavior_20260813.ahk
 #Include unit/test_gesture_restart_result_zero_is_success.ahk
+#Include unit/test_touchpad_registry.ahk
 _LogBootProgress("gestures + test included")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
@@ -1224,15 +1240,13 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_hotkey_registrar_modifier_keys.ahk
 #Include unit/test_keyboard_slot_win_space.ahk
-#Include unit/test_llm_trigger_shortcut_transactions.ahk
+#Include unit/test_llm_trigger_shortcut_retired.ahk
+#Include unit/test_llm_hotkey_identity.ahk
 #Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk
 #Include meta/test_llm_hotkey_cross_owner_policy.ahk
-#Include unit/test_llm_trigger_journal.ahk
-#Include meta/test_llm_trigger_shortcut_transaction.ahk
-#Include meta/test_llm_trigger_journal_lifecycle.ahk
 #Include meta/test_config_transition_integration.ahk
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
 ; same shared file the macOS and Linux suites replay.
@@ -1332,9 +1346,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_no_onexit_keylogger_flush.ahk
 #Include meta/test_onboarding_no_appstate.ahk
 #Include meta/test_onboarding_toml_bool_reads.ahk
-#Include meta/test_onboarding_magic_key_sentinel.ahk
 #Include meta/test_onboarding_effective_config_dir.ahk
-#Include meta/test_onboarding_back_keeps_answers.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_oneshotshift_suspend_guard.ahk
@@ -1719,6 +1731,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_kana_altgr_ctrl_chords.ahk
 #Include ../ui/error_dialog/init.ahk
 #Include unit/test_error_dialog.ahk
+#Include ../ui/update_check/init.ahk
+#Include unit/test_updater_result_dialog_states.ahk
+#Include meta/test_updater_manual_check_uses_dialog.ahk
 #Include unit/test_healthcheck_os_name_windows11.ahk
 #Include unit/test_healthcheck_issues_from_errors_file.ahk
 #Include unit/test_healthcheck_report_issue.ahk
@@ -1767,7 +1782,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_json_string_literal_single_source.ahk
 #Include meta/test_json_string_decoder_single_source.ahk
 #Include meta/test_toml_string_codec_single_source.ahk
-#Include meta/test_onboarding_gesture_msgbox_zorder.ahk
+#Include meta/test_magic_key_editor_reopen_presents.ahk
+#Include meta/test_update_check_window_presented.ahk
+#Include meta/test_gesture_notice_presented.ahk
+#Include meta/test_hs_delimiter_dialog_reachable.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
 #Include meta/test_open_downloads_catch.ahk
@@ -1924,6 +1942,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_taphold_hold_gate_arms_without_tap.ahk
 #Include meta/test_tooltip_debounce_is_load_bearing.ahk
 #Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_reveal_zorder.ahk
+#Include meta/test_tooltip_border_ring_region.ahk
 #Include meta/test_tooltip_render_accounting.ahk
 #Include meta/test_tray_suspend_checkmark_survives_rebuild.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk

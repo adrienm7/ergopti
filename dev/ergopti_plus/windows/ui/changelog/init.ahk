@@ -111,10 +111,9 @@ _CLW_OpenCapturedRequest(Channel, Request) {
 
 	; Singleton: reuse the existing window.
 	if IsSet(_CLW_Gui) {
-		try _CLW_Gui.Restore()
 		if !_Updater_RequestMayPublish(Request)
 			return false
-		try WinActivate(_CLW_Gui.Hwnd)
+		WMPresentWindow(_CLW_Gui)
 		if !_Updater_RequestMayPublish(Request)
 			return false
 		_CLW_Channel := Channel

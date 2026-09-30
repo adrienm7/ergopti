@@ -40,6 +40,9 @@ local LOG = "personal_hotstrings"
 -- any real personal hotstrings layout; past it we stop descending and warn.
 local SCAN_MAX_DEPTH = 16
 
+-- Group-name prefix of every extra personal file; the stem path follows it.
+local EXTENSION_GROUP_PREFIX = "personal_ext_"
+
 
 
 
@@ -137,7 +140,7 @@ function M.load(ctx)
 		for _, item in ipairs(items) do
 			if item.type == "file" then
 				local new_prefix = (prefix == "") and item.stem or (prefix .. "__" .. item.stem)
-				local group_name = "personal_ext_" .. new_prefix
+				local group_name = EXTENSION_GROUP_PREFIX .. new_prefix
 				local prior_path = group_name_sources[group_name]
 				if prior_path then
 					-- F-LOW-5: e.g. a flat "a__b.toml" and a nested "a/b.toml" both derive
@@ -163,6 +166,15 @@ function M.load(ctx)
 	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "", 1)
 
 	return loaded
+end
+
+--- Whether a registered hotstring group is the user's own: the personal file
+--- or one of the extra files this loader registers beside it.
+--- @param name string Registered group name.
+--- @return boolean
+function M.is_personal_group(name)
+	return name == keymap.PERSONAL_GROUP_NAME
+		or (type(name) == "string" and name:sub(1, #EXTENSION_GROUP_PREFIX) == EXTENSION_GROUP_PREFIX)
 end
 
 return M

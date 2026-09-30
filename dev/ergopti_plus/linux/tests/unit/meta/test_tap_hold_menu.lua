@@ -15,12 +15,12 @@ local helpers = require("tests.helpers")
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 local WRITER = "platform.remap.tap_hold_writer"
 local PICKER = "ui.action_picker.bridge"
+local SCOPE = "infra.tap_hold_scope"
 
 --- A fake writer recording its calls.
 local function fake_writer(calls)
 	local writer = {}
-	for _, name in ipairs({ "set_tap", "set_hold", "set_native", "set_threshold", "set_enabled",
-		"disable_all", "reset_all" }) do
+	for _, name in ipairs({ "set_tap", "set_hold", "set_native", "set_threshold", "set_enabled" }) do
 		writer[name] = function(...)
 			calls[#calls + 1] = { name, ... }
 			return true
@@ -53,6 +53,12 @@ local function build(calls, picked, user_text)
 		user_path = user_path,
 	})
 	package.loaded[WRITER] = fake_writer(calls)
+	package.loaded[SCOPE] = {
+		apply = function(mode, is_paused)
+			calls[#calls + 1] = { "scope", mode, is_paused() }
+			return true
+		end,
+	}
 	package.loaded[PICKER] = {
 		open = function(opts, on_confirm)
 			picked.opts = opts
@@ -75,6 +81,7 @@ end
 local function restore(Manager)
 	Manager._reset_for_test()
 	package.loaded[WRITER] = nil
+	package.loaded[SCOPE] = nil
 	package.loaded[PICKER] = nil
 end
 
@@ -102,8 +109,9 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
 			helpers.assert_true(section ~= nil, "a Tap-Holds section in the tray")
-			helpers.assert_eq(#key_rows(section), #require("platform.remap.tap_hold_engine").KEY_ORDER,
-				"every key the engine can remap has its row")
+			local engine_keys = 0
+			for _ in pairs(require("platform.remap.tap_hold_engine").KEY_CODES) do engine_keys = engine_keys + 1 end
+			helpers.assert_eq(#key_rows(section), engine_keys, "every key the engine can remap has its row")
 			local i18n = require("infra.i18n")
 			local reset = find(section.menu, i18n.get("common.restore_recommended"))
 			local disable = find(section.menu, i18n.get("common.clear_to_system"))
@@ -111,12 +119,30 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_not_nil(reset, "the recommended restore row")
 			helpers.assert_not_nil(disable, "the clear-to-system row")
 			helpers.assert_not_nil(toggle, "the feature switch")
-			reset.fn()
-			disable.fn()
+			local asked = {}
+			local execute = os.execute
+			os.execute = function(command)
+				if command:find("command -v zenity", 1, true) then return 0 end
+				if command:find("zenity --question", 1, true) then
+					asked[#asked + 1] = command
+					return #asked == 3 and 1 or 0
+				end
+				return execute(command)
+			end
+			local ran, raised = pcall(function()
+				reset.fn()
+				disable.fn()
+				reset.fn()
+			end)
+			os.execute = execute
+			if not ran then error(raised, 0) end
 			toggle.fn()
-			helpers.assert_eq(calls[1][1], "reset_all")
-			helpers.assert_eq(calls[2][1], "disable_all")
-			helpers.assert_eq(calls[3][1], "set_enabled")
+			helpers.assert_eq(#asked, 3, "every whole-section row asks first")
+			helpers.assert_contains(asked[1], i18n.get("common.restore_recommended"))
+			helpers.assert_contains(asked[1], "--default-cancel")
+			helpers.assert_eq(calls[1], { "scope", "recommended", false })
+			helpers.assert_eq(calls[2], { "scope", "clear", false })
+			helpers.assert_eq(calls[3][1], "set_enabled", "a declined confirmation runs nothing")
 			helpers.assert_eq(calls[3][2], false, "the switch was on, a click turns it off")
 		end)
 		restore(Manager)
@@ -255,6 +281,43 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_eq(calls[1][2], "left_ctrl")
 			local escape = find(key_rows(section), i18n.get("tap_hold.group.escape"))
 			helpers.assert_true(not escape.checked, "an unconfigured key is not ticked")
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	-- The keys sat in one undivided list in the Windows order (Engine.KEY_ORDER),
+	-- with no hand; the shared key catalogue now decides the hand of each.
+	helpers.it("lists the keys by hand, with a separator after Space and AltGr opening the right hand", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local rows = section.menu
+			local function index_of(title)
+				for index, row in ipairs(rows) do
+					if row.title == title then return index end
+				end
+				return nil
+			end
+			local function key_index(label_key)
+				local prefix = i18n.get(label_key) .. "  :"
+				for index, row in ipairs(rows) do
+					if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return index end
+				end
+				return nil
+			end
+			local left = index_of(i18n.section("menu.tapholds.left_hand_tap_hold"))
+			local right = index_of(i18n.section("menu.tapholds.right_hand_tap_hold"))
+			helpers.assert_not_nil(left, "the « Main gauche — Tap / Hold » header")
+			helpers.assert_not_nil(right, "the « Main droite — Tap / Hold » header")
+			local space = key_index("tap_hold.group.space")
+			helpers.assert_true(space ~= nil and space > left and space < right, "Space is a left-hand key")
+			helpers.assert_eq(space, right - 2, "Space is the last left-hand key")
+			helpers.assert_true(rows[space + 1].title == "-" or rows[space + 1].separator == true,
+				"a separator follows the last left-hand key")
+			helpers.assert_eq(key_index("tap_hold.group.alt_gr"), right + 1, "AltGr is the first right-hand key")
+			helpers.assert_true(key_index("tap_hold.group.enter") > right, "Enter is a right-hand key")
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end

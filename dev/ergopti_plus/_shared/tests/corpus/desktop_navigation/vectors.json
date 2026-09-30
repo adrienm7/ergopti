@@ -1,0 +1,176 @@
+{
+	"description": "Golden vectors for the previous/next desktop actions: macOS space_prev / space_next and space_prev_wrap / space_next_wrap, Windows and Linux desktop_prev / desktop_next and desktop_prev_wrap / desktop_next_wrap. Replayed by the macOS, Linux and Windows suites so the three drivers agree on where a step lands.",
+	"rule": "index is the 0-based position of the current desktop among count desktops (count >= 1, 0 <= index < count). direction is prev or next. A step moves one position in that direction. At an edge a plain action (wrap false) stays where it is, and a wrapping action (wrap true) goes to the other end: next from the last desktop lands on the first, prev from the first lands on the last. With a single desktop both stay. target is the 0-based index the action lands on; target equal to index means no switch. The signed number of single steps is target - index.",
+	"vectors": [
+		{
+			"id": "next_in_the_middle",
+			"index": 1,
+			"count": 4,
+			"direction": "next",
+			"wrap": false,
+			"target": 2
+		},
+		{
+			"id": "next_in_the_middle_wrapping",
+			"index": 1,
+			"count": 4,
+			"direction": "next",
+			"wrap": true,
+			"target": 2
+		},
+		{
+			"id": "prev_in_the_middle",
+			"index": 2,
+			"count": 4,
+			"direction": "prev",
+			"wrap": false,
+			"target": 1
+		},
+		{
+			"id": "prev_in_the_middle_wrapping",
+			"index": 2,
+			"count": 4,
+			"direction": "prev",
+			"wrap": true,
+			"target": 1
+		},
+		{
+			"id": "next_onto_the_last",
+			"index": 2,
+			"count": 4,
+			"direction": "next",
+			"wrap": false,
+			"target": 3
+		},
+		{
+			"id": "prev_onto_the_first",
+			"index": 1,
+			"count": 4,
+			"direction": "prev",
+			"wrap": false,
+			"target": 0
+		},
+		{
+			"id": "next_at_the_last_stays",
+			"index": 3,
+			"count": 4,
+			"direction": "next",
+			"wrap": false,
+			"target": 3
+		},
+		{
+			"id": "next_at_the_last_wraps_to_the_first",
+			"index": 3,
+			"count": 4,
+			"direction": "next",
+			"wrap": true,
+			"target": 0
+		},
+		{
+			"id": "prev_at_the_first_stays",
+			"index": 0,
+			"count": 4,
+			"direction": "prev",
+			"wrap": false,
+			"target": 0
+		},
+		{
+			"id": "prev_at_the_first_wraps_to_the_last",
+			"index": 0,
+			"count": 4,
+			"direction": "prev",
+			"wrap": true,
+			"target": 3
+		},
+		{
+			"id": "next_from_the_first",
+			"index": 0,
+			"count": 4,
+			"direction": "next",
+			"wrap": false,
+			"target": 1
+		},
+		{
+			"id": "prev_from_the_last_wrapping",
+			"index": 3,
+			"count": 4,
+			"direction": "prev",
+			"wrap": true,
+			"target": 2
+		},
+		{
+			"id": "single_desktop_next_stays",
+			"index": 0,
+			"count": 1,
+			"direction": "next",
+			"wrap": false,
+			"target": 0
+		},
+		{
+			"id": "single_desktop_next_wrapping_stays",
+			"index": 0,
+			"count": 1,
+			"direction": "next",
+			"wrap": true,
+			"target": 0
+		},
+		{
+			"id": "single_desktop_prev_wrapping_stays",
+			"index": 0,
+			"count": 1,
+			"direction": "prev",
+			"wrap": true,
+			"target": 0
+		},
+		{
+			"id": "two_desktops_next_at_the_last_stays",
+			"index": 1,
+			"count": 2,
+			"direction": "next",
+			"wrap": false,
+			"target": 1
+		},
+		{
+			"id": "two_desktops_next_at_the_last_wraps",
+			"index": 1,
+			"count": 2,
+			"direction": "next",
+			"wrap": true,
+			"target": 0
+		},
+		{
+			"id": "two_desktops_prev_at_the_first_wraps",
+			"index": 0,
+			"count": 2,
+			"direction": "prev",
+			"wrap": true,
+			"target": 1
+		},
+		{
+			"id": "ten_desktops_next_at_the_last_wraps",
+			"index": 9,
+			"count": 10,
+			"direction": "next",
+			"wrap": true,
+			"target": 0
+		},
+		{
+			"id": "ten_desktops_prev_at_the_first_wraps",
+			"index": 0,
+			"count": 10,
+			"direction": "prev",
+			"wrap": true,
+			"target": 9
+		}
+	],
+	"invalid_rule": "Each invalid input is a failed read of the operating system, never a position to clamp: every driver refuses it (Lua raises, Windows throws) instead of switching somewhere.",
+	"invalid": [
+		{ "id": "index_past_the_count", "index": 4, "count": 4, "direction": "next", "wrap": true },
+		{ "id": "negative_index", "index": -1, "count": 4, "direction": "prev", "wrap": false },
+		{ "id": "no_desktop", "index": 0, "count": 0, "direction": "next", "wrap": true },
+		{ "id": "fractional_index", "index": 1.5, "count": 4, "direction": "next", "wrap": false },
+		{ "id": "fractional_count", "index": 0, "count": 2.5, "direction": "next", "wrap": false },
+		{ "id": "unknown_direction", "index": 0, "count": 4, "direction": "up", "wrap": false },
+		{ "id": "wrap_not_a_boolean", "index": 0, "count": 4, "direction": "next", "wrap": "yes" }
+	]
+}

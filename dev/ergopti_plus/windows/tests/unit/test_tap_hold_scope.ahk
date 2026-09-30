@@ -37,7 +37,8 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 		Id := Mode == "clear" ? "disable_all" : "reset_defaults"
 		Rendered.Delete()
 		Rendered := MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "",
-			Map("tap_hold_keys", (*) => []), Commands, Map("tapholds_enabled", (*) => false))
+			Map("tap_hold_keys_left", (*) => [], "tap_hold_keys_right", (*) => []),
+			Commands, Map("tapholds_enabled", (*) => false))
 		ItemId := 0
 		Loop TrayMenuItemCount(Rendered) {
 			CandidateId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", A_Index - 1, "uint")

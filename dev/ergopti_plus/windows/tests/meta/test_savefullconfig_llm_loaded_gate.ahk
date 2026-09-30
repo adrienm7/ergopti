@@ -3,10 +3,10 @@
 ; ==============================================================================
 ; MODULE: SaveFullConfig LLM-loaded gate guard
 ; DESCRIPTION:
-; SaveFullConfig gates _LLM_Menu_SyncToFeatures on _LLM_Menu_Loaded, but the six
-; flat [llm] keys (onboarding_seen, app_profile_overrides, and the four written by
-; _LLM_Menu_AppendPersistedUpdates: trigger_shortcut, ollama_port, nav_modifiers,
-; disabled_apps) round-trip through _LLM_Menu DIRECTLY and were left ungated. The
+; SaveFullConfig gates _LLM_Menu_SyncToFeatures on _LLM_Menu_Loaded, but the five
+; flat [llm] keys (onboarding_seen, app_profile_overrides, and the three written by
+; _LLM_Menu_AppendPersistedUpdates: ollama_port, nav_modifiers, disabled_apps)
+; round-trip through _LLM_Menu DIRECTLY and were left ungated. The
 ; boot-armed SaveFullConfig retry timer fires ~0-100 ms after _DriverReady, while
 ; LLM_Menu_Init runs seconds later at the end of the deferred menu build -- so the
 ; first flush wrote module defaults over the user's persisted LLM settings, and a

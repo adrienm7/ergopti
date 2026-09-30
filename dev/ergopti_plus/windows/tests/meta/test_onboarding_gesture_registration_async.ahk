@@ -5,11 +5,10 @@ _OGRA_NativeRegistrationIsAsync() {
     Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
     Poll := _DriverFuncBody("_Onboarding_PollGestureAuto")
     Builder := _DriverFuncBody("_Onboarding_BuildGesturePsScript")
-    ClickBody := _DriverFuncBody("_Step5_AutoRegister")
     Web := _DriverFuncBody("_OnbWeb_RegisterGesturesAuto")
-    Assert(Start != "" && Poll != "" && Builder != "" && ClickBody != "" && Web != "", "onboarding async registration helpers must exist")
-    Assert(InStr(Start, "RunWait") = 0 && InStr(ClickBody, "RunWait") = 0,
-        "native onboarding gesture registration must never block the AHK thread with RunWait")
+    Assert(Start != "" && Poll != "" && Builder != "" && Web != "", "onboarding async registration helpers must exist")
+    Assert(InStr(Start, "RunWait") = 0,
+        "onboarding gesture registration must never block the AHK thread with RunWait")
     Reserve := _DriverFuncBody("_Onboarding_ReserveGestureAuto")
     Assert(InStr(Start, "Run(") > 0 && InStr(Start, "&Pid") > 0
 			&& InStr(Start, "_Onboarding_ReserveGestureAuto(") > 0

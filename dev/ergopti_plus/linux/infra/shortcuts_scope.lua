@@ -46,10 +46,17 @@ function M.new(options)
 		return nil
 	end
 	local validators = { action_parameter_domain = parameter_domain }
-	local function resolve(config)
-		url.configuration_candidate(config)
-		return { manager = manager.configuration_candidate(config), keyboard = keyboard.configuration_candidate(config),
-			taps = taps.configuration_candidate(config) }
+	--- Resolves every owner's view of a document. The pre-write source is the
+	--- user's, where outdated values are tolerated; the post-write candidate
+	--- (`written`) holds only this scope's output, so owners check it strictly.
+	--- @param config table Decoded document.
+	--- @param written boolean|nil True for the post-write candidate.
+	--- @return table state
+	local function resolve(config, written)
+		url.configuration_candidate(config, written)
+		return { manager = manager.configuration_candidate(config),
+			keyboard = keyboard.configuration_candidate(config, written),
+			taps = taps.configuration_candidate(config, written) }
 	end
 	local function inventory()
 		local bytes, status, detail = Writer.read_classified(options.path, files)
@@ -85,13 +92,24 @@ function M.new(options)
 		manifest = Manifest, owned_paths = inventory, owners = validators, capture = capture, restore = apply_state,
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
+			-- A plain value an older build left where this scope keeps a table of
+			-- assignments (`keyboard = "…"`) would make every row below it
+			-- unwritable. The scope owns that container, so the outdated value
+			-- goes with its reset instead of refusing it.
+			local section = type(document) == "table" and document.shortcuts or nil
+			for _, key in ipairs(type(section) == "table" and { "keyboard", "tap_keys" } or {}) do
+				local value = section[key]
+				if value ~= nil and (type(value) ~= "table" or #value > 0) then
+					operations[#operations + 1] = { section = "shortcuts", key = key, delete = true }
+				end
+			end
 			for _, row in ipairs(updates) do operations[#operations + 1] = row end
 			for _, row in ipairs(legacy) do operations[#operations + 1] = row end
 			return Writer.prepare_batch(path, operations, adapter, source)
 		end,
 		apply = function(config)
 			if options.is_paused() then return false end
-			local candidate = resolve(config)
+			local candidate = resolve(config, true)
 			candidate.parameters = parameters.parameter_configuration_snapshot(owner)
 			if type(candidate.parameters) ~= "table" then return false end
 			for key in pairs(candidate.parameters) do
@@ -119,6 +137,19 @@ function M.new(options)
 		if #held > 0 then release() end
 		return true
 	end
+	--- Undoes the last commit under the same dispatch ownership as apply().
+	function owner.revert()
+		if #held > 0 or options.is_paused() then return false, "shortcut configuration is already owned" end
+		for _, port in ipairs(ports) do
+			local called, acquired = pcall(port.acquire, owner)
+			if not called or acquired ~= true then release(); return false, "shortcut configuration is already owned" end
+			held[#held + 1] = port
+		end
+		local reverted, detail = transaction.revert()
+		if not transaction.pending() then release() end
+		return reverted, detail
+	end
+	function owner.release() transaction.release() end
 	return owner
 end
 
@@ -138,6 +169,16 @@ function M.apply(mode, is_paused)
 	if committed == true then Logger.success(LOG, "Shortcut preference scope %s completed.", mode)
 	else Logger.error(LOG, "Shortcut preference scope %s refused: %s.", mode, tostring(detail)) end
 	return committed == true
+end
+
+--- The shortcut participant of a composed scope, bound to the retained owner.
+--- @param is_paused function Live pause getter.
+--- @return table participant See config_scope_composition.
+function M.participant(is_paused)
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply(mode, is_paused) end,
+		owner = function() return _owner end,
+	})
 end
 
 return M

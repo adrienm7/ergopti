@@ -483,17 +483,12 @@ local function open_editor_impl()
 		if _webview_committed ~= true then
 			if close_webview() ~= true then return false, true end
 		else
-			local ok_ui = pcall(require, "ui.ui_builder")
-			if ok_ui then
-				local ui_builder = require("ui.ui_builder")
-				local view, controller, focus_owner = _webview, _usercontent, _focus_owner
-				ui_builder.force_focus(view, false, { is_current = function()
-					return focus_owner ~= nil and _focus_owner == focus_owner
-						and _webview == view and _usercontent == controller and _webview_committed == true
-				end })
-			else
-				pcall(function() _webview:bringToFront() end)
-			end
+			local ui_builder = require("ui.ui_builder")
+			local view, controller, focus_owner = _webview, _usercontent, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _webview == view and _usercontent == controller and _webview_committed == true
+			end })
 			return true
 		end
 	end

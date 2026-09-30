@@ -28,5 +28,8 @@ cases = [
 	"op_set_if_absent",
 	"shipped_space_wrap_removed_on_macos",
 	"shipped_stamp_only_on_windows_and_linux",
+	"shipped_trigger_shortcut_off_removed_on_macos",
+	"shipped_trigger_shortcut_removed_on_macos",
+	"shipped_trigger_shortcut_removed_on_windows",
 	"unsupported_version_refused",
 ]

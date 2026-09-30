@@ -62,8 +62,7 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 		ResolvedPort.Get("apply", DefaultApply),
 		ResolvedPort.Get("writer", 0), ResolvedPort.Get("notify", 0),
 		ResolvedPort.Get("acquire", 0), ResolvedPort.Get("settle", 0),
-		ResolvedPort.Get("quiesce", 0), ResolvedPort.Get("collect", 0),
-		DefaultPrepare, DefaultPublish)
+		ResolvedPort.Get("collect", 0), DefaultPrepare, DefaultPublish)
 }
 
 
@@ -324,16 +323,12 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 		return false
 	}
 	CandidatePlan := Built["plan"]
-	TriggerConflict := _LLM_Menu_RuntimeTriggerNavCollision(CandidatePlan,
-		KeyResolverFn)
-	if !TriggerConflict["ok"] {
+	; Resolves each chord's native spelling and physical identity from one
+	; keyboard-layout snapshot; the plan check below refuses any entry left
+	; without them, and a duplicate physical owner leaves the plan untouched.
+	if !_LLM_Menu_AttachPlanPhysicalIdentities(CandidatePlan, KeyResolverFn) {
 		_LLM_Menu_LogNavBindingFailure(
-			"Navigation hotkeys rejected: invalid collision state.", LogFn)
-		return false
-	}
-	if TriggerConflict["identity"] != "" {
-		_LLM_Menu_LogNavBindingFailure(
-			"Navigation hotkeys rejected: a chord is owned by the prediction trigger.",
+			"Navigation hotkeys rejected: physical ownership could not be resolved.",
 			LogFn)
 		return false
 	}

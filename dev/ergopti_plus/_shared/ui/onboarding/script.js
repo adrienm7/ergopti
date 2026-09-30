@@ -2,44 +2,71 @@
 
 // =======================================
 // =======================================
-// ======= 1/ Locale definitions =========
+// ======= 1/ Constants and state ========
 // =======================================
 // =======================================
 
-// List of supported locales — injected by Lua via initData() before the
-// first render. Lua is the single source of truth (lib/i18n.LOCALES table,
-// sorted by lib/i18n.get_sorted_locales()), so the wizard, the macOS
-// menubar language submenu and the AHK tray menu agree on both the set
-// of supported locales and their display order — non-Latin script names
-// (Cyrillic, Hebrew, Arabic, Devanagari, CJK, Hangul) trail after the
-// Latin ones instead of intermixing alphabetically. A small inline
-// fallback below keeps step 1 usable if the injection ever fails.
+// Supported locales, replaced by the host's list (initData.locales) before the
+// first render so the wizard and every tray language menu share one order.
 var LOCALES = [
 	{ code: 'en', flag: '🇬🇧', name: 'English' },
 	{ code: 'fr', flag: '🇫🇷', name: 'Français' }
 ];
 
-// Default locale shown when no locale has been set yet
+// Locale shown until the host names the current one.
 var DEFAULT_LOCALE_CODE = 'en';
 
-// Default magic key character. ★ (U+2605 BLACK STAR) is the documented
-// Ergopti default — a dedicated key in the Ergopti+ layout, and the value
-// the rest of the app already labels as "the magic key" (category headers,
-// reset menu, dialogs). Pre-selected on step 3; the other rows offer the
-// fallback picks for non-Ergopti layouts (*, ù, ;) plus a custom input.
-var DEFAULT_MAGIC_KEY = '★';
+// The catalogue format this page renders; generated with the same number by
+// tools/codegen/codegen-onboarding-catalogue.cjs.
+var CATALOGUE_SCHEMA_VERSION = 1;
 
-// ======================================
-// ======================================
-// ======= 2/ i18n helpers ==============
-// ======================================
-// ======================================
+// Steps that precede the configuration pages.
+var STEP_LANGUAGE = 'language';
+var STEP_CONFIG = 'config';
 
-// Locale strings — injected by Lua via initStrings() before the first step renders
+// Placeholder a label key fills with the value label ("Right Opt + Return → %s").
+var VALUE_PLACEHOLDER = '%s';
+
+// Separator between a slot's label and its action when the key has no placeholder.
+var VALUE_SEPARATOR = ' → ';
+
+// Radio value of the custom trigger-character row.
+var CUSTOM_MAGIC_VALUE = '__custom__';
+
+// Locale strings injected by the host (initData / applyStrings).
 var _strings = {};
 
+// Wizard state.
+var _selectedLocale = DEFAULT_LOCALE_CODE;
+var _platform = '';
+var _pages = [];
+var _steps = [STEP_LANGUAGE, STEP_CONFIG];
+var _stepIndex = 0;
+var _configDir = '';
+var _loadedDir = '';
+var _current = {};
+var _pageState = {};
+
+// Metrics store path named by the consent text, resolved by the host for the
+// folder chosen on the config step. Replies carrying an older request number
+// belong to a folder the user has since changed and are dropped.
+var _metricsPath = '';
+var _metricsRequest = 0;
+
+// Request number of the latest loadExistingConfig; older replies are dropped.
+var _configRequest = 0;
+
+// makeHostBridge probes WebView2 (Windows) first and returns synchronously.
+var _post = makeHostBridge('hsOnboarding');
+
+// ======================================
+// ======================================
+// ======= 2/ Labels ====================
+// ======================================
+// ======================================
+
 /**
- * Returns the translated string for key, or key itself as fallback.
+ * Returns the translated string for key, or the key itself when missing.
  * @param {string} key
  * @returns {string}
  */
@@ -47,37 +74,264 @@ function _t(key) {
 	return _strings[key] || key;
 }
 
+/**
+ * Resolves one catalogue label segment in the selected locale.
+ * @param {{key?: string, text?: string, text_ref?: string}} segment
+ * @returns {string}
+ */
+function _segment(segment) {
+	if (typeof segment.key === 'string') return _t(segment.key);
+	if (typeof segment.text === 'string') return segment.text;
+	var translations = _catalogue().texts[segment.text_ref];
+	return translations && translations[_selectedLocale]
+		? translations[_selectedLocale]
+		: segment.text_ref;
+}
+
+/**
+ * Joins a catalogue label.
+ * @param {Array<object>} segments
+ * @returns {string}
+ */
+function _label(segments) {
+	return segments.map(_segment).join('');
+}
+
+/**
+ * The label of a checklist item, with the imported action when it is a slot.
+ * @param {object} item
+ * @returns {string}
+ */
+function _itemLabel(item) {
+	var base = _label(item.label);
+	if (!item.value_label) return base;
+	var value = _segment(item.value_label);
+	// split/join, not replace: a label containing "$&" must stay literal.
+	if (base.indexOf(VALUE_PLACEHOLDER) !== -1) return base.split(VALUE_PLACEHOLDER).join(value);
+	return base + VALUE_SEPARATOR + value;
+}
+
+/**
+ * Fills the {n} placeholders of a translated template literally.
+ * @param {string} template
+ * @param {Array<string|number>} values
+ * @returns {string}
+ */
+function _format(template, values) {
+	var out = template;
+	values.forEach(function (value, index) {
+		out = out.split('{' + (index + 1) + '}').join(String(value));
+	});
+	return out;
+}
+
 // ======================================
 // ======================================
-// ======= 3/ Wizard state ==============
+// ======= 3/ Catalogue model ===========
 // ======================================
 // ======================================
 
-// _currentStep is a string so we can distinguish the inserted "config"
-// step from the numeric ones (1..5). The step-bar dot id mirrors this:
-// numeric steps light up dot-1..dot-5, the config step lights up
-// dot-config.
-var _currentStep = 1;
-var _selectedLocale = DEFAULT_LOCALE_CODE;
-var _answers = {
-	locale: DEFAULT_LOCALE_CODE,
-	config_dir: '', // empty = keep OS default; Lua injects the
-	// current value via initData when the wizard
-	// re-runs over an already-configured install.
-	use_ergopti: true,
-	magic_key: DEFAULT_MAGIC_KEY,
-	use_metrics: false,
-	use_gestures: false
-};
+/**
+ * The generated catalogue, refusing a missing or foreign-format one.
+ * @returns {object}
+ */
+function _catalogue() {
+	var catalogue = window.ONBOARDING_CATALOGUE;
+	if (!catalogue || catalogue.schema_version !== CATALOGUE_SCHEMA_VERSION) {
+		throw new Error('onboarding catalogue is missing or has an unsupported format');
+	}
+	return catalogue;
+}
 
-// Metrics store path shown in the step-4 consent warning. The host resolves it
-// from the driver's own path authority for the folder chosen on the config
-// step (initData for the initial folder, setMetricsPath after each change), so
-// the warning never names a folder keystrokes will not be written to.
-var _metricsPath = '';
-// Sequence number of the latest resolveMetricsPath request; replies carrying an
-// older one belong to a folder the user has since changed and are dropped.
-var _metricsRequest = 0;
+/**
+ * Structural equality over configuration values.
+ * @param {*} left
+ * @param {*} right
+ * @returns {boolean}
+ */
+function _sameValue(left, right) {
+	return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * The configuration value currently in force at a path.
+ * @param {{path: string, default: *}} entry
+ * @returns {*}
+ */
+function _currentValue(entry) {
+	return Object.prototype.hasOwnProperty.call(_current, entry.path)
+		? _current[entry.path]
+		: entry.default;
+}
+
+/**
+ * Whether an importable entry (item or file switch) is already on.
+ * @param {{path: string, value: *, default: *}} entry
+ * @returns {boolean}
+ */
+function _currentlyOn(entry) {
+	return _sameValue(_currentValue(entry), entry.value);
+}
+
+/**
+ * Visits every checklist item of a group tree.
+ * @param {Array<object>} groups
+ * @param {function(object): void} visit
+ */
+function _eachItem(groups, visit) {
+	groups.forEach(function (group) {
+		(group.items || []).forEach(visit);
+		_eachItem(group.groups || [], visit);
+	});
+}
+
+/**
+ * Visits every group that persists a switch of its own (a hotstring file).
+ * @param {Array<object>} groups
+ * @param {function(object): void} visit
+ */
+function _eachGate(groups, visit) {
+	groups.forEach(function (group) {
+		if (typeof group.path === 'string') visit(group);
+		_eachGate(group.groups || [], visit);
+	});
+}
+
+/**
+ * Counts the checked and total items below a group.
+ * @param {object} group
+ * @param {object} state Page state.
+ * @returns {{checked: number, total: number}}
+ */
+function _countItems(group, state) {
+	var counts = { checked: 0, total: 0 };
+	_eachItem([group], function (item) {
+		counts.total += 1;
+		if (state.checked[item.path]) counts.checked += 1;
+	});
+	return counts;
+}
+
+/**
+ * Builds a page's answer from the configuration in force: the question starts
+ * at the category switch's value (No when absent) and every item at whether it
+ * is already imported.
+ * @param {object} page
+ * @returns {object}
+ */
+function _initialState(page) {
+	var state = { answer: false, checked: {}, prefilled: false, magic: null, custom: '' };
+	var anyOn = false;
+	_eachItem(page.groups, function (item) {
+		var on = _currentlyOn(item);
+		state.checked[item.path] = on;
+		if (on) anyOn = true;
+	});
+	state.answer = page.master ? _currentValue(page.master) === true : anyOn;
+	// An existing selection is shown as it is; only a page with nothing imported
+	// yet receives the recommendation when its question turns to Yes.
+	state.prefilled = anyOn;
+	if (page.magic_key && Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)) {
+		state.magic = _current[page.magic_key.path];
+	}
+	return state;
+}
+
+/** Rebuilds every page's state from the configuration in force. */
+function _resetStates() {
+	_pageState = {};
+	_pages.forEach(function (page) {
+		_pageState[page.id] = _initialState(page);
+	});
+}
+
+/**
+ * Sets a page's answer, applying the recommendation the first time it turns Yes.
+ * @param {object} page
+ * @param {boolean} answer
+ */
+function _setAnswer(page, answer) {
+	var state = _pageState[page.id];
+	state.answer = answer;
+	if (answer && !state.prefilled) {
+		_eachItem(page.groups, function (item) {
+			state.checked[item.path] = item.recommended === true;
+		});
+		state.prefilled = true;
+	}
+}
+
+/**
+ * Whether a page asks its question: a category switch or something to import.
+ * @param {object} page
+ * @returns {boolean}
+ */
+function _asks(page) {
+	return !!page.master || page.groups.length > 0;
+}
+
+/**
+ * The trigger character a page proposes when the configuration names none:
+ * the Ergopti key when the Ergopti layout is used, ù on French layouts, ;
+ * elsewhere.
+ * @param {object} choice The page's magic_key descriptor.
+ * @returns {string}
+ */
+function _contextMagicKey(choice) {
+	var layoutPage = _pageState.keyboard_layout;
+	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
+	if ((layoutPage && layoutPage.answer) || system.indexOf('ergopti') !== -1)
+		return choice.recommended;
+	if (system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1) return 'ù';
+	return ';';
+}
+
+/**
+ * The trigger character currently chosen on a page, or "" for an empty custom entry.
+ * @param {object} page
+ * @returns {string}
+ */
+function _magicValue(page) {
+	var state = _pageState[page.id];
+	if (state.magic === CUSTOM_MAGIC_VALUE) return state.custom.trim();
+	if (typeof state.magic === 'string') return state.magic;
+	return _contextMagicKey(page.magic_key);
+}
+
+/**
+ * The manifest paths and values the answers change. The category switch is
+ * always explicit; items are written only where the answer differs from the
+ * configuration in force, so a value set elsewhere is never overwritten by a
+ * checklist the user left alone.
+ * @returns {Array<{path: string, value: *}>}
+ */
+function _operations() {
+	var operations = [];
+	_pages.forEach(function (page) {
+		var state = _pageState[page.id];
+		if (page.master) operations.push({ path: page.master.path, value: state.answer });
+		if (!state.answer) return;
+		_eachItem(page.groups, function (item) {
+			var wanted = state.checked[item.path] === true;
+			if (wanted !== _currentlyOn(item)) {
+				operations.push({ path: item.path, value: wanted ? item.value : item.default });
+			}
+		});
+		_eachGate(page.groups, function (gate) {
+			var wanted = _countItems(gate, state).checked > 0;
+			if (wanted !== _currentlyOn(gate)) {
+				operations.push({ path: gate.path, value: wanted ? gate.value : gate.default });
+			}
+		});
+		if (page.magic_key) {
+			var chosen = _magicValue(page);
+			if (chosen !== _currentValue(page.magic_key)) {
+				operations.push({ path: page.magic_key.path, value: chosen });
+			}
+		}
+	});
+	return operations;
+}
 
 // ======================================
 // ======================================
@@ -86,45 +340,61 @@ var _metricsRequest = 0;
 // ======================================
 
 /**
- * Shows the given step (1-5), hiding all others and updating the step dots.
- * @param {number} n
+ * The configuration page shown at a step index, or null.
+ * @param {number} index
+ * @returns {object|null}
  */
-function showStep(n) {
-	// Hide every step (numeric + the inserted config step) first.
-	for (var i = 1; i <= 5; i++) {
-		var el = document.getElementById('step-' + i);
-		if (el) el.classList.add('hidden');
+function _pageAt(index) {
+	var id = _steps[index];
+	for (var i = 0; i < _pages.length; i++) {
+		if (_pages[i].id === id) return _pages[i];
 	}
-	var cfgEl = document.getElementById('step-config');
-	if (cfgEl) cfgEl.classList.add('hidden');
+	return null;
+}
 
-	// Show the requested step.
-	if (n === 'config') {
-		if (cfgEl) cfgEl.classList.remove('hidden');
-	} else {
-		var target = document.getElementById('step-' + n);
-		if (target) target.classList.remove('hidden');
-	}
-
-	// Update the step-bar. Sequence order: 1 → config → 2 → 3 → 4 → 5.
-	var ORDER = [1, 'config', 2, 3, 4, 5];
-	var DOT_IDS = {
-		1: 'dot-1',
-		config: 'dot-config',
-		2: 'dot-2',
-		3: 'dot-3',
-		4: 'dot-4',
-		5: 'dot-5'
-	};
-	var pos = ORDER.indexOf(n);
-	ORDER.forEach(function (id, idx) {
-		var dot = document.getElementById(DOT_IDS[id]);
-		if (!dot) return;
-		dot.classList.remove('active', 'done');
-		if (idx < pos) dot.classList.add('done');
-		else if (idx === pos) dot.classList.add('active');
+/** Draws one dot per step, marking the done and active ones. */
+function _renderStepBar() {
+	var bar = document.getElementById('step-bar');
+	bar.innerHTML = '';
+	_steps.forEach(function (_id, index) {
+		var dot = document.createElement('div');
+		dot.className = 'step-dot';
+		if (index < _stepIndex) dot.classList.add('done');
+		else if (index === _stepIndex) dot.classList.add('active');
+		bar.appendChild(dot);
 	});
-	_currentStep = n;
+}
+
+/** Shows the current step and its footer buttons. */
+function _render() {
+	var step = _steps[_stepIndex];
+	document.getElementById('step-language').classList.toggle('hidden', step !== STEP_LANGUAGE);
+	document.getElementById('step-config').classList.toggle('hidden', step !== STEP_CONFIG);
+	var page = _pageAt(_stepIndex);
+	document.getElementById('step-page').classList.toggle('hidden', !page);
+	if (step === STEP_LANGUAGE) _renderLanguage();
+	else if (step === STEP_CONFIG) _renderConfig();
+	else _renderPage(page);
+	_renderStepBar();
+	var back = document.getElementById('btn-back');
+	back.textContent = _t('onboarding.back');
+	back.classList.toggle('hidden', _stepIndex === 0);
+	var last = _stepIndex === _steps.length - 1;
+	document.getElementById('btn-next').textContent = _t(
+		last ? 'onboarding.finish' : 'onboarding.next'
+	);
+	document.title = _t('onboarding.welcome.title');
+}
+
+/**
+ * Moves to a step.
+ * @param {number} index
+ */
+function _go(index) {
+	_stepIndex = index;
+	_render();
+	var scroller = document.getElementById('step-scroll');
+	if (scroller) scroller.scrollTop = 0;
 }
 
 // ======================================
@@ -133,12 +403,8 @@ function showStep(n) {
 // ======================================
 // ======================================
 
-/**
- * Builds the language list for step 1 and pre-selects the current locale.
- * Also refreshes the welcome title and heading so they read in the previewed
- * locale rather than the old "Welcome / Bienvenue / Willkommen" mash-up.
- */
-function renderStep1() {
+/** Builds the language list and pre-selects the current locale. */
+function _renderLanguage() {
 	var list = document.getElementById('lang-list');
 	list.innerHTML = '';
 	LOCALES.forEach(function (loc) {
@@ -148,9 +414,7 @@ function renderStep1() {
 
 		var flag = document.createElement('span');
 		flag.className = 'lang-flag';
-		// Windows has no flag-emoji font, so the AHK host injects a flag_url
-		// (file:// PNG from static/img/flags/). Prefer it when present; fall
-		// back to the emoji glyph the macOS WKWebView path renders directly.
+		// Windows has no flag-emoji font, so its host injects a flag_url.
 		if (loc.flag_url) {
 			var flagImg = document.createElement('img');
 			flagImg.className = 'lang-flag-img';
@@ -169,249 +433,373 @@ function renderStep1() {
 		row.appendChild(name);
 		row.addEventListener('click', function () {
 			_selectedLocale = loc.code;
-			list.querySelectorAll('.lang-item').forEach(function (r) {
-				r.classList.remove('selected');
-				r.querySelector('.lang-name').style.color = '';
-				r.querySelector('.lang-name').style.fontWeight = '';
-			});
-			row.classList.add('selected');
-			// Request Lua to load the strings for the selected locale so the
-			// button text and subsequent steps render in the right language
+			_renderLanguage();
+			// The host answers with applyStrings for the previewed locale.
 			_post({ action: 'previewLocale', locale: loc.code });
 		});
 		list.appendChild(row);
 	});
-
-	// Scroll the selected row into view
 	var selected = list.querySelector('.lang-item.selected');
 	if (selected) selected.scrollIntoView({ block: 'nearest' });
+	document.getElementById('language-title').textContent = _t('onboarding.welcome.title');
+	document.getElementById('language-subtitle').textContent = _t('onboarding.welcome.heading');
+}
 
-	document.getElementById('s1-title').textContent = _t('onboarding.welcome.title');
-	document.getElementById('s1-subtitle').textContent = _t('onboarding.welcome.heading');
-	document.getElementById('s1-next').textContent = _t('onboarding.next');
-	document.title = _t('onboarding.welcome.title');
+/** Refreshes the configuration-folder step from the answers. */
+function _renderConfig() {
+	document.getElementById('config-title').textContent = _t('dialog.config_folder.title');
+	document.getElementById('config-desc').textContent = _t('dialog.config_folder.label');
+	document.getElementById('config-hint').textContent = _t('dialog.config_folder.hint');
+	document.getElementById('config-browse').textContent = _t('common.browse');
+	var input = document.getElementById('config-input');
+	input.value = _configDir;
+	input.placeholder = window.DEFAULT_CONFIG_DIR || '';
 }
 
 /**
- * Refreshes the inserted config-folder step labels and fills the input
- * with the user's current path. Lua injects ``_answers.config_dir`` via
- * initData; an empty value means "use the OS default", which we then
- * resolve via DEFAULT_CONFIG_DIR (also injected by Lua) for the
- * placeholder so the user sees what the default would be.
+ * Shows a text block, or hides it when there is nothing to say.
+ * @param {string} id Element id.
+ * @param {string} text
  */
-function renderStepConfig() {
-	document.getElementById('sc-title').textContent = _t('dialog.config_folder.title');
-	document.getElementById('sc-desc').textContent = _t('dialog.config_folder.label');
-	document.getElementById('sc-hint').textContent = _t('dialog.config_folder.hint');
-	document.getElementById('sc-browse').textContent = _t('common.browse');
-	document.getElementById('sc-back').textContent = _t('onboarding.back');
-	document.getElementById('sc-next').textContent = _t('onboarding.next');
-
-	var inp = document.getElementById('sc-input');
-	inp.value = _answers.config_dir || '';
-	inp.placeholder = window.DEFAULT_CONFIG_DIR || '';
+function _showText(id, text) {
+	var el = document.getElementById(id);
+	el.textContent = text;
+	el.classList.toggle('hidden', text === '');
 }
 
 /**
- * Refreshes step 2 labels from the current _strings table.
+ * Renders one configuration page.
+ * @param {object} page
  */
-function renderStep2() {
-	document.getElementById('s2-title').textContent = _t('onboarding.layout.title');
-	document.getElementById('s2-desc').textContent = _t('onboarding.layout.desc');
-	document.getElementById('s2-yes-label').textContent = _t('onboarding.layout.yes');
-	document.getElementById('s2-no-label').textContent = _t('onboarding.layout.no');
-	document.getElementById('s2-back').textContent = _t('onboarding.back');
-	document.getElementById('s2-next').textContent = _t('onboarding.next');
+function _renderPage(page) {
+	var state = _pageState[page.id];
+	document.getElementById('page-title').textContent = _t(page.title_key);
+	document.getElementById('page-desc').textContent = _t(page.description_key);
+	_showText(
+		'page-consent',
+		page.consent ? _t('dialog.metrics.enable_warning').split('{1}').join(_metricsPath) : ''
+	);
+	_showText('page-hint', page.hint_key ? _t(page.hint_key) : '');
+	_showText('page-note', page.note_key ? _t(page.note_key) : '');
 
-	// Layout preview image — only show when Lua injected a usable URL.
-	// Keeps the wizard graceful on installs where static/img/ergopti.jpg
-	// is missing (asset-less build, unusual install path…).
-	var preview = document.getElementById('s2-preview');
-	if (preview) {
-		if (window.LAYOUT_IMAGE_URL) {
-			preview.src = window.LAYOUT_IMAGE_URL;
-			preview.hidden = false;
-		} else {
-			preview.hidden = true;
+	var asks = _asks(page);
+	document.getElementById('page-question').classList.toggle('hidden', !asks);
+	document.getElementById('page-question-label').textContent = _t(page.question_key);
+	document.getElementById('page-yes-label').textContent = _t('onboarding.yes');
+	document.getElementById('page-no-label').textContent = _t('onboarding.no');
+	document.getElementById('page-yes').checked = state.answer;
+	document.getElementById('page-no').checked = !state.answer;
+
+	_renderRegister(page, state);
+	_renderMagicKey(page, state);
+	_renderChecklist(page, state);
+}
+
+/**
+ * Shows the Windows gesture-registration panel on the gestures page when the
+ * answer is Yes.
+ * @param {object} page
+ * @param {object} state
+ */
+function _renderRegister(page, state) {
+	var panel = document.getElementById('page-register');
+	var shown = _platform === 'windows' && page.id === 'gestures' && state.answer;
+	panel.classList.toggle('hidden', !shown);
+	if (!shown) return;
+	document.getElementById('register-section').textContent = _t(
+		'onboarding.gestures.register_section'
+	);
+	document.getElementById('register-auto').textContent = _t('onboarding.gestures.register_auto');
+	document.getElementById('register-auto-hint').textContent = _t(
+		'onboarding.gestures.register_auto_hint'
+	);
+	document.getElementById('register-manual').textContent = _t(
+		'onboarding.gestures.register_manual'
+	);
+	document.getElementById('register-manual-hint').textContent = _t(
+		'onboarding.gestures.register_manual_hint'
+	);
+}
+
+/**
+ * Renders the trigger-character choice of a page that declares one.
+ * @param {object} page
+ * @param {object} state
+ */
+function _renderMagicKey(page, state) {
+	var box = document.getElementById('page-magic');
+	var choice = page.magic_key;
+	box.classList.toggle('hidden', !choice || !state.answer);
+	if (!choice || !state.answer) return;
+	document.getElementById('page-magic-label').textContent = _t(choice.label_key);
+	document.getElementById('page-magic-hint').textContent = _t(choice.hint_key);
+	var container = document.getElementById('page-magic-options');
+	container.innerHTML = '';
+	var chosen = _magicValue(page);
+	var isPreset =
+		state.magic !== CUSTOM_MAGIC_VALUE &&
+		choice.options.some(function (option) {
+			return option.value === chosen;
+		});
+	choice.options.forEach(function (option) {
+		container.appendChild(
+			_magicRow(page, option.value, _t(option.label_key), isPreset && chosen === option.value)
+		);
+	});
+	var custom = _magicRow(page, CUSTOM_MAGIC_VALUE, _t(choice.custom_label_key), !isPreset);
+	var input = document.createElement('input');
+	input.type = 'text';
+	input.className = 'magic-input';
+	input.maxLength = choice.max_characters;
+	input.value = isPreset
+		? state.custom
+		: state.magic === CUSTOM_MAGIC_VALUE
+			? state.custom
+			: chosen;
+	input.disabled = isPreset;
+	input.addEventListener('input', function () {
+		state.magic = CUSTOM_MAGIC_VALUE;
+		state.custom = input.value;
+		input.classList.remove('invalid');
+	});
+	custom.appendChild(input);
+	container.appendChild(custom);
+}
+
+/**
+ * One radio row of the trigger-character choice.
+ * @param {object} page
+ * @param {string} value
+ * @param {string} text
+ * @param {boolean} checked
+ * @returns {object} The row element.
+ */
+function _magicRow(page, value, text, checked) {
+	var state = _pageState[page.id];
+	var row = document.createElement('label');
+	row.className = 'radio-card';
+	var radio = document.createElement('input');
+	radio.type = 'radio';
+	radio.name = 'magic';
+	radio.value = value;
+	radio.checked = checked;
+	radio.addEventListener('change', function () {
+		if (!radio.checked) return;
+		if (value === CUSTOM_MAGIC_VALUE && state.magic !== CUSTOM_MAGIC_VALUE) {
+			state.custom = state.custom || _magicValue(page);
 		}
-	}
-
-	// Restore saved answer
-	var radios = document.querySelectorAll("input[name='layout']");
-	radios.forEach(function (r) {
-		r.checked = r.value === (_answers.use_ergopti ? 'yes' : 'no');
+		state.magic = value;
+		_renderMagicKey(page, state);
 	});
+	var label = document.createElement('span');
+	label.className = 'radio-label';
+	label.textContent = text;
+	row.appendChild(radio);
+	row.appendChild(label);
+	return row;
 }
 
 /**
- * Picks the radio that best matches the user's context — same contract
- * as the AHK _Onboarding_PickDefaultMagicKey helper so both drivers
- * surface identical defaults:
- *   - ★ when the user enabled the Ergopti emulation on step 2,
- *   - ù when the macOS keyboard layout name suggests French / AZERTY,
- *   - ; otherwise (QWERTY family).
- * Lua injects the detected layout name via initData.system_layout
- * (lowercase). When absent we fall back to ; for safety.
+ * Renders the collapsible checklist: disabled and unchecked while the answer is
+ * No, the retained selection when it is Yes.
+ * @param {object} page
+ * @param {object} state
  */
-function _pickDefaultMagicKey() {
-	if (_answers.use_ergopti) return '★';
-	var layout = (window.SYSTEM_LAYOUT || '').toLowerCase();
-	// Match French / AZERTY-flavoured layouts. The Apple-shipped layout
-	// names are "French" / "French - Numerical" / "French - PC" / etc.;
-	// the substring check catches them all without having to enumerate.
-	if (layout.indexOf('french') !== -1 || layout.indexOf('azerty') !== -1) return 'ù';
-	return ';';
-}
-
-/**
- * Refreshes step 3 labels + restores the pre-selected radio. Five rows:
- * ★ (Ergopti default, FIRST and checked), *, ù, ;, custom. The custom
- * row is the only one with a text input — disabled until selected so
- * the user can't accidentally type into an inert field.
- */
-function renderStep3() {
-	document.getElementById('s3-title').textContent = _t('onboarding.magic_key.title');
-	document.getElementById('s3-desc').textContent = _t('onboarding.magic_key.desc');
-	document.getElementById('s3-blackstar-label').textContent = _t(
-		'onboarding.magic_key.option_blackstar'
+function _renderChecklist(page, state) {
+	var details = document.getElementById('page-checklist');
+	details.classList.toggle('hidden', page.groups.length === 0);
+	if (page.groups.length === 0) return;
+	var counts = { checked: 0, total: 0 };
+	page.groups.forEach(function (group) {
+		var groupCounts = _countItems(group, state);
+		counts.checked += groupCounts.checked;
+		counts.total += groupCounts.total;
+	});
+	document.getElementById('page-checklist-summary').textContent = _format(
+		_t('onboarding.checklist.summary'),
+		[state.answer ? counts.checked : 0, counts.total]
 	);
-	document.getElementById('s3-ugrave-label').textContent = _t('onboarding.magic_key.option_ugrave');
-	document.getElementById('s3-semicolon-label').textContent = _t(
-		'onboarding.magic_key.option_semicolon'
+	_showText('page-checklist-inactive', state.answer ? '' : _t('onboarding.checklist.inactive'));
+	var body = document.getElementById('page-checklist-body');
+	body.innerHTML = '';
+	page.groups.forEach(function (group) {
+		body.appendChild(_groupNode(page, group, state, 0));
+	});
+}
+
+/**
+ * A group of the checklist: a header whose checkbox selects every item below
+ * it, then its items and sub-groups.
+ * @param {object} page
+ * @param {object} group
+ * @param {object} state
+ * @param {number} depth
+ * @returns {object} The group element.
+ */
+function _groupNode(page, group, state, depth) {
+	var node = document.createElement('div');
+	node.className = 'checklist-group depth-' + depth;
+	if (group.label) {
+		var counts = _countItems(group, state);
+		var header = _checkRow(
+			_label(group.label),
+			state.answer && counts.checked === counts.total && counts.total > 0,
+			state.answer && counts.checked > 0 && counts.checked < counts.total,
+			!state.answer,
+			function (checked) {
+				_eachItem([group], function (item) {
+					state.checked[item.path] = checked;
+				});
+				_renderChecklist(page, state);
+			}
+		);
+		header.classList.add('checklist-group-header');
+		node.appendChild(header);
+	}
+	(group.items || []).forEach(function (item) {
+		node.appendChild(
+			_checkRow(
+				_itemLabel(item),
+				state.answer && state.checked[item.path] === true,
+				false,
+				!state.answer,
+				function (checked) {
+					state.checked[item.path] = checked;
+					_renderChecklist(page, state);
+				}
+			)
+		);
+	});
+	(group.groups || []).forEach(function (child) {
+		node.appendChild(_groupNode(page, child, state, depth + 1));
+	});
+	return node;
+}
+
+/**
+ * One checkbox row.
+ * @param {string} text
+ * @param {boolean} checked
+ * @param {boolean} mixed
+ * @param {boolean} disabled
+ * @param {function(boolean): void} onChange
+ * @returns {object} The row element.
+ */
+function _checkRow(text, checked, mixed, disabled, onChange) {
+	var row = document.createElement('label');
+	row.className = 'check-row';
+	var box = document.createElement('input');
+	box.type = 'checkbox';
+	box.checked = checked;
+	box.indeterminate = mixed;
+	box.disabled = disabled;
+	box.addEventListener('change', function () {
+		onChange(box.checked);
+	});
+	var label = document.createElement('span');
+	label.className = 'check-label';
+	label.textContent = text;
+	row.appendChild(box);
+	row.appendChild(label);
+	return row;
+}
+
+// ======================================
+// ======================================
+// ======= 6/ Host bridge ===============
+// ======================================
+// ======================================
+
+/**
+ * Called by the host with the strings of a locale, either as a flat map (the
+ * initData path) or as a {locale, strings} envelope. A stale envelope from a
+ * rapid language switch is discarded.
+ * @param {Object} payload
+ */
+window.applyStrings = function (payload) {
+	var strings;
+	if (payload && typeof payload.strings === 'object' && typeof payload.locale === 'string') {
+		if (payload.locale !== _selectedLocale) return;
+		strings = payload.strings;
+	} else {
+		strings = payload || {};
+	}
+	_strings = strings;
+	if (_platform !== '') _render();
+	document.title = _t('onboarding.welcome.title');
+};
+
+/**
+ * Called by the host once the page is ready.
+ * @param {{locale: string, strings: Object, locales: Array, platform: string,
+ *   default_config_dir: string, config_dir: string, current: Object,
+ *   metrics_path: string, system_layout?: string}} data
+ */
+window.initData = function (data) {
+	var catalogue = _catalogue();
+	var platform = catalogue.platforms[data.platform];
+	if (!platform) throw new Error('onboarding host names an unknown platform: ' + data.platform);
+	_platform = data.platform;
+	_pages = platform.pages;
+	_steps = [STEP_LANGUAGE, STEP_CONFIG].concat(
+		_pages.map(function (page) {
+			return page.id;
+		})
 	);
-	document.getElementById('s3-custom-label').textContent = _t('onboarding.magic_key.option_custom');
-	document.getElementById('s3-hint').textContent = _t('onboarding.magic_key.choose_freely');
-	document.getElementById('s3-back').textContent = _t('onboarding.back');
-	document.getElementById('s3-next').textContent = _t('onboarding.next');
-
-	// Pre-select the radio matching the persisted value. If the user
-	// hasn't explicitly picked one yet (still at the wizard default ★),
-	// derive a context-aware default from the layout choice / system KB
-	// detection so AZERTY users land on ù, QWERTY on ; and Ergopti users
-	// keep ★.
-	var key = _answers.magic_key;
-	if (!key || key === DEFAULT_MAGIC_KEY) {
-		key = _pickDefaultMagicKey();
-		_answers.magic_key = key;
-	}
-	// The dedicated ASCII-star radio was retired (folded into the custom
-	// input slot, which defaults to "*") so any saved "*" value now lands
-	// on the custom row pre-filled with that character.
-	var preset = { '★': '★', ù: 'ù', ';': ';' };
-	var radioValue = preset[key] || '__custom__';
-	var radios = document.querySelectorAll("input[name='magickey']");
-	radios.forEach(function (r) {
-		r.checked = r.value === radioValue;
-	});
-
-	var inp = document.getElementById('s3-input');
-	// Custom row: show the saved value if any, otherwise fall back to the
-	// historical ASCII-star ("*") that used to live on its own radio.
-	inp.value = radioValue === '__custom__' ? key || '*' : '*';
-	inp.disabled = radioValue !== '__custom__';
-
-	// Wire the radios so toggling Custom enables/disables the text input.
-	radios.forEach(function (r) {
-		r.addEventListener(
-			'change',
-			function () {
-				var isCustom = r.checked && r.value === '__custom__';
-				inp.disabled = !isCustom;
-				if (isCustom) inp.focus();
-			},
-			{ once: true }
-		);
-	});
-}
+	if (typeof data.locale === 'string') _selectedLocale = data.locale;
+	if (Array.isArray(data.locales) && data.locales.length > 0) LOCALES = data.locales;
+	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
+	window.SYSTEM_LAYOUT = data.system_layout || '';
+	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
+	_loadedDir = _configDir;
+	_current = data.current && typeof data.current === 'object' ? data.current : {};
+	_metricsPath = typeof data.metrics_path === 'string' ? data.metrics_path : '';
+	_resetStates();
+	_strings = data.strings || {};
+	_go(0);
+};
 
 /**
- * Refreshes step 4 labels.
+ * Called by the host after the native folder picker resolves.
+ * @param {string} path
  */
-function renderStep4() {
-	document.getElementById('s4-title').textContent = _t('onboarding.metrics.title');
-	document.getElementById('s4-desc').textContent = _t('onboarding.metrics.desc');
-	// split/join, not replace: a path containing "$&" must stay literal.
-	document.getElementById('s4-warning').textContent = _t('dialog.metrics.enable_warning')
-		.split('{1}')
-		.join(_metricsPath);
-	document.getElementById('s4-yes-label').textContent = _t('onboarding.yes');
-	document.getElementById('s4-no-label').textContent = _t('onboarding.no');
-	document.getElementById('s4-back').textContent = _t('onboarding.back');
-	document.getElementById('s4-next').textContent = _t('onboarding.next');
-
-	var radios = document.querySelectorAll("input[name='metrics']");
-	radios.forEach(function (r) {
-		r.checked = r.value === (_answers.use_metrics ? 'yes' : 'no');
-	});
-}
+window.setConfigDir = function (path) {
+	if (typeof path !== 'string' || path === '') return;
+	_configDir = path;
+	var input = document.getElementById('config-input');
+	if (input) input.value = path;
+};
 
 /**
- * Refreshes step 5 labels.
+ * Called by the host in reply to resolveMetricsPath.
+ * @param {{request: number, path: string}} payload
  */
-function renderStep5() {
-	document.getElementById('s5-title').textContent = _t('onboarding.gestures.title');
-	document.getElementById('s5-desc').textContent = _t('onboarding.gestures.desc');
-	// Reuse the macOS-gestures-conflict warning shown by the tray "Enable
-	// gestures" toggle — same orange box style as the metrics keylogger
-	// warning on step 4. Tells the user that activating Ergopti gestures
-	// requires disabling certain macOS native swipes/taps first.
-	document.getElementById('s5-warning').textContent = _t('dialog.gestures.warning_msg');
-	document.getElementById('s5-yes-label').textContent = _t('onboarding.yes');
-	document.getElementById('s5-no-label').textContent = _t('onboarding.no');
-	document.getElementById('s5-back').textContent = _t('onboarding.back');
-	document.getElementById('s5-finish').textContent = _t('onboarding.finish');
-
-	var radios = document.querySelectorAll("input[name='gestures']");
-	radios.forEach(function (r) {
-		r.checked = r.value === (_answers.use_gestures ? 'yes' : 'no');
-	});
-
-	// Platform split: Windows offers the touchpad-gesture registration panel
-	// (auto/manual buttons); macOS shows only the system-gesture conflict warning.
-	var isWindows = window.PLATFORM_OS === 'windows';
-	var warning = document.getElementById('s5-warning');
-	if (warning) warning.classList.toggle('hidden', isWindows);
-	if (isWindows) {
-		document.getElementById('s5-register-section').textContent = _t(
-			'onboarding.gestures.register_section'
-		);
-		document.getElementById('s5-register-auto').textContent = _t(
-			'onboarding.gestures.register_auto'
-		);
-		document.getElementById('s5-register-auto-hint').textContent = _t(
-			'onboarding.gestures.register_auto_hint'
-		);
-		document.getElementById('s5-register-manual').textContent = _t(
-			'onboarding.gestures.register_manual'
-		);
-		document.getElementById('s5-register-manual-hint').textContent = _t(
-			'onboarding.gestures.register_manual_hint'
-		);
-	}
-	_updateGestureRegisterVisibility();
-}
+window.setMetricsPath = function (payload) {
+	if (!payload || typeof payload.path !== 'string') return;
+	if (payload.request !== _metricsRequest) return;
+	_metricsPath = payload.path;
+	if (_pageAt(_stepIndex)) _render();
+};
 
 /**
- * Shows the Windows gesture-registration panel only when the platform is Windows
- * AND the user selected "Yes". Called on render and on every gestures-radio change.
+ * Called by the host with the configuration found in the folder chosen on the
+ * config step: every page restarts from those values.
+ * @param {{request: number, values: Object}} payload
  */
-function _updateGestureRegisterVisibility() {
-	var panel = document.getElementById('s5-register');
-	if (!panel) return;
-	var isWindows = window.PLATFORM_OS === 'windows';
-	var checked = document.querySelector("input[name='gestures']:checked");
-	var yes = checked ? checked.value === 'yes' : false;
-	panel.classList.toggle('hidden', !(isWindows && yes));
-}
+window.applyCurrentValues = function (payload) {
+	if (!payload || typeof payload.values !== 'object' || payload.values === null) return;
+	if (payload.request !== _configRequest) return;
+	_current = payload.values;
+	_resetStates();
+	if (_pageAt(_stepIndex)) _render();
+};
 
 /**
- * Called by the host (Windows) after the elevated touchpad-gesture configuration
- * finishes, to show a green success / red failure line in the registration panel.
+ * Called by the host when the Windows touchpad registration finishes.
  * @param {boolean} ok
  */
 window.setGestureRegisterStatus = function (ok) {
-	var el = document.getElementById('s5-register-status');
-	if (!el) return;
+	var el = document.getElementById('register-status');
 	el.textContent = _t(
 		ok ? 'onboarding.gestures.register_success' : 'onboarding.gestures.register_failed'
 	);
@@ -422,230 +810,85 @@ window.setGestureRegisterStatus = function (ok) {
 
 // ======================================
 // ======================================
-// ======= 6/ Lua bridge ================
-// ======================================
-// ======================================
-
-// makeHostBridge probes WebView2 (Windows) first and returns synchronously,
-// matching the onboarding requirement: the previous version probed WKWebView
-// first inside setTimeout(0) and silently dropped every message under WebView2.
-var _post = makeHostBridge('hsOnboarding');
-
-/**
- * Called by Lua to inject translated strings for the selected locale.
- * Accepts either a raw flat map (legacy initData path) or a {locale, strings}
- * envelope. When an envelope is received, the locale is compared against
- * _selectedLocale to discard stale out-of-order responses from rapid switching.
- * @param {Object} payload - Flat key→value map, or {locale: string, strings: Object}.
- */
-window.applyStrings = function (payload) {
-	var strings;
-	if (payload && typeof payload.strings === 'object' && typeof payload.locale === 'string') {
-		// Envelope form — guard against stale rapid-switch responses
-		if (payload.locale !== _selectedLocale) return;
-		strings = payload.strings;
-	} else {
-		// Legacy flat-map form (initData path) — always apply
-		strings = payload || {};
-	}
-	_strings = strings;
-	// Re-render the current step with the new strings
-	if (_currentStep === 1) renderStep1();
-	else if (_currentStep === 'config') renderStepConfig();
-	else if (_currentStep === 2) renderStep2();
-	else if (_currentStep === 3) renderStep3();
-	else if (_currentStep === 4) renderStep4();
-	else if (_currentStep === 5) renderStep5();
-	// Keep the window title in sync with the active locale on every step
-	document.title = _t('onboarding.welcome.title');
-};
-
-/**
- * Called by Lua to provide the initial locale strings and pre-selected locale.
- * @param {Object} data - { locale: string, strings: Object }
- */
-window.initData = function (data) {
-	if (data && data.locale) _selectedLocale = data.locale;
-	if (data && data.answers) _answers = Object.assign(_answers, data.answers);
-	if (data && data.default_config_dir) window.DEFAULT_CONFIG_DIR = data.default_config_dir;
-	// Locale list authored and sorted in lib/i18n.lua — override the
-	// inline fallback so step 1 lists every supported locale in the
-	// same order as the menubar language submenu.
-	if (data && Array.isArray(data.locales) && data.locales.length > 0) {
-		LOCALES = data.locales;
-	}
-	// System layout name (macOS) — used by step 3 to pre-select ù on
-	// AZERTY-flavoured layouts and ; otherwise. Lua resolves it via
-	// hs.keycodes.currentLayout().
-	if (data && data.system_layout) window.SYSTEM_LAYOUT = data.system_layout;
-	// Layout preview image URL (file:// URI to static/img/ergopti.jpg).
-	// Optional — when absent step 2 renders without the visual cue.
-	if (data && data.layout_image_url) window.LAYOUT_IMAGE_URL = data.layout_image_url;
-	// Host platform ("windows" / "macos") — drives the gestures step 5 split
-	// (Windows registration buttons vs macOS warning). Absent ⇒ treated as macOS.
-	if (data && data.platform) window.PLATFORM_OS = data.platform;
-	// Metrics store path for the initial folder, resolved by the host.
-	if (data && typeof data.metrics_path === 'string') _metricsPath = data.metrics_path;
-	window.applyStrings(data && data.strings ? data.strings : {});
-	renderStep1();
-	showStep(1);
-};
-
-// Called by Lua after the native folder picker resolves. Fills the input
-// + remembers the choice without leaving the config step.
-window.setConfigDir = function (path) {
-	if (typeof path !== 'string' || path === '') return;
-	var inp = document.getElementById('sc-input');
-	if (inp) inp.value = path;
-	_answers.config_dir = path;
-};
-
-/**
- * Called by the host in reply to resolveMetricsPath. The host echoes the
- * request number so a reply for a folder the user has since changed is dropped.
- * @param {{request: number, path: string}} payload
- */
-window.setMetricsPath = function (payload) {
-	if (!payload || typeof payload.path !== 'string') return;
-	if (payload.request !== _metricsRequest) return;
-	_metricsPath = payload.path;
-	if (_currentStep === 4) renderStep4();
-};
-
-// Called by Lua after parsing an existing config.toml at the chosen folder.
-// Merges the saved answers into _answers and re-renders whichever step is
-// currently on screen so the pre-fill becomes visible without a manual nav.
-window.applyExistingAnswers = function (saved) {
-	if (!saved || typeof saved !== 'object') return;
-	_answers = Object.assign(_answers, saved);
-	// Re-render the active step so freshly-hydrated values show up. Subsequent
-	// steps read _answers directly when first rendered (via renderStepN), so
-	// only the current one needs an explicit refresh.
-	if (_currentStep === 2) renderStep2();
-	else if (_currentStep === 3) renderStep3();
-	else if (_currentStep === 4) renderStep4();
-	else if (_currentStep === 5) renderStep5();
-};
-
-// ======================================
-// ======================================
 // ======= 7/ Event wiring ==============
 // ======================================
 // ======================================
 
-// Step 1 → config
-document.getElementById('s1-next').addEventListener('click', function () {
-	_answers.locale = _selectedLocale;
-	// Ask Lua to commit the locale selection in memory
-	_post({ action: 'localeSelected', locale: _selectedLocale });
-	renderStepConfig();
-	showStep('config');
-});
-
-// Config step ← →
-document.getElementById('sc-back').addEventListener('click', function () {
-	renderStep1();
-	showStep(1);
-});
-document.getElementById('sc-next').addEventListener('click', function () {
-	var val = (document.getElementById('sc-input').value || '').trim();
-	_answers.config_dir = val;
-	// Ask Lua to load any existing config.toml at the chosen folder so steps
-	// 2-5 open pre-selected with the user's previous answers. The reply
-	// arrives asynchronously via window.applyExistingAnswers(), which
-	// re-renders the active step in place — so showing step 2 first is fine.
-	_post({ action: 'loadExistingConfig', config_dir: val });
-	// The step-4 consent warning names the metrics store of THIS folder; the
-	// host answers through window.setMetricsPath().
-	_metricsRequest += 1;
-	_post({ action: 'resolveMetricsPath', config_dir: val, request: _metricsRequest });
-	renderStep2();
-	showStep(2);
-});
-// Browse → asks Lua to open the macOS native folder picker. Lua replies
-// via window.setConfigDir(path) which fills the input back in.
-document.getElementById('sc-browse').addEventListener('click', function () {
-	_post({ action: 'pickConfigDir', current: document.getElementById('sc-input').value || '' });
-});
-
-// Step 2 ← →
-document.getElementById('s2-back').addEventListener('click', function () {
-	// Going back from layout returns to the inserted config step, not the
-	// language step — keeps the wizard's forward sequence reversible.
-	renderStepConfig();
-	showStep('config');
-});
-document.getElementById('s2-next').addEventListener('click', function () {
-	var checked = document.querySelector("input[name='layout']:checked");
-	_answers.use_ergopti = checked ? checked.value === 'yes' : true;
-	renderStep3();
-	showStep(3);
-});
-
-// Step 3 ← →
-document.getElementById('s3-back').addEventListener('click', function () {
-	renderStep2();
-	showStep(2);
-});
-document.getElementById('s3-next').addEventListener('click', function () {
-	// Read the value from the selected radio — the custom row carries
-	// its own text input that wins when checked. Empty input on custom
-	// row falls back to the Ergopti default so we never persist "".
-	var checked = document.querySelector("input[name='magickey']:checked");
-	var val;
-	if (!checked) {
-		val = _pickDefaultMagicKey();
-	} else if (checked.value === '__custom__') {
-		val = (document.getElementById('s3-input').value || '').trim();
-		if (val === '') val = DEFAULT_MAGIC_KEY;
-	} else {
-		val = checked.value;
+/** Leaves the config step: the folder's configuration and metrics store. */
+function _leaveConfig() {
+	_configDir = (document.getElementById('config-input').value || '').trim();
+	if (_configDir !== _loadedDir) {
+		_loadedDir = _configDir;
+		_configRequest += 1;
+		_post({ action: 'loadExistingConfig', config_dir: _configDir, request: _configRequest });
 	}
-	_answers.magic_key = val;
-	renderStep4();
-	showStep(4);
+	_metricsRequest += 1;
+	_post({ action: 'resolveMetricsPath', config_dir: _configDir, request: _metricsRequest });
+}
+
+/**
+ * Refuses to leave a page whose custom trigger character is empty.
+ * @param {object|null} page
+ * @returns {boolean} Whether the page can be left.
+ */
+function _pageComplete(page) {
+	if (!page || !page.magic_key || !_pageState[page.id].answer) return true;
+	if (_magicValue(page) !== '') return true;
+	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
+	if (input) {
+		input.classList.add('invalid');
+		input.focus();
+	}
+	return false;
+}
+
+document.getElementById('btn-next').addEventListener('click', function () {
+	var step = _steps[_stepIndex];
+	if (step === STEP_LANGUAGE) {
+		_post({ action: 'localeSelected', locale: _selectedLocale });
+	} else if (step === STEP_CONFIG) {
+		_leaveConfig();
+	} else if (!_pageComplete(_pageAt(_stepIndex))) {
+		return;
+	}
+	if (_stepIndex < _steps.length - 1) {
+		_go(_stepIndex + 1);
+		return;
+	}
+	_post({
+		action: 'finish',
+		answers: { locale: _selectedLocale, config_dir: _configDir, operations: _operations() }
+	});
 });
 
-// Step 4 ← →
-document.getElementById('s4-back').addEventListener('click', function () {
-	renderStep3();
-	showStep(3);
-});
-document.getElementById('s4-next').addEventListener('click', function () {
-	var checked = document.querySelector("input[name='metrics']:checked");
-	_answers.use_metrics = checked ? checked.value === 'yes' : false;
-	renderStep5();
-	showStep(5);
+document.getElementById('btn-back').addEventListener('click', function () {
+	if (_steps[_stepIndex] === STEP_CONFIG) {
+		_configDir = (document.getElementById('config-input').value || '').trim();
+	}
+	if (_stepIndex > 0) _go(_stepIndex - 1);
 });
 
-// Step 5 ← finish
-document.getElementById('s5-back').addEventListener('click', function () {
-	renderStep4();
-	showStep(4);
+document.getElementById('config-browse').addEventListener('click', function () {
+	_post({ action: 'pickConfigDir', current: document.getElementById('config-input').value || '' });
 });
-document.getElementById('s5-finish').addEventListener('click', function () {
-	var checked = document.querySelector("input[name='gestures']:checked");
-	_answers.use_gestures = checked ? checked.value === 'yes' : false;
-	_post({ action: 'finish', answers: _answers });
+
+['page-yes', 'page-no'].forEach(function (id) {
+	document.getElementById(id).addEventListener('change', function () {
+		var page = _pageAt(_stepIndex);
+		if (!page) return;
+		_setAnswer(page, document.getElementById('page-yes').checked);
+		_renderPage(page);
+	});
 });
-// Toggle the Windows registration panel as the gestures Yes/No choice changes.
-document.querySelectorAll("input[name='gestures']").forEach(function (r) {
-	r.addEventListener('change', _updateGestureRegisterVisibility);
-});
-// Windows gesture registration (no-op on macOS, where the panel stays hidden).
-// Auto → host runs the elevated touchpad config; Manual → host opens the tutorial.
-document.getElementById('s5-register-auto').addEventListener('click', function () {
+
+document.getElementById('register-auto').addEventListener('click', function () {
 	_post({ action: 'registerGesturesAuto' });
 });
-document.getElementById('s5-register-manual').addEventListener('click', function () {
+document.getElementById('register-manual').addEventListener('click', function () {
 	_post({ action: 'registerGesturesManual' });
 });
 
-// Signal the host that the page is ready to receive initData. Routed through
-// _post so it works under both the WKWebView (macOS) and WebView2 (Windows)
-// bridges rather than hard-coding the macOS-only channel. Gated on readyState
-// (mirroring model_browser) so the signal is never posted before the DOM the
-// host's initData render targets actually exists.
+// Signal the host once the DOM the initData render targets exists.
 if (document.readyState === 'loading') {
 	document.addEventListener('DOMContentLoaded', function () {
 		_post({ action: 'ready' });

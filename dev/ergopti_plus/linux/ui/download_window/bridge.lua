@@ -20,6 +20,10 @@ local LOG = "bridge.download_window"
 local _serial = 0
 local _session = nil
 
+-- The page's kinds (_shared/ui/download_window/script.js) a Linux producer
+-- uses: its heading and layout
+local KINDS = { ollama_model = true, app_update = true }
+
 local function manager()
 	local ok, module = pcall(require, "ui.webview_manager")
 	return ok and type(module) == "table" and module or nil
@@ -46,7 +50,7 @@ local function push_initial(session)
 	if _session ~= session then return false end
 	local statements = {
 		"if(window.resetUI){resetUI();",
-		"setKind('ollama_model',null,null);",
+		"setKind(" .. literal(session.kind) .. ",null,null);",
 		"setModel(" .. literal(session.label) .. ");",
 		"var terminalButton=document.getElementById('btn-term');",
 		"if(terminalButton)terminalButton.style.display='none';",
@@ -62,11 +66,15 @@ local function push_initial(session)
 end
 
 --- Opens one owned progress session.
---- @param opts table { label, on_cancel, on_retry }
+--- @param opts table { kind, label, on_cancel, on_retry }: kind is one of KINDS.
 --- @return number|nil session_id
 function M.show(opts)
 	if type(opts) ~= "table" or type(opts.label) ~= "string" or opts.label == "" then
 		Logger.error(LOG, "Download window requires a model label.")
+		return nil
+	end
+	if not KINDS[opts.kind] then
+		Logger.error(LOG, "Download window refused the unknown kind '%s'.", tostring(opts.kind))
 		return nil
 	end
 	local host = manager()
@@ -84,6 +92,7 @@ function M.show(opts)
 	_serial = _serial + 1
 	local session = {
 		id = _serial,
+		kind = opts.kind,
 		label = opts.label,
 		detail = translated("download_window.starting"),
 		progress = 0,

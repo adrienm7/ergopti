@@ -76,19 +76,9 @@ local function array_signature(v)
 	return table.concat(arr, ",")
 end
 
-local function shortcut_signature(v)
-	if type(v) ~= "table" then return tostring(v) end
-	local mods = normalize_toml_array(v.mods or {})
-	local key  = tostring(v.key or "")
-	return table.concat(mods, "+") .. "|" .. key
-end
-
 local function values_equal(expected, actual, entry)
 	if entry.toml_array then
 		return array_signature(expected) == array_signature(actual)
-	end
-	if entry.id == "trigger_shortcut" then
-		return shortcut_signature(expected) == shortcut_signature(actual)
 	end
 	if type(expected) == "number" and type(actual) == "number" then
 		return math.abs(expected - actual) < 1e-6
@@ -179,11 +169,6 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 				helpers.assert_eq(type(grouped), "table",
 					label .. ": a decode that answered nothing would make every key check below\n\t\t\t\tpass against an empty table")
 				local on_disk = grouped_get(grouped, hs)
-				if entry.id == "trigger_shortcut" and type(hs.sample) == "table" then
-					local sc = grouped.llm and grouped.llm.trigger and grouped.llm.trigger.shortcut
-					helpers.assert_true(type(sc) == "table", label .. " missing llm.trigger.shortcut table")
-					on_disk = sc
-				end
 				helpers.assert_true(
 					values_equal(expected_disk, on_disk, hs),
 					label .. " grouped TOML mismatch"

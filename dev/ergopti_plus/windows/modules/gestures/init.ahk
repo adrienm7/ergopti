@@ -50,89 +50,49 @@
 ; the first-run wizard run long before this file's top-level statements do.
 #Include constants.ahk
 
-; Registry path for precision touchpad settings
-global GESTURE_REG_PATH := "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad"
+; The Precision Touchpad registry contract comes from ONE table, generated from
+; precision_touchpad_registry.toml (_generated/touchpad_registry.ahk). These
+; globals are read-only views of it for the readers below (gesture status
+; rows); every write goes through modules/gestures/touchpad_registry.ahk, which
+; backs up the prior values first. None of these names is typed here.
+_GestureRegistrySlotField(Field) {
+		Slots := TouchpadRegistryData()["slots"]
+		Result := Map()
+		for Slot, Entry in Slots {
+				if Entry.Has(Field)
+						Result[Slot] := Entry[Field]
+		}
+		return Result
+}
 
-; Registry value names for each gesture action type
-global GESTURE_REG_ACTIONS := Map(
-		"tap_3", "ThreeFingerTapAction",
-		"swipe_3_up", "ThreeFingerSlideUpAction",
-		"swipe_3_down", "ThreeFingerSlideDownAction",
-		"swipe_3_left", "ThreeFingerSlideLeftAction",
-		"swipe_3_right", "ThreeFingerSlideRightAction",
-		"tap_4", "FourFingerTapAction",
-		"swipe_4_up", "FourFingerSlideUpAction",
-		"swipe_4_down", "FourFingerSlideDownAction",
-		"swipe_4_left", "FourFingerSlideLeftAction",
-		"swipe_4_right", "FourFingerSlideRightAction",
-)
+; Registry path for precision touchpad settings
+global GESTURE_REG_PATH := TouchpadRegistryData()["key"]
+
+; Registry value names of the new-system *Action for each gesture slot
+global GESTURE_REG_ACTIONS := _GestureRegistrySlotField("action")
 
 ; Value meaning "Custom keyboard shortcut" in the registry
-global GESTURE_REG_CUSTOM_VALUE := 65535
+global GESTURE_REG_CUSTOM_VALUE := TouchpadRegistryData()["custom_value"]
 
-; Modifier bitmask for KeyParams: Ctrl(1) | Shift(2) | Win(4) = 7
-global GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT := 0x07
-
-; Per-slot VK codes for F1..F10 (Windows VK_F1=0x70 … VK_F10=0x79)
-; Per-slot VK codes for F1..F10 (Windows VK_F1=0x70 … VK_F10=0x79)
-; All slots (taps and swipes) use (VK << 16) | modifiers — confirmed by
-; reading the registry after manual configuration in Windows Settings.
-global GESTURE_REG_KEY_PARAMS := Map(
-		"tap_3", (0x70 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F1
-		"swipe_3_up", (0x71 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F2
-		"swipe_3_down", (0x72 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F3
-		"swipe_3_left", (0x73 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F4
-		"swipe_3_right", (0x74 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F5
-		"tap_4", (0x75 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F6
-		"swipe_4_up", (0x76 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F7
-		"swipe_4_down", (0x77 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F8
-		"swipe_4_left", (0x78 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F9
-		"swipe_4_right", (0x79 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F10
-)
+; KeyParams per slot: (VK << 16) | Ctrl+Shift+Win, derived by the generator
+global GESTURE_REG_KEY_PARAMS := _GestureRegistrySlotField("key_params")
 
 ; Old-system KeyParams registry value names (the ones Windows actually reads
-; when sending the synthesised shortcut). Tap slots use Custom*Tap + KeyParams,
-; swipe slots use direction-specific *KeyParams pair.
-global GESTURE_REG_KEY_PARAMS_NAMES := Map(
-		"tap_3", "CustomThreeFingerTapKeyParams",
-		"swipe_3_up", "ThreeFingerUpKeyParams",
-		"swipe_3_down", "ThreeFingerDownKeyParams",
-		"swipe_3_left", "ThreeFingerLeftKeyParams",
-		"swipe_3_right", "ThreeFingerRightKeyParams",
-		"tap_4", "CustomFourFingerTapKeyParams",
-		"swipe_4_up", "FourFingerUpKeyParams",
-		"swipe_4_down", "FourFingerDownKeyParams",
-		"swipe_4_left", "FourFingerLeftKeyParams",
-		"swipe_4_right", "FourFingerRightKeyParams",
-)
+; when sending the synthesised shortcut).
+global GESTURE_REG_KEY_PARAMS_NAMES := _GestureRegistrySlotField("key_params_name")
 
-; Old-system "enable" registry values that must be set to 65535 to activate
-; the gesture / direction. Tap slots use a CustomXxxTap=7 sentinel instead.
-global GESTURE_REG_ENABLE_NAMES := Map(
-		"swipe_3_up", "ThreeFingerUp",
-		"swipe_3_down", "ThreeFingerDown",
-		"swipe_3_left", "ThreeFingerLeft",
-		"swipe_3_right", "ThreeFingerRight",
-		"swipe_4_up", "FourFingerUp",
-		"swipe_4_down", "FourFingerDown",
-		"swipe_4_left", "FourFingerLeft",
-		"swipe_4_right", "FourFingerRight",
-)
+; Old-system direction enables (swipe slots only)
+global GESTURE_REG_ENABLE_NAMES := _GestureRegistrySlotField("enable")
 
-; Tap slots use a "Custom*Tap=7" sentinel that means "user-defined shortcut".
-global GESTURE_REG_CUSTOM_TAP_NAMES := Map(
-		"tap_3", "CustomThreeFingerTap",
-		"tap_4", "CustomFourFingerTap",
-)
-global GESTURE_REG_CUSTOM_TAP_VALUE := 7
+; Tap slots use a "Custom*Tap" sentinel that means "user-defined shortcut".
+global GESTURE_REG_CUSTOM_TAP_NAMES := _GestureRegistrySlotField("custom_tap")
+global GESTURE_REG_CUSTOM_TAP_VALUE := TouchpadRegistryData()["custom_tap_value"]
+
+; The family enable each slot needs, one per three/four-finger tap/slide family
+global GESTURE_REG_FAMILY_ENABLES := _GestureRegistrySlotField("family_enable")
 
 ; Master enables — must be 65535 for the gesture family to be active
-global GESTURE_REG_MASTER_ENABLES := [
-		"ThreeFingerSlideEnabled",
-		"ThreeFingerTapEnabled",
-		"FourFingerSlideEnabled",
-		"FourFingerTapEnabled",
-]
+global GESTURE_REG_MASTER_ENABLES := TouchpadRegistryData()["family_enables"]
 
 ; Slot names — mirrors Hammerspoon's slot identifiers. The data itself lives in
 ; constants.ahk behind a function so consumers that run BEFORE this file's
@@ -154,6 +114,7 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 
 
 #Include actions.ahk
+#Include system_actions.ahk
 
 
 

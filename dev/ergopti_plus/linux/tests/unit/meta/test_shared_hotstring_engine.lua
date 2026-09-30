@@ -711,3 +711,84 @@ helpers.describe("shared hotstring engine — Backspace edits the buffer", funct
 	end)
 
 end)
+
+helpers.describe("shared hotstring engine — atomic catalogue publication", function()
+	local function mapping(trigger)
+		return { trigger = trigger, replacement = trigger .. "-result", auto_expand = true,
+			is_case_sensitive_strict = true }
+	end
+
+	local function match(engine, text)
+		engine:reset()
+		local result
+		for ch in text:gmatch(".") do result = engine:on_char(ch) end
+		return result and result.replacement
+	end
+
+	helpers.it("invalid input refuses without destroying the active catalogue", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ mapping("old") })
+		local committed = engine:load_mappings(false)
+		helpers.assert_eq(match(engine, "old"), "old-result", "refused replacement keeps old engine")
+		helpers.assert_eq(committed, false, "explicit refusal")
+		helpers.assert_eq(engine:mapping_state().generation, 1, "refusal does not publish")
+	end)
+
+	helpers.it("a compilation exception cannot publish a partially compiled catalogue", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ mapping("old") })
+		local reason = helpers.assert_throws(function()
+			engine:load_mappings({ mapping("new"), false })
+		end, "malformed mapping must propagate its compilation failure")
+		helpers.assert_true(tostring(reason):find("boolean", 1, true) ~= nil, "actual invalid row failure")
+		helpers.assert_eq(match(engine, "old"), "old-result", "old mapping survives failed compilation")
+		helpers.assert_nil(match(engine, "new"), "partial replacement is never visible")
+		helpers.assert_eq(engine:mapping_state().generation, 1, "exception does not publish")
+	end)
+
+	helpers.it("sorting failure preserves the old catalogue and exposes its reason", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ mapping("old") })
+		local original_sort = table.sort
+		table.sort = function() error("catalogue-sort-refused") end
+		local reason = helpers.assert_throws(function()
+			local ok, failure = pcall(function() engine:load_mappings({ mapping("new") }) end)
+			table.sort = original_sort
+			if not ok then error(failure) end
+		end, "sort refusal propagates")
+		helpers.assert_true(tostring(reason):find("catalogue-sort-refused", 1, true) ~= nil, "exact refusal")
+		helpers.assert_eq(match(engine, "old"), "old-result", "failed sort preserves old runtime")
+		helpers.assert_nil(match(engine, "new"), "failed sort cannot install new runtime")
+	end)
+
+	helpers.it("successful publication acknowledges replacement and reports detached counts", function()
+		local engine = engine_mod.new()
+		helpers.assert_eq(engine:mapping_state().generation, 0, "unpublished engine")
+		helpers.assert_eq(engine:load_mappings({ mapping("old") }), true, "initial publication")
+		helpers.assert_eq(engine:load_mappings({ mapping("new"), mapping("few") }), true, "replacement")
+		helpers.assert_nil(match(engine, "old"), "old mapping removed")
+		helpers.assert_eq(match(engine, "new"), "new-result", "new mapping consumed by actual engine")
+		local state = engine:mapping_state()
+		helpers.assert_eq(state.generation, 2, "one generation per publication")
+		helpers.assert_eq(state.mappings, 2, "source mappings")
+		helpers.assert_eq(state.entries, 2, "compiled entries")
+		helpers.assert_eq(state.buckets, 1, "shared tail bucket")
+		state.generation, state.entries = 99, 99
+		helpers.assert_eq(engine:mapping_state().generation, 2, "detached readback generation")
+		helpers.assert_eq(engine:mapping_state().entries, 2, "detached readback count")
+	end)
+
+	helpers.it("an empty catalogue is an acknowledged clear and can be replaced again", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ mapping("old") })
+		helpers.assert_eq(engine:load_mappings({}), true, "clear publication")
+		helpers.assert_nil(match(engine, "old"), "clear removes actual match")
+		local state = engine:mapping_state()
+		helpers.assert_eq(state.generation, 2, "clear counts as publication")
+		helpers.assert_eq(state.mappings, 0, "clear mapping count")
+		helpers.assert_eq(state.entries, 0, "clear entry count")
+		helpers.assert_eq(state.buckets, 0, "clear bucket count")
+		helpers.assert_eq(engine:load_mappings({ mapping("old") }), true, "explicit restoration")
+		helpers.assert_eq(match(engine, "old"), "old-result", "restored old mapping really executes")
+	end)
+end)

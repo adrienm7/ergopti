@@ -146,7 +146,8 @@ end
 --- with the only trace a DEBUG line at each press.
 local function _warn_unsupported_taps(loaded)
 	local supported = _tap_action_set()
-	for _, key_id in ipairs(Engine.KEY_ORDER) do
+	for _, entry in ipairs(loaded.catalog) do
+		local key_id = entry.id
 		local key = loaded.keys[key_id]
 		local tap = key and key.enabled ~= false and key.tap_action
 		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
@@ -156,9 +157,31 @@ local function _warn_unsupported_taps(loaded)
 	end
 end
 
---- Reads the files and builds a fresh engine; the old one stays until _apply().
-local function _load()
-	local loaded = Config.load(_defaults_path, _user_path)
+--- Raises unless the catalogue's Linux column is exactly the keys the engine
+--- has an evdev code for: a listed key the engine cannot remap would be a tray
+--- row that does nothing, an unlisted one a key the tray cannot reach.
+--- @param catalog table The loader's `catalog`, this driver's column.
+local function _check_catalog(catalog)
+	local listed = {}
+	for _, entry in ipairs(catalog) do
+		if not Engine.KEY_CODES[entry.id] then
+			error(string.format("[tap_hold.catalog] lists '%s', which the Linux engine cannot remap", entry.id), 0)
+		end
+		listed[entry.id] = true
+	end
+	for key_id in pairs(Engine.KEY_CODES) do
+		if not listed[key_id] then
+			error(string.format("[tap_hold.catalog] has no Linux entry for the engine's key '%s'", key_id), 0)
+		end
+	end
+end
+
+--- Builds a fresh engine from a loaded configuration; the old one stays until
+--- the caller publishes the result and calls _apply().
+--- @param loaded table Config.load() or Config.load_document() result.
+--- @return table loaded, table one_shot, table engine
+local function _build(loaded)
+	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
 	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
 	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir })
@@ -179,8 +202,13 @@ local function _load()
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
-	_loaded, _one_shot, _engine = loaded, one_shot, engine
-	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, _loaded.enabled and "on" or "off")
+	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, loaded.enabled and "on" or "off")
+	return loaded, one_shot, engine
+end
+
+--- Reads the files and builds a fresh engine; the old one stays until _apply().
+local function _load()
+	_loaded, _one_shot, _engine = _build(Config.load(_defaults_path, _user_path))
 end
 
 local function _require_init()
@@ -244,6 +272,49 @@ function M.reload()
 	return true
 end
 
+--- Captures the configuration in force, for a scope transaction's inverse.
+--- @return table snapshot Opaque, detached from later loads.
+function M.configuration_snapshot()
+	_require_init()
+	return { loaded = _loaded, one_shot = _one_shot, engine = _engine }
+end
+
+--- Puts a candidate user document in force before its file is published, so a
+--- scope transaction acknowledges exactly what it is about to write.
+--- @param document table Decoded candidate tap_hold.toml.
+--- @return boolean True once the candidate engine is installed.
+function M.apply_configuration(document)
+	_require_init()
+	if type(document) ~= "table" then
+		Logger.error(LOG, "Tap-hold scope candidate must be a decoded document — nothing changed.")
+		return false
+	end
+	local ok, loaded, one_shot, engine = pcall(function()
+		return _build(Config.load_document(_defaults_path, document))
+	end)
+	if not ok then
+		Logger.error(LOG, "Tap-hold scope candidate refused, the previous configuration stays: %s.", tostring(loaded))
+		return false
+	end
+	_loaded, _one_shot, _engine = loaded, one_shot, engine
+	_apply()
+	return true
+end
+
+--- Reinstalls a configuration captured by configuration_snapshot().
+--- @param snapshot table Result of configuration_snapshot().
+--- @return boolean True once the captured engine is installed again.
+function M.restore_configuration(snapshot)
+	_require_init()
+	if type(snapshot) ~= "table" or type(snapshot.loaded) ~= "table" or type(snapshot.one_shot) ~= "table" then
+		Logger.error(LOG, "Tap-hold configuration snapshot is invalid — nothing restored.")
+		return false
+	end
+	_loaded, _one_shot, _engine = snapshot.loaded, snapshot.one_shot, snapshot.engine
+	_apply()
+	return true
+end
+
 --- Whether the runtime feature switch is on.
 --- @return boolean
 function M.is_enabled()
@@ -284,6 +355,14 @@ end
 function M.keys()
 	_require_init()
 	return _loaded.keys
+end
+
+--- The keys the tray lists, in order, each with its hand and label key: the
+--- Linux column of the shared key catalogue ([tap_hold.catalog]).
+--- @return table Array of { id, key, hand, label_key }.
+function M.key_catalog()
+	_require_init()
+	return _loaded.catalog
 end
 
 --- Whether the user's file sets the feature on (its [tap_hold] enabled).

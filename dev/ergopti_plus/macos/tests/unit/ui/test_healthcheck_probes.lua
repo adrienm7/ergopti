@@ -27,18 +27,37 @@ local function with_probes(body)
 	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
 		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false,
-			samplers = {}, stopped_samplers = 0 }
+			samplers = {}, stopped_samplers = 0, errors = {} }
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...)
+			local ok, text = pcall(string.format, tostring(message), ...)
+			world.errors[#world.errors + 1] = ok and text or tostring(message)
+		end
+		package.loaded["infra.logger"] = logger
 		-- The callback form, which samples on its own timer; the blocking form
 		-- (no callback) is never what a probe may call. Restored on the same
-		-- table, whichever runtime the scope installed.
+		-- table, whichever runtime the scope installed. Shaped like hs.host's
+		-- sampler: its timer is cleared before the callback runs, and stop()
+		-- indexes that timer, so stopping a sampler that already answered raises
+		-- exactly as it does on a Mac.
 		local host = hs.host
 		local saved_cpu_usage = host.cpuUsage
 		host.cpuUsage = function(period, callback)
 			if type(callback) ~= "function" then error("hs.host.cpuUsage called without a callback blocks") end
-			local sampler = { period = period, callback = callback }
-			function sampler.stop() world.stopped_samplers = world.stopped_samplers + 1 end
+			local sampler = { period = period, callbackTimer = {} }
+			function sampler:finished() return self.callbackTimer == nil end
+			function sampler:stop()
+				self.callbackTimer.stopped = true
+				self.callbackTimer = nil
+				world.stopped_samplers = world.stopped_samplers + 1
+				return self
+			end
+			-- What the sampling timer does when it fires
+			function sampler.callback(result)
+				sampler.callbackTimer = nil
+				callback(result)
+			end
 			world.samplers[#world.samplers + 1] = sampler
 			return sampler
 		end
@@ -276,6 +295,10 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(answer.sections.system.cpu_usage, 40)
 			helpers.assert_eq(answer.sections.system.process_cpu, 10, "20 % of one core is 10 % of two")
 			helpers.assert_eq(answer.sections.system.process_memory, 51200 * 1024)
+			for _, message in ipairs(world.errors) do
+				helpers.assert_true(not message:find("could not be stopped", 1, true),
+					"a sampler that already answered must not be stopped again: " .. message)
+			end
 		end)
 	end)
 

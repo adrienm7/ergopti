@@ -47,11 +47,13 @@ _MMLP_AllPostTraceFallbacksCloseLifecycle() {
 }
 
 _MMLP_OnboardingAndLiveRebuildCloseTheirLifecycles() {
-    Preload := _DriverFuncBody("_Onboarding_PreloadFromExistingConfig")
+    Read := _DriverFuncBody("OnboardingReadCurrentValues")
     Rebuild := _DriverFuncBody("_RebuildHotstringsLiveOnce")
 
-    Assert(InStr(Preload, "LoggerTrace") > 0 && InStr(Preload, "LoggerDone") > 0,
-        "Onboarding config preload must close its traced lifecycle on fallback paths")
+    RegExReplace(Read, "LoggerStart\(", "", &Starts)
+    RegExReplace(Read, "LoggerSuccess\(|LoggerError\(", "", &Ends)
+    Assert(Starts == 1 && Ends >= 3,
+        "the wizard's configuration read must close its lifecycle on every path: absent, unreadable and read")
     Assert(InStr(Rebuild, "LoggerStart") > 0 && InStr(Rebuild, "catch as e") > 0
             && InStr(Rebuild, "LoggerError") > 0 && InStr(Rebuild, "throw e") > 0,
         "the serialized live-rebuild pass must log and rethrow failures so its LoggerStart never has a silent unmatched exit")

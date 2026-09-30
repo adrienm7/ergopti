@@ -140,7 +140,9 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 			.. "dropped by the renderer and the submenu shows no version at all")
 		helpers.assert_true(src:find('label = i18n.get("menu.about.check_for_updates")', 1, true) ~= nil,
 			"the Sparkle command must remain a visible provider row")
-		helpers.assert_true(src:find("UpdateLauncher.request_check(channel)", 1, true) ~= nil,
-			"the visible update row must retain its native Sparkle action")
+		helpers.assert_true(src:find('require("ui.update_check").open(', 1, true) ~= nil,
+			"the visible check row must open the update-check window")
+		helpers.assert_true(src:find("UpdateLauncher.request_check(latest.channel)", 1, true) ~= nil,
+			"a row naming a found release must retain its native Sparkle action")
 	end)
 end)

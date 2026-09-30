@@ -52,7 +52,6 @@ _LMT_Menu() {
 		"label", "Live label", "system_single", "Live prompt",
 		"batch", false)]
 	MenuState["profile_id"] := "user_one"
-	MenuState["trigger_shortcut"] := "Ctrl+Space"
 	MenuState["nav_modifiers"] := ""
 	MenuState["disabled_apps"] := []
 	MenuState["ollama_port"] := 11434
@@ -68,10 +67,6 @@ _LMT_Acquire(Paths) {
 }
 
 _LMT_Settle(Bundle) {
-	return 1
-}
-
-_LMT_Quiesce(Bundle) {
 	return 1
 }
 
@@ -167,7 +162,7 @@ _LMT_FailedWriterKeepsNestedLiveState() {
 		_LMT_WriterResult := 0
 		AssertFalse(LLM_Menu_CommitMutation("the test LLM setting",
 			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
 		AssertEqual(1, _LMT_WriterCalls)
 		AssertEqual(0, _LMT_ApplyCalls,
 			"live application must not run after a refused durable writer")
@@ -195,7 +190,7 @@ _LMT_DurabilityPrecedesPublicationAndDefusesCritical() {
 		try {
 			AssertTrue(LLM_Menu_CommitMutation("the test LLM setting",
 				_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-				_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+				_LMT_Acquire, _LMT_Settle, _LMT_Collect))
 			AssertTrue(A_IsCritical,
 				"the transaction must restore its caller's Critical state")
 		} finally Critical(PriorCritical)
@@ -225,7 +220,7 @@ _LMT_PrepareRefusalPrecedesDurability() {
 		_LMT_PrepareResult := 0
 		AssertFalse(LLM_Menu_CommitMutation("the prepared LLM setting",
 			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect,
 			_LMT_Prepare, _LMT_Publish))
 		AssertEqual(1, _LMT_PrepareCalls)
 		AssertEqual(0, _LMT_WriterCalls,
@@ -248,7 +243,7 @@ _LMT_FailedWriterKeepsPreparedSurfaceInert() {
 		_LMT_WriterResult := 0
 		AssertFalse(LLM_Menu_CommitMutation("the prepared LLM setting",
 			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect,
 			_LMT_Prepare, _LMT_Publish))
 		AssertEqual(1, _LMT_PrepareCalls)
 		AssertEqual(1, _LMT_WriterCalls)
@@ -271,7 +266,7 @@ _LMT_SuccessPublishesPreparedSurfaceOnce() {
 	try {
 		AssertTrue(LLM_Menu_CommitMutation("the prepared LLM setting",
 			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect,
 			_LMT_Prepare, _LMT_Publish))
 		AssertEqual(1, _LMT_PrepareCalls)
 		AssertEqual(1, _LMT_WriterCalls)
@@ -296,7 +291,7 @@ _LMT_GlobalAdmissionRefusalDoesNotBuildCandidate() {
 		AssertTrue(OuterBundle is Object)
 		AssertFalse(LLM_Menu_CommitMutation("the contended LLM setting",
 			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
 		AssertEqual(0, _LMT_WriterCalls)
 		AssertEqual(0, _LMT_ApplyCalls)
 	} finally {
@@ -335,7 +330,7 @@ _LMT_DuplicateProfileDeleteIsMutationFree() {
 			(Candidate) => _LLM_Menu_DeleteProfileCandidate(
 				Candidate, "profile_p"),
 			_LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
 		AssertEqual(0, _LMT_WriterCalls,
 			"ambiguous identity must be rejected before durable mutation")
 		AssertEqual(0, _LMT_ApplyCalls)
@@ -367,7 +362,7 @@ _LMT_ProfileDeleteRemovesEveryExactOverride() {
 			(Candidate) => _LLM_Menu_DeleteProfileCandidate(
 				Candidate, "profile_p"),
 			_LMT_Apply, _LMT_Writer, _LMT_Notify,
-			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
 		AssertEqual(1, _LMT_WriterCalls)
 		AssertEqual(1, _LMT_ApplyCalls)
 		AssertEqual(1, _LLM_Menu["user_profiles"].Length)
@@ -520,14 +515,14 @@ _LMT_RestoreApiFixture(Previous) {
 _LMT_ApiCommit(Port := 0) {
 	return LLM_Menu_CommitApiEntriesMutation("the test API entry",
 		_LMT_ApiMutate, _LMT_Apply, Port, _LMT_Notify, _LMT_Acquire,
-		_LMT_Settle, _LMT_Quiesce, _LMT_Collect, _LMT_ApiBuildConfig,
+		_LMT_Settle, _LMT_Collect, _LMT_ApiBuildConfig,
 		_LMT_ApiSerialize)
 }
 
 _LMT_ApiCommitWithSerializer(SerializeFn) {
 	return LLM_Menu_CommitApiEntriesMutation("the test API entry",
 		_LMT_ApiMutate, _LMT_Apply, ConfigTransitionProductionPort(),
-		_LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+		_LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Collect,
 		_LMT_ApiBuildConfig, SerializeFn)
 }
 

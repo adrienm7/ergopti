@@ -12,7 +12,7 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 	global _MenuDispatchCallbacks
 	Fixture := _ScopeOwnerFixture()
-	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`ntrigger_shortcut = "Ctrl+L"`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
+	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
@@ -39,13 +39,13 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 				AssertEqual(Parsed["user"]["unknown"], "keep")
 				AssertEqual(Parsed["llm"]["unknown_user"], "keep", "an unknown key inside the scope remains user-owned")
 				if Scope == "llm" {
-					for Key in ["trigger_shortcut", "ollama_port", "api_entry_id"]
+					for Key in ["ollama_port", "api_entry_id"]
 						Assert(!Parsed["llm"].Has(Key), "the LLM owner must remove its foreign override " . Key)
 					Assert(!Parsed["llm.navigation"].Has("nav_modifiers"))
 					Assert(!Parsed["llm.trigger"].Has("disabled_apps"))
 					Assert(!Parsed["llm.generation"].Has("min_words"), "the manifest recommendation is sparse at its default")
 				} else {
-					AssertEqual(Parsed["llm"]["trigger_shortcut"], "Ctrl+L")
+					AssertEqual(Parsed["llm"]["ollama_port"], 12345)
 					AssertEqual(Parsed["llm"]["api_entry_id"], "saved-api")
 				}
 				if Scope == "keyboard_layout" {

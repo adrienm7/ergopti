@@ -111,6 +111,16 @@ local function count_categories(t)
 	return n
 end
 
+--- A set of section names from an optional source list.
+--- @param names table|nil Array of section names.
+--- @return table|nil Set, or nil when the source names none.
+local function section_set(names)
+	if names == nil then return nil end
+	local set = {}
+	for _, name in ipairs(names) do set[name] = true end
+	return set
+end
+
 --- Returns the stable identity of one logical catalogue source.
 --- @param path any Source path.
 --- @param forced_group any Optional namespaced category id.
@@ -191,6 +201,12 @@ function M.load_catalogue(paths, options)
 		local path = type(source) == "table" and source.path or source
 		local forced_group = type(source) == "table" and source.category or nil
 		local extension = type(source) == "table" and source.extension or nil
+		-- A layout extension may supply some sections of a bundled category: its
+		-- file loads only those (only_sections) and the bundled file loads the
+		-- rest (skip_sections). The category record, and so its metadata, comes
+		-- from whichever source the catalogue lists first.
+		local only_sections = section_set(type(source) == "table" and source.only_sections or nil)
+		local skip_sections = section_set(type(source) == "table" and source.skip_sections or nil)
 		local identity = source_identity(path, forced_group)
 		local ok, data, committed = pcall(Reader.parse, path)
 		if not ok or committed ~= true or type(data) ~= "table" then
@@ -238,15 +254,22 @@ function M.load_catalogue(paths, options)
 			categories[group] = category
 
 			-- The declared order, minus the "-" separators the menu renders itself.
+			-- A bound source adds only the sections it supplies that the order
+			-- does not already place.
+			local ordered = {}
+			for _, name in ipairs(category.sections_order) do ordered[name] = true end
 			for _, name in ipairs(meta.sections_order or data.sections_order or {}) do
-				if name ~= "-" then
+				if name ~= "-" and not ordered[name] and (not only_sections or only_sections[name]) then
 					category.sections_order[#category.sections_order + 1] = name
+					ordered[name] = true
 				end
 			end
 
 			for _, sec_name in ipairs(data.sections_order or {}) do
 				local section = data.sections[sec_name]
-				if section and type(section.entries) == "table" then
+				local selected = (not only_sections or only_sections[sec_name])
+					and not (skip_sections and skip_sections[sec_name])
+				if selected and section and type(section.entries) == "table" then
 					local entry_count = 0
 					for _, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
@@ -298,6 +321,9 @@ function M.load_catalogue(paths, options)
 						count    = entry_count,
 						delay    = tonumber((meta.section_delays or {})[sec_name]),
 						priority = section_priorities[sec_name],
+						-- The extension a bound section comes from (Ergopti's repeat
+						-- corrections): the menu lists it under that extension.
+						extension = only_sections and extension or nil,
 					}
 					category.count = category.count + entry_count
 				end

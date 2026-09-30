@@ -10,9 +10,7 @@ generated code is committed), and the Hammerspoon driver consumes it directly.
 _shared/modules/hotstrings/
   _index.toml              Category order, and the [languages] packs
   distancesreduction.toml  Language-neutral categories (one file each):
-  sfbsreduction.toml         layout distances, same-finger bigrams, rolls,
-  rolls.toml                 brand capitalisation, symbols
-  autocorrection.toml
+  autocorrection.toml        layout distances, brand capitalisation, symbols
   magickey.toml
   french/                  French language pack (declared in _index.toml)
     distancesreduction.toml  French suffixes
@@ -22,6 +20,19 @@ _shared/modules/hotstrings/
   priority.json            Collision priority tiers
   schema.md                Schema documentation for all TOML files
 ```
+
+## Ergopti layout hotstrings
+
+The hotstrings written for Ergopti's key positions — SFB reduction
+(`sfbsreduction`), rolls (`rolls`) and the magic key's repeat corrections
+(`magickey` section `repeat_corrections`) — live in the Ergopti layout
+extension, `static/layouts/registry/ergopti/hotstrings/`. Its manifest binds
+each file to its historical category, feature section and common priority
+tier (`[extension.hotstring_bindings.<stem>]`), so every existing preference
+still addresses it. They are available wherever the Ergopti extension is
+installed; every driver counts the Ergopti it ships as installed, and the
+Hotstrings menu lists them in the extensions section, under « Hotstrings
+Ergopti ».
 
 ## Language packs
 

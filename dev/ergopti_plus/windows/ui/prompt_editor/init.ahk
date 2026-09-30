@@ -146,7 +146,7 @@ _PromptEdWeb_TryOpen(Existing) {
 			? t("prompt_editor.title_edit")
 			: t("prompt_editor.title_new")
 		try _PromptEdWeb_PushInit(Context.EditId, Context.Epoch)
-		try WinActivate("ahk_id " . _PromptEdWeb_Gui.Hwnd)
+		WMPresentWindow(_PromptEdWeb_Gui)
 		return true
 	}
 

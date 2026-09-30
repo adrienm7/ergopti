@@ -29,9 +29,16 @@ local Logger   = require("infra.logger")
 
 local LOG = "healthcheck"
 
--- The macOS guardian registration states, as the launcher exports them
--- (launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift)
-local GUARDIAN_PERMISSION = { ready = "granted", requires_approval = "missing" }
+-- The remap guardian states platform.remap.guardian_state() reports, as
+-- permission states: a guardian needing approval is a missing grant, one that
+-- is unavailable leaves every remap inert, and it is not used at all while
+-- « Ergopti uses Karabiner » is off. Anything else reads as unknown.
+local GUARDIAN_PERMISSION = {
+	ready             = "granted",
+	requires_approval = "missing",
+	unavailable       = "unavailable",
+	not_used          = "not_used",
+}
 
 -- The manifest's platform codes, as the drivers are named
 local PLATFORM_NAMES = { ahk = "Windows", hs = "macOS", linux = "Linux" }
@@ -384,10 +391,11 @@ function H.collect_permissions(ids)
 		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
 		-- the grant belongs to the Karabiner grabber rather than to this process
 		input_monitoring = function() return "unknown" end,
+		-- Phase A only reads memory: a remap owner that never loaded is unknown
 		login_items      = function()
-			local _, snapshot = require("platform.remap.lease_controller").status()
-			local status = type(snapshot) == "table" and snapshot.guardian_status or nil
-			return GUARDIAN_PERMISSION[status] or "unknown"
+			local remap = package.loaded["platform.remap"]
+			if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
+			return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
 		end,
 	}
 	local items = {}

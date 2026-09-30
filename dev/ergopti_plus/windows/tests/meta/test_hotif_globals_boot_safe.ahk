@@ -284,8 +284,9 @@ _HGBS_FunctionScannerIgnoresLiteralBraces() {
 	Body := _DriverFuncBody("LLM_TooltipGetText")
 	AssertContains(Body, "_LLM_TooltipGetCurrentPresentation()",
 		"the positive-control tooltip body must be extracted")
-	Assert(InStr(Body, "LLM_TriggerJournalReconcile") = 0,
-		"a brace in a string or comment must not make function extraction absorb unrelated sibling files")
+	; LLM_TooltipGetSlots is the next definition in the same file.
+	Assert(InStr(Body, "LLM_TooltipGetSlots") = 0,
+		"a brace in a string or comment must not make function extraction absorb the next definition")
 }
 
 _HGBS_CalleeScannerIgnoresNonCodeAndMethods() {

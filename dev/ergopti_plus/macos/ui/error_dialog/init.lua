@@ -17,8 +17,11 @@
 ---    session, at most max_dialogs per window_sec, errors logged while a
 ---    window is open are counted in it, nothing while the Debug menu's "Show a
 ---    window for every error" is unticked.
---- 3. The window never takes the keyboard: it floats above other windows
----    without becoming the key window, since it can appear mid-sentence.
+--- 3. The window is presented like every Ergopti window (ui_builder.force_focus):
+---    raised and focused when it opens, never given a level (maintainer rule,
+---    2026-09-29). AppKit keeps a window of the inactive Hammerspoon app behind
+---    the user's key window, so show() alone left the error invisible. The page
+---    still never takes text entry (allowTextEntry is off).
 --- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
@@ -312,7 +315,7 @@ local function build_report(record)
 	}
 end
 
---- Opens the window for one error. Never takes the keyboard.
+--- Opens the window for one error and presents it (raised and focused once).
 --- @param record table { kind, module, message, time }
 --- @return boolean opened
 local function open_window(record)
@@ -392,7 +395,7 @@ local function open_window(record)
 	pcall(function()
 		webview:navigationCallback(function(action)
 			if _session ~= session or action ~= "didFinishNavigation" then return end
-			local ok_strings, strings = pcall(function() return require("infra.locale").all() end)
+			local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
 			local ok_enc, json = pcall(hs.json.encode, ok_strings and strings or {})
 			if not ok_strings or not ok_enc then
 				Logger.error(LOG, "The error window's strings could not be prepared.")
@@ -407,14 +410,18 @@ local function open_window(record)
 		close(session)
 		return false
 	end
-	-- show() without a focus request: the window floats above the user's work
-	-- and waits; the keyboard stays where the user was typing
 	local ok_show, show_err = xpcall(function() return webview:show() end, debug.traceback)
 	if not ok_show or show_err == nil or show_err == false then
 		Logger.error(LOG, "The error window could not be shown: %s.", tostring(show_err))
 		close(session)
 		return false
 	end
+	-- show() only orders the window front inside Hammerspoon, which is not the
+	-- active app while the user types elsewhere, so AppKit keeps it behind the
+	-- user's key window. Present it through the shared helper: raised and
+	-- focused once, at the normal level, so the next window the user opens
+	-- covers it. The helper logs its own failure; the window stays open.
+	ui_builder.force_focus(webview, true, { is_current = function() return _session == session end })
 	Logger.success(LOG, "Error window opened.")
 	return true
 end
@@ -474,6 +481,24 @@ function M.on_error(module_name, template, message)
 			time = os.date("%Y-%m-%d %H:%M:%S") })
 	end
 	return true
+end
+
+--- Reports one failure on GitHub exactly as this window's Report button does,
+--- for a window that shows a failure of its own (the update-check window): the
+--- same diagnostics report, redacted, the same prefilled issue form.
+--- @param record table { kind = "error", module, message, time }
+--- @return boolean reported
+function M.report(record)
+	local ok_report, fields = pcall(build_report, record)
+	if not ok_report then
+		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module),
+			tostring(fields))
+		return false
+	end
+	local result = require("ui.healthcheck.report").perform(
+		{ action = "report", text = fields.report.text, fields = fields.report.fields },
+		fields.paths, fields.documents, fields.redaction.context)
+	return result.ok == true
 end
 
 --- Test seam: forgets the policy, the decisions and the window.

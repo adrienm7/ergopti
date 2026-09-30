@@ -39,7 +39,7 @@
 
 _OGRT_ReaderTypeChecks() {
 	Body := _DriverFuncBody("_Onboarding_ReadGestureAutoResult")
-	Assert(Body != "", "_Onboarding_ReadGestureAutoResult must exist in ui/onboarding/steps_metrics.ahk")
+	Assert(Body != "", "_Onboarding_ReadGestureAutoResult must exist in ui/onboarding/gesture_registration.ahk")
 
 	Assert(InStr(Body, "is String") > 0,
 		"_Onboarding_ReadGestureAutoResult must discriminate FSRead's String|false result by TYPE (`is String`) — the success token is the numeric string 0, and AHK v2 compares numerically, so any value-comparison against false swallows success as failure")

@@ -1205,17 +1205,16 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 	; (updater-download-reentrancy).
 	if IsSet(_Updater_PromptGui) {
 		try LoggerDebug("Updater", "Update prompt already open -- reusing existing window instead of opening a duplicate.")
-		try _Updater_PromptGui.Restore()
 		if !_Updater_RequestMayPublish(Request) {
 			_Updater_CloseGui(_Updater_PromptGui)
 			return
 		}
-		try WinActivate(_Updater_PromptGui.Hwnd)
+		WMPresentWindow(_Updater_PromptGui)
 		if !_Updater_RequestMayPublish(Request)
 			_Updater_CloseGui(_Updater_PromptGui)
 		return
 	}
-	G := Gui("+Resize +MinSize720x420 +AlwaysOnTop", t("updater.update_dialog_title"))
+	G := Gui("+Resize +MinSize720x420", t("updater.update_dialog_title"))
 	_Updater_PromptGui := G
 	G.SetFont("s11 bold", "Segoe UI")
 	G.MarginX := 14

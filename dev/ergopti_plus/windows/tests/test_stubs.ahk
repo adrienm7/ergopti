@@ -75,6 +75,13 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
+    ; The physical magic key as the boot resolves it (feature_state.ahk and
+    ; LayoutRegistry_MagicKeySource): the shipped default, not chosen, fixed.
+    "MagicKeySourceScan", "SC02E",
+    "MagicKeySourceChar", "j",
+    "MagicKeySourceScanChosen", false,
+    "MagicKeySourceFollowsOsLayout", false,
+    "MagicKeySourceOverridesEmulation", false,
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",
@@ -349,9 +356,10 @@ IsCategoryGated(Category) {
 }
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
-; Stable locator used by the LLM trigger WAL. Boot is intentionally not loaded
-; by the unit runner, so give lifecycle tests a process-private absent journal
-; instead of letting owner discovery fail because the production global is unset.
+; Stable locator used by the configuration-transition WAL. Boot is intentionally
+; not loaded by the unit runner, so give lifecycle tests a process-private absent
+; journal instead of letting owner discovery fail because the production global
+; is unset.
 global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 

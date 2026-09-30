@@ -1,0 +1,186 @@
+{
+	"description": "Historical hotstring source bindings declared by extension manifests ([extension.hotstring_bindings.<stem>]) and the discovered file that supplies a category or one of its sections. Each case lists the extension packs in scan order (id, manifest text, hotstring file stems), whether the scan accepts them, the binding every accepted file must carry (unbound lists the files that carry none), and source queries: an empty section asks for the category's general data, an empty source means the bundled file applies, and \"error\" means the resolution is refused. A path is written <pack id>/<file stem>. Replayed by _shared/lua/hotstrings/extensions.lua (macOS and Linux) and windows/infra/hotstrings/extension_packs.ahk.",
+	"cases": [
+		{
+			"name": "a section binding moves only its sections and leaves the metadata bundled",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension]\nname = \"Geometry\"\n\n[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsections = [\"repeat_corrections\"]\nsource = \"common\"\n",
+					"files": ["magicrepeat", "extra"]
+				}
+			],
+			"valid": true,
+			"bindings": {
+				"geometry/magicrepeat": {
+					"category": "magickey",
+					"feature_section": "hotstrings.magic_key",
+					"sections": ["repeat_corrections"],
+					"source": "common"
+				}
+			},
+			"unbound": ["geometry/extra"],
+			"queries": [
+				{
+					"category": "magickey",
+					"section": "repeat_corrections",
+					"source": "geometry/magicrepeat"
+				},
+				{ "category": "magickey", "section": "text_expansion_symbols", "source": "" },
+				{ "category": "magickey", "section": "", "source": "" },
+				{ "category": "rolls", "section": "repeat_corrections", "source": "" },
+				{ "category": "ext:geometry:magicrepeat", "section": "", "source": "geometry/magicrepeat" },
+				{ "category": "ext:geometry:extra", "section": "", "source": "geometry/extra" },
+				{ "category": "ext:other:extra", "section": "", "source": "" }
+			]
+		},
+		{
+			"name": "a whole-category binding supplies the metadata and every section",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension]\nname = \"Geometry\"\n\n[extension.hotstring_bindings.sfbs]\ncategory = \"sfbsreduction\"\nfeature_section = \"hotstrings.sfbs_reduction\"\nsource = \"common\"\n",
+					"files": ["sfbs"]
+				}
+			],
+			"valid": true,
+			"bindings": {
+				"geometry/sfbs": {
+					"category": "sfbsreduction",
+					"feature_section": "hotstrings.sfbs_reduction",
+					"source": "common"
+				}
+			},
+			"unbound": [],
+			"queries": [
+				{ "category": "sfbsreduction", "section": "", "source": "geometry/sfbs" },
+				{ "category": "sfbsreduction", "section": "comma", "source": "geometry/sfbs" },
+				{ "category": "magickey", "section": "comma", "source": "" }
+			]
+		},
+		{
+			"name": "two owners of one section are refused while their other sources resolve",
+			"packs": [
+				{
+					"id": "first",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsections = [\"repeat_corrections\"]\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				},
+				{
+					"id": "second",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsections = [\"repeat_corrections\"]\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": true,
+			"bindings": {
+				"first/magicrepeat": {
+					"category": "magickey",
+					"feature_section": "hotstrings.magic_key",
+					"sections": ["repeat_corrections"],
+					"source": "common"
+				},
+				"second/magicrepeat": {
+					"category": "magickey",
+					"feature_section": "hotstrings.magic_key",
+					"sections": ["repeat_corrections"],
+					"source": "common"
+				}
+			},
+			"unbound": [],
+			"queries": [
+				{ "category": "magickey", "section": "repeat_corrections", "source": "error" },
+				{ "category": "magickey", "section": "", "source": "" },
+				{ "category": "ext:second:magicrepeat", "section": "", "source": "second/magicrepeat" }
+			]
+		},
+		{
+			"name": "an activation directive is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsource = \"common\"\nenabled = true\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a source tier other than common is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsource = \"package\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a feature section outside hotstrings is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"llm.enabled\"\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a category that is not a runtime identifier is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"Magic Key\"\nfeature_section = \"hotstrings.magic_key\"\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "an empty section selection is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsections = []\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a repeated section is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsections = [\"same\", \"same\"]\nsource = \"common\"\n",
+					"files": ["magicrepeat"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a binding whose file the pack does not carry is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.magicrepeat]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsource = \"common\"\n",
+					"files": ["other"]
+				}
+			],
+			"valid": false
+		},
+		{
+			"name": "a stem that no hotstring file can carry is refused",
+			"packs": [
+				{
+					"id": "geometry",
+					"manifest": "[extension.hotstring_bindings.Magic]\ncategory = \"magickey\"\nfeature_section = \"hotstrings.magic_key\"\nsource = \"common\"\n",
+					"files": ["Magic"]
+				}
+			],
+			"valid": false
+		}
+	]
+}

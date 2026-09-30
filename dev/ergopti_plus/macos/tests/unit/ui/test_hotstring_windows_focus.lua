@@ -67,10 +67,11 @@ local function with_window(module_name, scenario)
 					if self.deletes > 0 then error("deleted native view") end
 					return nil
 				end
-				function view:bringToFront()
+				function view:show()
 					if self.deletes > 0 then error("deleted native view") end
 					return self
 				end
+				function view:bringToFront() error("bringToFront pins the window above other apps") end
 				state.views[#state.views + 1] = view
 				if options.on_webview_created then options.on_webview_created(view) end
 				if state.focus_during_show then

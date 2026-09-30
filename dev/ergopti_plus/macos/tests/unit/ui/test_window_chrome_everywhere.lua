@@ -6,9 +6,11 @@
 --- The system diagnostics window had no visible edge over a white web page:
 --- Hammerspoon webviews cast no drop shadow by default, and that window built
 --- its own chrome instead of going through ui_builder. The chrome (native title
---- bar and close button, drop shadow, floating level) now comes from one
+--- bar and close button, drop shadow, normal level) now comes from one
 --- function, ui_builder.window_chrome_steps, and this file fails when it loses a
---- step or when any window of the driver is created without it.
+--- step or when any window of the driver is created without it. The level is
+--- the normal one: at the floating level the diagnostics window stayed above
+--- every window the user opened afterwards (ui-focus-not-topmost).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -67,7 +69,7 @@ local function load_builder()
 	end
 	local Builder = helpers.load_with_stubs("ui.ui_builder", {
 		webview = { windowMasks = { titled = 1, closable = 2, miniaturizable = 4, utility = 16 } },
-		drawing = { windowLevels = { floating = 3, normal = 0 } },
+		drawing = { windowLevels = { floating = 3, screenSaver = 1000, normal = 0 } },
 	})
 	return Builder, calls, window
 end
@@ -117,9 +119,25 @@ helpers.describe("window chrome: one function defines every window's frame", fun
 		helpers.assert_true(style & 2 == 2, "closable: every window can be closed from its frame")
 	end)
 
-	helpers.it("floats above other apps unless the caller asks otherwise", function()
-		helpers.assert_eq(value_of(applied(), "level"), 3)
-		helpers.assert_eq(value_of(applied({ level = 0 }), "level"), 0)
+	helpers.it("sits at the normal level, after the style mask (ui-focus-not-topmost)", function()
+		local calls = applied()
+		helpers.assert_eq(value_of(calls, "level"), 0,
+			"a window is focused when it opens, never kept above other apps")
+		local style_at, level_at
+		for index, call in ipairs(calls) do
+			if call.name == "windowStyle" then style_at = index end
+			if call.name == "level" then level_at = index end
+		end
+		helpers.assert_true(style_at < level_at,
+			"a utility panel mask can float the window: the level must be applied after it")
+	end)
+
+	helpers.it("refuses a caller's level override (ui-focus-not-topmost)", function()
+		local Builder = load_builder()
+		for _, level in ipairs({ 3, 1000, 0 }) do
+			local ok = pcall(Builder.window_chrome_steps, {}, { level = level })
+			helpers.assert_eq(ok, false, "a level override must be refused, got none for " .. level)
+		end
 	end)
 
 	helpers.it("keeps the shadow when a caller brings its own style mask", function()

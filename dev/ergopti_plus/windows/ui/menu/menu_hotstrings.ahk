@@ -382,10 +382,22 @@ _HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	return true
 }
 
+; The open add-delimiter dialog, "" when none is open.
+global _HS_DelimAddGui := ""
+
 ; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
-; Returns "" on cancel, or triggers the add immediately.
+; Returns "" on cancel, or triggers the add immediately. It is an unowned
+; window with its own taskbar entry: an owned window has none, so once another
+; app covered it the dialog this thread waits on could not be reached again.
 _HS_DelimAddCustom() {
-	G := Gui("+AlwaysOnTop +Owner", t("dialog.hotstrings.new_delimiter_title"))
+	global _HS_DelimAddGui
+	if IsObject(_HS_DelimAddGui) {
+		; Requested again: bring the open dialog back instead of stacking a
+		; second one over it.
+		WMPresentWindow(_HS_DelimAddGui)
+		return
+	}
+	G := Gui("", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
@@ -401,8 +413,10 @@ _HS_DelimAddCustom() {
 	G.OnEvent("Escape", (*) => G.Destroy())
 
 	G.Show("Center AutoSize")
+	_HS_DelimAddGui := G
 	; Block until the GUI is closed (OK or Cancel)
-	WinWaitClose("ahk_id " . G.Hwnd)
+	try WinWaitClose("ahk_id " . G.Hwnd)
+	finally _HS_DelimAddGui := ""
 
 	if (!Result.OK or Result.Char == "") {
 		return
@@ -525,26 +539,70 @@ _HS_CategoryRowsDynamic() {
 	return Rows
 }
 
-; Dynamic handler: Ergopti-specific hotstring categories.
-_HS_CategoryRowsErgopti() {
-	global HotstringCategoriesErgopti, SubMenus
-	Rows := []
+; The rows of the bundled categories one extension binds whole (Ergopti's SFB
+; reduction and rolls), then of the sections it binds inside a bundled category
+; (Ergopti's repeat corrections in the magic key). They keep their historical
+; ids, gates and SubMenus, so each row is built like a standard category's or
+; section's, under the extension that supplies it (_HotstringBoundSources,
+; committed at boot).
+; @param {String} ExtensionId - Discovered pack id.
+; @returns {Object} { rows: Array of menu rows, total: active hotstring count }.
+_HS_BoundCategoryRows(ExtensionId) {
+	global HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus, _HotstringBoundSources
+	Result := { rows: [], total: 0 }
+	if (_HotstringBoundSources.Count == 0)
+		return Result
 	IsGated := IsCategoryGated("Hotstrings")
-	for _, Category in HotstringCategoriesErgopti {
-		if !SubMenus.Has(Category)
-			continue
-		; Count + checkmark: same rule as the standard categories — enabled
-		; sections only, 0 when the master or this category's gate is off; the
-		; checkmark follows the category's own toggle, not its section states.
-		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
-		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		Row := Map(
-			"label",   Title,
-			"checked", IsCategoryGated(Category) ? true : false,
-			"submenu", SubMenus[Category])
-		Rows.Push(Row)
+	for _, Categories in [HotstringCategoriesStd, HotstringCategoriesErgopti] {
+		for _, Category in Categories {
+			Key := StrLower(StrReplace(Category, "_"))
+			if !_HotstringBoundSources.Has(Key) || _HotstringBoundSources[Key]["extension"] != ExtensionId
+					|| !SubMenus.Has(Category)
+				continue
+			; Count + checkmark: same rule as the standard categories — enabled
+			; sections only, 0 when the master or this category's gate is off; the
+			; checkmark follows the category's own toggle, not its section states.
+			Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
+			Result.rows.Push(Map(
+				"label",   GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")",
+				"checked", IsCategoryGated(Category) ? true : false,
+				"submenu", SubMenus[Category]))
+			Result.total += Total
+		}
 	}
-	return Rows
+	_HS_BoundSectionRows(ExtensionId, Result)
+	return Result
+}
+
+; Appends one row per section the extension binds inside a bundled category,
+; built from the section's manifest entry exactly as its category submenu did.
+_HS_BoundSectionRows(ExtensionId, Result) {
+	global HotstringCategoriesStd, HotstringCategoriesErgopti, _HotstringBoundSources, _LegacyTopCategoryMap
+	IsGated := IsCategoryGated("Hotstrings")
+	First := true
+	for _, Categories in [HotstringCategoriesStd, HotstringCategoriesErgopti] {
+		for _, Category in Categories {
+			Key := StrLower(StrReplace(Category, "_"))
+			if !_HotstringBoundSources.Has(Key) || !_LegacyTopCategoryMap.Has(Category)
+				continue
+			Owners := _HotstringBoundSources[Key]["section_extensions"]
+			for _, Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Category]) {
+				Parts := StrSplit(Entry["path"], ".")
+				Section := Parts[Parts.Length]
+				if !Owners.Has(StrLower(Section)) || Owners[StrLower(Section)] != ExtensionId
+					continue
+				Row := MenuRowFromManifest(Entry, Category)
+				if (Row == "")
+					continue
+				if (First && Result.rows.Length > 0)
+					Result.rows.Push(Map("separator", true))
+				First := false
+				Result.rows.Push(Row)
+				if (IsGated && IsCategoryGated(Category) && ReadFeatureStateV2(Entry["path"])["enabled"])
+					Result.total += CountTomlSection(Category, Section)
+			}
+		}
+	}
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
@@ -936,9 +994,15 @@ _HS_ExtensionRows(Options := unset) {
 	MasterOn := IsCategoryGated("Hotstrings")
 	for _, Ext in _HS_ExtensionsCache {
 		ExtRows := []
-		ExtTotalForExt := HotstringExtensions_Count(Features, [Ext], MasterOn)
+		; The categories the extension binds come first: « Hotstrings Ergopti »
+		; opens on SFB reduction and rolls, then any pack of its own.
+		Bound := _HS_BoundCategoryRows(Ext.id)
+		for _, Row in Bound.rows
+			ExtRows.Push(Row)
+		ExtTotalForExt := HotstringExtensions_Count(Features, [Ext], MasterOn) + Bound.total
 		if (Ext.toml_files.Length == 0) {
-			ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
+			if (Bound.rows.Length == 0)
+				ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
 		} else {
 			for _, TF in Ext.toml_files {
 				GroupPath := "hotstrings.groups." . TF.category
@@ -968,7 +1032,8 @@ _HS_ExtensionRows(Options := unset) {
 			}
 		}
 		Rows.Push(Map(
-			"label", Ext.name . " (" . FmtCount(ExtTotalForExt) . ")",
+			"label", StrReplace(t("menu.extensions.hotstrings_of"), "%s", Ext.name)
+				. " (" . FmtCount(ExtTotalForExt) . ")",
 			"items", ExtRows))
 	}
 	return Rows

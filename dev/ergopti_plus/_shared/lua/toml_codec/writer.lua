@@ -622,17 +622,25 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 			end
 		end
 	end
+	-- A key outside the bare and dotted alphabet, such as an extension pack's
+	-- `ext:pack:stem`, is written quoted so it stays one key a reader can parse.
+	local function key_text(key)
+		if key:match("^[A-Za-z0-9_%-%.]+$") then return key end
+		return KeyPath.render({ key })
+	end
 	local applied, replacements, removed = {}, {}, {}
 	for _, record in ipairs(scanned.records) do
-		if record.addressable then
-			local sl, kl = record.section:lower(), record.key:lower()
+		local section, key = record.section, record.key
+		if not record.addressable and record.quoted then section, key = record.quoted.section, record.quoted.key end
+		if record.addressable or record.quoted then
+			local sl, kl = section:lower(), key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
 			if u then
 				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = u.key .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key) .. " = " .. to_toml_value(u.value)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -677,7 +685,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
 			end
 		end
 	end
@@ -689,7 +697,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
 		end
 	end
 
@@ -756,6 +764,40 @@ function M.publish_if_unchanged(path, content, file_adapter, expected_source)
 		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
 	end
 	return publish_content(path, content, file_adapter, expected_source)
+end
+
+--- Removes a file only while it still holds exactly the bytes a caller published.
+--- This restores a proven absence: a created file that was edited since is kept.
+--- The macOS adapter exposes `remove_exact`, the Linux one `delete`; an explicit
+--- adapter with neither is refused instead of reaching around it.
+--- @param path string File to remove.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table `{ status = "ok", content = string }` precondition.
+--- @return boolean removed
+--- @return string|nil error_message
+function M.remove_if_unchanged(path, file_adapter, expected_source)
+	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
+		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
+		return false, "remove_if_unchanged needs a path and the exact bytes it must still hold"
+	end
+	local refusal = _refused_writes[refusal_key(path)]
+	if refusal then
+		return false, "writes to this file are refused for the session: " .. refusal
+	end
+	local current, status, detail = read_existing(path, file_adapter)
+	if status ~= "ok" or current ~= expected_source.content then
+		return false, "source changed before removal: " .. tostring(detail or status)
+	end
+	local remover = os.remove
+	if type(file_adapter) == "table" then
+		remover = file_adapter.remove_exact or file_adapter.delete
+		if type(remover) ~= "function" then
+			return false, "explicit file adapter has no removal method"
+		end
+	end
+	local call_ok, removed, remove_detail = pcall(remover, path)
+	if call_ok and removed == true then return true end
+	return false, tostring((call_ok and remove_detail) or removed or "removal failed")
 end
 
 --- Refuses every later publication to path for the rest of the session. There

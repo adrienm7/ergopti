@@ -229,6 +229,18 @@ local function load_fixture(options)
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 			"resolve_project_root", function() return "/repo" end))
 	end
+	fixture.check_impl = checker.check_and_install_deps
+	if options.backend == "mlx" then
+		-- The MLX script only ever runs for a selected, absent runtime: model
+		-- that state so these cases keep exercising the script's pause owner.
+		checker.runtime_installed = function() return false, "/fixture/venv/bin/python" end
+		local check = checker.check_and_install_deps
+		checker.check_and_install_deps = function(...)
+			helpers.assert_true(set_upvalue(check, "_install_granted", true),
+				"the MLX bootstrap must keep its selection grant")
+			return check(...)
+		end
+	end
 
 	local control
 	if options.real_script_control == true then
@@ -437,6 +449,53 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 		fixture.tasks[2]:complete(0, "", "")
 		helpers.assert_eq(fixture.daemon_calls, 1)
 		helpers.assert_eq(fixture.checker.get_state(), "ready")
+	end)
+
+	--- Pauses the running Ollama task, removes Ollama, then resumes and replays.
+	--- @param fixture table Loaded Ollama fixture with one running task.
+	--- @param binary table The resolver double the checker captured.
+	local function pause_remove_and_replay(fixture, binary)
+		local old_task = fixture.tasks[#fixture.tasks]
+		fixture.epoch = 1
+		fixture.transition = true
+		helpers.assert_eq(fixture.owner.pause(), false)
+		old_task:complete(143, "", "stopped")
+		helpers.assert_true(fixture.owner.pause())
+		fixture.paused = true
+		fixture.transition = false
+		binary.resolve = function() return nil, "no executable Ollama binary was found", nil end
+		fixture.epoch = 2
+		fixture.transition = true
+		helpers.assert_true(fixture.owner.resume())
+		local resume_timer = fixture.timers[#fixture.timers]
+		fixture.paused = false
+		fixture.transition = false
+		resume_timer:fire()
+	end
+
+	helpers.it("never replays a found executable's fast path as a download", function()
+		local fixture = load_fixture({ terminate_mode = "pending" })
+		local binary = package.loaded["modules.llm.ollama_binary"]
+		binary.managed_install_dir = function() return "/fixture/managed/ollama" end
+		helpers.assert_true(fixture.checker.check_and_install_deps())
+		helpers.assert_eq(fixture.tasks[1].args[6], "")
+		pause_remove_and_replay(fixture, binary)
+		helpers.assert_eq(#fixture.tasks, 1,
+			"a fast path had no consent: its replay must not download Ollama")
+		helpers.assert_eq(fixture.checker.get_state(), "missing")
+	end)
+
+	helpers.it("replays an accepted download as the same download", function()
+		local fixture = load_fixture({ terminate_mode = "pending" })
+		local binary = package.loaded["modules.llm.ollama_binary"]
+		binary.managed_install_dir = function() return "/fixture/managed/ollama" end
+		binary.resolve = function() return nil, "no executable Ollama binary was found", nil end
+		helpers.assert_true(fixture.checker.install_for_selection())
+		helpers.assert_eq(fixture.tasks[1].args[6], "/fixture/managed/ollama")
+		pause_remove_and_replay(fixture, binary)
+		helpers.assert_eq(#fixture.tasks, 2)
+		helpers.assert_eq(fixture.tasks[2].args[6], "/fixture/managed/ollama",
+			"the user's accepted download resumes after the pause")
 	end)
 
 	helpers.it("rejects a resume-stage callback from a different epoch", function()
@@ -719,7 +778,7 @@ helpers.describe("HS-117 dependency checker callback symmetry", function()
 			local fixture = load_fixture({ backend = backend })
 			local resolver_name = backend == "mlx"
 				and "resolve_bootstrap_script_path" or "resolve_project_root"
-			helpers.assert_true(set_upvalue(fixture.checker.check_and_install_deps,
+			helpers.assert_true(set_upvalue(fixture.check_impl,
 				resolver_name, function() return nil end))
 			local completions = {}
 

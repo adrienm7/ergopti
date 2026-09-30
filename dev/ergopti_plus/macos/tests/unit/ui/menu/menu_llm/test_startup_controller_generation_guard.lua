@@ -76,14 +76,13 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 		end,
 		save_prefs = function() return true end,
 		update_menu = function() return true end,
-		apply_llm_shortcut = function() return true end,
 		apply_llm_profile_shortcut = function() return true end,
 		activate_hotkey = function() return true end,
 		mlx_deps_checker = {},
+		runtime_installed = function() return true end,
 		deps = { update_menu = function() return true end },
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() end,
-		get_trigger_hk = function() return nil end,
 		get_profile_hks = function() return {} end,
 	}
 end
@@ -278,4 +277,78 @@ helpers.describe("startup_controller: a check's success re-reads the live enable
 			.. "terminal outcome from the other chain, never the user's own toggle")
 	end)
 
+end)
+
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= A missing runtime turns the AI off without a check =======
+-- ==================================================================
+-- ==================================================================
+
+--- Boot with the AI on and a local backend whose runtime is absent already
+--- posted one notice (init.lua's start_llm_bootstrap). The requirement check
+--- used to run anyway: the Ollama daemon restart then posted "Starting Ollama"
+--- and "Failed to launch Ollama daemon", and the MLX import probe repeated the
+--- runtime notice. The check must not run at all, and the AI must turn off.
+helpers.describe("startup_controller: a missing AI runtime skips the requirement check", function()
+	for _, backend in ipairs({ "mlx", "ollama" }) do
+		helpers.it("turns the AI off quietly when the " .. backend .. " runtime is missing", function()
+			local StartupCtrl, captured_timers = load_fresh_startup_controller()
+			local keymap = make_keymap_stub()
+			local asked = { installed_models = 0, checks = 0, presence = {} }
+			local models_mgr = {
+				get_installed_models = function()
+					asked.installed_models = asked.installed_models + 1
+					return { fake_model = true }
+				end,
+				force_mlx_check = function()
+					asked.checks = asked.checks + 1
+					return true
+				end,
+				check_requirements = function()
+					asked.checks = asked.checks + 1
+					return true
+				end,
+			}
+			local ctx = make_ctx(keymap, models_mgr, captured_timers)
+			ctx.state.llm_backend = backend
+			local saves = 0
+			ctx.save_prefs = function()
+				saves = saves + 1
+				return true
+			end
+			ctx.runtime_installed = function(name)
+				asked.presence[#asked.presence + 1] = name
+				return false
+			end
+
+			local check_startup = StartupCtrl.new(ctx)
+			check_startup()
+			fire_all_timers(captured_timers)
+
+			helpers.assert_eq(asked.presence, { backend })
+			helpers.assert_eq(asked.checks, 0,
+				"no daemon restart or import probe may add notices to the boot one")
+			helpers.assert_eq(asked.installed_models, 0)
+			helpers.assert_eq(ctx.state.llm_enabled, false,
+				"the AI must actually be off, as the boot notice says")
+			helpers.assert_true(saves >= 1, "the disabled state must be persisted")
+		end)
+	end
+
+	helpers.it("still checks the requirements when the runtime is installed", function()
+		local StartupCtrl, captured_timers = load_fresh_startup_controller()
+		local keymap = make_keymap_stub()
+		local models_mgr, captured_checks = make_models_mgr_stub()
+		local ctx = make_ctx(keymap, models_mgr, captured_timers)
+		local check_startup = StartupCtrl.new(ctx)
+		check_startup()
+		fire_all_timers(captured_timers)
+		helpers.assert_eq(#captured_checks, 2)
+		helpers.assert_eq(ctx.state.llm_enabled, true)
+	end)
 end)

@@ -2,7 +2,7 @@
 //
 // Non-modal windows of the in-app update flow. A modal alert would block the
 // launcher's main queue, which supervises the embedded Hammerspoon process
-// (a Sparkle modal once stalled that supervision in CI). One floating panel at
+// (a Sparkle modal once stalled that supervision in CI). One panel at
 // a time: a prompt with its buttons, or a progress bar. Closing a prompt with
 // its close button reports "no choice"; closing it programmatically reports
 // nothing.
@@ -160,7 +160,8 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		panel.title = title
 		panel.isReleasedWhenClosed = false
 		panel.hidesOnDeactivate = false
-		panel.level = .floating
+		// Normal level: the prompt is ordered front (and focused when the user
+		// asked for it), never kept above the windows the user opens next.
 		panel.contentView = stack
 		panel.setContentSize(stack.fittingSize)
 		panel.delegate = self

@@ -437,7 +437,7 @@ OpenHotstringsConfigWindow() {
 		_HCW_BuildCategoryList()
 		_HCW_BuildGroupList()
 		_HCW_RefreshExistingControls(Selection)
-		try _HCWGui.Show()
+		WMPresentWindow(_HCWGui)
 		return
 	}
 	_HCW_BuildCategoryList()
@@ -905,15 +905,39 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 		}
 	}
 
+	; A section a layout extension binds into this category (the magic key's
+	; repeat corrections on Ergopti) lives in the extension's file with its
+	; description: list it from there, as LoadHotstringsSection loads it, so its
+	; row and the « reset all » scope keep addressing its preference.
+	Bound := (Entry.IsPersonal or Entry.IsExtension) ? Map() : HotstringsBoundSections(Entry.Key)
+	for Section, BoundPath in Bound {
+		for _, BoundSection in _HCW_GetSections({ Path: BoundPath, IsPersonal: false, IsExtension: true }, ReadFn) {
+			if (BoundSection.Name != Section)
+				continue
+			if !Seen.Has(Section) {
+				Seen[Section] := true
+				SectionsOrder.Push(Section)
+			}
+			Descs[Section] := BoundSection.Title
+		}
+	}
+
 	Order := []
 	if (SectionsOrderRaw != "") {
+		Ordered := Map()
 		Pos := 1
 		while (RegExMatch(SectionsOrderRaw, '"([^"]*)"', &Tok, Pos)) {
 			T := StrLower(Tok[1])
 			if (T != "-" and Seen.Has(T)) {
 				Order.Push(T)
+				Ordered[T] := true
 			}
 			Pos := Tok.Pos + Tok.Len
+		}
+		; A bound section the category's own order does not name goes last.
+		for Section, _ in Bound {
+			if Seen.Has(Section) and !Ordered.Has(Section)
+				Order.Push(Section)
 		}
 	}
 	if (Order.Length == 0) {

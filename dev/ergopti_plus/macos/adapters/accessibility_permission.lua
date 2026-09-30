@@ -61,6 +61,19 @@ function M.bundle_id()
 	return require("adapters.tcc_grant").bundle_id()
 end
 
+--- Returns the path of the running app, the one the Accessibility list shows
+--- (as "Hammerspoon") and the one to add with + when the entry is missing.
+--- @return string|nil path Nil when the running process reports none.
+--- @return string|nil detail Exact reason when path is nil.
+function M.bundle_path()
+	local info = type(hs) == "table" and hs.processInfo or nil
+	local path = type(info) == "table" and info.bundlePath or nil
+	if type(path) ~= "string" or path == "" then
+		return nil, "hs.processInfo.bundlePath is unavailable"
+	end
+	return path
+end
+
 --- Removes this app's Accessibility entry so a stale grant cannot mask a refusal.
 --- @param bundle_id string Exact bundle identifier whose entry is reset.
 --- @param on_done function fn(ok, detail) once tccutil has exited.

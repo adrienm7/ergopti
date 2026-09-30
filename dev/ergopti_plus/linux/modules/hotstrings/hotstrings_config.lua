@@ -14,17 +14,22 @@
 --- user's copy of a category replacing the bundled one by file stem, which is
 --- also what install.sh produces (it copies the packs into that directory).
 ---
---- Enable state is persisted. It was in-memory only, so every toggle the user
---- made in the tray was forgotten on restart, silently, which reads as the menu
---- not working rather than as state not being saved.
+--- Category and section choices are canonical config.toml preferences,
+--- `hotstrings.groups.<group>` and `hotstrings.modules.<group>.<section>`, read
+--- through the manifest's neutral defaults: an empty configuration switches
+--- every catalogue off. A choice reaches the engine before it is written, and
+--- the previous catalogue is republished when the write is refused, so the menu,
+--- the file and the typing path never disagree about what fires.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Loader = require("modules.hotstrings.loader")
 local Shell = require("adapters.shell_runner")
-local Storage = require("adapters.storage")
+local Writer = require("toml_codec.writer")
+local LeafRows = require("toml_codec.leaf_rows")
 local DelayResolver = require("hotstrings.delay_resolver")
 local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
@@ -37,17 +42,6 @@ local Languages = require("hotstrings.languages")
 local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
-
--- Where the disabled-category set is persisted. One key holding a comma-joined
--- list rather than one key per category: the set is read and written whole, and
--- a per-key layout leaves orphans behind when a category is renamed.
-local DISABLED_KEY = "hotstrings.disabled_categories"
-
--- Prefix marking a SECTION the user explicitly switched on, stored in the same
--- set. Every bundled section ships disabled (the feature manifest says so), so a
--- section key absent from the set means "the shipped default" and the user's
--- opt-in has to be recorded as positively as an opt-out.
-local ENABLED_MARK = "+"
 
 -- Where per-category and per-section overrides are persisted. A TOML beside the
 -- packs rather than a storage key, because it is a file the user is expected to
@@ -77,11 +71,25 @@ local _config_dir     = nil
 local _toml_paths     = {}
 local _mappings       = {}
 local _categories     = {}
-local _disabled_groups = {}
+-- Set once a catalogue has been published: before that, `_categories` is the
+-- empty table a refused or failed load leaves, which proves nothing retired.
+local _published      = false
 local _parse_errors   = 0
 local _magic_key      = nil
 local _canonical_magic_key = nil
 local _override_config_dir = nil
+
+--- Explicit canonical category and section choices, as config.toml holds
+--- them: { groups = { [id] = boolean }, modules = { [id] = { [section] = boolean } } }.
+--- nil until init() has read them, and after a read that did not commit.
+local _choices = nil
+
+--- The transaction that owns hotstring configuration while it is set; ordinary
+--- setters are refused until it releases, so they cannot interleave its inverse.
+local _scope_owner = nil
+
+--- Test seam: the canonical configuration file, nil for the XDG location.
+local _config_file = nil
 
 --- Called after any change that alters what the menu should show. Set by the
 --- daemon; nil in the harness, where nothing is drawn.
@@ -90,53 +98,164 @@ local _on_change = nil
 --- Supplies mappings that no TOML file describes. See set_extra_mappings_provider.
 local _extra_mappings_provider = nil
 
---- Reads the persisted disabled set.
-local function load_disabled()
-	local raw = Storage.get(DISABLED_KEY, "")
-	local set = {}
-	if type(raw) == "string" and raw ~= "" then
-		for id in raw:gmatch("[^,]+") do set[id] = true end
-	end
-	return set
-end
-
---- Copies the disabled-set keys for a persistence transaction.
---- @param source table
---- @return table
-local function copy_disabled(source)
-	local copy = {}
-	for id in pairs(source) do copy[id] = true end
-	return copy
-end
-
---- Writes a candidate disabled set without publishing it in memory.
---- @param candidate table
---- @return boolean
-local function save_disabled(candidate)
-	local ids = {}
-	for id in pairs(candidate) do ids[#ids + 1] = id end
-	table.sort(ids)
-	if not Storage.set(DISABLED_KEY, table.concat(ids, ",")) then
-		Logger.error(LOG, "Disabled categories could not be persisted — the active set was not changed.")
-		return false
-	end
-	Logger.debug(LOG, "Disabled categories persisted: %s.",
-		#ids > 0 and table.concat(ids, ",") or "(none)")
-	return true
-end
-
---- Persists and publishes one candidate disabled set.
---- @param candidate table
---- @return boolean
-local function commit_disabled(candidate)
-	if not save_disabled(candidate) then return false end
-	_disabled_groups = candidate
-	return true
-end
-
 --- Fires the menu-rebuild callback, if the daemon supplied one.
 local function notify_change()
 	if _on_change then pcall(_on_change) end
+end
+
+--- The canonical configuration file the choices are read from and written to.
+--- @return string
+local function config_file()
+	return _config_file or ConfigPaths.config("config.toml")
+end
+
+--- Copies canonical choices so a candidate never aliases the published set.
+--- @param source table
+--- @return table
+local function copy_choices(source)
+	local copy = { groups = {}, modules = {} }
+	for id, value in pairs(source.groups) do copy.groups[id] = value end
+	for id, sections in pairs(source.modules) do
+		copy.modules[id] = {}
+		for name, value in pairs(sections) do copy.modules[id][name] = value end
+	end
+	return copy
+end
+
+--- Extracts the explicit category and section choices of a decoded config.toml.
+--- A choice of the wrong shape, written by an older build, is never guessed:
+--- it is outdated configuration, left absent (the neutral value), warned about
+--- once and offered by the config cleanup. Raising here turned every
+--- hotstring off for the session over one entry nothing reads.
+--- @param document table Decoded configuration.
+--- @return table choices Explicit choices only; absence stays absent.
+local function decode_choices(document)
+	assert(type(document) == "table", "hotstring configuration must be a table")
+	local choices = { groups = {}, modules = {} }
+	local hotstrings = document.hotstrings
+	if hotstrings ~= nil and type(hotstrings) ~= "table" then
+		ConfigOutdated.report({ "hotstrings" }, "[hotstrings] is not a table", Logger)
+		return choices
+	end
+	local groups = hotstrings and hotstrings.groups
+	if groups ~= nil and type(groups) ~= "table" then
+		ConfigOutdated.report({ "hotstrings", "groups" }, "category choices are not a table", Logger)
+		groups = nil
+	end
+	for id, value in pairs(groups or {}) do
+		if type(id) == "string" and id ~= "" and type(value) == "boolean" then
+			choices.groups[id] = value
+		else
+			ConfigOutdated.report({ "hotstrings", "groups", tostring(id) }, "a category choice takes true or false", Logger)
+		end
+	end
+	local modules = hotstrings and hotstrings.modules
+	if modules ~= nil and type(modules) ~= "table" then
+		ConfigOutdated.report({ "hotstrings", "modules" }, "section choices are not a table", Logger)
+		modules = nil
+	end
+	for id, sections in pairs(modules or {}) do
+		if type(id) == "string" and id ~= "" and type(sections) == "table" then
+			choices.modules[id] = {}
+			for name, value in pairs(sections) do
+				if type(name) == "string" and name ~= "" and type(value) == "boolean" then
+					choices.modules[id][name] = value
+				else
+					ConfigOutdated.report({ "hotstrings", "modules", id, tostring(name) },
+						"a section choice takes true or false", Logger)
+				end
+			end
+		else
+			ConfigOutdated.report({ "hotstrings", "modules", tostring(id) }, "section choices are not a table", Logger)
+		end
+	end
+	return choices
+end
+
+--- Whether a published category's sections are the ones this build ships. A
+--- category read from the user's same-stem override holds that file's sections
+--- only: a choice for a bundled section it lacks is not retired, since removing
+--- the override brings the section back.
+--- @param category table Published category record.
+--- @return boolean
+local function sections_are_the_builds(category)
+	if type(_config_dir) ~= "string" or _config_dir:match("%.toml$") then return true end
+	local prefix = _config_dir .. "/"
+	return type(category.path) ~= "string" or category.path:sub(1, #prefix) ~= prefix
+end
+
+--- Whether one explicit choice names something the published catalogue can
+--- prove retired. Nothing is retired before a catalogue was published.
+--- @param id string Category id.
+--- @param section string|nil Section name, for a section choice.
+--- @return boolean retired
+local function choice_is_retired(id, section)
+	if not _published then return false end
+	local category = _categories[id]
+	if category == nil then return true end
+	if section == nil or not sections_are_the_builds(category) then return false end
+	return not (category.sections or {})[section]
+end
+
+--- Reports the choices naming a category or section this build no longer
+--- ships: ignored at runtime, offered by the config cleanup.
+--- @param choices table Decoded choices.
+local function report_retired_choices(choices)
+	for id in pairs(choices.groups) do
+		if choice_is_retired(id) then
+			ConfigOutdated.report({ "hotstrings", "groups", id }, "no loaded hotstring category has this id", Logger)
+		end
+	end
+	for id, sections in pairs(choices.modules) do
+		for name in pairs(sections) do
+			if choice_is_retired(id, name) then
+				ConfigOutdated.report({ "hotstrings", "modules", id, name }, "no loaded hotstring section has this name", Logger)
+			end
+		end
+	end
+end
+
+--- Reads the canonical choices with the exact bytes they came from.
+--- @return table choices
+--- @return table source Classified source for a conditional write.
+local function read_choices()
+	local content, status, detail = Writer.read_classified(config_file())
+	assert(status == "ok" or status == "absent", "hotstring configuration is unreadable: " .. tostring(detail))
+	local document = TomlCodec.decode(content or "")
+	assert(type(document) == "table", "hotstring configuration is malformed")
+	return decode_choices(document), { status = status, content = content }
+end
+
+--- Whether a runtime identity can be named by a canonical key path. A file stem
+--- with a dot would split into two path segments and address another key.
+--- @param id string
+--- @return boolean
+local function addressable(id)
+	return type(id) == "string" and id ~= "" and not id:find(".", 1, true)
+end
+
+--- The desired state of one category: its explicit choice, else the manifest's.
+--- @param choices table Canonical choices.
+--- @param id string Runtime category identity.
+--- @return boolean
+local function group_choice(choices, id)
+	if not addressable(id) then return false end
+	local value = choices.groups[id]
+	if value == nil then value = ManifestReader.default_for("hotstrings.groups." .. id) end
+	return value
+end
+
+--- The desired state of one section, independent of its category's gate.
+--- @param choices table Canonical choices.
+--- @param id string Runtime category identity.
+--- @param section string Section name.
+--- @return boolean
+local function section_choice(choices, id, section)
+	if not addressable(id) or not addressable(section) then return false end
+	local sections = choices.modules[id]
+	local value = sections and sections[section]
+	if value == nil then value = ManifestReader.default_for("hotstrings.modules." .. id .. "." .. section) end
+	return value
 end
 
 
@@ -154,14 +273,6 @@ local function _count_groups(mappings)
 	local count = 0
 	for _ in pairs(seen) do count = count + 1 end
 	return count
-end
-
---- Counts the persisted disabled categories.
---- @return integer
-local function count_disabled()
-	local n = 0
-	for _ in pairs(_disabled_groups) do n = n + 1 end
-	return n
 end
 
 local function _collect_groups(mappings)
@@ -254,6 +365,36 @@ local function overrides_path()
 	return override_config_dir() .. "/" .. OVERRIDES_FILE
 end
 
+--- Interprets override file bytes, raising when they are not valid TOML.
+--- @param content string Exact file bytes.
+--- @return table overrides { [category] = { delay, color, show_tooltip, priority, sections } }
+local function parse_override_content(content)
+	local parsed = TomlCodec.decode(content)
+	assert(type(parsed) == "table", "the override file is not valid TOML")
+	local function override_fields(values)
+		return {
+			delay = tonumber(values.delay),
+			color = values.color,
+			show_tooltip = values.show_tooltip,
+			priority = tonumber(values.priority),
+		}
+	end
+	local overrides = {}
+	for category, values in pairs(parsed) do
+		if type(values) == "table" then
+			local entry = override_fields(values)
+			entry.sections = {}
+			for section, section_values in pairs(values) do
+				if type(section_values) == "table" then
+					entry.sections[section] = override_fields(section_values)
+				end
+			end
+			overrides[category] = entry
+		end
+	end
+	return overrides
+end
+
 --- Reads the override file into memory. A missing file is the normal case.
 local function load_overrides()
 	_overrides = {}
@@ -264,38 +405,15 @@ local function load_overrides()
 	if not fh then return end
 	local read_ok, content = pcall(fh.read, fh, "*a")
 	local close_ok, closed = pcall(fh.close, fh)
-	local ok, parsed = pcall(TomlCodec.decode, content)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true
-		or not ok or type(parsed) ~= "table"
-	then
+	local ok, parsed = pcall(parse_override_content, content)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true or not ok then
 		-- Loud, not silent: a malformed override file means the user's delays are
 		-- being ignored, and the only symptom otherwise is "my settings did
 		-- nothing".
 		Logger.error(LOG, "Override file '%s' is malformed — user delays and colours ignored.", path)
 		return
 	end
-
-	local function override_fields(values)
-		return {
-			delay = tonumber(values.delay),
-			color = values.color,
-			show_tooltip = values.show_tooltip,
-			priority = tonumber(values.priority),
-		}
-	end
-
-	for category, values in pairs(parsed) do
-		if type(values) == "table" then
-			local entry = override_fields(values)
-			entry.sections = {}
-			for section, section_values in pairs(values) do
-				if type(section_values) == "table" then
-					entry.sections[section] = override_fields(section_values)
-				end
-			end
-			_overrides[category] = entry
-		end
-	end
+	_overrides = parsed
 end
 
 --- Copies the override tree for a persistence transaction.
@@ -483,6 +601,12 @@ end
 --- @return boolean
 function M.set_override(category, section, field, value)
 	if type(category) ~= "string" or category == "" then return false end
+	-- A pending scope restores the override file only while it still holds the
+	-- scope's candidate bytes; a rewrite here would strand that inverse for good.
+	if _scope_owner ~= nil then
+		Logger.error(LOG, "set_override() refused: a hotstring configuration scope is still pending.")
+		return false
+	end
 	-- "priority" was missing until 2026-08-05. The settings window has a priority
 	-- field per category and per section, the bridge forwards it, and this guard
 	-- rejected it — so the control wrote an ERROR to the log and nothing else. The
@@ -575,6 +699,10 @@ end
 --- @param field string|nil nil clears every field of that scope.
 --- @return boolean
 function M.clear_override(category, section, field)
+	if _scope_owner ~= nil then
+		Logger.error(LOG, "clear_override() refused: a hotstring configuration scope is still pending.")
+		return false
+	end
 	local candidate = copy_overrides(_overrides)
 	local entry = candidate[category]
 	if not entry then return true end
@@ -678,10 +806,27 @@ function M.init(engine, config_dir, on_change)
 		local fh = io.open(xdg, "r")
 		if fh then fh:close(); _config_dir = xdg end
 	end
-	_disabled_groups = load_disabled()
+	_scope_owner = nil
 	load_overrides()
-	Logger.info(LOG, "Config manager initialised (dir=%s, %d disabled).",
-		_config_dir or "(bundled)", count_disabled())
+	local read, choices = pcall(read_choices)
+	if not read then
+		-- Every catalogue stays off: a choice that cannot be read is never guessed.
+		_choices = nil
+		Logger.error(LOG, "Hotstring choices are unreadable; no catalogue will be published: %s.", tostring(choices))
+		return false
+	end
+	_choices = choices
+	Logger.info(LOG, "Config manager initialised (dir=%s).", _config_dir or "(bundled)")
+	return true
+end
+
+--- Test seam: routes the canonical choices to an isolated configuration file.
+--- @param path string|nil Absolute file path, or nil to restore production routing.
+--- @return boolean
+function M._set_config_file_for_test(path)
+	if path ~= nil and (type(path) ~= "string" or path:sub(1, 1) ~= "/") then return false end
+	_config_file = path
+	return true
 end
 
 --- Registers a source of mappings that do not come from a TOML file.
@@ -727,6 +872,23 @@ end
 -- =========================================
 -- =========================================
 
+--- The extensions installed on this machine, as the shared scanner reports them.
+--- A root or pack the scanner refuses is logged and left out, so one broken
+--- third-party folder never costs the reload every other hotstring.
+--- @return table Array of extension records (toml_files, bound_files, …).
+function M.discover_extensions()
+	if type(Paths.extension_roots) ~= "function" then return {} end
+	return Extensions.scan(Paths.extension_roots(), {
+		list_dirs  = Loader.list_subdirs,
+		list_files = Loader.find_toml_files,
+		read_file  = Loader.read_file,
+		on_error   = function(where, err)
+			Logger.error(LOG, "Extension %s is left out: %s.",
+				tostring(where.path or (where.id and ("'" .. where.id .. "'")) or where.root), tostring(err))
+		end,
+	})
+end
+
 --- The extension packs installed on this machine, as loader entries.
 ---
 --- Separate from the bundled/user merge below because extensions answer a
@@ -734,15 +896,10 @@ end
 --- this one is "what did the user install on top". Returned in the shape
 --- load_catalogue understands directly, so no caller has to know the namespacing
 --- rule that keeps a third party's `rolls.toml` from displacing the bundled one.
+--- @param found table|nil Records from discover_extensions(); discovered when nil.
 --- @return table Array of { path, category, extension }.
-function M.extension_packs()
-	if type(Paths.extension_roots) ~= "function" then return {} end
-
-	local found = Extensions.scan(Paths.extension_roots(), {
-		list_dirs  = Loader.list_subdirs,
-		list_files = Loader.find_toml_files,
-		read_file  = Loader.read_file,
-	})
+function M.extension_packs(found)
+	found = found or M.discover_extensions()
 
 	local entries = {}
 	for _, extension in ipairs(found) do
@@ -758,6 +915,134 @@ function M.extension_packs()
 		Logger.info(LOG, "Extensions: %d pack(s) from %d extension(s).", #entries, #found)
 	end
 	return entries
+end
+
+--- The sections of a list that a set leaves out, in list order.
+--- @param list table Section names.
+--- @param set table Set of section names to leave out.
+--- @return table
+local function sections_without(list, set)
+	local out = {}
+	for _, name in ipairs(list) do
+		if not set[name] then out[#out + 1] = name end
+	end
+	return out
+end
+
+--- The bound sections a user's copy of a category declares itself.
+--- An unreadable copy declares none: the loader reports the file, and the
+--- extension keeps supplying its sections.
+--- @param path string The user's file.
+--- @param sections table Section names an extension binds in that category.
+--- @return table Set of the sections the file declares.
+local function carried_sections(path, sections)
+	local carried = {}
+	local ok, data, committed = pcall(TomlReader.parse, path)
+	if not ok or committed ~= true or type(data) ~= "table" or type(data.sections) ~= "table" then
+		return carried
+	end
+	for _, name in ipairs(sections) do
+		if data.sections[name] ~= nil then carried[name] = true end
+	end
+	return carried
+end
+
+--- Routes the bundled categories an extension binds to the files it ships.
+---
+--- A whole-category binding replaces the bundled file; a section binding loads
+--- those sections from the extension file and every other section, and the
+--- category's metadata, from the bundled one. The rules keep their category and
+--- common source tier, so existing preferences still address them. Every bound
+--- source is resolved through the shared owner, which refuses two owners.
+---
+--- The user's own copy of a category (resolve_paths overlays it on the bundled
+--- one) is an explicit override and keeps what it carries: the whole category,
+--- or each bound section it declares itself. An extension binding replaces the
+--- bundled file, never the user's.
+--- @param paths table Loader sources: paths, or { path, category, … } tables.
+--- @param found table Records from discover_extensions().
+--- @param user_paths table|nil Set of the source paths the user's folder supplies.
+--- @return table The sources with the bound files routed in.
+function M.route_bound_sources(paths, found, user_paths)
+	user_paths = user_paths or {}
+	local bound_sections, section_files, whole, whole_order, owners = {}, {}, {}, {}, {}
+	for _, extension in ipairs(found) do
+		for _, file in ipairs(extension.bound_files or {}) do
+			local binding = file.binding
+			if binding.sections == nil then
+				whole[binding.category] = Extensions.bound_source(found, binding.category)
+				whole_order[#whole_order + 1] = binding.category
+				-- The category record names the extension that supplies it, so the
+				-- menu lists it under that extension's own submenu.
+				owners[binding.category] = { id = extension.id, name = extension.name }
+			else
+				for _, section in ipairs(binding.sections) do
+					Extensions.bound_source(found, binding.category, section)
+					local skipped = bound_sections[binding.category] or {}
+					skipped[#skipped + 1] = section
+					bound_sections[binding.category] = skipped
+				end
+				section_files[#section_files + 1] = {
+					path = file.path, category = binding.category, only_sections = binding.sections,
+					extension = { id = extension.id, name = extension.name },
+				}
+			end
+		end
+	end
+
+	local routed, placed, kept = {}, {}, {}
+	for _, source in ipairs(paths) do
+		local path = type(source) == "table" and source.path or source
+		local category = type(source) == "table" and source.category or path:match("([^/\\]+)%.toml$")
+		local user = user_paths[path] == true
+		if whole[category] and user then
+			Logger.info(LOG, "Extensions: the user's copy of '%s' overrides the file extension '%s' binds.",
+				category, owners[category].id)
+			routed[#routed + 1] = { path = path, category = category, extension = owners[category] }
+		elseif whole[category] then
+			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
+		elseif bound_sections[category] then
+			local entry = type(source) == "table" and source or { path = path }
+			local skipped = bound_sections[category]
+			if user then
+				kept[category] = carried_sections(path, skipped)
+				skipped = sections_without(skipped, kept[category])
+				if #skipped < #bound_sections[category] then
+					Logger.info(LOG, "Extensions: the user's copy of '%s' keeps its own bound section(s).", category)
+				end
+			end
+			routed[#routed + 1] = {
+				path = entry.path, category = category, extension = entry.extension,
+				skip_sections = skipped,
+			}
+		else
+			routed[#routed + 1] = source
+		end
+		placed[category] = true
+	end
+	-- A category the bundled catalogue no longer carries is still the file's.
+	for _, category in ipairs(whole_order) do
+		if not placed[category] then
+			routed[#routed + 1] = { path = whole[category], category = category, extension = owners[category] }
+		end
+	end
+	-- After the bundled files, so the category record starts from their metadata.
+	-- A section the user's copy declares itself is not loaded a second time.
+	for _, entry in ipairs(section_files) do
+		local carried = kept[entry.category]
+		local only = carried and sections_without(entry.only_sections, carried) or entry.only_sections
+		if #only == #entry.only_sections then
+			routed[#routed + 1] = entry
+		elseif #only > 0 then
+			routed[#routed + 1] = {
+				path = entry.path, category = entry.category, only_sections = only, extension = entry.extension,
+			}
+		end
+	end
+	if next(whole) or #section_files > 0 then
+		Logger.info(LOG, "Extensions: routed %d section file(s) into bundled categories.", #section_files)
+	end
+	return routed
 end
 
 --- The language packs declared by the shared hotstring index, read once.
@@ -795,10 +1080,12 @@ end
 --- what a category is: a same-stem file in the user's directory is an explicit
 --- override, not a second category with the same name. The standalone installer
 --- no longer seeds those files; its one-time migration retires only copies that
---- are byte-identical to the previously installed canonical bundle.
+--- are byte-identical to the previously installed canonical bundle. The user's
+--- copies stay overrides when an extension binds their category, so they are
+--- handed to route_bound_sources by path.
 --- @return table Array of absolute paths.
 local function resolve_paths()
-	local by_stem, order = {}, {}
+	local by_stem, order, user_paths = {}, {}, {}
 
 	--- @param path string
 	local function add(path)
@@ -827,7 +1114,10 @@ local function resolve_paths()
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
 		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do
-			if not in_language_folder(path, _config_dir) then add(path) end
+			if not in_language_folder(path, _config_dir) then
+				add(path)
+				user_paths[path] = true
+			end
 		end
 	end
 
@@ -843,7 +1133,11 @@ local function resolve_paths()
 				local path = bundled .. rel
 				if _config_dir then
 					local fh = io.open(_config_dir .. rel, "r")
-					if fh then fh:close(); path = _config_dir .. rel end
+					if fh then
+						fh:close()
+						path = _config_dir .. rel
+						user_paths[path] = true
+					end
 				end
 				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
 			end
@@ -854,30 +1148,41 @@ local function resolve_paths()
 	-- namespaced category key so a third party shipping `rolls.toml` cannot
 	-- replace the bundled category of that name. Appended rather than merged for
 	-- the same reason — an extension adds categories, it never substitutes one.
-	for _, entry in ipairs(M.extension_packs()) do
+	local found = M.discover_extensions()
+	paths = M.route_bound_sources(paths, found, user_paths)
+	for _, entry in ipairs(M.extension_packs(found)) do
 		paths[#paths + 1] = entry
 	end
 
 	return paths
 end
 
+--- Loads one complete catalogue and reports whether runtime publication succeeded.
+--- @return number Retained or newly accepted mapping count.
+--- @return boolean True only after the engine acknowledges publication.
+--- @return string|nil Refusal reason.
 function M.load_all()
 	if not _engine then
 		Logger.error(LOG, "load_all(): engine not initialised.")
-		return 0
+		return 0, false, "engine-not-initialized"
+	end
+	local choices = _choices
+	if not choices then
+		Logger.error(LOG, "load_all(): hotstring choices are unavailable; the catalogue was not published.")
+		return #_mappings, false, "choices-unavailable"
 	end
 
-	_toml_paths = resolve_paths()
+	local staged_paths = resolve_paths()
 
 	-- An empty catalogue is not an empty load. This used to return here, which
 	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
 	-- the prefix expansions built from personal_info.toml — two unrelated files,
 	-- one of which was punishing the other.
-	if #_toml_paths == 0 then
+	if #staged_paths == 0 then
 		Logger.warn(LOG, "load_all(): no TOML files found.")
 	end
 
-	local catalogue = Loader.load_catalogue(_toml_paths, {
+	local catalogue = Loader.load_catalogue(staged_paths, {
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
 	})
@@ -886,26 +1191,31 @@ function M.load_all()
 		Logger.error(LOG,
 			"Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).",
 			_parse_errors, #_mappings)
-		return #_mappings
+		return #_mappings, false, "catalogue-not-committed"
 	end
 	local staged_mappings = catalogue.mappings
 	local staged_categories = catalogue.categories
+	local catalogue_count = #staged_mappings
 
 	-- Mappings that no file describes — today, the prefix expansions built from
-	-- personal_info.toml. Appended AFTER the catalogue and BEFORE the filter, so
-	-- the disable set and the dedup pass treat them exactly like any other
-	-- mapping: a user who switches the dynamic category off loses these too, which
-	-- is what the category claims to control.
+	-- personal_info.toml. Appended AFTER the catalogue so the priority pass treats
+	-- them like any other mapping. Their provider has already applied its own
+	-- switches (the dynamic master and each prefix family), which the menu offers;
+	-- the catalogue choices below never gate them a second time.
 	if _extra_mappings_provider then
 		local ok, extra = pcall(_extra_mappings_provider)
 		if not ok then
-			Logger.error(LOG, "The extra mappings provider raised — those mappings are absent: %s.",
+			Logger.error(LOG, "The extra mappings provider refused the catalogue: %s.",
 				tostring(extra))
+			return #_mappings, false, tostring(extra)
 		elseif type(extra) == "table" then
 			for _, mapping in ipairs(extra) do
 				staged_mappings[#staged_mappings + 1] = mapping
 			end
 			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
+		else
+			Logger.error(LOG, "The extra mappings provider must return a table.")
+			return #_mappings, false, "invalid-extra-mappings"
 		end
 	end
 
@@ -929,33 +1239,58 @@ function M.load_all()
 		end
 	end
 
-	-- Filter what the user switched off, at either level. A section is checked
-	-- separately from its category so re-enabling a category restores exactly the
-	-- sections it had rather than all of them.
-	local filtered = {}
-	for _, m in ipairs(staged_mappings) do
-		local off = _disabled_groups[m.group]
-			or (m.section and not M.is_section_checked(m.group, m.section))
-		if not off then
-			filtered[#filtered + 1] = m
+	-- Keep what the canonical choices switch on, at both levels. A section is
+	-- chosen separately from its category so re-enabling a category restores
+	-- exactly the sections it had rather than all of them. Resolved once per
+	-- identity: the corpus holds tens of thousands of mappings.
+	local filtered, groups_on, sections_on, unaddressable = {}, {}, {}, {}
+	for index, m in ipairs(staged_mappings) do
+		local keep = index > catalogue_count
+		if not keep and type(m.group) == "string" then
+			keep = groups_on[m.group]
+			if keep == nil then
+				keep = group_choice(choices, m.group)
+				groups_on[m.group] = keep
+				if not addressable(m.group) then unaddressable[m.group] = true end
+			end
+			if keep and m.section then
+				local key = m.group .. "\0" .. m.section
+				local checked = sections_on[key]
+				if checked == nil then
+					checked = section_choice(choices, m.group, m.section)
+					sections_on[key] = checked
+				end
+				keep = checked
+			end
 		end
+		if keep then filtered[#filtered + 1] = m end
+	end
+	for id in pairs(unaddressable) do
+		Logger.error(LOG, "Category '%s' has no canonical configuration key and stays off; rename its file.", id)
 	end
 
 	-- Exact-trigger collisions are intentional engine input: equal-length
 	-- candidates are ordered by effective priority, then registration order.
-	_engine:load_mappings(filtered)
+	local ok, committed = pcall(_engine.load_mappings, _engine, filtered)
+	if not ok or committed ~= true then
+		local reason = ok and "engine-publication-refused" or tostring(committed)
+		Logger.error(LOG, "Catalogue publication refused: %s.", reason)
+		return #_mappings, false, reason
+	end
+	_toml_paths = staged_paths
 	_mappings = staged_mappings
 	_categories = staged_categories
+	_published = true
 	_resolve_cache = {}
+	report_retired_choices(choices)
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#filtered, _count_groups(filtered), _parse_errors)
-	return #filtered
+	return #filtered, true
 end
 
 function M.reload()
 	Logger.info(LOG, "Reload requested — re-scanning…")
-	_toml_paths = {}
 	return M.load_all()
 end
 
@@ -966,130 +1301,178 @@ end
 -- =========================================
 -- =========================================
 
-function M.disable_group(group_name)
-	if type(group_name) ~= "string" then return false end
-	if _disabled_groups[group_name] then return true end
-	local candidate = copy_disabled(_disabled_groups)
-	candidate[group_name] = true
-	if not commit_disabled(candidate) then return false end
-	Logger.info(LOG, "Category '%s' disabled.", group_name)
-	return true
-end
-
-function M.enable_group(group_name)
-	if type(group_name) ~= "string" then return false end
-	if not _disabled_groups[group_name] then return true end
-	local candidate = copy_disabled(_disabled_groups)
-	candidate[group_name] = nil
-	if not commit_disabled(candidate) then return false end
-	Logger.info(LOG, "Category '%s' enabled.", group_name)
-	return true
-end
-
-function M.toggle_group(group_name)
-	local changed
-	if _disabled_groups[group_name] then
-		changed = M.enable_group(group_name)
-	else
-		changed = M.disable_group(group_name)
+--- Publishes candidate choices to the engine, then to config.toml.
+---
+--- The engine goes first so a catalogue it refuses never reaches the file. A
+--- refused write republishes the previous choices, so the menu, the file and
+--- the typing path keep agreeing. Each choice is sparse: a value equal to the
+--- manifest's neutral default removes the key instead of repeating it.
+--- @param changes table Dense array of `{ group, section|nil, enabled }`.
+--- @param label string What asked, for the log.
+--- @return boolean committed
+--- @return string|nil reason Refusal reason.
+local function commit_choices(changes, label)
+	if _scope_owner ~= nil then
+		Logger.error(LOG, "%s refused: a hotstring configuration scope is still pending.", label)
+		return false, "scope-pending"
 	end
-	if not changed then return false end
-	M.load_all()
-	notify_change()
-	return true
+	if not _engine then
+		Logger.error(LOG, "%s refused: engine not initialised.", label)
+		return false, "engine-not-initialized"
+	end
+	local previous = _choices
+	local called, committed, reason = pcall(function()
+		local current, source = read_choices()
+		local candidate, operations = copy_choices(current), {}
+		for _, change in ipairs(changes) do
+			local id, section, enabled = change.group, change.section, change.enabled
+			assert(addressable(id) and (section == nil or addressable(section)) and type(enabled) == "boolean",
+				"invalid hotstring choice")
+			local path = section and { "hotstrings", "modules", id, section } or { "hotstrings", "groups", id }
+			local neutral = ManifestReader.default_for(table.concat(path, "."))
+			local explicit = nil
+			if enabled ~= neutral then explicit = enabled end
+			if section then
+				candidate.modules[id] = candidate.modules[id] or {}
+				candidate.modules[id][section] = explicit
+				if next(candidate.modules[id]) == nil then candidate.modules[id] = nil end
+			else
+				candidate.groups[id] = explicit
+			end
+			if explicit == nil then
+				operations[#operations + 1] = { path = path, delete = true }
+			else
+				operations[#operations + 1] = { path = path, value = explicit }
+			end
+		end
+		local rows = LeafRows.prepare(source.content or "", operations)
+		local directory = config_file():match("^(.*)/[^/]+$")
+		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
+			return false, "the configuration folder cannot be created"
+		end
+		_choices = candidate
+		local _, published, refusal = M.load_all()
+		if published ~= true then return false, refusal end
+		local written, detail = Writer.batch_write(config_file(), rows, nil, source)
+		if written ~= true then return false, tostring(detail) end
+		return true
+	end)
+	if called and committed == true then
+		Logger.info(LOG, "%s committed (%d choice(s)).", label, #changes)
+		return true
+	end
+	reason = called and reason or tostring(committed)
+	if _choices ~= previous then
+		_choices = previous
+		local _, restored = M.load_all()
+		if restored ~= true then
+			Logger.error(LOG, "%s: the previous catalogue could not be republished.", label)
+		end
+	end
+	Logger.error(LOG, "%s refused: %s.", label, tostring(reason))
+	return false, reason
 end
 
---- Enables every known category.
+--- The categories the current catalogue offers, in a stable order.
+--- @return table Array of category ids.
+local function known_categories()
+	local ids = {}
+	for id in pairs(_categories) do ids[#ids + 1] = id end
+	table.sort(ids)
+	return ids
+end
+
+--- The sections one category declares, in a stable order.
+--- @param id string
+--- @return table Array of section names.
+local function known_sections(id)
+	local names = {}
+	local category = _categories[id]
+	for name in pairs(category and category.sections or {}) do names[#names + 1] = name end
+	table.sort(names)
+	return names
+end
+
+--- Switches one category off, keeping its section choices.
+--- @param group_name string
+--- @return boolean committed
+function M.disable_group(group_name)
+	if not addressable(group_name) then return false end
+	if not M.is_group_enabled(group_name) then return true end
+	return commit_choices({ { group = group_name, enabled = false } }, "Category '" .. group_name .. "' disable")
+end
+
+--- Switches one category on, keeping its section choices.
+--- @param group_name string
+--- @return boolean committed
+function M.enable_group(group_name)
+	if not addressable(group_name) then return false end
+	if M.is_group_enabled(group_name) then return true end
+	return commit_choices({ { group = group_name, enabled = true } }, "Category '" .. group_name .. "' enable")
+end
+
+--- Flips one category and redraws the menu.
+--- @param group_name string
+--- @return boolean committed
+function M.toggle_group(group_name)
+	if not addressable(group_name) then return false end
+	local committed = commit_choices({ { group = group_name, enabled = not M.is_group_enabled(group_name) } },
+		"Category '" .. group_name .. "' toggle")
+	if committed then notify_change() end
+	return committed
+end
+
+--- Enables every known category and every one of its sections.
 ---
 --- These two were called by the menu and did not exist, so the rows behind them
 --- were silent no-ops: the `if` guarding the call was false and nothing
 --- happened, which is indistinguishable from a click that missed.
---- @return integer Number of categories affected.
+--- @return integer|boolean Number of choices changed, or false when refused.
 function M.enable_all()
-	local candidate = copy_disabled(_disabled_groups)
-	local changed = 0
-	-- Every gate lifted and every known section switched on explicitly: bundled
-	-- sections ship disabled, so clearing the set alone would leave them off.
-	for id in pairs(_disabled_groups) do
-		if id:sub(1, #ENABLED_MARK) ~= ENABLED_MARK then
-			candidate[id] = nil
-			changed = changed + 1
-		end
-	end
-	for category, cat in pairs(_categories) do
-		for name in pairs(cat.sections or {}) do
-			local mark = ENABLED_MARK .. category .. "." .. name
-			if not candidate[mark] then
-				candidate[mark] = true
-				changed = changed + 1
+	local changes = {}
+	for _, id in ipairs(known_categories()) do
+		if addressable(id) then
+			if not M.is_group_enabled(id) then changes[#changes + 1] = { group = id, enabled = true } end
+			for _, name in ipairs(known_sections(id)) do
+				if addressable(name) and not M.is_section_checked(id, name) then
+					changes[#changes + 1] = { group = id, section = name, enabled = true }
+				end
 			end
 		end
 	end
-	if changed == 0 then return 0 end
-	if not commit_disabled(candidate) then return false end
-	-- Once, not once per category: reloading inside the loop re-parses every
-	-- TOML for every category, which on the magickey pack alone is 300 KB a turn.
-	M.load_all()
+	if #changes == 0 then return 0 end
+	-- One commit, not one per category: every commit republishes the catalogue,
+	-- and magickey.toml alone is 300 KB of it.
+	if not commit_choices(changes, "Enable every category") then return false end
 	notify_change()
-	Logger.info(LOG, "All categories enabled (%d re-enabled).", changed)
-	return changed
+	return #changes
 end
 
---- Disables every known category.
---- @return integer Number of categories affected.
+--- Disables every known category, leaving each section choice as it was.
+--- @return integer|boolean Number of categories changed, or false when refused.
 function M.disable_all()
-	local candidate = copy_disabled(_disabled_groups)
-	local changed = 0
-	for id in pairs(_categories) do
-		if not candidate[id] then
-			candidate[id] = true
-			changed = changed + 1
-		end
+	local changes = {}
+	for _, id in ipairs(known_categories()) do
+		if addressable(id) and M.is_group_enabled(id) then changes[#changes + 1] = { group = id, enabled = false } end
 	end
-	-- Section keys are left alone on purpose: disabling everything and enabling
-	-- it again should give the user back the sections they had chosen, not reset
-	-- their per-section choices as a side effect.
-	if changed == 0 then return 0 end
-	if not commit_disabled(candidate) then return false end
-	M.load_all()
+	-- Section choices are left alone on purpose: disabling everything and enabling
+	-- it again should give the user back the sections they had chosen.
+	if #changes == 0 then return 0 end
+	if not commit_choices(changes, "Disable every category") then return false end
 	notify_change()
-	Logger.info(LOG, "All categories disabled (%d disabled).", changed)
-	return changed
+	return #changes
 end
 
---- Restores the shipped state: every gate open and every section back to the
---- manifest's default, which is disabled for the bundled packs.
---- @return integer Number of entries cleared.
-function M.reset_defaults()
-	local changed = 0
-	for _ in pairs(_disabled_groups) do changed = changed + 1 end
-	if changed == 0 then return 0 end
-	if not commit_disabled({}) then return false end
-	M.load_all()
-	notify_change()
-	Logger.info(LOG, "Hotstring state reset to the shipped defaults (%d entries cleared).", changed)
-	return changed
-end
-
+--- Whether a category's gate is open.
+--- @param group_name string
+--- @return boolean
 function M.is_group_enabled(group_name)
-	return not _disabled_groups[group_name]
+	if not _choices then return false end
+	return group_choice(_choices, group_name)
 end
 
 function M.get_groups()
 	return _collect_groups(_mappings)
-end
-
---- The storage key for one section's enable state.
----
---- Sections live in the same set as categories, keyed "category.section". One
---- namespace rather than two, because a category and a section are both just
---- "something the user switched off" and a second set would need its own
---- persistence, its own reload and its own reset.
---- @param category string
---- @param section string
---- @return string
-local function section_key(category, section)
-	return category .. "." .. section
 end
 
 --- Whether one section of a category is active.
@@ -1101,8 +1484,7 @@ end
 --- @param section string
 --- @return boolean
 function M.is_section_enabled(category, section)
-	if _disabled_groups[category] then return false end
-	return M.is_section_checked(category, section)
+	return M.is_group_enabled(category) and M.is_section_checked(category, section)
 end
 
 --- Whether the user has this section TICKED, regardless of its category's gate.
@@ -1110,9 +1492,7 @@ end
 --- Two different questions live behind one answer above, and conflating them
 --- cost the menu real information: a category switched off made every one of its
 --- sections read as disabled, so the menu unticked them all at once and the user
---- could no longer see which ones would come back. Their choices were never lost
---- — they are still stored — but the screen said otherwise, which looks exactly
---- like a reset.
+--- could no longer see which ones would come back.
 ---
 --- `is_section_enabled` stays the EFFECTIVE answer and is what the loader filters
 --- on. This one is what a checkbox should show. macOS keeps them separate for the
@@ -1121,36 +1501,15 @@ end
 --- @param section string
 --- @return boolean
 function M.is_section_checked(category, section)
-	local key = section_key(category, section)
-	if _disabled_groups[key] then return false end
-	if _disabled_groups[ENABLED_MARK .. key] then return true end
-	-- Untouched: the feature manifest's shipped default. A section it does not
-	-- declare belongs to a personal or extension pack and remains opt-in too.
-	local shipped = Languages.section_default(ManifestReader.features(), category, section)
-	if shipped == nil then
-		return ManifestReader.default_for("hotstrings.modules." .. category .. "." .. section)
-	end
-	return shipped
-end
-
---- Records an explicit choice for one section in a candidate set.
---- @param candidate table
---- @param category string
---- @param section string
---- @param enabled boolean
-local function set_section_choice(candidate, category, section, enabled)
-	local key = section_key(category, section)
-	candidate[key] = (not enabled) or nil
-	candidate[ENABLED_MARK .. key] = enabled or nil
+	if not _choices then return false end
+	return section_choice(_choices, category, section)
 end
 
 --- How many hotstrings a category is ACTUALLY firing right now.
 ---
 --- Not the same as the number it holds. A user reads the figure beside a category
 --- as "what this is doing"; switch the category off, or untick half its sections,
---- and the number must fall — that is how they check a disable took effect, which
---- is the main reason to look at it. It never moved, so a fully disabled
---- Autocorrection went on advertising 14 231 entries.
+--- and the number must fall — that is how they check a disable took effect.
 ---
 --- Windows encodes the same rule in hotstring_count_policy.ahk: a disabled scope
 --- shows no active hotstrings, not the count it would have if re-enabled.
@@ -1159,7 +1518,7 @@ end
 function M.active_count(category)
 	local cat = _categories[category]
 	if not cat then return 0 end
-	if _disabled_groups[category] then return 0 end
+	if not M.is_group_enabled(category) then return 0 end
 
 	-- A category with no declared sections cannot be counted section by section;
 	-- its gate is the only switch it has, and the gate is on.
@@ -1179,62 +1538,214 @@ end
 --- Flips one section.
 --- @param category string
 --- @param section string
+--- @return boolean committed
 function M.toggle_section(category, section)
-	if type(category) ~= "string" or type(section) ~= "string" then return false end
-	local candidate = copy_disabled(_disabled_groups)
-	set_section_choice(candidate, category, section, not M.is_section_checked(category, section))
-	if not commit_disabled(candidate) then return false end
-	Logger.info(LOG, "Section '%s' %s.", key, candidate[key] and "disabled" or "enabled")
-	M.load_all()
-	notify_change()
-	return true
+	if not addressable(category) or not addressable(section) then return false end
+	local committed = commit_choices({ { group = category, section = section,
+		enabled = not M.is_section_checked(category, section) } }, "Section '" .. category .. "." .. section .. "' toggle")
+	if committed then notify_change() end
+	return committed
+end
+
+--- Stages every section of the given categories in one candidate.
+--- Enabling lifts each category gate too: without it the row could set every
+--- section on and change nothing visible, because the gate above them was
+--- still shut. Both reference drivers lift it here.
+--- @param categories table Array of category ids.
+--- @param enabled boolean
+--- @return table|nil changes nil when a category is unknown.
+local function section_changes(categories, enabled)
+	local changes = {}
+	for _, category in ipairs(categories) do
+		if not _categories[category] or not addressable(category) then
+			Logger.error(LOG, "Unknown or unaddressable category '%s' — its sections were not changed.", tostring(category))
+			return nil
+		end
+		if enabled then changes[#changes + 1] = { group = category, enabled = true } end
+		for _, name in ipairs(known_sections(category)) do
+			if addressable(name) then changes[#changes + 1] = { group = category, section = name, enabled = enabled } end
+		end
+	end
+	return changes
 end
 
 --- Sets every section of a category at once.
 --- @param category string
 --- @param enabled boolean
+--- @return boolean committed
 function M.set_all_sections(category, enabled)
-	local cat = _categories[category]
-	if not cat then return false end
-	local candidate = copy_disabled(_disabled_groups)
-	-- Enabling lifts the category gate too. Without this the row could set every
-	-- section on and change nothing visible, because the gate above them was
-	-- still shut — and the user had to find and click a second control to make
-	-- the first one mean anything. Both reference drivers lift it here.
-	if enabled then candidate[category] = nil end
-	for name in pairs(cat.sections or {}) do
-		set_section_choice(candidate, category, name, enabled)
+	if type(enabled) ~= "boolean" then return false end
+	local changes = section_changes({ category }, enabled)
+	if not changes then return false end
+	local committed = commit_choices(changes, "Category '" .. tostring(category) .. "' sections")
+	if committed then notify_change() end
+	return committed
+end
+
+--- Sets every section of several categories at once — one language pack's
+--- « tout activer » / « tout désactiver ». One candidate, so the whole language
+--- commits or none of it does; enabling lifts each category gate.
+--- @param categories table Array of category ids.
+--- @param enabled boolean
+--- @return boolean committed
+function M.set_categories_sections(categories, enabled)
+	if type(categories) ~= "table" or type(enabled) ~= "boolean" then return false end
+	local changes = section_changes(categories, enabled)
+	if not changes then return false end
+	local committed = commit_choices(changes, "Language sections")
+	if committed then notify_change() end
+	return committed
+end
+
+--- Rereads the canonical choices and republishes the catalogue with them.
+--- Used after another owner published config.toml; a refusal keeps the previous
+--- choices and catalogue.
+--- @return boolean committed
+--- @return string|nil reason
+function M.refresh_choices()
+	if _scope_owner ~= nil then return false, "scope-pending" end
+	local read, choices = pcall(read_choices)
+	if not read then
+		Logger.error(LOG, "Hotstring choices refresh refused: %s.", tostring(choices))
+		return false, tostring(choices)
 	end
-	if not commit_disabled(candidate) then return false end
-	M.load_all()
+	local previous = _choices
+	_choices = choices
+	local _, published, reason = M.load_all()
+	if published ~= true then
+		_choices = previous
+		return false, reason
+	end
 	notify_change()
 	return true
 end
 
---- Sets every section of several categories at once — one language pack's
---- « tout activer » / « tout désactiver ». One persisted candidate, so the whole
---- language commits or none of it does; enabling lifts each category gate.
---- @param categories table Array of category ids.
---- @param enabled boolean
---- @return boolean
-function M.set_categories_sections(categories, enabled)
-	if type(categories) ~= "table" or type(enabled) ~= "boolean" then return false end
-	local candidate = copy_disabled(_disabled_groups)
-	for _, category in ipairs(categories) do
-		local cat = _categories[category]
-		if not cat then
-			Logger.error(LOG, "set_categories_sections(): unknown category '%s'.", tostring(category))
-			return false
-		end
-		if enabled then candidate[category] = nil end
-		for name in pairs(cat.sections or {}) do
-			set_section_choice(candidate, category, name, enabled)
+--- The override file this owner reads and the scope publishes.
+--- @return string
+function M.override_path()
+	return overrides_path()
+end
+
+--- The delay a section inherits once every user override is removed: its
+--- corpus rungs, then the shared default. The scope compares it with the
+--- manifest recommendation instead of assuming deletion restores it.
+--- @param category string Loaded category.
+--- @param section string Section name.
+--- @return number seconds
+function M.inherited_delay(category, section)
+	local meta = _categories[category]
+	assert(type(meta) == "table", "unknown hotstring category: " .. tostring(category))
+	return DelayResolver.resolve({
+		meta_category = meta,
+		meta_section = (meta.sections or {})[section],
+		default_delay = GLOBAL_DEFAULT_DELAY,
+	}).delay
+end
+
+--- The categories shipped with the product: the bundled file stems and the
+--- declared language packs. Personal and extension packs are user content.
+--- @return table Set of category ids.
+function M.bundled_categories()
+	local set = {}
+	local bundled = Paths.shared("modules/hotstrings")
+	for _, path in ipairs(Loader.find_toml_files(bundled)) do
+		local stem = path:match("([^/\\]+)%.toml$")
+		if stem and not in_language_folder(path, bundled) then set[stem] = true end
+	end
+	for _, pack in ipairs(M.language_packs()) do
+		for _, stem in ipairs(pack.categories) do set[Languages.group_id(pack.id, stem)] = true end
+	end
+	-- A category an extension binds (SFB reduction and rolls, moved into the
+	-- shipped Ergopti extension) keeps its historical manifest rows: the scope
+	-- still restores their recommended delays, as for any bundled category.
+	for _, extension in ipairs(M.discover_extensions()) do
+		for _, file in ipairs(extension.bound_files or {}) do set[file.binding.category] = true end
+	end
+	return set
+end
+
+--- Acquires the configuration for one scope transaction; ordinary setters are
+--- refused until it releases.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire(owner)
+	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases the configuration held by an owner.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release(owner)
+	if _scope_owner ~= owner then return false end
+	_scope_owner = nil
+	return true
+end
+
+--- Detached runtime state a scope restores after a refused publication.
+--- @return table|nil snapshot nil while the choices are unreadable.
+function M.configuration_snapshot()
+	if not _choices then return nil end
+	return { choices = copy_choices(_choices), overrides = copy_overrides(_overrides),
+		magic_key = _magic_key, canonical_magic_key = _canonical_magic_key }
+end
+
+--- Publishes a candidate configuration to the engine without writing a file.
+--- The previous catalogue stays effective when the engine refuses.
+--- @param owner table The acquiring transaction.
+--- @param document table Decoded config.toml candidate.
+--- @param override_content string Override file candidate bytes.
+--- @return boolean applied
+function M.apply_configuration(owner, document, override_content)
+	if _scope_owner ~= owner then return false end
+	local decoded, choices = pcall(decode_choices, document)
+	local parsed, overrides = pcall(parse_override_content, override_content)
+	if not decoded or not parsed then
+		Logger.error(LOG, "Candidate hotstring configuration refused: %s.", tostring(decoded and overrides or choices))
+		return false
+	end
+	local previous_choices, previous_overrides = _choices, _overrides
+	_choices, _overrides, _resolve_cache = choices, overrides, {}
+	local _, committed, reason = M.load_all()
+	if committed == true then return true end
+	_choices, _overrides, _resolve_cache = previous_choices, previous_overrides, {}
+	local _, restored = M.load_all()
+	Logger.error(LOG, "Candidate hotstring catalogue refused (%s); previous catalogue %s.",
+		tostring(reason), restored == true and "republished" or "NOT republished")
+	return false
+end
+
+--- Republishes an exact snapshot taken before a scope.
+--- @param owner table The acquiring transaction.
+--- @param snapshot table Result of M.configuration_snapshot().
+--- @return boolean restored
+function M.restore_configuration(owner, snapshot)
+	if _scope_owner ~= owner or type(snapshot) ~= "table" then return false end
+	_choices, _overrides, _resolve_cache = copy_choices(snapshot.choices), copy_overrides(snapshot.overrides), {}
+	_magic_key, _canonical_magic_key = snapshot.magic_key, snapshot.canonical_magic_key
+	local _, committed = M.load_all()
+	return committed == true
+end
+
+--- Marks the choices this owner consumes for the unused-key cleanup: every
+--- well-formed choice the published catalogue cannot prove retired, through
+--- the same decoder the reader applies. Without a published catalogue (a
+--- refused or failed load) every such choice is kept: a transient failure must
+--- never offer the user's real settings for deletion.
+--- @param document table Decoded config.toml.
+--- @param mark function mark(...segments).
+function M.mark_config_reads(document, mark)
+	local choices = decode_choices(document)
+	report_retired_choices(choices)
+	for id in pairs(choices.groups) do
+		if not choice_is_retired(id) then mark("hotstrings", "groups", id) end
+	end
+	for id, sections in pairs(choices.modules) do
+		for name in pairs(sections) do
+			if not choice_is_retired(id, name) then mark("hotstrings", "modules", id, name) end
 		end
 	end
-	if not commit_disabled(candidate) then return false end
-	M.load_all()
-	notify_change()
-	return true
 end
 
 --- Every known category, keyed by id, with the metadata the menu renders.

@@ -26,6 +26,14 @@
 --- would be too late by the whole page load. So this harness builds the HTML
 --- itself, splices the trap in immediately after <head>, and loads that.
 ---
+--- THE SAME PAGE A WINDOW LOADS:
+--- The HTML comes from webview_manager.build_page_html(), the builder show()
+--- uses, never from a copy of it. A copy had lost the strings show() seeds into
+--- the boot script (the whole catalogue as inline JSON), so the one script every
+--- Linux window runs first never ran in a real engine here. Each page must also
+--- hold that catalogue once loaded, and the diagnostics page, the one a failed
+--- boot sends users to, must show a label as text.
+---
 --- Exit 0 = every page loaded without raising. 1 = at least one raised, and the
 --- message says where. 2 = the environment cannot host the test.
 --- ==============================================================================
@@ -48,6 +56,7 @@ window.webkit.messageHandlers = window.webkit.messageHandlers || {};
 window.webkit.messageHandlers.prompt_bridge = {
 	postMessage: function (payload) { window.__posts.push(payload); }
 };
+window.webkit.messageHandlers.healthcheck = window.webkit.messageHandlers.prompt_bridge;
 </script>]]
 
 local _failures, _checks = 0, 0
@@ -86,6 +95,17 @@ if not ok_webkit or not WebKit then abort("WebKit2GTK is not available to lgi.")
 
 local Gtk = lgi.require("Gtk", "3.0")
 local WebkitHost = require("ui.webkit_host")
+local WebviewManager = require("ui.webview_manager")
+local Locale = require("infra.locale")
+
+-- Every page boots in English here, and the locale core follows, as the
+-- interface locale and the locale core move together in the driver
+local LOCALE = "en"
+Locale.set_locale(LOCALE)
+local CATALOGUE = Locale.catalogue()
+local CATALOGUE_SIZE = 0
+for _ in pairs(CATALOGUE) do CATALOGUE_SIZE = CATALOGUE_SIZE + 1 end
+if CATALOGUE_SIZE == 0 then abort("the locale catalogue did not load.") end
 
 
 
@@ -122,14 +142,15 @@ end
 --- @param app_name string Directory under _shared/ui/.
 --- @param entry string The global the host pushes into.
 --- @param expected_action string|nil Page lifecycle action expected at load.
-local function inspect(app_name, entry, expected_action)
+--- @param label table|nil { id, key }: an element whose text must be the key's translation.
+local function inspect(app_name, entry, expected_action, label)
 	print(string.format("--- %s ---", app_name))
 
 	local driver_root = "."
 	local ui_root = WebkitHost.resolve_ui_root(driver_root)
 	if ui_root == "" then abort("could not resolve _shared/ui from " .. driver_root) end
 
-	local html = WebkitHost.build_app_html(driver_root, app_name, "en")
+	local html = WebviewManager.build_page_html(app_name, LOCALE)
 	check(html ~= nil and #html > 1000, app_name .. ": the page builds")
 	if not html or #html < 1000 then return end
 
@@ -169,6 +190,20 @@ local function inspect(app_name, entry, expected_action)
 			app_name, expected_action, tostring(actions)))
 	end
 
+	-- The seed is inline JSON of the whole catalogue: a store short of it means
+	-- the engine refused or cut the boot script, and the page shows its keys
+	local held = tonumber(eval_sync(webview, "String(Object.keys(window._i18n_strings||{}).length)"))
+	check(held ~= nil and held >= CATALOGUE_SIZE, string.format(
+		"%s: the page holds the %d strings it was built with (got %s)",
+		app_name, CATALOGUE_SIZE, tostring(held)))
+	if label then
+		local shown = eval_sync(webview, string.format(
+			"String((document.getElementById('%s')||{}).textContent)", label.id))
+		check(shown == CATALOGUE[label.key], string.format(
+			"%s: #%s reads '%s', not its key (got %s)",
+			app_name, label.id, tostring(CATALOGUE[label.key]), tostring(shown)))
+	end
+
 	-- Printed whatever the verdict: on a green run these numbers are the baseline
 	-- a later regression is read against.
 	print(string.format("       scripts=%s bytes=%s makeHostBridge=%s",
@@ -184,6 +219,7 @@ end
 inspect("hotstrings_config_window", "setData")
 inspect("hotstring_editor", "initData")
 inspect("prompt_editor", "init", "ready")
+inspect("healthcheck", "receiveDiagnostics", "ready", { id = "btn-close", key = "healthcheck.toolbar.close" })
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)

@@ -431,7 +431,7 @@ LayoutManager_Open(*) {
 		return false
 	}
 	if (_LayMgrWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _LayMgrWeb_Gui.Hwnd)
+		WMPresentWindow(_LayMgrWeb_Gui)
 		return true
 	}
 	LoggerStart("LayoutManager", "Opening the layout manager…")

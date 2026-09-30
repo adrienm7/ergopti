@@ -18,7 +18,7 @@ local M = {}
 M.version = "2.0.0"
 
 M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
-M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
+M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
 
 M.sections = {
 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -383,9 +383,6 @@ M.features = {
 		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "llm.trigger.shortcut", id = "shortcut", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.shortcut", platforms = { "hs" }, recommended = false, input_altering = false,
-	},
-	{
 		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "hs" }, recommended = {  }, input_altering = false,
 	},
 	{
@@ -459,9 +456,6 @@ M.features = {
 	},
 	{
 		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "app_window_previous", input_altering = true,
-	},
-	{
-		path = "gestures.space_wrap", id = "space_wrap", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.circular_spaces", platforms = { "hs" }, recommended = true, input_altering = false,
 	},
 	{
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "arrow_up", input_altering = true,
@@ -1227,6 +1221,9 @@ M.unavailable = {
 	},
 	{
 		path = "category_enabled.tap_holds", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "category_enabled.key_combinations", section = "category_enabled", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "category_enabled.autocorrection", section = "category_enabled", reason_key = "", platforms = { "ahk" },

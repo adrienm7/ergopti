@@ -62,9 +62,19 @@ local function values_equal(expected, actual, entry)
 	return expected == actual
 end
 
-local function count_rows(menu)
+--- The generation-parameters submenu of the real LLM menu.
+--- @param menu table The LLM menu handler.
+--- @return table rows
+local function generation_rows(menu)
 	local item = menu.build_item()
 	for _, row in ipairs(item.submenu) do
+		if row.title == "menu.llm.generation_menu_title" then return row.menu end
+	end
+	error("The real LLM menu did not expose its generation submenu")
+end
+
+local function count_rows(menu)
+	for _, row in ipairs(generation_rows(menu)) do
 		if row.title == "menu.llm.num_predictions_label" then return row.menu end
 	end
 	error("The real LLM menu did not expose its prediction count submenu")
@@ -100,6 +110,35 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 			helpers.assert_eq(#calls, 1)
 			helpers.assert_eq(calls[1].value, 3)
 			helpers.assert_eq(state.llm_num_predictions, 7)
+		end)
+	end)
+
+	-- The count is a generation parameter: it heads the generation submenu on
+	-- every driver, and the top level no longer carries a row of its own.
+	helpers.it("num_predictions heads the generation submenu, not the top level (llm-count-row)", function()
+		with_count_menu(function(menu)
+			for _, row in ipairs(menu.build_item().submenu) do
+				helpers.assert_true(row.title ~= "menu.llm.num_predictions_label",
+					"the top level must not carry the suggestion count row")
+			end
+			local rows = generation_rows(menu)
+			helpers.assert_eq(rows[1].title, "menu.llm.num_predictions_label",
+				"the count must be the first generation parameter")
+			helpers.assert_eq(#rows[1].menu, 10, "the count row keeps its ten choices")
+		end)
+	end)
+
+	-- The count used to be one key with an "s" injected after it, which no
+	-- language but French and English pluralises that way. The rows now read the
+	-- singular key for one and the plural key for every other count.
+	helpers.it("num_predictions rows read the one/other plural keys (llm-count-plural)", function()
+		with_count_menu(function(menu)
+			local rows = count_rows(menu)
+			helpers.assert_eq(#rows, 10)
+			helpers.assert_eq(rows[1].title, "1 prediction", "one reads the singular key")
+			for i = 2, 10 do
+				helpers.assert_eq(rows[i].title, i .. " predictions", "every other count reads the plural key")
+			end
 		end)
 	end)
 

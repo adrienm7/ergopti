@@ -59,9 +59,10 @@ Updater_GetUpdateMenuLabel() {
 ; One-click update entry point wired to the dynamic tray menu item.
 ;
 ; State machine:
-;   idle      → fetch latest, compare, cache if newer, rebuild menu, then open
-;               the update prompt: the row read "Check for updates", so nothing
-;               is downloaded before the prompt's Install button
+;   idle      → open the update-check window ("checking"), fetch the list,
+;               compare, cache if newer, rebuild menu, then show the answer in
+;               the window: the row read "Check for updates", so nothing is
+;               downloaded before the window's Update button
 ;   available → install from cache: the row itself named the release
 ;               ("Update to vX"), so the click is the user's consent
 ;   checking  → no-op (item is disabled in the menu, but guard here too)
@@ -98,6 +99,8 @@ Updater_OneClickUpdate(*) {
 	Current := Updater_CurrentVersion()
 	try LoggerStart("Updater", "One-click update check (channel: {1}, current: {2})…", UPDATER_CHANNEL, Current)
 	
+	; The answer is shown in the update-check window, never in a tray balloon
+	UpdateCheck_Begin(Request, Current)
 	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, Request,
 		(Json, CompletedRequest, Terminal := 0) => _Updater_OneClickUpdateCallback(
 			Json, Current, CompletedRequest, Terminal))
@@ -113,30 +116,32 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 
 	if !_Updater_RequestMayPublish(Request) {
 		try LoggerDone("Updater", "One-click update check cancelled at a suspend boundary.")
+		UpdateCheck_Abandon(Request)
 		return
 	}
 	if _Updater_AsyncTerminalIsCancelled(Terminal) {
 		try LoggerDone("Updater", "One-click update check cancelled ({1}).", Terminal.Reason)
+		UpdateCheck_Abandon(Request)
 		return
 	}
 
+	Others := _Updater_RequestOtherChannels(Request)
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
 		try LoggerDone("Updater", "One-click update check finished without a network response.")
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
-			return
-		_Updater_ReleaseBalloon()
-		TrayTip(t("updater.no_connection"), t("updater.title_update"))
+			return UpdateCheck_Abandon(Request)
+		UpdateCheck_ShowResult(Request, Map("state", "error", "current", Current,
+			"reason", "no_connection", "detail", "GitHub could not be reached"))
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
 		try LoggerDone("Updater", "One-click update check: no release on channel {1} yet.", Request.Channel)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
-			return
-		_Updater_ReleaseBalloon()
-		TrayTip(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"))
+			return UpdateCheck_Abandon(Request)
+		UpdateCheck_ShowResult(Request, Map("state", "no_release", "current", Current, "others", Others))
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
@@ -145,9 +150,9 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		try LoggerDone("Updater", "One-click update check finished with invalid release metadata.")
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
-			return
-		_Updater_ReleaseBalloon()
-		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
+			return UpdateCheck_Abandon(Request)
+		UpdateCheck_ShowResult(Request, Map("state", "error", "current", Current,
+			"reason", "parse_failed", "detail", "the latest release names no tag"))
 		return
 	}
 	if !UpdateChannels_ShouldOffer(
@@ -155,9 +160,9 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
-			return
-		_Updater_ReleaseBalloon()
-		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
+			return UpdateCheck_Abandon(Request)
+		UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", Current,
+			"latest", Latest, "others", Others))
 		return
 	}
 
@@ -174,10 +179,10 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 }
 
 ; Publish a release that a "Check for updates" click found and offer it in the
-; update prompt. The user asked to check, not to install: the download starts
-; only from the prompt's Install button.
+; update-check window. The user asked to check, not to install: the download
+; starts only from the window's Update button.
 ; @param OfferFn {Func} Test seam called as (Release, Request); production
-;        opens Updater_ShowUpdatePrompt.
+;        shows it with UpdateCheck_ShowAvailable.
 ; @return {Boolean} True when the release was published and offered.
 _Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, OfferFn := 0) {
 	HasSuspendOverride := IsSet(IsSuspended)
@@ -201,7 +206,7 @@ _Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildF
 	if IsObject(OfferFn)
 		OfferFn.Call(Release, Request)
 	else
-		Updater_ShowUpdatePrompt(Release, Request)
+		UpdateCheck_ShowAvailable(Release, Request)
 	return true
 }
 

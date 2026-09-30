@@ -3,8 +3,10 @@
 --- ==============================================================================
 --- MODULE: LLM Shortcut Owner Transactions
 --- DESCRIPTION:
---- Exercises the primary/profile shortcut owner and the real confirmed profile
---- Delete action through refusal-capable registrar seams. Real Hammerspoon-shaped
+--- Exercises the profile shortcut owner and the real confirmed profile Delete
+--- action through refusal-capable registrar seams. The primary trigger shortcut
+--- is retired (a prediction on demand is the llm_generate_prediction action in a
+--- keyboard slot), so profile shortcuts are the owner's only family. Real Hammerspoon-shaped
 --- doubles keep enable=self|nil, disable=self, and delete=void|throw contracts.
 --- Tests preserve handle identity and invoke retained callbacks so a
 --- bookkeeping-only rollback cannot pass.
@@ -19,25 +21,16 @@ local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 
 helpers.describe("HS-033 exact LLM shortcut transactions", function()
-	for _, family in ipairs({"primary", "profile"}) do
+	for _, family in ipairs({"profile"}) do
 		for _, outcome in ipairs({"false", "nil", "throw"}) do
 			helpers.it("HS-033 " .. family .. " fresh bind rejects new " .. outcome, function()
 				with_trigger_fixture({}, function(fixture)
 					fixture.backend.plan("new", {outcome})
-					local apply
-					local get_handle
-					local get_pref
-					if family == "primary" then
-						apply = fixture.orchestrator.apply_llm_shortcut
-						get_handle = fixture.get_trigger_hk
-						get_pref = function() return fixture.state.llm_trigger_shortcut end
-					else
-						apply = function(mods, key)
-							return fixture.orchestrator.apply_llm_profile_shortcut("user_p", mods, key)
-						end
-						get_handle = function() return fixture.get_profile_hk("user_p") end
-						get_pref = function() return fixture.state.llm_profile_shortcuts.user_p end
+					local function apply(mods, key)
+						return fixture.orchestrator.apply_llm_profile_shortcut("user_p", mods, key)
 					end
+					local function get_handle() return fixture.get_profile_hk("user_p") end
+					local function get_pref() return fixture.state.llm_profile_shortcuts.user_p end
 					local result = apply({"ctrl"}, "b")
 					helpers.assert_nil(get_handle())
 					helpers.assert_true(get_pref() == false or get_pref() == nil)
@@ -50,18 +43,9 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 			helpers.it("HS-033 " .. family .. " fresh bind rejects enable " .. outcome, function()
 				with_trigger_fixture({}, function(fixture)
 					fixture.backend.plan("enable", {outcome})
-					local result
-					local handle
-					local pref
-					if family == "primary" then
-						result = fixture.orchestrator.apply_llm_shortcut({"ctrl"}, "b")
-						handle = fixture.get_trigger_hk()
-						pref = fixture.state.llm_trigger_shortcut
-					else
-						result = fixture.orchestrator.apply_llm_profile_shortcut("user_p", {"ctrl"}, "b")
-						handle = fixture.get_profile_hk("user_p")
-						pref = fixture.state.llm_profile_shortcuts.user_p
-					end
+					local result = fixture.orchestrator.apply_llm_profile_shortcut("user_p", {"ctrl"}, "b")
+					local handle = fixture.get_profile_hk("user_p")
+					local pref = fixture.state.llm_profile_shortcuts.user_p
 					helpers.assert_nil(handle)
 					helpers.assert_true(pref == false or pref == nil)
 					helpers.assert_eq(fixture.get_save_count(), 0)
@@ -72,19 +56,10 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 			helpers.it("HS-033 " .. family .. " fresh bind rejects staging disable " .. outcome, function()
 				with_trigger_fixture({}, function(fixture)
 					fixture.backend.plan("disable", {outcome})
-					local result
-					local handle
-					local pref
-					if family == "primary" then
-						result = fixture.orchestrator.apply_llm_shortcut({"ctrl"}, "b")
-						handle = fixture.get_trigger_hk()
-						pref = fixture.state.llm_trigger_shortcut
-					else
-						result = fixture.orchestrator.apply_llm_profile_shortcut(
-							"user_p", {"ctrl"}, "b")
-						handle = fixture.get_profile_hk("user_p")
-						pref = fixture.state.llm_profile_shortcuts.user_p
-					end
+					local result = fixture.orchestrator.apply_llm_profile_shortcut(
+						"user_p", {"ctrl"}, "b")
+					local handle = fixture.get_profile_hk("user_p")
+					local pref = fixture.state.llm_profile_shortcuts.user_p
 					helpers.assert_nil(handle)
 					helpers.assert_true(pref == false or pref == nil)
 					helpers.assert_eq(fixture.get_save_count(), 0)
@@ -129,14 +104,10 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 				fixture.backend.plan("disable", {"throw", "throw"})
 				fixture.backend.plan("delete", {"false"})
 				local function apply(opts)
-					if family == "primary" then
-						return fixture.orchestrator.apply_llm_shortcut({"ctrl"}, "b", opts)
-					end
 					return fixture.orchestrator.apply_llm_profile_shortcut(
 						"user_p", {"ctrl"}, "b", opts)
 				end
 				local function get_owner()
-					if family == "primary" then return fixture.get_trigger_hk() end
 					return fixture.get_profile_hk("user_p")
 				end
 
@@ -160,11 +131,7 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 			with_trigger_fixture({}, function(fixture)
 				local slot = seed_family(fixture, family)
 				local old_handle = slot.get_handle()
-				if family == "primary" then
-					fixture.state.llm_trigger_shortcut = false
-				else
-					fixture.state.llm_profile_shortcuts.user_p = nil
-				end
+				fixture.state.llm_profile_shortcuts.user_p = nil
 
 				helpers.assert_eq(slot.apply(nil, nil, {persist = false}), true)
 				helpers.assert_nil(slot.get_handle())
@@ -207,12 +174,10 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 					fixture.reset_observations()
 					fixture.backend.plan("disable", {outcome})
 
-					if family == "primary" then fixture.set_startup_silence(true) end
 					local result = slot.apply({"ctrl"}, "a", {
 						persist = false,
-						silent = family == "profile",
+						silent = true,
 					})
-					if family == "primary" then fixture.set_startup_silence(false) end
 
 					helpers.assert_true(slot.get_handle() == owner)
 					helpers.assert_true(slot.get_pref() == preference)
@@ -221,12 +186,10 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 						"a refused same-chord suspension must close logical delivery")
 					helpers.assert_eq(result, false)
 
-					if family == "primary" then fixture.set_startup_silence(true) end
 					helpers.assert_eq(slot.apply({"ctrl"}, "a", {
 						persist = false,
-						silent = family == "profile",
+						silent = true,
 					}), true)
-					if family == "primary" then fixture.set_startup_silence(false) end
 					fixture.fire(owner)
 					helpers.assert_eq(fixture.get_prediction_count(), 0)
 
@@ -252,19 +215,11 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 				helpers.assert_eq(slot.get_handle().chord, old_chord)
 				helpers.assert_true(slot.get_pref() == old_pref,
 					"rollback must restore the exact prior preference object")
-				helpers.assert_eq(fixture.durable().llm_trigger_shortcut,
-					family == "primary" and old_pref or false)
-				if family == "profile" then
-					helpers.assert_true(fixture.state.llm_profile_shortcuts
-						== old_profile_shortcuts)
-					helpers.assert_eq(fixture.durable().llm_profile_shortcuts.user_p, old_pref)
-				end
-				helpers.assert_eq(fixture.get_menu_snapshot().llm_trigger_shortcut,
-					family == "primary" and old_pref or false)
-				if family == "profile" then
-					helpers.assert_eq(fixture.get_menu_snapshot().llm_profile_shortcuts.user_p,
-						old_pref)
-				end
+				helpers.assert_true(fixture.state.llm_profile_shortcuts
+					== old_profile_shortcuts)
+				helpers.assert_eq(fixture.durable().llm_profile_shortcuts.user_p, old_pref)
+				helpers.assert_eq(fixture.get_menu_snapshot().llm_profile_shortcuts.user_p,
+					old_pref)
 				fixture.fire(old_handle)
 				helpers.assert_eq(fixture.get_prediction_count(), 1,
 					"the exact prior handle must still deliver after rollback")
@@ -303,8 +258,8 @@ helpers.describe("HS-033 exact LLM shortcut transactions", function()
 					local result = slot.apply({"ctrl"}, "b")
 					helpers.assert_true(slot.get_handle() == old_handle)
 					helpers.assert_true(slot.get_pref() == old_pref)
-					helpers.assert_eq(fixture.get_menu_snapshot().llm_trigger_shortcut,
-						family == "primary" and old_pref or false)
+					helpers.assert_eq(fixture.get_menu_snapshot().llm_profile_shortcuts.user_p,
+						old_pref)
 					fixture.fire(old_handle)
 					helpers.assert_eq(fixture.get_prediction_count(), 1)
 					helpers.assert_eq(fixture.get_menu_count(), 2,

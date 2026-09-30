@@ -33,15 +33,12 @@ local SUBSCRIBED_NON_DEFAULT = (function()
 	error("the update channel registry must declare a second channel")
 end)()
 
--- One key of each shape the Linux readers take, and five they never read.
--- First-use completion survives cleanup because graphical startup reads it.
+-- One key of each shape the Linux readers take, and six they never read.
+-- Linux has no hotstring master switch: the setup wizard asks per section.
 local FIXTURE = table.concat({
-	"[script]",
-	"onboarding_done = true",
-	"",
 	"[hotstrings]",
 	"enabled = false",
-	"trigger_char = \"★\"",
+	"trigger_char = \"§\"",
 	"stale_toggle = false",
 	"",
 	"[metrics]",
@@ -73,6 +70,7 @@ local FIXTURE = table.concat({
 }, "\n")
 
 local EXPECTED = {
+	"hotstrings.enabled=leaf",
 	"hotstrings.stale_toggle=leaf",
 	"metrics.metrics_encrypt=leaf",
 	"gestures.not_a_slot=leaf",
@@ -81,8 +79,7 @@ local EXPECTED = {
 }
 
 local SURVIVORS = {
-	{ { "script", "onboarding_done" }, true },
-	{ { "hotstrings", "trigger_char" }, "★" },
+	{ { "hotstrings", "trigger_char" }, "§" },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
 	{ { "gesture_parameters", "tap_3__open_url" }, "https://example.com" },
@@ -142,6 +139,8 @@ local function driver_state(path)
 
 	local paths = require("infra.config_paths")
 	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
+	local previous_preferences = package.loaded["infra.hotstring_preferences"]
+	local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
 	paths.config = function(name)
 		helpers.assert_eq(name, "config.toml")
 		return path
@@ -149,19 +148,28 @@ local function driver_state(path)
 	local ok_url, chatgpt_url = pcall(function()
 		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
 	end)
+	-- The magic key is read from config.toml by the hotstring preferences, not
+	-- by the setup wizard, which leaves the Linux trigger to the tray.
+	package.loaded["infra.hotstring_preferences"] = nil
+	local ok_key, magic_key = pcall(function()
+		return helpers.load_module("modules.hotstrings.magic_key").get()
+	end)
 	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
+	package.loaded["infra.hotstring_preferences"] = previous_preferences
+	package.loaded["modules.hotstrings.magic_key"] = previous_magic_key
 	if not ok_url then error(chatgpt_url, 0) end
+	if not ok_key then error(magic_key, 0) end
 
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
-		needs_onboarding = require("ui.onboarding.startup").should_show(decoded),
 		actions = actions,
 		parameter = gestures.get_action_parameter("tap_3", "open_url"),
 		gestures_enabled = enable_requested,
 		shortcuts_enabled = shortcuts.is_enabled(),
 		chatgpt_url = chatgpt_url,
+		magic_key = magic_key,
 		update_channel = update_channel,
-		answers = require("ui.onboarding.bridge")._answers_from_config(decoded, ""),
+		wizard = require("ui.onboarding.bridge").config_values(decoded),
 	}
 end
 
@@ -198,7 +206,7 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 				checked = checked + 1
 			end
 		end
-		helpers.assert_eq(checked, #SURVIVORS + 2,
+		helpers.assert_eq(checked, #SURVIVORS + 1,
 			"every used record of the fixture must be exercised")
 	end)
 
@@ -221,6 +229,136 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 		helpers.assert_eq(#unknown.keys, 1, "a channel outside the registry is ignored by the updater")
 		helpers.assert_eq(unknown.keys[1].key, "channel")
 	end)
+
+	helpers.it("unused keys: live bindings are kept, retired actions are offered (config-outdated-shortcuts)",
+		function()
+			local source = table.concat({
+				"[gestures]",
+				"swipe_3_up = \"open_url\"",
+				"tap_3 = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.keyboard]",
+				"ctrl_k = \"select_line\"",
+				"ctrl_j = \"retired_action_xyz\"",
+				"",
+				"[shortcuts.tap_keys]",
+				"number_row_left = \"retired_action_xyz\"",
+				"",
+			}, "\n")
+			local offered = {}
+			for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+				offered[#offered + 1] = key.section .. "." .. key.key
+			end
+			table.sort(offered)
+			-- ctrl_k is a live binding: offering it would delete the user's shortcut.
+			helpers.assert_eq(offered, {
+				"gestures.tap_3", "shortcuts.keyboard.ctrl_j", "shortcuts.tap_keys.number_row_left",
+			})
+
+			-- The Shortcuts scope resolves the same document instead of refusing it.
+			local decoded = TomlCodec.decode(source)
+			local keyboard = require("modules.shortcuts.keyboard_shortcuts").configuration_candidate(decoded)
+			helpers.assert_eq(keyboard.assignments.ctrl_k, "select_line")
+			helpers.assert_nil(keyboard.assignments.ctrl_j)
+			local tap = require("modules.shortcuts.tap_keys").configuration_candidate(decoded)
+			helpers.assert_eq(tap.assignments.number_row_left, "none")
+		end)
+
+	helpers.it("unused keys: what the readers warn about is exactly what is offered (config-outdated-warned-offered)",
+		function()
+			-- Unknown gesture slots and invalid parameters were offered but never
+			-- warned about; an invalid AI value was warned about but never offered
+			-- (and a wrong-typed one made every AI preference read raise).
+			local source = table.concat({
+				"[gestures]",
+				"enabled = true",
+				"not_a_slot = \"none\"",
+				"tap_3 = 5",
+				"",
+				"[gesture_parameters]",
+				"broken = \"x\"",
+				"tap_3__open_url = \"not a url\"",
+				"",
+				"[llm]",
+				"enabled = true",
+				"",
+				"[llm.trigger]",
+				"debounce_ms = \"fast\"",
+				"",
+				"[llm.generation]",
+				"temperature = 99",
+				"",
+			}, "\n")
+			local scan
+			local reported = require("config_outdated").collect_reports(function()
+				scan = Engine.find_in_source(source, Cleanup.collect)
+			end)
+			local offered, warned = {}, {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			for path in pairs(reported) do warned[#warned + 1] = path end
+			table.sort(offered)
+			table.sort(warned)
+			helpers.assert_eq(offered, { "gesture_parameters.broken", "gesture_parameters.tap_3__open_url",
+				"gestures.not_a_slot", "gestures.tap_3", "llm.generation.temperature", "llm.trigger.debounce_ms" })
+			helpers.assert_eq(warned, offered)
+
+			-- The wrong-typed AI leaf is read as absent; its neighbours still read.
+			Sandbox.with_config(source, function(path)
+				local paths = require("infra.config_paths")
+				local previous_config, previous_preferences = paths.config, package.loaded["infra.llm_preferences"]
+				paths.config = function() return path end
+				package.loaded["infra.llm_preferences"] = nil
+				local ok, err = pcall(function()
+					local preferences = require("infra.llm_preferences")
+					helpers.assert_eq(preferences.get("llm.enabled", nil), true)
+					helpers.assert_nil(preferences.get("llm.trigger.debounce_ms", nil))
+				end)
+				paths.config, package.loaded["infra.llm_preferences"] = previous_config, previous_preferences
+				if not ok then error(err, 0) end
+			end)
+		end)
+
+	helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)",
+		function()
+			local source = "[shortcuts]\ntap_keys = { number_row_left = \"retired_action_xyz\", "
+				.. "number_row_right_1 = \"none\" }\n"
+			Sandbox.with_config(source, function(path)
+				local before = driver_state(path)
+				local keys = Cleanup.find(path).keys
+				helpers.assert_eq(#keys, 1)
+				helpers.assert_eq({ keys[1].section, keys[1].key }, { "shortcuts.tap_keys", "number_row_left" })
+				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP })
+				helpers.assert_eq(result.status, "removed")
+				helpers.assert_eq(Sandbox.read_bytes(path),
+					"[shortcuts]\ntap_keys = { number_row_right_1 = \"none\" }\n")
+				-- The setup wizard shows the raw stale value; every runtime reader
+				-- already ignored it.
+				local after = driver_state(path)
+				before.wizard, after.wizard = nil, nil
+				helpers.assert_eq(after, before, "the live member keeps its value")
+				helpers.assert_eq(#Cleanup.find(path).keys, 0)
+			end)
+		end)
+
+	helpers.it("unused keys: an old-shape hotstring choice is offered, not fatal (config-outdated-hotstrings)",
+		function()
+			-- One retired pack in a legacy spelling used to raise in the choice
+			-- decoder: every hotstring went off and the cleanup could list nothing.
+			local source = table.concat({
+				"[hotstrings.groups]",
+				"retired_pack = \"on\"",
+				"",
+				"[stale.section]",
+				"label = \"old\"",
+				"",
+			}, "\n")
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			local offered = {}
+			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+			table.sort(offered)
+			helpers.assert_eq(offered, { "hotstrings.groups.retired_pack", "stale.section.label" })
+		end)
 
 	helpers.it("unused keys: an invalid gesture parameter is ignored by the loader and offered", function()
 		local scan = Engine.find_in_source(

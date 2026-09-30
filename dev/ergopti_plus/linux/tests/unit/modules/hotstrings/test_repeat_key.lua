@@ -110,22 +110,179 @@ end)
 -- =================================================================
 -- =================================================================
 
-helpers.describe("magic-key repeat: the toggle", function()
+--- Runs canonical persistence over an exclusive file and isolated runtime cache.
+--- @param source string|nil Configuration bytes.
+--- @param body function Test body.
+local function with_repeat(source, body)
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Writer = require("toml_codec.writer")
+	local loaded = {}
+	for name, value in pairs(package.loaded) do loaded[name] = value end
+	local original = Writer.batch_write
+	local ok, err = pcall(function()
+		Sandbox.with_config(source, function(path)
+			local controls = { legacy_writes = 0 }
+			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["adapters.storage"] = {
+				get = function() return true end,
+				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
+			}
+			Writer.batch_write = function(target, operations, files, expected)
+				if controls.external then Sandbox.write_bytes(target, controls.external) end
+				if controls.refuse then return false, "injected publication refusal" end
+				return original(target, operations, files, expected)
+			end
+			local function reload()
+				package.loaded["modules.hotstrings.repeat_key"] = nil
+				return require("modules.hotstrings.repeat_key")
+			end
+			body(reload(), controls, path, reload, Sandbox)
+		end)
+	end)
+	Writer.batch_write = original
+	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(loaded) do package.loaded[name] = value end
+	if not ok then error(err, 0) end
+end
 
-	helpers.it("is on for a user who has never touched it", function()
-		-- Opt-out, not opt-in: both other drivers default it on, so a user who has
-		-- set nothing must get the same behaviour on all three.
-		local Storage = helpers.load_module("adapters.storage")
-		Storage.delete("hotstrings.repeat_key_enabled")
-		local fresh = helpers.load_module("modules.hotstrings.repeat_key")
-		helpers.assert_true(fresh.is_enabled(), "the shipped default is on")
+local SOURCE = '[hotstrings]\nrepeat_key_enabled = true\nunknown = "keep"\n[other]\nvalue = 42\n'
+helpers.describe("magic-key repeat: canonical sparse preferences", function()
+	helpers.it("keeps an empty canonical config neutral despite a legacy true", function()
+		with_repeat(nil, function(subject, _, path, _, sandbox)
+			helpers.assert_eq(subject.is_enabled(), false)
+			helpers.assert_eq(sandbox.read_bytes(path), nil)
+		end)
 	end)
 
-	helpers.it("remembers being switched off", function()
-		local fresh = helpers.load_module("modules.hotstrings.repeat_key")
-		fresh.set_enabled(false)
-		helpers.assert_true(not fresh.is_enabled(), "and a stored false must not read as unset")
-		fresh.set_enabled(true)
+	helpers.it("reads canonical false instead of the legacy true", function()
+		with_repeat('[hotstrings]\nrepeat_key_enabled = false\n', function(subject)
+			helpers.assert_eq(subject.is_enabled(), false)
+		end)
 	end)
 
+	helpers.it("persists true and preserves neighbors across fresh module load", function()
+		with_repeat(SOURCE:gsub("enabled = true", "enabled = false"), function(subject, controls, path, reload, sandbox)
+			helpers.assert_true(subject.set_enabled(true))
+			local config = require("toml_codec").decode(sandbox.read_bytes(path))
+			helpers.assert_eq(config.hotstrings.repeat_key_enabled, true)
+			helpers.assert_eq(config.hotstrings.unknown, "keep")
+			helpers.assert_eq(config.other.value, 42)
+			helpers.assert_true(subject.is_enabled())
+			helpers.assert_true(reload().is_enabled())
+			helpers.assert_eq(controls.legacy_writes, 0)
+		end)
+	end)
+
+	helpers.it("clears the leaf sparsely without resurrecting legacy or cached true", function()
+		with_repeat(SOURCE, function(subject, _, path, reload, sandbox)
+			helpers.assert_true(subject.is_enabled())
+			helpers.assert_true(subject.set_enabled(false))
+			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.repeat_key_enabled, nil)
+			helpers.assert_eq(subject.is_enabled(), false)
+			helpers.assert_eq(reload().is_enabled(), false)
+		end)
+	end)
+
+	helpers.it("preserves exact runtime and source when publication refuses", function()
+		with_repeat(SOURCE, function(subject, controls, path, _, sandbox)
+			helpers.assert_true(subject.is_enabled())
+			controls.refuse = true
+			helpers.assert_eq(subject.set_enabled(false), false)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+			helpers.assert_true(subject.is_enabled())
+		end)
+	end)
+
+	helpers.it("rejects an external edit between validation and publication", function()
+		with_repeat(SOURCE, function(subject, controls, path, _, sandbox)
+			helpers.assert_true(subject.is_enabled())
+			controls.external = SOURCE .. "external = 9\n"
+			helpers.assert_eq(subject.set_enabled(false), false)
+			helpers.assert_eq(sandbox.read_bytes(path), controls.external)
+			helpers.assert_true(subject.is_enabled())
+		end)
+	end)
+
+	helpers.it("keeps malformed canonical data neutral instead of using a legacy value", function()
+		with_repeat('[hotstrings]\nrepeat_key_enabled = "bad"\n', function(subject, _, path, _, sandbox)
+			local before = sandbox.read_bytes(path)
+			helpers.assert_eq(subject.is_enabled(), false)
+			helpers.assert_eq(subject.set_enabled(false), false)
+			helpers.assert_eq(sandbox.read_bytes(path), before)
+		end)
+	end)
+
+	-- The typing path calls is_enabled() for every unmatched character inside the
+	-- keyboard hook's guarded callback, whose error handler emergency-stops the
+	-- hook: one malformed leaf must neither raise nor reread the disk per key.
+	for _, source in ipairs({ '[hotstrings]\nrepeat_key_enabled = "true"\n', "[hotstrings\nbroken" }) do
+		helpers.it("never raises on the typing path for " .. source:gsub("\n", " "), function()
+			with_repeat(source, function(subject)
+				local writer = require("toml_codec.writer")
+				local read = writer.read_classified
+				local calls = 0
+				writer.read_classified = function(...) calls = calls + 1; return read(...) end
+				local ok, err = pcall(function()
+					for _ = 1, 50 do helpers.assert_eq(subject.is_enabled(), false) end
+				end)
+				writer.read_classified = read
+				if not ok then error(err, 0) end
+				helpers.assert_eq(calls, 1, "a refused read is cached, not retried per keystroke")
+			end)
+		end)
+	end
+
+	helpers.it("does not coerce a nonboolean setter into activation", function()
+		with_repeat(SOURCE, function(subject, _, path, _, sandbox)
+			helpers.assert_eq(subject.set_enabled("false"), false)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+
+	helpers.it("refreshes the leaf after an actual canonical clear candidate was published", function()
+		with_repeat(SOURCE, function(subject, _, path)
+			helpers.assert_true(subject.is_enabled())
+			local operations = require("infra.manifest_reader").scope_operations("hotstrings", "clear")
+			helpers.assert_true(require("toml_codec.writer").batch_write(path, operations))
+			helpers.assert_true(subject.refresh())
+			helpers.assert_eq(subject.is_enabled(), false)
+		end)
+	end)
+
+	helpers.it("retains the last valid runtime when an explicit refresh refuses", function()
+		with_repeat(SOURCE, function(subject, _, path, _, sandbox)
+			helpers.assert_true(subject.is_enabled())
+			sandbox.write_bytes(path, '[hotstrings]\nrepeat_key_enabled = "bad"\n')
+			helpers.assert_eq(subject.refresh(), false)
+			helpers.assert_true(subject.is_enabled())
+		end)
+	end)
+
+	helpers.it("does not reread disk on each input-path query", function()
+		with_repeat(SOURCE, function(subject)
+			helpers.assert_true(subject.is_enabled())
+			local writer = require("toml_codec.writer")
+			local read = writer.read_classified
+			local calls = 0
+			writer.read_classified = function(...) calls = calls + 1; return read(...) end
+			local ok, err = pcall(function() for _ = 1, 100 do helpers.assert_true(subject.is_enabled()) end end)
+			writer.read_classified = read
+			if not ok then error(err, 0) end
+			helpers.assert_eq(calls, 0)
+		end)
+	end)
+
+	helpers.it("keeps the consumed setting during actual unused-key cleanup", function()
+		with_repeat(SOURCE, function(_, _, path)
+			package.loaded["ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			local found_unknown = false
+			for _, key in ipairs(scan.keys) do
+				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.repeat_key_enabled")
+				if table.concat(key.path, ".") == "hotstrings.unknown" then found_unknown = true end
+			end
+			helpers.assert_true(found_unknown)
+		end)
+	end)
 end)

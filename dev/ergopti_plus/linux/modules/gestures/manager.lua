@@ -38,6 +38,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -45,10 +46,13 @@ local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
 local PromptAction = require("llm.prompt_action")
 local Vision = require("llm.vision")
+local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local ShellRunner = require("adapters.shell_runner")
+local DesktopNavigation = require("desktop_navigation")
+local SystemActions = require("modules.gestures.system_actions")
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -88,6 +92,16 @@ if not _ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~=
 	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.slots) ~= "table" then
 	error("_generated/action_catalogue.lua is missing or invalid — run `npm run gen`: "
 		.. tostring(Catalogue))
+end
+
+-- A confirmation is chained in front of a shell command (system_actions), so
+-- an action the catalogue asks to confirm must be one: anything else would run
+-- unasked. Checked once, here, rather than discovered on the first press.
+for action_name, meta in pairs(Catalogue.actions) do
+	if meta.confirm == true and SystemActions.COMMANDS[action_name] == nil then
+		error("the catalogue asks to confirm '" .. action_name
+			.. "', which is not a system command this driver can confirm")
+	end
 end
 
 -- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
@@ -310,44 +324,17 @@ local function primary_selection()
 	return (value:gsub("%s+$", ""))
 end
 
--- Seconds each wmctrl call may take. The daemon waits for it while it holds
--- the keyboard, so a hung X server must cost a second, not the keyboard.
-local WMCTRL_TIMEOUT_S = 1
-
---- A shell command that switches to the workspace `delta` steps away.
----
---- `wmctrl -s` takes an ABSOLUTE, zero-based desktop index and has no relative
---- form. This shipped as `wmctrl -s -1` and `wmctrl -s +1`, which wmctrl rejects
---- every time — so the wmctrl branch was dead and the `||` fallback carried the
---- feature, which makes both actions silently X11-only. libinput-gestures hit the
---- same wall and had to add its own ws_up/ws_down for exactly this reason.
----
---- The neighbour is therefore computed from `wmctrl -d`, whose current desktop is
---- the row marked `*`, with wraparound at both ends.
----
---- The command fails whenever no desktop was switched to. It used to end in
---- `| xargs -r wmctrl -s`, which exits 0 on empty input, so a wmctrl that could
---- list nothing (every Wayland session) reported success and its keystroke
---- fallback never ran. Each wmctrl is bounded by WMCTRL_TIMEOUT_S.
----
---- The row is picked with shell builtins only. It used awk, which no package
---- declares as a dependency and a minimal openSUSE lacks: the pick then printed
---- nothing and every switch fell through to the keystroke. A listing with no
---- current desktop also fails now, instead of counting from desktop 0.
---- @param delta integer -1 for the previous workspace, 1 for the next.
---- @return string
-local function workspace_switch_command(delta)
-	local pick = "{ n=0; cur=; while read -r id mark rest; do"
-		.. " [ \"$mark\" = \"*\" ] && cur=$id; n=$((n + 1)); done;"
-		.. " [ -n \"$cur\" ] && echo $(( ((cur + (" .. tostring(delta) .. ")) % n + n) % n )); }"
-	return "t=$(timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -d 2>/dev/null | " .. pick .. ")"
-		.. " && [ -n \"$t\" ] && timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -s \"$t\" 2>/dev/null"
-end
-
--- The combination the desktops bind to the previous and the next workspace,
--- pressed when wmctrl cannot switch. Under Wayland it is the only way another
--- process can: no protocol lets it name a workspace.
-local WORKSPACE_COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
+-- The four workspace actions and the step each asks for. The plain pair stops
+-- at the first and the last workspace, as Windows and macOS do; the _wrap pair
+-- goes on to the other end. modules/gestures/workspace_switcher.lua drives
+-- whatever interface the session offers and presses the desktop's own shortcut
+-- when there is none.
+local WORKSPACE_ACTIONS = {
+	desktop_prev      = { direction = DesktopNavigation.PREVIOUS, wrap = false },
+	desktop_next      = { direction = DesktopNavigation.NEXT,     wrap = false },
+	desktop_prev_wrap = { direction = DesktopNavigation.PREVIOUS, wrap = true },
+	desktop_next_wrap = { direction = DesktopNavigation.NEXT,     wrap = true },
+}
 
 -- How long a media tool may take before its key is pressed instead.
 local MEDIA_TOOL_TIMEOUT_S = 1
@@ -495,6 +482,17 @@ local BUILTIN_HANDLERS = {
 		if M.validate_action_parameter("open_url", url) then
 			run_background("xdg-open " .. shell_quote(url))
 		end
+	end,
+	-- The binding's desktop-file id, launched the way the desktop's own
+	-- launcher does (its Exec line, environment and startup notification).
+	["open_app"] = function(binding)
+		local app = M.get_action_parameter(binding, "open_app")
+		if not M.validate_action_parameter("open_app", app) then
+			Logger.warn(LOG, "open_app ignored for binding '%s': no valid application is stored.", tostring(binding))
+			return
+		end
+		Logger.info(LOG, "Opening the application '%s'.", app)
+		run_background("gtk-launch " .. shell_quote(app))
 	end,
 	["search_web"] = function(binding)
 		local template = M.get_action_parameter(binding, "search_web")
@@ -666,12 +664,31 @@ local function _execute_action(action_name, go_next, binding)
 		return
 	end
 
-	if WORKSPACE_COMBO[action_name] then
-		-- wmctrl on its own, and waited for: only its exit status says whether
-		-- the combination is still needed.
-		if not ShellRunner.run(workspace_switch_command(action_name == "desktop_next" and 1 or -1)) then
-			_press_combo(WORKSPACE_COMBO[action_name])
-		end
+	if SystemActions.COMMANDS[action_name] then
+		local meta = Catalogue.actions[action_name]
+		local command = SystemActions.command_for(action_name, M.get_action_label(action_name),
+			meta ~= nil and meta.confirm == true)
+		if command then run_background(command) end
+		return
+	end
+	local system_handler = SystemActions.HANDLERS[action_name]
+	if system_handler then
+		local ok, err = pcall(system_handler, {
+			run_background = run_background,
+			clipboard = require("adapters.clipboard"),
+			emit_combo = require("modules.gestures.combo_emitter").press,
+			sleep_ms = require("adapters.event_loop").sleep_ms,
+		})
+		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
+		return
+	end
+
+	local workspace = WORKSPACE_ACTIONS[action_name]
+	if workspace then
+		-- Waited for: only the switcher's answer says whether the desktop's own
+		-- shortcut is still needed.
+		require("modules.gestures.workspace_switcher").switch(
+			workspace.direction, workspace.wrap, _press_combo)
 		return
 	elseif MEDIA_ACTIONS[action_name] then
 		-- The tool on its own, and waited for: only its exit status says whether
@@ -750,12 +767,14 @@ function M.is_runnable(action_name)
 		or OPEN_WINDOW[action_name] ~= nil
 		or OPEN_PATH[action_name] ~= nil
 		or OPEN_LOG[action_name] ~= nil
-		or WORKSPACE_COMBO[action_name] ~= nil
+		or WORKSPACE_ACTIONS[action_name] ~= nil
 		or MEDIA_ACTIONS[action_name] ~= nil
 		or _action_handlers[action_name] ~= nil
 		or SCREENSHOT_COMMANDS[action_name] ~= nil
 		or DIRECT_COMMANDS[action_name] ~= nil
 		or BUILTIN_HANDLERS[action_name] ~= nil
+		or SystemActions.COMMANDS[action_name] ~= nil
+		or SystemActions.HANDLERS[action_name] ~= nil
 end
 
 --- Every id the executor can run, for the catalogue parity test's reverse
@@ -765,8 +784,9 @@ end
 function M.runnable_action_ids()
 	local seen, out = { none = true }, { "none" }
 	for _, source in ipairs({ MODIFIER_ACTION_COMMANDS, _EMIT_ROWS, OPEN_WINDOW, OPEN_PATH,
-		OPEN_LOG, WORKSPACE_COMBO, MEDIA_ACTIONS,
-		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS }) do
+		OPEN_LOG, WORKSPACE_ACTIONS, MEDIA_ACTIONS,
+		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS,
+		SystemActions.COMMANDS, SystemActions.HANDLERS }) do
 		for action_name in pairs(source) do
 			if not seen[action_name] then
 				seen[action_name] = true
@@ -792,7 +812,7 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>" or "session:x11".
+--- @param token string "tool:<binary>", "session:x11" or "session:workspaces".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
@@ -811,6 +831,19 @@ local function requirement_holds(token)
 		local kind = Display.kind()
 		if kind == Display.X11 then return true, nil end
 		if kind == Display.WAYLAND then return false, i18n.get("dialog.action_picker.requires_x11") end
+		return nil, nil
+	end
+	if token == "session:workspaces" then
+		-- A session that lets another process read and pick its workspaces:
+		-- X11 (wmctrl), KDE Plasma (KWin over D-Bus), sway or Hyprland.
+		local backend, reason = require("modules.gestures.workspace_switcher").detect()
+		if backend then return true, nil end
+		local missing = reason:match("^tool:(.+)$")
+		if missing then
+			local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return missing end)
+			return false, hint
+		end
+		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
 	end
 	error("unknown action requirement token '" .. tostring(token) .. "'")
@@ -980,6 +1013,9 @@ function M.set_enabled(enabled)
 		debt = nil
 		return true
 	end
+	-- A refused switch commits nothing, so a composed scope has nothing to undo.
+	function owner.revert() return false, "no committed gesture scope to revert" end
+	function owner.release() end
 	_scope_owner = owner
 	if owner.retry_restore() then
 		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
@@ -1093,6 +1129,8 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	-- A closed list: "ui" or a shipped locale code (translate.lua).
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
+	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
+	if spec == "app" then return AppParameter.is_valid(value) end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1111,6 +1149,7 @@ function M.get_action_parameter_prompt(action_name)
 	local spec = M.get_action_parameter_spec(action_name)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		local WrapPair = require("wrap_pair")
@@ -1159,6 +1198,7 @@ function M.get_action_parameter_error(action_name)
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1347,6 +1387,24 @@ function M.apply_scope(mode)
 	local committed, detail = _scope_owner.apply(mode)
 	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
 	return committed, detail, backup
+end
+
+--- Whether a gesture scope can be acknowledged on this machine: the reader is
+--- already running, or the finder selects a touchpad to start it on. Without
+--- one, « recommended » can never start the reader it requires.
+--- @return boolean available
+function M.scope_available()
+	if _reading then return true end
+	return require("modules.gestures.touchpad_finder").find() ~= nil
+end
+
+--- The gesture participant of a composed scope, bound to the retained owner.
+--- @return table participant See config_scope_composition.
+function M.scope_participant()
+	return require("config_scope_participant").synchronous({
+		apply = function(mode) return M.apply_scope(mode) end,
+		owner = function() return _scope_owner end,
+	})
 end
 
 --- Resets all gesture actions to defaults.
@@ -1638,14 +1696,37 @@ end
 --- @param visit table `{ action(section, slot, action), param(section, key, value),
 ---   enabled(value) }`; every field is optional.
 local function walk_user_config(config, visit)
+	--- Path segments of one entry of a (possibly dotted) section.
+	--- @param section_name string
+	--- @param key any
+	--- @return table segments
+	local function entry_path(section_name, key)
+		local segments = {}
+		for part in section_name:gmatch("[^.]+") do segments[#segments + 1] = part end
+		segments[#segments + 1] = key
+		return segments
+	end
+
 	--- Visits one section's slot→action pairs the loader binds.
 	--- @param section_name string
 	--- @param section table|nil
 	local function walk_actions(section_name, section)
 		if type(section) ~= "table" or not visit.action then return end
 		for slot, action in pairs(section) do
-			if M.DEFAULT_GESTURES[slot] and type(action) == "string" then
+			-- An unknown slot, a non-text action or a retired one is outdated
+			-- configuration: neither the loader nor the cleanup marker takes it,
+			-- so it is warned about once and offered for removal instead of
+			-- being skipped in silence. `enabled` is the master switch.
+			if slot == "enabled" and section_name == CONFIG_SECTION then
+				-- Read by the enabled visitor below.
+			elseif not M.DEFAULT_GESTURES[slot] then
+				ConfigOutdated.report(entry_path(section_name, slot), "no gesture slot of this build has this name", Logger)
+			elseif type(action) ~= "string" then
+				ConfigOutdated.report(entry_path(section_name, slot), "the value is not an action id", Logger)
+			elseif M.is_assignable(action) then
 				visit.action(section_name, slot, action)
+			else
+				ConfigOutdated.report(entry_path(section_name, slot), "action '" .. action .. "' no longer exists", Logger)
 			end
 		end
 	end
@@ -1659,6 +1740,11 @@ local function walk_user_config(config, visit)
 			local binding, action = M.split_action_parameter_key(key)
 			if binding and action and M.validate_action_parameter(action, value) then
 				visit.param(section_name, key, value)
+			else
+				-- Outdated configuration, named once and offered by the cleanup.
+				ConfigOutdated.report(entry_path(section_name, key), binding and action
+					and "the value no longer fits its action's parameter"
+					or "no action parameter of this build has this name", Logger)
 			end
 		end
 	end

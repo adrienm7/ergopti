@@ -81,7 +81,6 @@ _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle, RollbackName,
 	Assert(Body != "", Name . " must exist")
 	CriticalOff := InStr(Body, 'Critical("Off")', true)
 	Acquire := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(", true)
-	Quiesce := InStr(Body, "LLM_Menu_QuiesceTriggerForLifecycle(", true)
 	Commit := InStr(Body, CommitNeedle, true)
 	Strict := InStr(Body,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")', true)
@@ -93,8 +92,8 @@ _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle, RollbackName,
 	Release := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)", true)
 	Assert(CriticalOff > 0 && Acquire > CriticalOff,
 		Name . " must drop inherited Critical before adapter/file/logger work")
-	Assert(Acquire > 0 && Quiesce > Acquire && Commit > Quiesce,
-		Name . " must acquire globally, quiesce native/WAL state, then commit")
+	Assert(Acquire > 0 && Commit > Acquire,
+		Name . " must acquire the global lifecycle bundle, then commit")
 	Assert(Strict > Commit && BarrierFlag > Strict && Reload > BarrierFlag
 		&& Settle > Reload && Handoff > Settle && SyncRollback > Handoff
 		&& Release > SyncRollback,
@@ -249,20 +248,3 @@ _CTIM_RuntimeDropsCriticalAtEveryIoEntry() {
 Test("config transition integration: no filesystem/logger I/O inherits Critical "
 	. "(config-transition-integration-no-critical-io)",
 	_CTIM_RuntimeDropsCriticalAtEveryIoEntry)
-
-_CTIM_OnlyOrdinaryExitAllowsReadOnlyTriggerQuarantine() {
-	Body := _StripFullLineComments(_DriverFuncBody("Ergopti_OnShutdown"))
-	Assert(Body != "", "Ergopti_OnShutdown must exist")
-	Decision := InStr(Body,
-		"AllowReadOnlyTriggerJournal := !(TerminalHandoff is Map)", true)
-	ReloadGate := InStr(Body,
-		'StrCompare(reason, "Reload", true) != 0', true)
-	Quiesce := InStr(Body,
-		'ShutdownOwners, 0, 0, 0, "", AllowReadOnlyTriggerJournal', true)
-	Assert(Decision > 0 && ReloadGate > Decision && Quiesce > ReloadGate,
-		"only non-Reload shutdown may treat malformed LLM WAL as read-only; "
-		. "Reload/destructive transitions must remain fail-closed")
-}
-Test("config transition integration: ordinary Quit alone permits read-only LLM WAL "
-	. "(config-transition-integration-quit-readonly-wal)",
-	_CTIM_OnlyOrdinaryExitAllowsReadOnlyTriggerQuarantine)

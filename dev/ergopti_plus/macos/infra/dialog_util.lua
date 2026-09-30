@@ -165,6 +165,23 @@ function M.text_prompt(...)
 	return hs.dialog.textPrompt(...)
 end
 
+--- The folder the application chooser opens on.
+local APPLICATIONS_DIR = "/Applications"
+
+--- Focus-aware application chooser: an open panel on /Applications that
+--- accepts application bundles only. Modal, like text_prompt, and opened from
+--- a menu, never from the keyboard tap.
+--- @param message string The panel's message.
+--- @return string|nil path The chosen .app path, nil when cancelled.
+function M.choose_application(message)
+	focus_hammerspoon()
+	local chosen = hs.dialog.chooseFileOrFolder(message, APPLICATIONS_DIR, true, false, false, { "app" }, true)
+	if type(chosen) ~= "table" then return nil end
+	-- The panel returns its selection keyed by position, as a string key.
+	local path = chosen[1] or chosen["1"]
+	return type(path) == "string" and path ~= "" and path or nil
+end
+
 --- Focus-aware wrapper around hs.dialog.alert (the non-blocking variant).
 --- Focusing is still useful so the alert renders on top of the user's current
 --- app and its auto-dismiss / button-click behaviour is predictable.

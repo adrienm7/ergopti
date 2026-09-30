@@ -81,8 +81,9 @@ end
 --- Respects per-section enable/disable state stored in hs.settings.
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
-function M.load_toml(name, path)
-	return Groups.load_toml(name, path)
+--- @param section_sources table|nil Sections a layout extension's files supply.
+function M.load_toml(name, path, section_sources)
+	return Groups.load_toml(name, path, section_sources)
 end
 
 --- Atomically replaces one enabled TOML group while preserving a deliberately
@@ -151,6 +152,12 @@ end
 --- @return boolean committed
 function M.with_hotstring_delays(resolve, publish)
 	return Groups.with_hotstring_delays(resolve, publish)
+end
+
+--- Returns every registered TOML group's sections and corpus delay metadata.
+--- @return table|nil inventory Detached copies keyed by group name.
+function M.hotstring_delay_inventory()
+	return Groups.hotstring_delay_inventory()
 end
 
 --- Enables a previously disabled group by reloading its file (or re-running its hook).

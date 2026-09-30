@@ -25,10 +25,10 @@ local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_regi
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
 M._active_tasks = {}
 
--- Optional dependency: the auto-bootstrap status lives in this module so we
--- can differentiate "still installing" from "definitively failed" when the
--- MLX import probe below fails. If the module is absent (unusual layout),
--- we fall back to the previous generic behaviour.
+-- The MLX runtime owner: it names the venv folder and holds the bootstrap
+-- status, so a failed import probe below can tell "installing", "not
+-- installed", "failed" and "broken" apart. If the module cannot load (unusual
+-- layout), no interpreter can be named and MLX stays unavailable.
 local ok_mlx_deps, mlx_deps_checker = pcall(require, "modules.llm.mlx_deps_checker")
 if not ok_mlx_deps then mlx_deps_checker = nil end
 
@@ -82,36 +82,26 @@ function M.new(deps, presets)
 	-- "fixing" mismatches with zombie kills and forced restarts was chasing a
 	-- phantom. The registration side outlived its only invoker and read as live.
 
-	local module_source = debug.getinfo(1, "S").source:sub(2)
-	local project_root = module_source:match("^(.*)/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx%.lua$")
 	-- Single, canonical Python interpreter for every Hammerspoon-driven MLX
-	-- invocation. This venv is provisioned by modules/llm/ensure-mlx-deps.sh
-	-- on first launch from the pinned pyproject.toml, so its absolute path is
-	-- the only one we ever shell out to. Any consumer that hits a missing
-	-- interpreter must fail fast — silent fallback to a system python would
-	-- bypass the pinned mlx-lm version and reintroduce the very drift we are
-	-- trying to eliminate.
-	local hs_root = project_root and (project_root .. "/static/ergopti_plus/macos") or ""
-	local project_venv_python = hs_root ~= "" and (hs_root .. "/.venv/bin/python") or ""
+	-- invocation. modules/llm/ensure-mlx-deps.sh provisions its venv from the
+	-- pinned pyproject.toml the first time the user selects the MLX backend
+	-- (ui/menu/menu_llm/runtime_install_offer), never at startup. The folder
+	-- comes from mlx_deps_checker.venv_dir(), the same answer its "installed"
+	-- verdict reads, so the menu and the interpreter launched here can never
+	-- name two different venvs. Any consumer that hits a missing interpreter
+	-- must fail fast — silent fallback to a system python would bypass the
+	-- pinned mlx-lm version and reintroduce the very drift we are trying to
+	-- eliminate.
+	local venv_dir = mlx_deps_checker and type(mlx_deps_checker.venv_dir) == "function"
+		and mlx_deps_checker.venv_dir() or nil
+	local project_venv_python = type(venv_dir) == "string" and (venv_dir .. "/bin/python") or ""
 
-	-- When the Swift launcher is running (ERGOPTI_CONFIG_DIR is set), the
-	-- bundle is read-only and ensure-mlx-deps.sh redirected the venv to
-	-- ~/Library/Application Support/Ergopti/mlx-venv (same logic as the
-	-- shell script). Override the computed in-bundle path accordingly.
-	local _ergopti_config_dir = os.getenv("ERGOPTI_CONFIG_DIR")
-	if _ergopti_config_dir and _ergopti_config_dir ~= "" then
-		local home = os.getenv("HOME") or ""
-		if home ~= "" then
-			project_venv_python = home .. "/Library/Application Support/Ergopti/mlx-venv/bin/python"
-		end
-	end
-
-	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
-		-- The auto-bootstrap (modules/llm/mlx_deps_checker) provisions this interpreter
-		-- on every reload; if it is still missing here the bootstrap failed and
-		-- the user has already been notified.
-		Logger.warn(LOG, "Project venv python introuvable à %s — bootstrap auto en échec.",
-			tostring(project_venv_python))
+	if project_venv_python == "" then
+		Logger.error(LOG, "The MLX runtime folder cannot be named; MLX stays unavailable.")
+	elseif not hs.fs.attributes(project_venv_python, "mode") then
+		-- Normal for anyone who never selected MLX: nothing failed.
+		Logger.debug(LOG, "MLX runtime not installed at %s; it installs when the MLX backend is selected.",
+			project_venv_python)
 	end
 	local project_venv_python_escaped = project_venv_python:gsub("\\", "\\\\"):gsub("\"", "\\\"")
 
@@ -455,10 +445,12 @@ function M.new(deps, presets)
 		end
 
 		-- Verify the pinned project venv has every required MLX dependency
-		-- importable. If it does not, the venv is broken / out of sync and the
-		-- user must run modules/llm/ensure-mlx-deps.sh manually — silently
-		-- pip-installing a fallback would bypass pyproject.toml.
-		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"
+		-- importable: the packages ensure-mlx-deps.sh's fast path checks,
+		-- truststore included since the model download gate imports it. If it
+		-- does not, the venv is broken / out of sync and the next MLX selection
+		-- must rebuild it — silently pip-installing a fallback would bypass
+		-- pyproject.toml.
+		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors; import truststore'"
 		-- Publish the exact owner before start(). TaskLifecycle.start() can mutate
 		-- native state and still return false/nil/throw, so refusal begins cleanup;
 		-- it never authorizes the queued completion or drops the GC pin
@@ -482,15 +474,18 @@ function M.new(deps, presets)
 				--   1. bootstrap still running → "patientez", do not flip to error
 				--   2. bootstrap failed        → show the actual stderr cause
 				--   3. unknown                 → previous generic message
-				if mlx_deps_checker and mlx_deps_checker.is_pending and mlx_deps_checker.is_pending() then
-					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — launching install.")
-					local bootstrap_ok, accepted = xpcall(
-						mlx_deps_checker.check_and_install_deps, debug.traceback)
-					if not bootstrap_ok or accepted ~= true then
-						Logger.debug(LOG,
-							"MLX dependency install was rejected by its pause admission.")
-						return settle_cancel("dependency_bootstrap_refused")
-					end
+				-- A model check never provisions the runtime: only selecting the
+				-- MLX backend may, so a restored model cannot start a download.
+				if mlx_deps_checker and mlx_deps_checker.is_task_running
+					and mlx_deps_checker.is_task_running() then
+					Logger.info(LOG, "MLX import probe failed while the selected runtime installs.")
+					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
+						i18n.get("mlx.deps_missing_body"), "info")
+				elseif mlx_deps_checker and mlx_deps_checker.runtime_installed
+					and not mlx_deps_checker.runtime_installed() then
+					Logger.warn(LOG, "MLX import probe failed: the MLX runtime is not installed.")
+					pcall(notifications.notify, i18n.get("mlx.runtime_missing_title"),
+						i18n.get("mlx.runtime_missing_body"), "warning")
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
 					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
 						or "Cause inconnue. Consultez la console Hammerspoon."
@@ -508,9 +503,16 @@ function M.new(deps, presets)
 						pcall(mlx_deps_checker.reset_bootstrap_state)
 					end
 				else
-					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
-					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
-						i18n.get("mlx.deps_missing_body"), "error")
+					-- Installed yet not importable: a partial venv or one an update's
+					-- new lock outdated. Nothing re-syncs it on its own, so mark it
+					-- not installed and name the selection that rebuilds it.
+					Logger.error(LOG, "MLX packages are not importable from the installed runtime %s.",
+						project_venv_python_escaped)
+					if mlx_deps_checker and mlx_deps_checker.invalidate_runtime then
+						pcall(mlx_deps_checker.invalidate_runtime)
+					end
+					pcall(notifications.notify, i18n.get("mlx.runtime_broken_title"),
+						i18n.get("mlx.runtime_broken_body"), "error")
 				end
 				return settle_cancel("dependency_probe_failed")
 			end

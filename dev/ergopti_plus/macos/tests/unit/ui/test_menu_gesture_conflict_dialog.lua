@@ -65,6 +65,12 @@ local function choose(parameter, clicked, refusal, picked)
 	package.loaded["ui.menu.shortcut_utils"] = {
 		action_parameter_title = function(label) return label end,
 		picker_parameter_fields = function() return {} end,
+		-- The kind-aware ask of the real module, reduced to its text prompt.
+		ask_parameter_value = function(_, _, _, title, prior)
+			local button, typed = package.loaded["infra.dialog_util"].text_prompt(title, "", prior)
+			if button ~= "button.save" then return nil end
+			return typed
+		end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.storage"] = { get = function() return false end }

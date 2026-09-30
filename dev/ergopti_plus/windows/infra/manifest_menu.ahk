@@ -203,7 +203,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			ItemCount++
 
 		} else if ItemType == "group" {
-			_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders)
+			_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters)
 			ItemCount++
 
 		} else if ItemType == "letter_picker" {
@@ -545,6 +545,18 @@ _MR_RenderFeature(ResultMenu, Item, CategoryName) {
 		try LoggerWarn("MenuRenderer", "feature item has no path — skipped.")
 		return
 	}
+	; A row carrying a ``group_label`` names a feature SECTION: it becomes one
+	; submenu, titled by that label, holding every feature of the section — the
+	; key-combination families of key_combinations_group (AltGrLAlt, …).
+	GroupLabel := _MR_Get(Item, "group_label")
+	if (GroupLabel != "") {
+		GroupSub := Menu()
+		for FeatureEntry in ManifestFeaturesForSection(Path) {
+			MenuAddItemFromManifest(GroupSub, FeatureEntry, CategoryName . "." . GroupLabel)
+		}
+		ResultMenu.Add(GroupLabel, GroupSub)
+		return
+	}
 	Entry := ManifestFindEntryByPath(Path)
 	if (Entry == false) {
 		try LoggerWarn("MenuRenderer", "feature path '{1}' not in manifest — skipped.", Path)
@@ -591,8 +603,10 @@ _MR_RenderSectionHeader(ResultMenu, Item) {
 	ResultMenu.Disable(Label)
 }
 
-; Render a named group submenu.
-_MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders) {
+; Render a named group submenu. A group declaring ``checked_when`` ticks its
+; title from those getters, as a category's parent row shows its switch: the
+; key-combinations group is checked while its own first-row switch is on.
+_MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "") {
 	Id    := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	if (Id == "" or I18nKey == "") {
@@ -601,19 +615,20 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders) {
 	}
 	Label := t(I18nKey)
 
-	; Try the caller-supplied builder first.
+	; The caller-supplied builder first, else the built-in accented_letters_group.
 	if (GroupBuilders is Map and GroupBuilders.Has(Id)) {
 		Sub := (GroupBuilders[Id])()
-		if (Sub is Menu) {
-			ResultMenu.Add(Label, Sub)
-		}
+	} else {
+		Sub := _MR_BuildBuiltinGroup(Id, CategoryName)
+	}
+	if !(Sub is Menu) {
 		return
 	}
-
-	; Built-in group: modifier_combos_group, accented_letters_group.
-	Sub := _MR_BuildBuiltinGroup(Id, CategoryName)
-	if (Sub is Menu) {
-		ResultMenu.Add(Label, Sub)
+	ResultMenu.Add(Label, Sub)
+	if (_MR_Get(Item, "checked_when", 0) is Array) {
+		if MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters) {
+			try ResultMenu.Check(Label)
+		}
 	}
 }
 
@@ -633,29 +648,11 @@ _MR_RenderLetterPicker(ResultMenu, Item, _CategoryName) {
 _MR_BuildBuiltinGroup(GroupId, CategoryName) {
 	; The rows come from the manifest section named after the group — the
 	; ``<id>_group`` convention the renderer already uses for hotstrings_params.
-	; Both lists used to be hardcoded here as well as declared in the manifest,
+	; The list used to be hardcoded here as well as declared in the manifest,
 	; so editing the manifest moved nothing and the code copy was the real source.
+	; The key-combination families left this builder with their group: the
+	; Shortcuts menu renders key_combinations_group, first-row switch included.
 	Section := _MR_GetMenuDef(GroupId . "_group")
-
-	if (GroupId == "modifier_combos") {
-		Sub := Menu()
-		for Entry in Section {
-			if !_MR_IsForAhk(Entry)
-				continue
-			; ``path`` is a feature-manifest SECTION here: each row expands to
-			; every feature under it, gathered in one labelled submenu.
-			V2Section := _MR_Get(Entry, "path")
-			GroupLabel := _MR_Get(Entry, "group_label")
-			if (V2Section == "" or GroupLabel == "")
-				continue
-			GroupSub := Menu()
-			for FeatureEntry in ManifestFeaturesForSection(V2Section) {
-				MenuAddItemFromManifest(GroupSub, FeatureEntry, "Shortcuts." . GroupLabel)
-			}
-			Sub.Add(GroupLabel, GroupSub)
-		}
-		return Sub
-	}
 
 	if (GroupId == "accented_letters") {
 		Sub := Menu()

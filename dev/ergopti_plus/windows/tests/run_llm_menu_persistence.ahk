@@ -27,14 +27,14 @@ global _LLM_Menu := Map(
 	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
-	"trigger_shortcut", "Ctrl+Space", "api_entry_id", "api_primary",
+	"api_entry_id", "api_primary",
 	"ollama_port", 11434, "inline_autotype", false, "user_profiles", []
 )
 global _LLM_Menu_Loaded := false
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
-#Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+#Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/init.ahk
 #Include unit/test_llm_menu_persistence.ahk

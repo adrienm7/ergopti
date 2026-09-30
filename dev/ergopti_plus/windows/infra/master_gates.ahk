@@ -73,12 +73,15 @@ MasterGateDesiredTapHold(TapHoldSource) {
 
 ; Only declared switches and alpha activation flags are runtime gates. Parameters
 ; retain their types and values, including numbers, strings, and alpha options.
-_MG_DisableFeatureNode(Node, Prefix) {
+; Keys listed in Kept (an Array) are left to another gate.
+_MG_DisableFeatureNode(Node, Prefix, Kept := "") {
 	if InStr(Prefix, ".") && Node.Has("enabled") {
 		Node["enabled"] := false
 		return
 	}
 	for Key, Value in Node {
+		if _MG_ArrayHas(Kept, Key)
+			continue
 		Path := Prefix . "." . Key
 		if Value is Map {
 			_MG_DisableFeatureNode(Value, Path)
@@ -92,6 +95,17 @@ _MG_DisableFeatureNode(Node, Prefix) {
 	}
 }
 
+; Whether Items is an Array holding Value.
+_MG_ArrayHas(Items, Value) {
+	if !(Items is Array)
+		return false
+	for Item in Items {
+		if (Item == Value)
+			return true
+	}
+	return false
+}
+
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
 		if !(FeaturesTarget is Map)
 				throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
@@ -102,7 +116,9 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Validate the canonical manifest before touching either candidate.  A
 		; malformed/missing manifest is a startup configuration error, not a reason
 		; to silently run an unreviewed duplicate gate table.
-		SubGates := _MG_LoadSubCategories()
+		ManifestRoot := ""
+		SubGates := _MG_LoadSubCategories("", &ManifestRoot)
+		KeyCombinationFamilies := _MG_KeyCombinationFamilies(ManifestRoot)
 
 		; Layout master
 		if !CategoryGateFn.Call("Layout") and FeaturesTarget.Has("layout") {
@@ -113,9 +129,20 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Layout master: a disabled category has already turned the selection off.
 		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
-		; Shortcuts master
+		; Shortcuts master: every shortcut but the key-combination families, which
+		; only their own switch governs, as on macOS.
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
-				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")
+				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts", KeyCombinationFamilies)
+		}
+
+		; « Combinaisons de touches »: the only gate of the combination families,
+		; whatever the Shortcuts master says. Off, they go off, each keeping its
+		; choices on disk.
+		if !CategoryGateFn.Call("KeyCombinations") and FeaturesTarget.Has("shortcuts") {
+				for Family in KeyCombinationFamilies {
+						if FeaturesTarget["shortcuts"].Has(Family)
+								_MG_DisableFeatureNode(FeaturesTarget["shortcuts"][Family], "shortcuts." . Family)
+				}
 		}
 
 		; Hotstrings master (includes Personal sub-category).
@@ -240,7 +267,9 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 ; Reads and validates hotstring_category_keys from menu_manifest.json.
 ; The manifest is the sole behavioral definition: failure is explicit so a
 ; candidate state can never be partially gated by a stale fallback table.
-_MG_LoadSubCategories(ManifestPath := "") {
+; ``Root`` receives the parsed manifest, so the gate application reads the
+; key-combination families from the same uncached parse instead of a second one.
+_MG_LoadSubCategories(ManifestPath := "", &Root := "") {
 		global _SharedDir
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
 		; reverted: it defeats the fail-fast contract that an invalid canonical
@@ -285,4 +314,36 @@ _MG_LoadSubCategories(ManifestPath := "") {
 						throw Error("Master gate manifest contains an invalid sub-category entry.")
 		}
 		return SubCats
+}
+
+; The Features["shortcuts"] families the « Combinaisons de touches » switch
+; alone gates: the Windows ``feature`` rows of key_combinations_group, each naming a
+; feature section (shortcuts.alt_gr_lalt, …). The menu draws the same rows, so
+; a family shown there is gated the day it is added.
+; @param Root {Map} The manifest parsed by _MG_LoadSubCategories.
+; @returns {Array} Family ids under Features["shortcuts"].
+_MG_KeyCombinationFamilies(Root) {
+		Rows := (Root is Map && Root.Has("key_combinations_group")) ? Root["key_combinations_group"] : ""
+		if !(Rows is Array)
+				throw Error("Master gate manifest lacks key_combinations_group.")
+		Families := []
+		for Row in Rows {
+				if !(Row is Map) || !Row.Has("type") || Row["type"] != "feature"
+						continue
+				Plats := Row.Has("platforms") ? Row["platforms"] : ""
+				ForAhk := !(Plats is Array)
+				if (Plats is Array) {
+						for Plat in Plats
+								ForAhk := ForAhk || Plat == "ahk"
+				}
+				if !ForAhk
+						continue
+				Path := Row.Has("path") ? Row["path"] : ""
+				if !(Path is String) || !RegExMatch(Path, "^shortcuts\.([a-z0-9_]+)$", &Match)
+						throw Error("Master gate manifest has an invalid key-combination family.")
+				Families.Push(Match[1])
+		}
+		if (Families.Length == 0)
+				throw Error("Master gate manifest declares no Windows key-combination family.")
+		return Families
 }

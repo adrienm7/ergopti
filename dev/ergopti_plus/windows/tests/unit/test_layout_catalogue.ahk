@@ -348,6 +348,124 @@ _LCT_ExtensionOverlayCase() {
 Test("layout extensions: desired choices survive master gating (layout-extension-runtime)",
 	_LCT_ExtensionDesiredCase)
 
+Test("layout extensions: bound fragments preserve historical section routing (layout-extension-binding)",
+	_LCT_ExtensionBindingCase)
+
+_LCT_ExtensionBindingCase() {
+	Binding := Map("category", "magickey", "feature_section", "hotstrings.magic_key",
+		"source", "common", "sections", ["repeat_corrections"])
+	File := { category: "ext:ergopti:magicrepeat", path: "geometry.toml", binding: Binding }
+	Packs := [{ id: "ergopti", toml_files: [File] }]
+	AssertEqual("geometry.toml", HotstringExtensions_Source(Packs, "magickey", "repeat_corrections"))
+	AssertEqual("", HotstringExtensions_Source(Packs, "magickey", "text_expansion_symbols"))
+	AssertEqual("", HotstringExtensions_Source(Packs, "magickey"), "general metadata remains owned by the base file")
+	AssertEqual("geometry.toml", HotstringExtensions_Source(Packs, File.category))
+	Packs.Push({ id: "conflicting", toml_files: [File] })
+	AssertThrows(() => HotstringExtensions_Source(Packs, "magickey", "repeat_corrections"),
+		"two owners cannot silently replace a historical section")
+}
+
+Test("layout extensions: the shared binding vectors decide the same sources on Windows (layout-extension-binding)",
+	_LCT_ExtensionBindingVectorsCase)
+
+; Replays _shared/tests/corpus/layouts/extension_binding_vectors.json through the
+; real scanner on real files, the vectors the macOS and Linux suites replay.
+_LCT_ExtensionBindingVectorsCase() {
+	Doc := JsonParse(_LCT_Read(_SharedDir . "\tests\corpus\layouts\extension_binding_vectors.json"))
+	Valid := 0, Invalid := 0
+	for Scenario in Doc["cases"] {
+		Dir := _LCT_TempDir()
+		try {
+			Root := Dir . "ext"
+			for Pack in Scenario["packs"] {
+				PackDir := Root . "\" . Pack["id"] . "\"
+				DirCreate(PackDir . "hotstrings")
+				_LCT_WriteRaw(PackDir . "manifest.toml", Pack["manifest"])
+				for Stem in Pack["files"]
+					_LCT_WriteRaw(PackDir . "hotstrings\" . Stem . ".toml", '[[section]]' . "`n" . '"aa" = { output = "b" }' . "`n")
+			}
+			if !Scenario["valid"] {
+				Invalid += 1
+				AssertThrows(() => HotstringExtensions_Scan([Root]), Scenario["name"])
+				continue
+			}
+			Valid += 1
+			Packs := HotstringExtensions_Scan([Root])
+			Bound := Map(), Unbound := []
+			for Pack in Packs {
+				for File in Pack.bound_files
+					Bound[Pack.id . "/" . File.stem] := File.binding
+				for File in Pack.toml_files {
+					AssertFalse(File.HasOwnProp("binding"), "an ext: pack carries no binding: " . Scenario["name"])
+					Unbound.Push(Pack.id . "/" . File.stem)
+				}
+			}
+			AssertEqual(Scenario["bindings"].Count, Bound.Count, Scenario["name"])
+			for Key, Expected in Scenario["bindings"] {
+				AssertTrue(Bound.Has(Key), Scenario["name"] . ": " . Key)
+				for Field in ["category", "feature_section", "source"]
+					AssertEqual(Expected[Field], Bound[Key][Field], Scenario["name"] . ": " . Key . "." . Field)
+				AssertEqual(Expected.Has("sections"), Bound[Key].Has("sections"), Scenario["name"] . ": " . Key)
+				if Expected.Has("sections") {
+					AssertEqual(Expected["sections"].Length, Bound[Key]["sections"].Length)
+					for Index, Name in Expected["sections"]
+						AssertEqual(Name, Bound[Key]["sections"][Index])
+				}
+			}
+			AssertEqual(Scenario["unbound"].Length, Unbound.Length, Scenario["name"])
+			for Key in Scenario["unbound"] {
+				Listed := false
+				for Found in Unbound
+					Listed := Listed || Found == Key
+				AssertTrue(Listed, Scenario["name"] . ": " . Key)
+			}
+			for Query in Scenario["queries"] {
+				Label := Scenario["name"] . ": " . Query["category"] . "." . Query["section"]
+				if Query["source"] == "error" {
+					AssertThrows(HotstringExtensions_Source.Bind(Packs, Query["category"], Query["section"]), Label)
+					continue
+				}
+				Expected := ""
+				if Query["source"] != "" {
+					Parts := StrSplit(Query["source"], "/")
+					Expected := Root . "\" . Parts[1] . "\hotstrings\" . Parts[2] . ".toml"
+				}
+				AssertEqual(Expected, HotstringExtensions_Source(Packs, Query["category"], Query["section"]), Label)
+			}
+		} finally DirDelete(Dir, true)
+	}
+	AssertTrue(Valid >= 3 && Invalid >= 5, "the shared vectors lost their coverage")
+}
+
+Test("layout extensions: the shared magic-key vectors read the same declaration on Windows (layout-magic-key)",
+	_LCT_ExtensionMagicKeyVectorsCase)
+
+; Replays _shared/tests/corpus/layouts/extension_magic_key_vectors.json through
+; the real scanner on a real manifest, as the macOS and Linux suites do.
+_LCT_ExtensionMagicKeyVectorsCase() {
+	Doc := JsonParse(_LCT_Read(_SharedDir . "\tests\corpus\layouts\extension_magic_key_vectors.json"))
+	Declared := 0, Refused := 0
+	for Scenario in Doc["cases"] {
+		Dir := _LCT_TempDir()
+		try {
+			Root := Dir . "ext"
+			DirCreate(Root . "\geometry\hotstrings")
+			_LCT_WriteRaw(Root . "\geometry\manifest.toml", Scenario["manifest"])
+			if !Scenario["valid"] {
+				Refused += 1
+				AssertThrows(() => HotstringExtensions_Scan([Root]), Scenario["name"])
+				continue
+			}
+			Packs := HotstringExtensions_Scan([Root])
+			AssertEqual(1, Packs.Length, Scenario["name"])
+			AssertEqual(Scenario["magic_key"], Packs[1].magic_key, Scenario["name"])
+			if Scenario["magic_key"] != ""
+				Declared += 1
+		} finally DirDelete(Dir, true)
+	}
+	AssertTrue(Declared >= 2 && Refused >= 4, "the shared vectors lost their coverage")
+}
+
 _LCT_ExtensionDesiredCase() {
 	Category := "ext:ergopti:rolls"
 	Packs := [{ id: "ergopti", name: "Ergopti", toml_files: [

@@ -216,6 +216,36 @@ function M.with_hotstring_delays(resolve, publish)
 end
 
 
+--- Deep-copies corpus metadata so a caller cannot reach the registered record.
+--- @param value any Plain Lua data.
+--- @return any copy
+local function copy_plain(value)
+	if type(value) ~= "table" then return value end
+	local out = {}
+	for key, child in pairs(value) do out[key] = copy_plain(child) end
+	return out
+end
+
+--- Returns the delay inputs of every registered TOML group, detached: its
+--- section names (separators and placeholders excluded) and the corpus
+--- metadata the delay projection resolves against. A disabled group keeps the
+--- metadata of its last registration, which is what re-enabling it reads.
+--- @return table|nil inventory { [name] = { sections = { string }, metadata = table } }
+function M.hotstring_delay_inventory()
+	if not require_state("hotstring_delay_inventory") then return nil end
+	local inventory = {}
+	for name, group in pairs(_state.groups) do
+		if group.kind == "toml" then
+			local sections = {}
+			for _, section in ipairs(group.sections or {}) do
+				if section.name ~= "-" and not section.is_module_placeholder then sections[#sections + 1] = section.name end
+			end
+			inventory[name] = { sections = sections, metadata = copy_plain(group.delay_metadata or {}) }
+		end
+	end
+	return inventory
+end
+
 --- Replaces one group's complete section-delay ownership and resizes the word timeout.
 --- Passing nil removes the owner; outer multi-step mutations provide rollback.
 --- @param name string
@@ -366,18 +396,91 @@ function M.load_file(name, path)
 	end)
 end
 
+--- Whether a section-source list has the shape load_toml takes.
+--- @param section_sources any
+--- @return boolean
+local function valid_section_sources(section_sources)
+	if section_sources == nil then return true end
+	if type(section_sources) ~= "table" then return false end
+	for _, source in ipairs(section_sources) do
+		if type(source) ~= "table" or type(source.path) ~= "string" or source.path == ""
+			or type(source.sections) ~= "table" or #source.sections == 0 then
+			return false
+		end
+		for _, section in ipairs(source.sections) do
+			if type(section) ~= "string" or section == "" then return false end
+		end
+	end
+	return true
+end
+
+--- A parse whose sections other files supply: a layout extension binds some
+--- sections of a bundled category to its own file. The category's general
+--- metadata stays the bundled file's; each bound section, with its own section
+--- metadata, comes from the extension file. The parse is copied, never edited:
+--- the reader may hand back a cached snapshot shared with other readers.
+--- @param data table Parse of the bundled file.
+--- @param section_sources table Array of { path, sections }.
+--- @param toml_reader table The TOML reader.
+--- @return table|nil merged
+--- @return string|nil err
+local function merge_section_sources(data, section_sources, toml_reader)
+	local meta = {}
+	for key, value in pairs(type(data.meta) == "table" and data.meta or {}) do meta[key] = value end
+	local meta_sections, section_delays = {}, {}
+	for key, value in pairs(type(meta.sections) == "table" and meta.sections or {}) do meta_sections[key] = value end
+	for key, value in pairs(type(meta.section_delays) == "table" and meta.section_delays or {}) do
+		section_delays[key] = value
+	end
+	meta.sections, meta.section_delays = meta_sections, section_delays
+	local sections, order, placed = {}, {}, {}
+	for key, value in pairs(type(data.sections) == "table" and data.sections or {}) do sections[key] = value end
+	local declared = (data.sections_order and #data.sections_order > 0) and data.sections_order
+		or (type(data.meta) == "table" and data.meta.sections_order or {})
+	for _, name in ipairs(declared) do
+		order[#order + 1] = name
+		placed[name] = true
+	end
+	for _, source in ipairs(section_sources) do
+		local ok, bound, committed = pcall(toml_reader.parse, source.path)
+		if not ok or type(bound) ~= "table" or committed ~= true then
+			return nil, "cannot parse the bound file '" .. source.path .. "': " .. tostring(bound)
+		end
+		local bound_meta = type(bound.meta) == "table" and bound.meta or {}
+		for _, name in ipairs(source.sections) do
+			local section = type(bound.sections) == "table" and bound.sections[name] or nil
+			if section == nil then
+				return nil, "the bound file '" .. source.path .. "' carries no section '" .. name .. "'"
+			end
+			sections[name] = section
+			meta_sections[name] = type(bound_meta.sections) == "table" and bound_meta.sections[name] or nil
+			section_delays[name] = type(bound_meta.section_delays) == "table" and bound_meta.section_delays[name] or nil
+			if not placed[name] then
+				order[#order + 1] = name
+				placed[name] = true
+			end
+		end
+	end
+	return { meta = meta, sections = sections, sections_order = order }
+end
+
 --- Loads and parses mappings from a TOML configuration file.
 --- Skips sections the user has disabled, per _callbacks.is_section_enabled
 --- (the persisted enable/disable state itself is owned by registry_index.lua).
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
-function M.load_toml(name, path)
+--- @param section_sources table|nil Sections other files supply, as { path,
+---   sections } records; kept with the group so every reload reads them again.
+function M.load_toml(name, path, section_sources)
 	if not require_state("load_toml") then return false end
 	if type(name) ~= "string" or name == "" then
 		Logger.error(LOG, "load_toml: name must be a non-empty string."); return false
 	end
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "load_toml: path must be a non-empty string."); return false
+	end
+	if not valid_section_sources(section_sources) then
+		Logger.error(LOG, "load_toml: section sources must be { path, sections } records."); return false
 	end
 
 	return run_transaction("load_toml:" .. name, function()
@@ -388,6 +491,14 @@ function M.load_toml(name, path)
 		if not ok or type(data) ~= "table" or committed ~= true then
 			Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
 			return false
+		end
+		if section_sources ~= nil then
+			local merged, merge_err = merge_section_sources(data, section_sources, toml_reader)
+			if not merged then
+				Logger.error(LOG, "TOML group '%s' cannot take its bound sections: %s.", name, merge_err)
+				return false
+			end
+			data = merged
 		end
 
 	ensure_group_order(name)
@@ -543,6 +654,7 @@ function M.load_toml(name, path)
 	local existing_order = _state.groups[name] and _state.groups[name].group_order or nil
 	_state.groups[name] = {
 		path             = path,
+		section_sources  = section_sources,
 		enabled          = true,
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
@@ -599,7 +711,7 @@ function M.reload_toml(name, path)
 			return true
 		end
 		if M.disable_group(name) ~= true then return false end
-		return M.load_toml(name, path) == true
+		return M.load_toml(name, path, group.section_sources) == true
 	end)
 end
 
@@ -741,7 +853,7 @@ function M.enable_group(name)
 
 		local loaded
 		if g.kind == "toml" then
-			loaded = M.load_toml(name, g.path)
+			loaded = M.load_toml(name, g.path, g.section_sources)
 		else
 			loaded = M.load_file(name, g.path)
 		end

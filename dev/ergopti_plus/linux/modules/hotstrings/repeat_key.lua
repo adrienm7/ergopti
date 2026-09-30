@@ -28,17 +28,16 @@
 local M = {}
 
 local Logger = require("logger.shim")
-local Storage = require("adapters.storage")
+local Manifest = require("infra.manifest_reader")
+local Paths = require("infra.config_paths")
+local Writer = require("toml_codec.writer")
+local Codec = require("toml_codec")
+local Preferences = require("infra.hotstring_preferences")
 
 local LOG = "hotstrings.repeat_key"
 
--- Where the user's choice lives. The manifest path doubles as the storage key,
--- as it does for the preview toggles: they name the same setting.
-local STORAGE_KEY = "hotstrings.repeat_key_enabled"
-
--- Opt-out, not opt-in: both other drivers default it on, and a user who has
--- never touched the setting must get the same behaviour on all three.
-local DEFAULT_ENABLED = true
+local FEATURE_PATH = "hotstrings.repeat_key_enabled"
+local _enabled = nil -- populated once; no preference IO on each keystroke
 
 -- One UTF-8 codepoint, as a byte pattern. LuaJIT is 5.1-based and has no `utf8`
 -- library, so the buffer is walked with the same pattern the rest of this driver
@@ -54,24 +53,110 @@ local UTF8_CODEPOINT = "[%z\1-\127\194-\244][\128-\191]*"
 -- =========================================
 -- =========================================
 
---- Whether the repeat is active.
---- @return boolean
-function M.is_enabled()
-	local stored = Storage.get(STORAGE_KEY, nil)
-	if type(stored) == "boolean" then return stored end
-	return DEFAULT_ENABLED
+--- Resolves exactly the leaf consumed by this runtime owner.
+--- @param document table Decoded canonical configuration.
+--- @param mark function|nil Cleanup ownership visitor.
+--- @return boolean enabled
+local function resolve_setting(document, mark)
+	local section = document.hotstrings
+	assert(section == nil or type(section) == "table", "hotstrings configuration must be a table")
+	local value = section and section.repeat_key_enabled
+	if value == nil then value = Manifest.default_for(FEATURE_PATH)
+	elseif mark then mark("hotstrings", "repeat_key_enabled") end
+	assert(type(value) == "boolean", "repeat_key_enabled must be boolean")
+	return value
 end
 
---- Turns the repeat on or off, persisting the choice.
---- @param enabled boolean
---- @return boolean True when the choice was stored.
-function M.set_enabled(enabled)
-	local wanted = enabled and true or false
-	if not Storage.set(STORAGE_KEY, wanted) then
-		Logger.error(LOG, "Could not persist the repeat setting — it would be lost at restart.")
+--- Captures one validated source for a conditional sparse write.
+--- @return boolean enabled
+--- @return table source
+local function read_setting()
+	local content, status, detail = Writer.read_classified(Paths.config("config.toml"))
+	assert(status == "ok" or status == "absent", "repeat configuration is unreadable: " .. tostring(detail))
+	local decoded = Codec.decode(content or "")
+	assert(type(decoded) == "table", "repeat configuration is malformed")
+	return resolve_setting(decoded), { status = status, content = content }
+end
+
+--- Marks the same canonical value used by initialization and setters.
+--- @param document table Decoded configuration.
+--- @param mark function Exact ownership visitor.
+function M.mark_config_reads(document, mark)
+	resolve_setting(document, mark)
+end
+
+--- Reloads the runtime value only after its canonical source is validated.
+--- A terminal scope must call this owner when publishing an external candidate.
+--- @return boolean acknowledged
+function M.refresh()
+	local called, value = pcall(read_setting)
+	if not called then
+		Logger.error(LOG, "Repeat configuration refresh refused: %s.", tostring(value))
 		return false
 	end
-	Logger.debug(LOG, "Magic-key repeat: %s.", wanted and "on" or "off")
+	_enabled = value
+	return true
+end
+
+--- Makes a scope's validated candidate effective before its file is published.
+--- @param document table Decoded configuration candidate.
+--- @return boolean adopted
+function M.adopt_configuration(document)
+	local called, value = pcall(resolve_setting, document)
+	if not called then
+		Logger.error(LOG, "Candidate repeat configuration refused: %s.", tostring(value))
+		return false
+	end
+	_enabled = value
+	return true
+end
+
+--- Restores the exact runtime value a scope captured before a refused publication.
+--- @param enabled boolean Captured value.
+--- @return boolean restored
+function M.restore_configuration(enabled)
+	if type(enabled) ~= "boolean" then return false end
+	_enabled = enabled
+	return true
+end
+
+--- Whether repeat is active, with no repeated disk IO on the input path.
+---
+--- Called for every unmatched character, inside the keyboard hook's guarded
+--- callback: a raise here emergency-stops the whole hook. A configuration that
+--- cannot be read therefore leaves repeat on its neutral default until an
+--- explicit refresh succeeds, and that fallback is cached so the typing path
+--- never retries the disk on each keystroke.
+--- @return boolean enabled
+function M.is_enabled()
+	if _enabled == nil and not M.refresh() then
+		Logger.error(LOG, "Repeat configuration is unreadable; repeat stays neutral until a refresh succeeds.")
+		_enabled = Manifest.default_for(FEATURE_PATH)
+	end
+	return _enabled
+end
+
+--- Publishes a sparse canonical preference before changing runtime state.
+--- @param enabled boolean Desired state.
+--- @return boolean committed
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then return false end
+	-- The hotstrings scope owns this leaf while it holds the preferences.
+	if Preferences.is_acquired() then
+		Logger.error(LOG, "Repeat configuration refused: a hotstring configuration scope is still pending.")
+		return false
+	end
+	local called, committed, detail = pcall(function()
+		local _, source = read_setting()
+		return Writer.batch_write(Paths.config("config.toml"),
+			{ Manifest.sparse_operation(FEATURE_PATH, enabled) }, nil, source)
+	end)
+	if not called or committed ~= true then
+		Logger.error(LOG, "Repeat configuration was not persisted: %s.", tostring(called and detail or committed))
+		return false
+	end
+	_enabled = enabled
+	Logger.debug(LOG, "Magic-key repeat: %s.", enabled and "on" or "off")
 	return true
 end
 

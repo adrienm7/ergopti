@@ -590,7 +590,13 @@ function M.new(deps)
 						sub_menu = type(built.menu) == "table" and built.menu or built
 					end
 					local sub_disabled = built.disabled or nil
-					table.insert(result, { title = label, menu = sub_menu, disabled = sub_disabled })
+					-- A group declaring checked_when ticks its title, as a category's
+					-- parent row shows its switch (the key-combinations group).
+					local sub_checked = nil
+					if type(item.checked_when) == "table" then
+						sub_checked = R.resolve_checked_when(manifest_key, group_id, getters)
+					end
+					table.insert(result, { title = label, menu = sub_menu, disabled = sub_disabled, checked = sub_checked })
 					item_count = item_count + 1
 				end
 

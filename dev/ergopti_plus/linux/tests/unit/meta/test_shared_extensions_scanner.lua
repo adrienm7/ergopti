@@ -26,8 +26,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Json = require("json")
 
 local Extensions = helpers.load_module("hotstrings.extensions")
+
+-- Shared with the macOS suite and the Windows scanner, so the three readers of a
+-- manifest's historical bindings are pinned to one set of decisions.
+local BINDING_VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/extension_binding_vectors.json"
+local MAGIC_KEY_VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/extension_magic_key_vectors.json"
 
 
 --- Builds an injected filesystem from a plain description.
@@ -184,6 +190,55 @@ helpers.describe("extensions: scanning finds packs and names them", function()
 		helpers.assert_eq(0, #found, "no extensions installed is the normal state, not an error")
 	end)
 
+	helpers.it("(extension-isolation) hands one broken pack or root to on_error and keeps the rest", function()
+		local io_fns = fake_fs({
+			["/bundled"] = { "/bundled/demo" },
+			["/user"] = { "/user/demo", "/user/broken", "/user/healthy" },
+		}, {
+			["/user/demo/manifest.toml"] = "[extension\nname = ",
+			["/user/broken/manifest.toml"] = "[extension.magic_key]\nkey = 3\n",
+		})
+		local strict = pcall(Extensions.scan, { "/bundled", "/user" }, io_fns)
+		helpers.assert_eq(false, strict, "without on_error a broken pack still refuses the whole scan")
+
+		local list_dirs = io_fns.list_dirs
+		io_fns.list_dirs = function(root)
+			if root == "/gone" then error("unlistable root", 0) end
+			return list_dirs(root)
+		end
+		local failures = {}
+		io_fns.on_error = function(where, err) failures[#failures + 1] = { where = where, err = err } end
+		local found = Extensions.scan({ "/bundled", "/gone", "/user" }, io_fns)
+		helpers.assert_eq({ "demo", "healthy" }, { found[1].id, found[2].id })
+		helpers.assert_eq(2, #found, "only the broken packs are left out")
+		helpers.assert_eq("/bundled/demo", found[1].dir,
+			"a broken user override leaves the bundled copy of that id in place")
+		helpers.assert_eq({ { root = "/gone" }, { root = "/user", dir = "/user/demo", id = "demo" },
+			{ root = "/user", dir = "/user/broken", id = "broken" } },
+			{ failures[1].where, failures[2].where, failures[3].where })
+	end)
+
+	helpers.it("(extension-isolation) refuses a pack id or file stem no preference path can address", function()
+		local io_fns = fake_fs({
+			["/user"] = { "/user/com.acme", "/user/acme" },
+			["/user/com.acme/hotstrings"] = { "/user/com.acme/hotstrings/words.toml" },
+			["/user/acme/hotstrings"] = { "/user/acme/hotstrings/words.toml",
+				"/user/acme/hotstrings/words.old.toml", "/user/acme/hotstrings/a:b.toml" },
+		}, {})
+		helpers.assert_eq(false, (pcall(Extensions.scan, { "/user" }, io_fns)),
+			"a dotted id would register a group the configuration grammar cannot name")
+		local failures = {}
+		io_fns.on_error = function(where) failures[#failures + 1] = where.path or where.id end
+		local found = Extensions.scan({ "/user" }, io_fns)
+		helpers.assert_eq(1, #found)
+		helpers.assert_eq("acme", found[1].id)
+		helpers.assert_eq({ { path = "/user/acme/hotstrings/words.toml", stem = "words" } }, found[1].toml_files,
+			"a backup file costs only itself, not its healthy siblings")
+		table.sort(failures)
+		helpers.assert_eq({ "/user/acme/hotstrings/a:b.toml", "/user/acme/hotstrings/words.old.toml", "com.acme" },
+			failures)
+	end)
+
 end)
 
 
@@ -225,3 +280,27 @@ helpers.describe("extensions: a pack's category is namespaced by its extension",
 	end)
 
 end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 4/ Historical source bindings ============
+-- ==================================================
+-- ==================================================
+
+do
+	local fh = assert(io.open(BINDING_VECTORS_PATH, "r"))
+	local text = fh:read("*a")
+	fh:close()
+	require("test.extension_binding_contract")(helpers, Extensions, Json.decode(text))
+end
+
+do
+	local fh = assert(io.open(MAGIC_KEY_VECTORS_PATH, "r"))
+	local text = fh:read("*a")
+	fh:close()
+	require("test.extension_magic_key_contract")(helpers, Extensions, Json.decode(text))
+end

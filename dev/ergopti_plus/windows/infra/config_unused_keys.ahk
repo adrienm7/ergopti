@@ -3,13 +3,16 @@
 ; ==============================================================================
 ; MODULE: Unused Configuration Keys
 ; DESCRIPTION:
-; Lists the keys of config.toml that the boot loader reports as unknown and, on
-; request, removes them after writing a byte-exact backup next to the file.
+; Lists the keys of config.toml that the boot loader reports as unknown or
+; outdated and, on request, removes them after writing a byte-exact backup next
+; to the file.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One rule. A key is unused exactly when TomlConfigUnknownKind says so for
-;    the manifest-built tree the boot loader applies the file onto. There is no
-;    second schema here, so the list matches the unused-key warning at startup.
+;    the manifest-built tree the boot loader applies the file onto, and a known
+;    key is outdated exactly when TomlConfigOutdatedReason says its value is no
+;    longer accepted. There is no second schema here, so the list matches the
+;    unused-key and outdated-value warnings at startup.
 ;    Sections the loader skips on purpose
 ;    (``[_*]`` metadata, ``[updater]``, the obsolete ``[ahk.*]`` silo) and the
 ;    dynamic personal namespaces are never offered for removal.
@@ -41,8 +44,9 @@ global CONFIG_UNUSED_KEYS_DISPLAY_LIMIT := 30
 ; default, the same tree boot applies the file onto). Returns a Map with
 ; "status" ("ok", "unreadable" or "malformed") and "keys", an Array of Maps
 ; carrying "section", "key", "kind" (TomlConfigUnknownKind's "section" or
-; "leaf") and "value" (the value rendered as a TOML literal). A missing file is
-; "ok" with no keys: there is nothing to clean.
+; "leaf"; an outdated value of a known key is a "leaf") and "value" (the value
+; rendered as a TOML literal). A missing file is "ok" with no keys: there is
+; nothing to clean.
 ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 	Keys := []
 	Tree := IsSet(SchemaTree) ? SchemaTree : ManifestBuildFeaturesMap()
@@ -55,9 +59,16 @@ ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 		if (SectionPath == "" || TomlConfigSectionSkipKind(SectionPath) != "")
 			continue
 		for Key, Value in Entries {
-			Kind := TomlConfigUnknownKind(Tree, SectionPath, Key)
-			if (Kind == "")
-				continue
+			Kind := TomlConfigUnknownKind(Tree, SectionPath, Key, &ForeignOwner)
+			if (Kind == "") {
+				; The typed parse keeps the literal's type, so its rendering is the
+				; literal the boot loader judged.
+				Native := Value is TOML_Bool ? Value.Value : Value
+				if (TomlConfigOutdatedReason(Tree, SectionPath, Key, Native,
+						TOML_RenderValue(Value), ForeignOwner) == "")
+					continue
+				Kind := "leaf"
+			}
 			Keys.Push(Map("section", SectionPath, "key", Key, "kind", Kind,
 				"value", TOML_RenderValue(Value)))
 		}

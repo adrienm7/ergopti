@@ -25,7 +25,9 @@ local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local WrapPair      = require("wrap_pair")
+local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
+local AppParameter  = require("app_parameter")
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
 local Tone          = require("llm.tone")
@@ -576,10 +578,12 @@ local _all_spaces_at    = 0
 
 --- Returns (ok, allSpaces) using a short-lived cache.
 --- @param spaces table The Spaces binding module.
+--- @param refresh boolean|nil True to re-read the layout whatever its age.
 --- @return boolean, table|nil
-local function _cached_all_spaces(spaces)
+local function _cached_all_spaces(spaces, refresh)
 	local now = hs.timer.secondsSinceEpoch()
-	if _all_spaces_cache ~= nil and (now - _all_spaces_at) < SPACES_LAYOUT_TTL_SEC then
+	if refresh ~= true and _all_spaces_cache ~= nil
+		and (now - _all_spaces_at) < SPACES_LAYOUT_TTL_SEC then
 		return true, _all_spaces_cache
 	end
 	local ok, all = pcall(spaces.allSpaces)
@@ -590,48 +594,135 @@ local function _cached_all_spaces(spaces)
 	return ok, all
 end
 
---- Navigates between macOS Spaces (Desktops).
-local function spaceNav(goNext)
-	-- space_wrap is persisted, restored and exposed as a menu checkbox, but nothing
-	-- ever read it: the toggle looked functional and did nothing. macOS itself stops
-	-- at the first and last Space, so honouring the setting means suppressing the
-	-- navigation at the edge rather than asking the OS to wrap.
-	if _state and _state.space_wrap == false then
-		local spaces = _spaces_module()
-		if spaces and type(spaces.spaceType) == "function" then
-			-- allSpaces is a private-API round-trip and this runs on the gesture
-			-- frame callback, where a stall shows up directly as input lag. The
-			-- Space LAYOUT changes only when the user adds or removes a desktop,
-			-- so it is cached briefly; the focused Space, which changes with every
-			-- navigation, is always read live.
-			local ok_all, all = _cached_all_spaces(spaces)
-			local ok_cur, cur = pcall(spaces.focusedSpace)
-			if ok_all and ok_cur and type(all) == "table" and cur then
-				local screen_spaces
-				for _, list in pairs(all) do
-					for _, id in ipairs(list) do
-						if id == cur then screen_spaces = list break end
-					end
-					if screen_spaces then break end
-				end
-				if screen_spaces and #screen_spaces > 0 then
-					local at_edge = (goNext and screen_spaces[#screen_spaces] == cur)
-						or ((not goNext) and screen_spaces[1] == cur)
-					if at_edge then
-						Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
-						return
-					end
-				end
+--- The Spaces of the screen that holds the focused Space, in Ctrl+Arrow order,
+--- and the position of the focused one among them.
+---
+--- allSpaces is a private-API round-trip and this runs on the gesture frame
+--- callback, where a stall shows up directly as input lag. The Space LAYOUT
+--- changes only when the user adds or removes a desktop, so it is cached
+--- briefly; the focused Space, which changes with every navigation, is always
+--- read live. A focused Space missing from the cached layout means a desktop
+--- was added within the cache lifetime, so the layout is read once more.
+--- @param spaces table The Spaces binding module.
+--- @return table|nil list Ordered Space ids of the focused screen.
+--- @return integer|nil index 0-based position of the focused Space in list.
+--- @return string|nil reason Why the layout could not be read.
+local function focused_screen_spaces(spaces)
+	local ok_cur, cur = pcall(spaces.focusedSpace)
+	if not ok_cur or cur == nil then
+		return nil, nil, "the focused Space is unreadable (" .. tostring(cur) .. ")"
+	end
+	for _, refresh in ipairs({ false, true }) do
+		local ok_all, all = _cached_all_spaces(spaces, refresh)
+		if not ok_all or type(all) ~= "table" then
+			return nil, nil, "the Space layout is unreadable (" .. tostring(all) .. ")"
+		end
+		for _, list in pairs(all) do
+			for position, id in ipairs(list) do
+				if id == cur then return list, position - 1, nil end
 			end
 		end
 	end
+	return nil, nil, "the focused Space " .. tostring(cur) .. " is on no screen"
+end
 
-	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	-- AppleScript-generated key events carry no Ergopti provenance. Both taps then
-	-- treated this Space navigation as physical typing, so action-epoch consumers
-	-- could retain text/LLM state from the previous desktop. Numeric Quartz keycodes
-	-- are supported by the same exact-tag adapter used by named gesture keys.
-	postKeyStroke({ "ctrl" }, key_code)
+-- Ctrl+Left and Ctrl+Right, as Quartz key codes. AppleScript-generated key
+-- events carry no Ergopti provenance: both taps then treated a Space
+-- navigation as physical typing, so action-epoch consumers could retain
+-- text/LLM state from the previous desktop. Numeric Quartz keycodes are
+-- supported by the same exact-tag adapter used by named gesture keys.
+local SPACE_STEP_KEY = { [DesktopNavigation.PREVIOUS] = 123, [DesktopNavigation.NEXT] = 124 }
+
+--- Moves one Space in a direction, as Ctrl+Arrow does: macOS stops at the
+--- first and the last Space of the screen.
+--- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
+--- @return boolean posted
+local function space_step(direction)
+	return postKeyStroke({ "ctrl" }, SPACE_STEP_KEY[direction])
+end
+
+--- Jumps to one Space of the focused screen, or walks there one Ctrl+Arrow at
+--- a time when the jump is refused.
+---
+--- gotoSpace clicks the Space's button in Mission Control through the Dock's
+--- accessibility tree and waits for Mission Control to open, so it holds the
+--- Hammerspoon run loop for a moment. It therefore never runs inside the
+--- gesture or hotkey callback that asked for it (the caller defers it through
+--- the auxiliary owner), and only for a jump across the whole screen: a
+--- neighbour is always a single keystroke.
+--- @param spaces table The Spaces binding module.
+--- @param space_id integer The Space to land on.
+--- @param steps integer Signed number of single steps to the same Space.
+--- @return boolean arrived
+local function goto_space_or_walk(spaces, space_id, steps)
+	local ok, went, err = pcall(spaces.gotoSpace, space_id)
+	if ok and went == true then
+		Logger.debug(LOG, "Wrapped to Space %s.", tostring(space_id))
+		return true
+	end
+	Logger.warn(LOG, "Jump to Space %s refused (%s) — walking %d Space(s) with Ctrl+Arrow instead.",
+		tostring(space_id), tostring(ok and err or went), math.abs(steps))
+	local direction = steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS
+	for _ = 1, math.abs(steps) do
+		if not space_step(direction) then return false end
+	end
+	return true
+end
+
+--- Moves one Space in a direction, wrapping at the edges of the focused
+--- screen: from its last Space to its first and from its first to its last.
+--- macOS stops at both ends, so the wrap is Ergopti's.
+---
+--- Without a readable layout the edge cannot be told apart from the middle:
+--- the step is then the plain one, and the log says the wrap was not possible.
+--- @param direction string DesktopNavigation.PREVIOUS or .NEXT.
+--- @return boolean handled
+local function wrapping_space_step(direction)
+	local spaces = _spaces_module()
+	if not spaces then
+		Logger.warn(LOG, "The Spaces binding is unavailable — moving one Space without wrapping.")
+		return space_step(direction)
+	end
+	local list, index, reason = focused_screen_spaces(spaces)
+	if not list then
+		Logger.warn(LOG, "Cannot wrap: %s — moving one Space without wrapping.", reason)
+		return space_step(direction)
+	end
+	local target = DesktopNavigation.target(index, #list, direction, true)
+	local steps = target - index
+	if steps == 0 then
+		Logger.debug(LOG, "The focused screen has a single Space — nothing to wrap to.")
+		return true
+	end
+	-- The key follows the sign of the step, not the requested direction: with
+	-- two Spaces the wrap from the last one is a single step LEFT.
+	if math.abs(steps) == 1 then
+		return space_step(steps > 0 and DesktopNavigation.NEXT or DesktopNavigation.PREVIOUS)
+	end
+	local target_id = list[target + 1]
+	Logger.debug(LOG, "Wrapping from Space %s to Space %s.", tostring(list[index + 1]), tostring(target_id))
+	return AuxOwner.after(0, "space wrap", function()
+		return goto_space_or_walk(spaces, target_id, steps)
+	end, current_action_parent())
+end
+
+--- Opens Mission Control or App Exposé through the Dock itself. The F3 key and
+--- Ctrl+Down posted before do nothing once the user changes or disables those
+--- shortcuts in System Settings; the Dock notification does not depend on them.
+--- @param method string toggleMissionControl or toggleAppExpose.
+--- @return boolean toggled
+local function dock_toggle(method)
+	local spaces = _spaces_module()
+	if not spaces or type(spaces[method]) ~= "function" then
+		Logger.error(LOG, "The Spaces binding has no %s — the action is a no-op.", method)
+		return false
+	end
+	local ok, err = pcall(spaces[method])
+	if not ok then
+		Logger.error(LOG, "The Spaces binding's %s raised: %s.", method, tostring(err))
+		return false
+	end
+	return true
 end
 
 -- Axis actions (prev / next)
@@ -668,8 +759,8 @@ ax("windows",
 	function() winNav(true) end)
 
 ax("spaces",     
-	function() spaceNav(false) end, 
-	function() spaceNav(true) end)
+	function() space_step(DesktopNavigation.PREVIOUS) end, 
+	function() space_step(DesktopNavigation.NEXT) end)
 
 ax("volume",     
 	function() sysKey("SOUND_DOWN") end, 
@@ -893,13 +984,15 @@ sg("maximize",                     function()
 		return win:maximize()
 	end)
 end)
-sg("space_prev",             function() spaceNav(false) end)
-sg("space_next",               function() spaceNav(true) end)
-sg("mission_control",        function()
-	postKeyStroke({}, 160)
-end)
-sg("app_expose",                  function()
-	postKeyStroke({ "ctrl" }, 125)
+sg("space_prev",             function() space_step(DesktopNavigation.PREVIOUS) end)
+sg("space_next",               function() space_step(DesktopNavigation.NEXT) end)
+sg("space_prev_wrap",        function() return wrapping_space_step(DesktopNavigation.PREVIOUS) end)
+sg("space_next_wrap",        function() return wrapping_space_step(DesktopNavigation.NEXT) end)
+sg("mission_control",        function() return dock_toggle("toggleMissionControl") end)
+sg("app_expose",             function() return dock_toggle("toggleAppExpose") end)
+-- Command + the Mission Control key: macOS's own Show Desktop shortcut.
+sg("show_desktop",                function()
+	return postKeyStroke({ "cmd" }, 160)
 end)
 
 -- Cursor movement
@@ -957,18 +1050,21 @@ end)
 -- for users who never bind one of these.
 --- Builds a gesture action that runs one function of a parent-scoped owner of
 --- the shortcut layer under the dispatching parent, so PAUSE of that parent
---- fences it and a sibling parent's PAUSE does not.
+--- fences it and a sibling parent's PAUSE does not. A confirmed action also
+--- gets the application the user acted from, which its question read before
+--- bringing the driver to the front (execute_single).
 --- @param module_name string The owner module.
---- @param method string Public function taking the parent as its last argument.
+--- @param method string Public function taking the parent, then that
+--- application (nil for an action that asks nothing).
 --- @return function
 local function owner_action(module_name, method)
-	return function()
+	return function(_, acted_from)
 		local ok, Owner = pcall(require, module_name)
 		if not ok or type(Owner) ~= "table" or type(Owner[method]) ~= "function" then
 			Logger.error(LOG, "Action '%s.%s' is unavailable: %s.", module_name, method, tostring(Owner))
 			return false
 		end
-		return Owner[method](current_action_parent())
+		return Owner[method](current_action_parent(), acted_from)
 	end
 end
 
@@ -1268,6 +1364,34 @@ sg("notification_center",          function()
 	return AuxOwner.applescript(
 		"tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"",
 		"open notification center", nil, current_action_parent())
+end)
+
+-- The system actions that run a native command (modules/gestures/system_actions),
+-- each under the dispatching parent. The ones the catalogue declares
+-- `confirm = true` are asked for by execute_single before they run.
+local SYSTEM_ACTIONS = {
+	"minimize_all", "quit_frontmost_app", "force_quit_frontmost", "clear_clipboard",
+	"center_mouse", "mic_mute_toggle", "sleep_displays", "toggle_dark_mode",
+	"empty_trash", "eject_all_disks", "remove_quarantine_selection",
+	"make_executable_selection", "open_terminal_here", "new_text_file_here",
+}
+for _, system_action in ipairs(SYSTEM_ACTIONS) do
+	sg(system_action, owner_action("modules.gestures.system_actions", system_action))
+end
+-- The application is the binding's own parameter, as for open_url.
+sg("open_app", function(binding)
+	local value = M.get_action_parameter(binding, "open_app")
+	if not M.validate_action_parameter("open_app", value) then
+		Logger.warn(LOG, "open_app ignored for binding '%s': no valid application is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok, System = pcall(require, "modules.gestures.system_actions")
+	if not ok or type(System) ~= "table" or type(System.open_app) ~= "function" then
+		Logger.error(LOG, "open_app is unavailable: %s.", tostring(System))
+		return false
+	end
+	return System.open_app(value, current_action_parent())
 end)
 
 -- Applications and Stats
@@ -2086,6 +2210,8 @@ function M.validate_action_parameter(action, value)
 	-- Syntax only too: whether the provider exists is checked when the action runs
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
+	-- Syntax only: whether the application is installed is checked when it opens
+	if spec == "app" then return AppParameter.is_valid(value) end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2106,6 +2232,7 @@ function M.parameter_prompt(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "text" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2154,6 +2281,7 @@ function M.parameter_error(action)
 	if spec == "llm_prompt" then return i18n.get("dialog.gestures.param_err_llm_prompt") end
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2423,18 +2551,16 @@ function M.get_label(name)
 	return name
 end
 
---- Dispatches a registered single-shot action.
+--- Runs one registered single action under the parent that dispatched it.
 --- @param name string Action identifier.
 --- @param binding table|nil The binding that invoked it.
---- @return boolean True when a handler was found and invoked; false when the
---- action is unknown here, so the caller can try its own fallback instead of
---- assuming the action ran.
-function M.execute_single(name, binding)
-	local parent = parent_for_binding(binding)
-	local control_plane = is_script_control_plane_action(name, binding)
-	if not control_plane and not aux_admission_open(parent) then return false end
-	local s = SG[name]
-	if not s or type(s.fn) ~= "function" then return false end
+--- @param s table The registry entry.
+--- @param parent string The dispatch parent.
+--- @param control_plane boolean Whether the action is script control.
+--- @param acted_from table|nil The application a confirmation read before its
+--- question, handed to the handler after the binding.
+--- @return boolean True when the handler ran under a still-admitted parent.
+local function dispatch_single(name, binding, s, parent, control_plane, acted_from)
 	local prior_parent = _dispatch_parent
 	_dispatch_parent = parent
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
@@ -2458,7 +2584,7 @@ function M.execute_single(name, binding)
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
 	local dispatch_ok, callback_ok = xpcall(function()
 		return Logger.callback(LOG,
-			"Gesture action '" .. tostring(name) .. "'", s.fn, binding)
+			"Gesture action '" .. tostring(name) .. "'", s.fn, binding, acted_from)
 	end, debug.traceback)
 	local admission_committed = control_plane or aux_admission_open(parent)
 	_dispatch_parent = prior_parent
@@ -2471,6 +2597,44 @@ function M.execute_single(name, binding)
 	-- refuses. Only transport failure or a superseded lifecycle admission lets
 	-- the caller fall through to another action provider.
 	return callback_ok == true and admission_committed == true
+end
+
+--- Dispatches a registered single-shot action. An action the catalogue
+--- declares `confirm = true` only asks here; it runs from the answer, and only
+--- while its parent is still admitted.
+--- @param name string Action identifier.
+--- @param binding table|nil The binding that invoked it.
+--- @return boolean True when a handler was found and invoked (or its
+--- confirmation asked for); false when the action is unknown here, so the
+--- caller can try its own fallback instead of assuming the action ran.
+function M.execute_single(name, binding)
+	local parent = parent_for_binding(binding)
+	local control_plane = is_script_control_plane_action(name, binding)
+	if not control_plane and not aux_admission_open(parent) then return false end
+	local s = SG[name]
+	if not s or type(s.fn) ~= "function" then return false end
+	local meta = Catalogue.actions[name]
+	if meta and meta.confirm == true then
+		-- Required on the first confirmation only: the alert pulls in the dialog
+		-- and screen adapters, which no other action needs at load.
+		local ok_confirm, ActionConfirm = pcall(require, "modules.gestures.action_confirm")
+		if not ok_confirm or type(ActionConfirm) ~= "table" or type(ActionConfirm.ask) ~= "function" then
+			Logger.error(LOG, "'%s' needs a confirmation that cannot be asked (%s) — not run.",
+				tostring(name), tostring(ActionConfirm))
+			return false
+		end
+		-- The action owns the dispatch whether or not its question could be shown
+		-- (ask logs why not): a fallback provider must never run it unasked.
+		ActionConfirm.ask(M.get_label(name), function(acted_from)
+			if not aux_admission_open(parent) then
+				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
+				return
+			end
+			dispatch_single(name, binding, s, parent, control_plane, acted_from)
+		end)
+		return true
+	end
+	return dispatch_single(name, binding, s, parent, control_plane)
 end
 
 function M.execute_axis(name, goNext)

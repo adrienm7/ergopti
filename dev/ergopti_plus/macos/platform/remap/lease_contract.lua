@@ -35,6 +35,9 @@ M.RUNTIME_HELD_LOGICAL_PREFIX = "ke_held_"
 M.MODE_OFF = 0
 M.MODE_ACTIVE = 1
 M.MODE_PAUSED = 2
+M.MANAGED_TAG_LABEL = "ErgoptiPlus managed"
+M.MANAGED_MODE_NORMAL = "normal"
+M.MANAGED_MODE_PAUSE = "pause"
 
 local UUID_HYPHEN_POSITIONS = { 9, 14, 19, 24 }
 local RUNTIME_LOGICAL_NAMES = {
@@ -222,6 +225,43 @@ function M.is_managed_variable_name(name)
 			or name:sub(1, #M.LEGACY_LEASE_VARIABLE_PREFIX) == M.LEGACY_LEASE_VARIABLE_PREFIX
 			or name:sub(1, #M.LEGACY_PAUSE_VARIABLE_PREFIX) == M.LEGACY_PAUSE_VARIABLE_PREFIX
 			or M.is_runtime_variable_namespace_name(name))
+end
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 3/ Rule Ownership Marker =======
+-- ========================================
+-- ========================================
+
+--- Builds the exact rule-description prefix owned by ErgoptiPlus.
+--- @param token string Canonical generation token.
+--- @param mode string Managed mode (`normal` or `pause`).
+--- @return string prefix Exact prefix including its trailing space.
+function M.managed_description_prefix(token, mode)
+	return string.format("[%s:%s:%s] ", M.MANAGED_TAG_LABEL, token, mode)
+end
+
+--- Parses only canonical ErgoptiPlus ownership markers. The generator writes
+--- them and the integration switch removes exactly the rules that carry one.
+--- Lua patterns have no alternation or fixed-count quantifier, so the broad
+--- capture is followed by explicit length, mode, and prefix checks.
+--- @param description any Rule description candidate.
+--- @return string|nil token Canonical token when the prefix is exact.
+--- @return string|nil mode Canonical managed mode when the prefix is exact.
+function M.parse_managed_description(description)
+	if type(description) ~= "string" then return nil end
+	local token, mode = description:match(
+		"^%[ErgoptiPlus managed:([0-9a-f]+):([a-z]+)%] "
+	)
+	if not M.is_valid_token(token) then return nil end
+	if mode ~= M.MANAGED_MODE_NORMAL and mode ~= M.MANAGED_MODE_PAUSE then return nil end
+	local expected = M.managed_description_prefix(token, mode)
+	if description:sub(1, #expected) ~= expected then return nil end
+	return token, mode
 end
 
 return M

@@ -85,9 +85,9 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"---",
 	"section_header:menu.hotstrings.header_languages",
 	"list:hotstring_languages",
-	"---",
-	"section_header:menu.hotstrings.header_ergopti",
-	"list:hotstring_categories_ergopti",
+	-- The « Disposition Ergopti » section left on 2026-09-29: SFB reduction and
+	-- rolls moved into the Ergopti layout extension and render under its
+	-- « Hotstrings Ergopti » submenu, among the extensions below.
 	"---",
 	"section_header:menu.hotstrings.personal_header",
 	"list:hotstring_personal",
@@ -244,7 +244,6 @@ helpers.describe("menu drift gate (macOS): hotstrings_menu/layout_menu manifest 
 			"disagree with it in silence")
 		for _, id in ipairs({
 			"hotstring_categories_standard",
-			"hotstring_categories_ergopti",
 			"hotstring_languages",
 			"hotstring_personal",
 			"hotstring_extensions",

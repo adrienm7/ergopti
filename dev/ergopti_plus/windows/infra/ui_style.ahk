@@ -338,11 +338,23 @@ Gui_HarmoniseButtonWidths(buttons, minWidth := unset) {
 /**
  * Centralized factory to create a Gui window with consistent title naming.
  * Enforces the "ErgoptiPlus — <Name>" format mandated by repo conventions.
+ * Refuses a topmost window: an ErgoptiPlus window is focused when it opens,
+ * never kept above the windows the user opens afterwards (maintainer rule,
+ * 2026-09-29). Overlays that must float build their Gui directly.
  * @param {string} Options - Standard AHK Gui options.
  * @param {string} Name - The suffix for the window title.
  * @returns {Gui} The instantiated Gui object.
  */
 Gui_Create(Options := "", Name := "") {
+    if InStr(Options, "AlwaysOnTop")
+        throw ValueError("Gui_Create: a window is focused, never kept on top", -1, Options)
+    Pos := 1
+    while RegExMatch(Options, "i)(?:^|\s)\+?E(0x[0-9a-f]+|\d+)", &ExStyle, Pos) {
+        ; WS_EX_TOPMOST (0x8) is the same flag spelled as an extended style.
+        if (Integer(ExStyle[1]) & 0x8)
+            throw ValueError("Gui_Create: a window is focused, never kept on top", -1, Options)
+        Pos := ExStyle.Pos + ExStyle.Len
+    }
     Prefix := "ErgoptiPlus"
     Title := (Name == "") ? Prefix : Prefix . " — " . Name
     return Gui(Options, Title)

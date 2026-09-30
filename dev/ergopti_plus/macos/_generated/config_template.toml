@@ -302,7 +302,6 @@ instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
 url_bar_filter_enabled = false
-shortcut = false
 
 [llm.navigation]
 nav_modifiers = []
@@ -348,7 +347,6 @@ swipe_4_right = "none"
 swipe_4_up = "none"
 tap_3 = "none"
 tap_4 = "none"
-space_wrap = true
 swipe_2_left = "none"
 swipe_5_up = "none"
 swipe_5_down = "none"

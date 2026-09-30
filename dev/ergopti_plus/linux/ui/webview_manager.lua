@@ -160,6 +160,7 @@ local BRIDGE_MODULES = {
 	numeric_prompt        = "ui.numeric_prompt.bridge",
 	prompt_editor         = "ui.prompt_editor.bridge",
 	token_prompt          = "ui.token_prompt.bridge",
+	update_check          = "ui.update_check.bridge",
 }
 
 --- Loads a bridge handler module by pcall-requiring it.
@@ -214,6 +215,32 @@ end
 -- Exported for the pure-Lua lifecycle regression harness.
 M._release_app_ownership = _release_app_ownership
 
+--- Builds the HTML a window loads for a shared UI app, with the page's
+--- strings: active locale over English over French, so a key the active
+--- locale lacks reads as English, not as a key. show() and the WebKitGTK
+--- page-error harness (tests/hardware/run_page_errors.lua) both build
+--- through here: that harness is the only place a real engine parses these
+--- pages, and its own copy of this build had lost the seeded strings.
+--- @param app_name string The shared UI app directory name.
+--- @param active_locale string Locale code the page boots with.
+--- @return string html Complete HTML, or an error page from the builder.
+function M.build_page_html(app_name, active_locale)
+	if type(app_name) ~= "string" or app_name == "" then
+		error("build_page_html(): app_name must be a nonempty string", 2)
+	end
+	if type(active_locale) ~= "string" or active_locale == "" then
+		error("build_page_html(): active_locale must be a nonempty string", 2)
+	end
+	local root = _driver_root()
+	local ok_catalogue, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	if not ok_catalogue or type(catalogue) ~= "table" or next(catalogue) == nil then
+		Logger.error(LOG, "build_page_html(): '%s' opens without its strings: the locale catalogue is unavailable (%s).",
+			app_name, tostring(catalogue))
+		catalogue = nil
+	end
+	return webkit_host.build_app_html(root, app_name, active_locale, catalogue)
+end
+
 --- Opens a webview window for the given shared UI app.
 --- If the window already exists, brings it to front instead of creating a new one.
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
@@ -241,9 +268,7 @@ function M.show(app_name, active_locale)
 		return true
 	end
 
-	-- Build the HTML.
-	local root = _driver_root()
-	local html = webkit_host.build_app_html(root, app_name, active_locale)
+	local html = M.build_page_html(app_name, active_locale)
 	if not html or html == "" then
 		Logger.error(LOG, "show(): failed to build HTML for '%s'.", app_name)
 		return false
@@ -596,6 +621,7 @@ local function _app_title(app_name)
 		config_cleanup          = "dialog.unused_keys.title",
 		error_dialog            = "common.error_title",
 		healthcheck             = "menu.debug.healthcheck",
+		update_check            = "update_check.window_title",
 	}
 	if title_keys[app_name] then
 		return require("infra.i18n").get(title_keys[app_name])
@@ -780,7 +806,7 @@ function M._create_gtk_window(app_name, html, handler)
 
 	-- ── Assemble and show ──
 	window:add(webview)
-	window:show_all()
+	M._present_gtk_window(window, not UNFOCUSED_APPS[app_name])
 
 	-- ── Track native references ──
 	_gtk_windows[app_name] = {
@@ -831,6 +857,18 @@ function M._destroy_gtk_window(app_name, expected_epoch)
 	return true
 end
 
+--- Presents a native window, the driver's one "present window" step for a
+--- window that opens or is requested again: maps it, then raises and focuses
+--- it with present() unless it must leave the keyboard where the user types.
+--- It never sets keep-above or a floating type hint: an Ergopti window is
+--- focused, never kept above the windows the user opens afterwards.
+--- @param window userdata The Gtk.Window.
+--- @param take_focus boolean False for a window that must not take the keyboard.
+function M._present_gtk_window(window, take_focus)
+	if not window.visible then window:show_all() end
+	if take_focus then window:present() end
+end
+
 --- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
 function M._focus_gtk_window(app_name)
@@ -840,12 +878,11 @@ function M._focus_gtk_window(app_name)
 		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
 		return
 	end
-	pcall(function()
-		wref.window:present()
-		if not wref.window.visible then
-			wref.window:show_all()
-		end
-	end)
+	local ok, err = pcall(M._present_gtk_window, wref.window, true)
+	if not ok then
+		Logger.error(LOG, "GTK window '%s' could not be presented: %s.", app_name, tostring(err))
+		return
+	end
 	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
 end
 
