@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "无法保存语言选择。",
 	"onboarding.error.reload_pending": "你的回答已保存，但未能执行应用这些回答的重新加载。请使用菜单栏中的“重新加载”完成设置。",
 	"onboarding.error.tap_holds_import": "你的其他回答已保存，但未能导入推荐的轻按-长按按键。请在“点按/长按”菜单中选择它们。",
+	"onboarding.error.nav_layer_import": "你的其他回答和轻按-长按按键已保存，但未能导入推荐的导航层。请在“点按/长按”菜单中通过“编辑导航层…”恢复它。",
 	"onboarding.error.tap_holds_import_timeout": "你的其他回答已保存，但推荐的轻按-长按按键未能及时导入完成。重新加载后请在“点按/长按”菜单中检查它们。",
 	"onboarding.error.title": "ErgoptiPlus — 错误",
 	"onboarding.error.write_failed": "无法写入配置文件。",

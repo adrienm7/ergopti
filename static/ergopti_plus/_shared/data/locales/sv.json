@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Det gick inte att spara språkvalet.",
 	"onboarding.error.reload_pending": "Dina svar sparades, men omladdningen som tillämpar dem kunde inte köras. Använd Ladda om i menyraden för att slutföra inställningen.",
 	"onboarding.error.tap_holds_import": "Dina övriga svar sparades, men de rekommenderade tap-hold-tangenterna kunde inte importeras. Välj dem i menyn Tap-Holds.",
+	"onboarding.error.nav_layer_import": "Dina övriga svar och tap-hold-tangenterna sparades, men det rekommenderade navigeringslagret kunde inte importeras. Återställ det med ”Redigera navigeringslagret…” i menyn Tap-Holds.",
 	"onboarding.error.tap_holds_import_timeout": "Dina övriga svar sparades, men importen av de rekommenderade tap-hold-tangenterna blev inte klar i tid. Kontrollera dem i menyn Tap-Holds efter omladdningen.",
 	"onboarding.error.title": "ErgoptiPlus — Fel",
 	"onboarding.error.write_failed": "Kunde inte skriva konfigurationsfilen.",

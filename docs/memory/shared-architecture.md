@@ -222,6 +222,24 @@ to import over a customised key, backing up the file they replace. Action:
 add a key to the catalogue and to its engine in the same change, and keep
 every manifest path out of `tap_holds.keys`.
 
+### project-the-nav-layer-comes-with-its-key
+
+An absent or empty layers.toml binds no key on every driver, and no loader
+falls back to `_shared/keymap/layers.recommended.toml` (the W1 neutral
+install). Importing Ergopti's recommended key whose hold enters that layer
+(Windows/Linux `hold_layer = "nav"`, macOS hold `layer`) must therefore bring
+the layer along, or the key enters an empty layer: the first-run wizard's
+Tap-Holds import and the Tap-Holds « Restore recommended values » (so the
+global restore too) create layers.toml with the preset's exact bytes, only
+while it is absent (`_shared/lua/keymap/layer_preset.lua`; Windows
+`TapHoldLayerImportImage`, in the same transition cohort). An existing file,
+even empty or unreadable, is the user's and is never replaced; a refused
+import or restore removes only the file it created. Windows threads the
+folder as the `layers_config_dir` option, set only by the tray's own command
+factories, so tests that inject options never write the real folder. Action:
+a new flow that imports a layer-holding key calls the same owner; never make
+a loader substitute the preset for an absent file.
+
 ### project-key-combinations-have-their-own-gate
 
 The modifier combinations are the Shortcuts group `key_combinations_group`

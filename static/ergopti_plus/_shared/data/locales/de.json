@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Die Sprachauswahl konnte nicht gespeichert werden.",
 	"onboarding.error.reload_pending": "Ihre Antworten wurden gespeichert, aber das Neuladen, das sie anwendet, konnte nicht erfolgen. Verwenden Sie „Neu laden“ in der Menüleiste, um die Einrichtung abzuschließen.",
 	"onboarding.error.tap_holds_import": "Ihre anderen Antworten wurden gespeichert, aber die empfohlenen Tap-Hold-Tasten konnten nicht importiert werden. Wählen Sie sie im Menü Tap-Holds.",
+	"onboarding.error.nav_layer_import": "Ihre anderen Antworten und die Tap-Hold-Tasten wurden gespeichert, aber die empfohlene Navigationsebene konnte nicht importiert werden. Stellen Sie sie mit „Navigationsebene bearbeiten…“ im Menü Tap-Holds wieder her.",
 	"onboarding.error.tap_holds_import_timeout": "Ihre anderen Antworten wurden gespeichert, aber der Import der empfohlenen Tap-Hold-Tasten wurde nicht rechtzeitig abgeschlossen. Prüfen Sie sie nach dem Neuladen im Menü Tap-Holds.",
 	"onboarding.error.title": "ErgoptiPlus — Fehler",
 	"onboarding.error.write_failed": "Konfigurationsdatei konnte nicht geschrieben werden.",

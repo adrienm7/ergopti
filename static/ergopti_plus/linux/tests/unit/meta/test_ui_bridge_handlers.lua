@@ -1209,6 +1209,86 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.errors, {})
 		end)
 
+		-- A fresh install has no layers.toml, which binds no key: the imported
+		-- left_alt entered an empty navigation layer. The key now brings
+		-- Ergopti's recommended layer along, never over the user's own file.
+		local function import_left_alt(state, target)
+			helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+			return finish(state, { locale = "en", config_dir = target, operations = {
+				{ path = "tap_holds.keys.left_alt", value = true },
+			} })
+		end
+
+		local function remove_folder(target)
+			for _, name in ipairs({ "tap_hold.toml", "layers.toml" }) do os.remove(target .. "/" .. name) end
+			os.remove(target)
+		end
+
+		local function read_text(path)
+			local fh = io.open(path, "rb")
+			if not fh then return nil end
+			local text = fh:read("*a")
+			fh:close()
+			return text
+		end
+
+		helpers.it("(nav-layer-fresh-install-default) the key holding the layer brings Ergopti's layer into a new folder", function()
+			local state, _, captured = onboarding_state()
+			local target = scratch_dir()
+			local result = import_left_alt(state, target)
+			local text = read_text(target .. "/layers.toml")
+			local ok, layer = pcall(require("platform.remap.nav_layer").load,
+				{ shared_root = require("infra.paths").shared_root(), config_dir = target })
+			remove_folder(target)
+			helpers.assert_eq(result, { done = true, restarted = true })
+			helpers.assert_eq(captured.errors, {})
+			helpers.assert_eq(text, read_text(require("infra.paths").shared("keymap/layers.recommended.toml")),
+				"layers.toml holds the recommended layer's exact bytes")
+			helpers.assert_true(ok and next(layer) ~= nil, "the imported layer binds keys on Linux: " .. tostring(layer))
+		end)
+
+		helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
+			local state, _, captured = onboarding_state()
+			local target = scratch_dir()
+			helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+			local own = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n'
+			write_file(target .. "/layers.toml", own)
+			local result = import_left_alt(state, target)
+			local text = read_text(target .. "/layers.toml")
+			remove_folder(target)
+			helpers.assert_true(result.done)
+			helpers.assert_eq(captured.errors, {})
+			helpers.assert_eq(text, own, "the user's layer file stays byte for byte")
+		end)
+
+		helpers.it("(nav-layer-fresh-install-default) keys that do not hold the layer import no layer file", function()
+			local state = onboarding_state()
+			local target = scratch_dir()
+			helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+			finish(state, { locale = "en", config_dir = target, operations = {
+				{ path = "tap_holds.keys.caps_lock", value = true },
+				{ path = "tap_holds.keys.left_alt", value = false },
+			} })
+			local text = read_text(target .. "/layers.toml")
+			remove_folder(target)
+			helpers.assert_nil(text, "no layer is imported without the key that enters it")
+		end)
+
+		helpers.it("(nav-layer-fresh-install-default) a layer that cannot be written is reported, the keys stay", function()
+			local state, _, captured = onboarding_state()
+			local target = scratch_dir()
+			local LayerPreset = require("keymap.layer_preset")
+			state.layer_preset = setmetatable({
+				import_if_absent = function() return nil, "disk full" end,
+			}, { __index = LayerPreset })
+			local result = import_left_alt(state, target)
+			local keys = read_text(target .. "/tap_hold.toml")
+			remove_folder(target)
+			helpers.assert_eq(result, { done = true, restarted = true })
+			helpers.assert_true(keys ~= nil, "the tap-hold keys are imported")
+			helpers.assert_eq(captured.errors, { "onboarding.error.nav_layer_import" })
+		end)
+
 		helpers.it("(onboarding-tap-holds) a No or an unchecked list never reaches the tap-hold writer", function()
 			local state, _, captured = onboarding_state()
 			local calls = 0

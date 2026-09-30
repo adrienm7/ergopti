@@ -198,6 +198,62 @@ end)
 
 
 
+-- ====================================================
+-- ====================================================
+-- ======= 3b/ The Navigation Layer Comes Along =======
+-- ====================================================
+-- ====================================================
+
+-- A fresh install has no layers.toml, which binds no key: the imported
+-- left_command held an empty navigation layer. The key that enters the layer
+-- now brings Ergopti's recommended layer into the configuration folder (the
+-- owner never replaces a layers.toml the user has).
+helpers.describe("the key holding the navigation layer brings the recommended layer", function()
+	helpers.it("(nav-layer-fresh-install-default) imports the layer into the configuration folder", function()
+		for _, remap in ipairs({ { running = false }, { running = true } }) do
+			with_finish({ answers = answers({ caps_lock = true, left_command = true }), remap = remap }, function(state)
+				helpers.assert_eq(state.layer_imports, { Fixture.CONFIG_DIR },
+					"one import, into the folder layers.toml is read from")
+				helpers.assert_eq(state.layer_undos, {})
+				helpers.assert_eq(#state.alerts, 0)
+				helpers.assert_eq(Fixture.count_deferred(state, NOTICE), 0)
+				helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+			end)
+		end
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) imports no layer for keys that do not hold it", function()
+		with_finish({ answers = answers({ caps_lock = true, tab = true, left_command = false }) }, function(state)
+			helpers.assert_eq(state.layer_imports, {})
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) a layer that cannot be written is said, the keys stay", function()
+		with_finish({ answers = answers({ left_command = true }), layer = "fail" }, function(state)
+			helpers.assert_eq(state.saves, { { keys = { "left_command" }, path = Fixture.KARABINER_CONFIG_PATH } })
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0, "the reload follows the notice")
+			helpers.assert_true(Fixture.run_deferred(state, NOTICE))
+			helpers.assert_eq(state.alerts[1].body, "onboarding.error.nav_layer_import")
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 1)
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) a refused key import takes the layer back", function()
+		with_finish({ answers = answers({ left_command = true }), remap = { running = true, import_ok = false } },
+			function(state)
+				helpers.assert_eq(#state.layer_undos, 1, "the layer never outlives the key that enters it")
+				helpers.assert_eq(state.layer_undos[1].status, "imported")
+				helpers.assert_true(Fixture.run_deferred(state, NOTICE))
+				helpers.assert_eq(state.alerts[1].body, "onboarding.error.tap_holds_import")
+			end)
+	end)
+end)
+
+
+
+
+
 -- =================================================
 -- =================================================
 -- ======= 4/ The Reload Happens Or Says Why =======

@@ -406,6 +406,41 @@ _TOAN_TapHoldTargetNeverCostsTheOtherAnswers() {
 Test("onboarding answers: a tap-hold file that cannot take the import never costs the other answers (onboarding-answers-windows)",
 	_TOAN_TapHoldTargetNeverCostsTheOtherAnswers)
 
+; A fresh install has no layers.toml, which binds no key: the imported left_alt
+; entered an empty navigation layer. The key now brings Ergopti's recommended
+; layer into the commit, never over a layers.toml the user has.
+_TOAN_NavLayerComesWithItsKey() {
+	global _SharedDir
+	Folder := _TOAN_NewFolder()
+	LayersPath := Folder . "\layers.toml"
+	try {
+		Preset := TapHoldRecommendedLayer(_SharedDir)
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), Preset["text"])
+		AssertEqual("nav", Preset["layer_id"], "the layer the recommended left_alt holds")
+		AssertEqual(LayersPath, _Onboarding_NavLayerPath(Folder, ["caps_lock", "left_alt"]),
+			"the key holding the layer brings the folder's layers.toml into the commit")
+		AssertEqual("", _Onboarding_NavLayerPath(Folder, ["caps_lock", "tab"]),
+			"keys that do not hold the layer import no layer file")
+		Target := _Onboarding_NavLayerTarget(LayersPath)
+		AssertTrue(Target is Map, "a folder without layers.toml gets the recommended layer")
+		AssertEqual(LayersPath, Target["path"])
+		AssertEqual(Preset["text"], Target["new_content"], "the preset's exact bytes")
+		AssertEqual(0, Target["expected_old"]["present"], "the transition creates the file only while it is absent")
+		AssertFalse(FileExist(LayersPath), "preparing the target publishes nothing")
+		Loaded := KeymapLayers_Load("windows", KeymapLayers_LoadContext(_SharedDir), Target["new_content"])
+		AssertTrue(Loaded["ok"] && Loaded["layers"].Has("nav") && Loaded["layers"]["nav"].Count > 0,
+			"the imported layer binds keys on Windows")
+		Own := '[_meta]`nschema_version = 1`n`n[layers.nav.all]`n"KeyJ" = "keystroke:ArrowDown"`n'
+		AssertTrue(FSWriteDurable(LayersPath, Own))
+		AssertEqual(0, _Onboarding_NavLayerTarget(LayersPath), "an existing layers.toml is never replaced")
+		AssertEqual(Own, FSReadUtf8Exact(LayersPath))
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("onboarding answers: the key holding the navigation layer brings the recommended layer (nav-layer-fresh-install-default)",
+	_TOAN_NavLayerComesWithItsKey)
+
 
 
 

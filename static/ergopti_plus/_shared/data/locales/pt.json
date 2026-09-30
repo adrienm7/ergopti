@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Não foi possível guardar a seleção de idioma.",
 	"onboarding.error.reload_pending": "As suas respostas foram guardadas, mas não foi possível executar o recarregamento que as aplica. Use Recarregar na barra de menus para concluir a configuração.",
 	"onboarding.error.tap_holds_import": "As suas outras respostas foram guardadas, mas não foi possível importar as teclas tap-hold recomendadas. Escolha-as no menu Tap-Holds.",
+	"onboarding.error.nav_layer_import": "As suas outras respostas e as teclas tap-hold foram guardadas, mas não foi possível importar a camada de navegação recomendada. Restaure-a com «Editar a camada de navegação…» no menu Tap-Holds.",
 	"onboarding.error.tap_holds_import_timeout": "As suas outras respostas foram guardadas, mas a importação das teclas tap-hold recomendadas não terminou a tempo. Verifique-as no menu Tap-Holds após o recarregamento.",
 	"onboarding.error.title": "ErgoptiPlus — Erro",
 	"onboarding.error.write_failed": "Falha ao gravar o arquivo de configuração.",

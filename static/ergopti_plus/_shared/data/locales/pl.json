@@ -1814,6 +1814,7 @@
 	"onboarding.error.locale_persist_failed": "Nie udało się zapisać wyboru języka.",
 	"onboarding.error.reload_pending": "Twoje odpowiedzi zostały zapisane, ale nie udało się wykonać ponownego wczytania, które je stosuje. Użyj opcji Wczytaj ponownie na pasku menu, aby dokończyć konfigurację.",
 	"onboarding.error.tap_holds_import": "Pozostałe odpowiedzi zostały zapisane, ale nie udało się zaimportować zalecanych klawiszy tap-hold. Wybierz je w menu Dotknięcie-Przytrzymanie.",
+	"onboarding.error.nav_layer_import": "Pozostałe odpowiedzi i klawisze tap-hold zostały zapisane, ale nie udało się zaimportować zalecanej warstwy nawigacji. Przywróć ją za pomocą „Edytuj warstwę nawigacji…” w menu Dotknięcie-Przytrzymanie.",
 	"onboarding.error.tap_holds_import_timeout": "Pozostałe odpowiedzi zostały zapisane, ale import zalecanych klawiszy tap-hold nie zakończył się na czas. Sprawdź je w menu Dotknięcie-Przytrzymanie po ponownym wczytaniu.",
 	"onboarding.error.title": "ErgoptiPlus — Błąd",
 	"onboarding.error.write_failed": "Nie udało się zapisać pliku konfiguracji.",

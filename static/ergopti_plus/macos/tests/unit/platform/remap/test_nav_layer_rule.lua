@@ -22,6 +22,10 @@
 ---    closes its START with an error and no SUCCESS.
 --- 4. The generator deploys state.nav_layer in place of the static file and
 ---    still reads the frozen file as the legacy anchor.
+--- 5. Fresh install (nav-layer-fresh-install-default): the recommended import
+---    creates layers.toml with the preset's bytes where there is none, so the
+---    loader then generates the layer; an existing file is never replaced, and
+---    an undo removes only a file still holding the preset's bytes.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
@@ -255,5 +259,92 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
 		if not ok then error(err, 0) end
+	end)
+end)
+
+
+
+
+
+-- ========================================================
+-- ========================================================
+-- ======= 6/ Fresh install: the recommended import =======
+-- ========================================================
+-- ========================================================
+
+-- A fresh install has no layers.toml, which binds no key: the recommended key
+-- the wizard or « Restore recommended values » imported held an empty layer.
+helpers.describe("the recommended layer comes with the key that enters it", function()
+	--- Runs body(dir) in a private configuration folder, removed afterwards.
+	local function with_folder(body)
+		local dir = helpers.temp_dir() .. "/ergopti_nav_layer_import_" .. tostring(os.time()) .. "_"
+			.. tostring(math.random(100000, 999999))
+		local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+		helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+		local ok, err = pcall(body, dir)
+		os.remove(dir .. "/layers.toml")
+		os.execute('rmdir "' .. dir .. '"')
+		if not ok then error(err, 0) end
+	end
+
+	--- The content of a file, nil when absent.
+	local function content(path)
+		local fh = io.open(path, "rb")
+		if not fh then return nil end
+		local text = fh:read("*a")
+		fh:close()
+		return text
+	end
+
+	helpers.it("(nav-layer-fresh-install-default) a folder without layers.toml gets the preset, which generates the layer", function()
+		with_folder(function(dir)
+			helpers.assert_nil(NavLayer.build_rule(NavLayer.load({ shared_root = helpers.shared(), config_dir = dir }).bindings,
+				ctx.registry), "before the import the folder binds no key")
+			local import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
+			helpers.assert_not_nil(import, "the import succeeds")
+			helpers.assert_eq(import.status, "imported")
+			helpers.assert_eq(content(dir .. "/layers.toml"), recommended, "the preset's exact bytes")
+			local layer = NavLayer.load({ shared_root = helpers.shared(), config_dir = dir })
+			local rule = NavLayer.build_rule(layer.bindings, layer.registry)
+			helpers.assert_true(rule ~= nil and #rule.manipulators >= MIN_ENTRIES,
+				"the imported layer generates the navigation rule")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
+		for label, own in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
+			empty = "" }) do
+			with_folder(function(dir)
+				local fh = assert(io.open(dir .. "/layers.toml", "wb"))
+				fh:write(own)
+				fh:close()
+				local import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
+				helpers.assert_eq(import.status, "kept", label)
+				helpers.assert_eq(content(dir .. "/layers.toml"), own, label .. ": the user's file stays byte for byte")
+				helpers.assert_true(NavLayer.undo_import(import), label)
+				helpers.assert_eq(content(dir .. "/layers.toml"), own, label .. ": an undo never removes a kept file")
+			end)
+		end
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it", function()
+		with_folder(function(dir)
+			local import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
+			helpers.assert_true(NavLayer.undo_import(import))
+			helpers.assert_nil(content(dir .. "/layers.toml"), "the created file is removed")
+			import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
+			local fh = assert(io.open(dir .. "/layers.toml", "ab"))
+			fh:write("# edited since\n")
+			fh:close()
+			helpers.assert_true(NavLayer.undo_import(import))
+			helpers.assert_eq(content(dir .. "/layers.toml"), recommended .. "# edited since\n", "a later edit survives")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) only a key whose preset hold is the layer brings it", function()
+		local presets = require("platform.remap.defaults").tap_hold
+		helpers.assert_eq(presets.left_command[2], NavLayer.HOLD_ACTION_ID, "the shipped preset's layer key")
+		helpers.assert_true(NavLayer.recommendation_enters_layer({ "caps_lock", "left_command" }, presets))
+		helpers.assert_eq(NavLayer.recommendation_enters_layer({ "caps_lock", "tab" }, presets), false)
 	end)
 end)

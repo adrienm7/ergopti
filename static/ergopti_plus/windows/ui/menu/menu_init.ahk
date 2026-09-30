@@ -561,8 +561,13 @@ _LAY_ScopeCommands(Options := unset) {
 	return Commands
 }
 
-/** Reuses the existing global Restore row without adding platform-only UI. */
+/**
+ * Reuses the existing global Restore row without adding platform-only UI. The
+ * tray's restore also creates the configuration folder's layers.toml from the
+ * recommended layer when it has none; injected options name their own.
+ */
 _MI_GlobalScopeCommands(Options := unset) {
-	Selected := IsSet(Options) ? Options : Map()
+	global _ConfigDir
+	Selected := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map("restore_recommended", (*) => ConfigGlobalScopeApply("recommended", Selected))
 }

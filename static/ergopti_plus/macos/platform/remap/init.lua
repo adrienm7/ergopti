@@ -5029,7 +5029,10 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- backed-up bytes, and the Karabiner terminal before success. « recommended »
 --- writes the shipped preset, « clear » the neutral none/none; the timings are
 --- parameters whose default is the recommendation. The master comes from the
---- manifest rows; every other table of the file is left untouched.
+--- manifest rows; every other table of the file is left untouched. The
+--- tap_holds « recommended » first creates layers.toml from Ergopti's
+--- recommended layer when the folder has none, so the regeneration deploys the
+--- layer the preset's key enters; a refused transaction removes that file.
 --- @param request table `{ scope = "tap_holds"|"shortcuts",
 ---   mode = "recommended"|"clear", backup_path = string }`.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
@@ -5051,6 +5054,21 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
+	local layer = nil
+	if request.scope == "tap_holds" and request.mode == "recommended" then
+		local import, layer_err = NavLayer.import_recommended()
+		if not import then
+			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
+				label, tostring(layer_err))
+			invoke_public_callback(label, on_done, false, "nav-layer-import-failed", 0)
+			return false
+		end
+		layer = import
+	end
+	local function settle(ok, reason, change_count)
+		if ok ~= true then NavLayer.undo_import(layer) end
+		if on_done then return on_done(ok, reason, change_count) end
+	end
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
@@ -5077,7 +5095,7 @@ function M.apply_scope(request, on_done)
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
-	end, on_done, nil, request.backup_path)
+	end, settle, nil, request.backup_path)
 end
 
 --- Restores the settings to defaults as one exact transaction: every setting,
