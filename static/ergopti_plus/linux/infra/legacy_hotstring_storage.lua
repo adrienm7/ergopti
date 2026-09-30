@@ -256,10 +256,21 @@ function M.import(options)
 		local document = Codec.decode(content or "")
 		assert(type(document) == "table", "configuration is malformed")
 		local operations = {}
-		local custom_defined = lookup(document, CUSTOM_PATH) ~= nil
+		-- Only a usable list is config.toml's own; one of another shape is
+		-- outdated, so the legacy delimiters replace it rather than being
+		-- skipped, then removed from storage without ever being imported.
+		local list = lookup(document, CUSTOM_PATH)
+		local listed = type(list) == "table" and (next(list) == nil or #list > 0)
+		local outdated_list = list ~= nil and not listed
 		for _, choice in ipairs(choices) do
-			if lookup(document, choice.path) == nil and not (choice.custom and custom_defined) then
+			local replaces = outdated_list and #choice.path == #CUSTOM_PATH
+				and choice.path[1] == CUSTOM_PATH[1] and choice.path[2] == CUSTOM_PATH[2]
+			if (replaces or lookup(document, choice.path) == nil) and not (choice.custom and listed) then
 				operations[#operations + 1] = { path = choice.path, value = choice.value }
+				if replaces then
+					Logger.warn(LOG, "config.toml hotstrings.terminators is not a list of delimiters; the legacy "
+						.. "delimiters replace it.")
+				end
 			end
 		end
 		if #operations == 0 then return true, 0 end

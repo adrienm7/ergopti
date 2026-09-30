@@ -196,6 +196,44 @@ helpers.describe("legacy hotstring storage import: word delimiters", function()
 		end)
 	end)
 
+	-- A delimiter the user once added for a character a later catalogue ships
+	-- itself cannot be imported as their own; its on/off state still belongs to
+	-- that character, so the shipped delimiter takes it unless the store
+	-- recorded a state for the shipped one too.
+	helpers.it("carries a custom delimiter's state to the shipped one that now owns its character", function()
+		with_config('[hotstrings]\nunknown = "kept"\n', function(Import, path)
+			local adapter = storage({
+				[STATE_KEY] = table.concat({ "custom_comma" .. FIELD .. "0", "custom_period" .. FIELD .. "0",
+					"period" .. FIELD .. "1" }, RECORD),
+				[CUSTOM_KEY] = table.concat({ "custom_comma" .. FIELD .. "," .. FIELD .. "," .. FIELD .. "0",
+					"custom_period" .. FIELD .. "." .. FIELD .. "." .. FIELD .. "0" }, RECORD),
+			})
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			local hotstrings = Codec.decode(read(path)).hotstrings
+			local states = hotstrings.terminator_states or {}
+			helpers.assert_eq(states.comma, false, "the custom delimiter's off state reaches its character")
+			helpers.assert_nil(states.period, "a state the store recorded for the shipped one wins")
+			helpers.assert_nil(hotstrings.terminators)
+			helpers.assert_eq(next(adapter.values), nil)
+		end)
+	end)
+
+	-- A config.toml list of another shape is outdated: it used to count as
+	-- defined, so the legacy delimiters were skipped, then deleted unimported.
+	helpers.it("imports the legacy delimiters over a config.toml list of another shape", function()
+		with_config('[hotstrings]\nterminators = "broken"\n', function(Import, path)
+			local adapter = storage({
+				[STATE_KEY] = "custom_§" .. FIELD .. "0",
+				[CUSTOM_KEY] = "custom_§" .. FIELD .. "§" .. FIELD .. "§" .. FIELD .. "1",
+			})
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			local hotstrings = Codec.decode(read(path)).hotstrings
+			helpers.assert_eq(hotstrings.terminators, { { key = "custom_§", char = "§", label = "§", consume = true } })
+			helpers.assert_eq(hotstrings.terminator_states["custom_§"], false)
+			helpers.assert_eq(next(adapter.values), nil, "removed only once imported")
+		end)
+	end)
+
 	helpers.it("keeps the delimiter list config.toml already defines, with its states", function()
 		local source = '[hotstrings]\nterminators = [{ key = "custom_x", char = "¤", label = "¤", consume = false }]\n'
 		with_config(source, function(Import, path)

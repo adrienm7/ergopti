@@ -509,7 +509,10 @@ end
 
 --- The config.toml leaves one set of delimiter settings amounts to, for an
 --- import from an older store: sparse against the catalogue defaults, the
---- custom list first. Unusable entries are named through `reject`.
+--- custom list first. Unusable entries are named through `reject`. A custom
+--- delimiter whose character a shipped delimiter now owns cannot be kept, but
+--- its state belongs to that character: the shipped delimiter takes it, unless
+--- the store recorded a state for the shipped delimiter too.
 --- @param states table Key -> enabled.
 --- @param custom table Array of { key, char, label, consume } records.
 --- @param reject function reject(path_segments, detail).
@@ -518,7 +521,18 @@ end
 function M.leaves(states, custom, reject)
 	assert(type(states) == "table" and type(custom) == "table" and type(reject) == "function",
 		"word-delimiter leaves need states, custom records and a reject port")
-	local settings, shipped = keep_usable(states, custom, reject), builtins()
+	local shipped, carried, owner_of = builtins(), {}, {}
+	for key, entry in pairs(shipped) do
+		for _, char in ipairs(entry.chars) do owner_of[char] = key end
+	end
+	for key, enabled in pairs(states) do carried[key] = enabled end
+	for _, record in ipairs(custom) do
+		local owner = type(record) == "table" and owner_of[record.char] or nil
+		if owner and not shipped[record.key] and carried[owner] == nil and type(states[record.key]) == "boolean" then
+			carried[owner] = states[record.key]
+		end
+	end
+	local settings = keep_usable(carried, custom, reject)
 	local leaves = {}
 	if #settings.custom > 0 then
 		leaves[#leaves + 1] = { path = { CUSTOM_PATH[1], CUSTOM_PATH[2] }, value = settings.custom, custom = true }
