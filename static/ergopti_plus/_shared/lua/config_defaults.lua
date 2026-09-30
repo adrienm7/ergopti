@@ -180,7 +180,11 @@ function M.new(manifest)
 		for _, entry in ipairs(manifest.features) do
 			local selected = false
 			for _, prefix in ipairs(prefixes) do selected = selected or belongs(entry.path, prefix) end
-			if selected then
+			if selected and mode == "clear" and entry.cleared ~= nil then
+				-- An entry active by default restores its preset when its key is
+				-- deleted, so the system's behaviour is its off value, written.
+				operations[#operations + 1] = row(entry.path, entry.cleared)
+			elseif selected then
 				local value = entry.recommended
 				if entry.type == "feature" then
 					local keys = {}

@@ -229,6 +229,17 @@ function validate(features) {
 				}
 			}
 		}
+		// A clear must give the system's behaviour, and deleting the key of an
+		// entry active by default restores its preset: such an entry names the
+		// off value a clear writes explicitly, and no other entry may.
+		if ((f.cleared !== undefined) !== (f.active_by_default === true)) {
+			throw new Error(
+				`feature ${f.path} declares "cleared" if and only if it is active_by_default`
+			);
+		}
+		if (f.cleared !== undefined && ![false, 'none', ''].includes(f.cleared)) {
+			throw new Error(`feature ${f.path}: "cleared" must be an off value (false, "none" or "")`);
+		}
 		if (f.type === 'enum' && (!f.enum_values || f.enum_values.length === 0)) {
 			throw new Error(`feature ${f.path} has type=enum but no enum_values`);
 		}
@@ -363,6 +374,7 @@ function renderAhkManifest(manifest, sections, features) {
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		if (f.superseded_reason_key) entry.superseded_reason_key = f.superseded_reason_key;
+		if (f.cleared !== undefined) entry.cleared = f.cleared;
 		return `        ${ahkLiteral(entry)}`;
 	});
 	lines.push(featLines.join(',\n'));
@@ -469,6 +481,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 			input_altering: f.input_altering
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
+		if (f.cleared !== undefined) entry.cleared = f.cleared;
 		// Emit each feature compactly: opening brace, all fields on one line, then
 		// the closing brace. ~3 lines/feature instead of ~9, while keeping the
 		// entry's opening "{" on its own line so the regex manifest parsers

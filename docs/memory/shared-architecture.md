@@ -205,7 +205,10 @@ missing key takes the preset. The wizard lists only entries whose preset
 differs from their default, so the chords left its Shortcuts page. Action:
 never extend the list without a maintainer decision. A clear that must give
 the system's behaviour writes the off value explicitly, because deleting the
-key restores the preset. On Windows the submenu's switch
+key restores the preset: such an entry declares it as `cleared`, and the scope
+builders (`config_defaults.scope_operations`, `ManifestScopeOperations`) write
+it in every clear, the Shortcuts and global ones included. On Windows the
+submenu's switch
 (`shortcuts.script_control.chords_enabled`) only narrows what the slots
 enable, so it is a parameter that starts on, like the key-combinations switch.
 

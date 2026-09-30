@@ -333,6 +333,12 @@ ManifestScopeOperations(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
 			Selected := Selected || ManifestPathBelongs(Entry["path"], Prefix)
 		if !Selected
 			continue
+		; An entry active by default restores its preset when its key is
+		; deleted, so the system's behaviour is its off value, written.
+		if Mode == "clear" && Entry.Has("cleared") {
+			Rows.Push(ManifestConfigRow(Entry["path"], Entry["cleared"]))
+			continue
+		}
 		Values := Map(Entry["path"], Entry["recommended"])
 		if Entry["type"] == "feature" {
 			Values := Map()
