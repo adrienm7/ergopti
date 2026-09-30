@@ -75,7 +75,9 @@ M.DEFAULT_STATE = {
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
 	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
-	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.altgr_symbol") end
+	-- Any symbol the layout types wraps the selection, AltGr or not: Ergopti puts
+	-- them on AltGr, other layouts elsewhere, so the trigger names no key.
+	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.selection_symbol") end
 
 	local parts = {}
 	for p in id:gmatch("[^_]+") do table.insert(parts, p) end
@@ -184,6 +186,10 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	local is_on  = s.enabled == true
 	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
 	local pk     = pretty_key(s.id, state)
+	-- The wrap row reads as its behaviour alone, « Taper un symbole encadre la
+	-- sélection », as on Windows and Linux: its trigger is any typed symbol, so
+	-- a trigger prefix only repeated it (the maintainer's wording, 2026-09-30).
+	if s.id == "wrap_text_if_selected" and desc ~= "" then pk, desc = desc, "" end
 	-- Provider data since 2026-08-07: the shared renderer's `group` branch
 	-- materialises `items` the same way a `list` row's provider rows are, so a
 	-- group builder no longer has to assemble the driver's own tree.
@@ -818,10 +824,12 @@ function M.build(ctx)
 		-- Its rows are the user's own symbol pairs, so no static entry can
 		-- enumerate them — and the manifest called this Windows-only until
 		-- 2026-08-06 while this driver had been building it all along.
+		-- The wrap toggle and its symbols form one group, with no line between
+		-- them (the maintainer's request of 2026-09-30), as the manifest declares
+		-- the same pair for Windows and Linux.
 		["wrap_symbols_menu"] = function()
 			local rows = {}
 			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
-			if #rows > 0 then rows[#rows + 1] = { separator = true } end
 			rows[#rows + 1] = { label = i18n.get("menu.shortcuts.wrap_symbols"),
 			                    disabled = not state.shortcuts or paused or nil,
 			                    items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) }

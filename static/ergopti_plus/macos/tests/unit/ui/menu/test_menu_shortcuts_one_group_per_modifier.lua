@@ -113,4 +113,22 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 			and rows[5].title:find("menu.shortcuts.header_tap_keys", 1, true) ~= nil,
 			"the tap keys follow the first group under their header")
 	end)
+
+	-- The maintainer's request of 2026-09-30: the wrap-text toggle reads as its
+	-- behaviour alone (no « AltGr + symbole » trigger: the symbols need not be on
+	-- AltGr), and « Symboles encadrants » follows it with no line between them.
+	helpers.it("draws the wrap-text toggle as its behaviour, grouped with its symbols", function()
+		local rows = render_shortcuts_submenu()
+		local at = nil
+		for index, entry in ipairs(rows) do
+			if entry.title == "Wrap" then at = index end
+		end
+		helpers.assert_true(at ~= nil, "the wrap-text toggle is labelled by its behaviour alone")
+		helpers.assert_eq(rows[at + 1].title, "menu.shortcuts.wrap_symbols",
+			"the wrapping symbols follow the toggle with no separator between them")
+		for _, entry in ipairs(rows) do
+			helpers.assert_true(type(entry.title) ~= "string" or not entry.title:find("altgr", 1, true),
+				"no row names the retired AltGr trigger: " .. tostring(entry.title))
+		end
+	end)
 end)

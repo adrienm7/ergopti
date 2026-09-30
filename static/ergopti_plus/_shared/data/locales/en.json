@@ -1554,7 +1554,7 @@
 	"menu.settings.temperature_title": "Temperature",
 	"menu.shortcuts.alt_add": "[+ Add an Alt+… shortcut]",
 	"menu.shortcuts.alt_group": "⎇ Alt shortcuts",
-	"menu.shortcuts.altgr_symbol": "AltGr + symbol",
+	"menu.shortcuts.selection_symbol": "Selection + symbol",
 	"menu.shortcuts.wrap_symbols_title": "  ↳ Symbols that wrap the selection",
 	"menu.shortcuts.wrap_symbols_check_all": "Check all",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Uncheck all",

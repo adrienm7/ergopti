@@ -289,6 +289,12 @@ const CHECKS = [
 		repro: 'npm run test:menu-first-group'
 	},
 	{
+		name: 'the wrap toggle and its symbols form one group, named without AltGr (shortcuts-wrap-group)',
+		cmd: 'node',
+		args: ['tools/test/test-shortcuts-wrap-group.cjs'],
+		repro: 'npm run test:shortcuts-wrap-group'
+	},
+	{
 		name: 'a row a platform lacks is declared hidden (not applicable) or greyed with its reason (not yet ported)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-unavailable-rows.cjs'],

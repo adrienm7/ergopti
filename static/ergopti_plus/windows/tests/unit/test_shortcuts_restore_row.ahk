@@ -59,3 +59,24 @@ Test("menu-first-group: the drawn Shortcuts clear row clears the scope",
 	_ScopeShortcutsCase.Bind("clear", true))
 Test("menu-first-group: the Layout submenu declares the clear row",
 	_SRR_DeclaredRestoreRow.Bind("_MI_StageLayout", "layout_menu", "_LAY_ScopeCommands", "scope_clear"))
+
+; The maintainer's request of 2026-09-30: « Taper un symbole encadre la
+; sélection » (no AltGr: the symbols need not be there) and « Symboles
+; encadrants » form one group. The manifest declares the pair with nothing
+; between them, and the symbols provider returns their one row, no separator.
+_SRR_WrapPairIsOneGroup() {
+	Def := _MR_GetMenuDef("shortcuts_menu")
+	At := 0
+	for Index, Item in Def {
+		if (_MR_Get(Item, "type") == "feature" && _MR_Get(Item, "path") == "shortcuts.wrap_text_if_selected")
+			At := Index
+	}
+	Assert(At > 0 && At < Def.Length, "shortcuts_menu must declare the wrap toggle")
+	AssertEqual("wrap_symbols_menu", _MR_Get(Def[At + 1], "id"), "the wrapping symbols follow the toggle directly")
+	Rows := _SC_WrapSymbolRows()
+	AssertEqual(1, Rows.Length, "the symbols provider returns one row")
+	Assert(!Rows[1].Has("separator"), "no separator between the toggle and its symbols")
+	AssertEqual(t("menu.shortcuts.wrap_symbols_title"), Rows[1]["label"])
+	Assert(!InStr(t("shortcuts.label_wrap_text"), "AltGr"), "the toggle's label names no AltGr")
+}
+Test("menu-first-group: the wrap toggle and its symbols form one group", _SRR_WrapPairIsOneGroup)

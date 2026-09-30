@@ -4417,6 +4417,10 @@ id = "tap_keys"
 [[menu.shortcuts_menu]]
 type = "---"
 
+# « Taper un symbole encadre la sélection » and « Symboles encadrants » below it
+# form one group, with no separator between them (the maintainer's request of
+# 2026-09-30): the switch and the symbols it wraps with go together. The label
+# names no AltGr, since only Ergopti puts the symbols there.
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
@@ -6048,7 +6052,7 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 # spells, before the action it runs.
 [onboarding.pages.shortcuts.triggers]
 "shortcuts.keys.layer_scroll" = "menu.shortcuts.key_layer_scroll"
-"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.altgr_symbol"
+"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.selection_symbol"
 
 [onboarding.pages.gestures]
 title_key = "menu.gestures.title"

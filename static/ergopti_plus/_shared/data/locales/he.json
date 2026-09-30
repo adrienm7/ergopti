@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "טמפרטורה",
 	"menu.shortcuts.alt_add": "[+ הוסף קיצור Alt+…]",
 	"menu.shortcuts.alt_group": "⎇ קיצורי Alt",
-	"menu.shortcuts.altgr_symbol": "AltGr + סמל",
+	"menu.shortcuts.selection_symbol": "בחירה + סמל",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ערוך URL של ChatGPT…",
 	"menu.shortcuts.ctrl_add": "[+ הוסף קיצור Ctrl+…]",
 	"menu.shortcuts.cmd_add": "[+ הוסף קיצור Cmd+…]",

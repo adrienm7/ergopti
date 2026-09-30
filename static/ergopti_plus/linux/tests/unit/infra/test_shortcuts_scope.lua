@@ -422,6 +422,40 @@ helpers.describe("Linux Shortcuts restore row", function()
 	end)
 end)
 
+-- The maintainer's request of 2026-09-30: « Taper un symbole encadre la
+-- sélection » (no AltGr: the symbols need not be there) and « Symboles
+-- encadrants » form one group, with no separator between them.
+helpers.describe("Linux Shortcuts wrap group", function()
+	helpers.it("draws the wrap toggle by its behaviour, followed by its symbols", function()
+		with_scope(function(_, owners, controls)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top = root.top_level
+			local passed, err = pcall(function()
+				root.top_level = {{ id = "shortcuts" }}
+				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					is_paused = function() return controls.paused end })
+				local i18n = require("infra.i18n")
+				local submenu
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
+				end
+				helpers.assert_true(type(submenu) == "table", "the real Shortcuts submenu must exist")
+				local at
+				for index, row in ipairs(submenu) do
+					if row.title == i18n.get("shortcuts.label_wrap_text") then at = index end
+				end
+				helpers.assert_true(at ~= nil, "the wrap toggle is drawn with its label")
+				helpers.assert_eq(submenu[at + 1].title, i18n.get("menu.shortcuts.wrap_symbols"),
+					"the wrapping symbols follow the toggle with no separator between them")
+				helpers.assert_true(not i18n.get("shortcuts.label_wrap_text"):find("AltGr", 1, true))
+			end)
+			root.top_level = top
+			if not passed then error(err, 0) end
+		end)
+	end)
+end)
+
 helpers.describe("Linux terminal shortcut scope revert", function()
 	helpers.it("reverts a committed clear under the same dispatch ownership", function()
 		with_scope(function(scope, owners, _, path, backup)

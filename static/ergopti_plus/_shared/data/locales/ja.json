@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "温度",
 	"menu.shortcuts.alt_add": "[+ Alt+…ショートカットを追加]",
 	"menu.shortcuts.alt_group": "⎇ Altショートカット",
-	"menu.shortcuts.altgr_symbol": "AltGr + 記号",
+	"menu.shortcuts.selection_symbol": "選択範囲 + 記号",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ChatGPT URLを編集…",
 	"menu.shortcuts.ctrl_add": "[+ Ctrl+…ショートカットを追加]",
 	"menu.shortcuts.cmd_add": "[+ Cmd+…ショートカットを追加]",

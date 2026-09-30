@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Temperatuur",
 	"menu.shortcuts.alt_add": "[+ Een Alt+…-sneltoets toevoegen]",
 	"menu.shortcuts.alt_group": "⎇ Alt-sneltoetsen",
-	"menu.shortcuts.altgr_symbol": "AltGr + symbool",
+	"menu.shortcuts.selection_symbol": "Selectie + symbool",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ ChatGPT-URL bewerken…",
 	"menu.shortcuts.ctrl_add": "[+ Een Ctrl+…-sneltoets toevoegen]",
 	"menu.shortcuts.cmd_add": "[+ Een Cmd+…-sneltoets toevoegen]",

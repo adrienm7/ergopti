@@ -1542,7 +1542,7 @@
 	"menu.settings.temperature_title": "Temperatur",
 	"menu.shortcuts.alt_add": "[+ Lägg till en Alt+… genväg]",
 	"menu.shortcuts.alt_group": "⎇ Alt-genvägar",
-	"menu.shortcuts.altgr_symbol": "AltGr + symbol",
+	"menu.shortcuts.selection_symbol": "Markering + symbol",
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Redigera ChatGPT-URL…",
 	"menu.shortcuts.ctrl_add": "[+ Lägg till en Ctrl+… genväg]",
 	"menu.shortcuts.cmd_add": "[+ Lägg till en Cmd+… genväg]",
