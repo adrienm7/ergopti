@@ -217,7 +217,10 @@ driver registers `scope_restore`/`scope_clear` on that menu's scope owner.
 exceptions are restore-only menus (AI, Metrics: the maintainer said clearing
 them means nothing, while the global clear still composes their owners).
 Action: add a scope row to the first group of the manifest menu, never below
-it and never natively.
+it and never natively. Every other row belongs in the manifest too (the
+maintainer's rule): `test-native-menu-rows.cjs` ratchets the rows drivers still
+build themselves against `native-menu-rows-baseline.json`, which lists each
+site as file:line; lower it with `--update-baseline` as rows move.
 
 ### project-a-composite-scope-composes-revertible-owners
 
