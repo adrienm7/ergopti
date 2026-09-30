@@ -375,6 +375,15 @@ local function fresh_mouse_owner()
 	}
 	package.loaded["adapters.shell_runner"] = shell_runner
 	package.loaded["adapters.timer_scheduler"] = nil
+	fixture.python = helpers.healthy_python_resolver()
+	package.loaded["adapters.python_interpreter"] = fixture.python
+	fixture.python_offers = {}
+	package.loaded["ui.python_runtime_offer"] = {
+		offer = function(state)
+			fixture.python_offers[#fixture.python_offers + 1] = state
+			return true
+		end,
+	}
 	package.loaded["modules.shortcuts.actions.system_mouse"] = nil
 	fixture.subject = require("modules.shortcuts.actions.system_mouse")
 	return fixture
@@ -417,12 +426,48 @@ end
 -- ==============================================
 
 helpers.describe("SystemMouse mirror owner: positive and synchronous controls", function()
+	-- hardening-h-no-rosetta: only an Intel Python on an Apple silicon Mac.
+	helpers.it("starts nothing and offers a native Python when only Intel ones exist", function()
+		local fixture = fresh_mouse_owner()
+		local intel = "\207\250\237\254" .. "\7\0\0\1" .. string.rep("\0", 24)
+		fixture.python._set_deps({
+			read_head = function(path)
+				if path == helpers.HEALTHY_PYTHON or path == "/usr/local/bin/python3" then return intel end
+				return nil
+			end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), false)
+		helpers.assert_eq(#fixture.shells, 0, "no interpreter may start under Rosetta")
+		helpers.assert_eq(#fixture.python_offers, 1, "the refusal carries the install offer")
+		helpers.assert_eq(fixture.python_offers[1].kind, "python_not_native")
+		helpers.assert_eq(#fixture.python_offers[1].found, 2)
+		-- A native interpreter installed since: the next toggle starts it.
+		fixture.python._set_deps({
+			read_head = function(path)
+				if path == "/opt/homebrew/bin/python3" then return "\207\250\237\254\12\0\0\1" .. string.rep("\0", 24) end
+				if path == helpers.HEALTHY_PYTHON or path == "/usr/local/bin/python3" then return intel end
+				return nil
+			end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
+		helpers.assert_eq(fixture.shells[1].executable, "/opt/homebrew/bin/python3")
+		fixture.shells[1]:deliver(0, "single_screen\n", "")
+	end)
+
 	helpers.it("dispatches the Python source inline without a shared temp pathname", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
 		helpers.assert_eq(#fixture.shells, 1)
 		local handle = fixture.shells[1]
-		helpers.assert_eq(handle.executable, "/usr/bin/python3")
+		helpers.assert_eq(handle.executable, helpers.HEALTHY_PYTHON)
 		helpers.assert_eq(handle.args[1], "-c")
 		helpers.assert_type(handle.args[2], "string")
 		helpers.assert_contains(handle.args[2], "CGGetOnlineDisplayList")

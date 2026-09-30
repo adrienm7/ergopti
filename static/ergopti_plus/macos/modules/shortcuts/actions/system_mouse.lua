@@ -27,12 +27,14 @@ local MouseControl   = require("adapters.mouse_control")
 local ShellRunner    = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "shortcuts.actions.system"
 
--- Absolute path: the interactive layer must not inherit its binaries from PATH,
--- which differs between a login shell and the Hammerspoon process.
-local PYTHON_BIN = "/usr/bin/python3"
+-- The display-mirror Python is resolved per toggle by adapters.python_interpreter:
+-- an absolute path this Mac runs natively, never PATH (it differs between a
+-- login shell and the Hammerspoon process) nor an interpreter macOS would
+-- start under Rosetta (hardening-h-no-rosetta).
 
 -- Spotlight ring color (circle on the screen that holds the cursor)
 local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
@@ -325,11 +327,12 @@ end
 --- Constructs, publishes, observes, and then starts the mirror process.
 --- @param operation table Mirror operation published by the public action.
 --- @param source string Inline Python source.
+--- @param python_bin string Native interpreter from adapters.python_interpreter.
 --- @return boolean committed
-local function start_mirror_process(operation, source)
+local function start_mirror_process(operation, source, python_bin)
 	operation.acquiring = true
 	local call_ok, handle_or_error = xpcall(function()
-		return ShellRunner.spawn(PYTHON_BIN, { "-c", source }, function(...)
+		return ShellRunner.spawn(python_bin, { "-c", source }, function(...)
 			receive_mirror_terminal(operation, ...)
 		end)
 	end, debug.traceback)
@@ -713,6 +716,12 @@ function M.toggle_display_mirror(parent)
 		Logger.warn(LOG, "Display mirror toggle refused while an earlier toggle remains owned.")
 		return false
 	end
+	-- Without a native interpreter nothing starts; the user is offered one.
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		return false
+	end
 	Logger.start(LOG, "Toggling display mirror via CoreGraphics…")
 	local operation = {
 		id = next_mouse_owner_id(),
@@ -766,7 +775,7 @@ else:
 	-- Asynchronous: a Python interpreter start plus a display-configuration round
 	-- trip is hundreds of milliseconds, and this runs from a shortcut — the
 	-- blocking form froze every keystroke for that whole window.
-	return start_mirror_process(operation, py)
+	return start_mirror_process(operation, py, python_bin)
 end
 
 --- Publishes one canvas before showing it so every partial acquisition is owned.

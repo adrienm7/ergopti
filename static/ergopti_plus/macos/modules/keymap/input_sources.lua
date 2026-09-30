@@ -29,6 +29,7 @@ local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local OpenStepPlist = require("infra.openstep_plist")
+local PythonInterpreter = require("adapters.python_interpreter")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -881,7 +882,15 @@ print("OK")
 local function edit_enabled_list_async(mode, target, display, accepted, on_done)
 	local label = mode == "enable" and "enable_source" or "disable_source"
 	local nested_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
-	return run_bounded_process("Edit enabled keyboard input sources", "/usr/bin/python3",
+	-- Only an interpreter this Mac runs natively: none starts nothing and
+	-- offers the install (hardening-h-no-rosetta).
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done(label .. ".done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	return run_bounded_process("Edit enabled keyboard input sources", python_bin,
 		{ "-c", ENABLED_LIST_SCRIPT, mode, target, tostring(nested_timeout) },
 		function(process_ok, out, reason)
 			local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
