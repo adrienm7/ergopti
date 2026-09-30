@@ -3,24 +3,25 @@
 ; ==============================================================================
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys
 ; DESCRIPTION:
-; Owns the context-sensitive Tab hotkey that accepts the visible prediction
-; and the slot-navigation hotkeys (~Up / ~Down / val_modifiers + 1..9, 0) that
-; move the active slot when the tooltip shows multiple predictions. The hotkey
-; context is gated by ``LLM_Tooltip_GetText() != ""`` via ``#HotIf`` so the
-; Tab key reaches the underlying app unchanged whenever no prediction is on
-; screen.
+; Owns the slot-navigation hotkeys (nav_modifiers + Up / Down, val_modifiers +
+; 1..9, 0) that move the active slot when the tooltip shows multiple
+; predictions. The physical Tab that accepts the visible prediction is an SC00F
+; variant in platform/remap/tab.ahk: AutoHotkey looks the physical Tab up by
+; its scan code once any SC00F hotkey exists, so a `Tab::` hotkey here never
+; fired (llm-tab-accepts-visible-prediction).
 ;
 ; FEATURES & RATIONALE:
-; 1. HotIf-gated Tab: when no tooltip is visible, Tab passes through to the
-;    active app — the user keeps the OS-native Tab behaviour everywhere
+; 1. Tab outside a prediction: when no tooltip offers text, Tab passes through
+;    to the active app — the user keeps the OS-native Tab behaviour everywhere
 ;    except when actively reviewing a prediction.
-; 2. Cycle wraps around: ~Up past the first slot loops to the last, and
-;    ~Down past the last loops back to the first — feels snappier than a
-;    hard stop at the boundary.
-; 3. ~ prefix on Up/Down: the tilde tells AHK to let the original keystroke
-;    pass through to the app, so the user's cursor still moves while the
-;    tooltip slot cycles. Mirrors the HS llm_nav_modifiers default of
-;    empty modifiers (bare arrows).
+; 2. Cycle wraps around: Up past the first slot loops to the last, and Down
+;    past the last loops back to the first — feels snappier than a hard stop
+;    at the boundary.
+; 3. Navigation is consumed: while the native owner cycles a multi-slot
+;    prediction, its Up / Down chord never reaches the application, like the
+;    macOS tooltip (handle_llm_keys). The native plan keeps passing the cycle
+;    chord (its route contract), and the hotkeys below, next in the hook
+;    chain, swallow it (llm-tooltip-nav-consumed).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -69,18 +70,78 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 
 
 
-; ====================================
-; ====================================
-; ======= 1/ Tab Accept Hotkey =======
-; ====================================
-; ====================================
+; ===============================================
+; ===============================================
+; ======= 1/ Navigation Chord Consumption =======
+; ===============================================
+; ===============================================
 
-; A bare physical Tab accepts only when the canonical source-control policy
-; succeeds. On any rejection the wrapper emits the native Tab instead.
-; The hotkey is context-sensitive: active only when the tooltip is shown.
-#HotIf LLM_Tooltip_GetText() != ""
-Tab:: {
-	LLM_Tooltip_FireTabOrAccept([], true)
+; The physical Tab that accepts a prediction is not declared here: see the
+; module header and platform/remap/tab.ahk (8.5).
+;
+; The native owner cycles the slot on the configured Up / Down chord, then
+; passes the key on: its plan contract requires a cycle route to pass through.
+; The AutoHotkey hook comes next in the chain, and these hotkeys swallow the
+; chord while that owner cycles a multi-slot prediction, so the caret never moves
+; in the application behind the tooltip (macOS consumes the arrows the same way).
+; The wildcard lets one hotkey serve every configured modifier; the criterion
+; demands the exact chord of the committed plan. #InputLevel 1 is the native
+; routes' own level: both take physical input and AutoHotkey output above it.
+#InputLevel 1
+#HotIf LLM_Menu_NavCycleChordIsOwned("Up")
+*Up:: return
+#HotIf LLM_Menu_NavCycleChordIsOwned("Down")
+*Down:: return
+#HotIf
+#InputLevel 0
+
+; Cycle routes of the committed plan (entries 1 and 2) by key, with the scan
+; code the wildcard hotkey above resolves the key to.
+global LLM_NAV_CYCLE_ROUTES := Map(
+	"Up", Map("index", 1, "code", "sc0148"),
+	"Down", Map("index", 2, "code", "sc0150"))
+
+/**
+ * The #HotIf of the hotkeys that consume the navigation chord: whether the Up
+ * or Down press being resolved is the committed cycle chord, with exactly its
+ * modifiers held, while the native owner cycles a multi-slot prediction. Any
+ * other modifier set, one slot, or an owner that is not routing leaves the key
+ * to the application.
+ * @param {String} Key - "Up" or "Down".
+ * @param {Func} ModifierIsHeldFn - Test seam taking "Ctrl", "Alt", "Shift",
+ *     "LWin" or "RWin"; the logical key state when omitted, which is what a
+ *     hotkey without the wildcard would compare.
+ * @returns {Boolean}
+ */
+LLM_Menu_NavCycleChordIsOwned(Key, ModifierIsHeldFn := 0) {
+	global _LLM_Menu_NavHotkeysBound, LLM_NAV_CYCLE_ROUTES
+	; A #HotIf criterion is live before this file's globals are assigned.
+	if !IsSet(_LLM_Menu_NavHotkeysBound) || !IsSet(LLM_NAV_CYCLE_ROUTES)
+		return false
+	if !(_LLM_Menu_NavHotkeysBound is Array) || !LLM_NAV_CYCLE_ROUTES.Has(Key)
+		return false
+	Route := LLM_NAV_CYCLE_ROUTES[Key]
+	if _LLM_Menu_NavHotkeysBound.Length < Route["index"]
+		return false
+	Entry := _LLM_Menu_NavHotkeysBound[Route["index"]]
+	if !(Entry is Map)
+		return false
+	; The physical identity is what the native route matches: its modifiers
+	; are the exact chord, its key must be the one this hotkey resolves to.
+	if !RegExMatch(Entry.Get("physical_id", ""),
+			"i)^([\^!+#]*)" . Route["code"] . "$", &Match)
+		return false
+	Chord := Match[1]
+	if !HasMethod(ModifierIsHeldFn, "Call")
+		ModifierIsHeldFn := GetKeyState
+	for Symbol, Name in Map("^", "Ctrl", "!", "Alt", "+", "Shift") {
+		if (InStr(Chord, Symbol) > 0) != (ModifierIsHeldFn.Call(Name) ? true : false)
+			return false
+	}
+	WinHeld := ModifierIsHeldFn.Call("LWin") || ModifierIsHeldFn.Call("RWin")
+	if (InStr(Chord, "#") > 0) != (WinHeld ? true : false)
+		return false
+	return LLM_TooltipNavCycleIsOwned()
 }
 
 ; ── Slot navigation ──
