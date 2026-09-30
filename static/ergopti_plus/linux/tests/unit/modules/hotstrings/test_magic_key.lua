@@ -146,6 +146,30 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		restore_manifest(); restore_storage()
 	end)
 
+	helpers.it("warns once, never an ERROR, about that key and offers it (config-outdated-magic-key)", function()
+		local _, restore_storage = stub_storage({ stored = "e" })
+		local restore_manifest = stub_manifest("★")
+		local Logger = require("logger.shim")
+		local real_warn, real_error, warnings, errors = Logger.warn, Logger.error, {}, {}
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(function()
+			local magic = load_magic_key()
+			for _ = 1, 3 do helpers.assert_eq(magic.get(), "★") end
+			helpers.assert_eq(errors, {}, "an outdated magic key is never an ERROR")
+			helpers.assert_eq(#warnings, 1, "named once, not at every menu build")
+			helpers.assert_contains(warnings[1], "hotstrings.trigger_char")
+		end)
+		Logger.warn, Logger.error = real_warn, real_error
+		restore_manifest(); restore_storage()
+		if not ok then error(err, 0) end
+		local source = '[hotstrings]\ntrigger_char = "e"\n'
+		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the key the reader ignores")
+		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "trigger_char" })
+	end)
+
 end)
 
 
