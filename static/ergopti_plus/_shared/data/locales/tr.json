@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fiziksel sihirli tuş",
 	"dialog.magic_key_source.prompt": "Sihirli tuşu yazacak tuşa basın. Escape iptal eder.",
 	"dialog.magic_key_source.not_a_candidate": "Bu tuş sihirli tuşu yazamaz: boşluk çubuğu dışında karakter yazan bir tuş seçin.",
+	"dialog.magic_key_source.untypable": "Klavye düzeniniz sihirli tuşu bir tuş basışıyla yazamıyor, bu yüzden başka hiçbir tuş onun yerine yazamaz. Otomatik tuşu koruyun ya da düzeninizin yazdığı bir sihirli tuş karakteri seçin.",
 	"dialog.metrics.bad_password_warning": "⚠️ Uyarı: Şifre çözme hatası tespit edildi. Parola yanlış olabilir.",
 	"dialog.metrics.complete_label": "İşlem tamamlandı.\n\nBaşarıyla işlenen dosyalar: %d\nKarşılaşılan hatalar: %d",
 	"dialog.metrics.decrypt_confirm_body": "Tüm şifreli günlükleriniz diskte düz metin olarak geri yüklenecek.\n\nOnaylıyor musunuz?",

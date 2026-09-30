@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fysieke magische toets",
 	"dialog.magic_key_source.prompt": "Druk op de toets die de magische toets moet typen. Escape annuleert.",
 	"dialog.magic_key_source.not_a_candidate": "Deze toets kan de magische toets niet typen: kies een toets die een teken typt, behalve de spatiebalk.",
+	"dialog.magic_key_source.untypable": "Uw toetsenbordindeling kan de magische toets niet met een toetsaanslag typen, dus kan geen andere toets hem in zijn plaats typen. Behoud de automatische toets, of kies een teken voor de magische toets dat uw indeling typt.",
 	"dialog.metrics.bad_password_warning": "⚠️ Waarschuwing: Ontsleutelingsfout gedetecteerd. Het wachtwoord is mogelijk onjuist.",
 	"dialog.metrics.complete_label": "Bewerking voltooid.\n\nBestanden succesvol verwerkt: %d\nFouten opgetreden: %d",
 	"dialog.metrics.decrypt_confirm_body": "Alle versleutelde logs worden hersteld als leesbare tekst op schijf.\n\nBevestigen?",

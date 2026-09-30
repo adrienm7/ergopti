@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Tecla mágica física",
 	"dialog.magic_key_source.prompt": "Pulse la tecla que escribirá la tecla mágica. Escape cancela.",
 	"dialog.magic_key_source.not_a_candidate": "Esta tecla no puede escribir la tecla mágica: elija una tecla que escriba un carácter, distinta de la barra espaciadora.",
+	"dialog.magic_key_source.untypable": "Su distribución de teclado no puede escribir la tecla mágica con una pulsación, así que ninguna otra tecla puede escribirla en su lugar. Mantenga la tecla automática o elija un carácter de tecla mágica que su distribución escriba.",
 	"dialog.metrics.bad_password_warning": "⚠️ Atención: Fallo de descifrado detectado. La contraseña puede ser incorrecta.",
 	"dialog.metrics.complete_label": "Operación completada.\n\nArchivos procesados correctamente: %d\nErrores: %d",
 	"dialog.metrics.decrypt_confirm_body": "Todos sus registros cifrados se restaurarán como texto plano en disco.\n\n¿Confirmar?",

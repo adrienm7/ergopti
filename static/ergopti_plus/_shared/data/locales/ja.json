@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "物理マジックキー",
 	"dialog.magic_key_source.prompt": "マジックキーを入力するキーを押してください。Esc でキャンセルします。",
 	"dialog.magic_key_source.not_a_candidate": "このキーではマジックキーを入力できません。スペースバー以外の、文字を入力するキーを選んでください。",
+	"dialog.magic_key_source.untypable": "お使いのキーボード配列ではキーを押してマジックキーを入力できないため、ほかのキーが代わりに入力することもできません。自動のキーのままにするか、配列で入力できるマジックキーの文字を選んでください。",
 	"dialog.metrics.bad_password_warning": "⚠️ 警告: 復号化に失敗しました。パスワードが間違っている可能性があります。",
 	"dialog.metrics.complete_label": "操作が完了しました。\n\n正常に処理されたファイル: %d\nエラー: %d",
 	"dialog.metrics.decrypt_confirm_body": "暗号化されたすべてのログがディスク上のプレーンテキストとして復元されます。\n\n確認しますか？",

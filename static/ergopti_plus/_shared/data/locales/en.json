@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Physical magic key",
 	"dialog.magic_key_source.prompt": "Press the key that will type the magic key. Escape cancels.",
 	"dialog.magic_key_source.not_a_candidate": "This key cannot type the magic key: choose a key that types a character, other than the space bar.",
+	"dialog.magic_key_source.untypable": "Your keyboard layout cannot type the magic key with a key press, so no other key can type it in its place. Keep the automatic key, or choose a magic key character your layout types.",
 	"dialog.metrics.bad_password_warning": "⚠️ Warning: Decryption failure detected. The password may be incorrect.",
 	"dialog.metrics.complete_label": "Operation complete.\n\nFiles processed successfully: %d\nErrors encountered: %d",
 	"dialog.metrics.decrypt_confirm_body": "All your encrypted logs will be restored as plaintext on disk.\n\nConfirm?",

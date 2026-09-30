@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fysisk magisk tast",
 	"dialog.magic_key_source.prompt": "Trykk på tasten som skal skrive den magiske tasten. Escape avbryter.",
 	"dialog.magic_key_source.not_a_candidate": "Denne tasten kan ikke skrive den magiske tasten: velg en tast som skriver et tegn, bortsett fra mellomromstasten.",
+	"dialog.magic_key_source.untypable": "Tastaturoppsettet ditt kan ikke skrive den magiske tasten med et tastetrykk, så ingen annen tast kan skrive den i stedet. Behold den automatiske tasten, eller velg et tegn for den magiske tasten som oppsettet ditt skriver.",
 	"dialog.metrics.bad_password_warning": "⚠️ Advarsel: Dekrypteringsfeil oppdaget. Passordet kan være feil.",
 	"dialog.metrics.complete_label": "Operasjonen er fullført.\n\nFiler behandlet med suksess: %d\nFeil oppstod: %d",
 	"dialog.metrics.decrypt_confirm_body": "Alle dine krypterte logger blir gjenopprettet som klartekst på disk.\n\nBekreft?",

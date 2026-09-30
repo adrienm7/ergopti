@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fysisk magisk tangent",
 	"dialog.magic_key_source.prompt": "Tryck på tangenten som ska skriva den magiska tangenten. Escape avbryter.",
 	"dialog.magic_key_source.not_a_candidate": "Den här tangenten kan inte skriva den magiska tangenten: välj en tangent som skriver ett tecken, förutom mellanslagstangenten.",
+	"dialog.magic_key_source.untypable": "Din tangentbordslayout kan inte skriva den magiska tangenten med ett tangenttryck, så ingen annan tangent kan skriva den i dess ställe. Behåll den automatiska tangenten, eller välj ett tecken för den magiska tangenten som din layout skriver.",
 	"dialog.metrics.bad_password_warning": "⚠️ Varning: Dekrypteringsfel upptäckt. Lösenordet kan vara felaktigt.",
 	"dialog.metrics.complete_label": "Operationen klar.\n\nFiler bearbetade framgångsrikt: %d\nFel påträffade: %d",
 	"dialog.metrics.decrypt_confirm_body": "Alla dina krypterade loggar kommer att återställas som oformaterad text på disken.\n\nBekräfta?",

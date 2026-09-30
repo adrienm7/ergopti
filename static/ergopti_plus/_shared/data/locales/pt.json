@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Tecla mágica física",
 	"dialog.magic_key_source.prompt": "Pressione a tecla que digitará a tecla mágica. Esc cancela.",
 	"dialog.magic_key_source.not_a_candidate": "Esta tecla não pode digitar a tecla mágica: escolha uma tecla que digite um caractere, diferente da barra de espaço.",
+	"dialog.magic_key_source.untypable": "O seu layout de teclado não consegue digitar a tecla mágica com um toque de tecla, por isso nenhuma outra tecla pode digitá-la no seu lugar. Mantenha a tecla automática ou escolha um caractere de tecla mágica que o seu layout digite.",
 	"dialog.metrics.bad_password_warning": "⚠️ Atenção: Falha de descriptografia detectada. A senha pode estar incorreta.",
 	"dialog.metrics.complete_label": "Operação concluída.\n\nArquivos processados com sucesso: %d\nErros encontrados: %d",
 	"dialog.metrics.decrypt_confirm_body": "Todos os logs criptografados serão restaurados como texto simples em disco.\n\nConfirmar?",

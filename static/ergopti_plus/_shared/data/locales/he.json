@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "מקש קסם פיזי",
 	"dialog.magic_key_source.prompt": "לחצו על המקש שיקליד את מקש הקסם. Escape מבטל.",
 	"dialog.magic_key_source.not_a_candidate": "מקש זה אינו יכול להקליד את מקש הקסם: בחרו מקש שמקליד תו, שאינו מקש הרווח.",
+	"dialog.magic_key_source.untypable": "פריסת המקלדת שלכם אינה יכולה להקליד את מקש הקסם בלחיצת מקש, ולכן אף מקש אחר אינו יכול להקליד אותו במקומו. השאירו את המקש האוטומטי, או בחרו תו למקש הקסם שהפריסה שלכם מקלידה.",
 	"dialog.metrics.bad_password_warning": "⚠️ אזהרה: זוהה כשל פענוח. ייתכן שהסיסמה שגויה.",
 	"dialog.metrics.complete_label": "הפעולה הושלמה.\n\nקבצים שעובדו בהצלחה: %d\nשגיאות שנתקלו: %d",
 	"dialog.metrics.decrypt_confirm_body": "כל היומנים המוצפנים שלך ישוחזרו כטקסט גלוי בדיסק.\n\nלאשר?",

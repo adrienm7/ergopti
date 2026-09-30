@@ -168,7 +168,58 @@ end)
 
 -- =========================================================================
 -- =========================================================================
--- ======= 3/ No clipboard route is said out loud ==========================
+-- ======= 3/ A key typed in place of another never pastes =================
+-- =========================================================================
+-- =========================================================================
+
+-- The physical magic key types ★ in place of the key the hook consumed. Through
+-- inject(), a stock layout without ★ pasted it on every press — clipboard tools
+-- spawned inside the hook, the clipboard history filled — and a paste that
+-- failed stopped the grab.
+helpers.describe("injector: a key typed in place of another is key presses or nothing", function()
+
+	helpers.it("(magic-key-source) refuses an untypable character without sending or pasting anything", function()
+		local clip, restore = stub_clipboard(true)
+		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		local stops = {}
+		package.loaded["adapters.keyboard_hook"] = {
+			emergency_stop = function(reason) stops[#stops + 1] = reason end,
+		}
+		local ch = fake_channel(true)
+		local injector = load_injector(ch)
+		local ok, err = pcall(function()
+			helpers.assert_eq(injector.can_type_directly("★"), false, "no key of this layout types ★")
+			local result = injector.type_directly("★")
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.error, "untypable")
+			helpers.assert_eq(#clip.calls, 0, "never a paste")
+			helpers.assert_eq(#ch.emitted, 0, "nothing sent: the caller lets the key through")
+			helpers.assert_eq(#stops, 0, "and the grab is kept")
+
+			helpers.assert_true(injector.can_type_directly("s"))
+			helpers.assert_true(injector.type_directly("s").ok)
+			helpers.assert_eq(#clip.calls, 0)
+			local pressed = false
+			for _, event in ipairs(ch.emitted) do
+				if event.code == 31 and event.value == 1 then pressed = true end
+			end
+			helpers.assert_true(pressed, "a typable character goes out as its key")
+			helpers.assert_eq(#stops, 0)
+		end)
+		restore()
+		package.loaded["adapters.keyboard_hook"] = previous_hook
+		if not ok then error(err, 0) end
+	end)
+
+end)
+
+
+
+
+
+-- =========================================================================
+-- =========================================================================
+-- ======= 4/ No clipboard route is said out loud ==========================
 -- =========================================================================
 -- =========================================================================
 

@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Physische magische Taste",
 	"dialog.magic_key_source.prompt": "Drücken Sie die Taste, die die magische Taste eingeben soll. Escape bricht ab.",
 	"dialog.magic_key_source.not_a_candidate": "Diese Taste kann die magische Taste nicht eingeben: Wählen Sie eine Taste, die ein Zeichen eingibt, außer der Leertaste.",
+	"dialog.magic_key_source.untypable": "Ihr Tastaturlayout kann die magische Taste nicht mit einem Tastendruck eingeben, daher kann keine andere Taste sie an ihrer Stelle eingeben. Behalten Sie die automatische Taste bei oder wählen Sie ein Zeichen für die magische Taste, das Ihr Layout eingibt.",
 	"dialog.metrics.bad_password_warning": "⚠️ Achtung: Entschlüsselung fehlgeschlagen. Das Passwort könnte falsch sein.",
 	"dialog.metrics.complete_label": "Vorgang abgeschlossen.\n\nErfolgreich verarbeitete Dateien: %d\nFehler: %d",
 	"dialog.metrics.decrypt_confirm_body": "Alle verschlüsselten Logs werden als Klartext auf der Festplatte wiederhergestellt.\n\nBestätigen?",

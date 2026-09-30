@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Tasto magico fisico",
 	"dialog.magic_key_source.prompt": "Premere il tasto che digiterà il tasto magico. Esc annulla.",
 	"dialog.magic_key_source.not_a_candidate": "Questo tasto non può digitare il tasto magico: scegliere un tasto che digita un carattere, diverso dalla barra spaziatrice.",
+	"dialog.magic_key_source.untypable": "Il layout della tastiera non può digitare il tasto magico con una pressione di tasto, quindi nessun altro tasto può digitarlo al suo posto. Mantenere il tasto automatico, oppure scegliere un carattere del tasto magico che il layout digita.",
 	"dialog.metrics.bad_password_warning": "⚠️ Attenzione: rilevato errore di decifratura. La password potrebbe essere errata.",
 	"dialog.metrics.complete_label": "Operazione completata.\n\nFile elaborati con successo: %d\nErrori riscontrati: %d",
 	"dialog.metrics.decrypt_confirm_body": "Tutti i log cifrati verranno ripristinati in testo normale su disco.\n\nConfermare?",

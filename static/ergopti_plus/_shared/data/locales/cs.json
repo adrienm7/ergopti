@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fyzická kouzelná klávesa",
 	"dialog.magic_key_source.prompt": "Stiskněte klávesu, která bude psát kouzelnou klávesu. Escape zruší.",
 	"dialog.magic_key_source.not_a_candidate": "Tato klávesa nemůže psát kouzelnou klávesu: zvolte klávesu, která píše znak, jinou než mezerník.",
+	"dialog.magic_key_source.untypable": "Vaše rozložení klávesnice nedokáže napsat kouzelnou klávesu stiskem klávesy, takže ji žádná jiná klávesa nemůže napsat místo ní. Ponechte automatickou klávesu, nebo zvolte znak kouzelné klávesy, který vaše rozložení píše.",
 	"dialog.metrics.bad_password_warning": "⚠️ Upozornění: Detekováno selhání dešifrování. Heslo může být nesprávné.",
 	"dialog.metrics.complete_label": "Operace dokončena.\n\nÚspěšně zpracované soubory: %d\nChyby: %d",
 	"dialog.metrics.decrypt_confirm_body": "Všechny vaše zašifrované záznamy budou obnoveny jako prostý text na disku.\n\nPotvrdit?",
