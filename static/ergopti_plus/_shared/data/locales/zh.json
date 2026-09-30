@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "物理魔法键",
 	"dialog.magic_key_source.prompt": "按下将输入魔法键的按键。按 Esc 取消。",
 	"dialog.magic_key_source.not_a_candidate": "此按键无法输入魔法键：请选择除空格键外可输入字符的按键。",
+	"dialog.magic_key_source.untypable": "您的键盘布局无法通过按键输入魔法键，因此任何其他按键都无法代替它输入。请保留自动按键，或选择您的布局能够输入的魔法键字符。",
 	"dialog.metrics.bad_password_warning": "⚠️ 注意：检测到解密失败，密码可能不正确。",
 	"dialog.metrics.complete_label": "操作完成。\n\n成功处理文件：%d\n遇到错误：%d",
 	"dialog.metrics.decrypt_confirm_body": "所有加密日志将以明文形式恢复到磁盘。\n\n确认？",

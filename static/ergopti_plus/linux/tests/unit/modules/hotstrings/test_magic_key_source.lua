@@ -63,7 +63,7 @@ end
 
 --- Wires the owner to recording collaborators.
 --- @param Source table
---- @param state table { active, replace, typed_ok, grab } switches the test flips.
+--- @param state table { active, replace, typed_ok, grab, typable } switches the test flips.
 --- @return table calls { typed = {}, dispatched = {}, deferred = {} }
 local function wire(Source, state)
 	local calls = { typed = {}, dispatched = {}, deferred = {} }
@@ -71,6 +71,7 @@ local function wire(Source, state)
 		is_active = function() return state.active end,
 		replace_on = function() return state.replace end,
 		magic_key = function() return "★" end,
+		can_type = function(text) return text == "★" and state.typable ~= false end,
 		type_text = function(text)
 			calls.typed[#calls.typed + 1] = text
 			return state.typed_ok
@@ -199,6 +200,10 @@ end)
 helpers.describe("magic key source: choosing a key", function()
 	helpers.it("(magic-key-source) stores a candidate sparsely and refuses any other value", function()
 		with_source(nil, function(Source, Preferences)
+			local _, refusal = pcall(Source.set, "Semicolon")
+			helpers.assert_true(tostring(refusal):find("needs M.init first", 1, true) ~= nil,
+				"a choice needs the daemon's collaborators: " .. tostring(refusal))
+			wire(Source, { active = true, replace = true, typed_ok = true })
 			helpers.assert_true(Source.set("Semicolon"))
 			helpers.assert_eq(Source.get(), "Semicolon")
 			helpers.assert_eq(Source.evdev_code(), 39)
@@ -208,6 +213,26 @@ helpers.describe("magic key source: choosing a key", function()
 			helpers.assert_eq(Source.get(), "Semicolon", "a refusal changes nothing")
 			helpers.assert_true(Source.set("auto"))
 			helpers.assert_eq(Preferences.is_explicit(PATH), false, "the automatic key is written as absence")
+			Source._reset_for_test()
+		end)
+	end)
+
+	helpers.it("(magic-key-source) a magic key the layout cannot type with key presses leaves every key its own", function()
+		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
+			local state = { active = true, replace = true, typed_ok = true, typable = false }
+			local calls = wire(Source, state)
+			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false, "the key types its own character")
+			helpers.assert_eq(#calls.typed, 0, "nothing is injected: no paste on every press")
+			local ok, reason = Source.set("Semicolon")
+			helpers.assert_eq(ok, false, "a key that would do nothing is refused aloud")
+			helpers.assert_eq(reason, "dialog.magic_key_source.untypable")
+			helpers.assert_eq(Source.get(), "KeyJ")
+			helpers.assert_true(Source.set("auto"), "the automatic key is always allowed")
+			state.typable = true
+			helpers.assert_true(Source.set("KeyJ"))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }))
+			helpers.assert_eq(calls.typed, { "★" })
+			Source._reset_for_test()
 		end)
 	end)
 

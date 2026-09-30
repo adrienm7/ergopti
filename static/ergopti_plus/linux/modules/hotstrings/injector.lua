@@ -532,6 +532,38 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	return result
 end
 
+--- Whether the session's layout types a text with key presses alone, the one
+--- route that never touches the clipboard.
+--- @param text string
+--- @return boolean
+function M.can_type_directly(text)
+	return type(text) == "string" and text ~= "" and KeyboardLayout.is_ready()
+		and KeyboardLayout.plan(text) ~= nil
+end
+
+--- Types a text in place of a key the keyboard hook consumed: key presses
+--- only, never the clipboard. A key typing another character is a keystroke,
+--- decided inside the hook and repeated at typing speed — a paste would spawn
+--- the clipboard tools on each press, fill the clipboard history and wait on
+--- them in the hook — and a character the layout cannot type is not typed at
+--- all: nothing is sent and the caller lets the key through. Only a uinput
+--- write that fails midway stops the grab, as for every injection, since a
+--- keyboard the daemon holds and cannot write to must be given back.
+--- @param text string
+--- @return table result { ok, error, cleanup_ok }; error "untypable" when no
+---   key press sequence exists, with nothing sent.
+function M.type_directly(text)
+	if not M.can_type_directly(text) then
+		return { ok = false, error = "untypable", cleanup_ok = true }
+	end
+	if not (_uinput and _uinput.is_open()) then
+		return { ok = false, error = "no uinput channel", cleanup_ok = true }
+	end
+	return run_transaction("type_directly()", function(tx)
+		if not send_text_native(tx, text) then error(tx.error() or "the key presses were refused", 0) end
+	end)
+end
+
 --- Types several values separated by a real Tab KEYSTROKE.
 ---
 --- WHY NOT JUST inject() WITH "\t" IN THE TEXT: the text path resolves every

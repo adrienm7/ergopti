@@ -1323,9 +1323,12 @@ local function main()
 		is_active = function() return not script_actions.is_paused() end,
 		replace_on = function() return hotstrings_config.is_section_enabled("magickey", "replace") end,
 		magic_key = MagicKey.get,
+		-- Key presses only: a clipboard paste on every press is no typing, and
+		-- a character the layout lacks leaves the key its own.
+		can_type = injector.can_type_directly,
 		type_text = function(text)
 			if opts.dry_run then return false end
-			local result = injector.inject(0, text, false)
+			local result = injector.type_directly(text)
 			return type(result) == "table" and result.ok == true
 		end,
 		dispatch_char = function(char, code) on_char(char, code) end,

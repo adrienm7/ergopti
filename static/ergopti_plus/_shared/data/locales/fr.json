@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Touche magique physique",
 	"dialog.magic_key_source.prompt": "Appuyez sur la touche qui tapera la touche magique. Échap annule.",
 	"dialog.magic_key_source.not_a_candidate": "Cette touche ne peut pas taper la touche magique : choisissez une touche qui tape un caractère, autre que la barre d'espace.",
+	"dialog.magic_key_source.untypable": "Votre disposition de clavier ne peut pas taper la touche magique d'une simple frappe : aucune autre touche ne peut donc la taper à sa place. Gardez la touche automatique, ou choisissez un caractère de touche magique que votre disposition tape.",
 	"dialog.metrics.bad_password_warning": "⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect.",
 	"dialog.metrics.complete_label": "Opération terminée.\n\nFichiers traités avec succès : %d\nErreurs rencontrées : %d",
 	"dialog.metrics.decrypt_confirm_body": "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?",

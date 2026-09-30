@@ -270,6 +270,7 @@
 	"dialog.magic_key_source.title": "Fizyczny klawisz magiczny",
 	"dialog.magic_key_source.prompt": "Naciśnij klawisz, który będzie wpisywał klawisz magiczny. Escape anuluje.",
 	"dialog.magic_key_source.not_a_candidate": "Ten klawisz nie może wpisywać klawisza magicznego: wybierz klawisz wpisujący znak, inny niż spacja.",
+	"dialog.magic_key_source.untypable": "Twój układ klawiatury nie może wpisać klawisza magicznego naciśnięciem klawisza, więc żaden inny klawisz nie może go wpisać w jego miejsce. Zachowaj klawisz automatyczny albo wybierz znak klawisza magicznego, który wpisuje twój układ.",
 	"dialog.metrics.bad_password_warning": "⚠️ Ostrzeżenie: Wykryto błąd odszyfrowania. Hasło może być nieprawidłowe.",
 	"dialog.metrics.complete_label": "Operacja zakończona.\n\nPliki przetworzone pomyślnie: %d\nWystąpione błędy: %d",
 	"dialog.metrics.decrypt_confirm_body": "Wszystkie zaszyfrowane logi zostaną przywrócone jako zwykły tekst na dysku.\n\nPotwierdzasz?",

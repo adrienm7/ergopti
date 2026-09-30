@@ -23,7 +23,12 @@
 --- 3. Fail safe. A paused driver, the replace section off, a modifier held or
 ---    an injection that did not happen lets the key through untouched, so it is
 ---    typed exactly once, as its own character.
---- 4. Chosen by pressing it. A capture takes the next grabbed key-down, which
+--- 4. Key presses only. The magic key is typed only when the XKB layout types
+---    it with key presses (injector.type_directly): on a stock layout without ★
+---    the key stays its own character and a choice is refused aloud, where
+---    every press used to go through a clipboard paste — tools spawned in the
+---    hook, the clipboard history filled — and a failed paste stopped the grab.
+--- 5. Chosen by pressing it. A capture takes the next grabbed key-down, which
 ---    reaches no application, and identifies it by evdev code, so the character
 ---    the layout gives it does not matter. It needs the grab: without it the
 ---    key would already have been typed.
@@ -63,6 +68,9 @@ local _deps = nil
 
 -- The capture waiting for a key, nil when none: { handlers }.
 local _capture = nil
+
+-- The magic key character last reported as untypable on the session layout.
+local _untypable_reported = nil
 
 
 
@@ -115,14 +123,22 @@ function M.evdev_code()
 end
 
 --- Stores a new value; the next press follows it, nothing is re-registered.
+--- A key is refused while the layout cannot type the magic key with key
+--- presses: it would keep typing its own character, and say nothing.
 --- @param value string A candidate code or the automatic value.
 --- @return boolean ok
 --- @return string|nil reason_key The i18n key of a refusal.
 function M.set(value)
+	if _deps == nil then error("magic_key_source.set needs M.init first", 2) end
 	local resolver = M.resolver()
 	if value ~= resolver.automatic and not resolver.is_candidate(value) then
 		Logger.warn(LOG, "Refused physical magic key '%s': no candidate key has that code.", tostring(value))
 		return false, "dialog.magic_key_source.not_a_candidate"
+	end
+	if value ~= resolver.automatic and _deps.can_type(_deps.magic_key()) ~= true then
+		Logger.warn(LOG, "Refused physical magic key '%s': the layout cannot type the magic key '%s' with key presses.",
+			tostring(value), tostring(_deps.magic_key()))
+		return false, "dialog.magic_key_source.untypable"
 	end
 	if not Preferences.set(M.PATH, value) then
 		Logger.error(LOG, "Could not persist the physical magic key — the change would be lost at restart.")
@@ -155,7 +171,9 @@ end
 ---   is_active     fn() -> boolean  The driver runs and is not paused.
 ---   replace_on    fn() -> boolean  The magic key's replace section is on.
 ---   magic_key     fn() -> string   The magic key character.
----   type_text     fn(text) -> boolean  Injects text at the caret.
+---   can_type      fn(text) -> boolean  The layout types text with key presses.
+---   type_text     fn(text) -> boolean  Types text with key presses only, never
+---                                  the clipboard (injector.type_directly).
 ---   dispatch_char fn(char, code)   The character path a typed key takes.
 ---   can_capture   fn() -> boolean  The hook owns the keyboard (grab), so a
 ---                                  captured key never reaches an application.
@@ -164,7 +182,7 @@ end
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
-	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "type_text", "dispatch_char",
+	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
 		"can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
@@ -250,6 +268,16 @@ function M.on_key(detail)
 	if _deps.is_active() ~= true or _deps.replace_on() ~= true then return false end
 	local magic = _deps.magic_key()
 	if type(magic) ~= "string" or magic == "" then return false end
+	if _deps.can_type(magic) ~= true then
+		-- Once per character: the key may be pressed or held again and again.
+		if _untypable_reported ~= magic then
+			_untypable_reported = magic
+			Logger.warn(LOG, "The layout cannot type the magic key '%s' with key presses — "
+				.. "the physical magic key types its own character.", magic)
+		end
+		return false
+	end
+	_untypable_reported = nil
 	local called, typed = pcall(_deps.type_text, magic)
 	if not called or typed ~= true then
 		Logger.error(LOG, "The magic key could not be typed (%s) — the key types its own character.",
@@ -266,6 +294,7 @@ function M._reset_for_test()
 	_resolver = nil
 	_capture = nil
 	_code, _code_generation = nil, nil
+	_untypable_reported = nil
 end
 
 return M
