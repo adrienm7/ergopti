@@ -1,0 +1,200 @@
+{
+	"_comment": "Pins _shared/lua/llm/api_entry_names.lua and its AutoHotkey port in windows/ui/menu/menu_llm/menu_api_entries.ahk: the automatic name of a remote API entry, <provider>/<model>, told apart by host, then by order, when two entries share it. Each entry is given resolved: the model and base URL its requests use.",
+	"host": [
+		{
+			"url": "https://api.x.ai/v1",
+			"host": "api.x.ai"
+		},
+		{
+			"url": "http://localhost:1234/v1",
+			"host": "localhost:1234"
+		},
+		{
+			"url": "https://user@host.example/v1",
+			"host": "host.example"
+		},
+		{
+			"url": "api.example.com/v1",
+			"host": "api.example.com"
+		},
+		{
+			"url": "  https://API.Example.COM/v1  ",
+			"host": "api.example.com"
+		},
+		{
+			"url": "https://h.example?key=1",
+			"host": "h.example"
+		},
+		{
+			"url": "",
+			"host": ""
+		}
+	],
+	"names": [
+		{
+			"id": "one entry",
+			"entries": [
+				{
+					"provider": "cerebras",
+					"model": "qwen-3.8-27b",
+					"base_url": "https://api.cerebras.ai/v1"
+				}
+			],
+			"names": ["cerebras/qwen-3.8-27b"]
+		},
+		{
+			"id": "distinct providers and models",
+			"entries": [
+				{
+					"provider": "openai",
+					"model": "gpt-4o-mini",
+					"base_url": "https://api.openai.com/v1"
+				},
+				{
+					"provider": "cerebras",
+					"model": "qwen-3.8-27b",
+					"base_url": "https://api.cerebras.ai/v1"
+				},
+				{
+					"provider": "cerebras",
+					"model": "llama-3.3-70b",
+					"base_url": "https://api.cerebras.ai/v1"
+				}
+			],
+			"names": ["openai/gpt-4o-mini", "cerebras/qwen-3.8-27b", "cerebras/llama-3.3-70b"]
+		},
+		{
+			"id": "a model that names its own provider",
+			"entries": [
+				{
+					"provider": "openrouter",
+					"model": "openai/gpt-4o-mini",
+					"base_url": "https://openrouter.ai/api/v1"
+				}
+			],
+			"names": ["openrouter/openai/gpt-4o-mini"]
+		},
+		{
+			"id": "one provider and model at two hosts",
+			"entries": [
+				{
+					"provider": "openai_compat",
+					"model": "llama3",
+					"base_url": "http://192.168.1.5:8080/v1"
+				},
+				{
+					"provider": "openai_compat",
+					"model": "llama3",
+					"base_url": "http://localhost:8080/v1"
+				}
+			],
+			"names": ["openai_compat/llama3 (192.168.1.5:8080)", "openai_compat/llama3 (localhost:8080)"]
+		},
+		{
+			"id": "one provider and model at one host, two keys",
+			"entries": [
+				{
+					"provider": "cerebras",
+					"model": "qwen-3.8-27b",
+					"base_url": "https://api.cerebras.ai/v1"
+				},
+				{
+					"provider": "cerebras",
+					"model": "qwen-3.8-27b",
+					"base_url": "https://api.cerebras.ai/v1"
+				}
+			],
+			"names": [
+				"cerebras/qwen-3.8-27b (api.cerebras.ai)",
+				"cerebras/qwen-3.8-27b (api.cerebras.ai, 2)"
+			]
+		},
+		{
+			"id": "a repeated host among other hosts",
+			"entries": [
+				{
+					"provider": "openai_compat",
+					"model": "m",
+					"base_url": "http://a.example/v1"
+				},
+				{
+					"provider": "openai_compat",
+					"model": "m",
+					"base_url": "http://b.example/v1"
+				},
+				{
+					"provider": "openai_compat",
+					"model": "m",
+					"base_url": "http://a.example/v2"
+				}
+			],
+			"names": [
+				"openai_compat/m (a.example)",
+				"openai_compat/m (b.example)",
+				"openai_compat/m (a.example, 2)"
+			]
+		},
+		{
+			"id": "a unique name stays plain beside a shared one",
+			"entries": [
+				{
+					"provider": "mistral",
+					"model": "small",
+					"base_url": "https://api.mistral.ai/v1"
+				},
+				{
+					"provider": "groq",
+					"model": "llama",
+					"base_url": "https://api.groq.com/openai/v1"
+				},
+				{
+					"provider": "mistral",
+					"model": "small",
+					"base_url": "https://eu.mistral.example/v1"
+				}
+			],
+			"names": [
+				"mistral/small (api.mistral.ai)",
+				"groq/llama",
+				"mistral/small (eu.mistral.example)"
+			]
+		},
+		{
+			"id": "hosts compare without case",
+			"entries": [
+				{
+					"provider": "openai",
+					"model": "gpt-4o-mini",
+					"base_url": "https://API.OpenAI.com/v1"
+				},
+				{
+					"provider": "openai",
+					"model": "gpt-4o-mini",
+					"base_url": "https://api.openai.com/v1"
+				}
+			],
+			"names": ["openai/gpt-4o-mini (api.openai.com)", "openai/gpt-4o-mini (api.openai.com, 2)"]
+		},
+		{
+			"id": "no host to tell apart",
+			"entries": [
+				{
+					"provider": "openai_compat",
+					"model": "m",
+					"base_url": ""
+				},
+				{
+					"provider": "openai_compat",
+					"model": "m",
+					"base_url": ""
+				}
+			],
+			"names": ["openai_compat/m", "openai_compat/m (2)"]
+		},
+		{
+			"id": "no entry",
+			"entries": [],
+			"names": []
+		}
+	]
+}

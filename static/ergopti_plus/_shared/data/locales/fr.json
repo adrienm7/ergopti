@@ -1303,7 +1303,6 @@
 	"menu.llm.api_edit_entry": "Modifier l’API sélectionnée",
 	"menu.llm.api_no_entry": "Aucun point d’API configuré",
 	"menu.llm.api_prompt_model": "Nom du modèle :",
-	"menu.llm.api_prompt_name": "Nom (ex. « Ma clé OpenAI ») :",
 	"menu.llm.api_prompt_provider": "Identifiant fournisseur ({1}) :",
 	"menu.llm.api_prompt_token": "Clé / jeton d’API (masqué) :",
 	"menu.llm.api_prompt_url": "URL de base :",

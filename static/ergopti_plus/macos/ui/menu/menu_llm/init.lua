@@ -1077,7 +1077,7 @@ local function create_menu(deps)
 				local model_text
 				if state.llm_backend == "api" then
 						-- The local llm_model slot is stale on this backend: show the
-						-- active API entry's configured name instead, without
+						-- active API entry's automatic name instead, without
 						-- local-model badges.
 						local entry_name = nil
 						if type(ApiPanel.active_entry_display_name) == "function" then

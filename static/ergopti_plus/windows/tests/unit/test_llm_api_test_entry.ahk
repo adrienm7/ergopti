@@ -106,50 +106,28 @@ _LAT_RowsOrder() {
 Test("llm api test: Add sits before the separator, none when empty (api-test-entry-row-order)",
 	_LAT_RowsOrder)
 
-; Entry rows show the defined name only: the provider/model suffix is
-; folded into the default name at creation, so the list never repeats it.
+; Entry rows show the automatic name, never the one the fixture's entry
+; stored (api-entry-auto-name, test_llm_api_entry_names.ahk).
 _LAT_EntryRowsShowNameOnly() {
 	SavedMenu := _LAT_FixtureMenu()
 	try {
 		Rows := _LLM_Menu_ApiEntriesRows()
-		Found := false
-		for Row in Rows {
-			if (Row.Has("label") && InStr(Row["label"], "Prod") == 1) {
-				Found := true
-				AssertEqual("Prod", Row["label"])
-			}
-		}
-		AssertTrue(Found, "the entry row must list the defined name")
+		AssertEqual("openai/b", Rows[1]["label"], "the entry row reads provider/model")
+		for Row in Rows
+			AssertFalse(Row.Get("label", "") == "Prod", "the stored name is never shown")
 	} finally _LAT_RestoreMenu(SavedMenu)
 }
-Test("llm api test: entry rows show the defined name only (api-test-entry-row-name)",
+Test("llm api test: entry rows show the automatic name (api-test-entry-row-name)",
 	_LAT_EntryRowsShowNameOnly)
 
-; A default name collides safely: creation appends a counter, editing
-; keeps its own name untouched.
-_LAT_UniqueEntryName() {
-	Entries := [Map("Id", "a", "Name", "cerebras/qwen"),
-		Map("Id", "b", "Name", "cerebras/qwen (2)")]
-	AssertEqual("cerebras/qwen (3)",
-		_LLM_Menu_UniqueApiEntryName("cerebras/qwen", Entries, ""),
-		"a taken default name must count up")
-	AssertEqual("mine", _LLM_Menu_UniqueApiEntryName("mine", Entries, ""),
-		"a free name must pass through")
-	AssertEqual("cerebras/qwen",
-		_LLM_Menu_UniqueApiEntryName("cerebras/qwen", Entries, "a"),
-		"editing must keep its own name without suffix")
-}
-Test("llm api test: default names dedupe, edits keep theirs (api-test-entry-unique-name)",
-	_LAT_UniqueEntryName)
-
-; The creation dialog asks the name LAST (provider, URL, token, model
-; first) so the default can be provider/model. Scanned comment-stripped.
+; The creation dialog asks the provider first, then the URL, the key and the
+; model; it asks no name. Scanned comment-stripped.
 _LAT_PromptOrder() {
 	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
 	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
 	Pos := Map()
 	for Key in ["api_prompt_provider", "api_prompt_url", "api_prompt_token",
-		"api_prompt_model", "api_prompt_name"] {
+		"api_prompt_model"] {
 		At := InStr(Code, Key)
 		Assert(At > 0, "the dialog must prompt " . Key)
 		Pos[Key] := At
@@ -160,12 +138,9 @@ _LAT_PromptOrder() {
 		"URL comes before the token")
 	AssertTrue(Pos["api_prompt_token"] < Pos["api_prompt_model"],
 		"token comes before the model")
-	AssertTrue(Pos["api_prompt_model"] < Pos["api_prompt_name"],
-		"name comes last so its default is provider/model")
-	Assert(InStr(Code, 'provider_id . "/" . new_model') > 0,
-		"the name default must be provider/model")
+	AssertEqual(0, InStr(Code, "api_prompt_name"), "the dialog asks no name")
 }
-Test("llm api test: creation asks the name last with provider/model default (api-test-entry-prompt-order)",
+Test("llm api test: creation asks provider, URL, key and model (api-test-entry-prompt-order)",
 	_LAT_PromptOrder)
 
 ; After a creation persist the flow offers the end-to-end probe on the new

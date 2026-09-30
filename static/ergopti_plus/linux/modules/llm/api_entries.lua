@@ -14,7 +14,10 @@
 --- 2. Written to a fresh temporary file and renamed, so a crash leaves the
 ---    previous file intact and a pre-existing file's looser mode never carries
 ---    over.
---- 3. Keys never reach a log: entries are described by label and provider.
+--- 3. Keys never reach a log: entries are described by id and provider.
+--- 4. `label` stays required, so this file still loads in the builds before
+---    2026-10; it holds the automatic name the tray writes and no build after
+---    them reads it: every tray names an entry after its provider and model.
 --- ==============================================================================
 
 local M = {}
@@ -257,18 +260,6 @@ function M.active()
 	return id ~= "" and M.get(id) or nil
 end
 
---- A label no other entry uses: "Cerebras", then "Cerebras (2)".
---- @param label string
---- @return string
-local function unique_label(label)
-	local taken = {}
-	for _, entry in ipairs(state().entries) do taken[entry.label] = true end
-	if not taken[label] then return label end
-	local index = 2
-	while taken[string.format("%s (%d)", label, index)] do index = index + 1 end
-	return string.format("%s (%d)", label, index)
-end
-
 --- Adds an entry and makes it active.
 --- @param fields table { provider, token, label, model?, base_url? }
 --- @return table|nil entry, string|nil err
@@ -277,7 +268,7 @@ function M.add(fields)
 	local entry = valid_entry({
 		id = string.format("%s-%d-%d", tostring(fields.provider), os.time(), _sequence),
 		provider = fields.provider,
-		label = type(fields.label) == "string" and unique_label(fields.label) or nil,
+		label = fields.label,
 		token = fields.token,
 		model = fields.model,
 		base_url = fields.base_url,
@@ -294,7 +285,7 @@ function M.add(fields)
 	end
 	-- The user chose an entry: a stored selection nothing matched is replaced.
 	current.dangling_active_id = nil
-	Logger.info(LOG, "API entry '%s' (%s) added and selected.", entry.label, entry.provider)
+	Logger.info(LOG, "API entry '%s' (%s) added and selected.", entry.id, entry.provider)
 	return entry
 end
 
@@ -324,7 +315,7 @@ function M.remove(id)
 			local previous = current.active_id
 			if previous == id then current.active_id = "" end
 			if persist() then
-				Logger.info(LOG, "API entry '%s' removed.", entry.label)
+				Logger.info(LOG, "API entry '%s' removed.", entry.id)
 				return true
 			end
 			table.insert(current.entries, index, entry)

@@ -129,7 +129,9 @@ helpers.describe("api_remote entry identity generation", function()
 				if line:find("retired_provider", 1, true) then named[#named + 1] = line end
 			end
 			helpers.assert_eq(#named, 1, table.concat(warnings, " | "))
-			helpers.assert_true(named[1]:find("Old", 1, true) ~= nil, named[1])
+			-- Named as the AI menu names it (api-entry-auto-name), never by its stored label
+			helpers.assert_true(named[1]:find("retired_provider/m", 1, true) ~= nil, named[1])
+			helpers.assert_true(named[1]:find("Old", 1, true) == nil, named[1])
 			helpers.assert_true(named[1]:find("secret-token", 1, true) == nil, "a token never reaches a log")
 		end)
 		Logger.warn = real_warn

@@ -136,27 +136,23 @@ _LLM_Menu_BackendRows() {
 ; ================================
 
 /**
- * Display name for one API entry: its configured name, else its model,
- * else the provider default (exactly what requests resolve), else "".
+ * Display name for one API entry: its automatic name, <provider>/<model> with
+ * the model its requests use, told apart from the menu's other entries as the
+ * entry list tells it. A name the user typed in an earlier build is not read.
  * @param {Map} Entry API entry record.
- * @returns {String} Display name or "".
+ * @returns {String} Such as "cerebras/qwen-3.8-27b".
  */
 _LLM_Menu_ApiEntryDisplayName(Entry) {
-	global LLM_API_PROVIDERS
-	Name := _LLM_MenuApiEntryGet(Entry, "Name", "")
-	if (Name != "")
-		return Name
-	Model := _LLM_MenuApiEntryGet(Entry, "Model", "")
-	if (Model != "")
-		return Model
-	Provider := _LLM_MenuApiEntryGet(Entry, "Provider", "")
-	if ((Provider != "") && (LLM_API_PROVIDERS is Map)
-		&& LLM_API_PROVIDERS.Has(Provider)) {
-		Desc := LLM_API_PROVIDERS[Provider]
-		if ((Desc is Map) && Desc.Has("DefaultModel"))
-			return Desc["DefaultModel"]
+	global _LLM_Menu
+	Entries := (_LLM_Menu is Map) ? _LLM_Menu.Get("api_entries", []) : []
+	Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
+	if ((Entries is Array) && (Id != "")) {
+		for Index, Listed in Entries {
+			if (_LLM_MenuApiEntryGet(Listed, "Id", "") == Id)
+				return _LLM_Menu_ApiEntryNameList(Entries)[Index]
+		}
 	}
-	return ""
+	return _LLM_Menu_ApiEntryNameList([Entry])[1]
 }
 
 /**

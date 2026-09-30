@@ -93,6 +93,18 @@ local function find(rows, fragment)
 	return nil
 end
 
+--- The row whose label is exactly `label`, at any depth.
+local function exact(rows, label)
+	for _, row in ipairs(rows) do
+		if row.label == label then return row end
+		if type(row.items) == "table" then
+			local nested = exact(row.items, label)
+			if nested then return nested end
+		end
+	end
+	return nil
+end
+
 helpers.describe("AI menu: the backend choice", function()
 
 	helpers.it("shows Ollama's models under the Ollama backend", function()
@@ -140,9 +152,11 @@ helpers.describe("AI menu: the selected-model row (menu.llm.model_label)", funct
 		local build, state, restore = setup("api")
 		state.answers = { "k", "qwen" }
 		find(build(), "➕ Cerebras").action()
+		-- A label an earlier build stored is never read (api-entry-auto-name)
+		state.active.label = "Ma clé"
 		local rows = build()
 		restore()
-		helpers.assert_eq(rows[1].label, expected(state.active.label))
+		helpers.assert_eq(rows[1].label, expected("cerebras/qwen"))
 	end)
 
 	helpers.it("says so when no model is selected", function()
@@ -205,6 +219,58 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 
 end)
 
+helpers.describe("AI menu: every API entry is named after its provider and model (api-entry-auto-name)", function()
+
+	helpers.it("asks the key and the model, no name, and stores the automatic one", function()
+		local build, state, restore = setup("api")
+		state.answers = { "k", "llama" }
+		find(build(), "➕ Cerebras").action()
+		restore()
+		helpers.assert_eq(#state.prompts, 2, "the key and the model: no name is asked")
+		helpers.assert_eq(state.entries[1].label, "cerebras/llama",
+			"the stored label is the automatic name, for the builds that still read it")
+	end)
+
+	helpers.it("lists provider/model, never a label an earlier build stored", function()
+		local build, state, restore = setup("api")
+		state.entries = {
+			{ id = "a", provider = "cerebras", label = "Ma clé perso", token = "k", model = "", base_url = "" },
+			{ id = "b", provider = "cerebras", label = "Autre", token = "k", model = "llama", base_url = "" },
+		}
+		state.active = state.entries[1]
+		local rows = build()
+		restore()
+		helpers.assert_true(find(rows, "Ma clé") == nil, "the stored label is not shown")
+		helpers.assert_true(exact(rows, "cerebras/qwen") ~= nil, "an entry without a model uses the provider's")
+		helpers.assert_true(exact(rows, "cerebras/llama") ~= nil)
+		helpers.assert_true(exact(rows, "cerebras/qwen").checked, "the active entry is ticked")
+	end)
+
+	helpers.it("tells two entries of one provider and model apart", function()
+		local build, state, restore = setup("api")
+		state.entries = {
+			{ id = "a", provider = "cerebras", label = "Un", token = "k1", model = "", base_url = "" },
+			{ id = "b", provider = "cerebras", label = "Deux", token = "k2", model = "", base_url = "" },
+			{ id = "c", provider = "cerebras", label = "Trois", token = "k3", model = "",
+				base_url = "http://localhost:8080/v1" },
+		}
+		local rows = build()
+		restore()
+		local labels = {}
+		for _, row in ipairs(rows) do
+			if type(row.label) == "string" and row.label:find("cerebras/", 1, true) == 1 then
+				labels[#labels + 1] = row.label
+			end
+		end
+		helpers.assert_eq(labels, {
+			"cerebras/qwen (api.cerebras.ai)",
+			"cerebras/qwen (api.cerebras.ai, 2)",
+			"cerebras/qwen (localhost:8080)",
+		})
+	end)
+
+end)
+
 helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function()
 
 	helpers.it("is stored and tested, but predictions keep their backend and entry", function()
@@ -227,7 +293,7 @@ helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function(
 		state.answers = { "tsk-1", "jev-latest" }
 		find(build(), "➕ TypeSafe (Jev)").action()
 		local rows = build()
-		local row = find(rows, "TypeSafe (Jev) — jev-latest")
+		local row = exact(rows, "typesafe/jev-latest")
 		helpers.assert_true(row ~= nil and row.items ~= nil, "a submenu, not a radio row")
 		helpers.assert_eq(row.checked, nil, "never checked")
 		helpers.assert_eq(row.action, nil, "never selected")

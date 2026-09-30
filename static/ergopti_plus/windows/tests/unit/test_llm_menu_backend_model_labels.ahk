@@ -7,8 +7,8 @@
 ; backend row reads what its submenu shows for the selected backend, cut
 ; before the em dash (« API 🌐 », never « Backend : api »), and the model row
 ; follows the active backend — with backend api it shows the selected API
-; entry's model (falling back to the provider default, exactly what requests
-; use), never the stale Ollama tag from before the switch. The Ollama slot
+; entry's automatic name, <provider>/<model> with the model requests use,
+; never the stale Ollama tag from before the switch. The Ollama slot
 ; itself is preserved untouched so switching back restores it.
 ; ==============================================================================
 
@@ -62,17 +62,14 @@ _LBMD_ModelDisplayText() {
 			"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 				"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",
 				"Token", "sekret", "Model", "qwen-3.8-27b")])
-		AssertEqual("Cerebras", _LLM_Menu_ModelDisplayText(),
-			"with backend api the row shows the configured entry name")
-		AssertEqual("Cerebras",
+		AssertEqual("cerebras/qwen-3.8-27b", _LLM_Menu_ModelDisplayText(),
+			"with backend api the row shows the entry's automatic name, not its stored one")
+		AssertEqual("cerebras/qwen-3.8-27b",
 			_LLM_Menu_ApiEntryDisplayName(_LLM_Menu["api_entries"][1]))
-		_LLM_Menu["api_entries"][1]["Name"] := ""
-		AssertEqual("qwen-3.8-27b", _LLM_Menu_ModelDisplayText(),
-			"an unnamed entry falls back to its model")
 		_LLM_Menu["api_entries"][1]["Model"] := ""
-		AssertEqual(LLM_API_PROVIDERS["cerebras"]["DefaultModel"],
+		AssertEqual("cerebras/" . LLM_API_PROVIDERS["cerebras"]["DefaultModel"],
 			_LLM_Menu_ModelDisplayText(),
-			"an entry without name or model falls back to the provider default")
+			"an entry without a model is named after the provider default")
 		_LLM_Menu["api_entry_id"] := "ghost"
 		AssertEqual("", _LLM_Menu_ModelDisplayText(),
 			"an unknown entry never resurrects the stale ollama tag")

@@ -1308,7 +1308,6 @@
 	"menu.llm.api_edit_entry": "编辑所选 API",
 	"menu.llm.api_no_entry": "尚未配置 API 端点",
 	"menu.llm.api_prompt_model": "模型名称：",
-	"menu.llm.api_prompt_name": "名称（例如「我的 OpenAI 密钥」）：",
 	"menu.llm.api_prompt_provider": "提供商 ID（{1}）：",
 	"menu.llm.api_prompt_token": "API 令牌 / 密钥（隐藏）：",
 	"menu.llm.api_prompt_url": "基础 URL：",
