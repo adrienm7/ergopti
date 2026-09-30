@@ -538,21 +538,19 @@ local function _build_layouts(ctx)
 	return { label = i18n_safe("menu.layout.title"), submenu = rows }
 end
 
---- True only when every hotstring group is on: the state the Hotstrings switch
---- and its parent row both show on this driver, where the category gate is the
---- set of groups rather than a flag of its own.
---- @param config table The hotstrings config module.
+--- Whether any hotstring can expand: a category gate open, or the dynamic
+--- hotstrings (dates, @-tags) on. The state the Hotstrings switch and its
+--- parent row show on this driver, where the master is that set of gates
+--- rather than a flag of its own. It used to be « every category on », so the
+--- wizard's recommendation, which opens one category, showed the switch
+--- unticked while ★ expanded, and a click switched every category on.
+--- @param ctx table Menu context: config, dyn_hotstrings.
 --- @return boolean
-local function _all_hotstring_groups_on(config)
-	if type(config.get_groups) ~= "function" or type(config.is_group_enabled) ~= "function" then
-		return false
-	end
-	local groups = config.get_groups() or {}
-	if #groups == 0 then return false end
-	for _, name in ipairs(groups) do
-		if not config.is_group_enabled(name) then return false end
-	end
-	return true
+local function _hotstrings_on(ctx)
+	local config = ctx.config
+	if type(config.any_enabled) == "function" and config.any_enabled() then return true end
+	local dyn = ctx.dyn_hotstrings
+	return type(dyn) == "table" and type(dyn.is_enabled) == "function" and dyn.is_enabled() == true
 end
 
 --- Restores or clears the Hotstrings scope after the user confirms it.
@@ -1667,7 +1665,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	-- renderer, so this driver supplies only its behaviour and its tick.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
-	local function all_groups_on() return _all_hotstring_groups_on(config) end
+	local function hotstrings_on() return _hotstrings_on(ctx) end
 	local whole_tree = all_sections_row(all_category_ids())
 
 	--- Restores or clears the Hotstrings scope after the user confirms it.
@@ -1687,11 +1685,18 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
-			local changed = false
-			if all_groups_on() then
-				if config.disable_all then changed = config.disable_all() end
+			local changed
+			if hotstrings_on() then
+				-- Off stops every expansion: each gate closes, keeping its section
+				-- choices, and the dynamic hotstrings stop with them.
+				changed = config.disable_all()
+				local dyn = ctx.dyn_hotstrings
+				if changed ~= false and type(dyn) == "table" and type(dyn.is_enabled) == "function"
+					and dyn.is_enabled() and dyn.set_enabled(false) ~= true then
+					changed = false
+				end
 			else
-				if config.enable_all then changed = config.enable_all() end
+				changed = config.enable_all()
 			end
 			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
@@ -1704,7 +1709,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	}
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
-	hs_ctx.state_getters["hotstrings_enabled"] = all_groups_on
+	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
 	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree.checked end
 
 	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
@@ -1752,7 +1757,7 @@ local function _build_hotstrings(ctx)
 	-- The parent carries the same tick as the switch that opens the submenu, for
 	-- a user scanning the top level. It cannot be clicked: no tray binds a click
 	-- on a row that opens a submenu, which is why the switch is a row inside.
-	return { label = title, checked = _all_hotstring_groups_on(config), submenu = items }
+	return { label = title, checked = _hotstrings_on(ctx), submenu = items }
 end
 
 --- Builds the AI / LLM submenu.
