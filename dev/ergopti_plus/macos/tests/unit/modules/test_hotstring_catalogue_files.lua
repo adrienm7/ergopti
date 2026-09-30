@@ -26,6 +26,20 @@ helpers.describe("hotstring catalogue (macos): metadata is never a category", fu
 		helpers.assert_eq(CatalogueFiles.is_category_file(nil), false, "no name at all")
 	end)
 
+	helpers.it("catalogue files: the configuration folder's own files are not categories", function()
+		-- macOS reads its configuration folder as the hotstrings folder. The
+		-- recommended import writes layers.toml there, and older releases left
+		-- wrap_symbols.toml: either one read as a category made the boot load
+		-- that folder instead of the bundled catalogue, and every shipped
+		-- hotstring was gone (hardening-a-startup-zero-error).
+		helpers.assert_eq(CatalogueFiles.is_category_file("/Users/u/.config/ergopti_plus/layers.toml"), false,
+			"layers.toml is the navigation layer")
+		helpers.assert_eq(CatalogueFiles.is_category_file("wrap_symbols.toml"), false,
+			"wrap_symbols.toml is an older release's wrap symbols")
+		helpers.assert_eq(CatalogueFiles.is_category_file("rolls.toml"), true,
+			"a category copy still marks the folder as the user's catalogue")
+	end)
+
 	helpers.it("catalogue files: every category the shared index orders is accepted", function()
 		local fh = assert(io.open(helpers.shared("modules/hotstrings/_index.toml"), "r"))
 		local index = TomlCodec.decode(fh:read("*a"))

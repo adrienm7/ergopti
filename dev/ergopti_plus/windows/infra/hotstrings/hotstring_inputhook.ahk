@@ -1321,6 +1321,12 @@ _OnPrefixChar(IH, Char) {
 		; persisting either ordinary typing or resolved private expansions.
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "OnChar: input_units={1} prefix_units={2} engine_units={3} suppressed={4}/{5}.", StrLen(Char), _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
+		; Time every character the engine is fed, emulated or not. The layout
+		; emulation stamps what it types, but a key typed through the OS layout
+		; (the neutral layout setting) was never stamped, so every time-gated
+		; hotstring failed closed in _HSE_PrepareDispatchDecision: no expansion
+		; and no preview bubble (hotstring-preview-shows).
+		AppState_TouchLastSentKey(Char)
 		; Feed HSE — when HSE_FeedChar reports a match, fire the
 		; expansion right here. HSE_LastEndChar is the authoritative end
 		; character: empty for star (immediate) triggers, the just-typed

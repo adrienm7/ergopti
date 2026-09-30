@@ -394,6 +394,10 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
+; Mirrors the pruning thresholds of infra/boot.ahk: AppState_TouchLastSentKey
+; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
+global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
+global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 global RemappedList := Map()
 ; Stub for the INI cache — gestures.ahk reads it at load time via GesturesReadConfig()
 global _IniCache := Map()

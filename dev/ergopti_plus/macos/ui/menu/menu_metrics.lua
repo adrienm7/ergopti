@@ -367,7 +367,7 @@ function M.build(ctx)
 	local function cmd_show_apps()
 		local ok, at = pcall(require, "ui.metrics_apps")
 		if ok and type(at.show) == "function" then
-		pcall(at.show, hs.configdir .. "/logs")
+		pcall(at.show)
 		end
 	end
 

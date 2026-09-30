@@ -1430,27 +1430,34 @@ sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "o
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
 end)
+-- The user's files live in the configuration folder, resolved by
+-- infra/config_paths like every other reader. They were opened from
+-- hs.configdir, the script folder, which is the application bundle once
+-- installed: the actions opened files that do not exist there
+-- (hardening-b-installed-layout).
+--- Opens one of the user's files through its config_paths key.
+--- @param key string config_paths.get key.
+--- @param label string Opener label.
+--- @return boolean started
+local function open_user_file(key, label)
+	local path = require("infra.config_paths").get(key)
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "%s: the configuration path %s is not resolvable.", label, key)
+		return false
+	end
+	return AuxOwner.open(path, label, nil, current_action_parent())
+end
 sg("open_personal_shortcuts",     function()
-	return AuxOwner.open(hs.configdir .. "/personal_shortcuts.toml",
-		"open personal shortcuts", nil, current_action_parent())
+	return open_user_file("PersonalShortcutsLuaPath", "open personal shortcuts")
 end)
 sg("open_personal_hotstrings",    function()
-	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
-	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
-	if type(p) == "string" and p ~= "" then
-		return AuxOwner.open(p, "open personal hotstrings", nil, current_action_parent())
-	else
-		return AuxOwner.open(hs.configdir .. "/hotstrings/personal_hotstrings.toml",
-			"open personal hotstrings", nil, current_action_parent())
-	end
+	return open_user_file("PersonalTomlPath", "open personal hotstrings")
 end)
 sg("open_personal_info",               function()
-	return AuxOwner.open(hs.configdir .. "/personal_info.toml",
-		"open personal info", nil, current_action_parent())
+	return open_user_file("PersonalInfoTomlPath", "open personal info")
 end)
 sg("open_config",                    function()
-	return AuxOwner.open(hs.configdir .. "/config.toml",
-		"open config", nil, current_action_parent())
+	return open_user_file("ConfigTomlPath", "open config")
 end)
 -- The three log actions share the Debug menu's owner (ui/log_openers), which
 -- asks the logger for each path at the moment of the gesture; only the

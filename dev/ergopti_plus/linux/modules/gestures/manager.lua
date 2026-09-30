@@ -965,9 +965,15 @@ end
 --- @return boolean True when gestures are enabled and readable.
 function M.enable()
 	if not admit_mutation() then return false end
-	if not M.start_reading() then
+	local reading, unavailable = M.start_reading()
+	if not reading then
 		_enabled = false
-		Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
+		-- A machine without a touchpad is not a failure (start_reading said so at
+		-- INFO): an ERROR here opened the error window at every start of a
+		-- desktop whose config.toml enables gestures (hardening-a-startup-zero-error).
+		if unavailable ~= "no_touchpad" then
+			Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
+		end
 		return false
 	end
 	_enabled = true
@@ -1545,6 +1551,7 @@ end
 --- gesture state machine on `finger_count <= 4`, so five-finger swipes and
 --- multi-finger taps never leave it at all.
 --- @return boolean True when a touchpad was found and opened.
+--- @return string|nil "no_touchpad" when the machine has none, which is not a failure.
 function M.start_reading()
 	if not _scope_native and not admit_mutation() then return false end
 	if _reader_stop_error then return false end
@@ -1565,7 +1572,7 @@ function M.start_reading()
 		-- tell this apart from a silent failure.
 		Logger.info(LOG, "No touchpad found (%s) — gestures are unavailable on this machine.",
 			tostring(reason))
-		return false
+		return false, "no_touchpad"
 	end
 
 	if not Reader.open(touchpad.path, Reader.TOUCHPAD) then

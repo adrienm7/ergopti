@@ -4,8 +4,9 @@
 ; MODULE: Hotstring Engine — Low-level Send & Ring Buffer
 ; DESCRIPTION:
 ; Low-level send primitives (SendNewResult, SendFinalResult, SendInstant,
-; ActivateHotstrings, GetSelection) and the last-sent-character ring buffer
-; (_LSC_*) used by time-gated triggers and deadkey sequences.
+; ActivateHotstrings, GetSelection), the last-sent-character ring buffer
+; (_LSC_*) used by deadkey sequences, and the last-sent-character timestamps
+; that time-gated triggers read.
 ;
 ; Included by infra/hotstrings/hotstring_engine.ahk after the constants section.
 ; ==============================================================================
@@ -871,5 +872,35 @@ _LSCResetFrom(Chars) {
 		_LSC_LEN := 0
 		for c in Chars {
 				_LSCPush(c)
+		}
+}
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 3/ Last-sent-character timestamps =======
+; =================================================
+; =================================================
+
+; Single write path for LastSentCharacterKeyTime, the origin of every
+; time-activation gate (_HSE_PrepareDispatchDecision, IsTimeActivationExpired).
+; It lives with the engine rather than with the layout emulation because two
+; callers feed it: the emulation stamps what it types (UpdateLastSentCharacter),
+; and the prefix watcher stamps every character it observes, so a key typed
+; through the OS layout is timed too (hotstring-preview-shows). Pruning keeps
+; the map size bounded across a long session.
+; @param Character {String} The character that reached the screen.
+AppState_TouchLastSentKey(Character) {
+		global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
+		LastSentCharacterKeyTime[Character] := A_TickCount
+		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
+				Now := A_TickCount
+				for k, ts in LastSentCharacterKeyTime.Clone() {
+						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
+								LastSentCharacterKeyTime.Delete(k)
+				}
 		}
 }
