@@ -154,6 +154,8 @@ Effort is in focused agent-days, including CI iteration.
     - reads the real CoreState filters and `disabled_apps`;
     - records enable, pause and filter changes, and wake and wall-clock changes;
     - prunes its history through periodic lease rotation.
+  - Held modifiers across source changes: flagsChanged keeps its `modifier_down_at` bookkeeping under every source of `physical_accounting_mode.lua`, so a modifier pressed under one source and released under another credits only half of its press/hold pair. Settle the held modifiers (clear them or credit both halves from one source) at every select, admit, interrupt and release.
+  - A producer whose opening or baseline version the consumer refuses (today's version-1 diagnostic producer) maps to an explicit `unavailable(reason)` with exactly one WARNING, never an error per attempt or a restart loop. Until WP4 aligns the producer, `tools/diagnostics/hs274_baseline_contract.py` stops `hs274-native.yml` on Linux before a Hammerspoon-consumer run spends a macOS runner.
 - **Depends on:** WP1, WP2.
 - **Verify:** `npm run test:hs`, with native doubles, covering:
   - startup ordering, and stop requested during spawn;
