@@ -66,19 +66,37 @@ local function stage_install(driver, root)
 	return installed
 end
 
-local CORPUS = "/../_shared/tests/corpus/config_migrations/"
+local CORPUS = "/../_shared/tests/corpus/config_migrations"
 
--- A fresh install opens the first-use wizard; a configured one never does.
-local SCENARIOS = {
-	{ name = "a fresh install opens the first-use wizard", steps = { "boot" }, wizard = true },
-	{ name = "the neutral defaults start", seed = "/_generated/config_template.toml", steps = { "boot" } },
-	{ name = "the recommended preset imported from the menu starts", seed = "/_generated/config_template.toml",
-		steps = { "restore_recommended", "boot" }, recommended = true },
-	{ name = "a config.toml an older release stamped starts",
-		seed = CORPUS .. "shipped_stamp_only_on_windows_and_linux/input.toml", steps = { "boot" } },
-	{ name = "a config.toml with switch actions an older release wrote starts",
-		seed = CORPUS .. "shipped_switch_actions_kept_on_windows_and_linux/input.toml", steps = { "boot" } },
-}
+--- Every scenario. A fresh install opens the first-use wizard; a configured
+--- one never does. The config.toml files older Linux releases wrote are every
+--- shipped case of the shared migration corpus, found by name so a new case
+--- starts without an edit here.
+--- @param driver string Repository Linux driver folder.
+--- @return table scenarios
+local function scenarios(driver)
+	local list = {
+		{ name = "a fresh install opens the first-use wizard", steps = { "boot" }, wizard = true },
+		{ name = "the neutral defaults start", seed = "/_generated/config_template.toml", steps = { "boot" } },
+		{ name = "the recommended preset imported from the menu starts", seed = "/_generated/config_template.toml",
+			steps = { "restore_recommended", "boot" }, recommended = true },
+	}
+	local cases = {}
+	local listing = io.popen("ls " .. q(driver .. CORPUS))
+	for name in listing:lines() do
+		if name:match("^shipped_.+_on_linux$") or name:match("^shipped_.+_on_windows_and_linux$") then
+			cases[#cases + 1] = name
+		end
+	end
+	listing:close()
+	table.sort(cases)
+	for _, name in ipairs(cases) do
+		list[#list + 1] = { name = "an older release's config.toml starts (" .. name .. ")",
+			seed = CORPUS .. "/" .. name .. "/input.toml", steps = { "boot" } }
+	end
+	if #cases < 2 then error("startup scenarios: the migration corpus holds fewer than two Linux releases") end
+	return list
+end
 
 --- What one start showed the user or did to the package, as failure lines.
 --- @param output string
@@ -152,7 +170,7 @@ function M.run(check, options)
 	local device = scratch .. "/device"
 	run(": > " .. q(device))
 	local before = files_under(scratch .. "/lib")
-	for index, scenario in ipairs(SCENARIOS) do
+	for index, scenario in ipairs(scenarios(options.driver)) do
 		local home = scratch .. "/home" .. index
 		run("mkdir -p " .. q(home) .. " " .. q(scratch .. "/tmp"))
 		local problems, facts = {}, {}
