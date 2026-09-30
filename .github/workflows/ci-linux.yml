@@ -497,6 +497,8 @@ jobs:
       - name: The release list window lists GitHub's releases in real WebKit
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           sudo apt-get install -y --no-install-recommends lua-luv
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
