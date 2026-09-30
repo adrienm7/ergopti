@@ -365,6 +365,17 @@ These are software implementations; final hardware verification remains below.
         Linux need an asynchronous probe (WinHTTP, curl), keyless API entries
         (Linux `api_remote.lua` refuses an empty key) and menu rows; the Linux
         tray has no text input for an address or a key.
+48. [ ] Enabling the AI when Ollama does not answer is explained on macOS
+        only: the AI stays off and one error names Ollama and its address,
+        with a button per running local server, "Start Ollama" or "Install
+        Ollama and the model" (`llm-enable-unreachable-local`,
+        `ui/menu/menu_llm/unreachable_backend_offer.lua`). Linux `llm_toggle`
+        turns the prediction engine on without any reachability check, and the
+        Windows tray only adds an install row while the Ollama dependencies are
+        missing; neither names the address nor offers a start or a running
+        server. Their neutral backend is Ollama (`llm.models.selected`
+        `default_per_platform`), so once item 47 lands a server that answers is
+        the natural first button there; the switch must still be confirmed (W1).
 
 ## Time estimate
 
