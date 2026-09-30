@@ -19,6 +19,7 @@ local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
 local DeferredWork = require("infra.deferred_work")
+local BackendLabels = require("ui.menu.menu_llm.backend_labels")
 
 local LOG = "models_selector"
 
@@ -539,7 +540,8 @@ function M.build(ctx)
 
 				local hw            = m.hardware_requirements or {}
 				local hw_active     = hw[active_backend] or {}
-				local display_backend = (active_backend == "mlx") and "MLX" or "Ollama"
+				local display_backend = BackendLabels.head(
+					BackendLabels.option((active_backend == "mlx") and "mlx" or "ollama"))
 				local active_source = m.urls and m.urls[active_backend]
 				local has_active_source = (type(active_source) == "string" and active_source ~= "")
 

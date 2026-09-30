@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "التثبيت عند إغلاق ErgoptiPlus",
 	"updater.move_to_applications": "يجب تشغيل ErgoptiPlus من مجلد التطبيقات لتثبيت التحديثات. انقله إلى هناك ثم أعد المحاولة.",
 	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "غير مثبّت",
 	"menu.llm.backend_mlx_unsupported": "يتطلب Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

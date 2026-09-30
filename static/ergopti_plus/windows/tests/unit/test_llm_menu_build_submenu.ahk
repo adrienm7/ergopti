@@ -113,6 +113,30 @@ _LBMS_NoClearRow() {
 Test("ai-menu-no-clear: the drawn AI submenu has a restore row and no clear row",
 	_LBMS_NoClearRow)
 
+; backend-row-selected-option. The drawn Backend row, the first after the
+; switch's group, reads the selected option before its em dash.
+_LBMS_BackendRowLabel() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
+	_LLM_Menu_Handle := Menu()
+	try {
+		; Off, so no install warning row sits between the group and the row.
+		_LLM_Menu["enabled"] := false
+		for Backend, Expected in Map("api", "API 🌐", "ollama", "Ollama 🦙") {
+			_LLM_Menu["backend"] := Backend
+			Labels := _LBMS_Labels(LLM_Menu_BuildSubmenu())
+			AssertEqual(Expected, Labels[4], Backend . ": the Backend row names the selected option")
+		}
+	} finally {
+		_LLM_Menu := SavedMenu
+		if (SavedHandle != "")
+			_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("backend-row-selected-option: the drawn Backend row names the selected option",
+	_LBMS_BackendRowLabel)
+
 ; LLM_Menu_Build must construct rows through the extractor — one row
 ; construction site, not two drifting copies.
 _LBMS_BuildCallsExtractor() {

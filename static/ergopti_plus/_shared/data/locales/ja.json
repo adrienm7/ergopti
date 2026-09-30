@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "ErgoptiPlus の終了時にインストール",
 	"updater.move_to_applications": "アップデートをインストールするには、ErgoptiPlus を「アプリケーション」フォルダから実行する必要があります。そこへ移動してから、もう一度お試しください。",
 	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "未インストール",
 	"menu.llm.backend_mlx_unsupported": "Apple シリコンが必要",
 	"menu.llm.backend_unknown": "Unknown",

@@ -55,17 +55,45 @@ LLM_Menu_BuildBackendMenu() {
 }
 
 /**
- * Display brand for a backend id. Brand names are not translated (same in
- * every language, matching the submenu prefixes below); an unknown id falls
- * back to itself so a future backend never blanks the parent row.
- * @param {String} BackendId Storage id ("ollama", "api", …).
- * @returns {String} "Ollama", "API", or the id itself.
+ * The label of a backend's option in the Backend submenu: its brand and emoji,
+ * the same in every language, then an em dash and the localised description.
+ * @param {String} BackendId "ollama" or "api".
+ * @returns {String} Such as "API 🌐 — Fournisseur distant".
  */
-_LLM_Menu_BackendDisplayName(BackendId) {
-	static Brands := Map("ollama", "Ollama", "api", "API")
-	if ((BackendId is String) && Brands.Has(BackendId))
-		return Brands[BackendId]
-	return (BackendId is String) ? BackendId : ""
+_LLM_Menu_BackendOptionLabel(BackendId) {
+	static Brands := Map("ollama", "Ollama 🦙", "api", "API 🌐")
+	if !(BackendId is String) || !Brands.Has(BackendId)
+		throw ValueError("The Backend submenu offers no backend '"
+			. ((BackendId is String) ? BackendId : Type(BackendId)) . "'.")
+	return Brands[BackendId] . " — " . t("menu.llm.backend_" . BackendId . "_suffix")
+}
+
+/**
+ * What an option names: its label before the first em dash, trimmed, or the
+ * whole label when it has none.
+ * @param {String} Label An option label.
+ * @returns {String} Such as "API 🌐".
+ */
+_LLM_Menu_OptionHead(Label) {
+	Dash := InStr(Label, "—")
+	return Trim(Dash ? SubStr(Label, 1, Dash - 1) : Label)
+}
+
+/**
+ * The Backend row's label: the selected option as the submenu lists it, cut
+ * before its em dash, emoji included. It read « Backend : API » until the
+ * maintainer asked on 2026-09-30 for what the submenu shows instead.
+ * @returns {String} Such as "Ollama 🦙".
+ */
+_LLM_Menu_BackendRowLabel() {
+	global _LLM_Menu
+	for Row in _LLM_Menu_BackendRows() {
+		if Row.Get("checked", false)
+			return _LLM_Menu_OptionHead(Row["label"])
+	}
+	try LoggerWarn("LLM", "The Backend submenu offers no option for backend '{1}'.",
+		_LLM_Menu.Get("backend", ""))
+	return t("menu.llm.backend_unknown")
 }
 
 /**
@@ -74,19 +102,10 @@ _LLM_Menu_BackendDisplayName(BackendId) {
  */
 _LLM_Menu_BackendRows() {
 	global _LLM_Menu
-	; Hardcoded brand prefix per backend — name + emoji + em-dash. Only
-	; the localised descriptive suffix (e.g. "Standard" / "fournisseur
-	; distant") lives in the i18n catalogue; the rest is the same in
-	; every language and would just be noise to translate.
-	static _backend_prefix := Map(
-		"ollama", "Ollama 🦙 — ",
-		"api",    "API 🌐 — "
-	)
 	Rows := []
 	for backend_id in LLM_MENU_BACKEND_OPTIONS {
-		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
 		Rows.Push(Map(
-			"label",   prefix . t("menu.llm.backend_" backend_id "_suffix"),
+			"label",   _LLM_Menu_BackendOptionLabel(backend_id),
 			"checked", (backend_id == _LLM_Menu["backend"]),
 			"action",  _LLM_Menu_MakeSetBackendHandler(backend_id)))
 	}
@@ -432,7 +451,8 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 	Rows.Push(Map("separator", true))
 	; A row with no action is drawn disabled by the renderer, which is what every
 	; spec line below is: information, not a click target.
-	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s", "Ollama")))
+	Rows.Push(Map("label", StrReplace(t("menu.llm.model_backend"), "%s",
+		_LLM_Menu_OptionHead(_LLM_Menu_BackendOptionLabel("ollama")))))
 	Rows.Push(Map(
 		"label",  StrReplace(t("menu.llm.model_source"), "%s", ollama_url),
 		"action", _LLM_Menu_MakeOpenUrlHandler(ollama_url)))

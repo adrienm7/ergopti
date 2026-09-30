@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "התקן כאשר ErgoptiPlus נסגר",
 	"updater.move_to_applications": "כדי להתקין עדכונים, יש להפעיל את ErgoptiPlus מתיקיית היישומים. העבר אותו לשם ונסה שוב.",
 	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "לא מותקן",
 	"menu.llm.backend_mlx_unsupported": "דורש Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

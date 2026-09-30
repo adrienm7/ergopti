@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Zainstaluj przy zamykaniu ErgoptiPlus",
 	"updater.move_to_applications": "Aby instalować aktualizacje, ErgoptiPlus musi działać z folderu Aplikacje. Przenieś go tam i spróbuj ponownie.",
 	"vscode.reload_required": "Przeładuj VSCode (Cmd+Shift+P > Reload Window), aby aktywować rozszerzenie pisania",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "niezainstalowany",
 	"menu.llm.backend_mlx_unsupported": "wymaga Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

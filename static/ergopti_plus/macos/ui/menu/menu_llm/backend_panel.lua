@@ -24,6 +24,7 @@ local LOG = "backend_panel"
 
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local mlx_repair_offer = require("ui.menu.menu_llm.mlx_repair_offer")
+local BackendLabels = require("ui.menu.menu_llm.backend_labels")
 
 -- Survives menu rebuilds so a deferred settlement callback from an older row
 -- cannot publish a backend after a newer selection has taken ownership.
@@ -337,10 +338,7 @@ end
 --- @param backend string Backend identifier.
 --- @return string|nil label Existing presentation label.
 function M.runtime_label(backend)
-	if backend == "mlx" then return "MLX 🚀" end
-	if backend == "ollama" then return "Ollama 🦙" end
-	if backend == "api" then return "API 🌐" end
-	return nil
+	return BackendLabels.brand(backend)
 end
 
 function M.scope_idle()
@@ -574,18 +572,6 @@ function M.build(ctx)
 		return true
 	end
 
-	-- Title reflects current active backend
-	local backend_title_str = i18n.get("menu.llm.backend_title")
-	if state.llm_backend == "mlx" then     backend_title_str = backend_title_str .. "MLX 🚀"
-	elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
-	elseif state.llm_backend == "api" then
-		-- A local server's entry names the server rather than the remote API
-		local active = llm_mod.api_remote and llm_mod.api_remote.get_active_entry() or nil
-		local server = active and llm_mod.api_remote.is_local_server(active.provider)
-			and llm_mod.api_remote.PROVIDERS[active.provider] or nil
-		backend_title_str = backend_title_str .. (server and (server.label .. " 🖥️") or "API 🌐")
-	else                                     backend_title_str = backend_title_str .. i18n.get("menu.llm.backend_unknown") end
-
 	local rows = {}
 
 
@@ -595,7 +581,7 @@ function M.build(ctx)
 
 	-- A Mac without Apple Silicon cannot run MLX: the row says so, beside the
 	-- Ollama row that works there.
-	local mlx_label = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix")
+	local mlx_label = BackendLabels.option("mlx")
 	if not is_apple_silicon() then
 		mlx_label = mlx_label .. " (" .. i18n.get("menu.llm.backend_mlx_unsupported") .. ")"
 	else
@@ -653,7 +639,7 @@ function M.build(ctx)
 	-- =====================================================
 
 	table.insert(rows, {
-		label    = runtime_row_label("Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"), "ollama"),
+		label    = runtime_row_label(BackendLabels.option("ollama"), "ollama"),
 		checked  = (state.llm_backend == "ollama"),
 		disabled = paused or nil,
 		action       = not paused and function()
@@ -745,7 +731,7 @@ function M.build(ctx)
 		end
 	end
 	table.insert(rows, {
-		label    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
+		label    = BackendLabels.option("api"),
 		checked  = (state.llm_backend == "api"),
 		disabled = paused or nil,
 		action   = not paused and activate_api or nil
@@ -763,6 +749,21 @@ function M.build(ctx)
 		for _, row in ipairs(ctx.local_server_rows(activate_api)) do
 			table.insert(rows, row)
 		end
+	end
+
+	-- The row names the selected option, cut before its em dash. A local
+	-- server's row follows the API row and is ticked with it: the last ticked
+	-- row is the most precise choice.
+	local selected = nil
+	for _, row in ipairs(rows) do
+		if row.checked then selected = row end
+	end
+	local backend_title_str
+	if selected then
+		backend_title_str = BackendLabels.head(selected.label)
+	else
+		Logger.warn(LOG, "The Backend submenu offers no option for backend '%s'.", tostring(state.llm_backend))
+		backend_title_str = i18n.get("menu.llm.backend_unknown")
 	end
 
 	return backend_title_str, ManifestMenu.render_rows(rows, "llm_backend")

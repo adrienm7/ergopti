@@ -26,7 +26,7 @@ helpers.describe("backend_panel: no duplicate MLX server launch on backend switc
 		-- Selected by a declaration unique to ui/menu/menu_llm/backend_panel.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("\"menu.llm.backend_ollama_suffix\"")
+		local src = helpers.read_driver_source("M.is_apple_silicon = is_apple_silicon")
 		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
 		-- The fix removes the redundant force_mlx_check call that launched a second
@@ -40,7 +40,7 @@ helpers.describe("backend_panel: no duplicate MLX server launch on backend switc
 		-- Selected by a declaration unique to ui/menu/menu_llm/backend_panel.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("\"menu.llm.backend_ollama_suffix\"")
+		local src = helpers.read_driver_source("M.is_apple_silicon = is_apple_silicon")
 		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
 		local dispatch_at = src:find('"MLX model successor", switch_model, target_model', 1, true)

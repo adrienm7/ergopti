@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "Install when ErgoptiPlus quits",
 	"updater.move_to_applications": "ErgoptiPlus must run from the Applications folder to install updates. Move it there, then try again.",
 	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "not installed",
 	"menu.llm.backend_mlx_unsupported": "needs Apple Silicon",
 	"menu.llm.backend_unknown": "Unknown",

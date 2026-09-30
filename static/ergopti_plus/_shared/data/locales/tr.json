@@ -3006,7 +3006,6 @@
 	"updater.install_on_quit": "ErgoptiPlus kapanınca yükle",
 	"updater.move_to_applications": "Güncellemeleri yüklemek için ErgoptiPlus’ın Uygulamalar klasöründen çalışması gerekir. Oraya taşıyıp yeniden deneyin.",
 	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
-	"menu.llm.backend_title": "AI engine (Backend): ",
 	"menu.llm.backend_runtime_missing": "yüklü değil",
 	"menu.llm.backend_mlx_unsupported": "Apple Silicon gerekir",
 	"menu.llm.backend_unknown": "Unknown",
