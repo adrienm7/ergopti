@@ -47,3 +47,22 @@ _KLCRT_ClipboardRegistrationIsTransactional() {
 		"KL_Clip_Stop must stop retaining notification ownership")
 }
 Test("keylogger: clipboard and paste-chord observers register transactionally", _KLCRT_ClipboardRegistrationIsTransactional)
+
+; The layout emulation types Ctrl+V itself (Ctrl on the QWERTY V position, and
+; Ctrl on Ergopti's V through RemapKey). The paste observer sees that output
+; only when it is sent by SendEvent at the hotkey's SendLevel 2: SendInput
+; removes the script's own keyboard hook while it sends (keyboard_mouse.cpp
+; SendEventArray), so no InputHook of this process sees the keys it types.
+_KLCRT_EmulatedPasteReachesTheObserver() {
+	Code := _DriverSourceNoComments()
+	Assert(RegExMatch(Code, "m)^\^SC02F::[ \t]*(.*)$", &Paste) > 0,
+		"the emulation's Ctrl paste on SC02F must stay declared")
+	AssertEqual(1, InStr(Paste[1], '_RemapEmit("^v"'),
+		"the emulation's Ctrl paste must emit through _RemapEmit, as RemapKey's Ctrl variant of V does")
+	EmitBody := _DriverFuncBody("_RemapEmit")
+	Assert(EmitBody != "", "_RemapEmit must exist")
+	Assert(InStr(EmitBody, "SendEvent(") > 0 && !InStr(EmitBody, "SendInput("),
+		"_RemapEmit must send by SendEvent, which the script's own InputHooks observe")
+}
+Test("keylogger: the layout emulation's own Ctrl+V reaches the paste observer",
+	_KLCRT_EmulatedPasteReachesTheObserver)
