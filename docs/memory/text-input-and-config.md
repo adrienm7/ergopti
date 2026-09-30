@@ -151,6 +151,15 @@ full saves keep boot-outdated entries on disk for the cleanup. Judge
 "retired" only against a published catalogue; before one exists, keep every
 choice. Real failures stay fail-closed: an unreadable or malformed file, a
 native refusal, and a scope's own post-write candidate still refuse.
+Other files (layers.toml, tap_hold.toml, installed.json, storage.json,
+api_keys.json, hotstrings_overrides.toml, config_karabiner.toml) follow the
+same rule through `config_outdated.report_in_file`: one WARNING naming the
+file and the entry to fix by hand, since only config.toml has a cleanup, and
+never recorded by a cleanup scan. The entry is ignored and the rest of the
+file kept; a record the app writes back (installed.json, api_keys.json)
+carries such an entry over unchanged, never deleting it. A file its owner
+refuses as a whole must still not stop a driver's startup: the installed
+layouts' packs are skipped with an ERROR on all three drivers.
 
 ### project-toml-cache-returns-real-booleans
 
