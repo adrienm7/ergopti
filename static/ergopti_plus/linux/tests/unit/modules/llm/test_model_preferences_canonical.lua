@@ -71,6 +71,23 @@ helpers.describe("canonical Linux model preferences", function()
 		end)
 	end)
 
+	helpers.it("reads a retired backend as the default, warns once and offers it (config-outdated-llm-backend)", function()
+		local source = '[llm.models]\nselected = "openai"\n'
+		with_config(source, function()
+			require("config_outdated").reset_for_tests()
+			local engine = require("modules.llm.prediction_engine")
+			local reported = require("config_outdated").collect_reports(function()
+				helpers.assert_eq(engine.get_backend(), require("infra.manifest_reader").default_for("llm.models.selected"),
+					"a retired backend never raises on the menu or typing path")
+			end)
+			helpers.assert_eq(reported, { ["llm.models.selected"] = true })
+			local scan = require("config_unused_keys").find_in_source(source,
+				require("ui.menu.unused_keys_cleanup").collect)
+			helpers.assert_eq(#scan.keys, 1, "the cleanup offers what the reader ignores")
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.models", "selected" })
+		end)
+	end)
+
 	helpers.it("keeps the prior model and consent after a refused canonical write", function()
 		with_config('[llm]\nenabled = false\n[llm.models]\nollama = "canonical-model"\n', function(path)
 			local profiles = require("modules.llm.profiles")
