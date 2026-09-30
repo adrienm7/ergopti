@@ -18,6 +18,8 @@ local OWNED_MODULES = {
 	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
+	"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
+	"infra.deferred_work", "modules.llm.backend_detector",
 }
 
 local ROW = { mlx = 1, ollama = 2, api = 3 }
@@ -73,7 +75,7 @@ local function new_checker(installed, refuses_while_completing)
 end
 
 --- Runs one scenario with the real backend rows over the doubles.
---- @param opts table { backend, mlx_installed, ollama_installed, dialog_choice }
+--- @param opts table { backend, mlx_installed, ollama_installed, dialog_choice, arch }
 --- @param scenario function Receives (rows, record, state).
 local function with_rows(opts, scenario)
 	helpers.with_fresh_modules(OWNED_MODULES, function()
@@ -100,7 +102,10 @@ local function with_rows(opts, scenario)
 			end,
 			load_api_entries = function() return true end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.i18n"] = {
+			get = function(key) return key end,
+			format = function(key) return key end,
+		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
 		package.loaded["infra.notifications"] = {
@@ -121,7 +126,7 @@ local function with_rows(opts, scenario)
 		local previous_execute = os.execute
 		local previous_hs_execute = hs.execute
 		os.execute = function() return true end
-		hs.execute = function() return "arm64" end
+		hs.execute = function() return opts.arch or "arm64" end
 		local ok, err = xpcall(function()
 			local BackendPanel = require("ui.menu.menu_llm.backend_panel")
 			local _, rows = BackendPanel.build({
@@ -258,6 +263,43 @@ helpers.describe("MLX row waits for its runtime install (backend-runtime-install
 			helpers.assert_eq(record.mlx.installs, 0)
 			helpers.assert_eq(#record.switches, 1)
 			helpers.assert_eq(state.llm_backend, "mlx")
+		end)
+	end)
+end)
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 3/ A Mac That Cannot Run MLX ===========
+-- ================================================
+-- ================================================
+
+helpers.describe("The MLX row explains an unsupported Mac and offers Ollama (mlx-bootstrap-unsupported-row)", function()
+	helpers.it("labels the disabled row and lets the repair offer select Ollama", function()
+		with_rows({ backend = "api", arch = "x86_64" }, function(rows, record, state)
+			local mlx_row = rows[ROW.mlx]
+			helpers.assert_true(mlx_row.disabled == true, "MLX cannot run on an Intel Mac")
+			helpers.assert_true(mlx_row.label:find("(menu.llm.backend_mlx_unsupported)", 1, true) ~= nil,
+				"the disabled row must say why: " .. mlx_row.label)
+
+			package.loaded["infra.deferred_work"] = {
+				after = function(_, callback) callback(); return true end,
+			}
+			package.loaded["infra.dialog_util"].block_alert = function(_, _, primary)
+				record.dialogs = record.dialogs + 1
+				return primary
+			end
+			local offered = require("ui.menu.menu_llm.mlx_repair_offer").offer({
+				kind = "unsupported", machine = "Intel", repairable = false,
+			})
+			helpers.assert_true(offered)
+			helpers.assert_eq(record.dialogs, 1)
+			helpers.assert_eq(#record.switches, 1, "« Use Ollama » runs the Ollama row's own selection")
+			helpers.assert_eq(record.switches[1].model, "ollama-model")
+			helpers.assert_eq(state.llm_backend, "ollama")
 		end)
 	end)
 end)

@@ -23,6 +23,7 @@ local Logger   = require("infra.logger")
 local LOG = "backend_panel"
 
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
+local mlx_repair_offer = require("ui.menu.menu_llm.mlx_repair_offer")
 
 -- Survives menu rebuilds so a deferred settlement callback from an older row
 -- cannot publish a backend after a newer selection has taken ownership.
@@ -592,8 +593,16 @@ function M.build(ctx)
 	-- ===== 1.1) MLX entry =====
 	-- =====================================================
 
+	-- A Mac without Apple Silicon cannot run MLX: the row says so, beside the
+	-- Ollama row that works there.
+	local mlx_label = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix")
+	if not is_apple_silicon() then
+		mlx_label = mlx_label .. " (" .. i18n.get("menu.llm.backend_mlx_unsupported") .. ")"
+	else
+		mlx_label = runtime_row_label(mlx_label, "mlx")
+	end
 	table.insert(rows, {
-		label    = runtime_row_label("MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"), "mlx"),
+		label    = mlx_label,
 		checked  = (state.llm_backend == "mlx"),
 		disabled = (not is_apple_silicon()) or paused or nil,
 		action       = not paused and function()
@@ -692,6 +701,11 @@ function M.build(ctx)
 			return activate_ollama()
 		end or nil
 	})
+
+
+	-- The MLX repair offer proposes Ollama on a Mac that cannot run MLX: the
+	-- same selection as this row, registered from the latest menu build.
+	mlx_repair_offer.set_alternative(rows[#rows].action)
 
 
 	-- =====================================================

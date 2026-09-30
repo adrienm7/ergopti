@@ -493,7 +493,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
-		assert_gc_pinned("\"Cause inconnue. Consultez la console Hammerspoon.\"") -- ui/menu/menu_llm/models_manager_mlx.lua
+		assert_gc_pinned("--- MODULE: MLX Models Manager\n") -- ui/menu/menu_llm/models_manager_mlx.lua
 	end)
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()

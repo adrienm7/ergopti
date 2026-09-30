@@ -26,15 +26,20 @@
 ---    same live download progress instead of a 4-minute frozen silence.
 --- 4. Final state reporting: a successful slow-path run posts a final
 ---    "Moteur IA prêt." step then auto-hides 1.5s later. Any failure
----    routes through ui.download_window.set_error with the actual stderr
----    tail from the script (network down, uv install blocked, etc.) so
----    the user sees the real cause.
+---    routes through ui.download_window.set_error with the cause the
+---    retained output names (mlx_bootstrap_diagnosis): the streaming
+---    callback takes every line before the completion runs, so the tail is
+---    kept while it streams, and the full tail is logged.
 --- 5. Non-blocking: full check + install runs in a background hs.task so
 ---    the Hammerspoon main loop is never frozen, even on a fresh clone
 ---    where bootstrapping uv + Python + the MLX wheels takes minutes.
 --- 6. Explicit lifecycle: callers branch on get_state() ("pending" /
 ---    "ready" / "missing" / "failed"). "missing" means no runtime and no
 ---    selection asked for one; the IA menu stays usable in every state.
+--- 7. Repair: a runtime whose import probe failed is flagged broken in
+---    memory, so it never reads as installed even when its fingerprint
+---    cannot be removed; the next selection, or the repair button, runs the
+---    script in repair mode, which removes only Ergopti's own venv first.
 --- ==============================================================================
 
 local M = {}
@@ -49,6 +54,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
+local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 
 local LOG = "mlx_deps"
 
@@ -68,11 +74,14 @@ local MARKER_VENV_CREATE    = "VENV_CREATING"
 local MARKER_VENV_CREATED   = "VENV_CREATED"
 local MARKER_DEPS_SYNC      = "DEPS_SYNCING"
 local MARKER_DEPS_SYNCED    = "DEPS_SYNCED"
+-- Repair mode removes Ergopti's own venv before rebuilding it, and every build
+-- imports the MLX packages before it is published.
+local MARKER_VENV_REMOVE    = "VENV_REMOVING"
+local MARKER_IMPORT_CHECK   = "IMPORT_CHECKING"
 
--- Number of trailing characters of stderr/stdout to surface in the failure
--- message. Long enough to include the actual error from curl / uv, short
--- enough to fit on a single line of the progress UI.
-local FAILURE_TAIL_CHARS = 280
+-- Exit code the deadline reports: the conventional timeout status, which the
+-- process-group wrapper also uses for a drain that never finished.
+local TIMEOUT_EXIT_CODE = 124
 
 -- Delay before auto-hiding the progress UI after a successful bootstrap.
 -- Long enough for the user to register "moteur IA prêt", short enough to
@@ -95,6 +104,20 @@ local _bootstrap_state = "pending"
 -- Last error message captured from the script (stderr tail). Surfaced by
 -- callers that need to explain WHY an IA action was refused.
 local _last_failure_message = nil
+
+-- Cause of the last failure (mlx_bootstrap_diagnosis.classify), which the
+-- repair offer turns into its dialog. Nil after a success.
+local _last_failure_cause = nil
+
+-- Cause of a failed import probe on a venv that is still on disk. While set,
+-- runtime_installed() reads false whatever the filesystem says: removing the
+-- fingerprint can itself be refused, and a runtime that cannot import mlx_lm
+-- must never be reused as installed.
+local _runtime_broken = nil
+
+-- Repair authority. install_for_selection() grants it for a broken runtime or
+-- the repair button; the next check consumes it, like the install grant.
+local _repair_granted = false
 
 -- Callbacks registered while the script is running. Fired all at once when
 -- the script exits so concurrent callers (startup probe + user click) each
@@ -197,18 +220,42 @@ function M.venv_dir()
 end
 
 --- Reports whether a completed MLX runtime exists, with stat-only probes: the
---- interpreter plus the fingerprint the script writes only after a full sync.
+--- interpreter plus the fingerprint the script writes only after a full sync
+--- and a passing import probe. A runtime whose import probe failed since then
+--- reads as not installed, whatever remains on disk.
 --- @return boolean installed
 --- @return string|nil python_path Interpreter path when the folder is known.
 function M.runtime_installed()
 	local venv = M.venv_dir()
 	if not venv then return false, nil end
 	local python_path = venv .. "/bin/python"
+	if _runtime_broken ~= nil then return false, python_path end
 	local function is_file(path)
 		local ok, mode = pcall(hs.fs.attributes, path, "mode")
 		return ok and mode == "file"
 	end
 	return is_file(python_path) and is_file(venv .. "/.last_sync_hash"), python_path
+end
+
+--- Names the venv only when it is exactly the folder Ergopti owns and may
+--- delete: the path venv_dir() derives, absolute, named mlx-venv (launcher) or
+--- .venv (checkout), without "." or ".." segments, and not a link or a file.
+--- ensure-mlx-deps.sh checks the same folder again before it removes it.
+--- @return string|nil venv Owned folder, or nil when it must not be removed.
+--- @return string|nil refusal Why the folder is not treated as Ergopti's.
+function M.owned_venv_dir()
+	local venv = M.venv_dir()
+	if type(venv) ~= "string" or venv:sub(1, 1) ~= "/" then return nil, "unnamed folder" end
+	for segment in venv:gmatch("[^/]+") do
+		if segment == "." or segment == ".." then return nil, "relative segment" end
+	end
+	local leaf = venv:match("([^/]+)$")
+	if leaf ~= "mlx-venv" and leaf ~= ".venv" then return nil, "unexpected folder name" end
+	local probed, mode = pcall(hs.fs.symlinkAttributes, venv, "mode")
+	if not probed then return nil, "link state unreadable" end
+	if mode == "link" then return nil, "symbolic link" end
+	if mode ~= nil and mode ~= "directory" then return nil, "not a folder" end
+	return venv
 end
 
 --- Shell-quotes an arbitrary string for safe insertion into /bin/bash -c.
@@ -241,6 +288,8 @@ local KNOWN_MARKERS = {
 	[MARKER_VENV_CREATED]   = true,
 	[MARKER_DEPS_SYNC]      = true,
 	[MARKER_DEPS_SYNCED]    = true,
+	[MARKER_VENV_REMOVE]    = true,
+	[MARKER_IMPORT_CHECK]   = true,
 }
 
 -- French step labels keyed by marker. Only the "starting" markers map to
@@ -251,6 +300,8 @@ local PROGRESS_LABELS = {
 	[MARKER_PYTHON_INSTALL] = i18n.get("mlx.deps_step_python"),
 	[MARKER_VENV_CREATE]    = i18n.get("mlx.deps_step_venv"),
 	[MARKER_DEPS_SYNC]      = i18n.get("mlx.deps_step_sync"),
+	[MARKER_VENV_REMOVE]    = i18n.get("mlx.deps_step_remove"),
+	[MARKER_IMPORT_CHECK]   = i18n.get("mlx.deps_step_verify"),
 }
 
 --- Detects whether a stdout chunk contains a specific marker line.
@@ -300,9 +351,11 @@ end
 -- advances rather than sitting at 0%. Values are coarse on purpose: they
 -- only need to show monotonic progress, not exact accuracy. uv resolution
 -- and wheel downloads dominate the slow path, hence the wide gap from
--- DEPS_SYNCING (70%) to DEPS_SYNCED (100%) — the script can spend several
--- minutes there.
+-- DEPS_SYNCING (70%) to DEPS_SYNCED (85%) — the script can spend several
+-- minutes there. The import probe that follows runs before publication; the
+-- success step itself fills the bar.
 local MARKER_PROGRESS = {
+	[MARKER_VENV_REMOVE]    = 2,
 	[MARKER_UV_INSTALL]     = 5,
 	[MARKER_UV_INSTALLED]   = 15,
 	[MARKER_PYTHON_INSTALL] = 25,
@@ -310,27 +363,48 @@ local MARKER_PROGRESS = {
 	[MARKER_VENV_CREATE]    = 50,
 	[MARKER_VENV_CREATED]   = 60,
 	[MARKER_DEPS_SYNC]      = 70,
-	[MARKER_DEPS_SYNCED]    = 100,
+	[MARKER_DEPS_SYNCED]    = 85,
+	[MARKER_IMPORT_CHECK]   = 92,
 }
 
---- Returns the trailing N characters of `s`, trimmed of empty lines, so
---- the failure message carries the actual cause rather than a generic
---- "consultez la console".
---- @param s string Combined stdout+stderr of the script.
---- @return string Trimmed tail suitable for an error display.
-local function tail_for_error(s)
-	if type(s) ~= "string" or s == "" then return "" end
-	local n = #s
-	local start = n > FAILURE_TAIL_CHARS and (n - FAILURE_TAIL_CHARS + 1) or 1
-	local tail = s:sub(start)
-	tail = tail:gsub("^[^\n]*\n", "")
-	for marker, _ in pairs(KNOWN_MARKERS) do
-		tail = tail:gsub(marker .. "\n?", "")
+--- Lines of a failed run joined for one log record, oldest first.
+--- @param lines table Clean retained lines.
+--- @return string joined
+local function joined_tail(lines)
+	if #lines == 0 then return "(no output)" end
+	return table.concat(lines, " | ")
+end
+
+--- Names the platform for a failure that blames "the current platform": a
+--- supported Mac was handed a foreign Python, an unsupported one cannot run
+--- MLX at all. Unknown probes leave the classifier's own reading.
+--- @return table context { platform_supported, machine }
+local function platform_context()
+	local ok, Detector = pcall(require, "modules.llm.backend_detector")
+	if not ok or type(Detector) ~= "table" or type(Detector.mlx_support) ~= "function" then
+		Logger.error(LOG, "The MLX platform probe is unavailable: %s.", tostring(Detector))
+		return {}
 	end
-	tail = tail:gsub("[ \t]+\n", "\n"):gsub("\n\n+", "\n")
-	-- Keep only the last non-empty line for a single-line UI render
-	local last = tail:match("([^\n]+)%s*$")
-	return last or tail
+	local probed, supported, platform = pcall(Detector.mlx_support)
+	if not probed then
+		Logger.error(LOG, "The MLX platform probe failed: %s.", tostring(supported))
+		return {}
+	end
+	platform = type(platform) == "table" and platform or {}
+	return {
+		platform_supported = supported,
+		machine = Diagnosis.describe_machine(platform.arch, platform.macos_major),
+	}
+end
+
+--- Records a failure cause and the explanation callers show for it.
+--- @param cause table Cause from mlx_bootstrap_diagnosis.classify().
+local function publish_failure_cause(cause)
+	_last_failure_cause = cause
+	_last_failure_message = Diagnosis.describe(cause, {
+		venv = M.venv_dir(),
+		log_path = Logger.today_log_path(),
+	})
 end
 
 --- @return boolean True when the Lua-side knows a real sync ran (slow path).
@@ -390,7 +464,7 @@ local function release_window_claim()
 	_ui_session = nil
 end
 
-local function make_streaming_handler(is_current)
+local function make_streaming_handler(is_current, record_output)
 	is_current = type(is_current) == "function" and is_current or function() return true end
 	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
 	-- multiple times across chunks; we want exactly one transition each.
@@ -407,6 +481,9 @@ local function make_streaming_handler(is_current)
 
 	return function(_, stdout_chunk, stderr_chunk)
 		if not is_current() then return false end
+		-- The completion receives only what this callback did not take: the
+		-- failure's cause must be kept here or it is gone.
+		if type(record_output) == "function" then record_output(stdout_chunk, stderr_chunk) end
 		-- Forward stderr (uv's verbose output) so the live log AND the
 		-- progress UI's detail line both reflect real-time progress.
 		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
@@ -881,6 +958,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- later plain check install without any selection.
 	local install_granted = _install_granted == true
 	_install_granted = false
+	local repair_granted = _repair_granted == true
+	_repair_granted = false
 	if not _pause_controller.is_admitted() then
 		Logger.debug(LOG, "MLX dependency bootstrap rejected by pause admission.")
 		return false
@@ -946,14 +1025,23 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
 		and _resume_intent.kind == "task"
 	local install_allowed = install_granted or replaying_install
+	-- A repair rebuilds even a runtime that still reads as installed: the user
+	-- asked for it, or its import probe failed.
+	local repair = install_allowed and (repair_granted
+		or (replaying_install and _resume_intent.repair == true))
+	if repair then installed = false end
 	if installed or not install_allowed then
 		if installed then
 			_bootstrap_state = "ready"
 			_last_failure_message = nil
+			_last_failure_cause = nil
 			Logger.info(LOG, "MLX runtime already installed (%s); reusing it.", tostring(venv_python))
 		else
 			_bootstrap_state = "missing"
-			_last_failure_message = i18n.get("mlx.runtime_missing_body")
+			-- A broken runtime keeps the explanation its failed probe published.
+			if _runtime_broken == nil then
+				_last_failure_message = i18n.get("mlx.runtime_missing_body")
+			end
 			Logger.warn(LOG, "MLX runtime is not installed; no bootstrap without an MLX backend selection.")
 		end
 		if replay_token ~= nil then
@@ -991,11 +1079,16 @@ function M.check_and_install_deps(on_complete, replay_token)
 		_terminal_outcome = nil
 		return true
 	end
-	local function settle_preflight_failure(message)
+	local function settle_preflight_failure(message, cause)
 		local current = _pause_controller.is_current(token, authorization)
 		if current then
 			_bootstrap_state = "failed"
-			_last_failure_message = message
+			if cause ~= nil then
+				publish_failure_cause(cause)
+			else
+				_last_failure_message = message
+				_last_failure_cause = { kind = "exit", line = message, repairable = true }
+			end
 			_pause_controller.complete(token)
 		elseif not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
@@ -1024,9 +1117,24 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_preflight_failure("Chemin du script MLX invalide.")
 	end
 
+	-- The repair deletes the venv: only the exact folder Ergopti owns, never a
+	-- link or a folder somewhere else. The script checks it again itself.
+	if repair then
+		local owned, refusal = M.owned_venv_dir()
+		if not owned then
+			Logger.error(LOG, "MLX repair refused: %s is not Ergopti's venv (%s).",
+				tostring(M.venv_dir()), tostring(refusal))
+			return settle_preflight_failure(nil, {
+				kind = "foreign_path", path = M.venv_dir(), line = refusal, repairable = false,
+			})
+		end
+		Logger.info(LOG, "Repairing the MLX runtime: %s is removed, then rebuilt.", owned)
+	end
+
 	-- Forward the project root so the script knows where to find .venv even
 	-- when launched outside the project directory (e.g. from launchd).
 	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
+	if repair then env_prefix = env_prefix .. "ERGOPTI_MLX_REPAIR=1 " end
 	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
 
 	Logger.debug(LOG, "Executing dependency validation script in background (root=%s)…", hs_root)
@@ -1092,16 +1200,23 @@ function M.check_and_install_deps(on_complete, replay_token)
 		termination_accepted = false,
 		deadline_wait_registered = false,
 		timed_out = false,
+		-- Every meaningful line the script printed, kept as it streams: the
+		-- completion only receives what the streaming callback did not take.
+		output_tail = Diagnosis.new_tail({ markers = KNOWN_MARKERS }),
 	}
 	local task
 	local function owner_is_current()
 		return owner.authorized == true
 			and _pause_controller.is_current(owner.token, owner.authorization)
 	end
-	local consume_stream = make_streaming_handler(owner_is_current)
+	local function record_output(stdout_chunk, stderr_chunk)
+		owner.output_tail.push(stdout_chunk, "stdout")
+		owner.output_tail.push(stderr_chunk, "stderr")
+	end
+	local consume_stream = make_streaming_handler(owner_is_current, record_output)
 	local function process_terminal(exit_code, stdout, stderr)
 		-- Completion callback: fires when the process exits
-		local combined = (stdout or "") .. (stderr or "")
+		record_output(stdout, stderr)
 
 		-- Final pass: forward any residual lines the streaming callback may
 		-- have missed if the task ended before its final flush.
@@ -1160,6 +1275,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 			end
 			_bootstrap_state = "ready"
 			_last_failure_message = nil
+			_last_failure_cause = nil
+			_runtime_broken = nil
 			_terminal_outcome = true
 			local callbacks_delivered = fire_pending_callbacks(true, owner_is_current)
 			if callbacks_delivered == true then
@@ -1169,10 +1286,13 @@ function M.check_and_install_deps(on_complete, replay_token)
 			return callbacks_delivered
 		else
 			if not owner_is_current() then return false end
-			local tail = tail_for_error(combined)
-			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.today_log_path() .. "." end
-			Logger.error(LOG, "MLX bootstrap failed (exit=%d) — %s",
-				tonumber(exit_code) or -1, tail:gsub("\n", " | "))
+			-- The cause is searched for in every retained line: the closing
+			-- lines of the script blame the network whatever failed.
+			local lines = owner.output_tail.lines()
+			local cause = Diagnosis.classify(lines, exit_code, platform_context())
+			local tail = Diagnosis.summary(cause)
+			Logger.error(LOG, "MLX bootstrap failed (exit=%s, cause=%s, path=%s). Last output: %s",
+				tostring(exit_code), tostring(cause.kind), tostring(cause.path), joined_tail(lines))
 			-- Make sure the UI is visible so the error is surfaced even when
 			-- the failure happened before the slow-path marker was emitted.
 			if not owner_is_current() then return false end
@@ -1199,7 +1319,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 				if not owner_is_current() then return false end
 			end
 			_bootstrap_state = "failed"
-			_last_failure_message = tail
+			publish_failure_cause(cause)
 			_terminal_outcome = false
 			local callbacks_delivered = fire_pending_callbacks(false, owner_is_current)
 			if callbacks_delivered == true then
@@ -1285,13 +1405,15 @@ function M.check_and_install_deps(on_complete, replay_token)
 			return false
 		end
 		owner.timed_out = true
-		local message = i18n.get("mlx.deps_failed")
+		local lines = owner.output_tail.lines()
+		local cause = Diagnosis.classify(lines, TIMEOUT_EXIT_CODE, platform_context())
+		local message = Diagnosis.summary(cause)
 		Logger.error(LOG,
-			"MLX dependency bootstrap timed out after %.1f seconds; terminating the exact child.",
-			BOOTSTRAP_TIMEOUT_SEC)
+			"MLX dependency bootstrap timed out after %.1f seconds; terminating the exact child. Last output: %s",
+			BOOTSTRAP_TIMEOUT_SEC, joined_tail(lines))
 		if owns_window() then pcall(llm_progress.set_error, message) end
 		_bootstrap_state = "failed"
-		_last_failure_message = message
+		publish_failure_cause(cause)
 		_terminal_outcome = false
 		if fire_pending_callbacks(false, owner_is_current) ~= true then
 			discard_pending_callbacks()
@@ -1351,7 +1473,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		end
 		return false
 	end
-	_resume_intent = { kind = "task" }
+	_resume_intent = { kind = "task", repair = repair }
 	owner.dispatching = false
 	for _, args in ipairs(owner.pending_streams) do
 		if not owner_is_current()
@@ -1402,17 +1524,35 @@ function M.get_failure_message() return _last_failure_message end
 --- @return boolean True when the last check found no runtime and ran nothing.
 function M.is_missing() return _bootstrap_state == "missing" end
 
+--- @return table|nil cause Copy of the last failure's cause (kind, line, path,
+--- exit_code, machine, repairable), or of the failed import probe's while the
+--- runtime is flagged broken; nil when nothing failed.
+function M.get_failure_cause()
+	local cause = _last_failure_cause or _runtime_broken
+	if type(cause) ~= "table" then return nil end
+	local copy = {}
+	for key, value in pairs(cause) do copy[key] = value end
+	return copy
+end
+
+--- @return boolean True while a failed import probe flags the runtime broken.
+function M.is_runtime_broken() return _runtime_broken ~= nil end
+
 --- @return boolean True while the selection's bootstrap script is running.
 function M.is_task_running() return _task_running == true end
 
 --- Marks an installed runtime whose import probe failed as not installed, so
 --- the next MLX selection rebuilds it. Updates never re-sync the venv, so a
---- lock bump or a partial environment otherwise stays broken for good. Only
---- the sync fingerprint is removed: runtime_installed() then reads false, and
---- ensure-mlx-deps.sh takes its full staged rebuild path. Nothing is fetched
---- here; the selection that follows owns the download.
---- @return boolean invalidated True when the fingerprint was removed.
-function M.invalidate_runtime()
+--- lock bump or a partial environment otherwise stays broken for good. The
+--- runtime is flagged broken in memory first, so it reads as not installed
+--- even when removing the sync fingerprint is refused (a permission error
+--- used to leave it "installed" and every later selection did nothing). The
+--- fingerprint is then removed so a reload keeps the verdict, and the next
+--- selection runs ensure-mlx-deps.sh in repair mode. Nothing is fetched here;
+--- the selection that follows owns the download.
+--- @param cause table|nil Cause of the failed probe (mlx_bootstrap_diagnosis).
+--- @return boolean invalidated True when the runtime now reads as not installed.
+function M.invalidate_runtime(cause)
 	if _task_running then
 		Logger.debug(LOG, "MLX runtime invalidation skipped: its bootstrap is running.")
 		return false
@@ -1422,38 +1562,57 @@ function M.invalidate_runtime()
 		Logger.error(LOG, "Cannot invalidate the MLX runtime: its folder cannot be named.")
 		return false
 	end
+	_runtime_broken = type(cause) == "table" and cause
+		or { kind = "import_failed", repairable = true }
+	_bootstrap_state = "missing"
+	_terminal_outcome = nil
+	if type(cause) == "table" then
+		publish_failure_cause(cause)
+	else
+		_last_failure_cause = nil
+		_last_failure_message = i18n.get("mlx.runtime_broken_body")
+	end
 	local marker = venv .. "/.last_sync_hash"
 	local ok, removed, remove_err = pcall(os.remove, marker)
 	if not ok or not removed then
-		Logger.error(LOG, "Cannot invalidate the MLX runtime fingerprint %s: %s",
+		Logger.error(LOG, "MLX runtime flagged broken, but its fingerprint %s was not removed: %s",
 			marker, tostring(ok and remove_err or removed))
-		return false
 	end
-	_bootstrap_state = "missing"
-	_last_failure_message = i18n.get("mlx.runtime_broken_body")
-	_terminal_outcome = nil
-	Logger.warn(LOG, "MLX runtime invalidated; the next MLX selection rebuilds %s.", venv)
+	Logger.warn(LOG, "MLX runtime invalidated; the next MLX selection repairs %s.", venv)
 	return true
 end
 
 --- The only bootstrap entry: the user selected the MLX backend (menu row or
---- AI enable while MLX is the backend). An installed runtime is reused and the
---- grant is consumed without running the script; a missing one is provisioned.
---- A definitive failure is cleared first, since the selection is the retry.
+--- AI enable while MLX is the backend), or pressed the repair button. An
+--- installed runtime is reused and the grant is consumed without running the
+--- script; a missing one is provisioned; a broken one, or any runtime when the
+--- repair is asked for, is removed and rebuilt. A definitive failure is
+--- cleared first, since the selection is the retry.
 --- @param on_complete function|nil Called once with the terminal result.
+--- @param opts table|nil { repair = true } to rebuild even an installed runtime.
 --- @return boolean accepted
-function M.install_for_selection(on_complete)
-	Logger.info(LOG, "MLX backend selected; bootstrap authorized if the runtime is absent.")
+function M.install_for_selection(on_complete, opts)
+	local repair = (type(opts) == "table" and opts.repair == true) or _runtime_broken ~= nil
+	Logger.info(LOG, repair
+		and "MLX repair requested; the runtime is removed and rebuilt."
+		or "MLX backend selected; bootstrap authorized if the runtime is absent.")
 	-- A running task already is the selection's bootstrap: joining it needs no
 	-- grant, and a leftover one must not leak to a later non-selection check.
 	_install_granted = not _task_running
-	if not _task_running and (_bootstrap_state == "failed" or _bootstrap_state == "missing") then
+	_repair_granted = repair and not _task_running
+	local stale = _bootstrap_state == "failed" or _bootstrap_state == "missing"
+		or (repair and _bootstrap_state == "ready")
+	if not _task_running and stale then
 		_bootstrap_state = "pending"
 		_last_failure_message = nil
+		_last_failure_cause = nil
 		_terminal_outcome = nil
 	end
 	local accepted = M.check_and_install_deps(on_complete)
-	if accepted ~= true then _install_granted = false end
+	if accepted ~= true then
+		_install_granted = false
+		_repair_granted = false
+	end
 	return accepted
 end
 
@@ -1483,6 +1642,7 @@ function M.reset_bootstrap_state()
 	Logger.info(LOG, "Resetting MLX bootstrap state from 'failed' back to 'pending' — retry now possible.")
 	_bootstrap_state      = "pending"
 	_last_failure_message = nil
+	_last_failure_cause   = nil
 	_terminal_outcome     = nil
 	return true
 end

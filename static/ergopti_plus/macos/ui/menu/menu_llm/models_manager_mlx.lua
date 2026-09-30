@@ -20,6 +20,7 @@ local i18n = require("infra.i18n")
 local ApiCommon = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
+local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
@@ -465,17 +466,30 @@ function M.new(deps, presets)
 			termination_accepted = false,
 		}
 		local check_task
-		local function handle_requirement_completion(code)
+		--- Opens the repair offer; its dialog names the cause and the button.
+		--- @param cause table|nil Cause of the failure, the checker's when nil.
+		local function offer_repair(cause)
+			local ok, offered = pcall(function()
+				return require("ui.menu.menu_llm.mlx_repair_offer").offer(cause)
+			end)
+			if not ok or offered ~= true then
+				Logger.error(LOG, "The MLX repair offer could not be scheduled: %s.", tostring(offered))
+			end
+		end
+		local function handle_requirement_completion(code, stdout, stderr)
 			if not current_or_cancel() then return end
 			if code == 0 then
 				return do_check()
 			else
-				-- Differentiate three cases so the user sees the truth:
+				-- Differentiate the cases so the user sees the truth:
 				--   1. bootstrap still running → "patientez", do not flip to error
-				--   2. bootstrap failed        → show the actual stderr cause
-				--   3. unknown                 → previous generic message
+				--   2. no runtime at all        → name the selection that installs it
+				--   3. bootstrap failed         → its cause, with the repair button
+				--   4. installed, not importable → the probe's own error, with the
+				--      repair button; the runtime is flagged broken
 				-- A model check never provisions the runtime: only selecting the
-				-- MLX backend may, so a restored model cannot start a download.
+				-- MLX backend or the repair button may, so a restored model cannot
+				-- start a download.
 				if mlx_deps_checker and mlx_deps_checker.is_task_running
 					and mlx_deps_checker.is_task_running() then
 					Logger.info(LOG, "MLX import probe failed while the selected runtime installs.")
@@ -483,15 +497,21 @@ function M.new(deps, presets)
 						i18n.get("mlx.deps_missing_body"), "info")
 				elseif mlx_deps_checker and mlx_deps_checker.runtime_installed
 					and not mlx_deps_checker.runtime_installed() then
-					Logger.warn(LOG, "MLX import probe failed: the MLX runtime is not installed.")
-					pcall(notifications.notify, i18n.get("mlx.runtime_missing_title"),
-						i18n.get("mlx.runtime_missing_body"), "warning")
+					if mlx_deps_checker.is_runtime_broken and mlx_deps_checker.is_runtime_broken() then
+						-- Already flagged: offer the repair again rather than an
+						-- install the selection would turn into the same repair.
+						Logger.warn(LOG, "MLX import probe failed again on the runtime flagged broken.")
+						offer_repair(nil)
+					else
+						Logger.warn(LOG, "MLX import probe failed: the MLX runtime is not installed.")
+						pcall(notifications.notify, i18n.get("mlx.runtime_missing_title"),
+							i18n.get("mlx.runtime_missing_body"), "warning")
+					end
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
-					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
-						or "Cause inconnue. Consultez la console Hammerspoon."
+					local cause = mlx_deps_checker.get_failure_cause and mlx_deps_checker.get_failure_cause()
 					Logger.error(LOG, "MLX dependencies missing — bootstrap definitively failed: %s",
-						tostring(cause):gsub("\n", " | "))
-					pcall(notifications.notify, i18n.get("mlx.deps_missing"), cause, "error")
+						tostring(mlx_deps_checker.get_failure_message
+							and mlx_deps_checker.get_failure_message()):gsub("\n", " | "))
 					-- F-LOW-10: the "failed" state used to be a permanent dead end —
 					-- check_and_install_deps() short-circuited on it forever, so a
 					-- transient (now-resolved) failure required a full HS reload to
@@ -502,17 +522,30 @@ function M.new(deps, presets)
 					if mlx_deps_checker.reset_bootstrap_state then
 						pcall(mlx_deps_checker.reset_bootstrap_state)
 					end
+					offer_repair(cause)
 				else
-					-- Installed yet not importable: a partial venv or one an update's
-					-- new lock outdated. Nothing re-syncs it on its own, so mark it
-					-- not installed and name the selection that rebuilds it.
-					Logger.error(LOG, "MLX packages are not importable from the installed runtime %s.",
-						project_venv_python_escaped)
-					if mlx_deps_checker and mlx_deps_checker.invalidate_runtime then
-						pcall(mlx_deps_checker.invalidate_runtime)
+					-- Installed yet not importable: a partial venv, one an update's
+					-- new lock outdated, or one macOS refuses to load. Its stderr
+					-- names why; nothing re-syncs it on its own, so flag it broken
+					-- and offer the repair that rebuilds it.
+					local tail = Diagnosis.new_tail()
+					tail.push(stdout, "stdout")
+					tail.push(stderr, "stderr")
+					local lines = tail.lines()
+					local cause = Diagnosis.classify(lines, code)
+					-- The probe only imports: a failure without a more specific
+					-- signature is an import failure.
+					if cause.kind == "exit" then
+						cause.kind = "import_failed"
+						cause.repairable = true
 					end
-					pcall(notifications.notify, i18n.get("mlx.runtime_broken_title"),
-						i18n.get("mlx.runtime_broken_body"), "error")
+					Logger.error(LOG, "MLX packages are not importable from the installed runtime %s (exit=%s, cause=%s, path=%s): %s",
+						project_venv_python_escaped, tostring(code), tostring(cause.kind),
+						tostring(cause.path), #lines > 0 and table.concat(lines, " | ") or "(no output)")
+					if mlx_deps_checker and mlx_deps_checker.invalidate_runtime then
+						pcall(mlx_deps_checker.invalidate_runtime, cause)
+					end
+					offer_repair(cause)
 				end
 				return settle_cancel("dependency_probe_failed")
 			end

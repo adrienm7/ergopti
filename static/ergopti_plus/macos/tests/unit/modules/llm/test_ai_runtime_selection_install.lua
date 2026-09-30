@@ -69,23 +69,30 @@ local DEFAULT_ENV = {
 }
 
 --- Fake filesystem: executables answer the resolver's stat, absent paths
---- answer nothing, every other mode query (scripts, roots) exists.
+--- answer nothing, a path holding a known file is a folder, and every other
+--- mode query (scripts, roots) exists. Nothing is a link, so lstat answers
+--- what stat answers, as on a real Mac without links.
 local function fake_fs(state)
-	return {
-		attributes = function(path, attribute)
-			if state.executables[path] then
-				if attribute == "mode" then return "file" end
-				return { mode = "file", permissions = "rwxr-xr-x" }
+	local function attributes(path, attribute)
+		for file in pairs(state.files) do
+			if file:sub(1, #path + 1) == path .. "/" then
+				if attribute == "mode" then return "directory" end
+				return { mode = "directory", permissions = "rwxr-xr-x" }
 			end
-			if state.files[path] then
-				if attribute == "mode" then return "file" end
-				return { mode = "file", permissions = "rw-r--r--" }
-			end
-			if state.absent[path] then return nil end
+		end
+		if state.executables[path] then
 			if attribute == "mode" then return "file" end
-			return nil
-		end,
-	}
+			return { mode = "file", permissions = "rwxr-xr-x" }
+		end
+		if state.files[path] then
+			if attribute == "mode" then return "file" end
+			return { mode = "file", permissions = "rw-r--r--" }
+		end
+		if state.absent[path] then return nil end
+		if attribute == "mode" then return "file" end
+		return nil
+	end
+	return { attributes = attributes, symlinkAttributes = attributes }
 end
 
 local function new_state()
