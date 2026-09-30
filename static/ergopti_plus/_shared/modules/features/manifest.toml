@@ -376,16 +376,33 @@ input_altering = false
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
+# The physical key that types the magic key while `hotstrings.magic_key.replace`
+# is on, named by its W3C KeyboardEvent.code like a layout extension's
+# [extension.magic_key] declaration, so one value means the same key on every
+# driver: Windows resolves it to a scan code, macOS to a virtual keycode and
+# Linux to an evdev code, all through _shared/data/keycodes/physical_keys.json.
+# "auto" leaves the key to the layout: on Windows the emulated layout's declared
+# key, or the key typing magic_key_source_char on the OS layout, or the key the
+# built-in Ergopti layout declares; on macOS and Linux the OS keyboard layout,
+# which types the magic key itself (the driver remaps nothing). The candidates
+# are the character keys a registry layout defines
+# (_shared/modules/layouts/mac_keycodes.json) except Space, which every
+# hotstring terminator relies on; tools/test/test-magic-key-source.cjs pins both
+# lists together. It replaced the Windows-only magic_key_source_scan in config
+# schema v5 (migrations.toml), so a value is a parameter of the replace feature,
+# not an activation of its own.
 [[features.hotstrings]]
-id = "magic_key_source_scan"
-default = "SC02E"
-recommended = "SC02E"
+id = "magic_key_source"
+default = "auto"
+recommended = "auto"
 input_altering = false
-type = "string"
-description_key = "menu.hotstrings.magic_key_source_scan"
-platforms = ["ahk"]
-reason_key = "platform_reason.magic_key_source_is_windows"
+type = "enum"
+enum_values = ["auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]
+description_key = "menu.hotstrings.magic_key_source"
 
+# The character whose key Windows looks for on the OS layout when no key is
+# chosen and no emulated layout declares one. The Lua drivers have no such
+# detection: without a choice their OS layout types the magic key itself.
 [[features.hotstrings]]
 id = "magic_key_source_char"
 default = "j"
@@ -394,7 +411,7 @@ input_altering = false
 type = "string"
 description_key = "menu.hotstrings.magic_key_source_char"
 platforms = ["ahk"]
-reason_key = "platform_reason.magic_key_source_is_windows"
+reason_key = "platform_reason.magic_key_detection_is_windows"
 
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
 # it was written: macOS ships the engine (modules/keymap/expander.lua

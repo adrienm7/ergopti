@@ -833,13 +833,14 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
 ; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
-; user's configured key always wins; then the key the active layout's extension
-; declares — the emulated registry layout, or the built-in Ergopti emulation;
-; then, with no layout emulated, the key that types MagicKeySourceChar ("j" by
-; default) on the user's own OS layout — on bépo not the SC02E Ergopti/QWERTY
-; position; then the shipped default. A layout is emulated only while the base
-; layer is on (_KLE_BaseCriterion): a layout left selected in the manager with
-; the base layer off types nothing, so the OS layout is still probed.
+; key the user chose in [hotstrings] magic_key_source always wins; then the key
+; the active layout's extension declares — the emulated registry layout, or the
+; built-in Ergopti emulation; then, with no layout emulated, the key that types
+; MagicKeySourceChar ("j" by default) on the user's own OS layout — on bépo not
+; the SC02E Ergopti/QWERTY position; then the key the shipped Ergopti layout
+; declares. A layout is emulated only while the base layer is on
+; (_KLE_BaseCriterion): a layout left selected in the manager with the base
+; layer off types nothing, so the OS layout is still probed.
 ;
 ; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
 ; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
@@ -847,8 +848,8 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; one layout and the layout poll, seeded with the same HKL, reloads when the
 ; user switched — only when the key follows the OS layout at all.
 _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
-	"chosen", ScriptInformation["MagicKeySourceScanChosen"],
-	"configured", ScriptInformation["MagicKeySourceScan"],
+	"chosen", ScriptInformation["MagicKeySourceChosen"],
+	"configured", ScriptInformation["MagicKeySource"],
 	"declared", LayoutRegistry_DeclaredMagicKey(
 		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
 			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
@@ -856,7 +857,8 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
 	"emulated", Features["layout"]["ergopti_base"],
 	"keycodes", LayoutRegistry_Keycodes(),
-	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"])))
+	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
+	"shipped", LayoutRegistry_ShippedMagicKey))
 ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
 ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
 ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]

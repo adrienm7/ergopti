@@ -1441,6 +1441,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-config-migrations.cjs'
 	},
 	{
+		name: 'physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)',
+		cmd: 'node',
+		args: ['tools/test/test-magic-key-source.cjs'],
+		repro: 'node tools/test/test-magic-key-source.cjs'
+	},
+	{
 		name: 'metrics heatmap translation coverage',
 		cmd: 'node',
 		args: ['tools/test/test-metrics-heatmap-translation.cjs'],

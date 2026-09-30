@@ -21,17 +21,21 @@ global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
 		"MagicKey", _FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
-		; Scancode and QWERTY character of the physical key remapped to ★.
-		; Defaults come from the manifest (the J position on the Ergopti layout).
-		; QWERTY users or other layouts can override via [hotstrings] magic_key_source_scan
-		; and magic_key_source_char in config.toml.
-		"MagicKeySourceScan", _FeatureStateRequireManifestDefault(
-			"hotstrings.magic_key_source_scan"),
+		; The physical key remapped to ★, as the shared [hotstrings]
+		; magic_key_source names it on every driver: a KeyboardEvent.code, or the
+		; manifest default "auto" that leaves the key to the layout.
+		"MagicKeySource", _FeatureStateRequireManifestDefault(
+			"hotstrings.magic_key_source"),
+		; Its scan code, resolved once at boot by LayoutRegistry_MagicKeySource
+		; (ErgoptiPlus.ahk) before any hotkey registers on it.
+		"MagicKeySourceScan", "",
+		; The character whose key the boot looks for on the OS layout when no key
+		; is chosen and no emulated layout declares one.
 		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
 			"hotstrings.magic_key_source_char"),
-		; Whether config.toml names the source scan code: the user's choice then
-		; wins over the active layout's declared key and over any detection.
-		"MagicKeySourceScanChosen", false,
+		; Whether config.toml names the source key: the user's choice then wins
+		; over the active layout's declared key and over any detection.
+		"MagicKeySourceChosen", false,
 		; Whether the boot took the source key from the OS layout, so a switch of
 		; OS layout can move it (LayoutRemapSignature); decided at boot.
 		"MagicKeySourceFollowsOsLayout", false,
@@ -193,13 +197,15 @@ ReadScriptConfig(Cache) {
 		Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
 		if Raw != "_"
 				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
-		; Source key for the J→★ remap — scancode and QWERTY character are stored
-		; separately so the remapping works regardless of the active OS layout.
-		RawScan := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_scan")
-		if RawScan != "_"
-				ScriptInformation["MagicKeySourceScan"] :=
-					_FeatureStateValidateSourceScan(RawScan)
-		ScriptInformation["MagicKeySourceScanChosen"] := RawScan != "_"
+		; Source key for the J→★ remap, named by its KeyboardEvent.code so the one
+		; value means the same physical key on every driver. A value that names
+		; no candidate is outdated configuration: the loader reports it and the
+		; cleanup offers it, so it reads as the automatic key here, never as a
+		; boot failure.
+		RawSource := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source")
+		ScriptInformation["MagicKeySource"] := _FeatureStateMagicKeySource(RawSource)
+		ScriptInformation["MagicKeySourceChosen"] := ScriptInformation["MagicKeySource"]
+			!== _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
 		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
 		if RawChar != "_"
 				ScriptInformation["MagicKeySourceChar"] :=
@@ -242,11 +248,22 @@ _FeatureStateValidateKanaOverride(Value) {
 		"script.alt_gr_is_kana_remap")
 }
 
-_FeatureStateValidateSourceScan(Value) {
-	if !(Value is String) || !RegExMatch(Value,
-			"i)^SC(?!000$)[0-9A-F]{3}$")
-		throw ValueError("hotstrings.magic_key_source_scan must be a non-zero SCxxx key name")
-	return StrUpper(Value)
+; The configured magic-key source in its manifest spelling, or the manifest
+; default for an absent or outdated value. Membership follows the loader's enum
+; rule (TomlConfigValueMatchesManifest compares with AHK's case-insensitive =),
+; so a value the loader applies is never read here as another key.
+_FeatureStateMagicKeySource(Raw) {
+	Default := _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
+	if Raw == "_" || !(Raw is String)
+		return Default
+	Entry := ManifestFindEntryByPath("hotstrings.magic_key_source")
+	if !(Entry is Map) || !Entry.Has("enum_values")
+		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
+	for Allowed in Entry["enum_values"] {
+		if Allowed = Raw
+			return Allowed
+	}
+	return Default
 }
 
 _FeatureStateValidateCodePoint(Value, Path) {

@@ -4,9 +4,9 @@
 --- MODULE: Hotstring Scalar Preferences (Linux)
 --- DESCRIPTION:
 --- Owns the hotstring settings that are single canonical config.toml leaves:
---- the magic key, the four preview toggles, the dynamic master and each dynamic
---- family. Absence resolves through the manifest's neutral default, so an empty
---- configuration switches every one of them off.
+--- the magic key and its physical key, the four preview toggles, the dynamic
+--- master and each dynamic family. Absence resolves through the manifest's
+--- neutral default, so an empty configuration switches every one of them off.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One cached document. The magic key and the dynamic family switches are
@@ -37,6 +37,7 @@ local LOG = "infra.hotstring_preferences"
 --- is owned here without a second list.
 local OWNED = {
 	"hotstrings.trigger_char",
+	"hotstrings.magic_key_source",
 	"hotstrings.preview_star_enabled",
 	"hotstrings.preview_autocorrect_enabled",
 	"hotstrings.preview_ai_enabled",
@@ -102,6 +103,13 @@ local function inspect(document, path)
 	end
 	if value ~= nil and type(value) ~= _owned[path] then
 		return nil, path, "the value is not a " .. _owned[path]
+	end
+	-- An enum leaf (the physical magic key) holding a value its manifest no
+	-- longer lists is outdated on its own, never read as another choice.
+	local entry = value ~= nil and Manifest.find_entry_by_path(path) or nil
+	if type(entry) == "table" and entry.type == "enum" then
+		local fits, detail = ConfigOutdated.manifest_value_fits(entry, value, "linux")
+		if not fits then return nil, path, detail end
 	end
 	return value
 end

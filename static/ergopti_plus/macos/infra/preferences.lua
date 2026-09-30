@@ -65,6 +65,8 @@ local KEY_MAP = {
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
 	preview_star_enabled                 = { sec = "hotstrings"                                        },
 	trigger_char                         = { sec = "hotstrings"                                        },
+	-- One of the manifest's enum values: take_value reports any other as outdated.
+	magic_key_source                     = { sec = "hotstrings", enum = true                           },
 	-- Dynamic hotstrings sub-section
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
@@ -503,6 +505,13 @@ local function flatten_from_disk(grouped, mark)
 	--- the whole file load as corrupt.
 	local function take_value(flat_key, value, ...)
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
+		local spec = KEY_MAP[flat_key]
+		if fits and spec and spec.enum then
+			-- A value the manifest no longer lists (a key a newer build added, a
+			-- hand edit) is outdated on its own, never a guess at another key.
+			fits, detail = ConfigOutdated.manifest_value_fits(
+				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
+		end
 		if not fits then
 			ConfigOutdated.report({ ... }, detail)
 			return

@@ -105,6 +105,7 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("modules.hotstrings.magic_key")
+local MagicKeySource    = require("modules.hotstrings.magic_key_source")
 local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
@@ -1313,6 +1314,23 @@ local function main()
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
 
+	-- The physical magic key: a plain press of the key chosen in [hotstrings]
+	-- magic_key_source types the magic key instead of its own character, while
+	-- the magic key's replace section is on. Decided first in the consumption
+	-- callback below, so no other consumer reads the key it replaces; the typed
+	-- magic key then takes the character path, as a re-emitted key would.
+	MagicKeySource.init({
+		is_active = function() return not script_actions.is_paused() end,
+		replace_on = function() return hotstrings_config.is_section_enabled("magickey", "replace") end,
+		magic_key = MagicKey.get,
+		type_text = function(text)
+			if opts.dry_run then return false end
+			local result = injector.inject(0, text, false)
+			return type(result) == "table" and result.ok == true
+		end,
+		dispatch_char = function(char, code) on_char(char, code) end,
+	})
+
 	local function on_click()
 		secure_focus_guard.invalidate()
 		wrap_on_type.on_pointer_down()
@@ -1406,6 +1424,7 @@ local function main()
 		return true
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if MagicKeySource.on_key(detail) then return true end
 		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine

@@ -333,6 +333,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 			{ fn = "set_trigger_char",                val = state.trigger_char },
+			{ fn = "set_magic_key_source",            val = state.magic_key_source },
 		}) do
 			if type(keymap[item.fn]) == "function" then
 				try("hotstrings", "keymap." .. item.fn, keymap[item.fn], item.val)
