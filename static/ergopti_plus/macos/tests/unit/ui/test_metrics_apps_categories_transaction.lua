@@ -10,8 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local CONFIG_DIR = "/virtual/ergopti"
-local TARGET_PATH = CONFIG_DIR .. "/data/app_categories.json"
+-- The driver folder of an installed app is inside its read-only bundle, and
+-- has no data folder: the categories belong to the configuration folder.
+local DRIVER_DIR = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos"
+local CONFIG_DIR = "/virtual/ergopti/"
+local TARGET_PATH = CONFIG_DIR .. "app_categories.json"
 local INITIAL_JSON = '{"Example":{"score":0,"type":"Old"}}'
 
 --- Runs a callback with category-file adapter calls virtualized and observed.
@@ -99,9 +102,11 @@ local function with_category_store(spec, callback)
 		alert = noop,
 	}
 	local previous_modules = {}
-	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keylogger.log_manager" }) do
+	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keylogger.log_manager",
+			"infra.config_paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
+	package.loaded["infra.config_paths"] = { get_config_dir = function() return CONFIG_DIR end }
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function() return { timer = {} }, true end,
@@ -135,7 +140,7 @@ local function with_category_store(spec, callback)
 		end,
 	}
 	local metrics = helpers.load_with_stubs("ui.metrics_apps", {
-		configdir = CONFIG_DIR,
+		configdir = DRIVER_DIR,
 		chooser = chooser,
 		application = { find = function() return nil end },
 		image = {},
@@ -200,6 +205,19 @@ helpers.describe("metrics_apps categories: unsafe input is never treated as empt
 			end)
 		end)
 	end
+
+	helpers.it("(app-categories-outside-bundle) the dashboard reads and writes the configuration folder", function()
+		-- dev.152 read hs.configdir .. "/data/app_categories.json": inside an
+		-- installed app that folder is missing, every read was an error, and
+		-- « Temps sur les applications » refused to render anything.
+		with_category_store({ initial_status = "absent" }, function(metrics, state, callbacks, logs)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_true(state.read_calls >= 1, "the editor read the category file")
+			helpers.assert_eq(#callbacks, 1, "a first run with no category file opens the editor")
+			helpers.assert_eq(state.writes, 1, "the first category is written beside config.toml")
+			helpers.assert_eq(#logs, 0, "a missing category file is no error")
+		end)
+	end)
 
 	helpers.it("a proven absence can create the first category file", function()
 		with_category_store({ initial_status = "absent" }, function(metrics, state, callbacks, _logs)
