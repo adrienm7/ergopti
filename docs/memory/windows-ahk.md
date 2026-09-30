@@ -304,6 +304,18 @@ the Linux digit-row codes. The Ctrl+1..9 profile hotkeys still follow the
 character. Action: keep the navigation plan layout-independent; a French
 fixture must yield the same digit identities as a US one.
 
+### project-ahk-unassigned-slot-leaves-the-key
+
+A hotkey that runs a configurable slot must be ineligible in its `#HotIf`
+while the slot holds no action. The script chords took AltGr+Enter anyway and
+retyped a bare `{Enter}`, which drops the AltGr the user holds. In a
+configuration without an assignment the chord did neither the action nor the
+system's AltGr+Enter, and looked dead. Keyboard slots skip registration on
+"none", tap keys gate on `TapKeyShouldFire`, and the script chords on
+`ScriptShortcutSlotRunsAction` through `ScriptAltGrChordPlan`. Action: gate every
+new slot-driven hotkey on its assignment in its criterion, never in its
+callback (`test_script_chords_follow_their_slot.ahk`).
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a

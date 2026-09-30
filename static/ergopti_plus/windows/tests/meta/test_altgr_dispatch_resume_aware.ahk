@@ -92,8 +92,12 @@ Test("script_altgr: chord debounce check runs before the action call (altgr-disp
 
 
 _ADRA_SuspendedHotIfBlockRegistered() {
-	Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-	Assert(Body != "", "_RegisterScriptAltGrHotkeys must be defined in infra/script_altgr_hotkeys.ahk")
+	; The registrar registers the plan's rows; the paused twin's criterion is
+	; the plan's ScriptAltGrPausedChordRunsSlot (script-chord-slot-2026-09-30).
+	Assert(InStr(_DriverFuncBody("ScriptAltGrChordPlan"), "ScriptAltGrPausedChordRunsSlot.Bind(Slot)") > 0,
+		"the plan must register the paused twin of every script chord")
+	Body := _DriverFuncBody("ScriptAltGrPausedChordRunsSlot")
+	Assert(Body != "", "ScriptAltGrPausedChordRunsSlot must be defined")
 
 	; Must register HotIf context that is active when suspended AND SC138 is held
 	Assert(InStr(Body, "A_IsSuspended") > 0 and InStr(Body, "GetKeyState") > 0,
