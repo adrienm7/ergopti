@@ -196,9 +196,9 @@ _MKS_CapturePollCase() {
 	Assert(InStr(Body, 'GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))') > 0,
 		"closing the dialog stops the suppressive hook")
 	Assert(InStr(Body, '"magic_key_capture_timeout_ms"') > 0, "the capture ends on the shared timeout")
-	Assert(InStr(Body, 'SetTimer(Poll, TimingsGet("ui", "magic_key_capture_poll_ms"))') > 0,
+	Assert(InStr(Body, 'SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))') > 0,
 		"the poll runs on the shared interval while the capture waits")
-	Assert(InStr(Body, "SetTimer(Poll, 0)") > 0, "and stops with it")
+	Assert(InStr(Body, "SetTimer(MagicKeyCapturePoll, 0)") > 0, "and stops with it")
 	Assert(InStr(Body, "ModifyMagicKeySource(LayoutRegistry_KeyCode(State.Scan,") > 0,
 		"a captured candidate is persisted")
 }

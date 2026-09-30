@@ -88,7 +88,8 @@ _FTI_Inventory() {
 		"WPMWidget_Tick",               "200",   ; only armed while the WPM widget is visible; timings [ui] wpm_widget_update_ms, the macOS rate
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
-		"SimulateActivity",             "?")     ; randomised interval, awake mode only
+		"SimulateActivity",             "?",     ; randomised interval, awake mode only
+		"MagicKeyCapturePoll",          "?")     ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
 }
 
 

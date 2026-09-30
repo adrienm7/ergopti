@@ -259,7 +259,7 @@ MagicKeySourceCapture(*) {
 		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
 		IH.KeyOpt("{All}", "NS")
 		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
-		Poll := _MagicKeySourceCapturePoll.Bind(State, IH)
+		MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
 		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
 		try {
@@ -275,10 +275,10 @@ MagicKeySourceCapture(*) {
 				} finally {
 						Critical("Off")
 				}
-				SetTimer(Poll, TimingsGet("ui", "magic_key_capture_poll_ms"))
+				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
 				IH.Wait()
 		} finally {
-				SetTimer(Poll, 0)
+				SetTimer(MagicKeyCapturePoll, 0)
 				_MagicKeyEditorStopOwned(IH)
 				if (_MagicKeyEditorGui == GuiToShow)
 						_MagicKeyEditorGui := ""
