@@ -91,9 +91,9 @@ records. Linux reads and writes them through
 save writes only what differs from the catalogue at the last sync, so hand
 edits and outdated entries survive, and the Hotstrings scope resets only the
 shipped delimiters' states, keeping the user's own. Windows keeps its
-delimiter string in the override file. The shared writer cannot address an
-`[[array-of-tables]]` element: such a list is read, but only an inline list
-can be saved.
+delimiter string in the override file. The shared writer cannot address one
+`[[array-of-tables]]` element; it replaces the whole list by an inline one
+(macOS full saves), and Linux still refuses to save over such a list.
 
 ### project-hotstrings-self-healing-cache
 
@@ -160,6 +160,23 @@ file kept; a record the app writes back (installed.json, api_keys.json)
 carries such an entry over unchanged, never deleting it. A file its owner
 refuses as a whole must still not stop a driver's startup: the installed
 layouts' packs are skipped with an ERROR on all three drivers.
+
+### project-batch-writer-addresses-every-spelling
+
+A macOS menu save sends the whole preference state as one sparse batch, so a
+key the shared writer cannot address fails every menu action, not one feature.
+Older macOS builds wrote config.toml whole through `codec.encode`, which gives
+every empty map its own header (`[hotstrings.delays]`,
+`[llm.models.user_models]`), and today's saves still write structured values
+(`[metrics.shortcut]`) as headers. `toml_codec/writer.prepare_batch` therefore
+replaces a header-held key as one value (header lines and assignments go,
+comments stay), leaves a value already held in any spelling untouched, and
+matches quoted keys; only a changed key inside an inline table or a root
+entry is refused, naming its path. Action: a new writer shape must stay
+addressable by the batch, and a whole-table reset in `Preferences.save` must
+keep the load-outdated entries below it (`reset_keeping_outdated`). The Lua
+codec reads a dotted key (`a.b = 1`) as one literal key, so such a hand edit
+is ignored, not refused.
 
 ### project-toml-cache-returns-real-booleans
 

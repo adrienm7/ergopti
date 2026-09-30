@@ -1325,6 +1325,44 @@ function M.snapshot(state, hotfiles, core_mods)
 	return clone_value(existing)
 end
 
+--- The deletes that reset one whole preference table while keeping the entries
+--- load() judged outdated below it (see _load_outdated). A table the state
+--- holds empty is saved as one delete or `{}`, which replaces the table and
+--- every entry on disk, whether inline or behind its own [header], erasing the
+--- outdated ones before the cleanup could offer them.
+--- @param row table Sparse row of one preference path.
+--- @param outdated table Set of outdated dotted paths.
+--- @param document table|nil Decoded source.
+--- @return table|nil rows Deletes of the entries the state owns, or nil when
+---   the row is not such a reset or no outdated entry lies below it.
+local function reset_keeping_outdated(row, outdated, document)
+	if not row.delete and not (type(row.value) == "table" and next(row.value) == nil) then return nil end
+	local function below(prefix)
+		for candidate in pairs(outdated) do
+			if candidate:sub(1, #prefix + 1) == prefix .. "." then return true end
+		end
+		return false
+	end
+	local path = row.section .. "." .. row.key
+	if not below(path) then return nil end
+	local node = document
+	for segment in path:gmatch("[^.]+") do
+		if type(node) ~= "table" then return nil end
+		node = node[segment]
+	end
+	-- A list has no id = value entries to keep one by one.
+	if type(node) ~= "table" or #node > 0 then return nil end
+	local rows = {}
+	for key in pairs(node) do
+		local child = path .. "." .. tostring(key)
+		if not outdated[child] and not below(child) then
+			rows[#rows + 1] = { section = path, key = key, delete = true }
+		end
+	end
+	table.sort(rows, function(left, right) return left.key < right.key end)
+	return rows
+end
+
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
 --- file on disk. The sections Preferences owns come from the state; every
@@ -1376,10 +1414,14 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
 	local ok, updates = pcall(function()
+		local document = expected_source.status == "ok" and TomlCodec.decode(expected_source.content) or nil
 		local leaves = {}
 		for _, row in ipairs(sparse_updates(existing)) do
 			local path = row.section .. "." .. row.key
-			if not (row.delete and outdated[path]) then
+			local reset = reset_keeping_outdated(row, outdated, document)
+			if reset then
+				for _, child in ipairs(reset) do leaves[#leaves + 1] = child end
+			elseif not (row.delete and outdated[path]) then
 				leaves[#leaves + 1] = row
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
