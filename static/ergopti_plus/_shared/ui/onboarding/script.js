@@ -299,20 +299,30 @@ function _magicValue(page) {
 }
 
 /**
- * The value a page's sub-switch takes from its answer, or null when the answer
- * leaves it alone: off for a No, as the category switch once turned those items
- * off, on for a Yes that imports one of its items, untouched by a Yes that
- * imports none of them.
+ * The value a page's sub-switch takes from the answers, or null when they leave
+ * it alone. It follows only what the answers change against the values in
+ * force: off when the answer turns a category switch in force from Yes to No,
+ * as that switch once turned those items off, and on when the answer imports
+ * one of its items that was not on. A page the user left alone, a first No
+ * over nothing in force and a Yes that imports nothing new write nothing, so a
+ * choice made in the tray is never overwritten.
  * @param {object} page
  * @param {object} state Page state.
  * @returns {boolean|null}
  */
 function _subSwitchValue(page, state) {
-	if (!state.answer) return false;
-	var imported = page.sub_switch.items.some(function (itemPath) {
-		return state.checked[itemPath] === true;
+	if (!state.answer) return _currentValue(page.master) === true ? false : null;
+	var governed = {};
+	page.sub_switch.items.forEach(function (itemPath) {
+		governed[itemPath] = true;
 	});
-	return imported ? true : null;
+	var newlyImported = false;
+	_eachItem(page.groups, function (item) {
+		if (governed[item.path] && state.checked[item.path] === true && !_currentlyOn(item)) {
+			newlyImported = true;
+		}
+	});
+	return newlyImported ? true : null;
 }
 
 /**

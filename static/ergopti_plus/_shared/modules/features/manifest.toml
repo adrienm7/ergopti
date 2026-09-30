@@ -5871,8 +5871,9 @@ restore_exclude = []
 #   sub_switch   Per-platform switch of part of the checklist that the category
 #                switch does not reach: `path` names it and `menu_group` the
 #                menu group whose `feature` rows are the sections it governs.
-#                The answer writes it too: No turns it off, Yes turns it on
-#                once one of those items is imported.
+#                The answer writes it only where it changes what is in force:
+#                off when it turns the category switch from Yes to No, on when
+#                it imports one of those items that was off.
 # The wizard persists only manifest paths, except the tap-hold keys: no driver
 # keeps those in config.toml, so each host imports a checked key's shipped
 # recommendation through its own tap-hold writer. A checklist's pre-selection is

@@ -223,7 +223,8 @@ These are software implementations; final hardware verification remains below.
     hs.alert banner. Integrated.
 29. [~] force_quit_frontmost asks for confirmation; key combinations governed only
     by their own switch on every OS. Integrated. The Windows wizard's Shortcuts
-    answer also writes that switch (No off, Yes on once a family is imported);
+    answer also writes that switch where it changes what is in force (off when
+    it turns Shortcuts from Yes to No, on when it newly imports a family);
     macOS lists no combination there and Linux has none. Statically checked
     on Windows until its CI run.
 30. [ ] Physical magic-key setting on all three OSes (after the demo).

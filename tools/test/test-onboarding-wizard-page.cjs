@@ -478,12 +478,13 @@ function cataloguePaths(driver) {
 		assert.ok(asked >= 5, `${driver}: most pages ask their question`);
 		const done = page.messages.find((m) => m.action === 'finish');
 		assert.ok(done, `${driver}: the last page finishes`);
-		const switches = CATALOGUE.platforms[driver].pages.flatMap((p) =>
-			[p.master, p.sub_switch].filter(Boolean).map((entry) => entry.path)
-		);
+		// A sub-switch stays unwritten: a first No turns nothing in force off.
+		const masters = CATALOGUE.platforms[driver].pages
+			.filter((p) => p.master)
+			.map((p) => p.master.path);
 		assert.deepEqual(
 			done.answers.operations,
-			switches.map((switchPath) => ({ path: switchPath, value: false })),
+			masters.map((master) => ({ path: master, value: false })),
 			`${driver}: declining everything writes each category switch off and nothing else`
 		);
 	}
@@ -596,21 +597,59 @@ function cataloguePaths(driver) {
 	}
 	const combinations = (operations) =>
 		operations.filter((op) => op.path === 'category_enabled.key_combinations');
+	const familiesOn = Object.fromEntries(items.map((item) => [item.path, item.value]));
+	/**
+	 * Opens the Shortcuts page over the given values in force.
+	 * @param {object} current
+	 * @returns {object} Page handle.
+	 */
+	const shortcutsOver = (current) => {
+		const page = openWizard({ platform: 'windows', current });
+		page.platform = 'windows';
+		goToPage(page, 'shortcuts');
+		return page;
+	};
 
-	const declined = openWizard({ platform: 'windows' });
-	declined.platform = 'windows';
-	goToPage(declined, 'shortcuts');
-	answer(declined, true);
-	answer(declined, false);
+	const firstNo = shortcutsOver({});
+	answer(firstNo, true);
+	answer(firstNo, false);
 	assert.deepEqual(
-		combinations(finish(declined).answers.operations),
-		[{ path: 'category_enabled.key_combinations', value: false }],
-		'a No turns the key combinations off'
+		combinations(finish(firstNo).answers.operations),
+		[],
+		'a first No over nothing in force leaves the switch absent, so a family enabled later works'
 	);
 
-	const accepted = openWizard({ platform: 'windows' });
-	accepted.platform = 'windows';
-	goToPage(accepted, 'shortcuts');
+	const rerunNo = shortcutsOver({ 'category_enabled.shortcuts': true, ...familiesOn });
+	answer(rerunNo, false);
+	assert.deepEqual(
+		combinations(finish(rerunNo).answers.operations),
+		[{ path: 'category_enabled.key_combinations', value: false }],
+		'a No that turns Shortcuts in force off turns the key combinations off, as the master once did'
+	);
+
+	// A: the master is off, the families on and the switch absent: untouched.
+	const keptOff = shortcutsOver(familiesOn);
+	assert.equal(keptOff.el('page-no').checked, true);
+	assert.deepEqual(
+		combinations(finish(keptOff).answers.operations),
+		[],
+		'a page left at the No in force never switches the combinations off'
+	);
+
+	// B: the master and the families are on, the switch off in the tray.
+	const keptChoice = shortcutsOver({
+		'category_enabled.shortcuts': true,
+		'category_enabled.key_combinations': false,
+		...familiesOn
+	});
+	assert.equal(keptChoice.el('page-yes').checked, true);
+	assert.deepEqual(
+		combinations(finish(keptChoice).answers.operations),
+		[],
+		'a Yes that imports no new family keeps the tray choice'
+	);
+
+	const accepted = shortcutsOver({});
 	answer(accepted, true);
 	assert.deepEqual(
 		combinations(finish(accepted).answers.operations),
@@ -618,12 +657,7 @@ function cataloguePaths(driver) {
 		'a Yes that imports a family turns them on'
 	);
 
-	const without = openWizard({
-		platform: 'windows',
-		current: { 'category_enabled.key_combinations': false }
-	});
-	without.platform = 'windows';
-	goToPage(without, 'shortcuts');
+	const without = shortcutsOver({ 'category_enabled.key_combinations': false });
 	answer(without, true);
 	const labels = new Set(items.map((item) => locale('en')[item.label[0].key]));
 	const familyRows = checkRows(without).filter((row) => labels.has(row.text));
