@@ -640,6 +640,29 @@ helpers.with_stub_scope(MODULES, function()
 			end)
 		end)
 
+		helpers.it("unused keys: an ordinary save keeps plain keyboard and tap_keys values for the cleanup (config-outdated-save-keeps)",
+			function()
+				-- Every Preferences.save deleted them in silence, since the Shortcuts
+				-- reset's container rows ran on every shortcut preparation.
+				local source = "[shortcuts]\nkeyboard = \"legacy\"\ntap_keys = [\"legacy\"]\n"
+				local changed = not require("infra.manifest_reader").default_for("shortcuts.enabled")
+				Sandbox.with_config(source, function(path)
+					helpers.assert_eq(select(2, Preferences.load(path)), "ok")
+					helpers.assert_eq(Preferences.save(path, { shortcuts = changed }, {}, {}), true)
+					local saved = TomlCodec.decode(Sandbox.read_bytes(path))
+					helpers.assert_eq(saved.shortcuts.enabled, changed, "the ordinary change is saved")
+					helpers.assert_eq(saved.shortcuts.keyboard, "legacy", "the outdated keyboard value is kept")
+					helpers.assert_eq(saved.shortcuts.tap_keys, { "legacy" }, "the outdated tap_keys value is kept")
+					local rows = Preferences.prepare_shortcut_updates({ status = "ok", content = source },
+						{ { section = "shortcuts.keyboard", key = "cmd_k", value = "copy" } }, { "keyboard" })
+					local deleted = {}
+					for _, row in ipairs(rows) do
+						if row.delete and row.section == "shortcuts" then deleted[#deleted + 1] = row.key end
+					end
+					helpers.assert_eq(deleted, { "keyboard" }, "a single-slot write replaces only its own container")
+				end)
+			end)
+
 		helpers.it("unused keys: the next preference save succeeds after a cleanup", function()
 			Sandbox.with_config(FIXTURE, function(path)
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")

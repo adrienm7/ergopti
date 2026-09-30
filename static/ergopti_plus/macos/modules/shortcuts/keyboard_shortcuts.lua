@@ -559,7 +559,8 @@ local function set_action(slot_id, action_id)
 	ensure_loaded()
 	local old_action = _actions[slot_id] or "none"
 	local _, source = read_config()
-	local rows = Preferences.prepare_shortcut_updates(source, { Manifest.sparse_operation(KEYBOARD_SECTION .. "." .. slot_id, action_id) })
+	local rows = Preferences.prepare_shortcut_updates(source,
+		{ Manifest.sparse_operation(KEYBOARD_SECTION .. "." .. slot_id, action_id) }, { "keyboard" })
 
 	local native_transition = nil
 	if _started and old_action == "none" and action_id ~= "none" then
