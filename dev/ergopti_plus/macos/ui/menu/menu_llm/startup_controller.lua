@@ -24,6 +24,7 @@ local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
+local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 
 local LOG = "startup_ctrl"
 
@@ -51,6 +52,8 @@ local LOG = "startup_ctrl"
 ---   activate_hotkey           function Enables a hs.hotkey object.
 ---   mlx_deps_checker          table    MLX deps checker module.
 ---   runtime_installed         function Stat-only presence of a backend's local runtime.
+---   offer_unreachable_ollama  function Posts the error that names the fixes of a
+---                                      silent Ollama (a notification, clicked for buttons).
 ---   deps                      table    Full deps table (for update_menu access after reload).
 ---   get_startup_silence       function Returns the current _startup_silence flag.
 ---   set_startup_silence       function Sets the _startup_silence flag.
@@ -67,6 +70,7 @@ function M.new(ctx)
 	local activate_hotkey            = ctx.activate_hotkey
 	local mlx_deps_checker           = ctx.mlx_deps_checker
 	local runtime_installed          = ctx.runtime_installed
+	local offer_unreachable_ollama   = ctx.offer_unreachable_ollama
 	local deps                       = ctx.deps
 	local get_startup_silence        = ctx.get_startup_silence
 	local set_startup_silence        = ctx.set_startup_silence
@@ -685,12 +689,23 @@ function M.new(ctx)
 
 		Logger.info(LOG, string.format("LLM enabled at startup, model: %s.", state.llm_model or "nil"))
 
-		local function disable_llm()
-			Logger.error(LOG, "Disabling LLM (requirements check failed).")
+		--- Turns the AI off for this failed startup check.
+		--- @param cause table|nil { backend, reason, offer } when the user is told
+		---   what is wrong and how to fix it: a warning, and `offer` (the
+		---   unreachable-backend error) once the AI is off. Nil for an unexplained
+		---   failure, which stays an error.
+		local function disable_llm(cause)
+			if type(cause) == "table" then
+				Logger.warn(LOG, "Disabling LLM: the %s backend %s.", tostring(cause.backend),
+					tostring(cause.reason))
+			else
+				Logger.error(LOG, "Disabling LLM (requirements check failed).")
+			end
 			state.llm_enabled = false
 			local preference_applied = false
 			local prefs_saved = false
 			local menu_updated = false
+			local offered = false
 			local function finalize_disable()
 				if _startup_paused == true then return false end
 				if not preference_applied then
@@ -712,6 +727,15 @@ function M.new(ctx)
 					if ok ~= true then return false end
 					menu_updated = true
 					if _startup_paused == true then return false end
+				end
+				if not offered and type(cause) == "table" and cause.offer == true then
+					-- Once, after the AI is off: the fix turns it back on
+					offered = true
+					if type(offer_unreachable_ollama) ~= "function" then
+						Logger.error(LOG, "The unreachable-backend error cannot be offered: no offer owner.")
+					else
+						Logger.callback(LOG, "Unreachable backend offer", offer_unreachable_ollama)
+					end
 				end
 				return true
 			end
@@ -762,17 +786,28 @@ function M.new(ctx)
 		-- at doAfter(0), so the first tick may return an empty table.
 		local function do_check_requirements()
 			if not runtime_current(my_pause_epoch) then return end
+			-- A remote provider or a local OpenAI-compatible server (oMLX, LM
+			-- Studio…) has no local runtime to install, start or poll: its own
+			-- requests report a failure. Checking it against Ollama turned a dead
+			-- Ollama into "requirements check failed" for an oMLX user.
+			if state.llm_backend == "api" then
+				if quiesce_startup_cycle("API backend requirements") ~= true then return false end
+				Logger.info(LOG, "API backend: no local runtime to check at startup.")
+				return true
+			end
 			-- A backend whose runtime is not installed cannot pass this check. The
-			-- boot bootstrap already posted the one notice that says so; the
 			-- Ollama daemon restart or the MLX import probe would only add a
-			-- "daemon failed" error that reads like a crash and a duplicate
-			-- notice. Turn the AI off quietly; the backend selection installs it.
+			-- "daemon failed" error that reads like a crash. Turn the AI off with a
+			-- warning: MLX's boot notice already says so and its selection installs
+			-- it; nothing answers at Ollama's address, whose error offers the fixes.
 			local presence_ok, runtime_present = Logger.callback(LOG,
 				"Startup AI runtime presence", runtime_installed, state.llm_backend)
 			if presence_ok ~= true or runtime_present ~= true then
-				Logger.warn(LOG, "The %s runtime is not installed; the AI stays off until that backend is selected.",
-					tostring(state.llm_backend))
-				return disable_llm()
+				return disable_llm({
+					backend = state.llm_backend,
+					reason = "runtime is not installed",
+					offer = state.llm_backend == "ollama",
+				})
 			end
 			local installed = models_mgr.get_installed_models()
 			if _startup_paused == true or not runtime_current(my_pause_epoch) then
@@ -798,6 +833,8 @@ function M.new(ctx)
 			local check_fn = function(model_name, on_ok, on_fail)
 				return models_mgr.check_requirements(model_name, on_ok, on_fail, {
 					silent_notifications = false,
+					-- A start that never answers ends in this controller's offer
+					reports_unreachable = true,
 					requirement_owner = requirement_owner,
 					is_current = function()
 						return my_startup_gen == _startup_check_generation
@@ -844,14 +881,21 @@ function M.new(ctx)
 					end
 				end
 				return true
-			end, function(...)
+			end, function(reason)
 				if my_startup_gen ~= _startup_check_generation
 					or not runtime_current(my_pause_epoch) then
 					Logger.debug(LOG,
 						"Startup primary failure terminal discarded after pause/supersession.")
 					return false
 				end
-				return disable_llm(...)
+				if reason == OllamaEndpoint.UNREACHABLE then
+					return disable_llm({
+						backend = state.llm_backend,
+						reason = "does not answer at " .. OllamaEndpoint.get_base_url(),
+						offer = true,
+					})
+				end
+				return disable_llm()
 			end)
 			if dispatch_result ~= true then
 				abort_startup_cycle("requirements dispatch")

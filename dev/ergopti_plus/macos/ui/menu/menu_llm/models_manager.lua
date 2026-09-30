@@ -755,6 +755,17 @@ function M.new(deps)
 	end
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
+		if llm_mod.get_backend() == "api" then
+			-- A remote provider or a local OpenAI-compatible server: nothing to
+			-- install or start here, and its own requests report a failure
+			-- (api_remote, local_servers). Routing it to Ollama's check turned a
+			-- dead Ollama into "requirements check failed" for an oMLX user.
+			Logger.debug(LOG, "API backend: no local runtime requirement for %s.", tostring(target_model))
+			if type(on_success) == "function" then
+				Logger.callback(LOG, "API backend requirement success", on_success)
+			end
+			return true
+		end
 		local backend = llm_mod.get_backend() == "mlx" and "mlx" or "ollama"
 		local manager = backend == "mlx" and mlx or ollama
 		return manager.check_requirements(target_model, on_success, on_cancel,

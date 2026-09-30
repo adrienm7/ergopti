@@ -323,13 +323,16 @@ helpers.describe("hotstrings scope: refusals", function()
 				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
 				local key = selected == "clear" and "common.clear_to_system" or "common.restore_recommended"
-				local changed = 0
+				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					-- The real hotstrings_menu declaration: the rows are the manifest's.
 					root.top_level = { { id = "hotstrings" } }
 					os.execute = function(command)
 						if command:find("command -v zenity", 1, true) then return 0 end
-						if command:find("zenity --question", 1, true) then return mode == "cancel" and 1 or 0 end
+						if command:find("zenity --question", 1, true) then
+							questions = questions + 1
+							return mode == "cancel" and 1 or 0
+						end
 						return execute(command)
 					end
 					local menu = require("ui.menu.menu_builder").build({ config = c.Config, paused = false,
@@ -347,6 +350,8 @@ helpers.describe("hotstrings scope: refusals", function()
 					action()
 					local expected = mode ~= "cancel"
 					helpers.assert_eq(changed, expected and 1 or 0)
+					-- Only the clear asks (restore-recommended-no-confirm).
+					helpers.assert_eq(questions, selected == "clear" and 1 or 0)
 					if expected then
 						helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
 						helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, mode == "clear" and 1.0 or 0.5)

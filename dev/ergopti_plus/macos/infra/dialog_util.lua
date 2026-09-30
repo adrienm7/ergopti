@@ -17,6 +17,9 @@
 --- 3. Safe Focus: hs.focus is wrapped in pcall so a transient focus failure
 ---    (rare but possible during app-switch races) never prevents the dialog
 ---    from opening.
+--- 4. More than two buttons: an error that offers several fixes needs more
+---    buttons than hs.dialog.blockAlert holds, so choose() asks through an
+---    AppleScript alert (three buttons) or, beyond that, a list.
 --- ==============================================================================
 
 local hs = hs
@@ -24,6 +27,7 @@ local hs = hs
 local Logger         = require("infra.logger")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local text_utils     = require("infra.text_utils")
 
 -- Absolute path: this process does not inherit the login shell's PATH.
 local OPEN_BIN = "/usr/bin/open"
@@ -163,6 +167,90 @@ end
 function M.text_prompt(...)
 	focus_hammerspoon()
 	return hs.dialog.textPrompt(...)
+end
+
+-- An AppleScript alert holds three buttons: the cancel one and two choices
+local MAX_ALERT_CHOICES = 2
+
+--- Quotes a list of labels as an AppleScript list literal, ready to sit in a
+--- string.format pattern: a "%" in a label (a model name) is doubled.
+--- @param labels table Array of strings.
+--- @return string
+local function applescript_list(labels)
+	local quoted = {}
+	for index, label in ipairs(labels) do
+		quoted[index] = '"' .. text_utils.applescript_escape(label) .. '"'
+	end
+	return (("{" .. table.concat(quoted, ", ") .. "}"):gsub("%%", "%%%%"))
+end
+
+--- Builds the AppleScript that asks for one of several choices. Up to two are
+--- buttons of one alert, the first the default at the right; more are a list,
+--- because an alert holds three buttons at most. Both return the chosen label,
+--- or "" when the user cancels.
+--- @param title string Window title.
+--- @param message string Text above the choices.
+--- @param choices table Labels, the preferred first.
+--- @param cancel_label string Label of the cancel button.
+--- @param ok_label string Label of the list's confirm button.
+--- @return string script
+function M.choose_script(title, message, choices, cancel_label, ok_label)
+	if #choices <= MAX_ALERT_CHOICES then
+		-- AppleScript lays the buttons out from left to right
+		local buttons = { cancel_label }
+		for index = #choices, 1, -1 do buttons[#buttons + 1] = choices[index] end
+		return text_utils.applescript_format([[
+try
+	set answer to display dialog "%s" with title "%s" buttons ]] .. applescript_list(buttons)
+			.. [[ default button "%s" cancel button "%s" with icon caution
+	return button returned of answer
+on error number -128
+	return ""
+end try]], message, title, choices[1], cancel_label)
+	end
+	return text_utils.applescript_format([[
+set picked to choose from list ]] .. applescript_list(choices)
+		.. [[ with title "%s" with prompt "%s" default items {"%s"} OK button name "%s" cancel button name "%s"
+if picked is false then return ""
+return item 1 of picked]], title, message, choices[1], ok_label, cancel_label)
+end
+
+--- Focus-aware choice among several labelled fixes, with a cancel button.
+--- Modal like block_alert: opened from a menu or a notification click, never
+--- from the keyboard tap.
+--- @param title string Window title.
+--- @param message string Text above the choices.
+--- @param choices table Non-empty array of distinct labels, the preferred first.
+--- @param cancel_label string Label of the cancel button.
+--- @param ok_label string Label of the confirm button when the choices are a list.
+--- @return integer|nil index The chosen label's index, nil when cancelled.
+function M.choose(title, message, choices, cancel_label, ok_label)
+	if type(choices) ~= "table" or #choices == 0 then
+		error("dialog_util.choose: at least one choice is required", 2)
+	end
+	local seen = { [cancel_label] = true }
+	for _, label in ipairs(choices) do
+		if type(label) ~= "string" or label == "" or seen[label] then
+			error("dialog_util.choose: choices must be distinct non-empty labels", 2)
+		end
+		seen[label] = true
+	end
+	for _, value in ipairs({ title, message, cancel_label, ok_label }) do
+		if type(value) ~= "string" or value == "" then
+			error("dialog_util.choose: title, message and button labels are required", 2)
+		end
+	end
+	focus_hammerspoon()
+	local ok, answer, raw = hs.osascript.applescript(
+		M.choose_script(title, message, choices, cancel_label, ok_label))
+	if ok ~= true or type(answer) ~= "string" then
+		error("dialog_util.choose: the dialog failed: " .. tostring(raw), 2)
+	end
+	if answer == "" then return nil end
+	for index, label in ipairs(choices) do
+		if label == answer then return index end
+	end
+	error("dialog_util.choose: the dialog answered an unknown choice", 2)
 end
 
 --- The folder the application chooser opens on.

@@ -11,7 +11,8 @@
 --- FEATURES & RATIONALE:
 --- 1. One entry per backend: select_ollama() and select_mlx() are the only
 ---    callers of the checkers' install_for_selection(), so no boot, update or
----    other-backend path can reach a download.
+---    other-backend path can reach a download. install_ollama() is the install
+---    button of the unreachable-backend error, through select_ollama().
 --- 2. Clear decline: refusing the download opens the website and posts a
 ---    notification that says what stays in place (the AI off, or the current
 ---    backend during a switch) and how to install later.
@@ -92,7 +93,9 @@ end
 --- the download once. A decline changes nothing and says what stays in place.
 --- @param on_complete function|nil Receives the terminal result when accepted.
 --- @param opts table|nil { keeps_current_backend = true } when the user is
----   switching from another backend, which a decline leaves running.
+---   switching from another backend, which a decline leaves running;
+---   { install_consented = true } when the user already pressed an install
+---   button, which is not asked again.
 --- @return boolean accepted False when the user declined or the check refused.
 function M.select_ollama(on_complete, opts)
 	if ollama_deps().runtime_available() then
@@ -105,22 +108,35 @@ function M.select_ollama(on_complete, opts)
 		Logger.debug(LOG, "Ollama provisioning already running; joining it.")
 		return ollama_deps().check_and_install_deps(on_complete) == true
 	end
-	Logger.start(LOG, "Offering the Ollama download…")
-	if ask_ollama_download() ~= "download" then
-		-- Declining a switch leaves the previous backend running, so "the AI
-		-- stays off" would be false there; it is true when enabling the AI.
-		local keeps_backend = type(opts) == "table" and opts.keeps_current_backend == true
-		Logger.warn(LOG, keeps_backend
-			and "Ollama download declined; the current backend stays active."
-			or "Ollama download declined; the AI stays off with this backend.")
-		pcall(notifications().notify, i18n.get("ollama.runtime_missing_title"),
-			i18n.get(keeps_backend and "ollama.switch_declined_body" or "ollama.runtime_missing_body"),
-			"warning")
-		Logger.success(LOG, "Ollama download offer settled (declined).")
-		return false
+	if type(opts) == "table" and opts.install_consented == true then
+		Logger.info(LOG, "Ollama download already chosen by the user; not asking again.")
+	else
+		Logger.start(LOG, "Offering the Ollama download…")
+		if ask_ollama_download() ~= "download" then
+			-- Declining a switch leaves the previous backend running, so "the AI
+			-- stays off" would be false there; it is true when enabling the AI.
+			local keeps_backend = type(opts) == "table" and opts.keeps_current_backend == true
+			Logger.warn(LOG, keeps_backend
+				and "Ollama download declined; the current backend stays active."
+				or "Ollama download declined; the AI stays off with this backend.")
+			pcall(notifications().notify, i18n.get("ollama.runtime_missing_title"),
+				i18n.get(keeps_backend and "ollama.switch_declined_body" or "ollama.runtime_missing_body"),
+				"warning")
+			Logger.success(LOG, "Ollama download offer settled (declined).")
+			return false
+		end
+		Logger.success(LOG, "Ollama download offer settled (accepted).")
 	end
-	Logger.success(LOG, "Ollama download offer settled (accepted).")
 	return ollama_deps().install_for_selection(on_complete) == true
+end
+
+--- Installs Ollama without asking again: the user pressed the install button
+--- of the error that says Ollama does not answer (unreachable_backend_offer).
+--- An installed Ollama is reused, as by select_ollama().
+--- @param on_complete function|nil Receives the terminal result.
+--- @return boolean accepted
+function M.install_ollama(on_complete)
+	return M.select_ollama(on_complete, { install_consented = true })
 end
 
 --- Selects the MLX backend's runtime: reuses it, or provisions it once.

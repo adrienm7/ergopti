@@ -5,7 +5,9 @@
 --- DESCRIPTION:
 --- Resolves the one loopback Ollama endpoint shared by HTTP clients, readiness
 --- probes and daemon launchers. A persisted user override wins; otherwise the
---- already-loaded shared LLM defaults remain authoritative.
+--- already-loaded shared LLM defaults remain authoritative. Also names the
+--- requirement failure "nothing answers at this endpoint", which the models
+--- manager reports and the AI menu turns into the error that offers its fixes.
 --- ==============================================================================
 
 local M = {}
@@ -18,6 +20,10 @@ local HOST = "127.0.0.1"
 local PORT_SETTING_KEY = "llm.ollama_port"
 local PORT_MIN, PORT_MAX = 1024, 65535
 local EMERGENCY_PORT = 11434
+
+-- Cancel reason of a requirement check whose Ollama never answered at the
+-- endpoint: not installed, not started, or started and still silent
+M.UNREACHABLE = "ollama_unreachable"
 
 --- Reads a valid persisted user override.
 --- @return integer|nil port

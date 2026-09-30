@@ -73,8 +73,8 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 
 -- Transaction test harness
 
--- The two scope rows ask first and name a backup under the remap file; both
--- boundaries are doubles for the whole module, restored at its end.
+-- The clear row asks first and both scope rows name a backup under the remap
+-- file; both boundaries are doubles for the whole module, restored at its end.
 local SAVED_DIALOGS = package.loaded["infra.dialog_util"]
 local SAVED_PATHS = package.loaded["infra.config_paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
@@ -393,17 +393,20 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		end
 	end)
 
-	helpers.it("W1 asks before either scope row and a declined question sends nothing", function()
+	-- The restore row asked as well until restore-recommended-no-confirm.
+	helpers.it("W1 asks before the clear row only and a declined question sends nothing", function()
 		for _, case in ipairs({ COMMAND_CASES[1], COMMAND_CASES[2] }) do
 			local built, observations = build_menu("pending")
 			local asked = CONFIRMATION.asked
+			local asks = case.request.mode == "clear"
 			CONFIRMATION.answer = "no"
 			local ok, result = pcall(row_action(find_item(built, case.label)))
 			CONFIRMATION.answer = "yes"
 			helpers.assert_true(ok, tostring(result))
-			helpers.assert_eq(result, false)
-			helpers.assert_eq(CONFIRMATION.asked, asked + 1)
-			helpers.assert_eq(observations.calls.apply_scope, 0, case.id .. " must not run after No")
+			helpers.assert_eq(result, not asks)
+			helpers.assert_eq(CONFIRMATION.asked, asked + (asks and 1 or 0))
+			helpers.assert_eq(observations.calls.apply_scope, asks and 0 or 1,
+				case.id .. (asks and " must not run after No" or " runs without a question"))
 			helpers.assert_true(row_action(find_item(built, case.label))())
 			local first = observations.arguments.apply_scope.backup_path
 			helpers.assert_true(row_action(find_item(built, case.label))())
