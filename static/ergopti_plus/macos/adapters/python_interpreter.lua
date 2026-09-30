@@ -103,6 +103,10 @@ local DEFAULT_DEPS = {
 }
 local _deps = DEFAULT_DEPS
 
+-- The processor this process runs as never changes while it runs; asked once
+-- (its fallback is a subprocess), false when it could not be named.
+local _native_arch = nil
+
 
 
 
@@ -170,10 +174,17 @@ end
 --- The processor a native child of this process runs as.
 --- @return string|nil arch "arm64" or "x86_64", nil when unknown.
 function M.native_arch()
-	local arch = _deps.process_arch()
-	if arch == "arm64" or arch == "arm64e" then return "arm64" end
-	if arch == "x86_64" or arch == "x86_64h" then return "x86_64" end
-	return nil
+	if _native_arch == nil then
+		local arch = _deps.process_arch()
+		if arch == "arm64" or arch == "arm64e" then
+			_native_arch = "arm64"
+		elseif arch == "x86_64" or arch == "x86_64h" then
+			_native_arch = "x86_64"
+		else
+			_native_arch = false
+		end
+	end
+	return _native_arch or nil
 end
 
 
@@ -329,6 +340,7 @@ end
 --- Replaces native edges for tests; nil restores the defaults.
 --- @param overrides table|nil { read_head, realpath, getenv, select_link_target, process_arch }
 function M._set_deps(overrides)
+	_native_arch = nil
 	if overrides == nil then
 		_deps = DEFAULT_DEPS
 		return
