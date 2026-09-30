@@ -611,8 +611,12 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "list",
-			"id": "script_control_shortcuts",
+			"type": "group",
+			"id": "script_control",
+			"i18n": "menu.shortcuts.script_shortcuts",
+			"checked_when": [
+				"script_control_enabled"
+			],
 			"platforms": [
 				"ahk"
 			],
@@ -729,6 +733,53 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.chord_families_are_each_platforms"
+		}
+	],
+	"script_control_group": [
+		{
+			"type": "toggle",
+			"id": "script_control_toggle",
+			"i18n": "menu.shortcuts.script_shortcuts_enable",
+			"checked_when": [
+				"script_control_enabled"
+			],
+			"category": "ScriptControl",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "command",
+			"id": "restore_recommended",
+			"i18n": "common.restore_recommended",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "command",
+			"id": "clear_to_system",
+			"i18n": "common.clear_to_system",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk"
+			]
+		},
+		{
+			"type": "list",
+			"id": "script_control_shortcuts",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		}
 	],
 	"metrics_menu": [

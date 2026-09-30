@@ -38,13 +38,19 @@ _SCFS_Assignments(Value) {
 	return Assignments
 }
 
-; Runs Body with ScriptShortcutAssignments replaced, restoring it after.
-_SCFS_WithAssignments(Assignments, Body) {
-	global ScriptShortcutAssignments
+; Runs Body with ScriptShortcutAssignments and the submenu's switch replaced,
+; restoring both after.
+_SCFS_WithAssignments(Assignments, Body, ChordsOn := true) {
+	global ScriptShortcutAssignments, ScriptShortcutChordsOn
 	Saved := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
+	SavedOn := IsSet(ScriptShortcutChordsOn) ? ScriptShortcutChordsOn : unset
 	ScriptShortcutAssignments := Assignments
+	ScriptShortcutChordsOn := ChordsOn
 	try Body.Call()
-	finally ScriptShortcutAssignments := IsSet(Saved) ? Saved : unset
+	finally {
+		ScriptShortcutAssignments := IsSet(Saved) ? Saved : unset
+		ScriptShortcutChordsOn := IsSet(SavedOn) ? SavedOn : unset
+	}
 }
 
 _SCFS_PlanHasThreeHotkeysPerSlot() {
@@ -57,7 +63,8 @@ _SCFS_PlanHasThreeHotkeysPerSlot() {
 		Sc := _SCFS_ScanCodes()[Slot]
 		AssertEqual(Slot, Row["slot"], "the plan runs its slots in order")
 		AssertEqual(Sc, Row["scan_code"], Slot . " names its own key")
-		Expected := ["SC138 & " . Sc, "$" . Sc, "$*" . Sc][Mod(Index - 1, 3) + 1]
+		Names := ["SC138 & " . Sc, "$" . Sc, "$*" . Sc]
+		Expected := Names[Mod(Index - 1, 3) + 1]
 		AssertEqual(Expected, Row["hotkey"], Slot . " registers the scan-code hotkey " . Expected)
 		Assert(Row["criterion"] is BoundFunc, Slot . ": each hotkey's criterion is bound to its slot")
 	}
@@ -107,6 +114,14 @@ _SCFS_GateMixed() {
 Test("script chords: a slot runs its chord only with an action, while paused only script management (script-chord-slot-2026-09-30)",
 	_SCFS_GateFollowsTheSlot)
 
+; The switch at the head of « Raccourcis de gestion du script »: off leaves every
+; chord to the system, running or paused, while the slots keep their actions.
+_SCFS_SwitchOffLeavesEveryChord() {
+	_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_GateNone, false)
+}
+Test("script chords: the submenu switch off leaves every chord to the system (script-chords-switch-2026-09-30)",
+	_SCFS_SwitchOffLeavesEveryChord)
+
 ; The real criteria of the plan, on a Kana-style layout, where an AltGr press
 ; needs no physical RAlt: the combination is the driver's only while its slot
 ; holds an action. The Kana and paused twins read the physical SC138, which is
@@ -118,6 +133,7 @@ _SCFS_CriteriaAskTheSlot() {
 		TapHold := Map("keys", Map(), "layers", Map())
 		_SCFS_WithAssignments(_SCFS_Assignments("none"), _SCFS_CriteriaExpect.Bind(false))
 		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(true))
+		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(false), false)
 	} finally {
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)

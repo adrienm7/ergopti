@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "המקש השני מימין ל־0",
 	"menu.shortcuts.tap_keys.unassigned": "התנהגות רגילה",
 	"menu.shortcuts.script_shortcuts": "קיצורי ניהול סקריפט",
+	"menu.shortcuts.script_shortcuts_enable": "הפעל קיצורי ניהול סקריפט",
 	"menu.shortcuts.submenu_cmd": "קיצורי Cmd",
 	"menu.shortcuts.submenu_ctrl": "קיצורי Ctrl",
 	"menu.shortcuts.title": "🎯 קיצורים",

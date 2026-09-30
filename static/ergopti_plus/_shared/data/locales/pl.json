@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Drugi klawisz na prawo od 0",
 	"menu.shortcuts.tap_keys.unassigned": "zwykłe działanie",
 	"menu.shortcuts.script_shortcuts": "Skróty zarządzania skryptem",
+	"menu.shortcuts.script_shortcuts_enable": "Włącz skróty zarządzania skryptem",
 	"menu.shortcuts.submenu_cmd": "Skróty Cmd",
 	"menu.shortcuts.submenu_ctrl": "Skróty Ctrl",
 	"menu.shortcuts.title": "🎯 Skróty",

@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Друга клавіша праворуч від 0",
 	"menu.shortcuts.tap_keys.unassigned": "звичайна поведінка",
 	"menu.shortcuts.script_shortcuts": "Скорочення для керування скриптом",
+	"menu.shortcuts.script_shortcuts_enable": "Увімкнути скорочення для керування скриптом",
 	"menu.shortcuts.submenu_cmd": "Скорочення Cmd",
 	"menu.shortcuts.submenu_ctrl": "Скорочення Ctrl",
 	"menu.shortcuts.title": "🎯 Скорочення",

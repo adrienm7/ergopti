@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Tweede toets rechts van 0",
 	"menu.shortcuts.tap_keys.unassigned": "normaal gedrag",
 	"menu.shortcuts.script_shortcuts": "Scriptbeheer-sneltoetsen",
+	"menu.shortcuts.script_shortcuts_enable": "Scriptbeheer-sneltoetsen inschakelen",
 	"menu.shortcuts.submenu_cmd": "Cmd-sneltoetsen",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-sneltoetsen",
 	"menu.shortcuts.title": "🎯 Sneltoetsen",

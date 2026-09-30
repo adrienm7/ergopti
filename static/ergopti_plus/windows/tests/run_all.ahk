@@ -434,6 +434,7 @@ InstallSendNoOps()
 #Include unit/test_config_scope_menus.ahk
 #Include unit/test_config_scope_shortcuts.ahk
 #Include unit/test_shortcuts_restore_row.ahk
+#Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
 #Include unit/test_global_config_scope.ahk

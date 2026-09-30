@@ -88,6 +88,8 @@ const OPENS_SUBMENU = {
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	key_combinations: 'key_combinations_group',
+	// « Raccourcis de gestion du script », the Windows AltGr script chords.
+	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
 	// The language selector. Its rows inherit `top_level/language`'s visibility,

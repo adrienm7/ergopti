@@ -19,7 +19,10 @@
  *    any action outside the script-management allowlist.
  * 4. RunScriptShortcutAction runs only what that gate admits, and never gives a
  *    chord's key back without logging why.
- * 5. The AHK regression test is registered in run_all.ahk.
+ * 5. « Raccourcis de gestion du script » opens with its switch, the restore and
+ *    the clear, its title is ticked from the switch, and the switch off leaves
+ *    every chord to the system (script-chords-switch-2026-09-30).
+ * 6. The AHK regression tests are registered in run_all.ahk.
  *
  * ROOT CAUSE ENCODED:
  * The chords were registered under criteria that only checked the AltGr press
@@ -247,15 +250,77 @@ check(
 
 // ==================================================
 // ==================================================
-// ======= 4/ The AHK regression test runs ==========
+// ======= 4/ The submenu and its switch ============
+// ==================================================
+// ==================================================
+
+// The maintainer's first group (2026-09-30): the switch, the restore, the clear,
+// a separator, then the slots; the Shortcuts submenu ticks the group's title
+// from the same getter as the switch, so the tick can always be changed.
+const menu = JSON.parse(read(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json')));
+const group = (menu.script_control_group || []).map((row) => `${row.type}:${row.id || ''}`);
+check(
+	JSON.stringify(group) ===
+		JSON.stringify([
+			'toggle:script_control_toggle',
+			'command:restore_recommended',
+			'command:clear_to_system',
+			'---:',
+			'list:script_control_shortcuts'
+		]),
+	`script_control_group must be switch, restore, clear, separator, slots; found [${group}]`
+);
+const parent = (menu.shortcuts_menu || []).find((row) => row.id === 'script_control');
+const toggle = (menu.script_control_group || [])[0] || {};
+check(
+	parent !== undefined &&
+		parent.type === 'group' &&
+		JSON.stringify(parent.checked_when) === JSON.stringify(toggle.checked_when) &&
+		Array.isArray(toggle.checked_when) &&
+		toggle.checked_when.length === 1,
+	'the Shortcuts submenu must tick the script-control title from the switch getter'
+);
+check(
+	!(menu.shortcuts_menu || []).some((row) => row.id === 'script_control_shortcuts'),
+	'the slots belong to script_control_group, not to a bare Shortcuts row without a switch'
+);
+const menuSource = functionBody('_SC_ScriptControlCommands');
+for (const id of ['script_control_toggle', 'restore_recommended', 'clear_to_system']) {
+	check(menuSource.includes(`"${id}",`), `_SC_ScriptControlCommands must register ${id}`);
+}
+check(
+	functionBody('_SC_Getters').includes(
+		'"script_control_enabled", () => ScriptShortcutChordsAreOn()'
+	) &&
+		functionBody('_SC_ScriptControlSubmenu').includes(
+			'"script_control_enabled", () => ScriptShortcutChordsAreOn()'
+		),
+	'the title and the switch must read the same switch state'
+);
+const gateOn = gate.indexOf('ScriptShortcutChordsAreOn()');
+check(
+	gateOn > 0 && gateOn < gate.indexOf('ScriptShortcutAssignments[Slot]'),
+	'ScriptShortcutSlotRunsAction must leave every chord to the system while the switch is off'
+);
+const scopeRows = functionBody('ScriptShortcutScopeRows');
+check(
+	/Mode == "clear" \? "none"/.test(scopeRows),
+	'the clear must write "none" explicitly: deleting the key would restore the preset'
+);
+
+// ==================================================
+// ==================================================
+// ======= 5/ The AHK regression tests run ==========
 // ==================================================
 // ==================================================
 
 const runAll = read(path.join(WIN, 'tests', 'run_all.ahk'));
-check(
-	/^#Include unit\/test_script_chords_follow_their_slot\.ahk$/m.test(runAll),
-	'run_all.ahk must include unit/test_script_chords_follow_their_slot.ahk'
-);
+for (const test of ['test_script_chords_follow_their_slot', 'test_script_control_submenu']) {
+	check(
+		new RegExp(`^#Include unit/${test}\\.ahk$`, 'm').test(runAll),
+		`run_all.ahk must include unit/${test}.ahk`
+	);
+}
 
 if (errors.length > 0) {
 	for (const e of errors) console.error(`  FAIL  ${e}`);

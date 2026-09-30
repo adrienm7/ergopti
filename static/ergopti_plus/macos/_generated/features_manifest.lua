@@ -1127,6 +1127,9 @@ M.unavailable = {
 		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "shortcuts.script_control.chords_enabled", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
+	},
+	{
 		path = "shortcuts.script_control.script_altgr_backspace", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
 	},
 	{

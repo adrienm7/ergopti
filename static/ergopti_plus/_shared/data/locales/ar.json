@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "المفتاح الثاني على يمين 0",
 	"menu.shortcuts.tap_keys.unassigned": "السلوك العادي",
 	"menu.shortcuts.script_shortcuts": "اختصارات إدارة النص البرمجي",
+	"menu.shortcuts.script_shortcuts_enable": "تفعيل اختصارات إدارة النص البرمجي",
 	"menu.shortcuts.submenu_cmd": "اختصارات Cmd",
 	"menu.shortcuts.submenu_ctrl": "اختصارات Ctrl",
 	"menu.shortcuts.title": "🎯 اختصارات",

@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Andre tast til høyre for 0",
 	"menu.shortcuts.tap_keys.unassigned": "vanlig oppførsel",
 	"menu.shortcuts.script_shortcuts": "Skriptbehandlingssnarveier",
+	"menu.shortcuts.script_shortcuts_enable": "Aktiver skriptbehandlingssnarveier",
 	"menu.shortcuts.submenu_cmd": "Cmd-snarveier",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-snarveier",
 	"menu.shortcuts.title": "🎯 Snarveier",

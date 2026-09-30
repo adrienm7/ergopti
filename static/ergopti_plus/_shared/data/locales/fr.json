@@ -1600,6 +1600,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "2e touche à droite du 0",
 	"menu.shortcuts.tap_keys.unassigned": "comportement normal",
 	"menu.shortcuts.script_shortcuts": "Raccourcis de gestion du script",
+	"menu.shortcuts.script_shortcuts_enable": "Activer les raccourcis de gestion du script",
 	"menu.shortcuts.submenu_cmd": "Raccourcis Cmd",
 	"menu.shortcuts.submenu_ctrl": "Raccourcis Ctrl",
 	"menu.shortcuts.title": "🎯 Raccourcis",

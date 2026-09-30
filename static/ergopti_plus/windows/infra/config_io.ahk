@@ -1498,6 +1498,12 @@ _ConfigResetRollbackRefusedReload(OwnerBundle) {
 
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
+		global ScriptShortcutChordsOn
+		; The switch of the chords: absent keeps the manifest default, anything but
+		; a TOML boolean stops the boot like a malformed category gate.
+		Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+		if (Raw != "_")
+				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
 				Value := IniCacheGet(_IniCache, "shortcuts.script_control", Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
@@ -1599,6 +1605,9 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_SUSPEND_ALLOWED
 		if !ScriptShortcutAssignments.Has(Slot)
 				throw ValueError("Unknown script shortcut slot.", -1, Slot)
+		; The submenu's switch: off leaves every chord native and keeps the actions.
+		if !ScriptShortcutChordsAreOn()
+				return false
 		Action := ScriptShortcutAssignments[Slot]
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return false
@@ -1630,7 +1639,67 @@ SetScriptShortcutAction(Slot, ActionName) {
 		return ReloadPreservingSuspend()
 }
 
-BuildScriptShortcutsMenu() {
+; Whether the script chords' switch is on ([shortcuts.script_control] chords_enabled).
+; @return {Boolean}
+ScriptShortcutChordsAreOn() {
+		global ScriptShortcutChordsOn
+		return ScriptShortcutChordsOn ? true : false
+}
+
+; Turns the script chords' switch on or off, then reloads so every chord's
+; criterion and the menu read it. The slots keep their actions either way.
+; @param On {Boolean} The new state.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @return {Boolean} False when the write was refused.
+SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
+		global ConfigurationFile
+		Row := ManifestSparseOperation("shortcuts.script_control.chords_enabled", On ? true : false)
+		if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, [Row], "the script chords switch")
+				return false
+		return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
+}
+
+; The rows that put « Raccourcis de gestion du script » back to its preset
+; ("recommended": every slot and the switch; an entry equal to its default is a
+; deletion) or clear it to the system's behaviour ("clear": every slot "none",
+; written explicitly because an absent slot starts with its preset). Both drop
+; the parameters of script bindings.
+; @param Mode {String} "recommended" or "clear".
+; @return {Array} Sparse configuration rows.
+ScriptShortcutScopeRows(Mode) {
+		global SCRIPT_SHORTCUT_SLOTS
+		if !(Mode == "recommended" or Mode == "clear")
+				throw ValueError("Unknown script shortcut scope mode.", -1, Mode)
+		Rows := []
+		for Slot in SCRIPT_SHORTCUT_SLOTS {
+				Path := "shortcuts.script_control." . Slot
+				Rows.Push(ManifestSparseOperation(Path, Mode == "clear" ? "none" : ManifestRecommendedFor(Path)))
+		}
+		if (Mode == "recommended")
+				Rows.Push(ManifestSparseOperation("shortcuts.script_control.chords_enabled",
+						ManifestRecommendedFor("shortcuts.script_control.chords_enabled")))
+		for Path in ConfigScopeActionParameterPaths() {
+				if (ConfigScopeActionParameterDomain(Path) == "script")
+						Rows.Push(ManifestConfigRow(Path, , true))
+		}
+		return Rows
+}
+
+; Restores or clears the script chords the way every scope row does: a backup,
+; one conditional write, then the reload that reads it (no question asked).
+; @param Mode {String} "recommended" or "clear".
+; @param Options {Map} Scope ports (path, reload...) for tests.
+; @return {Map} The scope receipt.
+ScriptShortcutsApplyScope(Mode, Options := unset) {
+		return ConfigScopeCommitOperations("shortcuts", Mode, ScriptShortcutScopeRows.Bind(Mode),
+				IsSet(Options) ? Options : Map())
+}
+
+; The four slot rows of « Raccourcis de gestion du script », each opening the
+; shared action picker.
+; @return {Array} Renderer rows.
+ScriptShortcutRows() {
 		global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, GESTURE_ACTIONS
 		Rows := []
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
@@ -1641,9 +1710,7 @@ BuildScriptShortcutsMenu() {
 					"label",  SlotLabel . " : " . CurrentLabel,
 					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
-		SMenu := Menu()
-		MenuRenderer_AppendRows(SMenu, "shortcuts_menu", "script_control", Rows)
-		return SMenu
+		return Rows
 }
 
 /**

@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "0’ın sağındaki ikinci tuş",
 	"menu.shortcuts.tap_keys.unassigned": "normal davranış",
 	"menu.shortcuts.script_shortcuts": "Betik yönetim kısayolları",
+	"menu.shortcuts.script_shortcuts_enable": "Betik yönetim kısayollarını etkinleştir",
 	"menu.shortcuts.submenu_cmd": "Cmd kısayolları",
 	"menu.shortcuts.submenu_ctrl": "Ctrl kısayolları",
 	"menu.shortcuts.title": "🎯 Kısayollar",

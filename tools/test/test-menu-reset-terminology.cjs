@@ -67,6 +67,7 @@ const EXPECTED_ROWS = {
 	layout_menu: [1, 0],
 	llm_menu: [1, 1],
 	metrics_menu: [1, 1],
+	script_control_group: [1, 1],
 	shortcuts_menu: [1, 0],
 	tap_holds_menu: [1, 1]
 };

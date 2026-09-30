@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Zweite Taste rechts von 0",
 	"menu.shortcuts.tap_keys.unassigned": "normales Verhalten",
 	"menu.shortcuts.script_shortcuts": "Skript-Verwaltungskürzel",
+	"menu.shortcuts.script_shortcuts_enable": "Skript-Verwaltungskürzel aktivieren",
 	"menu.shortcuts.submenu_cmd": "Cmd-Kürzel",
 	"menu.shortcuts.submenu_ctrl": "Strg-Kürzel",
 	"menu.shortcuts.title": "🎯 Tastenkürzel",
