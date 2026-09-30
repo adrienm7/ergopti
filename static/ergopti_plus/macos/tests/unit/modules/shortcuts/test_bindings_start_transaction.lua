@@ -48,7 +48,7 @@ local function load_subject()
 	package.loaded["modules.shortcuts.actions.system"] = {
 		stop_awake = function() counters.stop_awake = counters.stop_awake + 1; return true end,
 		bind_tap_keys = special_factory,
-		bind_layer_scroll = special_factory,
+		bind_layer_wheel = special_factory,
 		bind_wrap_text_if_selected = special_factory,
 		bind_cmd_star = special_factory,
 		toggle_awake = function() end,

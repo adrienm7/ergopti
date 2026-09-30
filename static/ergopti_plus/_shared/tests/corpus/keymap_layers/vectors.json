@@ -412,17 +412,16 @@
 			}
 		},
 		{
-			"id": "wheel_is_not_a_macos_source",
-			"description": "Karabiner-Elements, which carries the macOS layer, takes no wheel input: a wheel direction bound on macOS is dropped and the reason is named, while a mouse button still binds.",
+			"id": "wheel_is_a_macos_source",
+			"description": "Hammerspoon runs the macOS wheel bindings that Karabiner-Elements cannot take: a wheel direction binds on macOS like a mouse button, and the Linux entry is not macOS's.",
 			"os": "macos",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
-				"errors": [
-					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"
-				],
+				"errors": [],
 				"layers": {
 					"nav": {
-						"MouseMiddle": "keystroke:Escape@repeat"
+						"MouseMiddle": "keystroke:Escape@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
 					}
 				}
 			}
@@ -435,8 +434,8 @@
 			"expected": {
 				"errors": [
 					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux",
-					"unavailable_on_os|nav|linux|WheelDown|platform_reason.layer_wheel_source_is_windows_only",
-					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_windows_only"
+					"unavailable_on_os|nav|linux|WheelDown|platform_reason.layer_wheel_source_is_not_linux",
+					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_not_linux"
 				],
 				"layers": { "nav": {} }
 			}
@@ -554,7 +553,7 @@
 		},
 		{
 			"id": "recommended_layer_on_macos",
-			"description": "The same preset on macOS: macOS chords for the same actions, F1-F12 on the number row, Spotlight on Space, window cycling on Tab, and the right Command key as Escape on a tap and Option+Shift held (a macOS call handler).",
+			"description": "The same preset on macOS: macOS chords for the same actions, F1-F12 on the number row, Spotlight on Space, window cycling on Tab, the right Command key as Escape on a tap and Option+Shift held (a macOS call handler), and the wheel as volume, which Hammerspoon runs.",
 			"os": "macos",
 			"file": "layers.recommended.toml",
 			"expected": {
@@ -609,7 +608,9 @@
 						"Semicolon": "keystroke:alt+ArrowRight@repeat",
 						"Slash": "keystroke:meta+ArrowRight",
 						"Space": "keystroke:meta+Space",
-						"Tab": "keystroke:meta+Backquote"
+						"Tab": "keystroke:meta+Backquote",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
 					}
 				}
 			}

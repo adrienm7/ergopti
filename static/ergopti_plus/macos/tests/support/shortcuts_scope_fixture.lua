@@ -34,10 +34,15 @@ local function run_fixture(body, source)
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.keycodes"] = {
-		F18_WAKE_OS = 79, F19_VOLUME_SCROLL_MODIFIER = 80,
+		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
 		RETURN = 36, BACKSPACE = 51, ESCAPE = 53,
 		to_name = function(code) return "f" .. tostring(code) end,
+	}
+	-- A layers.toml that binds no wheel direction: the layer's wheel owner
+	-- stays unbound, as for a user who never saved one.
+	package.loaded["platform.remap.nav_layer"] = {
+		load = function() return { bindings = {}, registry = {}, wheel = { vertical = {}, horizontal = {} } } end,
 	}
 	local function handle(kind)
 		if controls.refuse_start == kind then return nil end
@@ -77,7 +82,7 @@ local function run_fixture(body, source)
 	facades.system.has_screenshot_pause_claim = function(parent) return claims[parent] == true end
 	facades.system.has_pending_screenshot_action = function() return false end
 	for _, edge in ipairs({ "pause", "stop", "resume" }) do facades.system[edge .. "_awake"] = function() return true end end
-	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_scroll", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
+	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
 		facades.system[name] = function() return handle("binding") end
 	end
 	for name, facade in pairs(facades) do

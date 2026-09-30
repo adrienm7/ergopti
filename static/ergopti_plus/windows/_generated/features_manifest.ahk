@@ -406,7 +406,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.script_control.return_key", "section", "shortcuts.script_control", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.script_control.backspace", "section", "shortcuts.script_control", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.script_control.escape", "section", "shortcuts.script_control", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "shortcuts.keys.layer_scroll", "section", "shortcuts.keys", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.wrap_text_if_selected", "section", "shortcuts.keys", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.ctrl_a", "section", "shortcuts.keys", "reason_key", "", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.ctrl_d", "section", "shortcuts.keys", "reason_key", "", "platforms", ["hs"]),

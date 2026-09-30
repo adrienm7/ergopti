@@ -27,7 +27,7 @@ helpers.describe("Keycodes: numeric constants", function()
 		"F13_KARABINER_RETURN", "F14_KARABINER_BACKSPACE",
 		"F15_KARABINER_ESCAPE", "F16_LLM_CHAIN_SIGNAL",
 		"F17_CYCLE_WINDOWS",    "F18_WAKE_OS",
-		"F19_VOLUME_SCROLL_MODIFIER", "F20_LAYER_NAV_ENTERED",
+		"F19_LAYER_NAV_EXITED", "F20_LAYER_NAV_ENTERED",
 		"BACKSPACE", "RETURN", "ESCAPE", "TAB", "ENTER",
 		"LEFT_ARROW", "RIGHT_ARROW", "UP_ARROW", "DOWN_ARROW",
 		"LAYER_SYN_1", "LAYER_SYN_2", "LAYER_SYN_3",
@@ -64,7 +64,7 @@ helpers.describe("Keycodes: uniqueness invariants", function()
 			Keycodes.F13_KARABINER_RETURN, Keycodes.F14_KARABINER_BACKSPACE,
 			Keycodes.F15_KARABINER_ESCAPE, Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,    Keycodes.F18_WAKE_OS,
-			Keycodes.F19_VOLUME_SCROLL_MODIFIER,
+			Keycodes.F19_LAYER_NAV_EXITED,
 		}
 		for _, v in ipairs(others) do
 			helpers.assert_true(Keycodes.F20_LAYER_NAV_ENTERED ~= v)

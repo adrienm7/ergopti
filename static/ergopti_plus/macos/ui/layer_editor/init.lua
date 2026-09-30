@@ -9,7 +9,9 @@
 --- what it sends. The shared host logic (_shared/lua/keymap/layer_editor.lua) checks
 --- the text against every OS's loader and publishes it through the atomic
 --- FileSystem adapter; the Karabiner rules are then regenerated, and every
---- regeneration reads layers.toml again, so the edited layer applies.
+--- regeneration reads layers.toml again, so the edited layer applies. The
+--- wheel bindings, which Karabiner cannot take, are handed to their
+--- Hammerspoon owner.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One window: a second open brings the first to the front.
@@ -175,6 +177,19 @@ local function close_session(session)
 	Logger.info(LOG, "Layer editor closed.")
 end
 
+--- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
+--- Karabiner, to their owner (modules/shortcuts/bindings.lua).
+local function reconcile_wheel()
+	local ok, committed = pcall(function()
+		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+	end)
+	if not ok then
+		Logger.error(LOG, "The layer's wheel bindings could not be applied: %s.", tostring(committed))
+	elseif committed ~= true then
+		Logger.warn(LOG, "The layer's wheel bindings apply with the next Shortcuts start: a start is in progress.")
+	end
+end
+
 --- Asks the remap engine to regenerate the Karabiner rules.
 --- @param karabiner table The remap facade.
 --- @return boolean requested True when the regeneration was accepted.
@@ -261,6 +276,7 @@ local function save(session, text)
 		return
 	end
 	local applied = request_regeneration(session.karabiner)
+	reconcile_wheel()
 	if applied then
 		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
 	else

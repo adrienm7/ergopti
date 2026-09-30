@@ -2806,8 +2806,8 @@ end
 ---
 --- The rows above the manifest section are this driver's own — CapsWord, the
 --- selection transforms, the wrap pairs — and no manifest entry describes them
---- yet. macOS is in the same position with `at_hash` and `layer_scroll`, and
---- prepends them the same way.
+--- yet. macOS is in the same position with `at_hash`, and prepends it the
+--- same way.
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_shortcuts(ctx)

@@ -350,12 +350,9 @@ const DATA = (() => {
 		`init(${JSON.stringify({ os: 'macos', path: '/cfg/layers.toml', text: null, errors: [] })})`
 	);
 	check(
-		page.key('WheelUp').classList.contains('unavailable'),
-		'the wheel cannot be a layer key on macOS'
-	);
-	check(
-		page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_windows_only'],
-		'an unavailable input must say why'
+		!page.key('WheelUp').classList.contains('unavailable') &&
+			page.key('WheelUp').classList.contains('custom'),
+		'the wheel is a layer key on macOS, recommended as volume and unbound in an empty file'
 	);
 	check(
 		page.key('KeyQ').classList.contains('custom'),
@@ -367,6 +364,47 @@ const DATA = (() => {
 		page.row(EN['sg_actions.spotlight']) &&
 			!page.row(EN['sg_actions.spotlight']).classList.contains('disabled'),
 		'Spotlight is offered on macOS'
+	);
+}
+
+// The wheel slots (layer-wheel-slots): Scroll up and down are layer inputs on
+// Windows and macOS, volume up and down by default, editable like any key;
+// Linux cannot intercept the wheel and says so.
+for (const os of ['windows', 'macos']) {
+	const page = loadPage();
+	page.call(
+		`init(${JSON.stringify({ os, path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
+	check(
+		page.binding('WheelUp') === EN['sg_actions.vol_up'] &&
+			page.binding('WheelDown') === EN['sg_actions.vol_down'] &&
+			page.key('WheelUp').classList.contains('recommended'),
+		`(layer-wheel-slots) the recommended wheel is volume up and down on ${os}, shows "${page.binding('WheelUp')}"`
+	);
+	page.key('WheelUp').click();
+	page.row(EN['sg_actions.mute']).click();
+	page.el('btn-save').click();
+	const saved = page.lastSave();
+	const edited = saved && bindingsOf(saved.text, os);
+	check(
+		edited && edited.ok && edited.bindings.WheelUp === 'keystroke:AudioVolumeMute',
+		`(layer-wheel-slots) the wheel slot takes another action on ${os}: ${edited && edited.bindings.WheelUp}`
+	);
+	for (const other of DATA.platforms.filter((o) => o !== os))
+		check(
+			bindingsOf(saved.text, other).ok,
+			`(layer-wheel-slots) an edited ${os} wheel slot still loads on ${other}`
+		);
+}
+{
+	const page = loadPage();
+	page.call(
+		`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
+	check(
+		page.key('WheelUp').classList.contains('unavailable') &&
+			page.key('WheelUp').title === EN['platform_reason.layer_wheel_source_is_not_linux'],
+		'(layer-wheel-slots) the wheel cannot be a layer key on Linux, and the key says why'
 	);
 }
 

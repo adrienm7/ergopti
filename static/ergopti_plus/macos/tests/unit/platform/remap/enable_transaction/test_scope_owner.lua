@@ -187,17 +187,33 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 		end
 	end
 
+	--- Runs a case with an observable owner of the layer's wheel bindings,
+	--- which Hammerspoon runs (layer-wheel-slots).
+	--- @param body function Receives the reconciliation counter.
+	local function with_wheel_owner(body)
+		helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
+			local owner = { reconciles = 0 }
+			package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+				owner.reconciles = owner.reconciles + 1
+				return true
+			end }
+			body(owner)
+		end)
+	end
+
 	helpers.it("(nav-layer-fresh-install-default) the restore creates layers.toml before the regeneration", function()
-		with_fixture(function(fixture)
+		with_fixture(function(fixture) with_wheel_owner(function(wheel)
 			local remap, _, disk = scoped_remap(fixture)
 			removable(disk)
 			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-7")
 			helpers.assert_true(accepted)
 			helpers.assert_eq(disk.files[LAYERS], preset(), "the layer is on disk when the regeneration reads it")
+			helpers.assert_eq(wheel.reconciles, 0, "the wheel waits for the restore's terminal")
 			disk.terminal(true, "ready")
 			helpers.assert_eq(settled, { { ok = true, reason = "ready" } })
 			helpers.assert_eq(disk.files[LAYERS], preset())
-		end)
+			helpers.assert_eq(wheel.reconciles, 1, "the restored layer's wheel reaches its owner (layer-wheel-slots)")
+		end) end)
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
@@ -213,7 +229,7 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) a refused restore takes the created layer back", function()
-		with_fixture(function(fixture)
+		with_fixture(function(fixture) with_wheel_owner(function(wheel)
 			local remap, _, disk = scoped_remap(fixture)
 			removable(disk)
 			local _, settled = request(remap, "tap_holds", "recommended", "/remap/backup-9")
@@ -221,7 +237,8 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 			disk.terminal(true, "ready")
 			helpers.assert_eq(settled[1].ok, false)
 			helpers.assert_nil(disk.files[LAYERS], "no layer file outlives a refused restore")
-		end)
+			helpers.assert_eq(wheel.reconciles, 0, "a refused restore leaves the wheel as it was")
+		end) end)
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) clear and the shortcuts scope never touch the layer", function()

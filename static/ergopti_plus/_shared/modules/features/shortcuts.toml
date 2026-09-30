@@ -411,14 +411,6 @@ platforms = ["hs"]
 # =====================================================
 
 [[shortcuts]]
-id = "layer_scroll"
-label_key = "shortcuts.label_layer_scroll"
-description_key = "shortcuts.label_layer_scroll"
-default_key_ahk = ""
-default_key_hs = "layer_scroll"
-platforms = ["hs"]
-
-[[shortcuts]]
 id = "wrap_text_if_selected"
 label_key = "shortcuts.label_wrap_text"
 description_key = "shortcuts.label_wrap_text"

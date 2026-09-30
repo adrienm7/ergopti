@@ -140,7 +140,12 @@ local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 -- layer" from "user pressed a real key that should dismiss the tooltip".
 local LAYER_ACTIVE_VAR_NAME    = "layer_active"
 local LAYER_ACTIVE_ON_VALUE    = 1
+local LAYER_ACTIVE_OFF_VALUE   = 0
 local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
+-- Its pair, emitted by every event list that turns the layer off, so
+-- Hammerspoon knows when the layer is no longer held: it runs the layer's
+-- wheel bindings, which Karabiner cannot take, only in between.
+local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
 
 -- The tap-hold keys the navigation layer swallows while another key holds it,
 -- by key id, with the tap that makes them so (their hold being the layer):
@@ -516,6 +521,15 @@ local function is_layer_activation_event(ev)
 	   and ev.set_variable.value == LAYER_ACTIVE_ON_VALUE
 end
 
+--- Returns true when an event sets layer_active to its "off" value.
+--- @param ev table A karabiner event entry.
+--- @return boolean
+local function is_layer_deactivation_event(ev)
+	if type(ev) ~= "table" or type(ev.set_variable) ~= "table" then return false end
+	return ev.set_variable.name  == LAYER_ACTIVE_VAR_NAME
+	   and ev.set_variable.value == LAYER_ACTIVE_OFF_VALUE
+end
+
 --- Returns true when a karabiner_to array activates the navigation layer.
 --- @param to_events table List of karabiner_to events.
 --- @return boolean
@@ -558,6 +572,39 @@ local function prepend_nav_layer_sentinel(available_actions)
 	end
 end
 
+--- Mutates the available_actions list so every event list that turns the
+--- navigation layer off (a hold's karabiner_to_after_key_up, an explicit layer
+--- off's karabiner_to) emits the F19 exit sentinel right before the variable,
+--- as F20 precedes the one that turns it on. Karabiner holds only the last
+--- entry of a `to` list until the key is released: the sentinel is never that
+--- entry, so it is tapped, and an action that kept nothing down still keeps
+--- nothing down.
+---
+--- Idempotent: a deactivation already preceded by the sentinel is left alone.
+--- @param available_actions table List of action definitions (mutated in place).
+local function insert_nav_layer_exit_sentinel(available_actions)
+	local patched = 0
+	for _, action in ipairs(available_actions) do
+		for _, field in ipairs({ "karabiner_to", "karabiner_to_after_key_up" }) do
+			local events = action[field]
+			local index = nil
+			if type(events) == "table" then
+				for i, ev in ipairs(events) do
+					if index == nil and is_layer_deactivation_event(ev) then index = i end
+				end
+			end
+			local previous = index and events[index - 1] or nil
+			if index and not (type(previous) == "table" and previous.key_code == LAYER_EXIT_SENTINEL_NAME) then
+				table.insert(events, index, { key_code = LAYER_EXIT_SENTINEL_NAME })
+				patched = patched + 1
+			end
+		end
+	end
+	if patched > 0 then
+		Logger.info(LOG, "Inserted the F19 exit sentinel into %d nav-layer-deactivating event list(s).", patched)
+	end
+end
+
 --- Recursively copies a JSON-compatible value without retaining table aliases.
 --- Legacy graph hints must remain in their historical pre-lease form while
 --- timing and generation gates mutate the deployed rule graph in place.
@@ -592,6 +639,27 @@ local function detach_runtime_variable_actions(available_actions)
 		prepared[index] = requires_copy and deep_copy(action) or action
 	end
 	return prepared
+end
+
+--- Removes, in place, every F19 exit sentinel event from a rule graph copy:
+--- releases before the sentinel deployed the same graph without it, and the
+--- legacy compatibility graph must be theirs exactly.
+--- @param value table A deep copy of generated rules.
+local function strip_exit_sentinels(value)
+	if type(value) ~= "table" then return end
+	local count = #value
+	if count > 0 then
+		local kept = {}
+		for index = 1, count do
+			local item = value[index]
+			if not (type(item) == "table" and item.key_code == LAYER_EXIT_SENTINEL_NAME) then
+				kept[#kept + 1] = item
+			end
+			value[index] = nil
+		end
+		for index, item in ipairs(kept) do value[index] = item end
+	end
+	for _, nested in pairs(value) do strip_exit_sentinels(nested) end
 end
 
 --- Recursively compares two values for structural equality.
@@ -1594,9 +1662,11 @@ function M.build_karabiner_json(
 	end
 	available_actions = detach_runtime_variable_actions(available_actions)
 
-	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
-	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
+	-- Inject the F20 and F19 sentinels into every action that turns the nav
+	-- layer on or off BEFORE indexing, so all downstream rule builders
+	-- (tap/hold, combo, etc.) inherit them.
 	prepend_nav_layer_sentinel(available_actions)
+	insert_nav_layer_exit_sentinel(available_actions)
 
 	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)
 	if prepared_catalogue_err then
@@ -1800,7 +1870,11 @@ function M.build_karabiner_json(
 	local legacy_available_actions = detach_runtime_variable_actions(available_actions)
 	local legacy_rules = {}
 	for index, rule in ipairs(all_rules) do
-		if rule ~= nav_rule then legacy_rules[#legacy_rules + 1] = deep_copy(rule) end
+		if rule ~= nav_rule then
+			local legacy_rule = deep_copy(rule)
+			strip_exit_sentinels(legacy_rule)
+			legacy_rules[#legacy_rules + 1] = legacy_rule
+		end
 		if index == nav_layer_position and legacy_layer_keys then
 			legacy_rules[#legacy_rules + 1] = deep_copy(legacy_layer_keys)
 		end

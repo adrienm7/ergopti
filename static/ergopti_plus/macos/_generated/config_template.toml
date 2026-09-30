@@ -469,7 +469,6 @@ backspace = "none"
 escape = "none"
 
 [shortcuts.keys]
-layer_scroll = false
 wrap_text_if_selected = false
 ctrl_a = false
 ctrl_d = false

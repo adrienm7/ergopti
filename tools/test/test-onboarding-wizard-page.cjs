@@ -1059,10 +1059,12 @@ function assertSeparated(row, where) {
 		'Ctrl + E': en['shortcuts.label_ctrl_e'],
 		'Ctrl + .': en['shortcuts.label_ctrl_period'],
 		'Ctrl + CapsLock': en['shortcuts.label_ctrl_capslock'],
-		'Layer + Scroll': en['shortcuts.label_layer_scroll'],
 		'Ctrl + Space': en['sg_actions.llm_generate_prediction'],
 		'Right Opt + ⌫': en['sg_actions.script_reload']
 	};
+	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
+	// no shortcut the wizard offers any more.
+	assert.ok(!row('Layer + Scroll'), 'macOS no longer offers Layer + Scroll as a shortcut');
 	for (const [trigger, action] of Object.entries(expected)) {
 		assert.ok(row(trigger), `macOS lists ${trigger}`);
 		assertSeparated(row(trigger), `macos/${trigger}`);

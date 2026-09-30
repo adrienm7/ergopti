@@ -788,9 +788,6 @@ M.features = {
 		path = "shortcuts.script_control.escape", id = "escape", section = "shortcuts.script_control", default = "none", type = "action", description_key = "menu.shortcuts", platforms = { "hs" }, recommended = "script_quit", input_altering = true,
 	},
 	{
-		path = "shortcuts.keys.layer_scroll", id = "layer_scroll", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_layer_scroll", platforms = { "hs" }, recommended = true, input_altering = true,
-	},
-	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, input_altering = true,
 	},
 	{

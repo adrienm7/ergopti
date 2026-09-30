@@ -340,7 +340,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)", function()
 			-- The inline table was one record kept by its live member, so the
 			-- warned at_hash was never offered: warned and offered differed.
-			local source = "[shortcuts]\nkeys = { at_hash = true, layer_scroll = true }\n"
+			local source = "[shortcuts]\nkeys = { at_hash = true, cmd_star = true }\n"
 			Sandbox.with_config(source, function(path)
 				local before = driver_state(path)
 				local keys = Cleanup.find(path, IoAdapter).keys
@@ -350,7 +350,7 @@ helpers.with_stub_scope(MODULES, function()
 					file_adapter = IoAdapter })
 				helpers.assert_eq(result.status, "removed")
 				helpers.assert_eq(result.removed, 1)
-				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { layer_scroll = true }\n")
+				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { cmd_star = true }\n")
 				helpers.assert_eq(driver_state(path), before, "the live member keeps its value")
 				helpers.assert_eq(#Cleanup.find(path, IoAdapter).keys, 0)
 			end)
@@ -487,12 +487,12 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
-			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
+			-- The setup wizard marks shortcuts.keys.cmd_star; the owner's report
 			-- must still win, or the warned entry could never be removed.
-			local source = "[shortcuts.keys]\nlayer_scroll = \"yes\"\n"
+			local source = "[shortcuts.keys]\ncmd_star = \"yes\"\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
 			helpers.assert_eq(#scan.keys, 1)
-			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "layer_scroll" })
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "cmd_star" })
 		end)
 
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()

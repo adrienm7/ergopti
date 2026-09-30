@@ -69,6 +69,7 @@ local function with_generator(existing, json_codec, run)
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE    = 113,
 			F20_LAYER_NAV_ENTERED   = 90,
+			F19_LAYER_NAV_EXITED    = 80,
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 		package.loaded["toml_codec"] = toml_stub
