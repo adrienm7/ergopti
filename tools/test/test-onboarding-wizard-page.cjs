@@ -16,7 +16,10 @@
  *    that produced it.
  * 3. A Yes imports the recommended items, a re-run starts from the values in
  *    force and writes only what the answers change.
- * 4. The earlier regressions stay pinned: the title follows the previewed
+ * 4. The Tap-Holds page lists each engine's recommended keys from the shared
+ *    tap-hold catalogue; their answers name keys, never configuration paths,
+ *    and only a checked key under a Yes is imported.
+ * 5. The earlier regressions stay pinned: the title follows the previewed
  *    locale and names the product once, a folder picked natively reaches the
  *    payload, and the metrics consent names the store of the chosen folder.
  * ==============================================================================
@@ -41,6 +44,9 @@ const catalogueScript = fs.readFileSync(
 );
 const html = fs.readFileSync(path.join(SHARED, 'ui/onboarding/index.html'), 'utf8');
 const LOCALE_DIR = path.join(SHARED, 'data/locales');
+const TAP_HOLD_DEFAULTS = TOML.parse(
+	fs.readFileSync(path.join(SHARED, 'tap_hold/defaults.toml'), 'utf8')
+);
 const PRODUCT = 'ErgoptiPlus';
 
 // The approved first-run order: the Tap-Holds, Shortcuts, Gestures, keyboard
@@ -385,6 +391,26 @@ function toggle(row) {
 }
 
 /**
+ * Every tap-hold key item of a platform's catalogue, by answer path.
+ * @param {string} driver
+ * @returns {Map<string, object>}
+ */
+function tapHoldKeyItems(driver) {
+	const items = new Map();
+	for (const page of CATALOGUE.platforms[driver].pages) {
+		(function walk(groups) {
+			for (const group of groups) {
+				(group.items || []).forEach((item) => {
+					if (item.tap_hold_key !== undefined) items.set(item.path, item);
+				});
+				walk(group.groups || []);
+			}
+		})(page.groups);
+	}
+	return items;
+}
+
+/**
  * Every path a platform's catalogue lets the wizard write.
  * @param {string} driver
  * @returns {Set<string>}
@@ -465,11 +491,16 @@ function cataloguePaths(driver) {
 	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
 		const declared = declaredPaths(driver);
 		const allowed = cataloguePaths(driver);
+		const tapHoldKeys = tapHoldKeyItems(driver);
 		assert.ok(allowed.size > 10, `${driver}: the catalogue lists paths`);
+		assert.ok(tapHoldKeys.size > 0, `${driver}: the catalogue lists tap-hold keys`);
 		for (const entryPath of allowed) {
-			assert.ok(
+			// A tap-hold key goes to the driver's tap-hold writer: it must never
+			// read as a configuration path a host would write to config.toml.
+			assert.equal(
 				declared(entryPath),
-				`${driver}: ${entryPath} is declared by the driver's manifest`
+				!tapHoldKeys.has(entryPath),
+				`${driver}: ${entryPath} is a manifest path exactly when it is no tap-hold key`
 			);
 		}
 		const page = openWizard({ platform: driver });
@@ -488,7 +519,10 @@ function cataloguePaths(driver) {
 		for (const operation of done.answers.operations) {
 			assert.deepEqual(Object.keys(operation).sort(), ['path', 'value']);
 			assert.ok(allowed.has(operation.path), `${driver}: ${operation.path} is a wizard path`);
-			assert.ok(declared(operation.path), `${driver}: ${operation.path} is a manifest path`);
+			assert.ok(
+				declared(operation.path) || tapHoldKeys.has(operation.path),
+				`${driver}: ${operation.path} is a manifest path or a tap-hold key`
+			);
 			assert.ok(!seen.has(operation.path), `${driver}: ${operation.path} is written once`);
 			seen.add(operation.path);
 		}
@@ -585,7 +619,7 @@ function cataloguePaths(driver) {
 })();
 
 // ======================================
-// ======= 4/ Hotstrings ================
+// ======= 4/ Hotstrings, Tap-Holds ===
 // ======================================
 
 (function hotstringsGroupLanguageFileSection() {
@@ -642,25 +676,120 @@ function cataloguePaths(driver) {
 	);
 })();
 
-(function tapHoldsAreSwitchedOnlyWhereConfigTomlHoldsTheSwitch() {
+/**
+ * The keys an engine ships a recommendation for, in the order of its column of
+ * the shared key catalogue: Windows and Linux read [tap_hold.keys.*], macOS its
+ * Karabiner slots, where a key whose tap and hold are both "none" has none.
+ * @param {string} driver
+ * @returns {Array<{id: string, hand: string, label_key: string}>}
+ */
+function recommendedTapHoldKeys(driver) {
+	const platform = { windows: 'ahk', macos: 'hs', linux: 'linux' }[driver];
+	const preset =
+		platform === 'hs'
+			? Object.keys(TAP_HOLD_DEFAULTS.hs_tap_hold).filter((key) => {
+					const slots = TAP_HOLD_DEFAULTS.hs_tap_hold[key];
+					return slots.tap !== 'none' || slots.hold !== 'none';
+				})
+			: Object.keys(TAP_HOLD_DEFAULTS.tap_hold.keys);
+	return TAP_HOLD_DEFAULTS.tap_hold.catalog.keys
+		.filter((entry) => entry[platform] !== undefined && preset.includes(entry[platform]))
+		.map((entry) => ({ id: entry[platform], hand: entry.hand, label_key: entry.label_key }));
+}
+
+(function tapHoldPagesListEachEngineRecommendedKeys() {
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
+		const expected = recommendedTapHoldKeys(driver);
+		assert.ok(expected.length >= 7, `${driver}: the engine recommends its tap-hold keys`);
+		const items = described.groups.flatMap((group) => group.items);
+		assert.deepEqual(
+			items,
+			expected.map((key) => ({
+				path: 'tap_holds.keys.' + key.id,
+				value: true,
+				default: false,
+				recommended: true,
+				tap_hold_key: key.id,
+				label: [{ key: key.label_key }]
+			})),
+			`${driver}: one item per recommended key, in tray order, named by the catalogue`
+		);
+		assert.deepEqual(
+			described.groups.map((group) => group.label),
+			[
+				[{ key: 'menu.tapholds.left_hand_tap_hold' }],
+				[{ key: 'menu.tapholds.right_hand_tap_hold' }]
+			],
+			`${driver}: the keys are grouped under the tray's hand headers`
+		);
+		for (const [index, group] of described.groups.entries()) {
+			const hand = index === 0 ? 'left' : 'right';
+			assert.ok(
+				group.items.every(
+					(item) => expected.find((key) => key.id === item.tap_hold_key).hand === hand
+				),
+				`${driver}: each key sits under its own hand`
+			);
+		}
+		assert.equal(
+			described.note_key,
+			undefined,
+			`${driver}: the page asks instead of pointing away`
+		);
+		const page = openWizard({ platform: driver });
+		next(page, 2);
+		assert.equal(page.el('page-question').classList.contains('hidden'), false, `${driver} asks`);
+		assert.equal(page.el('page-checklist').classList.contains('hidden'), false, `${driver} lists`);
+	}
 	// macOS reads the switch from config_karabiner.toml and Linux from
-	// tap_hold.toml: a config.toml answer there was saved and never read.
+	// tap_hold.toml: there the import switches the Tap-Holds on, never config.toml.
 	for (const driver of ['macos', 'linux']) {
 		const described = CATALOGUE.platforms[driver].pages.find((p) => p.id === 'tap_holds');
 		assert.equal(described.master, undefined, `${driver}: no config.toml tap-hold switch`);
-		assert.ok(!cataloguePaths(driver).has('tap_holds.enabled'), `${driver}: nothing to write`);
-		assert.equal(described.note_key, 'onboarding.page.tap_holds.menu_note');
-		const page = openWizard({ platform: driver });
-		next(page, 2);
-		assert.equal(page.el('page-question').classList.contains('hidden'), true, driver);
-		assert.equal(
-			page.el('page-note').textContent,
-			locale('en')['onboarding.page.tap_holds.menu_note'],
-			`${driver}: the page says where tap-holds are switched on`
-		);
+		assert.ok(!cataloguePaths(driver).has('tap_holds.enabled'), `${driver}: no config.toml row`);
 	}
 	const windows = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'tap_holds');
 	assert.equal(windows.master.path, 'category_enabled.tap_holds', 'Windows reads its switch there');
+})();
+
+(function aYesImportsOnlyTheCheckedKeysAndANoImportsNone() {
+	for (const driver of Object.keys(DRIVER_MANIFESTS)) {
+		const keys = [...tapHoldKeyItems(driver).values()];
+		const labels = new Map(keys.map((item) => [locale('en')[item.label[0].key], item]));
+		const page = openWizard({ platform: driver });
+		page.platform = driver;
+		goToPage(page, 'tap_holds');
+		answer(page, true);
+		const rows = checkRows(page).filter((row) => labels.has(row.text));
+		assert.equal(rows.length, keys.length, `${driver}: one row per recommended key`);
+		assert.ok(
+			rows.every((row) => row.box.checked && !row.box.disabled),
+			`${driver}: Yes pre-checks every recommended key`
+		);
+		const left = rows[0];
+		toggle(left);
+		const imported = finish(page).answers.operations.filter((op) =>
+			tapHoldKeyItems(driver).has(op.path)
+		);
+		const leftItem = labels.get(left.text);
+		assert.deepEqual(
+			imported,
+			keys.filter((item) => item !== leftItem).map((item) => ({ path: item.path, value: true })),
+			`${driver}: every checked key is imported and the unchecked one is not written at all`
+		);
+
+		const declined = openWizard({ platform: driver });
+		declined.platform = driver;
+		goToPage(declined, 'tap_holds');
+		answer(declined, true);
+		answer(declined, false);
+		assert.deepEqual(
+			finish(declined).answers.operations.filter((op) => op.path.startsWith('tap_holds.')),
+			[],
+			`${driver}: answering No imports no key, even after a Yes`
+		);
+	}
 })();
 
 (function triggerLengthMatchesTheConfigurationSchema() {

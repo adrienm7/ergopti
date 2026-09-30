@@ -243,3 +243,79 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 	end)
 
 end)
+
+-- The first-run wizard's Tap-Holds answer: it names a file of the folder it
+-- sets up, which may not be the running one, and restarts the daemon after.
+helpers.describe("tap-hold writer: the wizard imports only the checked keys", function()
+
+	--- A throwaway path with no file behind it.
+	local function absent_path()
+		local path = os.tmpname()
+		os.remove(path)
+		return path
+	end
+
+	helpers.it("imports each key's preset exactly, switches the feature on and leaves the rest", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path = absent_path()
+		write_file(path, '[tap_hold]\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.caps_lock]\ntap_action = "copy"\nhold_layer = "nav"\nenabled = false\ncustom = 3\n'
+			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\n'
+			.. '[other]\nvalue = 17\n')
+		local preset = Loader.preset_keys(DEFAULTS)
+		local imported, err = writer.import_recommended(path, { "caps_lock", "left_alt" }, preset)
+		helpers.assert_true(imported, tostring(err))
+		local loaded = effective(path)
+		helpers.assert_eq(loaded.enabled, true, "an imported key is live once the daemon restarts")
+		helpers.assert_eq(loaded.keys.caps_lock.tap_action, preset.caps_lock.tap_action)
+		helpers.assert_eq(loaded.keys.caps_lock.hold_modifier, preset.caps_lock.hold_modifier)
+		helpers.assert_nil(loaded.keys.caps_lock.hold_layer, "the old hold does not survive the preset's")
+		helpers.assert_true(loaded.keys.caps_lock.enabled ~= false, "a disabled key is the recommendation again")
+		helpers.assert_eq(loaded.keys.caps_lock.time_activation_seconds, preset.caps_lock.time_activation_seconds)
+		helpers.assert_eq(loaded.keys.left_alt.hold_layer, preset.left_alt.hold_layer)
+		helpers.assert_eq(loaded.keys.left_shift.tap_action, "paste", "an unchecked key keeps what it had")
+		helpers.assert_nil(loaded.keys.right_ctrl, "a key nobody checked is not written")
+		local stored = require("toml_codec").decode(read_file(path))
+		helpers.assert_eq(stored.tap_hold.keys.caps_lock.custom, 3, "a field the writer does not own survives")
+		helpers.assert_eq(stored.tap_hold.inherit_defaults, false)
+		helpers.assert_eq(stored.other.value, 17)
+		os.remove(path)
+	end)
+
+	helpers.it("creates the file of a folder that has none", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path = absent_path()
+		helpers.assert_true(writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS)))
+		local loaded = effective(path)
+		helpers.assert_eq(loaded.enabled, true)
+		helpers.assert_eq(loaded.keys.tab.tap_action, Loader.preset_keys(DEFAULTS).tab.tap_action)
+		helpers.assert_nil(loaded.keys.caps_lock, "only the checked key")
+		os.remove(path)
+	end)
+
+	helpers.it("refuses what it cannot import exactly, and writes nothing", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local preset = Loader.preset_keys(DEFAULTS)
+		local path = absent_path()
+		for label, keys in pairs({
+			["unknown key"] = { "not_a_key" },
+			["key without a recommendation"] = { "escape" },
+			["key twice"] = { "tab", "tab" },
+			["no key"] = {},
+		}) do
+			local imported, err = writer.import_recommended(path, keys, preset)
+			helpers.assert_eq(imported, false, label)
+			helpers.assert_type(err, "string", label)
+			helpers.assert_eq(read_file(path), "", label .. ": nothing is written")
+		end
+		local broken = "[tap_hold.keys.left_shift\ntap_action = \"paste\"\n"
+		write_file(path, broken)
+		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset), false)
+		helpers.assert_eq(read_file(path), broken, "the user's text is left as it was")
+		write_file(path, 'tap_hold = "opaque"\n')
+		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset), false)
+		helpers.assert_eq(read_file(path), 'tap_hold = "opaque"\n')
+		os.remove(path)
+	end)
+
+end)

@@ -356,22 +356,25 @@ helpers.describe("karabiner setters — only the reset bypasses the corruption g
 	if not src then return end
 
 	-- Derived from source, so a setter added tomorrow is checked automatically.
-	local total, bypassing = 0, {}
+	local owners, bypassing = {}, {}
 	for pos, args in src:gmatch("()Config%.save_user_config(%b())") do
-		total = total + 1
-		if count_arguments(args) >= 3 then
-			-- Attribute the call to the nearest enclosing `function M.<name>`.
-			local owner = "<file scope>"
-			for name_pos, name in src:gmatch("()function M%.([%w_]+)") do
-				if name_pos < pos then owner = name else break end
-			end
-			bypassing[#bypassing + 1] = owner
+		-- Attribute the call to the nearest enclosing `function M.<name>`.
+		local owner = "<file scope>"
+		for name_pos, name in src:gmatch("()function M%.([%w_]+)") do
+			if name_pos < pos then owner = name else break end
 		end
+		owners[#owners + 1] = owner
+		if count_arguments(args) >= 3 then bypassing[#bypassing + 1] = owner end
 	end
+	table.sort(owners)
 
 	helpers.it("keeps direct persistence outside the setter transaction helper bounded", function()
-		helpers.assert_eq(total, 2,
-			"only boot migration and first-launch publication may call the writer directly")
+		-- M.init holds the boot migration and the first-launch publication; the
+		-- wizard's recommended keys go straight to the file of a folder no
+		-- running bridge owns, where no live state exists to publish.
+		helpers.assert_eq(owners, { "init", "init", "save_recommended_keys" },
+			"only boot migration, first-launch publication and the wizard's save to a folder "
+				.. "the bridge does not run may call the writer directly")
 	end)
 
 	helpers.it("routes the reset-only bypass through the transactional helper", function()

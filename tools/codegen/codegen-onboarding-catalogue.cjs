@@ -13,6 +13,7 @@
  *   _shared/modules/features/manifest.toml   features, scopes, [onboarding]
  *   _shared/modules/hotstrings/_index.toml   languages and category order
  *   _shared/modules/hotstrings/**.toml       file and section descriptions
+ *   _shared/tap_hold/defaults.toml           tap-hold keys and each engine's preset
  *   _shared/data/locales/*.json              label keys must exist in all 21
  *   _shared/data/locale_names.json           language-pack labels
  *
@@ -24,7 +25,10 @@
  * 1. One vocabulary: every persisted item is a manifest path declared for its
  *    platform (a feature, a feature's sub-key or a scope's dynamic leaf), with
  *    the neutral default and recommendation the drivers read from the same
- *    manifest. Hosts write what the page emits without interpreting it.
+ *    manifest. Hosts write what the page emits without interpreting it. The
+ *    one exception is a tap-hold key (`tap_hold_key`): its host imports that
+ *    key's shipped recommendation through its own tap-hold writer, because no
+ *    driver keeps its keys in config.toml.
  * 2. Labels are locale keys the drivers already use, resolved through the tray
  *    menu's candidate chain; an item whose label exists in no locale stops the
  *    generation instead of shipping a raw identifier.
@@ -48,6 +52,7 @@ const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
 // manifest binds the Ergopti-only hotstring files (SFB reduction, rolls, the
 // magic key's repeat corrections) to their historical categories and sections.
 const ERGOPTI_EXTENSION_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'ergopti');
+const TAP_HOLD_DEFAULTS_PATH = shared('tap_hold', 'defaults.toml');
 const LOCALE_DIR = shared('data', 'locales');
 const LOCALE_NAMES_PATH = shared('data', 'locale_names.json');
 const PAGE_OUTPUT = shared('ui', '_generated', 'onboarding_catalogue.js');
@@ -63,7 +68,7 @@ const MANIFEST_PLATFORMS = Object.values(DRIVERS);
 // change so a stale host refuses the data instead of misreading it.
 const SCHEMA_VERSION = 1;
 
-const CHECKLIST_KINDS = ['recommended', 'hotstrings', 'none'];
+const CHECKLIST_KINDS = ['recommended', 'hotstrings', 'tap_holds', 'none'];
 const PAGE_FIELDS = new Set([
 	'title_key',
 	'question_key',
@@ -83,6 +88,31 @@ const PAGE_FIELDS = new Set([
 
 // The separator a hotstring file writes between groups of its sections_order.
 const SECTION_SEPARATOR = '-';
+
+// The answer path of a tap-hold key the wizard imports. It names no
+// configuration key: every host hands these answers to its own tap-hold writer
+// and never to config.toml, so the prefix stays outside every manifest path.
+const TAP_HOLD_KEY_PREFIX = 'tap_holds.keys.';
+
+// The keys each engine ships a recommendation for: Windows and Linux read the
+// [tap_hold.keys.*] preset, macOS its own Karabiner slots, where a key whose
+// tap and hold are both "none" has none.
+const TAP_HOLD_PRESETS = {
+	ahk: (defaults) => Object.keys((defaults.tap_hold && defaults.tap_hold.keys) || {}),
+	linux: (defaults) => Object.keys((defaults.tap_hold && defaults.tap_hold.keys) || {}),
+	hs: (defaults) =>
+		Object.entries(defaults.hs_tap_hold || {})
+			.filter(
+				([, slots]) => isPlainObject(slots) && (slots.tap !== 'none' || slots.hold !== 'none')
+			)
+			.map(([key]) => key)
+};
+
+// The tray's hand headers, which the page reuses for its two key groups.
+const TAP_HOLD_HAND_LABELS = {
+	left: 'menu.tapholds.left_hand_tap_hold',
+	right: 'menu.tapholds.right_hand_tap_hold'
+};
 
 // ==========================================
 // ==========================================
@@ -423,6 +453,9 @@ function validatePage(id, page, manifest, labels) {
 	if (page.consent && page.checklist !== 'none') {
 		throw new Error(`[onboarding.pages.${id}] a consent page imports nothing else`);
 	}
+	if (page.checklist === 'tap_holds' && id !== 'tap_holds') {
+		throw new Error(`[onboarding.pages.${id}] only the tap_holds page lists tap-hold keys`);
+	}
 }
 
 /**
@@ -670,6 +703,62 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 }
 
 /**
+ * The tap-hold checklist: every key of the platform's column of the shared key
+ * catalogue that its engine ships a recommendation for, in tray order under the
+ * tray's two hand headers. An item imports that key's recommended tap and hold
+ * through the host's tap-hold writer; the host reads the recommendation from
+ * the same defaults.toml, so the catalogue carries only the key id.
+ * @param {string} id Page id.
+ * @param {string} platform Manifest platform token.
+ * @param {object} labels Label helpers.
+ * @returns {object[]} One group per hand that has a recommended key.
+ */
+function tapHoldGroups(id, platform, labels) {
+	const defaults = TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS_PATH, 'utf8'));
+	const catalog = defaults.tap_hold && defaults.tap_hold.catalog && defaults.tap_hold.catalog.keys;
+	if (!Array.isArray(catalog) || catalog.length === 0) {
+		throw new Error('_shared/tap_hold/defaults.toml declares no [tap_hold.catalog] keys');
+	}
+	const recommended = new Set(TAP_HOLD_PRESETS[platform](defaults));
+	const listed = new Set();
+	const hands = new Map(Object.keys(TAP_HOLD_HAND_LABELS).map((hand) => [hand, []]));
+	for (const entry of catalog) {
+		const key = entry[platform];
+		if (key === undefined) continue;
+		listed.add(key);
+		if (!recommended.has(key)) continue;
+		if (!hands.has(entry.hand))
+			throw new Error(`tap-hold key ${entry.id} names unknown hand ${entry.hand}`);
+		hands.get(entry.hand).push({
+			path: TAP_HOLD_KEY_PREFIX + key,
+			value: true,
+			default: false,
+			recommended: true,
+			tap_hold_key: key,
+			label: [{ key: labels.requireKey(entry.label_key, `onboarding page ${id} key ${key}`) }]
+		});
+	}
+	for (const key of recommended) {
+		if (!listed.has(key)) {
+			throw new Error(
+				`the ${platform} tap-hold preset recommends ${key}, which [tap_hold.catalog] does not list`
+			);
+		}
+	}
+	const groups = [];
+	for (const [hand, items] of hands) {
+		if (items.length === 0) continue;
+		groups.push({
+			label: [{ key: labels.requireKey(TAP_HOLD_HAND_LABELS[hand], `onboarding page ${id}`) }],
+			items
+		});
+	}
+	if (groups.length === 0)
+		throw new Error(`onboarding page ${id} recommends no tap-hold key on ${platform}`);
+	return groups;
+}
+
+/**
  * The hotstring trigger character choice, or undefined on a platform its
  * `platforms` list leaves out.
  * @returns {object|undefined} Choice descriptor.
@@ -734,6 +823,8 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 		);
 	} else if (page.checklist === 'hotstrings') {
 		groups = hotstringGroups(id, page, platform, manifest, features, projection, labels);
+	} else if (page.checklist === 'tap_holds') {
+		groups = tapHoldGroups(id, platform, labels);
 	}
 	const hint = page.hint_key && page.hint_key[platform];
 	const note = page.note_key && page.note_key[platform];
@@ -769,6 +860,13 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 function buildCatalogue() {
 	const manifest = loadManifest();
 	const features = indexFeatures(manifest);
+	for (const featurePath of features.keys()) {
+		if ((featurePath + '.').startsWith(TAP_HOLD_KEY_PREFIX)) {
+			throw new Error(
+				`${featurePath} would make a tap-hold key answer read as a configuration path`
+			);
+		}
+	}
 	const projection = createProjection(features, manifest.scopes);
 	const labels = createLabels(loadLocales());
 	const order = manifest.onboarding.order;

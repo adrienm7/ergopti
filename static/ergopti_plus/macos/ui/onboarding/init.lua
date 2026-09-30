@@ -15,7 +15,9 @@
 --- 3. No interpretation: the page answers with manifest paths and values; the
 ---    shared onboarding_answers contract validates them against the generated
 ---    catalogue and they reach config.toml in one versioned batch_write, then
----    hs.reload() starts every module from the file.
+---    hs.reload() starts every module from the file. The Tap-Holds page's
+---    checked keys go to the remap owner, which imports their recommendation
+---    into config_karabiner.toml and switches the Tap-Holds on there.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
 ---    user picks.
@@ -438,8 +440,36 @@ local function prepare_destination(path)
 	return true
 end
 
+--- Imports the checked tap-hold keys through the remap owner. The running
+--- bridge takes them in its settings transaction when it runs the folder the
+--- wizard set up; before it starts (the first run) or for a folder the wizard
+--- moves the configuration to, the owner saves them to that folder's file,
+--- which the reload reads.
+--- @param keys table Key ids of tap_hold_keys.json, at least one.
+--- @param moved boolean Whether the wizard moved the configuration folder.
+--- @param on_done function Callback fn(ok, detail), called exactly once.
+local function import_tap_holds(keys, moved, on_done)
+	local ok_remap, Remap = pcall(require, "platform.remap")
+	if not ok_remap or type(Remap) ~= "table" then
+		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
+		return
+	end
+	if Remap.is_initialized() and not moved then
+		Remap.import_recommended_keys(keys, function(ok, reason) on_done(ok == true, reason) end)
+		return
+	end
+	local ok_path, path = pcall(require("infra.config_paths").get, "KarabinerConfigPath")
+	if not ok_path then
+		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
+		return
+	end
+	local saved_ok, saved, detail = pcall(Remap.save_recommended_keys, keys, path)
+	on_done(saved_ok and saved == true, saved_ok and detail or saved)
+end
+
 --- Validates the answers, persists the folder and the language, writes every
---- answer to config.toml in one batch and reloads Hammerspoon.
+--- answer to config.toml in one batch, imports the checked tap-hold keys and
+--- reloads Hammerspoon.
 --- @param answers table The answers object from the JS "finish" message.
 local function commit(answers)
 	Logger.start(LOG, "Committing the onboarding answers…")
@@ -447,9 +477,10 @@ local function commit(answers)
 	-- Validate the whole payload before any side effect: a refused answer must
 	-- not leave the folder or the language changed behind it.
 	local catalogue_ok, index = pcall(catalogue)
-	local rows, refusal
+	local rows, refusal, tap_hold_keys
 	if catalogue_ok then
 		rows, refusal = Answers.rows(index, answers.operations, ManifestReader)
+		tap_hold_keys = rows and Answers.tap_hold_keys(index, answers.operations, ManifestReader)
 	else
 		refusal = index
 	end
@@ -465,6 +496,7 @@ local function commit(answers)
 	-- final reload, so subsequent saves go there straight away. An
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
+	local previous_config_path = _config_path
 	if answers.config_dir ~= "" then
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		local persisted, persist_err = M._persist_config_dir(
@@ -514,10 +546,28 @@ local function commit(answers)
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
-	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-	DeferredWork.after(RELOAD_DELAY_SEC, function()
-		hs.reload()
-	end, "onboarding.reload")
+	local function announce_and_reload()
+		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
+		DeferredWork.after(RELOAD_DELAY_SEC, function()
+			hs.reload()
+		end, "onboarding.reload")
+	end
+	if #tap_hold_keys == 0 then
+		announce_and_reload()
+		return
+	end
+	-- The answers are saved: a refused import leaves config_karabiner.toml as
+	-- it was, says so, and the reload still applies the rest.
+	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
+		if ok then
+			Logger.success(LOG, "Imported %d recommended tap-hold key(s).", #tap_hold_keys)
+		else
+			Logger.error(LOG, "The recommended tap-hold keys were not imported: %s.", tostring(detail))
+			require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"),
+				i18n.get("onboarding.error.tap_holds_import"), i18n.get("onboarding.btn.ok"))
+		end
+		announce_and_reload()
+	end)
 end
 
 

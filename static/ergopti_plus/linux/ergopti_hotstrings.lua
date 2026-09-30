@@ -702,7 +702,7 @@ local function main()
 			engine:reset()
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
-		user_path = require("infra.config_paths").config("tap_hold.toml"),
+		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live.

@@ -4,9 +4,10 @@
 --- MODULE: Onboarding Finish Fixture
 --- DESCRIPTION:
 --- Drives the real onboarding finish-message handler with controlled
---- persistence boundaries: the language store, the destination read and the
---- configuration writer. Everything else (the catalogue, the manifest reader,
---- the answers contract and the config migration) is the production code.
+--- persistence boundaries: the language store, the destination read, the
+--- configuration writer, the folder resolver and the remap owner that imports
+--- the tap-hold keys. Everything else (the catalogue, the manifest reader, the
+--- answers contract and the config migration) is the production code.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -24,8 +25,14 @@ local MODULE_NAMES = {
 	"infra.text_utils",
 	"infra.toml.codec",
 	"infra.toml.writer",
+	"infra.config_paths",
+	"platform.remap",
+	"ui.menu.menu_paths",
 	"ui.onboarding",
 }
+
+-- Where the doubled path resolver puts the remap settings.
+M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/config_karabiner.toml"
 
 --- Returns one named upvalue and its numeric slot.
 --- @param fn function
@@ -43,7 +50,10 @@ end
 
 --- Runs one finish message through the production handler.
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
----   write = "true"|"false"|"nil"|"throw", read = function(path)|nil }`.
+---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
+---   remap = { initialized, hold_import, import_ok, save_ok }|nil,
+---   menu_paths = table|nil }`. A held import leaves its callback in
+---   state.import_callbacks for the scenario to settle.
 --- @param scenario function scenario(state) with the recorded side effects.
 function M.with_finish(opts, scenario)
 	local saved = {}
@@ -89,6 +99,35 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}
+	-- The remap owner: a running bridge takes the import in its settings
+	-- transaction and answers through a callback; otherwise it saves the file.
+	local remap = opts.remap or {}
+	state.imports, state.saves, state.import_callbacks = {}, {}, {}
+	package.loaded["platform.remap"] = {
+		is_initialized = function() return remap.initialized == true end,
+		import_recommended_keys = function(keys, on_done)
+			state.imports[#state.imports + 1] = keys
+			if remap.hold_import then
+				state.import_callbacks[#state.import_callbacks + 1] = on_done
+				return true
+			end
+			local ok = remap.import_ok ~= false
+			on_done(ok, ok and "ready" or "activation-failed", #keys)
+			return ok
+		end,
+		save_recommended_keys = function(keys, path)
+			state.saves[#state.saves + 1] = { keys = keys, path = path }
+			if remap.save_ok == false then return false, "the settings file is unsafe" end
+			return true
+		end,
+	}
+	package.loaded["infra.config_paths"] = {
+		get = function(key)
+			assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+			return M.KARABINER_CONFIG_PATH
+		end,
+	}
+	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
 	package.loaded["infra.i18n"] = {
 		get = function(key) return key end,
 		set_locale_no_reload = function()

@@ -8,7 +8,9 @@
 ; to the candidate config.toml the commit transaction publishes: the whole
 ; payload is refused on any answer outside the catalogue, neutral answers become
 ; deletions, the file the wizard creates is stamped with the schema version, and
-; a re-run reads the values in force back through the same paths.
+; a re-run reads the values in force back through the same paths. The Tap-Holds
+; page's checked keys never become config.toml rows: the tap-hold writer renders
+; their preset into the tap_hold.toml the same transaction publishes.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -167,6 +169,47 @@ _TOAN_TriggerLengthCountsCharacters() {
 Test("onboarding answers: the trigger length counts characters (onboarding-answers-windows)",
 	_TOAN_TriggerLengthCountsCharacters)
 
+; The Tap-Holds page asked, then imported no key: its answers must reach the
+; tap-hold writer, and only the checked ones.
+_TOAN_TapHoldKeysGoToTheWriterNeverToConfig() {
+	global _SharedDir
+	Index := OnboardingCatalogue()
+	Listed := 0
+	for Path, Entry in Index["entries"] {
+		if (Entry["kind"] != "tap_hold_key")
+			continue
+		Listed += 1
+		AssertEqual("tap_holds.keys." . Entry["key"], Path)
+		AssertEqual(1, Entry["value"], "a key imports its recommendation")
+		AssertEqual(0, Entry["default"], "an unchecked key is its neutral value")
+	}
+	AssertEqual(LoadTapHoldToml(_SharedDir . "\tap_hold\defaults.toml")["keys"].Count, Listed,
+		"the page lists every key the shipped preset recommends")
+	Operations := [
+		_TOAN_Op("tap_holds.keys.caps_lock", true),
+		_TOAN_Op("gestures.enabled", true),
+		_TOAN_Op("tap_holds.keys.tab", false),
+		_TOAN_Op("tap_holds.keys.left_alt", true)
+	]
+	Rows := OnboardingAnswerRows(Index, Operations)
+	AssertTrue(Rows is Array, "a valid payload must produce rows: " . (Rows is String ? Rows : ""))
+	AssertEqual(1, Rows.Length, "no tap-hold key reaches config.toml")
+	AssertEqual(1, _TOAN_RowFor(Rows, "gestures", "enabled").Value)
+	Keys := OnboardingTapHoldKeys(Index, Operations)
+	AssertTrue(Keys is Array)
+	AssertEqual(2, Keys.Length, "the checked keys are imported, the unchecked one is not written")
+	AssertEqual("caps_lock", Keys[1])
+	AssertEqual("left_alt", Keys[2])
+	Refused := OnboardingTapHoldKeys(Index, [_TOAN_Op("tap_holds.keys.caps_lock", "yes")])
+	AssertTrue(Refused is String, "a key takes its recommendation or its neutral value")
+	AssertContains(Refused, "recommendation")
+	AssertTrue(OnboardingTapHoldKeys(Index, [_TOAN_Op("tap_holds.keys.caps_lock", true),
+		_TOAN_Op("script.onboarding_done", true)]) is String, "a refused payload imports no key either")
+	AssertEqual(0, OnboardingTapHoldKeys(Index, [_TOAN_Op("gestures.enabled", false)]).Length)
+}
+Test("onboarding answers: tap-hold keys go to the tap-hold writer, never to config.toml (onboarding-answers-windows)",
+	_TOAN_TapHoldKeysGoToTheWriterNeverToConfig)
+
 
 
 
@@ -183,6 +226,13 @@ _TOAN_FinishPlanValidatesBeforeAnyChange() {
 	AssertEqual("fr", Plan["locale"])
 	AssertEqual("D:\Ergopti", Plan["config_dir"])
 	AssertEqual(1, Plan["rows"].Length)
+	AssertEqual(0, Plan["tap_hold_keys"].Length, "no Tap-Holds answer, no import")
+	TapHolds := _OnbWeb_FinishPlan(_TOAN_Answers([_TOAN_Op("category_enabled.tap_holds", true),
+		_TOAN_Op("tap_holds.keys.right_ctrl", true)]))
+	AssertTrue(TapHolds is Map)
+	AssertEqual(1, TapHolds["rows"].Length, "the category switch is the only config.toml row")
+	AssertEqual(1, TapHolds["tap_hold_keys"].Length)
+	AssertEqual("right_ctrl", TapHolds["tap_hold_keys"][1])
 	Invalid := [
 		_TOAN_Answers([_TOAN_Op("gestures.enabled", true)], "xx"),
 		_TOAN_Answers([_TOAN_Op("gestures.enabled", true)], "fr", 7),
@@ -223,6 +273,45 @@ _TOAN_CommitRendersOneStampedCandidate() {
 }
 Test("onboarding answers: the commit renders one stamped candidate (onboarding-answers-windows)",
 	_TOAN_CommitRendersOneStampedCandidate)
+
+; The commit publishes this image beside config.toml in its own transition.
+_TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
+	global _SharedDir
+	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Path := _TOAN_NewPath()
+	Rendered := _TOAN_NewPath()
+	Source := '[tap_hold]`ninherit_defaults = false`n[tap_hold.keys.caps_lock]`ntap_action = "copy"`n'
+		. 'hold_layer = "nav"`n[tap_hold.keys.left_shift]`ntap_action = "paste"`n[private]`nnote = "keep"`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Image := TapHoldImportImage(Path, Defaults, ["caps_lock"])
+		AssertEqual(1, Image["source_present"])
+		AssertEqual(Source, Image["source_content"], "the transition checks the exact bytes it replaces")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "rendering publishes nothing")
+		AssertTrue(FSWriteDurable(Rendered, Image["content"]))
+		Loaded := LoadTapHoldToml(Rendered)
+		Preset := LoadTapHoldToml(Defaults)
+		for Field, Value in Preset["keys"]["caps_lock"]
+			AssertEqual(Value, Loaded["keys"]["caps_lock"][Field], "caps_lock." . Field . " is the preset's")
+		AssertFalse(Loaded["keys"]["caps_lock"].Has("hold_layer"), "the old hold does not survive the preset's")
+		AssertEqual("paste", Loaded["keys"]["left_shift"]["tap_action"], "an unchecked key keeps what it had")
+		AssertFalse(Loaded["keys"].Has("left_alt"), "a key nobody checked is not written")
+		AssertEqual("keep", TOML_ParseFreshFile(Rendered)["private"]["note"])
+		AssertContains(Image["content"], "inherit_defaults = false")
+		Absent := TapHoldImportImage(_TOAN_NewPath(), Defaults, ["tab"])
+		AssertEqual(0, Absent["source_present"], "a folder without tap_hold.toml gets one")
+		AssertContains(Absent["content"], "[tap_hold.keys.tab]")
+		AssertThrows(() => TapHoldImportImage(Path, Defaults, ["escape"]),
+			"a key the preset does not recommend is refused")
+		AssertThrows(() => TapHoldImportImage(Path, Defaults, ["tab", "tab"]), "a key is imported once")
+		AssertThrows(() => TapHoldImportImage(Path, Defaults, []), "an import names at least one key")
+	} finally {
+		try FileDelete(Path)
+		try FileDelete(Rendered)
+	}
+}
+Test("onboarding answers: the tap-hold import renders only the checked keys' preset (onboarding-answers-windows)",
+	_TOAN_TapHoldImportRendersOnlyTheCheckedKeys)
 
 
 

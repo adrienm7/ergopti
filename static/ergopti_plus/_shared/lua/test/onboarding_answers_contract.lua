@@ -6,8 +6,9 @@
 --- What every Lua host of the first-run wizard must keep, registered once per
 --- driver suite so the macOS runner (Lua 5.4) and the Linux runner (LuaJIT in
 --- CI) both prove it against their own generated manifest: the catalogue names
---- only this driver's configuration paths, the finish payload becomes manifest
---- rows or is refused whole, and the commit writes one versioned batch.
+--- only this driver's configuration paths and tap-hold keys, the finish payload
+--- becomes manifest rows and keys to import or is refused whole, and the commit
+--- writes one versioned batch.
 ---
 --- USAGE (one call per driver suite):
 ---   require("test.onboarding_answers_contract").register(helpers, { driver = "macos" })
@@ -20,6 +21,9 @@ local TomlCodec  = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
 
 local _sequence = 0
+
+-- The tap-hold catalogue column of each Lua host.
+local TAP_HOLD_PLATFORM = { macos = "hs", linux = "linux" }
 
 
 
@@ -121,15 +125,64 @@ function M.register(helpers, opts)
 			local count = 0
 			for path, entry in pairs(index.entries) do
 				count = count + 1
-				helpers.assert_true(Manifest.has_default(path), path .. " is declared for " .. driver)
-				local neutral = Manifest.default_for(path)
-				helpers.assert_eq(entry.default, neutral, path .. " keeps the manifest's neutral value")
-				if entry.kind == "choice" then
-					helpers.assert_eq(type(entry.value), type(neutral), path .. " imports a value of its type")
+				-- A tap-hold key is no configuration path: the next case pins it.
+				if entry.kind ~= "tap_hold_key" then
+					helpers.assert_true(Manifest.has_default(path), path .. " is declared for " .. driver)
+					local neutral = Manifest.default_for(path)
+					helpers.assert_eq(entry.default, neutral, path .. " keeps the manifest's neutral value")
+					if entry.kind == "choice" then
+						helpers.assert_eq(type(entry.value), type(neutral), path .. " imports a value of its type")
+					end
 				end
 			end
 			helpers.assert_true(count > 20, "the catalogue lists this driver's wizard paths")
 			helpers.assert_eq(#index.pages, 7, "one page per configuration scope")
+		end)
+
+		helpers.it("names this engine's tap-hold keys, never as configuration paths", function()
+			local catalogue = require("tap_hold.key_catalog").load(
+				require("infra.paths").shared("tap_hold/defaults.toml"), TAP_HOLD_PLATFORM[driver])
+			local engine_keys = {}
+			for _, key in ipairs(catalogue) do engine_keys[key.id] = true end
+			local count = 0
+			for path, entry in pairs(index.entries) do
+				if entry.kind == "tap_hold_key" then
+					count = count + 1
+					helpers.assert_eq(path, "tap_holds.keys." .. entry.key)
+					helpers.assert_true(engine_keys[entry.key] == true, entry.key .. " is a key of this engine")
+					helpers.assert_true(not Manifest.has_default(path), path .. " must never read as config.toml")
+					helpers.assert_eq(entry.value, true)
+					helpers.assert_eq(entry.default, false)
+				end
+			end
+			helpers.assert_true(count >= 7, "the Tap-Holds page lists the recommended keys")
+		end)
+
+		helpers.it("routes a checked tap-hold key to the tap-hold writer, never to config.toml", function()
+			local tap_holds = page(index, "tap_holds")
+			local first, second = tap_holds.groups[1].items[1], tap_holds.groups[1].items[2]
+			local master = page(index, "gestures").master.path
+			local operations = {
+				{ path = first.path, value = true },
+				{ path = master, value = true },
+				{ path = second.path, value = false },
+			}
+			local rows = assert(Answers.rows(index, operations, Manifest))
+			helpers.assert_eq(#rows, 1, "only the configuration answer is a row")
+			helpers.assert_eq(row_for(rows, master).value, true)
+			helpers.assert_eq(assert(Answers.tap_hold_keys(index, operations, Manifest)), { first.tap_hold_key },
+				"a checked key is imported, an unchecked one is not written at all")
+			helpers.assert_eq(assert(Answers.tap_hold_keys(index, { { path = master, value = false } }, Manifest)), {},
+				"a payload without the page imports nothing")
+			local keys, why = Answers.tap_hold_keys(index, { { path = first.path, value = "yes" } }, Manifest)
+			helpers.assert_nil(keys, "a key takes its recommendation or its neutral value")
+			helpers.assert_contains(tostring(why), "recommendation")
+			keys, why = Answers.tap_hold_keys(index,
+				{ { path = first.path, value = true }, { path = "script.log_level", value = "DEBUG" } }, Manifest)
+			helpers.assert_nil(keys, "a refused payload imports no key either")
+			helpers.assert_contains(tostring(why), "no wizard path")
+			local values = Answers.current_values(index, { tap_holds = { keys = { [first.tap_hold_key] = true } } })
+			helpers.assert_nil(values[first.path], "a tap-hold key is never read back from config.toml")
 		end)
 
 		helpers.it("turns declined and accepted answers into sparse manifest rows", function()
