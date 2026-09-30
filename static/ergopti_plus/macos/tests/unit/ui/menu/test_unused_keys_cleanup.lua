@@ -414,6 +414,25 @@ helpers.with_stub_scope(MODULES, function()
 				if not ok then error(err, 0) end
 			end)
 
+		helpers.it("unused keys: a retired hotstring delay is never saved back and is offered (config-outdated-delays)", function()
+			-- set_delay ignored it, the state kept it and every save wrote it back.
+			local source = "[hotstrings.delays]\nrolls = 0.4\nretired_delay = 0.1\nautocorrection = \"slow\"\n"
+			local saved = package.loaded["modules.keymap"]
+			package.loaded["modules.keymap"] = { DELAYS_DEFAULT = { rolls = 0.5, autocorrection = 1.0 } }
+			local ok, err = pcall(function()
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_eq(flat.delays, { rolls = 0.4 })
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "hotstrings.delays.autocorrection", "hotstrings.delays.retired_delay" })
+			end)
+			package.loaded["modules.keymap"] = saved
+			if not ok then error(err, 0) end
+		end)
+
 		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
 			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
 			-- must still win, or the warned entry could never be removed.

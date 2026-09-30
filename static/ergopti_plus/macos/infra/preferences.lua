@@ -234,6 +234,22 @@ local function action_parameter_fits(key, value)
 	return true
 end
 
+--- Owner check of one [hotstrings.delays] entry: a delay the keymap still
+--- declares (set_delay refuses any other), holding a number (it replaces any
+--- other value by the default in silence). The keymap judges it once loaded,
+--- which boot does before loading preferences; without it every entry is kept.
+--- @param key string Persisted delay key.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function delay_fits(key, value)
+	local keymap = package.loaded["modules.keymap"]
+	if type(keymap) ~= "table" or type(keymap.DELAYS_DEFAULT) ~= "table" then return true end
+	if keymap.DELAYS_DEFAULT[key] == nil then return false, "no hotstring delay of this build has this name" end
+	if tonumber(value) == nil then return false, "the value is not a number of seconds" end
+	return true
+end
+
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
@@ -612,6 +628,10 @@ local function flatten_from_disk(grouped, mark)
 								boolean_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
+						elseif nested_fk == "delays" then
+							-- A retired delay was ignored by set_delay and saved back
+							-- at every save, never offered.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned, delay_fits, mark)
 						elseif nested_fk == "gesture_action_parameters" then
 							-- The boot replay dropped these in silence and the whole
 							-- table was marked, so none was ever offered.
