@@ -19,6 +19,9 @@
  *      builder must route through the kernel (M.decorate_section / M.section /
  *      MenuUtils.build_section_header). Only the kernel file itself may contain
  *      the literal.
+ *   4. No section header the feature manifest declares carries a dash of its
+ *      own in any locale: the kernel frames it, and « Main gauche — Tap / Hold »
+ *      read « — Main gauche — Tap / Hold — » (section-header-no-inner-dash).
  * ==============================================================================
  */
 
@@ -123,6 +126,36 @@ if (offenders.length === 0) {
 			`       - ${path.relative(REPO_ROOT, f)} (route through i18n.decorate_section / M.section)`
 		);
 	}
+}
+
+// --- 4. Section header labels carry no dash of their own --------------------
+const MANIFEST = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/features/manifest.toml');
+const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales');
+const HEADER_KEY = /type\s*=\s*"section_header"\s*\n\s*i18n\s*=\s*"([^"]+)"/g;
+const headerKeys = [...fs.readFileSync(MANIFEST, 'utf8').matchAll(HEADER_KEY)].map((m) => m[1]);
+const dashed = [];
+for (const file of fs.readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
+	const strings = JSON.parse(
+		fs.readFileSync(path.join(LOCALE_DIR, file), 'utf8').replace(/^\uFEFF/, '')
+	);
+	for (const key of headerKeys) {
+		if (typeof strings[key] === 'string' && strings[key].includes('—')) {
+			dashed.push(`${file} ${key}: ${strings[key]}`);
+		}
+	}
+}
+if (headerKeys.length > 0 && dashed.length === 0) {
+	total_pass++;
+	console.log(
+		`  ${PASS_SYMBOL}  ${headerKeys.length} manifest section header(s) carry no dash of their own`
+	);
+} else {
+	total_fail++;
+	console.log(
+		`  ${FAIL_SYMBOL}  section headers the kernel frames must not add a dash (section-header-no-inner-dash)`
+	);
+	if (headerKeys.length === 0) console.log('       - no section_header found in the manifest');
+	for (const line of dashed) console.log(`       - ${line}`);
 }
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);
