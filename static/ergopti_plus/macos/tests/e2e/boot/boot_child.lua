@@ -16,8 +16,8 @@
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes).
 --- Output: the driver's log lines, E2E_* observation lines from the world,
---- E2E_FACT key=value lines (the lease workers started and the final lease
---- phase among them), and a final E2E_DONE line.
+--- E2E_FACT key=value lines (the lease workers started, the final lease phase
+--- and the native reloads among them), and a final E2E_DONE line.
 --- ==============================================================================
 
 local REPO_DRIVER, APP_ROOT, MACHINE_ROOT, HOME, ACTION, ARCH, SETTINGS_FILE, MACHINE =
@@ -154,5 +154,6 @@ local lease_ok, lease_phase = pcall(function()
 end)
 World.record("FACT", "lease_workers=" .. World.lease_workers_started)
 World.record("FACT", "lease_phase=" .. (lease_ok and tostring(lease_phase) or "unreadable"))
+World.record("FACT", "native_reloads=" .. World.native_reloads)
 World.flush_logs()
 World.record("DONE", ACTION)

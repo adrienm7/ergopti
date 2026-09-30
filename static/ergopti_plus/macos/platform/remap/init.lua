@@ -35,6 +35,7 @@ local NavLayer    = require("platform.remap.nav_layer")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
 local KeVariables = require("platform.remap.ke_variables")
 local LeaseController = require("platform.remap.lease_controller")
+local LeaseContract = require("platform.remap.lease_contract")
 local GuardianNotice = require("platform.remap.guardian_notice")
 local ManagedRuleRemoval = require("platform.remap.managed_rule_removal")
 local Notifications = require("infra.notifications")
@@ -596,19 +597,32 @@ end
 --- generation remains PAUSED, fences only the exact Ergopti lease. The KC
 --- classifier remains live while an ACTIVE generation is still being fenced so
 --- already-emitted managed events cannot be mistaken for physical input.
+--- An accepted Stop of the same generation is not an input failure: whoever
+--- requested it (a layout change during activation, a reload, a disable, a
+--- failure fence) has already logged why, at the severity its cause deserves.
+--- The superseded startup rolls its local inputs back the same way, requests
+--- no second fence and logs at INFO, so an expected fence never opens the
+--- error window (lease-stop-supersedes-activation).
 --- @param detail string Diagnostic detail.
 --- @param retain_if_paused boolean True only for a user resume that may remain paused.
 --- @param expected_token string|nil Generation capability captured before mounting.
 --- @param recovery_owner table|nil Regeneration transaction owning later recovery.
+--- @param superseded_by_stop boolean|nil True when an accepted Stop of this generation answered.
 --- @return boolean Always false.
 --- @return string Stable public failure reason.
 local function fail_lease_bound_input_start(
 	detail,
 	retain_if_paused,
 	expected_token,
-	recovery_owner
+	recovery_owner,
+	superseded_by_stop
 )
-	Logger.error(LOG, "Lease-bound input startup failed: %s.", tostring(detail))
+	if superseded_by_stop == true then
+		Logger.info(LOG, "Lease-bound input startup of generation %s superseded by its exact stop: %s.",
+			tostring(expected_token), tostring(detail))
+	else
+		Logger.error(LOG, "Lease-bound input startup failed: %s.", tostring(detail))
+	end
 	local exact_phase = exact_generation_phase(expected_token)
 	if exact_phase == nil then
 		-- Ownership changed while a local transaction was running. Never translate
@@ -619,7 +633,9 @@ local function fail_lease_bound_input_start(
 	end
 	local is_safely_paused = exact_phase == "paused"
 	local may_remain_paused = retain_if_paused == true and is_safely_paused
-	if not may_remain_paused then
+	-- A superseded startup's generation is already under the Stop that answered
+	-- it; a second fence request would only relabel that Stop as a bind failure.
+	if not may_remain_paused and superseded_by_stop ~= true then
 		local stop_method = type(LeaseController.stop_exact) == "function"
 			and LeaseController.stop_exact or LeaseController.stop
 		local on_fenced = exact_phase == "active"
@@ -855,12 +871,13 @@ local function activate_lease_generation(options, on_done)
 	options = options or {}
 	local retain_if_paused = options.retain_if_paused == true
 	local respect_pause_intent = options.respect_pause_intent == true
-	local function fail_activation_inputs(detail, may_retain, token)
+	local function fail_activation_inputs(detail, may_retain, token, superseded_by_stop)
 		return fail_lease_bound_input_start(
 			detail,
 			may_retain,
 			token,
-			options.failure_recovery_owner
+			options.failure_recovery_owner,
+			superseded_by_stop
 		)
 	end
 	local settled = false
@@ -1000,10 +1017,15 @@ local function activate_lease_generation(options, on_done)
 					finish(true, "ready-paused-by-user-intent")
 					return
 				end
+				-- A layout change, reload or disable that fenced this exact generation
+				-- while RESUME was in flight answers it with its own Stop reason.
+				local superseded = LeaseContract.is_superseded_by_stop(resume_reason)
 				local _, failure_reason = fail_activation_inputs(
-					"prepared lease RESUME failed: " .. tostring(resume_reason),
+					"prepared lease RESUME " .. (superseded and "answered " or "failed: ")
+						.. tostring(resume_reason),
 					retain_if_paused,
-					token
+					token,
+					superseded
 				)
 				if exact_generation_phase(token) == "paused" then clear_managed_output_set() end
 				finish(false, resume_reason or failure_reason)
@@ -3608,8 +3630,13 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			-- observe rules that are ACTIVE or whose acknowledgement is in flight.
 			-- Never dismantle F17 consumers/classification here; they stay mounted
 			-- until the exact STOPPED/fallback fence below settles.
-			Logger.error(LOG, "Karabiner enable activation failed: %s; revoking its exact generation.",
-				tostring(enable_reason))
+			if LeaseContract.is_superseded_by_stop(enable_reason) then
+				Logger.info(LOG, "Karabiner enable activation superseded by its exact stop: %s; revoking its exact generation.",
+					tostring(enable_reason))
+			else
+				Logger.error(LOG, "Karabiner enable activation failed: %s; revoking its exact generation.",
+					tostring(enable_reason))
+			end
 
 			local stop_callback_fired = false
 			local function finish_after_stop(stopped, stop_reason)
@@ -5540,7 +5567,13 @@ function M.regenerate(
 		end
 		start_callback_fired = true
 		if ok ~= true then
-			Logger.error(LOG, "Ergopti Karabiner lease preparation failed: %s.", tostring(reason))
+			if LeaseContract.is_superseded_by_stop(reason) then
+				-- The Stop's requester logged why it fenced this generation before READY.
+				Logger.info(LOG, "Ergopti Karabiner lease preparation superseded by its exact stop: %s.",
+					tostring(reason))
+			else
+				Logger.error(LOG, "Ergopti Karabiner lease preparation failed: %s.", tostring(reason))
+			end
 			finish(false, reason or "activation-failed")
 			return
 		end
@@ -5592,8 +5625,13 @@ function M.regenerate(
 				if activation_callback_fired then return end
 				activation_callback_fired = true
 				if activated ~= true then
-					Logger.error(LOG, "Prepared Karabiner lease activation failed: %s.",
-						tostring(activation_reason))
+					if LeaseContract.is_superseded_by_stop(activation_reason) then
+						Logger.info(LOG, "Prepared Karabiner lease activation superseded by its exact stop: %s.",
+							tostring(activation_reason))
+					else
+						Logger.error(LOG, "Prepared Karabiner lease activation failed: %s.",
+							tostring(activation_reason))
+					end
 					finish(false, activation_reason or "activation-failed")
 					return
 				end
@@ -5845,6 +5883,9 @@ function M.resume(on_done)
 		end
 		if ok == true then
 			Logger.success(LOG, "ErgoptiPlus Karabiner remapping resumed after paused preparation.")
+		elseif LeaseContract.is_superseded_by_stop(reason) then
+			Logger.info(LOG, "Karabiner resume transaction superseded by its exact stop, remaining fail-closed: %s.",
+				tostring(reason))
 		else
 			Logger.error(LOG, "Karabiner resume transaction failed while remaining fail-closed: %s.",
 				tostring(reason))

@@ -26,8 +26,9 @@
 --- 5. Either processor: the scenario names the architecture `uname -m`
 ---    answers, because the platform default AI backend follows it.
 --- 6. Named machines (M.MACHINES): the selected keyboard layout under both of
----    its names, and how long the Karabiner lease worker takes to answer
----    (layout-name-forms).
+---    its names, how long the Karabiner lease worker takes to answer, and what
+---    happens while the boot's first RESUME is in flight (layout-name-forms,
+---    lease-stop-supersedes-activation).
 --- ==============================================================================
 
 local M = {}
@@ -236,24 +237,34 @@ local HELPER_ROLE_ANSWERS = {
 -- differ for an Ergopti layout (modules/keymap/input_sources.lua).
 local LAYOUTS = {
 	abc = { localised = "ABC", hitoolbox = "ABC", id = 252, source_id = "com.apple.keylayout.ABC" },
+	french = { localised = "French", hitoolbox = "French", id = 1, source_id = "com.apple.keylayout.French" },
 	ergopti = { localised = "Ergopti+", hitoolbox = "Ergopti_v2_2_2_plus", id = -27340,
 		source_id = "org.sil.ukelele.keyboardlayout.ergopti.ergopti_v2_2_2_plus" },
 }
 
 --- The machines a scenario can boot on. `worker` delays are within the lease
---- worker's own budgets (READY_ACK_TIMEOUT_SEC 4 s, a command 1.75 s).
+--- worker's own budgets (READY_ACK_TIMEOUT_SEC 4 s, a command 1.75 s). A
+--- `during_resume` event happens once, `after` seconds into the boot's first
+--- RESUME, while its answer is still due.
 M.MACHINES = {
 	standard = { layout = "abc", worker = { ready_after = 0, answer_after = 0 } },
 	-- A user of an Ergopti layout on a start-up busy enough that the worker
 	-- answers late: RESUME is in flight when the first layout poll runs, 2 s
 	-- after the remap init.
 	ergopti_layout_slow_worker = { layout = "ergopti", worker = { ready_after = 1.0, answer_after = 1.5 } },
+	-- The user switches the layout while the boot's RESUME is in flight.
+	layout_switch_during_resume = { layout = "abc", worker = { ready_after = 0, answer_after = 1.0 },
+		during_resume = { after = 0.1, switch_layout = "french" } },
+	-- A reload (the menu, a shortcut, a watched file) during the same window.
+	reload_during_resume = { layout = "abc", worker = { ready_after = 0, answer_after = 1.0 },
+		during_resume = { after = 0.1, reload = true } },
 }
 
 -- The machine being booted and what it did; set by M.install.
 local _machine = nil
 local _selected_layout = nil
 M.lease_workers_started = 0
+M.native_reloads = 0
 
 --- AppleSelectedInputSources as `defaults read` prints it.
 --- @param layout table One of LAYOUTS.
@@ -283,6 +294,30 @@ local function file_exists(path)
 	return ok and type(attributes) == "table"
 end
 
+--- Selects the machine's keyboard layout and delivers the input-source
+--- notification macOS posts for the switch.
+--- @param name string LAYOUTS key.
+local function switch_layout(name)
+	_selected_layout = assert(LAYOUTS[name], "E2E world: unknown layout " .. tostring(name))
+	record("LAYOUT_SWITCH", _selected_layout.localised)
+	hs.keycodes.__fire_input_source_changed()
+end
+
+--- Runs the machine's `during_resume` event once, while the boot's first
+--- RESUME answer is still due.
+local function schedule_during_resume()
+	local event = _machine.during_resume
+	if not event or event.fired then return end
+	event.fired = true
+	hs.timer.doAfter(event.after, function()
+		if event.switch_layout then switch_layout(event.switch_layout) end
+		if event.reload then
+			record("RELOAD_REQUESTED", "while the boot's RESUME is in flight")
+			hs.reload()
+		end
+	end)
+end
+
 --- The Karabiner lease worker's line protocol, as RemapLeaseWorker.swift
 --- speaks it once the guardian is ready: READY, then one answer per command,
 --- each after the machine's worker delay.
@@ -297,7 +332,9 @@ local function lease_worker(api)
 			local sequence = line:match("^PING (%d+)$")
 			if sequence then api.emit("PONG " .. sequence .. "\n")
 			elseif line == "PAUSE" then api.emit("PAUSED\n", worker.answer_after)
-			elseif line == "RESUME" then api.emit("RESUMED\n", worker.answer_after)
+			elseif line == "RESUME" then
+				api.emit("RESUMED\n", worker.answer_after)
+				schedule_during_resume()
 			elseif line == "STOP" then
 				api.emit("STOPPED\n")
 				api.exit(0)
@@ -863,6 +900,11 @@ function M.install(hs, options)
 	_machine = M.MACHINES[options.machine or "standard"]
 	if not _machine then error("E2E world: unknown machine " .. tostring(options.machine), 2) end
 	_selected_layout = assert(LAYOUTS[_machine.layout], "E2E world: unknown layout " .. tostring(_machine.layout))
+	-- The native reload: the old Lua VM would be replaced here.
+	hs.reload = function()
+		M.native_reloads = M.native_reloads + 1
+		record("NATIVE_RELOAD", "the controlled reload reached hs.reload")
+	end
 	local env = M.launcher_environment(options.app_root, options.home)
 	install_log_transport()
 	install_timers(hs)

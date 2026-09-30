@@ -7,6 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- The real contract: the double answers what the controller's Stop answers.
+local LeaseContract = require("platform.remap.lease_contract")
 local M = {}
 local REAL_MODULES = {
 	"adapters.file_system", "infra.fs_dir", "platform.remap.ke_variables",
@@ -281,8 +283,9 @@ local function with_remap(options, body)
 					return true
 				end
 				publish("stopping", token)
-				settle_token_callbacks("start_callbacks", token, false, "lease-stopping")
-				settle_token_callbacks("resume_callbacks", token, false, "lease-stopping")
+				settle_token_callbacks("start_callbacks", token, false, LeaseContract.STOPPED_BEFORE_READY)
+				settle_token_callbacks("resume_callbacks", token, false,
+					LeaseContract.COMMAND_SUPERSEDED_BY_STOP)
 				if options.defer_exact_stop then
 					calls.exact_stop_deferred = {
 						token = token,
@@ -319,8 +322,9 @@ local function with_remap(options, body)
 				local token = calls.current_token
 				if token then
 					publish("stopping", token)
-					settle_token_callbacks("start_callbacks", token, false, "lease-stopping")
-					settle_token_callbacks("resume_callbacks", token, false, "lease-stopping")
+					settle_token_callbacks("start_callbacks", token, false, LeaseContract.STOPPED_BEFORE_READY)
+					settle_token_callbacks("resume_callbacks", token, false,
+						LeaseContract.COMMAND_SUPERSEDED_BY_STOP)
 				end
 				calls.current_token = nil
 				publish("idle", nil)
