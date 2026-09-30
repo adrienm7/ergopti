@@ -1686,6 +1686,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-rewrite-prompt-wiring'
 	},
 	{
+		name: 'Windows types an accepted prediction as one exact Text-mode batch at TextSender SendLevel',
+		cmd: 'node',
+		args: ['tools/test/test-windows-llm-accept-injection.cjs'],
+		repro: 'npm run test:windows-llm-accept-injection'
+	},
+	{
 		name: 'the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays',
 		cmd: 'node',
 		args: ['tools/test/test-send-input-vectors-shared.cjs'],

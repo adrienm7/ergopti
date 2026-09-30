@@ -178,13 +178,22 @@ _LLM_Bridge_CaptureAdmissionSeed(Source) {
 	)
 }
 
+; The live foreground window and focused control an injected text is admitted
+; into, as Map("hwnd", "control"). A global holding a function, as
+; _AHK_SendInput is, so a test can drive a real acceptance through admission
+; without owning the foreground window of a headless runner.
+global _LLM_Bridge_ReadLiveFocus := () => Map(
+	"hwnd", WIGetForegroundHwnd(), "control", WIGetFocusedControlToken())
+
 _LLM_Bridge_TextAdmissionStillCurrent(Expected) {
 	global _LLM_Bridge_ContentGeneration, _PrefixInputContextGeneration, _LLM_Engine
+	global _LLM_Bridge_ReadLiveFocus
 	LiveRequestId := (IsSet(_LLM_Engine) and _LLM_Engine is Map)
 		? _LLM_Engine.Get("request_id", -1) : -1
+	Focus := _LLM_Bridge_ReadLiveFocus.Call()
 	Live := Map(
-		"hwnd", WIGetForegroundHwnd(),
-		"control", WIGetFocusedControlToken(),
+		"hwnd", Focus["hwnd"],
+		"control", Focus["control"],
 		"physical_generation", KS_GetPhysicalInputGeneration(),
 		"content_generation", _LLM_Bridge_ContentGeneration,
 		"context_generation", IsSet(_PrefixInputContextGeneration)

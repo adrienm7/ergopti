@@ -208,6 +208,11 @@ SendLevel is its #InputLevel (2 for the tap-holds). Action: driver output that
 is not a stand-in for a physical key goes out at SendLevel 0
 (`TEXT_SENDER_SEND_LEVEL`), and observers use `I1`; the layout remap output
 stays at level 2 because it is the only trace of the key its hotkey suppresses.
+Every TextSender emission goes through `_TextSenderAtSendLevel`: the atomic
+direct and clipboard outputs once called their primitive directly, so a
+prediction accepted by the physical Tab (SC00F, #InputLevel 2) was typed at
+level 2 (`test_llm_accept_injects_exact_text.ahk`,
+`test-windows-llm-accept-injection.cjs`).
 
 ### project-ahk-hotif-variant-precedence
 
