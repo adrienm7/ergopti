@@ -369,6 +369,16 @@ le lecteur macOS ignore chaque `[tap_hold.*]`, et rien ne les recoupe.
 > tournent désormais dans le daemon (`linux/platform/remap/tap_hold_engine.lua`), avec la
 > sémantique et les seuils par touche de Windows, lus depuis `[tap_hold.*]`.
 
+> **Décidé le 2026-09-29 ([ADR 011](../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)).**
+> Sur macOS, le tap-hold ne passera plus par l'application Karabiner-Elements : Ergopti
+> lancera son propre runtime en arrière-plan (le VirtualHIDDevice de pqrs non modifié et un
+> fork headless de Karabiner-Elements 16.3.0), seulement quand le Tap-Hold est activé, avec
+> une option activée par défaut qui ferme les autres instances de Karabiner. Le mode
+> « partagé » décrit dans la colonne macOS (application officielle 16.0.0, règles fusionnées
+> dans le `karabiner.json` de l'utilisateur) reste le chemin de production jusqu'à la
+> livraison de ce runtime, planifiée dans
+> [`docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md`](handovers/2026-09-29-overnight/hs274-delivery-plan.md).
+
 ### 6.4 Gestes
 
 Il n'y a **pas trois reconnaisseurs** : il y a un reconnaisseur (macOS, frames tactiles
@@ -451,6 +461,14 @@ Le schéma utilise `CREATE TABLE IF NOT EXISTS` partout : les changements additi
 s'appliquent seuls, les destructifs échouent silencieusement.
 
 ⚠ Quatre problèmes de confidentialité vivants sont listés en §13.
+
+> **Comptage des touches physiques sur macOS (HS-274).** Le tap Quartz voit la sortie de
+> Karabiner : aujourd'hui, une touche remappée est comptée deux fois, sa sortie par le tap et
+> la touche physique par le journal `karabiner_kc.log`. Une fois le flux du runtime possédé
+> (ADR 011) actif, lui seul créditera les touches physiques : plus de répétition
+> automatique, les lettres de la couche navigation comptent comme des lettres, fn/globe et
+> touches média comprises, ce qui lève l'asymétrie I5. Sans Tap-Hold, le runtime ne tourne
+> pas et les métriques gardent le tap, exact quand rien n'est remappé.
 
 ### 6.8 Menu tray
 
