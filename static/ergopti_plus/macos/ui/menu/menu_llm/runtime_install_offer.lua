@@ -21,6 +21,9 @@
 --- 4. A failure offers its repair: an MLX selection that fails, or a Mac that
 ---    cannot run MLX, opens the repair offer (mlx_repair_offer), which names
 ---    the cause and carries the button that fixes it, or offers Ollama.
+--- 5. The boot notice of a missing runtime is clickable: the click opens the
+---    Ollama download offer, or the MLX offer's install button, instead of
+---    naming the menu row that installs it.
 --- ==============================================================================
 
 local M = {}
@@ -211,16 +214,40 @@ function M.select(backend, on_complete)
 end
 
 --- Tells the user, once per boot, that the configured backend has no runtime.
---- Never downloads anything; the menu selection remains the only install path.
+--- Never downloads anything by itself: a click on the notice opens the offer
+--- that installs it, the Ollama download offer or the MLX install button, as
+--- selecting the backend does.
 --- @param backend string Backend identifier restored from preferences.
 --- @return boolean missing True when a notice was posted.
 function M.notify_if_missing(backend)
 	if M.is_installed(backend) then return false end
-	local prefix = backend == "ollama" and "ollama" or "mlx"
-	Logger.warn(LOG, "The %s runtime is not installed; the AI waits for a backend selection.",
+	Logger.warn(LOG, "The %s runtime is not installed; its notice offers the install.",
 		tostring(backend))
-	pcall(notifications().notify, i18n.get(prefix .. ".runtime_missing_title"),
-		i18n.get(prefix .. ".runtime_missing_body"), "warning")
+	local ollama = backend == "ollama"
+	local ok, sent, detail = pcall(notifications().notify,
+		i18n.get(ollama and "ollama.runtime_missing_title" or "mlx.runtime_missing_title"),
+		i18n.get(ollama and "ollama.runtime_missing_click" or "mlx.runtime_missing_click"),
+		"warning", function()
+			if M.is_installed(backend) then
+				Logger.info(LOG, "The %s runtime was installed since its notice; nothing to offer.",
+					tostring(backend))
+				return
+			end
+			-- The Ollama offer asks before it downloads, and a decline is not a
+			-- failure; the MLX offer carries the install button.
+			local called, err = pcall(function()
+				if ollama then return M.select_ollama() end
+				return mlx_repair_offer().offer({ kind = "missing", repairable = true })
+			end)
+			if not called then
+				Logger.error(LOG, "The %s install offer raised: %s.", tostring(backend), tostring(err))
+			end
+		end)
+	if not ok or sent ~= true then
+		Logger.error(LOG, "The missing %s runtime notice was not posted: %s.",
+			tostring(backend), tostring(ok and detail or sent))
+		return false
+	end
 	return true
 end
 
