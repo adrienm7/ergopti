@@ -510,6 +510,11 @@ _LLM_Menu_SerializeUserProfiles(Profiles) {
 }
 
 _LLM_Menu_DeserializeUserProfiles(Payload) {
+	; The empty string is the declared neutral value of llm.user_profiles (its
+	; manifest default, written by the neutral config template): no user
+	; profile, as the Linux codec reads it (profile_registry_codec.lua).
+	if (Payload is String) && Payload == ""
+		return []
 	if !(Payload is String) || SubStr(Payload, 1, 3) != "v1:"
 		return false
 	try Bytes := CryptoBase64Decode(SubStr(Payload, 4))
