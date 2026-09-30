@@ -36,7 +36,13 @@ local LeaseHelper    = require("platform.remap.lease_helper")
 local LOG = "karabiner.lease"
 
 local READY_ACK_TIMEOUT_SEC = 4.0
-local COMMAND_ACK_TIMEOUT_SEC = 2.0
+-- The worker answers every PING, PAUSE and RESUME within its own private
+-- command budget (kPrivateCommandAckTimeoutSeconds, 1.75 s, in
+-- launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift) or fences itself, so
+-- this deadline only has to detect a dead worker. It keeps 2 s over that
+-- budget for pipe and main-thread latency: at 2.0 s the margin was 0.25 s, and
+-- a start-up busy with its first builds saw "timeout waiting for PONG 1".
+local COMMAND_ACK_TIMEOUT_SEC = 3.75
 local STOP_ACK_TIMEOUT_SEC = 7.0
 -- An ACK timeout that fires this much later than due was held by a parked run
 -- loop (a modal dialog, a busy main thread). The worker's answer may be waiting
