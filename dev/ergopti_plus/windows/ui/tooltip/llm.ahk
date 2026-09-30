@@ -752,6 +752,23 @@ LLM_TooltipNavCycleIsOwned() {
 	return IsObject(_LLM_TooltipNavCycleRecord())
 }
 
+; The slot a cycle of Delta lands on from Current among Count slots: past the
+; first slot it loops to the last, and past the last back to the first. The one
+; wrap rule of every prediction cycle (LLM_TooltipCycleActiveIdx, and the plan
+; callback in menu_llm/tab_accept.ahk).
+; @param {Integer} Current - The active slot.
+; @param {Integer} Delta - -1 for the previous slot, 1 for the next one.
+; @param {Integer} Count - The number of slots shown.
+; @returns {Integer} The target slot.
+LLM_TooltipWrapSlot(Current, Delta, Count) {
+	Target := Current + Delta
+	if (Target < 1)
+		return Count
+	if (Target > Count)
+		return 1
+	return Target
+}
+
 ; Moves the ▶ marker of the prediction the navigation chord cycles by Delta
 ; slots, wrapping around at both ends, and repaints it in place:
 ; LLM_TooltipSetActiveIdx republishes the record to the native owner with its
@@ -768,11 +785,7 @@ LLM_TooltipCycleActiveIdx(Delta, SetActiveIdxFn := 0) {
 	Record := _LLM_TooltipNavCycleRecord()
 	if !IsObject(Record)
 		return 0
-	Target := Record.ActiveIdx + Delta
-	if (Target < 1)
-		Target := Record.Slots.Length
-	else if (Target > Record.Slots.Length)
-		Target := 1
+	Target := LLM_TooltipWrapSlot(Record.ActiveIdx, Delta, Record.Slots.Length)
 	if !HasMethod(SetActiveIdxFn, "Call")
 		SetActiveIdxFn := LLM_TooltipSetActiveIdx
 	return SetActiveIdxFn.Call(Target) ? Target : 0
@@ -1168,6 +1181,14 @@ _LLM_FormatInfoLine(modelInfo, ttftMs := "", ttltMs := "", forSizing := false) {
 	return out
 }
 
+; The footer of a multi-slot prediction: every navigation chord the hotkeys of
+; menu_llm/tab_accept.ahk consume, the left and right Shift+Tab, then the
+; arrows with the configured modifiers, bare by default, as the macOS footer
+; (tooltip_llm.lua) shows them. The bare arrows were left out, so the footer
+; hid the default chord (llm-nav-left-right-windows).
+; @param {Integer} slotCount - The number of predictions shown.
+; @param {String} navMods - The configured nav_modifiers; "none" hides the arrows.
+; @returns {String}
 _LLM_BuildNavHint(slotCount, navMods := "") {
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
 	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
@@ -1177,19 +1198,13 @@ _LLM_BuildNavHint(slotCount, navMods := "") {
 	acceptSingle := UI_LLM_HINT_ACCEPT_SINGLE
 	if (slotCount <= 1)
 		return acceptSingle
-	navStr := navMods
-	if (navStr = "" or navStr = "none")
-		navStr := ""
-	else
-		navStr := _LLM_FormatValModifiers(navStr)
 	hintLeft := UI_LLM_HINT_NAV_LEFT
 	hintRight := UI_LLM_HINT_NAV_RIGHT
-	hintOr := UI_LLM_HINT_OR
-	arrL := UI_LLM_HINT_ARROW_LEFT
-	arrR := UI_LLM_HINT_ARROW_RIGHT
-	if (navStr != "") {
-		hintLeft .= hintOr . navStr . " + " . arrL
-		hintRight .= hintOr . navStr . " + " . arrR
+	if (navMods != "none") {
+		navStr := _LLM_FormatValModifiers(navMods)
+		chord := navStr == "" ? "" : navStr . " + "
+		hintLeft .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_LEFT
+		hintRight .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_RIGHT
 	}
 	sepL := UI_LLM_HINT_ARROW_SEP_LEFT
 	sepR := UI_LLM_HINT_ARROW_SEP_RIGHT

@@ -79,10 +79,11 @@ _FeatureStateDefaultsForSection(Section) {
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
 ; from GESTURE_ACTIONS (see modules/gestures.ahk) so the user can re-purpose
 ; them via the tray menu the same way they configure trackpad gestures.
-; ``Default`` is the action fired on a fresh install; ``Fallback`` is what we
-; send to the OS when the assignment is "none" (so the underlying key keeps
-; working). ``ScKey`` is the scancode of the secondary key for the GetKeyState
-; double-check guarding against AltGr+Enter pause-bug-style misfires.
+; ``DEFAULTS`` come from the manifest; ``FALLBACKS`` is the key a chord sends
+; when its AltGr turns out not to be physical (a latched prefix) or a pause
+; began between the press and its thread; ``SCAN_CODES`` is the key AltGr
+; modifies, which names the chord hotkeys and the GetKeyState double-check
+; guarding against AltGr+Enter pause-bug-style misfires.
 global SCRIPT_SHORTCUT_SLOTS := [
 		"script_altgr_enter",
 		"script_altgr_backspace",
@@ -102,6 +103,15 @@ global SCRIPT_SHORTCUT_FALLBACKS := Map(
 		"script_altgr_delete", "{Delete}",
 		"script_altgr_escape", "{Escape}",
 )
+global SCRIPT_SHORTCUT_SCAN_CODES := Map(
+		"script_altgr_enter", "SC01C",
+		"script_altgr_backspace", "SC00E",
+		"script_altgr_delete", "SC153",
+		"script_altgr_escape", "SC001",
+)
+; The switch at the head of « Raccourcis de gestion du script »: off leaves
+; every chord to the system and keeps the slots' actions.
+global ScriptShortcutChordsOn := _FeatureStateRequireManifestDefault("shortcuts.script_control.chords_enabled")
 global ScriptShortcutAssignments := Map()
 for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 		ScriptShortcutAssignments[_FeatureStateSlot] := SCRIPT_SHORTCUT_DEFAULTS[_FeatureStateSlot]

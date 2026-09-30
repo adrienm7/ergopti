@@ -88,7 +88,7 @@ _ACSD_EveryAltGrGateAppliesIt() {
 	Gate := InStr(Body, "AltGrKeyIsAltGr()")
 	AssertTrue(Gate > 0 and Gate < InStr(Body, 'GetKeyState("RAlt", "P")'),
 		"IsRealAltGrPress must stand down for a non-AltGr hold before its standard-layout physical check")
-	Script := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
+	Script := _DriverFuncBody("ScriptAltGrKanaChordRunsSlot")
 	AssertTrue(InStr(Script, 'ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P"))') > 0,
 		"the Kana suffix-only script chords must be gated by their criterion")
 	global TapHold

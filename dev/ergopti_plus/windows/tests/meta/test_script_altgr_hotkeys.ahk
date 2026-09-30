@@ -1,31 +1,18 @@
 ﻿; static/ergopti_plus/windows/tests/meta/test_script_altgr_hotkeys.ahk
 #Requires AutoHotkey v2.0
-; Smoke-test: _ScriptAltGrHookKey must not produce invalid Hotkey() names.
-
-_ScriptAltGrHookKey(KeyName) {
-    if (SubStr(KeyName, 1, 1) = "$")
-        return KeyName
-    if InStr(KeyName, " & ")
-        return KeyName
-    return "$" . KeyName
-}
+; Smoke-test: every hotkey name ScriptAltGrChordPlan builds must be a valid
+; Hotkey() name with the registrar's options.
 
 _DummyHandler(*) {
 }
 
 _ScriptAltGrValidationOptions := "I3 S"
-_ScriptAltGrValidationKeys := [
-    "SC138 & SC01C",
-    "SC138 & SC00E",
-    "SC138 & SC038",
-    "SC138 & SC03A",
-    "SC01C",
-    "SC00E",
-    "*SC01C",
-    "*SC00E",
-]
-for _ScriptAltGrValidationKey in _ScriptAltGrValidationKeys {
-    _ScriptAltGrValidationHotkey := _ScriptAltGrHookKey(_ScriptAltGrValidationKey)
+_ScriptAltGrValidationSlots := ["script_altgr_enter", "script_altgr_backspace",
+    "script_altgr_delete", "script_altgr_escape"]
+_ScriptAltGrValidationCodes := Map("script_altgr_enter", "SC01C", "script_altgr_backspace", "SC00E",
+    "script_altgr_delete", "SC153", "script_altgr_escape", "SC001")
+for _ScriptAltGrValidationRow in ScriptAltGrChordPlan(_ScriptAltGrValidationSlots, _ScriptAltGrValidationCodes) {
+    _ScriptAltGrValidationHotkey := _ScriptAltGrValidationRow["hotkey"]
     try {
         Hotkey(_ScriptAltGrValidationHotkey, _DummyHandler, _ScriptAltGrValidationOptions)
         Hotkey(_ScriptAltGrValidationHotkey, "Off")
@@ -45,16 +32,30 @@ for _ScriptAltGrValidationKey in _ScriptAltGrValidationKeys {
 ; LCtrl+RAlt of an AltGr layout: without it AltGr+Enter could not unpause
 ; there (script-altgr-scan-codes-2026-09-26).
 _SAH_ChordsAreScanCodesAndPausedOnesWildcard() {
-    Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-    for _, Dead in ['"RAlt & ', '"^!Enter"', '"^!Backspace"', '"^!Delete"', '"^!Escape"'] {
-        AssertFalse(InStr(Body, Dead) > 0, "no script chord may be named by a virtual key: " . Dead)
+    ; The registrar registers the rows of ScriptAltGrChordPlan, whose names are
+    ; built from the slots' scan codes (script-chord-slot-2026-09-30).
+    for _, Name in ["_RegisterScriptAltGrHotkeys", "ScriptAltGrChordPlan"] {
+        Body := _DriverFuncBody(Name)
+        for _, Dead in ['"RAlt & ', '"^!Enter"', '"^!Backspace"', '"^!Delete"', '"^!Escape"', '"^!"'] {
+            AssertFalse(InStr(Body, Dead) > 0, Name . ": no script chord may be named by a virtual key: " . Dead)
+        }
     }
-    Paused := InStr(Body, 'HotIf((*) => ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")))')
-    AssertTrue(Paused > 0, "the paused chords must still be registered")
-    for _, Suffix in ["SC01C", "SC00E", "SC153", "SC001"] {
-        AssertTrue(InStr(Body, '_ScriptAltGrHookKey("*' . Suffix . '")', , Paused) > 0,
-            "the paused " . Suffix . " chord must admit the modifiers AltGr holds")
+    AssertTrue(InStr(_DriverFuncBody("_RegisterScriptAltGrHotkeys"), "SCRIPT_SHORTCUT_SCAN_CODES") > 0,
+        "the chords must be named by the slots' scan codes")
+    AssertTrue(InStr(_DriverFuncBody("ScriptAltGrChordPlan"), '"$*" . Sc, "criterion", ScriptAltGrPausedChordRunsSlot.Bind(Slot)') > 0,
+        "the paused chords must still be registered, under the paused criterion")
+    Paused := 0
+    for Index, Row in ScriptAltGrChordPlan(["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete",
+            "script_altgr_escape"], Map("script_altgr_enter", "SC01C", "script_altgr_backspace", "SC00E",
+            "script_altgr_delete", "SC153", "script_altgr_escape", "SC001")) {
+        ; Each slot's third row is its paused twin.
+        if (Mod(Index, 3) == 0) {
+            Paused += 1
+            AssertEqual("$*" . Row["scan_code"], Row["hotkey"],
+                "the paused " . Row["scan_code"] . " chord must admit the modifiers AltGr holds")
+        }
     }
+    AssertEqual(4, Paused, "the paused chords must still be registered")
 }
 Test("script altgr: chords by scan code, paused ones admit AltGr's modifiers (script-altgr-scan-codes-2026-09-26)",
     _SAH_ChordsAreScanCodesAndPausedOnesWildcard)
@@ -78,14 +79,15 @@ _SAH_ChordsNeedAnAltGrLayout() {
             AssertFalse(ScriptAltGrChordIsLive(false), Family . ": no chord without its AltGr press")
         } finally _TestRestoreAltGrFamily(Saved)
     }
-    Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-    Assert(Body != "", "_RegisterScriptAltGrHotkeys must be found")
-    AssertTrue(InStr(Body, "HotIf((*) => ScriptAltGrChordIsLive(IsRealAltGrPress()))") > 0,
+    AssertTrue(InStr(_DriverFuncBody("ScriptAltGrChordRunsSlot"), "ScriptAltGrChordIsLive(IsRealAltGrPress())") > 0,
         "the running chords must go through the layout gate")
-    AssertTrue(InStr(Body, 'HotIf((*) => ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")))') > 0,
+    AssertTrue(InStr(_DriverFuncBody("ScriptAltGrPausedChordRunsSlot"), 'ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P"))') > 0,
         "the paused chords must go through the layout gate")
-    StrReplace(Body, "HotIf((*) =>", , , &Criteria)
-    AssertEqual(3, Criteria, "the running, Kana and paused chords are the only registrations")
+    Body := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
+    StrReplace(Body, "HotIf(", , , &Criteria)
+    AssertEqual(2, Criteria, "the plan's criterion and the reset are the registrar's only HotIf calls")
+    StrReplace(_DriverFuncBody("ScriptAltGrChordPlan"), "RunsSlot.Bind(Slot)", , , &Bound)
+    AssertEqual(3, Bound, "the running, Kana and paused chords are the only registrations")
 }
 Test("script altgr: the chords need a layout whose AltGr key is an AltGr, on every family (qwerty-script-chords-2026-09-26)",
     _SAH_ChordsNeedAnAltGrLayout)

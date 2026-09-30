@@ -20,11 +20,20 @@ _KL_Clip_CharCountFromBuffer(TextPtr, ByteCapacity) {
 ;    (text/image/other), the text length in characters (never the raw text
 ;    — only the count), and the source app. This lets the dashboard show
 ;    "copy rate" alongside keystrokes without ever storing clipboard content.
-; 2. Clipboard paste detection — when the user presses Ctrl+V (or
+; 2. Clipboard paste detection — when the application receives Ctrl+V (or
 ;    Shift+Insert) we emit a clipboard_paste event. Pairing it with the
 ;    last clipboard_copy gives the copy→paste interval and reveals whether
 ;    the user is collage-typing (copy, immediately paste elsewhere) or has
-;    the clipboard as a staging buffer.
+;    the clipboard as a staging buffer. The chord is observed on the shared
+;    InputHook (HookDispatcher), after every hotkey decision, never claimed by
+;    a hotkey: the driver declares every character key by scan code (the AltGr
+;    layer, the layout emulation), so AutoHotkey's hook resolves those keys
+;    through their scan code only (hook.cpp: ChangeHookState sets
+;    sc_takes_precedence, LowLevelCommon looks up the scan-code table alone)
+;    and the former "~^v" hotkey, named by its virtual key, never fired.
+;    Declaring it by scan code instead cannot work either: the key carrying
+;    VK_V follows the foreground layout, and a scan-code variant competes with
+;    the emulation's and the navigation layer's hotkeys of the same key.
 ; 3. Paste burst — if more than PASTE_BURST_THRESHOLD paste events occur
 ;    within PASTE_BURST_WINDOW_MS a paste_burst event is emitted. Paste
 ;    bursts indicate research-heavy or template-assembly work patterns that
@@ -34,9 +43,9 @@ _KL_Clip_CharCountFromBuffer(TextPtr, ByteCapacity) {
 ;    clipboards are logged as type "image" with size 0.
 ;
 ; INTEGRATION:
-; KL_Clip_Start() must be called after KL_Init(). It installs an
-; OnClipboardChange callback and two pass-through hotkeys (Ctrl+V and
-; Shift+Insert) that forward the event before passing through to the app.
+; KL_Clip_Start() must be called after KL_Init() and HookDispatcher.Start().
+; It installs an OnClipboardChange callback and subscribes KL_Clip_OnKeyDown
+; to the dispatcher's key-down events, which recognises the paste chords.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -59,6 +68,10 @@ class KLClipConst {
 		; Max character count to store (cap to avoid storing huge clipboard counts
 		; that would reveal document length)
 		static MAX_CHAR_COUNT          := 100000
+		; Virtual keys of the paste chords (WinUser.h). The application's paste
+		; accelerator is VK_V whatever physical key carries it on the layout.
+		static VK_V                    := 0x56
+		static VK_INSERT               := 0x2D
 }
 
 
@@ -203,11 +216,43 @@ KL_Clip_OnChange(data_type) {
 
 
 
-; ========================================
-; ========================================
-; ======= 4/ Paste hotkey handlers =======
-; ========================================
-; ========================================
+; =================================
+; =================================
+; ======= 4/ Paste handlers =======
+; =================================
+; =================================
+
+; Whether a key-down the application receives is a paste chord: Ctrl+V or
+; Shift+Insert with no other modifier, as the former "^v" and "+Insert" hotkeys
+; required. The modifiers are read logically, as the application reads them, so
+; a Ctrl held by a tap-hold counts like the physical one.
+; @param Vk {Integer} Virtual key of the key-down.
+; @param KeyIsDownFn {Func} Takes a key name, returns whether it is down.
+; @return {Boolean}
+_KL_Clip_IsPasteChord(Vk, KeyIsDownFn) {
+		if (Vk != KLClipConst.VK_V && Vk != KLClipConst.VK_INSERT)
+				return false
+		Ctrl := KeyIsDownFn.Call("Ctrl")
+		Shift := KeyIsDownFn.Call("Shift")
+		if KeyIsDownFn.Call("Alt") || KeyIsDownFn.Call("LWin") || KeyIsDownFn.Call("RWin")
+				return false
+		if (Vk == KLClipConst.VK_V)
+				return Ctrl && !Shift
+		return Shift && !Ctrl
+}
+
+_KL_Clip_KeyIsLogicallyDown(KeyName) {
+		return GetKeyState(KeyName) ? true : false
+}
+
+; HookDispatcher EVT_KB_DOWN subscriber. The shared InputHook ("V L0 I1") sees a
+; key only once no hotkey suppressed it, physical or sent at SendLevel 1 and
+; above: the layout emulation's own Ctrl+V (level 2) and the user's native one
+; alike, never the driver's level-0 TextSender paste.
+KL_Clip_OnKeyDown(ih, vk, sc) {
+		if _KL_Clip_IsPasteChord(vk, _KL_Clip_KeyIsLogicallyDown)
+				KL_Clip_OnPaste()
+}
 
 KL_Clip_OnPaste() {
 		; Synthetic Ctrl+V can arrive while the clipboard's deferred restore is
@@ -274,12 +319,13 @@ KL_Clip_Start() {
 		if KLClip.HasOwnProp("clip_handler") && IsObject(KLClip.clip_handler)
 				return true
 
-		; Register the clipboard observer and both pass-through paste hotkeys as
-		; one transaction.  A rejection after the first Hotkey used to leave a
-		; half-live observer/hotkey set and an unhandled boot exception.
+		; Register the clipboard observer and the paste-chord observer as one
+		; transaction.  A rejection after the first registration used to leave a
+		; half-live observer set and an unhandled boot exception.
 		Handler := KL_Clip_OnChange
 		ClipboardRegistered := false
 		OwnershipObserverActive := false
+		PasteObserverRegistered := false
 		try {
 				; Adapter writes made before observation started have no corresponding
 				; callback for this handler and must not consume the first user change.
@@ -293,14 +339,15 @@ KL_Clip_Start() {
 				} finally {
 						Critical(PreviousCritical)
 				}
-				; ``~`` ensures the paste still reaches the active application unchanged.
-				Hotkey("~^v",      KL_Clip_OnPasteHK, "On")
-				Hotkey("~+Insert", KL_Clip_OnPasteHK, "On")
+				; An observer, not a hotkey: the paste still reaches the application
+				; unchanged, and no hotkey of the key can shadow or be shadowed by it.
+				HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, KL_Clip_OnKeyDown)
+				PasteObserverRegistered := true
 				KLClip.clip_handler := Handler
 				return true
 		} catch as Err {
-				try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
-				try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
+				if PasteObserverRegistered
+						HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KL_Clip_OnKeyDown)
 				PreviousCritical := Critical("On")
 				try {
 						if ClipboardRegistered
@@ -315,10 +362,6 @@ KL_Clip_Start() {
 		}
 }
 
-KL_Clip_OnPasteHK(*) {
-		try KL_Clip_OnPaste()
-}
-
 KL_Clip_Stop() {
 		PreviousCritical := Critical("On")
 		try {
@@ -330,8 +373,7 @@ KL_Clip_Stop() {
 		} finally {
 				Critical(PreviousCritical)
 		}
-		try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
-		try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KL_Clip_OnKeyDown)
 		_KL_Clip_InvalidateProvenance()
 		KLClip.paste_ticks := []
 }

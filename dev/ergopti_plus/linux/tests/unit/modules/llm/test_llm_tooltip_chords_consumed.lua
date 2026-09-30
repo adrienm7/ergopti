@@ -4,8 +4,11 @@
 --- MODULE: Prediction Tooltip Chords Are Consumed, Every Other Chord Passes
 --- DESCRIPTION:
 --- The maintainer's rule, on every OS: while the AI tooltip shows predictions,
---- the configured navigation chord (llm.navigation.nav_modifiers + Up or Down)
---- moves the active prediction and the configured validation chord
+--- the configured navigation chord (llm.navigation.nav_modifiers + an arrow:
+--- Up or Left for the previous prediction, Down or Right for the next, as the
+--- shared menu.llm.nav_label says, or Shift+Tab, the left Shift back and the
+--- right one forward, as the Windows and macOS footers say) moves the active
+--- prediction and the configured validation chord
 --- (llm.navigation.val_modifiers + digit N) inserts prediction N, and the
 --- application never receives either. Any other modifier set (bare, a
 --- superset, a subset or a different one) reaches the application unchanged,
@@ -14,7 +17,8 @@
 --- (llm-tooltip-chords-consumed).
 ---
 --- Linux had no navigation chord: Up and Down moved only an agent's actions,
---- bare, and reached the application over every other offer. Its digit was the
+--- bare, and reached the application over every other offer; Left and Right
+--- then stayed the application's while macOS cycled on them. Its digit was the
 --- character the key typed, so Shift+2 was "@" on a US layout and a validation
 --- chord holding Shift never accepted anything. The expected verdict is computed
 --- here from set equality of the held and configured modifiers.
@@ -33,10 +37,13 @@ local KEY_4 = 5
 local KEY_0 = 11
 local EV_KEY = 1
 
--- The active prediction each arrow selects from the first of three.
+-- The active prediction each arrow selects from the first of three: Up and
+-- Left step back and wrap to the last, Down and Right step forward.
 local ARROWS = {
 	{ name = "Up", code = EvdevCodes.KEY_UP, target = 3 },
 	{ name = "Down", code = EvdevCodes.KEY_DOWN, target = 2 },
+	{ name = "Left", code = EvdevCodes.KEY_LEFT, target = 3 },
+	{ name = "Right", code = EvdevCodes.KEY_RIGHT, target = 2 },
 }
 
 -- Each configured modifier set, with a superset (one modifier added), a
@@ -239,7 +246,7 @@ helpers.describe("prediction tooltip: the navigation chord (llm-tooltip-chords-c
 				end
 			end
 		end
-		helpers.assert_eq(checked, 50, "every modifier set, chord and arrow is checked")
+		helpers.assert_eq(checked, 100, "every modifier set, chord and arrow is checked")
 	end)
 
 	helpers.it("(llm-tooltip-chords-consumed) leaves arrows to the app over one prediction or no tooltip", function()
@@ -265,17 +272,20 @@ helpers.describe("prediction tooltip: the navigation chord (llm-tooltip-chords-c
 		}
 		for _, side in ipairs(sides) do
 			for _, code in ipairs(side.codes) do
-				with_offer({ nav = side.nav, val = {} }, function(world)
-					local emitted = world.drive({
-						{ type = EV_KEY, code = code, value = 1 },
-						{ type = EV_KEY, code = EvdevCodes.KEY_DOWN, value = 1 },
-						{ type = EV_KEY, code = EvdevCodes.KEY_DOWN, value = 0 },
-						{ type = EV_KEY, code = code, value = 0 },
-					})
-					helpers.assert_eq(table.concat(emitted, " "), code .. ":1 " .. code .. ":0",
-						side.nav[1] .. " on key " .. code .. ": the application never sees the chord's arrow")
-					helpers.assert_eq(world.overlay.active_index(), 2)
-				end)
+				for _, arrow in ipairs({ EvdevCodes.KEY_DOWN, EvdevCodes.KEY_RIGHT }) do
+					with_offer({ nav = side.nav, val = {} }, function(world)
+						local emitted = world.drive({
+							{ type = EV_KEY, code = code, value = 1 },
+							{ type = EV_KEY, code = arrow, value = 1 },
+							{ type = EV_KEY, code = arrow, value = 0 },
+							{ type = EV_KEY, code = code, value = 0 },
+						})
+						helpers.assert_eq(table.concat(emitted, " "), code .. ":1 " .. code .. ":0",
+							side.nav[1] .. " on key " .. code .. ": the application never sees the chord's arrow "
+								.. arrow)
+						helpers.assert_eq(world.overlay.active_index(), 2)
+					end)
+				end
 			end
 		end
 		with_offer({ nav = { "alt" }, val = {} }, function(world)
@@ -290,6 +300,103 @@ helpers.describe("prediction tooltip: the navigation chord (llm-tooltip-chords-c
 				altgr, EvdevCodes.KEY_DOWN, EvdevCodes.KEY_DOWN, altgr), "AltGr+Down is the application's")
 			helpers.assert_eq(world.overlay.active_index(), 1)
 		end)
+	end)
+end)
+
+
+
+
+
+helpers.describe("prediction tooltip: Shift+Tab (llm-nav-left-right-windows)", function()
+	--- Types Shift+Tab with the given Shift keys held, through the real hook.
+	--- @return table emitted
+	local function shift_tab(world, shifts, extra)
+		local events = {}
+		for _, code in ipairs(extra or {}) do events[#events + 1] = { type = EV_KEY, code = code, value = 1 } end
+		for _, code in ipairs(shifts) do events[#events + 1] = { type = EV_KEY, code = code, value = 1 } end
+		events[#events + 1] = { type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 }
+		events[#events + 1] = { type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 }
+		for _, code in ipairs(shifts) do events[#events + 1] = { type = EV_KEY, code = code, value = 0 } end
+		for _, code in ipairs(extra or {}) do events[#events + 1] = { type = EV_KEY, code = code, value = 0 } end
+		return world.drive(events)
+	end
+
+	--- Asserts that a verdict is false.
+	local function assert_false(value, message) helpers.assert_eq(value, false, message) end
+
+	--- Whether the application received the Tab.
+	local function saw_tab(emitted)
+		for _, event in ipairs(emitted) do
+			if event == EvdevCodes.KEY_TAB .. ":1" then return true end
+		end
+		return false
+	end
+
+	helpers.it("(llm-nav-left-right-windows) the left Shift steps back, the right one forward, whatever nav_modifiers", function()
+		local checked = 0
+		for _, nav in ipairs({ {}, { "ctrl" }, { "alt", "shift" } }) do
+			local label = #nav > 0 and table.concat(nav, "+") or "none"
+			with_offer({ nav = nav, val = {} }, function(world)
+				assert_false(saw_tab(shift_tab(world, { EvdevCodes.KEY_LEFTSHIFT })),
+					label .. ": the application never sees the left Shift+Tab")
+				helpers.assert_eq(world.overlay.active_index(), 3, label .. ": left Shift+Tab wraps back to the last")
+				assert_false(saw_tab(shift_tab(world, { EvdevCodes.KEY_RIGHTSHIFT })),
+					label .. ": the application never sees the right Shift+Tab")
+				helpers.assert_eq(world.overlay.active_index(), 1, label .. ": right Shift+Tab wraps forward to the first")
+				assert_false(saw_tab(shift_tab(world, { EvdevCodes.KEY_RIGHTSHIFT })))
+				helpers.assert_eq(world.overlay.active_index(), 2, label .. ": right Shift+Tab steps forward")
+				helpers.assert_eq(#world.applied, 0, label .. ": navigating inserts nothing")
+				checked = checked + 1
+			end)
+		end
+		helpers.assert_eq(checked, 3, "every navigation configuration is checked")
+	end)
+
+	helpers.it("(llm-nav-left-right-windows) any other Shift+Tab, one prediction or no tooltip reaches the application", function()
+		with_offer({ nav = {}, val = {} }, function(world)
+			helpers.assert_true(saw_tab(shift_tab(world, { EvdevCodes.KEY_LEFTSHIFT, EvdevCodes.KEY_RIGHTSHIFT })),
+				"both Shifts name no side")
+			helpers.assert_true(saw_tab(shift_tab(world, { EvdevCodes.KEY_LEFTSHIFT }, { EvdevCodes.KEY_LEFTCTRL })),
+				"Ctrl+Shift+Tab is the application's")
+			helpers.assert_true(saw_tab(shift_tab(world, { EvdevCodes.KEY_RIGHTSHIFT }, { EvdevCodes.KEY_LEFTALT })),
+				"Alt+Shift+Tab is the application's")
+			helpers.assert_eq(world.overlay.active_index(), 1, "no other chord moves the active prediction")
+		end)
+		with_offer({ nav = {}, val = {}, count = 1 }, function(world)
+			helpers.assert_true(saw_tab(shift_tab(world, { EvdevCodes.KEY_LEFTSHIFT })),
+				"one prediction has nothing to move to")
+		end)
+		with_offer({ nav = {}, val = {} }, function(world)
+			helpers.assert_true(world.overlay.hide())
+			helpers.assert_true(saw_tab(shift_tab(world, { EvdevCodes.KEY_RIGHTSHIFT })), "no tooltip, no navigation")
+		end)
+	end)
+
+	helpers.it("(llm-nav-left-right-windows) the hook names the side of the one Shift held", function()
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local sides = {}
+		hook._test_drive({
+			{ type = EV_KEY, code = EvdevCodes.KEY_LEFTSHIFT, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_RIGHTSHIFT, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_LEFTSHIFT, value = 0 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_RIGHTSHIFT, value = 0 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 1 },
+			{ type = EV_KEY, code = EvdevCodes.KEY_TAB, value = 0 },
+		}, {
+			onConsume = function(detail)
+				if detail.code == EvdevCodes.KEY_TAB then sides[#sides + 1] = tostring(detail.shift_side) end
+				return false
+			end,
+			onEmitRaw = function() return true end,
+		}, true)
+		helpers.assert_eq(table.concat(sides, " "), "left nil right nil",
+			"left, both, right, then no Shift")
 	end)
 end)
 

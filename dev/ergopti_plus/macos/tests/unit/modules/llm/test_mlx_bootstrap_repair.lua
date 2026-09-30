@@ -17,6 +17,9 @@
 --- 4. A failure offers its repair button, and a selection after it retries.
 --- 5. The repair only ever removes the venv Ergopti owns.
 --- 6. A Mac that cannot run MLX is told so and offered Ollama.
+--- 7. A runtime that is not installed is announced with the button that
+---    installs it, never with the menu row to select; a failed install names
+---    its cause and retries with the repair button.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -215,8 +218,8 @@ local function load_world(world)
 		end,
 	}
 	package.loaded["infra.notifications"] = {
-		notify = function(title, body, kind)
-			world.notices[#world.notices + 1] = { title = title, body = body, kind = kind }
+		notify = function(title, body, kind, on_click)
+			world.notices[#world.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 			return true
 		end,
 	}
@@ -701,4 +704,121 @@ helpers.describe("A Mac that cannot run MLX is told so and offered Ollama (mlx-b
 				"a floor below the oldest wheel picks MLX where uv sync cannot install it")
 		end)
 	end)
+end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 8/ A Missing Runtime Offers Its Install ===
+-- ==================================================
+-- ==================================================
+
+helpers.describe("A missing MLX runtime is announced with its install button (mlx-runtime-missing-install)", function()
+	--- Posts the boot notice of a missing runtime, in French, and clicks it.
+	--- @param world table
+	local function click_boot_notice(world)
+		-- The router captures its locale owner when it loads: load it again
+		-- once the real French strings answer.
+		speak("fr")
+		package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
+		local router = require("ui.menu.menu_llm.runtime_install_offer")
+		helpers.assert_true(router.notify_if_missing("mlx"))
+		helpers.assert_eq(#world.notices, 1)
+		local notice = world.notices[1]
+		helpers.assert_eq(notice.title, "Le moteur MLX n’est pas installé")
+		helpers.assert_eq(notice.body, "L’IA reste désactivée tant qu’il n’est pas installé. Cliquez pour l’installer.")
+		helpers.assert_true(notice.body:find("Sélectionnez", 1, true) == nil,
+			"the notice used to name the menu row to select, with no action of its own")
+		helpers.assert_eq(type(notice.on_click), "function", "the notice carries the click that opens its fix")
+		helpers.assert_eq(#world.tasks, 0, "the boot notice never downloads by itself")
+		notice.on_click()
+	end
+
+	helpers.it("opens the install offer from the boot notice, whose button installs the runtime", scoped(function()
+		local world = new_world()
+		local checker, _, offer = load_world(world)
+		local resumed = 0
+		offer.set_resume(function() resumed = resumed + 1; return true end)
+		click_boot_notice(world)
+		helpers.assert_eq(#world.deferred, 1, "the click schedules the install offer")
+		world.answers = { "primary" }
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 1)
+		local dialog = world.dialogs[1]
+		helpers.assert_eq(dialog.title, "Le moteur MLX n’est pas installé")
+		helpers.assert_eq(dialog.primary, "Installer le moteur MLX")
+		helpers.assert_eq(dialog.secondary, "Plus tard")
+		helpers.assert_true(dialog.body:find("« Installer le moteur MLX » télécharge et installe l’environnement MLX d’ErgoptiPlus ("
+			.. MLX_VENV .. ").", 1, true) ~= nil, dialog.body)
+		helpers.assert_true(dialog.body:find("Sélectionnez", 1, true) == nil, dialog.body)
+
+		helpers.assert_eq(#world.tasks, 1, "the button runs the installation")
+		helpers.assert_true(world.tasks[1].command():find("ensure-mlx-deps.sh", 1, true) ~= nil,
+			world.tasks[1].command())
+		helpers.assert_true(world.tasks[1].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) == nil,
+			"an absent runtime is installed, not repaired")
+		world.tasks[1].finish(0, "", "")
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_eq(world.notices[#world.notices].title, "Moteur MLX installé")
+		helpers.assert_eq(resumed, 0, "the restart leaves the installer's completion first")
+		drain(world)
+		helpers.assert_eq(resumed, 1, "an installed runtime restarts the MLX model")
+		helpers.assert_eq(#world.dialogs, 1, "a success offers nothing more")
+	end))
+
+	helpers.it("names why a failed install failed and retries it with the repair button", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		click_boot_notice(world)
+		world.answers = { "primary" }
+		drain(world)
+		helpers.assert_eq(#world.tasks, 1)
+		stream_lines(world.tasks[1], { "curl: (6) Could not resolve host: astral.sh" })
+		world.tasks[1].finish(1, "", "")
+		helpers.assert_eq(checker.get_failure_cause().kind, "network")
+
+		-- The failure reopens the offer with its cause and the button that retries.
+		world.answers = { "primary" }
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 2)
+		local failed = world.dialogs[2]
+		helpers.assert_eq(failed.title, "L’installation de MLX a échoué")
+		helpers.assert_true(failed.body:find("Le téléchargement a échoué : vérifiez la connexion à Internet.", 1, true) ~= nil,
+			failed.body)
+		helpers.assert_true(failed.body:find("Could not resolve host: astral.sh", 1, true) ~= nil,
+			"the dialog quotes the line that proves the cause")
+		helpers.assert_eq(failed.primary, "Réparer l’installation MLX")
+		helpers.assert_eq(#world.tasks, 2, "the repair button retries at once")
+		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil,
+			"the retry removes what the failed install left, then installs again")
+
+		-- A repair that fails in turn says why, with the same button.
+		stream_lines(world.tasks[2], { "curl: (6) Could not resolve host: astral.sh" })
+		world.tasks[2].finish(1, "", "")
+		world.answers = { "secondary" }
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 3)
+		helpers.assert_eq(world.dialogs[3].primary, "Réparer l’installation MLX")
+		helpers.assert_true(world.dialogs[3].body:find("vérifiez la connexion à Internet", 1, true) ~= nil,
+			world.dialogs[3].body)
+		helpers.assert_eq(#world.tasks, 2, "« Plus tard » starts nothing")
+	end))
+
+	helpers.it("offers the install, not a repair, when a model check finds no runtime", scoped(function()
+		local world = new_world()
+		local _, _, offer = load_world(world)
+		speak("en")
+		helpers.assert_true(offer.offer({ kind = "missing", repairable = true }))
+		world.answers = { "secondary" }
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 1)
+		helpers.assert_eq(world.dialogs[1].title, "The MLX runtime is not installed")
+		helpers.assert_eq(world.dialogs[1].primary, "Install the MLX runtime")
+		helpers.assert_true(world.dialogs[1].body:find("Select the MLX backend", 1, true) == nil,
+			world.dialogs[1].body)
+		helpers.assert_eq(#world.tasks, 0, "« Later » starts nothing")
+	end))
 end)

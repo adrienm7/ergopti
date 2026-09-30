@@ -434,6 +434,7 @@ InstallSendNoOps()
 #Include unit/test_config_scope_menus.ahk
 #Include unit/test_config_scope_shortcuts.ahk
 #Include unit/test_shortcuts_restore_row.ahk
+#Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
 #Include unit/test_global_config_scope.ahk
@@ -1632,6 +1633,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_altgr_prefix_arms_on_press.ahk
 #Include unit/test_altgr_owner_matrix.ahk
 #Include unit/test_altgr_combos_stand_down.ahk
+#Include unit/test_script_chords_follow_their_slot.ahk
 #Include unit/test_altgr_layer_shift_from_hold.ahk
 #Include unit/test_ctrl_alt_numpad_gate.ahk
 #Include unit/test_user_lctrl_held.ahk

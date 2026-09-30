@@ -52,6 +52,8 @@ try {
 			_FeatureStateSmokeNeutral()
 		case "neutral_first_boot":
 			_FeatureStateSmokeNeutralFirstBoot()
+		case "script_none":
+			_FeatureStateSmokeScriptNone()
 		case "manifest_defaults":
 			_FeatureStateSmokeManifestDefaults()
         case "malformed":
@@ -140,11 +142,41 @@ _FeatureStateSmokeNeutral() {
 	_FeatureStateSmokeAssert(false, IsCategoryGated("Personal"), "missing inherited master stays neutral")
 	CategoryEnabled["Hotstrings"] := true
 	_FeatureStateSmokeAssert(true, IsCategoryGated("Personal"), "explicit inherited master remains enabled")
-	for Slot, Action in ScriptShortcutAssignments
-		_FeatureStateSmokeAssert("none", Action, "empty script shortcut: " . Slot)
+	; The script-management chords are the declared exception: an empty
+	; configuration starts them with their preset (maintainer decision of
+	; 2026-09-30, manifest active_by_default).
+	AssertedScriptSlots := 0
+	for Slot, Action in ScriptShortcutAssignments {
+		_FeatureStateSmokeAssert(ManifestRecommendedFor("shortcuts.script_control." . Slot), Action,
+			"empty script shortcut starts with its preset: " . Slot)
+		if (Action == "none")
+			throw Error("empty script shortcut " . Slot . " runs no action")
+		AssertedScriptSlots += 1
+	}
+	_FeatureStateSmokeAssert(4, AssertedScriptSlots, "the four script shortcut slots")
 	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
 		_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
 	_FeatureStateSmokeAssert(false, ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
+}
+
+; A config.toml that names "none" for a script slot keeps that chord off now
+; that an absent slot starts with its preset (maintainer decision 2026-09-30).
+_FeatureStateSmokeScriptNone() {
+	global ScriptShortcutAssignments, _IniCache
+	TempConfig := A_Temp . "\ergopti_script_none_" . DllCall("GetCurrentProcessId") . ".toml"
+	try {
+		try FileDelete(TempConfig)
+		FileAppend('[shortcuts.script_control]`nscript_altgr_enter = "none"`n', TempConfig, "UTF-8")
+		_IniCache := ParseTomlFile(TempConfig)
+		ReadScriptShortcutsConfig()
+	} finally {
+		try FileDelete(TempConfig)
+	}
+	_FeatureStateSmokeAssert("none", ScriptShortcutAssignments["script_altgr_enter"],
+		"an explicit none keeps the chord off")
+	for Slot in ["script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"]
+		_FeatureStateSmokeAssert(ManifestRecommendedFor("shortcuts.script_control." . Slot),
+			ScriptShortcutAssignments[Slot], "an absent slot starts with its preset: " . Slot)
 }
 
 _FeatureStateSmokeNeutralFirstBoot() {

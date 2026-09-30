@@ -16,6 +16,12 @@
 ; are parked on an identity no key produces, so a press cycles exactly once
 ; whichever hook Windows calls first.
 ;
+; Left and Right reached the application instead (maintainer report of the
+; same evening): only Up and Down had a consuming hotkey. They now step back
+; and forward like Up and Down, under the same chord, and so do the footer's
+; left and right Shift+Tab; the native owner matches none of them
+; (llm-nav-left-right-windows).
+;
 ; A press runs through both hooks in a given order. The AutoHotkey stage is the
 ; static hotkey: its #HotIf criterion, then its action, whose hotkey swallows
 ; the key. The native stage matches the event against exactly the routes the
@@ -46,6 +52,13 @@ _LNCW_Orders() {
 	]
 }
 
+; The virtual key and scan code of each navigation key (WinUser.h, and the
+; scan code AutoHotkey resolves the key name to).
+_LNCW_KeyCodes() {
+	return Map("Up", [0x26, 0x148], "Down", [0x28, 0x150],
+		"Left", [0x25, 0x14B], "Right", [0x27, 0x14D], "Tab", [0x09, 0x00F])
+}
+
 ; The event the DLL's hook builds for a physical press of Key
 ; (NavBuildHookEventLocked): its virtual key, its extended scan code and the
 ; Ctrl / Alt / Shift / Win mask of the held modifiers.
@@ -55,15 +68,18 @@ _LNCW_NativeEvent(Key, Held) {
 		if Held.Has(Name)
 			Modifiers |= Bit
 	}
+	if Held.Has("LShift") || Held.Has("RShift")
+		Modifiers |= 0x04
 	if Held.Has("LWin") || Held.Has("RWin")
 		Modifiers |= 0x08
-	return Map("vk", Key == "Up" ? 0x26 : 0x28,
-		"sc", Key == "Up" ? 0x148 : 0x150, "modifiers", Modifiers)
+	Codes := _LNCW_KeyCodes()[Key]
+	return Map("vk", Codes[1], "sc", Codes[2], "modifiers", Modifiers)
 }
 
-; The native cycle routes of the committed plan, as the adapter marshals them
-; to the DLL, whose identity is exactly Event's.
-_LNCW_NativeCycleRoutes(Event) {
+; The native routes of the committed plan, as the adapter marshals them to the
+; DLL, whose identity is exactly Event's: its cycle routes only, or every route
+; when AnyAction is set.
+_LNCW_NativeCycleRoutes(Event, AnyAction := false) {
 	global _LLM_Menu_NavHotkeysBound
 	Routes := _LLM_NavEventOwnerNativeBindings(_LLM_Menu_NavHotkeysBound)
 	AssertTrue(Routes is Array && Routes.Length == 12,
@@ -71,7 +87,7 @@ _LNCW_NativeCycleRoutes(Event) {
 	Matches := []
 	for Route in Routes {
 		Code := Route["axis"] == 2 ? Event["sc"] : Event["vk"]
-		if Route["action"] == 1 && Code == Route["code"]
+		if (AnyAction || Route["action"] == 1) && Code == Route["code"]
 				&& Event["modifiers"] == Route["modifiers"]
 			Matches.Push(Route)
 	}
@@ -118,6 +134,35 @@ _LNCW_Press(State, Probe, Key, HeldNames, Order) {
 			}
 		} else {
 			NativeCycles += _LNCW_NativeStage(State, _LNCW_NativeEvent(Key, Held))
+		}
+	}
+	return { Consumed: Consumed, NativeCycles: NativeCycles,
+		Cycles: Probe.Targets.Length - Before + NativeCycles }
+}
+
+; One press of Tab with HeldNames held, through both hooks in Order. The
+; AutoHotkey stage is the SC00F hotkey of the held Shift's side, whose criterion
+; demands that Shift alone; no other hotkey of this module matches the press.
+; @returns {Object} As _LNCW_Press.
+_LNCW_PressShiftTab(State, Probe, HeldNames, Order) {
+	HeldFn := _LTNC_HeldFn(_LTNC_HeldMap(HeldNames))
+	Before := Probe.Targets.Length
+	NativeCycles := 0
+	Consumed := false
+	for Stage in Order.Stages {
+		if (Stage == "ahk") {
+			for Side in ["LShift", "RShift"] {
+				if LLM_Menu_NavShiftTabIsOwned(Side, HeldFn) {
+					LLM_Menu_NavShiftTabCycle(Side, _LNCW_Repaint.Bind(Probe))
+					Consumed := true
+					break
+				}
+			}
+			if Consumed
+				break
+		} else {
+			NativeCycles += _LNCW_NativeStage(State,
+				_LNCW_NativeEvent("Tab", _LTNC_HeldMap(HeldNames)))
 		}
 	}
 	return { Consumed: Consumed, NativeCycles: NativeCycles,
@@ -178,7 +223,8 @@ _LNCW_ExactChordBody(Chord, Order, State) {
 	Label := "'" . Chord.Config . "', " . Order.Name
 	Probe := { Slots: ["alpha", "beta", "gamma"], Targets: [] }
 	_LTAV_RenderPrediction(Probe.Slots, 2, true)
-	for Step in [{ Key: "Down", Target: 3 }, { Key: "Up", Target: 2 }] {
+	for Step in [{ Key: "Down", Target: 3 }, { Key: "Up", Target: 2 },
+			{ Key: "Right", Target: 3 }, { Key: "Left", Target: 2 }] {
 		Press := _LNCW_Press(State, Probe, Step.Key, Chord.Held, Order)
 		AssertTrue(Press.Consumed,
 			Label . ": the exact " . Step.Key . " chord must never reach the application")
@@ -191,7 +237,7 @@ _LNCW_ExactChordBody(Chord, Order, State) {
 		AssertEqual(Step.Target, State.OwnerIndices.Get(State.CurrentToken, 0),
 			Label . ": the native owner must hold the moved slot for Tab and the digits")
 	}
-	return 2
+	return 4
 }
 
 _LNCW_ExactChordCyclesOnceInEitherOrder() {
@@ -201,7 +247,7 @@ _LNCW_ExactChordCyclesOnceInEitherOrder() {
 			Checked += _LNCW_WithPlan(Chord.Config,
 				_LNCW_ExactChordBody.Bind(Chord, Order))
 	}
-	AssertEqual(8, Checked, "both chords, both keys and both hook orders must be checked")
+	AssertEqual(16, Checked, "both chords, the four arrows and both hook orders must be checked")
 }
 
 Test("LLM nav: the exact chord cycles once and is consumed whichever hook runs first (llm-nav-cycle-windows)",
@@ -214,7 +260,7 @@ _LNCW_PassBody(Chord, Order, State) {
 	_LTAV_RenderPrediction(Probe.Slots, 2, true)
 	Checked := 0
 	for Held in Chord.Wrong {
-		for Key in ["Up", "Down"] {
+		for Key in _LTNC_NavKeys() {
 			Press := _LNCW_Press(State, Probe, Key, Held, Order)
 			AssertFalse(Press.Consumed,
 				Label . ": another chord than the configured one reaches the application")
@@ -225,15 +271,22 @@ _LNCW_PassBody(Chord, Order, State) {
 	AssertEqual(2, LLM_TooltipGetActiveIdx(),
 		Label . ": the marker stays where it was")
 	_LTAV_RenderPrediction(["solo"], 1, true)
-	Press := _LNCW_Press(State, Probe, "Down", Chord.Held, Order)
-	AssertFalse(Press.Consumed,
-		Label . ": one prediction has nothing to move to, the arrow is the application's")
-	AssertEqual(0, Press.Cycles, Label . ": one prediction never cycles")
+	for Key in _LTNC_NavKeys() {
+		Press := _LNCW_Press(State, Probe, Key, Chord.Held, Order)
+		AssertFalse(Press.Consumed, Label . ", " . Key
+			. ": one prediction has nothing to move to, the arrow is the application's")
+		AssertEqual(0, Press.Cycles, Label . ", " . Key . ": one prediction never cycles")
+		Checked++
+	}
 	_TooltipActiveSurface := 0
-	Press := _LNCW_Press(State, Probe, "Up", Chord.Held, Order)
-	AssertFalse(Press.Consumed, Label . ": no tooltip, the arrow is the application's")
-	AssertEqual(0, Press.Cycles, Label . ": no tooltip, nothing cycles")
-	return Checked + 2
+	for Key in _LTNC_NavKeys() {
+		Press := _LNCW_Press(State, Probe, Key, Chord.Held, Order)
+		AssertFalse(Press.Consumed, Label . ", " . Key
+			. ": no tooltip, the arrow is the application's")
+		AssertEqual(0, Press.Cycles, Label . ", " . Key . ": no tooltip, nothing cycles")
+		Checked++
+	}
+	return Checked
 }
 
 _LNCW_OtherChordsReachTheApplication() {
@@ -243,7 +296,7 @@ _LNCW_OtherChordsReachTheApplication() {
 			Checked += _LNCW_WithPlan(Chord.Config,
 				_LNCW_PassBody.Bind(Chord, Order))
 	}
-	AssertEqual(32, Checked, "every other chord, key and hook order must be checked")
+	AssertEqual(80, Checked, "every other chord, arrow and hook order must be checked")
 }
 
 Test("LLM nav: another chord, one prediction or no tooltip reaches the application uncycled (llm-nav-cycle-windows)",
@@ -256,7 +309,9 @@ _LNCW_WrapBody(Order, State) {
 		Loop Count
 			Probe.Slots.Push("slot" . A_Index)
 		for Step in [{ Key: "Up", From: 1, Target: Count },
-				{ Key: "Down", From: Count, Target: 1 }] {
+				{ Key: "Down", From: Count, Target: 1 },
+				{ Key: "Left", From: 1, Target: Count },
+				{ Key: "Right", From: Count, Target: 1 }] {
 			Label := Order.Name . ", " . Count . " slots, " . Step.Key
 				. " from slot " . Step.From
 			_LTAV_RenderPrediction(Probe.Slots, Step.From, true)
@@ -275,11 +330,74 @@ _LNCW_MarkerWrapsAroundAtBothEnds() {
 	Checked := 0
 	for Order in _LNCW_Orders()
 		Checked += _LNCW_WithPlan("", _LNCW_WrapBody.Bind(Order))
-	AssertEqual(8, Checked, "both ends, both sizes and both hook orders must be checked")
+	AssertEqual(16, Checked, "both ends, both sizes, the four arrows and both hook orders must be checked")
 }
 
 Test("LLM nav: the marker wraps around at both ends (llm-nav-cycle-windows)",
 	_LNCW_MarkerWrapsAroundAtBothEnds)
+
+_LNCW_ShiftTabBody(Chord, Order, State) {
+	global _TooltipActiveSurface
+	Label := "'" . Chord.Config . "', " . Order.Name
+	Checked := 0
+	for Count in [2, 3] {
+		Probe := { Slots: [], Targets: [] }
+		Loop Count
+			Probe.Slots.Push("slot" . A_Index)
+		for Step in [{ Held: ["LShift"], From: 2, Target: 1 },
+				{ Held: ["RShift"], From: 1, Target: 2 },
+				{ Held: ["LShift"], From: 1, Target: Count },
+				{ Held: ["RShift"], From: Count, Target: 1 }] {
+			Name := Label . ", " . Count . " slots, " . Step.Held[1] . "+Tab from slot " . Step.From
+			_LTAV_RenderPrediction(Probe.Slots, Step.From, true)
+			Press := _LNCW_PressShiftTab(State, Probe, Step.Held, Order)
+			AssertTrue(Press.Consumed, Name . ": Shift+Tab must never reach the application")
+			AssertEqual(1, Press.Cycles, Name . ": Shift+Tab must move the marker exactly once")
+			AssertEqual(0, Press.NativeCycles, Name . ": the native owner never cycles on Tab")
+			AssertEqual(Step.Target, LLM_TooltipGetActiveIdx(),
+				Name . ": the marker must land on slot " . Step.Target)
+			Checked++
+		}
+	}
+	Probe := { Slots: ["alpha", "beta", "gamma"], Targets: [] }
+	_LTAV_RenderPrediction(Probe.Slots, 2, true)
+	for Held in [["LShift", "RShift"], ["LShift", "Ctrl"], ["RShift", "Alt"],
+			["LShift", "LWin"], []] {
+		Press := _LNCW_PressShiftTab(State, Probe, Held, Order)
+		AssertFalse(Press.Consumed, Label . ": Tab with " . _LTNC_Join(Held)
+			. " is not the Shift+Tab chord and reaches its other owners")
+		AssertEqual(0, Press.Cycles, Label . ": Tab with " . _LTNC_Join(Held) . " moves nothing")
+		Checked++
+	}
+	_LTAV_RenderPrediction(["solo"], 1, true)
+	for Side in ["LShift", "RShift"] {
+		Press := _LNCW_PressShiftTab(State, Probe, [Side], Order)
+		AssertFalse(Press.Consumed, Label . ", " . Side
+			. "+Tab: one prediction has nothing to move to, Shift+Tab is the application's")
+		Checked++
+	}
+	_TooltipActiveSurface := 0
+	for Side in ["LShift", "RShift"] {
+		Press := _LNCW_PressShiftTab(State, Probe, [Side], Order)
+		AssertFalse(Press.Consumed, Label . ", " . Side . "+Tab: no tooltip, the key is the application's")
+		AssertEqual(0, Press.Cycles, Label . ", " . Side . "+Tab: no tooltip, nothing cycles")
+		Checked++
+	}
+	return Checked
+}
+
+_LNCW_ShiftTabCyclesOnceInEitherOrder() {
+	Checked := 0
+	for Chord in _LNCW_Chords() {
+		for Order in _LNCW_Orders()
+			Checked += _LNCW_WithPlan(Chord.Config,
+				_LNCW_ShiftTabBody.Bind(Chord, Order))
+	}
+	AssertEqual(68, Checked, "both configurations, sides, sizes, refusals and hook orders must be checked")
+}
+
+Test("LLM nav: the left Shift+Tab steps back and the right one forward, once, whichever hook runs first (llm-nav-left-right-windows)",
+	_LNCW_ShiftTabCyclesOnceInEitherOrder)
 
 
 
@@ -294,12 +412,14 @@ Test("LLM nav: the marker wraps around at both ends (llm-nav-cycle-windows)",
 _LNCW_NativeRoutesBody(Config, State) {
 	global _LLM_Menu_NavHotkeysBound
 	Checked := 0
-	for Key in ["Up", "Down"] {
+	for Key in ["Up", "Down", "Left", "Right", "Tab"] {
 		Loop 16 {
 			Event := _LNCW_NativeEvent(Key, Map())
 			Event["modifiers"] := A_Index - 1
-			AssertEqual(0, _LNCW_NativeCycleRoutes(Event).Length,
-				"'" . Config . "': no native cycle route may match " . Key
+			; No native route of any kind: the DLL passes every arrow on, and only
+			; the AutoHotkey hotkey decides whether it cycles.
+			AssertEqual(0, _LNCW_NativeCycleRoutes(Event, true).Length,
+				"'" . Config . "': no native route may match " . Key
 				. " with modifier mask " . (A_Index - 1))
 			Checked++
 		}
@@ -326,8 +446,8 @@ _LNCW_NativeOwnerNeverCyclesAnArrow() {
 	Checked := 0
 	for Config in ["", "ctrl", "alt", "shift", "win", "ctrl+shift"]
 		Checked += _LNCW_WithPlan(Config, _LNCW_NativeRoutesBody.Bind(Config))
-	AssertEqual(192, Checked, "every configuration, key and modifier mask must be checked")
+	AssertEqual(480, Checked, "every configuration, navigation key and modifier mask must be checked")
 }
 
-Test("LLM nav: the native owner never cycles an arrow, so a press never cycles twice (llm-nav-cycle-windows)",
+Test("LLM nav: the native owner never matches an arrow, so a press never cycles twice (llm-nav-cycle-windows)",
 	_LNCW_NativeOwnerNeverCyclesAnArrow)

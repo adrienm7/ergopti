@@ -14,6 +14,7 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
+local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -184,6 +185,22 @@ local CoreState = {
 local settle_deferred_profile_warmup
 local deferred_profile_warmup_cleanup_pending
 
+--- Tells whether an Ollama backend identity may start the Ollama daemon now.
+--- Only the live AI gate authorises it: a boot restores the saved backend with
+--- the AI off, and on an Intel Mac an older config.toml without a selected
+--- backend restores Ollama, the platform default. Ollama is installed only once
+--- its backend is selected, so a missing executable is the "not installed"
+--- state that the boot notice, the startup check and the AI switch present
+--- with their install button; starting the daemon anyway only logged a failed
+--- executable resolution as an error.
+--- @return boolean admitted True when the daemon may be started.
+--- @return string|nil reason Why nothing is started, when not admitted.
+local function ollama_start_admitted()
+	if CoreState.runtime_llm_enabled ~= true then return false, "the AI is off" end
+	if OllamaBinary.resolve() == nil then return false, "Ollama is not installed" end
+	return true, nil
+end
+
 
 
 
@@ -257,8 +274,15 @@ function M.auto_detect_backend(callback)
 		if next_backend == "ollama" then
 			-- Ensure the Ollama daemon is running now that we know it is the active
 			-- backend — doing this at api_ollama require-time would launch Ollama for
-			-- MLX/API users who never selected it.
-			pcall(function() ApiOllama.ensure_running() end)
+			-- MLX/API users who never selected it. The same admission as an explicit
+			-- selection: an Ollama that answers without a local executable (another
+			-- host, a container) is already running, and the AI may be off by now.
+			local admitted, refusal = ollama_start_admitted()
+			if admitted then
+				pcall(function() ApiOllama.ensure_running() end)
+			else
+				Logger.debug(LOG, "auto_detect: Ollama daemon not started: %s.", refusal)
+			end
 		end
 
 		if type(callback) == "function" then
@@ -1635,7 +1659,18 @@ local function apply_backend_identity(backend, start_service)
 				tostring(backend))
 			return false
 		end
+		local start_admitted, start_refusal = false, nil
 		if backend == "ollama" and start_service then
+			start_admitted, start_refusal = ollama_start_admitted()
+			-- The identity is committed either way: turning the AI on, or
+			-- installing Ollama from its offer, starts the daemon later.
+			if not start_admitted and CoreState.runtime_llm_enabled == true then
+				Logger.info(LOG, "set_backend: Ollama daemon not started: %s.", start_refusal)
+			elseif not start_admitted then
+				Logger.debug(LOG, "set_backend: Ollama daemon not started: %s.", start_refusal)
+			end
+		end
+		if start_admitted then
 			local ensure_ok, ensure_result = xpcall(function()
 				return ApiOllama.ensure_running()
 			end, debug.traceback)

@@ -455,10 +455,6 @@ LLM_Menu_OnAppPickerSave(selected, receipt) {
 ; =======================
 ; =======================
 
-LLM_Menu_OnAbout(*) {
-	MsgBox(t("menu.llm.about_body"), t("menu.llm.title"))
-}
-
 /**
  * Starts the LLM bridge with the current tray settings.
  */

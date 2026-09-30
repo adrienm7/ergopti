@@ -423,6 +423,20 @@ Test_LLM_Persist_LosslessCustomProfiles() {
 Test("LLM persist: custom profiles use a lossless versioned codec",
 	Test_LLM_Persist_LosslessCustomProfiles)
 
+; The neutral config template writes llm.user_profiles = "", its manifest
+; default. Reading it as a damaged payload logged an ERROR at every start of a
+; neutral install (full startup smoke, CI run 36768845608).
+Test_LLM_Persist_NeutralEmptyUserProfiles() {
+	Decoded := _LLM_Menu_DeserializeUserProfiles("")
+	Assert(Decoded is Array, "the neutral empty llm.user_profiles must decode")
+	AssertEqual(0, Decoded.Length)
+	AssertTrue(LLM_Option_TryNormalize("user_profiles", Decoded, &Normalized))
+	AssertEqual(0, Normalized.Length)
+	AssertEqual(false, _LLM_Menu_DeserializeUserProfiles("legacy text"))
+}
+Test("LLM persist: the neutral empty user profiles decode to no profile",
+	Test_LLM_Persist_NeutralEmptyUserProfiles)
+
 _LLM_Persist_AssertProfilesExact(Expected, Actual, Context) {
 	Assert(Expected is Array, Context . " expected profiles must be an Array")
 	Assert(Actual is Array, Context . " restored profiles must be an Array")
