@@ -1181,6 +1181,14 @@ _LLM_FormatInfoLine(modelInfo, ttftMs := "", ttltMs := "", forSizing := false) {
 	return out
 }
 
+; The footer of a multi-slot prediction: every navigation chord the hotkeys of
+; menu_llm/tab_accept.ahk consume, the left and right Shift+Tab, then the
+; arrows with the configured modifiers, bare by default, as the macOS footer
+; (tooltip_llm.lua) shows them. The bare arrows were left out, so the footer
+; hid the default chord (llm-nav-left-right-windows).
+; @param {Integer} slotCount - The number of predictions shown.
+; @param {String} navMods - The configured nav_modifiers; "none" hides the arrows.
+; @returns {String}
 _LLM_BuildNavHint(slotCount, navMods := "") {
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
 	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
@@ -1190,19 +1198,13 @@ _LLM_BuildNavHint(slotCount, navMods := "") {
 	acceptSingle := UI_LLM_HINT_ACCEPT_SINGLE
 	if (slotCount <= 1)
 		return acceptSingle
-	navStr := navMods
-	if (navStr = "" or navStr = "none")
-		navStr := ""
-	else
-		navStr := _LLM_FormatValModifiers(navStr)
 	hintLeft := UI_LLM_HINT_NAV_LEFT
 	hintRight := UI_LLM_HINT_NAV_RIGHT
-	hintOr := UI_LLM_HINT_OR
-	arrL := UI_LLM_HINT_ARROW_LEFT
-	arrR := UI_LLM_HINT_ARROW_RIGHT
-	if (navStr != "") {
-		hintLeft .= hintOr . navStr . " + " . arrL
-		hintRight .= hintOr . navStr . " + " . arrR
+	if (navMods != "none") {
+		navStr := _LLM_FormatValModifiers(navMods)
+		chord := navStr == "" ? "" : navStr . " + "
+		hintLeft .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_LEFT
+		hintRight .= UI_LLM_HINT_OR . chord . UI_LLM_HINT_ARROW_RIGHT
 	}
 	sepL := UI_LLM_HINT_ARROW_SEP_LEFT
 	sepR := UI_LLM_HINT_ARROW_SEP_RIGHT

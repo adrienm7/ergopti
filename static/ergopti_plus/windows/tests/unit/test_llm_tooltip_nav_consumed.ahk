@@ -15,6 +15,14 @@
 ; with exactly its modifiers, at the routes' input level; the native owner no
 ; longer cycles (test_llm_nav_cycle_windows, llm-nav-cycle-windows).
 ;
+; Left and Right then reached the application while the tooltip showed several
+; predictions (maintainer report of 2026-09-30): only Up and Down had a
+; consuming hotkey, although the shared label reads ↑/← and ↓/→ and macOS
+; cycles on all four arrows. Left now steps back like Up and Right forward like
+; Down, under the same chord, and the footer's left and right Shift+Tab (⇧G +
+; Tab, ⇧D + Tab), which Windows never handled either, step back and forward
+; (llm-nav-left-right-windows).
+;
 ; Section 2 (llm-tooltip-chords-consumed) runs the whole matrix of the rule the
 ; three drivers share: for every configured modifier set, only the exact
 ; navigation and validation chords are the tooltip's.
@@ -39,6 +47,25 @@
 ; Held modifier state stand-in for the consumption criterion.
 _LTNC_HeldFn(Held) {
 	return (Name) => Held.Has(Name)
+}
+
+; The four arrows the navigation chord cycles on: ↑/← the previous prediction,
+; ↓/→ the next (menu.llm.nav_label).
+_LTNC_NavKeys() {
+	return ["Up", "Down", "Left", "Right"]
+}
+
+; The #InputLevel directive in force at Pos of Src, "" when none precedes it.
+_LTNC_InputLevelAt(Src, Pos) {
+	Level := ""
+	Start := 1
+	while (Found := RegExMatch(Src, "m)^\s*#InputLevel\s+(\d+)", &Match, Start)) {
+		if (Found >= Pos)
+			break
+		Level := Match[1]
+		Start := Found + Match.Len
+	}
+	return Level
 }
 
 _LTNC_ChordConsumedWhileTheOwnerCycles() {
@@ -67,22 +94,26 @@ _LTNC_ChordConsumedWhileTheOwnerCycles() {
 			AssertTrue((Bound is Integer) && Bound == 1,
 				Mods . ": the navigation plan must commit through the native owner")
 			_LTAV_RenderPrediction(["alpha", "beta", "gamma"], 1, true)
-			for Key in ["Up", "Down"] {
+			for Key in _LTNC_NavKeys() {
 				AssertTrue(LLM_Menu_NavCycleChordIsOwned(Key, _LTNC_HeldFn(Chord)),
 					Mods . "+" . Key . ": the committed chord over a multi-slot prediction must be consumed")
 				AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, _LTNC_HeldFn(Other)),
 					Mods . "+" . Key . ": another modifier set is the application's")
 				Checked++
 			}
-			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Left", _LTNC_HeldFn(Chord)),
-				Mods . ": only the two cycle routes may be consumed")
+			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Home", _LTNC_HeldFn(Chord)),
+				Mods . ": only the four arrows may be consumed")
+			AssertEqual(12, _LLM_Menu_NavHotkeysBound.Length,
+				Mods . ": Left and Right share the Up and Down routes, the plan gains no native route")
 			_LTAV_RenderPrediction(["solo"], 1, true)
-			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Up", _LTNC_HeldFn(Chord)),
-				Mods . ": a single prediction does not cycle, so the arrow stays the application's")
+			for Key in _LTNC_NavKeys()
+				AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, _LTNC_HeldFn(Chord)),
+					Mods . "+" . Key . ": a single prediction does not cycle, so the arrow stays the application's")
 			_LTAV_RenderPrediction(["alpha", "beta"], 1, true)
 			State.GetOwnerMode := "refuse"
-			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Down", _LTNC_HeldFn(Chord)),
-				Mods . ": a record the native owner does not route must not swallow the key")
+			for Key in _LTNC_NavKeys()
+				AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, _LTNC_HeldFn(Chord)),
+					Mods . "+" . Key . ": a record the native owner does not route must not swallow the key")
 		} finally {
 			_LLM_Menu_NavHotkeysBound := Saved.Bound
 			_LLM_Menu_NavSlotPlans := Saved.SlotPlans
@@ -92,9 +123,10 @@ _LTNC_ChordConsumedWhileTheOwnerCycles() {
 			_TooltipGeneration := Saved.Generation
 		}
 	}
-	AssertEqual(4, Checked, "both chords and both keys must be checked")
-	AssertFalse(LLM_Menu_NavCycleChordIsOwned("Up", _LTNC_HeldFn(Map())),
-		"a stopped native owner must never let the key be swallowed")
+	AssertEqual(8, Checked, "both chords and the four arrows must be checked")
+	for Key in _LTNC_NavKeys()
+		AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, _LTNC_HeldFn(Map())),
+			Key . ": a stopped native owner must never let the key be swallowed")
 }
 
 Test("LLM nav: the cycle chord is consumed while the owner routes a multi-slot prediction (llm-tooltip-nav-consumed)",
@@ -102,7 +134,7 @@ Test("LLM nav: the cycle chord is consumed while the owner routes a multi-slot p
 
 _LTNC_ChordHotkeysSwallowTheKey() {
 	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
-	for Key in ["Up", "Down"] {
+	for Key in _LTNC_NavKeys() {
 		Found := 0
 		for Variant in _LTAV_Variants(Src, Key) {
 			if (Variant.HotIf != '#HotIf LLM_Menu_NavCycleChordIsOwned("' . Key . '")')
@@ -117,14 +149,254 @@ _LTNC_ChordHotkeysSwallowTheKey() {
 				Key . ": the hotkey must cycle and consume the key, never pass it on: " . Variant.Body)
 		}
 		AssertEqual(1, Found, Key . " must have exactly one consuming hotkey")
+		; The directive order, not the file, decides the level: each consuming
+		; hotkey is read at the #InputLevel that precedes its criterion.
+		HotIfPos := InStr(Src, '#HotIf LLM_Menu_NavCycleChordIsOwned("' . Key . '")')
+		Assert(HotIfPos > 0, Key . ": the consuming criterion must be found")
+		AssertEqual("1", _LTNC_InputLevelAt(Src, HotIfPos),
+			Key . ": the consuming hotkey must take the native routes' input level")
 	}
-	Assert(RegExMatch(Src,
-			'#InputLevel 1\s+#HotIf LLM_Menu_NavCycleChordIsOwned\("Up"\)') > 0,
-		"the consuming hotkeys must take the native routes' input level")
 }
 
-Test("LLM nav: the Up and Down chords have consuming hotkeys (llm-tooltip-nav-consumed)",
+Test("LLM nav: the four arrow chords have consuming hotkeys (llm-tooltip-nav-consumed, llm-nav-left-right-windows)",
 	_LTNC_ChordHotkeysSwallowTheKey)
+
+; The footer's Shift+Tab: the left Shift steps back, the right one forward,
+; alone and whatever nav_modifiers holds; both Shifts, another modifier, one
+; prediction, no routed record or the Tab key's own owners leave the key to the
+; application or to that owner.
+_LTNC_ShiftTabIsTheFootersChord() {
+	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavSlotPlans
+	global _LLM_Menu_NavActiveSlot, _TooltipGeneration, LayerEnabled
+	Saved := {
+		Bound: _LLM_Menu_NavHotkeysBound, SlotPlans: _LLM_Menu_NavSlotPlans,
+		ActiveSlot: _LLM_Menu_NavActiveSlot, Generation: _TooltipGeneration,
+		Layer: LayerEnabled
+	}
+	Checked := 0
+	for Mods in ["", "ctrl", "alt+shift"] {
+		State := 0
+		try {
+			_LLM_Menu_NavHotkeysBound := []
+			_LLM_Menu_NavSlotPlans := Map(1, [], 2, [])
+			_LLM_Menu_NavActiveSlot := 0
+			State := _LNEO_Setup()
+			Bound := LLM_Menu_BindNavHotkeys(
+				Map("nav_modifiers", Mods, "val_modifiers", ""), 0, 0,
+				_LNEO_CaptureLog.Bind(State), 0,
+				_LNEO_ResolveUsPhysicalKey.Bind(State), State.Port)
+			AssertTrue((Bound is Integer) && Bound == 1,
+				"'" . Mods . "': the navigation plan must commit through the native owner")
+			_LTAV_RenderPrediction(["alpha", "beta", "gamma"], 2, true)
+			for Row in [
+					{ Held: ["LShift"], Side: "LShift" },
+					{ Held: ["RShift"], Side: "RShift" },
+					{ Held: ["LShift", "RShift"], Side: "" },
+					{ Held: ["LShift", "Ctrl"], Side: "" },
+					{ Held: ["RShift", "Alt"], Side: "" },
+					{ Held: ["LShift", "LWin"], Side: "" },
+					{ Held: ["RShift", "RWin"], Side: "" },
+					{ Held: [], Side: "" }] {
+				Held := _LTNC_HeldFn(_LTNC_HeldMap(Row.Held))
+				AssertEqual(Row.Side, LLM_Menu_NavShiftTabSide(Held),
+					"'" . Mods . "': the Shift+Tab side of " . _LTNC_Join(Row.Held))
+				for Side in ["LShift", "RShift"] {
+					AssertEqual(Side == Row.Side,
+						LLM_Menu_NavShiftTabIsOwned(Side, Held) ? true : false,
+						"'" . Mods . "': " . Side . "+Tab with " . _LTNC_Join(Row.Held)
+						. " is consumed only when that Shift alone is held")
+					Checked++
+				}
+			}
+			LeftOnly := _LTNC_HeldFn(Map("LShift", true))
+			RightOnly := _LTNC_HeldFn(Map("RShift", true))
+			; The Tab key's own owners keep the press (platform/remap/tab.ahk).
+			LayerEnabled := true
+			AssertFalse(LLM_Menu_NavShiftTabIsOwned("LShift", LeftOnly),
+				"'" . Mods . "': the navigation layer keeps Tab while it is held")
+			LayerEnabled := Saved.Layer
+			_TapHoldClaimPress("tab")
+			try AssertFalse(LLM_Menu_NavShiftTabIsOwned("RShift", RightOnly),
+				"'" . Mods . "': the auto-repeat of a press a Tab tap-hold owns is that owner's")
+			finally _TapHoldEndPressClaim("tab")
+			AssertFalse(LLM_Menu_NavShiftTabIsOwned("Up", LeftOnly),
+				"'" . Mods . "': only the left and right Shift are Shift+Tab sides")
+			_LTAV_RenderPrediction(["solo"], 1, true)
+			AssertFalse(LLM_Menu_NavShiftTabIsOwned("LShift", LeftOnly),
+				"'" . Mods . "': one prediction has nothing to move to, Shift+Tab is the application's")
+			_LTAV_RenderPrediction(["alpha", "beta"], 1, true)
+			State.GetOwnerMode := "refuse"
+			AssertFalse(LLM_Menu_NavShiftTabIsOwned("RShift", RightOnly),
+				"'" . Mods . "': a record the native owner does not route must not swallow Shift+Tab")
+		} finally {
+			_LLM_Menu_NavHotkeysBound := Saved.Bound
+			_LLM_Menu_NavSlotPlans := Saved.SlotPlans
+			_LLM_Menu_NavActiveSlot := Saved.ActiveSlot
+			LayerEnabled := Saved.Layer
+			if IsObject(State)
+				_LNEO_Teardown()
+			_TooltipGeneration := Saved.Generation
+		}
+	}
+	AssertEqual(48, Checked, "every configuration, held set and side must be checked")
+	AssertFalse(LLM_Menu_NavShiftTabIsOwned("LShift", _LTNC_HeldFn(Map("LShift", true))),
+		"a stopped native owner must never let Shift+Tab be swallowed")
+}
+
+_LTNC_Join(Names) {
+	Text := ""
+	for Name in Names
+		Text .= (Text == "" ? "" : "+") . Name
+	return Text == "" ? "nothing" : Text
+}
+
+Test("LLM nav: the left and right Shift+Tab of the footer are consumed exactly (llm-nav-left-right-windows)",
+	_LTNC_ShiftTabIsTheFootersChord)
+
+; The physical Tab is SC00F. A side-specific Shift makes each hotkey the most
+; specific SC00F hotkey under its Shift, at the native routes' input level, and
+; its action cycles.
+_LTNC_ShiftTabHotkeysSwallowTheKey() {
+	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
+	for Pair in [["LShift", "<+"], ["RShift", ">+"]] {
+		Found := 0
+		for Variant in _LTAV_Variants(Src, "SC00F") {
+			if (Variant.HotIf != '#HotIf LLM_Menu_NavShiftTabIsOwned("' . Pair[1] . '")')
+				continue
+			Found++
+			AssertEqual(Pair[2], Variant.Prefix,
+				Pair[1] . ": the hotkey must name that Shift alone, without the wildcard")
+			Assert(RegExMatch(Variant.Body, "^\Q" . Pair[2] . "\ESC00F::\s*"
+					. 'LLM_Menu_NavShiftTabCycle\("' . Pair[1] . '"\)') > 0,
+				Pair[1] . ": the hotkey must cycle and consume Shift+Tab: " . Variant.Body)
+		}
+		AssertEqual(1, Found, Pair[1] . "+Tab must have exactly one consuming hotkey")
+		HotIfPos := InStr(Src, '#HotIf LLM_Menu_NavShiftTabIsOwned("' . Pair[1] . '")')
+		AssertEqual("1", _LTNC_InputLevelAt(Src, HotIfPos),
+			Pair[1] . ": the consuming hotkey must take the native routes' input level")
+	}
+}
+
+Test("LLM nav: the left and right Shift+Tab have consuming SC00F hotkeys (llm-nav-left-right-windows)",
+	_LTNC_ShiftTabHotkeysSwallowTheKey)
+
+; A tap-hold's Tab tapped under one Shift is the user's Shift+Tab (the
+; recommended AltGr taps Tab): it moves the marker like the physical chord,
+; types nothing, and the Tab wrapper asks it before acceptance.
+_LTNC_TapHoldShiftTabNavigates() {
+	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavSlotPlans
+	global _LLM_Menu_NavActiveSlot, _TooltipGeneration
+	Saved := {
+		Bound: _LLM_Menu_NavHotkeysBound, SlotPlans: _LLM_Menu_NavSlotPlans,
+		ActiveSlot: _LLM_Menu_NavActiveSlot, Generation: _TooltipGeneration
+	}
+	State := 0
+	try {
+		_LLM_Menu_NavHotkeysBound := []
+		_LLM_Menu_NavSlotPlans := Map(1, [], 2, [])
+		_LLM_Menu_NavActiveSlot := 0
+		State := _LNEO_Setup()
+		Bound := LLM_Menu_BindNavHotkeys(
+			Map("nav_modifiers", "", "val_modifiers", ""), 0, 0,
+			_LNEO_CaptureLog.Bind(State), 0,
+			_LNEO_ResolveUsPhysicalKey.Bind(State), State.Port)
+		AssertTrue((Bound is Integer) && Bound == 1,
+			"the navigation plan must commit through the native owner")
+		Slots := ["alpha", "beta", "gamma"]
+		for Step in [{ Held: "LShift", From: 1, Target: 3 },
+				{ Held: "RShift", From: 3, Target: 1 },
+				{ Held: "RShift", From: 1, Target: 2 },
+				{ Held: "LShift", From: 2, Target: 1 }] {
+			_LTAV_RenderPrediction(Slots, Step.From, true)
+			; The in-place repaint stand-in of test_llm_nav_cycle_windows.
+			Probe := { Slots: Slots, Targets: [] }
+			AssertTrue(LLM_Menu_NavShiftTabTap(_LTNC_HeldFn(Map(Step.Held, true)),
+					_LNCW_Repaint.Bind(Probe)),
+				Step.Held . "+tapped Tab from slot " . Step.From . " must be consumed")
+			AssertEqual(1, Probe.Targets.Length, Step.Held . ": the tap must cycle exactly once")
+			AssertEqual(Step.Target, LLM_TooltipGetActiveIdx(),
+				Step.Held . "+tapped Tab must move the marker from slot " . Step.From
+				. " to slot " . Step.Target)
+		}
+		for Held in [Map(), Map("LShift", true, "RShift", true),
+				Map("LShift", true, "Ctrl", true)] {
+			AssertFalse(LLM_Menu_NavShiftTabTap(_LTNC_HeldFn(Held), (*) => true),
+				"a tap without exactly one Shift is left to acceptance or the typed Tab")
+		}
+		_LTAV_RenderPrediction(["solo"], 1, true)
+		AssertFalse(LLM_Menu_NavShiftTabTap(_LTNC_HeldFn(Map("LShift", true)), (*) => true),
+			"over one prediction the tapped Shift+Tab is typed")
+	} finally {
+		_LLM_Menu_NavHotkeysBound := Saved.Bound
+		_LLM_Menu_NavSlotPlans := Saved.SlotPlans
+		_LLM_Menu_NavActiveSlot := Saved.ActiveSlot
+		if IsObject(State)
+			_LNEO_Teardown()
+		_TooltipGeneration := Saved.Generation
+	}
+	Body := _DriverFuncBody("LLM_Tooltip_FireTabOrAccept")
+	NavAt := InStr(Body, "LLM_Menu_NavShiftTabTap(ModifierIsHeldFn)")
+	Assert(NavAt > 0 && InStr(Body, "_LLM_Accept_TapHoldTapKey(TabProvenance)") > 0,
+		"the Tab wrapper must offer a tap-hold's Tab to the Shift+Tab chord: " . Body)
+	Assert(NavAt < InStr(Body, "LLM_Tooltip_TryAcceptTab("),
+		"the Shift+Tab chord must be asked before acceptance and the typed Tab")
+}
+
+Test("LLM nav: a tap-hold's Tab under one Shift navigates like the physical Shift+Tab (llm-nav-left-right-windows)",
+	_LTNC_TapHoldShiftTabNavigates)
+
+; The footer advertises every chord the hotkeys consume: Shift+Tab on either
+; side, then the arrows with the configured modifiers, bare by default, as the
+; macOS footer does. It showed the arrows only under a modifier, so the default
+; bare arrows were never advertised. Distinct tokens stand for the shared
+; strings, which this harness does not load (UiStyle_LoadSharedConst).
+_LTNC_FooterAdvertisesEveryChord() {
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
+	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
+	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
+	global UI_LLM_HINT_ARROW_SEP_RIGHT
+	Saved := [UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT,
+		UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT,
+		UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT,
+		UI_LLM_HINT_ARROW_SEP_RIGHT]
+	try {
+		UI_LLM_FOOTER_SPACE_DIV := "|"
+		UI_LLM_HINT_ACCEPT_SINGLE := "[single]"
+		UI_LLM_HINT_NAV_LEFT := "[left shift+tab]"
+		UI_LLM_HINT_NAV_RIGHT := "[right shift+tab]"
+		UI_LLM_HINT_ACCEPT_CENTER := "[accept]"
+		UI_LLM_HINT_ARROW_LEFT := "[up/left]"
+		UI_LLM_HINT_ARROW_RIGHT := "[down/right]"
+		UI_LLM_HINT_OR := " or "
+		UI_LLM_HINT_ARROW_SEP_LEFT := "<"
+		UI_LLM_HINT_ARROW_SEP_RIGHT := ">"
+		AssertEqual("[single]", _LLM_BuildNavHint(1, ""),
+			"one prediction only offers Tab")
+		AssertEqual("[left shift+tab] or [up/left]|<|[accept]|>|[right shift+tab] or [down/right]",
+			_LLM_BuildNavHint(3, ""),
+			"the bare arrows, the default chord, must be advertised beside Shift+Tab")
+		AssertEqual("[left shift+tab] or Ctrl + [up/left]|<|[accept]|>|[right shift+tab] or Ctrl + [down/right]",
+			_LLM_BuildNavHint(3, "ctrl"),
+			"the arrows carry the configured modifiers")
+		AssertEqual("[left shift+tab]|<|[accept]|>|[right shift+tab]",
+			_LLM_BuildNavHint(2, "none"),
+			"'none' hides the arrows, as on macOS")
+	} finally {
+		UI_LLM_FOOTER_SPACE_DIV := Saved[1]
+		UI_LLM_HINT_ACCEPT_SINGLE := Saved[2]
+		UI_LLM_HINT_NAV_LEFT := Saved[3]
+		UI_LLM_HINT_NAV_RIGHT := Saved[4]
+		UI_LLM_HINT_ACCEPT_CENTER := Saved[5]
+		UI_LLM_HINT_ARROW_LEFT := Saved[6]
+		UI_LLM_HINT_ARROW_RIGHT := Saved[7]
+		UI_LLM_HINT_OR := Saved[8]
+		UI_LLM_HINT_ARROW_SEP_LEFT := Saved[9]
+		UI_LLM_HINT_ARROW_SEP_RIGHT := Saved[10]
+	}
+}
+
+Test("LLM nav: the footer advertises Shift+Tab and the arrows, bare by default (llm-nav-left-right-windows)",
+	_LTNC_FooterAdvertisesEveryChord)
 
 
 
@@ -137,7 +409,7 @@ Test("LLM nav: the Up and Down chords have consuming hotkeys (llm-tooltip-nav-co
 ; =======================================================
 
 ; The maintainer's rule, on every OS: while a prediction is shown, the
-; configured navigation chord (nav_modifiers + Up / Down) and validation chord
+; configured navigation chord (nav_modifiers + an arrow) and validation chord
 ; (val_modifiers + 1..9, 0) are the tooltip's, and every other chord (bare, a
 ; superset, a subset or another modifier set) reaches the application
 ; (llm-tooltip-chords-consumed). Each row configures one modifier set; Mods
@@ -247,6 +519,8 @@ _LTNC_OnlyTheConfiguredChordsAreOwned() {
 				Row.Name . ": the Up route is the configured chord")
 			AssertEqual(Prefix . "sc0150", _LLM_Menu_NavHotkeysBound[2]["physical_id"],
 				Row.Name . ": the Down route is the configured chord")
+			AssertEqual(12, _LLM_Menu_NavHotkeysBound.Length,
+				Row.Name . ": Left and Right add no native route to the plan")
 			Loop 10 {
 				Digit := A_Index == 10 ? "0" : String(A_Index)
 				Entry := _LLM_Menu_NavHotkeysBound[A_Index + 2]
@@ -259,7 +533,7 @@ _LTNC_OnlyTheConfiguredChordsAreOwned() {
 			_LTAV_RenderPrediction(["alpha", "beta", "gamma"], 2, true)
 			for Chord in _LTNC_ChordsFor(Row) {
 				Owned := _LTNC_SameMods(Chord.Held, Row.Mods)
-				for Key in ["Up", "Down"] {
+				for Key in _LTNC_NavKeys() {
 					Consumed := LLM_Menu_NavCycleChordIsOwned(Key,
 						_LTNC_HeldFn(_LTNC_HeldMap(Chord.Held))) ? true : false
 					AssertEqual(Owned, Consumed,
@@ -270,11 +544,13 @@ _LTNC_OnlyTheConfiguredChordsAreOwned() {
 			}
 			Exact := _LTNC_HeldFn(_LTNC_HeldMap(_LTNC_HeldNames(Row.Mods, "LWin")))
 			_LTAV_RenderPrediction(["solo"], 1, true)
-			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Down", Exact),
-				Row.Name . ": one prediction has nothing to move to, the arrow is the application's")
+			for Key in _LTNC_NavKeys()
+				AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, Exact),
+					Row.Name . "+" . Key . ": one prediction has nothing to move to, the arrow is the application's")
 			_TooltipActiveSurface := 0
-			AssertFalse(LLM_Menu_NavCycleChordIsOwned("Up", Exact),
-				Row.Name . ": no tooltip, nothing is consumed")
+			for Key in _LTNC_NavKeys()
+				AssertFalse(LLM_Menu_NavCycleChordIsOwned(Key, Exact),
+					Row.Name . "+" . Key . ": no tooltip, nothing is consumed")
 		} finally {
 			_LLM_Menu_NavHotkeysBound := Saved.Bound
 			_LLM_Menu_NavSlotPlans := Saved.SlotPlans
@@ -284,7 +560,7 @@ _LTNC_OnlyTheConfiguredChordsAreOwned() {
 			_TooltipGeneration := Saved.Generation
 		}
 	}
-	AssertEqual(52, Checked, "every modifier set, chord and key must be checked")
+	AssertEqual(104, Checked, "every modifier set, chord and arrow must be checked")
 }
 
 Test("LLM nav: only the configured navigation and validation chords are owned (llm-tooltip-chords-consumed)",

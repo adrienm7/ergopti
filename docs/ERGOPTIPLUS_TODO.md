@@ -398,10 +398,12 @@ These are software implementations; final hardware verification remains below.
         predictions (latency, dropped or interleaved keys) before switching;
         not before the demo.
 51. [ ] Windows checks on a real machine for the 2026-09-30 evening fixes
-        (AutoHotkey cannot run in the Linux sessions): the arrows over a
-        multi-slot AI prediction move the marker once per press, wrap at both
-        ends and never move the caret, also right after a reload and with
-        `nav_modifiers` set to ctrl; Tab then inserts the chosen slot; the
+        (AutoHotkey cannot run in the Linux sessions): the four arrows (↑/←
+        back, ↓/→ forward) and the left and right Shift+Tab over a multi-slot
+        AI prediction move the marker once per press, wrap at both ends and
+        never move the caret, also right after a reload, with `nav_modifiers`
+        set to ctrl and with a tap-hold's Tab tapped under one Shift; the
+        footer shows "⇧G + Tab ou ↑/←"; Tab then inserts the chosen slot; the
         hotstring bubbles and the delayed expansions work with the layout
         emulation off and on; an accepted prediction no longer types "eeee".
 

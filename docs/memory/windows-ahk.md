@@ -267,10 +267,15 @@ Down cycle route that passes its key on, and changing it means rebuilding
 `ergopti_nav_owner.dll` with MSVC. A first fix let the native owner cycle and
 swallowed the passed arrow in AutoHotkey; once AutoHotkey's hook ran first
 (`project-ahk-sendinput-puts-its-hook-first`), it swallowed every arrow before
-any cycle. The `*Up`/`*Down` hotkeys in `menu_llm/tab_accept.ahk` now cycle
-(`LLM_TooltipCycleActiveIdx`, whose repaint republishes the slot to the owner)
-and consume the chord under `LLM_Menu_NavCycleChordIsOwned` (#InputLevel 1,
-exact modifiers, owner routing a multi-slot record). The adapter parks both
+any cycle. The `*Up`/`*Down`/`*Left`/`*Right` hotkeys in
+`menu_llm/tab_accept.ahk` now cycle (`LLM_TooltipCycleActiveIdx`, whose repaint
+republishes the slot to the owner) and consume the chord under
+`LLM_Menu_NavCycleChordIsOwned` (#InputLevel 1, exact modifiers, owner routing
+a multi-slot record). Left and Right share the chord and step of the Up and
+Down routes (`LLM_NAV_CYCLE_KEYS`) and are never native routes; Shift+Tab is
+`<+SC00F`/`>+SC00F` there, the most specific SC00F hotkey under that Shift, so
+the hook falls back to the Tab key's other owners when its criterion refuses
+(hotkey.cpp CriterionFiringIsCertain, the mNextHotkey list). The adapter parks both
 native cycle routes on extended scan code zero
 (`LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES`), so no hook order cycles twice or
 never (`test_llm_nav_cycle_windows.ahk`, `test-windows-llm-nav-cycle.cjs`).
