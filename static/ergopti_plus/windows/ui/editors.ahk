@@ -224,8 +224,17 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 ; The physical magic key captured by pressing it: the next key pressed while this
 ; dialog shows becomes [hotstrings] magic_key_source. Escape, closing the dialog
 ; or the shared capture timeout changes nothing. It shares the magic-key editor's
-; owner (one suppressive capture at a time, stopped by Suspend and by Close), and
-; the key is identified by scan code, so the layout it types on does not matter.
+; owner (one suppressive capture at a time, stopped by Suspend and by Close).
+;
+; The key is read from the keyboard hook's PHYSICAL key state, never from the
+; scan code the InputHook reports: a remap hotkey suppresses the key it fires on,
+; and the hook only sees what that hotkey sends (HookDispatcherConst), at level 2
+; — with the Ergopti emulation on, the key typing "j" reported the scan code of
+; "j" on the OS layout, and the magic key its own {Text}★, scan code 0. A key
+; press, whatever reaches the hook, and a short poll, for a hotkey that sends
+; nothing the hook sees (a dead key, a tap-hold), both ask which candidate key is
+; physically down. GetKeyState "P" is exact only while the keyboard hook is
+; installed, which it always is in this driver.
 MagicKeySourceCapture(*) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
 		if A_IsSuspended
@@ -244,12 +253,13 @@ MagicKeySourceCapture(*) {
 		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
 		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
 		GuiToShow.Show("Center")
-		Captured := { Scan: 0 }
+		State := _MagicKeySourceCaptureState()
 		; L0: no text is collected, every key is reported to OnKeyDown (N) and
 		; kept from the application (S); T ends the wait on the shared timeout.
 		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
 		IH.KeyOpt("{All}", "NS")
-		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(Captured)
+		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
+		Poll := _MagicKeySourceCapturePoll.Bind(State, IH)
 		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
 		try {
@@ -265,8 +275,10 @@ MagicKeySourceCapture(*) {
 				} finally {
 						Critical("Off")
 				}
+				SetTimer(Poll, TimingsGet("ui", "magic_key_capture_poll_ms"))
 				IH.Wait()
 		} finally {
+				SetTimer(Poll, 0)
 				_MagicKeyEditorStopOwned(IH)
 				if (_MagicKeyEditorGui == GuiToShow)
 						_MagicKeyEditorGui := ""
@@ -276,15 +288,74 @@ MagicKeySourceCapture(*) {
 		; A capture whose wait crossed the pause boundary is discarded.
 		if A_IsSuspended
 				return
-		; Escape, Close and the timeout all end without a scan code.
-		if (IH.EndReason != "Stopped" || Captured.Scan == 0)
+		; Escape, Close and the timeout all end without an answer.
+		if (IH.EndReason != "Stopped")
 				return
-		Code := LayoutRegistry_KeyCode(Format("SC{:03X}", Captured.Scan), LayoutRegistry_Keycodes())
-		if !MagicKeySourceIsCandidate(Code) {
+		if State.Refused {
 				MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
 				return
 		}
-		ModifyMagicKeySource(Code)
+		if (State.Scan == "")
+				return
+		ModifyMagicKeySource(LayoutRegistry_KeyCode(State.Scan, LayoutRegistry_Keycodes()))
+}
+
+; The state of one capture: the scan codes of the candidate keys, how a key's
+; physical state is read, the candidates already down when it opened (an answer
+; only once released), and the answer: a scan code, or Refused for a key that is
+; no candidate.
+; @param IsDown {Func} (KeyName) → whether the key is physically down.
+; @returns {Object} Scans, IsDown, Held, Scan and Refused.
+_MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
+		Scans := []
+		Keycodes := LayoutRegistry_Keycodes()
+		for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+				if MagicKeySourceIsCandidate(Code)
+						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
+		}
+		Held := Map()
+		for Scan in Scans {
+				if IsDown.Call(Scan)
+						Held[Scan] := true
+		}
+		return { Scans: Scans, IsDown: IsDown, Held: Held, Scan: "", Refused: false }
+}
+
+_MagicKeySourceIsDown(KeyName) {
+		return GetKeyState(KeyName, "P")
+}
+
+; The candidate key physically down, "" when none. A key held since the capture
+; opened stops being ignored once it was released.
+_MagicKeySourcePressedScan(State) {
+		; Collected first: a Map must not lose keys while it is enumerated.
+		Released := []
+		for Scan in State.Held {
+				if !State.IsDown.Call(Scan)
+						Released.Push(Scan)
+		}
+		for Scan in Released
+				State.Held.Delete(Scan)
+		for Scan in State.Scans {
+				if !State.Held.Has(Scan) && State.IsDown.Call(Scan)
+						return Scan
+		}
+		return ""
+}
+
+; Poll of the capture, for a key whose hotkey sends nothing the InputHook sees.
+_MagicKeySourceCapturePoll(State, IH) {
+		if !IH.InProgress
+				return
+		if State.IsDown.Call("Escape") {
+				IH.Stop()
+				return
+		}
+		Scan := _MagicKeySourcePressedScan(State)
+		if (Scan == "")
+				return
+		State.Scan := Scan
+		IH.Stop()
 }
 
 ; List provider of the Layout menu's `magic_key_source` row (ui/menu/menu_init.ahk).
@@ -323,14 +394,26 @@ _MagicKeySourceLabel(Code, Keycodes, Hkl) {
 	return (Trim(Text) == "") ? Code : Text . "   (" . Code . ")"
 }
 
-; OnKeyDown of the capture: a modifier alone chooses nothing, Escape cancels, any
-; other key is the answer.
-_MagicKeySourceCaptureKeyDown(Captured, IH, VK, SC) {
+; OnKeyDown of the capture: a modifier alone chooses nothing, Escape cancels, and
+; any other key answers with the candidate physically down — VK and SC describe
+; what reached the hook, a remap's output rather than the key pressed. With no
+; candidate down, the key pressed is none (Space, Enter, F5…) and is refused; a
+; candidate held since the capture opened only repeats and is no answer yet.
+_MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
 		global HOTKEY_MODIFIER_VKS
 		if HOTKEY_MODIFIER_VKS.Has(VK)
 				return
-		if (VK != GetKeyVK("Escape"))
-				Captured.Scan := SC
+		if (VK == GetKeyVK("Escape")) {
+				IH.Stop()
+				return
+		}
+		Scan := _MagicKeySourcePressedScan(State)
+		if (Scan == "") {
+				if (State.Held.Count > 0)
+						return
+				State.Refused := true
+		}
+		State.Scan := Scan
 		IH.Stop()
 }
 
