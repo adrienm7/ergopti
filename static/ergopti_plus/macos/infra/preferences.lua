@@ -212,6 +212,28 @@ function M.action_is_retired(value)
 	return true, "action '" .. value .. "' no longer exists"
 end
 
+--- Owner check of one [gestures.action_parameters] entry: its name must end in
+--- an action that still takes a parameter, and its value must still fit that
+--- parameter (a removed wrap pair, a retired language). The gesture catalogue
+--- judges it once loaded, as for retired actions; without it, or when its own
+--- validator cannot judge, every entry is kept. Whether the binding before the
+--- action still exists is not judged: no single catalogue lists every binding
+--- (gesture slots, keyboard__, tap_key__, script__…).
+--- @param key string Persisted parameter key.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function action_parameter_fits(key, value)
+	local catalogue = package.loaded["modules.gestures.actions"]
+	if type(catalogue) ~= "table" or type(catalogue.split_action_parameter_key) ~= "function"
+		or type(catalogue.validate_action_parameter) ~= "function" then return true end
+	local _, action = catalogue.split_action_parameter_key(key)
+	if not action then return false, "no action parameter of this build has this name" end
+	local judged, valid = pcall(catalogue.validate_action_parameter, action, value)
+	if judged and not valid then return false, "the value no longer fits its action's parameter" end
+	return true
+end
+
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
@@ -590,6 +612,11 @@ local function flatten_from_disk(grouped, mark)
 								boolean_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
+						elseif nested_fk == "gesture_action_parameters" then
+							-- The boot replay dropped these in silence and the whole
+							-- table was marked, so none was ever offered.
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								action_parameter_fits, mark)
 						else
 							take_value(nested_fk, owned, sec_name, disk_key)
 						end
