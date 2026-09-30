@@ -853,4 +853,45 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_eq(offers[1].found[1].path, helpers.HEALTHY_PYTHON)
 		helpers.assert_eq(#world.dialogs, 1, "no MLX repair dialog for a Python it cannot repair")
 	end))
+
+	-- hardening-h-no-rosetta: a venv an Intel interpreter built on Apple silicon.
+	helpers.it("never starts an installed venv on an Intel Python and repairs it natively", scoped(function()
+		local world = new_world({ installed = true })
+		local checker, router = load_world(world)
+		local intel = "\207\250\237\254" .. "\7\0\0\1" .. string.rep("\0", 24)
+		package.loaded["adapters.python_interpreter"]._set_deps({
+			read_head = function(path)
+				if path == MLX_VENV .. "/bin/python" then return intel end
+				if path == helpers.HEALTHY_PYTHON then
+					return "\202\254\186\190" .. "\0\0\0\2" .. "\1\0\0\7" .. string.rep("\0", 16)
+						.. "\1\0\0\12" .. string.rep("\0", 16)
+				end
+				return nil
+			end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		local cause = checker.foreign_interpreter_cause()
+		helpers.assert_eq(cause.kind, "venv_not_native")
+		helpers.assert_eq(cause.archs, "x86_64")
+
+		-- The boot check reuses no such runtime and starts nothing.
+		local results = {}
+		helpers.assert_true(checker.check_and_install_deps(function(ok) results[#results + 1] = ok end))
+		helpers.assert_eq(results, { false })
+		helpers.assert_eq(#world.tasks, 0, "the Intel interpreter is never started")
+		helpers.assert_eq(checker.get_state(), "missing")
+		helpers.assert_true(checker.is_runtime_broken())
+		helpers.assert_eq(checker.get_failure_cause().kind, "venv_not_native")
+
+		-- Selecting MLX repairs it, on the native interpreter, telling the script the processor.
+		helpers.assert_true(router.select_mlx(function() end))
+		helpers.assert_eq(#world.tasks, 1)
+		helpers.assert_eq(world.tasks[1].executable, helpers.HEALTHY_PYTHON)
+		local command = world.tasks[1].command()
+		helpers.assert_true(command:find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil, command)
+		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='arm64'", 1, true) ~= nil, command)
+	end))
 end)

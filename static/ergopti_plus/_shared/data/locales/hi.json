@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "MLX पैकेज इंस्टॉल हैं, पर लोड नहीं होते।",
 	"mlx.cause_python": "इंस्टॉलेशन द्वारा उपयोग किया गया Python MLX नहीं चला सकता।",
 	"mlx.cause_no_native_python": "इंस्टॉलेशन चलाने के लिए इस Mac के लिए बना कोई Python 3 इंस्टॉल नहीं है।",
+	"mlx.cause_venv_not_native": "MLX परिवेश किसी दूसरे प्रोसेसर ({1}) के Python से बनाया गया था: macOS उसे Rosetta से चलाएगा, इसलिए उसे शुरू नहीं किया जाता।",
 	"mlx.cause_gatekeeper": "macOS सुरक्षा (Gatekeeper) ने MLX इंस्टॉलेशन की एक फ़ाइल रोक दी।",
 	"mlx.cause_exit": "इंस्टॉलेशन कोड {1} के साथ रुक गया।",
 	"mlx.unsupported_title": "MLX इस Mac पर उपलब्ध नहीं है",

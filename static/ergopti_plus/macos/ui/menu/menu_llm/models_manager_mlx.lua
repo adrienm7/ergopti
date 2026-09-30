@@ -566,6 +566,19 @@ function M.new(deps, presets)
 			if not authorized then return true end
 			return handle_requirement_completion(...)
 		end
+		-- hardening-h-no-rosetta: a venv built on an interpreter for another
+		-- processor is never started, not even to probe it; its repair rebuilds it.
+		local foreign = mlx_deps_checker and type(mlx_deps_checker.foreign_interpreter_cause) == "function"
+			and mlx_deps_checker.foreign_interpreter_cause() or nil
+		if foreign then
+			Logger.error(LOG, "The MLX runtime's Python %s is built for %s, not this Mac; it is not started.",
+				tostring(foreign.path), tostring(foreign.archs))
+			if mlx_deps_checker.invalidate_runtime then
+				pcall(mlx_deps_checker.invalidate_runtime, foreign)
+			end
+			offer_repair(foreign)
+			return settle_cancel("runtime_not_native")
+		end
 		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash",
 			complete_requirement_task, {"-c", check_cmd})
 		task_owner.task = check_task

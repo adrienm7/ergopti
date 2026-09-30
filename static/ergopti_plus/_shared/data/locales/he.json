@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "חבילות MLX מותקנות אך אינן נטענות.",
 	"mlx.cause_python": "ה-Python שההתקנה משתמשת בו אינו יכול להריץ את MLX.",
 	"mlx.cause_no_native_python": "לא מותקן Python 3 שנבנה עבור מק זה כדי להריץ את ההתקנה.",
+	"mlx.cause_venv_not_native": "סביבת MLX נבנתה עם Python עבור מעבד אחר ({1}): macOS היה מריץ אותה דרך Rosetta, ולכן היא לא מופעלת.",
 	"mlx.cause_gatekeeper": "אבטחת macOS ‏(Gatekeeper) חסמה קובץ של התקנת MLX.",
 	"mlx.cause_exit": "ההתקנה נעצרה עם הקוד {1}.",
 	"mlx.unsupported_title": "MLX אינו זמין ב-Mac הזה",

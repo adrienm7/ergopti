@@ -238,6 +238,24 @@ function M.runtime_installed()
 	return is_file(python_path) and is_file(venv .. "/.last_sync_hash"), python_path
 end
 
+--- Names why the installed runtime's interpreter must never be started: its
+--- Mach-O lacks a slice for this Mac's processor (a venv built on an Intel
+--- Python on Apple silicon), so macOS would run it under Rosetta. Read from the
+--- header, without starting it.
+--- @return table|nil cause { kind = "venv_not_native", path, archs, line, repairable }, nil when native or absent.
+function M.foreign_interpreter_cause()
+	local venv = M.venv_dir()
+	if not venv then return nil end
+	local python = venv .. "/bin/python"
+	local native_ok, detail = PythonInterpreter.inspect(python)
+	if native_ok or detail.archs == nil or detail.reason == "unknown_native_arch" then return nil end
+	local archs = PythonInterpreter.describe_archs(detail.archs)
+	return {
+		kind = "venv_not_native", path = python, archs = archs, repairable = true,
+		line = python .. " [" .. archs .. "]",
+	}
+end
+
 --- Names the venv only when it is exactly the folder Ergopti owns and may
 --- delete: the path venv_dir() derives, absolute, named mlx-venv (launcher) or
 --- .venv (checkout), without "." or ".." segments, and not a link or a file.
@@ -1023,6 +1041,17 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- provisioned only under the grant of an MLX backend selection, or when a
 	-- pause replays a script that selection already started.
 	local installed, venv_python = M.runtime_installed()
+	-- A venv on an interpreter for another processor is never reused: it is
+	-- flagged broken, and the selection's repair rebuilds it natively.
+	if installed then
+		local foreign = M.foreign_interpreter_cause()
+		if foreign then
+			Logger.warn(LOG, "The MLX venv's Python %s is built for %s, not this Mac; it is never started.",
+				foreign.path, foreign.archs)
+			M.invalidate_runtime(foreign)
+			installed = false
+		end
+	end
 	local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
 		and _resume_intent.kind == "task"
 	local install_allowed = install_granted or replaying_install
@@ -1135,6 +1164,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- Forward the project root so the script knows where to find .venv even
 	-- when launched outside the project directory (e.g. from launchd).
 	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
+	-- The script refuses every uv and venv interpreter without this slice.
+	env_prefix = env_prefix .. "ERGOPTI_NATIVE_ARCH=" .. shell_quote(PythonInterpreter.native_arch() or "") .. " "
 	if repair then env_prefix = env_prefix .. "ERGOPTI_MLX_REPAIR=1 " end
 	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
 

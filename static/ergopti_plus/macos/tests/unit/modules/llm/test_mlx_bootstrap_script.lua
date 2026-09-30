@@ -322,6 +322,52 @@ end
 
 
 
+-- ===============================================
+-- ===============================================
+-- ======= 4b/ Never Rosetta (hardening-h) =======
+-- ===============================================
+-- ===============================================
+
+-- An x86_64-only Mach-O header, as file(1) identifies it on macOS and Linux.
+local INTEL_MACHO = "\207\250\237\254" .. "\7\0\0\1" .. "\3\0\0\0" .. "\2\0\0\0" .. string.rep("\0", 64)
+
+if POSIX then
+helpers.describe("No uv or venv Python built for another processor is started (hardening-h-no-rosetta)", function()
+	it_runs("skips an Intel uv first in PATH for a native one", function(fixture)
+		-- The Intel Homebrew uv of a migrated Mac, found first; the native uv after it.
+		run("mkdir -p " .. sh_quote(fixture.home .. "/.cargo/bin") .. " && mv "
+			.. sh_quote(fixture.home .. "/.local/bin/uv") .. " " .. sh_quote(fixture.home .. "/.cargo/bin/uv"))
+		write(fixture.home .. "/.local/bin/uv", INTEL_MACHO)
+		run("chmod +x " .. sh_quote(fixture.home .. "/.local/bin/uv"))
+		local output, status = bootstrap(fixture, "ERGOPTI_NATIVE_ARCH=arm64")
+		helpers.assert_eq(status, 0, output)
+		helpers.assert_true(output:find("Skipping " .. fixture.home .. "/.local/bin/uv", 1, true) ~= nil, output)
+		helpers.assert_true((read(fixture.root .. "/uv.log") or ""):find("venv", 1, true) ~= nil,
+			"the native uv built the venv")
+	end)
+
+	it_runs("rebuilds a venv whose Python is Intel without ever starting it", function(fixture)
+		local _, first = bootstrap(fixture, "ERGOPTI_NATIVE_ARCH=arm64")
+		helpers.assert_eq(first, 0)
+		-- The venv an Intel interpreter built: same fingerprint, same packages.
+		os.remove(fixture.venv .. "/bin/python")
+		write(fixture.venv .. "/bin/python", INTEL_MACHO)
+		run("chmod +x " .. sh_quote(fixture.venv .. "/bin/python"))
+		local output, status = bootstrap(fixture, "ERGOPTI_NATIVE_ARCH=arm64")
+		helpers.assert_eq(status, 0, output)
+		helpers.assert_true(output:find("built for another processor than arm64", 1, true) ~= nil, output)
+		helpers.assert_true(output:find("do not import with " .. fixture.venv .. "/bin/python", 1, true) == nil,
+			"the Intel interpreter is never started, not even to probe it: " .. output)
+		local header = read(fixture.venv .. "/bin/python") or ""
+		helpers.assert_true(header:sub(1, 2) == "#!", "the venv is rebuilt on uv's own interpreter")
+	end)
+end)
+end
+
+
+
+
+
 -- ===================================
 -- ===================================
 -- ======= 5/ One Import Probe =======

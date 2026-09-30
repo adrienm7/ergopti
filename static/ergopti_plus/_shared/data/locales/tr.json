@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "MLX paketleri kurulu ama yüklenmiyor.",
 	"mlx.cause_python": "Kurulumun kullandığı Python MLX'i çalıştıramıyor.",
 	"mlx.cause_no_native_python": "Kurulumu çalıştırmak için bu Mac için derlenmiş bir Python 3 yüklü değil.",
+	"mlx.cause_venv_not_native": "MLX ortamı başka bir işlemci için bir Python ile oluşturuldu ({1}): macOS onu Rosetta ile çalıştırırdı, bu yüzden başlatılmıyor.",
 	"mlx.cause_gatekeeper": "macOS güvenliği (Gatekeeper) MLX kurulumuna ait bir dosyayı engelledi.",
 	"mlx.cause_exit": "Kurulum {1} koduyla durdu.",
 	"mlx.unsupported_title": "MLX bu Mac'te kullanılamıyor",

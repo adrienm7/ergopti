@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "MLX 패키지가 설치되어 있지만 로드되지 않습니다.",
 	"mlx.cause_python": "설치에 사용된 Python으로는 MLX를 실행할 수 없습니다.",
 	"mlx.cause_no_native_python": "설치를 실행할 이 Mac용 Python 3이 설치되어 있지 않습니다.",
+	"mlx.cause_venv_not_native": "MLX 환경이 다른 프로세서({1})용 Python으로 만들어졌습니다. macOS가 Rosetta로 실행하게 되므로 시작하지 않습니다.",
 	"mlx.cause_gatekeeper": "macOS 보안(Gatekeeper)이 MLX 설치 파일을 차단했습니다.",
 	"mlx.cause_exit": "설치가 코드 {1}(으)로 중지되었습니다.",
 	"mlx.unsupported_title": "이 Mac에서는 MLX를 사용할 수 없습니다",

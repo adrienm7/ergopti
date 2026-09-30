@@ -1758,6 +1758,7 @@
 	"mlx.cause_import": "حزم MLX مثبتة لكنها لا تُحمَّل.",
 	"mlx.cause_python": "لا يستطيع Python الذي يستخدمه التثبيت تشغيل MLX.",
 	"mlx.cause_no_native_python": "لا يوجد Python 3 مُعدّ لهذا الـ Mac مثبّت لتشغيل التثبيت.",
+	"mlx.cause_venv_not_native": "أُنشئت بيئة MLX باستخدام Python لمعالج آخر ({1}): سيشغّلها macOS عبر Rosetta، لذلك لا تُشغَّل.",
 	"mlx.cause_gatekeeper": "حظر أمان macOS ‏(Gatekeeper) ملفًا من تثبيت MLX.",
 	"mlx.cause_exit": "توقف التثبيت بالرمز {1}.",
 	"mlx.unsupported_title": "MLX غير متاح على هذا الـ Mac",

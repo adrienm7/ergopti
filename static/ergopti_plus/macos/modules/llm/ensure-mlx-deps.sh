@@ -54,6 +54,10 @@
 # 12. Repair: ERGOPTI_MLX_REPAIR=1 removes Ergopti's own venv (only that
 #    folder, never a link or a folder without a Python environment) and
 #    rebuilds it from freshly downloaded packages.
+# 13. Never Rosetta: a uv or a venv interpreter whose Mach-O lacks a slice for
+#    the processor the app runs on (ERGOPTI_NATIVE_ARCH, from the Lua caller)
+#    is never started; macOS would run it under Rosetta and announce an Intel
+#    app. Such a uv is skipped and such a venv rebuilt (hardening-h-no-rosetta).
 # ==============================================================================
 
 set -eu
@@ -167,25 +171,44 @@ clear_quarantine() {
 	fi
 }
 
+# The processor the app runs on, as the Lua caller names it
+# (adapters/python_interpreter.lua); uname answers when run by hand.
+NATIVE_ARCH="${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}"
+
+# Succeeds only for a Mach-O executable without a slice for NATIVE_ARCH, one
+# macOS would start under Rosetta. A script or an unreadable file is left to
+# the command that runs it.
+lacks_native_slice() {
+	local description
+	description="$(/usr/bin/file -bL "$1" 2>/dev/null)" || return 1
+	case "$description" in
+		*Mach-O*) ;;
+		*) return 1 ;;
+	esac
+	case "$description" in
+		*"$NATIVE_ARCH"*) return 1 ;;
+	esac
+	return 0
+}
+
 # Locates uv in PATH or in the well-known install directories. Prints the
-# absolute path on success, returns non-zero on failure.
+# absolute path on success, returns non-zero on failure. A uv built for
+# another processor (an Intel Homebrew's /usr/local/bin/uv on Apple silicon)
+# is skipped: starting it would run it under Rosetta.
 locate_uv() {
-	if command -v uv >/dev/null 2>&1; then
-		command -v uv
+	local candidate
+	for candidate in "$(command -v uv 2>/dev/null || true)" "${UV_INSTALL_DIR:+$UV_INSTALL_DIR/uv}" \
+		"$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv"; do
+		if [ -z "$candidate" ] || [ ! -x "$candidate" ]; then
+			continue
+		fi
+		if lacks_native_slice "$candidate"; then
+			log_info "Skipping $candidate: it is built for another processor than $NATIVE_ARCH."
+			continue
+		fi
+		echo "$candidate"
 		return 0
-	fi
-	if [ -n "${UV_INSTALL_DIR:-}" ] && [ -x "$UV_INSTALL_DIR/uv" ]; then
-		echo "$UV_INSTALL_DIR/uv"
-		return 0
-	fi
-	if [ -x "$HOME/.local/bin/uv" ]; then
-		echo "$HOME/.local/bin/uv"
-		return 0
-	fi
-	if [ -x "$HOME/.cargo/bin/uv" ]; then
-		echo "$HOME/.cargo/bin/uv"
-		return 0
-	fi
+	done
 	return 1
 }
 
@@ -407,7 +430,14 @@ fi
 # `uv pip sync pyproject.toml` was a silent no-op, or a venv whose libraries
 # macOS refuses to load), and a hash-only check would then keep skipping work
 # forever. When the imports fail, the slow path rebuilds it below.
-if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
+# A venv built on an interpreter for another processor is never started, not
+# even to probe it: it is rebuilt on uv's own interpreter below.
+VENV_NOT_NATIVE=0
+if [ -e "$VENV_DIR/bin/python" ] && lacks_native_slice "$VENV_DIR/bin/python"; then
+	VENV_NOT_NATIVE=1
+	log_info "The installed venv's Python is built for another processor than $NATIVE_ARCH — rebuilding it."
+fi
+if [ "$VENV_NOT_NATIVE" = "0" ] && [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 	LAST_HASH="$(cat "$SYNC_HASH_FILE" 2>/dev/null || true)"
 	if [ "$LAST_HASH" = "$DEPS_FINGERPRINT" ]; then
 		# Cheap disk check before the python import probe: globbing the
