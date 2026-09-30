@@ -25,6 +25,9 @@
  *    label, the others read layer_actions.<id>; a missing English key fails
  *    the generation instead of shipping a raw identifier.
  * 4. Deterministic: registry order, vocabulary order, no timestamp.
+ * 5. Legends: a key marked `character` types what the active layout puts on
+ *    it, so the page shows the legend its host resolved; every other key is a
+ *    named key the page labels itself.
  * ==============================================================================
  */
 
@@ -159,8 +162,12 @@ function buildData() {
 	const repeat = vocabulary.parameters.repeat_count;
 	const repeatAvailability = probe(ctx, PROBE_KEY, `repeat_count:${repeat.min}`, 'repeat_count');
 
+	// A key the registry sends by its scan code rather than by name
+	// (`ahk_send: null`) types whatever the active layout puts there: its
+	// legend is the host's to send (script.js init), never a guess of the page.
 	const keys = Object.entries(registry.keys).map(([code, entry]) => {
 		const key = { code, kind: entry.kind, group: entry.group };
+		if (entry.kind === 'key' && entry.ahk_send === null) key.character = true;
 		if (entry.geometry) key.geometry = entry.geometry;
 		return key;
 	});

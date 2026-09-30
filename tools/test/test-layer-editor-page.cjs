@@ -22,6 +22,17 @@
  * 5. Key captions (layer-editor-action-wrap): a key's action wraps over
  *    several lines of a readable size that its key holds at the window's
  *    default and minimum sizes, and its tooltip carries the whole text.
+ * 6. Legends (layer-editor-current-layout-legends): a character key shows what
+ *    the host says the user's layout types on it (the shared corpus
+ *    _shared/tests/corpus/layer_editor/legends.json), never a QWERTY letter
+ *    of the page's own; a key the host did not resolve shows its registry
+ *    code; a named key its translated name; the host is asked again when the
+ *    window comes back to the front, and its answer keeps the edits.
+ * 7. Keycaps: a bound key shows its action's catalogue label, icon and words,
+ *    or the short form of a repeat count or a shortcut (read with the key's
+ *    current legend); an unbound key only its legend; the key whose hold
+ *    enters the layer is marked; the numeric keypad shows when asked or when
+ *    one of its keys is bound.
  * ==============================================================================
  */
 
@@ -40,6 +51,9 @@ const EN = JSON.parse(
 	fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8').replace(/^\uFEFF/, '')
 );
 const RECOMMENDED_TEXT = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
+const LEGENDS_CORPUS = JSON.parse(
+	fs.readFileSync(shared('tests', 'corpus', 'layer_editor', 'legends.json'), 'utf8')
+);
 const ctx = loadContext();
 
 const errors = [];
@@ -167,11 +181,15 @@ function loadPage() {
 	};
 
 	const storage = new Map();
+	const windowListeners = {};
 	// The context's global object is the page's window, as in a browser, so the
 	// UMD model's self.LayerModel is the bare LayerModel script.js reads.
 	const context = vm.createContext({
 		document,
 		console,
+		addEventListener(type, fn) {
+			(windowListeners[type] = windowListeners[type] || []).push(fn);
+		},
 		_i18n_strings: EN,
 		localStorage: {
 			getItem: (k) => (storage.has(k) ? storage.get(k) : null),
@@ -215,6 +233,7 @@ function loadPage() {
 			})(document.getElementById(container));
 			return out;
 		},
+		// What a key shows as its action: icon then words, as one text.
 		binding: (code) => {
 			const node = all().find(
 				(n) =>
@@ -222,8 +241,21 @@ function loadPage() {
 					n.dataset.code === code &&
 					!n.classList.contains('enter-lower')
 			);
-			return node.children[0].children[1].textContent;
+			const action = node.children[0].children.find((c) => c.className.split(' ')[0] === 'action');
+			return action ? action.children.map((c) => c.textContent).join('') : '';
 		},
+		// The legend in a key's corner.
+		legend: (code) => {
+			const node = all().find(
+				(n) =>
+					n.classList.contains('key') &&
+					n.dataset.code === code &&
+					!n.classList.contains('enter-lower')
+			);
+			const legend = node.children[0].children.find((c) => c.className === 'legend');
+			return legend ? legend.textContent : null;
+		},
+		fireWindow: (type) => (windowListeners[type] || []).slice().forEach((fn) => fn({ type })),
 		key: (code) =>
 			all().find(
 				(n) =>
@@ -272,9 +304,10 @@ const DATA = (() => {
 	page.call(
 		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
 	);
-	const isoKeys = DATA.keys.filter((k) => k.geometry && k.geometry.iso);
+	// The keypad is hidden until asked for or bound (section 7).
+	const isoKeys = DATA.keys.filter((k) => k.geometry && k.geometry.iso && k.group !== 'numpad');
 	const drawn = page.keys('board');
-	check(isoKeys.length > 90, `only ${isoKeys.length} ISO keys in the data`);
+	check(isoKeys.length > 75, `only ${isoKeys.length} ISO keys in the data`);
 	check(
 		drawn.length === isoKeys.length + 1,
 		`the ISO board draws ${drawn.length} blocks for ${isoKeys.length} keys (+1 for the Enter's lower row)`
@@ -293,8 +326,8 @@ const DATA = (() => {
 		'KeyQ must show its action label'
 	);
 	check(
-		page.binding('Digit1') === EN['layer_editor.value.repeat_count'].replace('{1}', '1'),
-		'Digit1 must show its repeat count'
+		page.binding('Digit1') === EN['layer_editor.caption.repeat_count'].replace('{1}', '1'),
+		`Digit1 must show its repeat count, not "${page.binding('Digit1')}"`
 	);
 	check(
 		!page.key('WheelUp').classList.contains('unavailable'),
@@ -303,7 +336,7 @@ const DATA = (() => {
 
 	page.el('form').value = 'ansi';
 	page.el('form').dispatch('change');
-	const ansiKeys = DATA.keys.filter((k) => k.geometry && k.geometry.ansi);
+	const ansiKeys = DATA.keys.filter((k) => k.geometry && k.geometry.ansi && k.group !== 'numpad');
 	check(
 		page.keys('board').length === ansiKeys.length,
 		`the ANSI board draws ${page.keys('board').length} blocks for ${ansiKeys.length} keys`
@@ -512,6 +545,18 @@ const DATA = (() => {
 	);
 }
 
+/**
+ * Runs one section of checks: an exception is one failed check naming the
+ * section, so a page that breaks early cannot hide the sections after it.
+ */
+function section(name, fn) {
+	try {
+		fn();
+	} catch (e) {
+		check(false, `(${name}) threw: ${e.message}`);
+	}
+}
+
 // ==================================================================
 // ==================================================================
 // ======= 5/ Key captions (layer-editor-action-wrap) ===============
@@ -573,28 +618,38 @@ function lineHeightPx(rule) {
 	return factor * px(rule['font-size']);
 }
 
-{
-	const binding = cssRule('.key .binding');
+section('layer-editor-action-wrap', () => {
+	const binding = cssRule('.key .action');
 	const legend = cssRule('.key .legend');
 	const cap = cssRule('.key .cap');
 	const slot = cssRule('.key');
-	check(binding !== null, '(layer-editor-action-wrap) style.css has no `.key .binding` rule');
+	check(binding !== null, '(layer-editor-action-wrap) style.css has no `.key .action` rule');
 	check(
 		legend !== null && cap !== null && slot !== null,
 		'(layer-editor-action-wrap) a key rule is missing'
 	);
-	if (binding && legend && cap && slot) {
+	// The rule of the narrow window: a 1u key holds one line less there.
+	const narrow = /@media\s*\(max-width:\s*(\d+)px\)\s*\{\s*\.key \.action\s*\{([^}]*)\}/.exec(CSS);
+	check(
+		narrow !== null,
+		'(layer-editor-action-wrap) style.css has no narrow-window clamp for `.key .action`'
+	);
+	if (binding && legend && cap && slot && narrow) {
 		check(
 			binding['white-space'] === 'normal',
 			`(layer-editor-action-wrap) a key's action must wrap (white-space: normal), not ${binding['white-space']}`
 		);
 		check(
-			binding['overflow-wrap'] === 'anywhere' || binding['word-break'] === 'break-word',
+			binding['overflow-wrap'] === 'break-word' || binding['overflow-wrap'] === 'anywhere',
 			"(layer-editor-action-wrap) a key's action must break a word longer than the key"
 		);
 		check(
 			!('text-overflow' in binding),
 			"(layer-editor-action-wrap) a key's action is clamped by lines, never cut on one line"
+		);
+		check(
+			cap.display === undefined || cap.display === 'block',
+			'(layer-editor-action-wrap) the cap is a plain block: a line clamp inside a flex column collapsed in WebKit'
 		);
 		const fontPx = px(binding['font-size']);
 		check(
@@ -606,38 +661,38 @@ function lineHeightPx(rule) {
 			Number.isInteger(clamp) && clamp >= MIN_BINDING_LINES,
 			`(layer-editor-action-wrap) a key's action must be clamped to at least ${MIN_BINDING_LINES} lines, not ${binding['-webkit-line-clamp']}`
 		);
+		const narrowWidth = Number(narrow[1]);
+		const narrowClamp = Number((/-webkit-line-clamp:\s*(\d+)/.exec(narrow[2]) || [])[1]);
+		check(
+			narrowClamp >= MIN_BINDING_LINES_AT_MIN_WIDTH,
+			`(layer-editor-action-wrap) the narrow window clamps a key's action to ${narrowClamp} line(s)`
+		);
 		check(
 			binding.display === '-webkit-box' && binding['-webkit-box-orient'] === 'vertical',
 			'(layer-editor-action-wrap) the line clamp needs display: -webkit-box and a vertical box'
 		);
 		check(
-			binding.overflow === 'hidden' && binding['min-height'] === '0',
-			"(layer-editor-action-wrap) the action must shrink inside its key's cap and hide what does not fit"
+			binding.overflow === 'hidden',
+			"(layer-editor-action-wrap) the action must hide what does not fit in its key's cap"
 		);
 
-		// The lines a 1u key holds at a window width, with the page's own board.
+		// The lines a 1u key holds at a window width, with the page's own board,
+		// keypad shown: its widest, so its narrowest keys.
 		const page = loadPage();
 		page.call(
 			`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
 		);
-		const columns = Math.max(
-			...DATA.keys
-				.filter((k) => k.geometry && k.geometry.iso)
-				.map((k) => {
-					const g = k.geometry.iso;
-					return Math.max(
-						g.col + g.width,
-						g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0
-					);
-				})
-		);
+		page.el('numpad').checked = true;
+		page.el('numpad').dispatch('change');
+		const columns = page.call('boardColumns(boardKeys({}))');
+		check(columns > 20, `the board with its keypad is ${columns} columns wide`);
 		const rows = page.call('BOARD_ROWS + FUNCTION_ROW_GAP');
 		const boardRatio = parseFloat(page.el('board').style.paddingTop) / 100;
 		const keyHeightPerWidth = (boardRatio * columns) / rows;
 		const slotPad = paddingOf(slot.padding);
 		const capPad = paddingOf(cap.padding);
 		const border = px(String(cap.border).split(/\s+/)[0]);
-		const gap = cap.gap === undefined ? 0 : px(cap.gap);
+		const margin = binding['margin-top'] === undefined ? 0 : px(binding['margin-top']);
 		const linesAt = (windowWidth) => {
 			const unit = (windowWidth - BOARD_SIDE_ALLOWANCE_PX) / columns;
 			const inner =
@@ -647,16 +702,20 @@ function lineHeightPx(rule) {
 				2 * border -
 				capPad.top -
 				capPad.bottom;
-			return Math.floor((inner - lineHeightPx(legend) - gap) / lineHeightPx(binding) + 1e-9);
+			return Math.floor((inner - lineHeightPx(legend) - margin) / lineHeightPx(binding) + 1e-9);
 		};
 		const app = APPS.apps ? APPS.apps.layer_editor : APPS.layer_editor;
 		check(
-			app && linesAt(app.width) >= Math.min(clamp, MIN_BINDING_LINES),
-			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.width)} line(s) of its action at the default ${app && app.width}px window, not ${MIN_BINDING_LINES}`
+			app && app.width > narrowWidth && linesAt(app.width) >= clamp,
+			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.width)} line(s) of its action at the default ${app && app.width}px window, not ${clamp}`
 		);
 		check(
-			app && linesAt(app.min_width) >= MIN_BINDING_LINES_AT_MIN_WIDTH,
-			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.min_width)} line(s) of its action at the minimum ${app && app.min_width}px window`
+			linesAt(narrowWidth + 1) >= clamp,
+			`(layer-editor-action-wrap) a 1u key holds ${linesAt(narrowWidth + 1)} line(s) just above the ${narrowWidth}px breakpoint, not ${clamp}`
+		);
+		check(
+			app && app.min_width <= narrowWidth && linesAt(app.min_width) >= narrowClamp,
+			`(layer-editor-action-wrap) a 1u key holds ${app && linesAt(app.min_width)} line(s) of its action at the minimum ${app && app.min_width}px window, not ${narrowClamp}`
 		);
 		check(
 			page.key('KeyQ').title === EN['layer_actions.sel_doc_start'],
@@ -667,9 +726,212 @@ function lineHeightPx(rule) {
 			"(layer-editor-action-wrap) a repeat count's tooltip must carry its whole text"
 		);
 	}
-}
+});
 
-if (checks < 40) fail(`only ${checks} checks ran (floor 40)`);
+// ==========================================================================
+// ==========================================================================
+// ======= 6/ Legends (layer-editor-current-layout-legends) =================
+// ==========================================================================
+// ==========================================================================
+
+// Every key used to show a QWERTY letter the page spelled from its code
+// (KeyQ -> "Q"), whatever the user typed with. A character key now shows what
+// its host read from the user's layout, and nothing the page made up.
+
+const CHARACTER_CODES = DATA.keys.filter((k) => k.character === true).map((k) => k.code);
+check(
+	CHARACTER_CODES.length >= 45,
+	`only ${CHARACTER_CODES.length} keys are marked as typing the layout's characters`
+);
+
+section('layer-editor-current-layout-legends: no legend', () => {
+	// A host that sent no legend: the page shows each character key's registry
+	// code, never a letter of its own.
+	const page = loadPage();
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [] })})`
+	);
+	for (const code of CHARACTER_CODES) {
+		const legend = page.legend(code);
+		if (legend === null) continue;
+		check(
+			legend === code,
+			`(layer-editor-current-layout-legends) ${code} shows "${legend}" with no legend from its host, not its code`
+		);
+	}
+	check(
+		(page.el('legend-source') || { textContent: '' }).textContent.includes(
+			EN['layer_editor.legends.missing']
+		),
+		'(layer-editor-current-layout-legends) the page must say why keys show their code'
+	);
+});
+
+section('layer-editor-current-layout-legends: corpus', () => {
+	for (const vector of LEGENDS_CORPUS.cases) {
+		for (const os of DATA.platforms) {
+			const page = loadPage();
+			page.call(
+				`init(${JSON.stringify({ os, path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [], legends: { source: vector.source, keys: vector.expected }, layer_keys: LEGENDS_CORPUS.recommended_layer_keys[os] })})`
+			);
+			for (const [code, legend] of Object.entries(vector.expected)) {
+				if (!page.key(code)) continue;
+				check(
+					page.legend(code) === legend,
+					`(layer-editor-current-layout-legends) ${vector.name} on ${os}: ${code} shows "${page.legend(code)}", not "${legend}"`
+				);
+			}
+			for (const code of vector.unresolved) {
+				if (!page.key(code)) continue;
+				check(
+					page.legend(code) === code,
+					`(layer-editor-current-layout-legends) ${vector.name} on ${os}: unresolved ${code} shows "${page.legend(code)}"`
+				);
+			}
+			check(
+				page.legend('Space') === EN['layer_editor.key.space'] &&
+					page.legend('Enter') === EN['layer_editor.key.enter'] &&
+					page.legend('ArrowUp') === '↑',
+				`(layer-editor-current-layout-legends) a named key keeps its translated name on ${os}`
+			);
+			check(
+				page.legend('MetaLeft') === { windows: 'Win', macos: '⌘', linux: 'Super' }[os],
+				`(layer-editor-current-layout-legends) the meta key reads ${page.legend('MetaLeft')} on ${os}`
+			);
+			const note = (page.el('legend-source') || { textContent: '' }).textContent;
+			check(
+				note.startsWith(EN['layer_editor.legends.' + vector.source]) &&
+					note.includes(EN['layer_editor.legends.missing']) === vector.unresolved.length > 0,
+				`(layer-editor-current-layout-legends) the header must say which layout the keys follow on ${os}, not "${note}"`
+			);
+		}
+	}
+});
+
+section('layer-editor-current-layout-legends: shortcut and refresh', () => {
+	// A shortcut presses a physical key: it reads as what that key types.
+	const page = loadPage();
+	const azerty = LEGENDS_CORPUS.cases[0].expected;
+	page.call(
+		`init(${JSON.stringify({ os: 'windows', path: 'C:/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [], legends: { source: 'os', keys: azerty } })})`
+	);
+	page.key('KeyY').click();
+	page.el('mod-primary').checked = true;
+	page.el('mod-shift').checked = true;
+	page.el('keystroke-key').value = 'KeyZ';
+	page.el('keystroke-apply').click();
+	const chord = `${EN['layer_editor.key.ctrl']}+${EN['layer_editor.key.shift']}+${azerty.KeyZ}`;
+	check(
+		page.binding('KeyY') === EN['layer_editor.caption.keystroke'].replace('{1}', chord),
+		`(layer-editor-current-layout-legends) a shortcut on KeyZ reads "${page.binding('KeyY')}" on AZERTY, not with "${azerty.KeyZ}"`
+	);
+	check(
+		page.key('KeyY').title === EN['layer_editor.value.keystroke'].replace('{1}', chord),
+		'(layer-editor-current-layout-legends) the tooltip names the shortcut with the current legend'
+	);
+
+	// Back in front: the page asks its host again, and the answer keeps the edits.
+	const before = page.posts.length;
+	page.fireWindow('focus');
+	check(
+		page.posts.length === before + 1 && page.posts[before].action === 'legends',
+		'(layer-editor-current-layout-legends) the page must ask for the legends again when its window comes back'
+	);
+	const ergo = { KeyZ: 'é', KeyQ: 'è' };
+	page.call(`setLegends(${JSON.stringify({ source: 'emulation', keys: ergo })})`);
+	check(
+		page.legend('KeyQ') === 'è' && page.legend('KeyW') === 'KeyW',
+		'(layer-editor-current-layout-legends) setLegends() redraws every legend'
+	);
+	check(
+		page.binding('KeyY').endsWith('+é'),
+		`(layer-editor-current-layout-legends) the edited shortcut must survive setLegends(), got "${page.binding('KeyY')}"`
+	);
+	check(
+		page.el('status').textContent === EN['layer_editor.unsaved'],
+		'(layer-editor-current-layout-legends) new legends keep the unsaved edits'
+	);
+});
+
+// ========================================
+// ========================================
+// ======= 7/ Keycaps =====================
+// ========================================
+// ========================================
+
+section('keycaps', () => {
+	const page = loadPage();
+	page.call(
+		`init(${JSON.stringify({ os: 'linux', path: '/cfg/layers.toml', text: RECOMMENDED_TEXT, errors: [], legends: { source: 'os', keys: LEGENDS_CORPUS.cases[0].expected }, layer_keys: ['AltLeft'] })})`
+	);
+	const effective = page.call(`LayerModel.effective(state.doc, DATA.layer, 'linux')`);
+	let bound = 0;
+	for (const k of DATA.keys) {
+		const node = page.key(k.code);
+		if (!node || k.code === 'AltLeft') continue;
+		const entry = effective[k.code];
+		if (entry === undefined) {
+			check(
+				page.binding(k.code) === '' && !node.classList.contains('bound'),
+				`(keycaps) unbound ${k.code} must stay quiet, shows "${page.binding(k.code)}"`
+			);
+			continue;
+		}
+		bound += 1;
+		const caption = page.call(`LayerModel.bindingCaption(${JSON.stringify(entry.value)}, view())`);
+		const shown = page.binding(k.code);
+		check(
+			shown !== '' &&
+				shown === (caption.icon && caption.text ? caption.icon + ' ' : caption.icon) + caption.text,
+			`(keycaps) bound ${k.code} shows "${shown}"`
+		);
+		check(node.classList.contains('bound'), `(keycaps) bound ${k.code} is not drawn as bound`);
+		const parsed = page.call(`LayerModel.parseBinding(${JSON.stringify(entry.value)}, DATA)`);
+		if (parsed.type === 'action') {
+			const label = EN[DATA.actions[parsed.id].label_key];
+			check(
+				shown === label,
+				`(keycaps) ${k.code} must show its action's catalogue label "${label}", not "${shown}"`
+			);
+		}
+	}
+	check(bound >= 30, `(keycaps) only ${bound} bound keys compared on Linux`);
+	check(
+		page.key('AltLeft').classList.contains('layer-key') &&
+			page.binding('AltLeft') === EN['layer_editor.layer_key'] &&
+			page.key('AltLeft').title.includes(EN['layer_editor.layer_key_hint']),
+		'(keycaps) the key whose hold enters the layer must be marked'
+	);
+	check(
+		!page.key('AltRight').classList.contains('layer-key'),
+		'(keycaps) only the layer key is marked'
+	);
+	check(
+		page.binding('KeyT') === EN['layer_editor.caption.keystroke'].replace('{1}', 'F2'),
+		`(keycaps) a shortcut shows its short form, not "${page.binding('KeyT')}"`
+	);
+
+	// The keypad: hidden, shown on request, and kept shown by a bound key.
+	check(!page.key('Numpad7'), '(keycaps) the keypad is hidden by default');
+	page.el('numpad').checked = true;
+	page.el('numpad').dispatch('change');
+	check(!!page.key('Numpad7'), '(keycaps) the keypad shows when asked');
+	check(page.legend('Numpad7') === '7', '(keycaps) a keypad digit reads as itself');
+	page.key('Numpad7').click();
+	page.row(EN['sg_actions.arrow_up']).click();
+	page.el('numpad').checked = false;
+	page.el('numpad').dispatch('change');
+	check(
+		!!page.key('Numpad7') && page.el('numpad').disabled === true,
+		'(keycaps) a bound keypad key keeps the keypad shown'
+	);
+	check(
+		page.binding('Numpad7') === EN['sg_actions.arrow_up'],
+		`(keycaps) the bound keypad key shows "${page.binding('Numpad7')}"`
+	);
+});
+
+if (checks < 400) fail(`only ${checks} checks ran (floor 400)`);
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer editor page breaks the host protocol:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

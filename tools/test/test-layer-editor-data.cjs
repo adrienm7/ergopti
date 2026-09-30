@@ -21,7 +21,9 @@
  *    reference loader the generator asks, so the two answers are independent.
  * 4. Labels: every label and reason key the page shows reads in all 21 locales.
  * 5. Keys and preset: the registry's codes, kinds and geometry in registry
- *    order, and the recommended layer as layers.recommended.toml writes it.
+ *    order, which keys type the layout's characters (the ones the registry
+ *    sends by scan code, `ahk_send: null`), and the recommended layer as
+ *    layers.recommended.toml writes it.
  * ==============================================================================
  */
 
@@ -237,7 +239,15 @@ for (const key of data.keys) {
 		fail(`${key.code}: kind/group ${key.kind}/${key.group}, registry ${entry.kind}/${entry.group}`);
 	if (JSON.stringify(key.geometry || null) !== JSON.stringify(entry.geometry || null))
 		fail(`${key.code}: geometry differs from the registry`);
+	const character = entry.kind === 'key' && entry.ahk_send === null;
+	if (
+		(key.character === true) !== character ||
+		(key.character !== undefined && key.character !== true)
+	)
+		fail(`${key.code}: character is ${key.character}, the registry's ahk_send says ${character}`);
 }
+const characterKeys = data.keys.filter((k) => k.character === true).length;
+if (characterKeys < 45) fail(`only ${characterKeys} keys type the layout's characters (floor 45)`);
 
 const recommendedLayers = recommendedDoc.layers || {};
 if (Object.keys(recommendedLayers).length !== 1 || !recommendedLayers[data.layer])

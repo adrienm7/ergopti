@@ -24,6 +24,10 @@
  *    _shared/tests/corpus/layer_editor/edited_layers.toml, the file the three
  *    drivers' bridge tests save and turn into their generated layer, and that
  *    file resolves to expected.json on every OS.
+ * 6. Words (layer-editor-current-layout-legends): a key that types a
+ *    character reads only as its host's legend or its registry code; every
+ *    other key has a name in all 21 locales, or a universal mark; every
+ *    catalogue label splits into an icon and words that give the label back.
  * ==============================================================================
  */
 
@@ -322,6 +326,68 @@ if (!fs.existsSync(FIXTURE_TOML) || !fs.existsSync(FIXTURE_EXPECTED)) {
 			fail(`expected.json pins fewer than two keys on ${os}`);
 	}
 }
+
+// =================================================================
+// =================================================================
+// ======= 6/ Words (layer-editor-current-layout-legends) ==========
+// =================================================================
+// =================================================================
+
+const LOCALES_DIR = path.join(path.dirname(FIXTURE_DIR), '..', '..', 'data', 'locales');
+const locales = fs
+	.readdirSync(LOCALES_DIR)
+	.filter((f) => f.endsWith('.json'))
+	.map((f) => ({
+		name: f,
+		strings: JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, f), 'utf8').replace(/^\uFEFF/, ''))
+	}));
+if (locales.length < 21) fail(`only ${locales.length} locales read`);
+let worded = 0;
+const MARK = (key) => `<${key}>`;
+for (const os of OSES) {
+	const bare = { os, data: DATA, t: MARK, legends: {} };
+	const given = { os, data: DATA, t: MARK, legends: { KeyQ: 'a', Digit1: '&', Space: '!' } };
+	for (const key of DATA.keys) {
+		if (key.kind !== 'key') continue;
+		worded += 1;
+		const legend = Model.keyLegend(key.code, bare);
+		if (key.character === true) {
+			if (legend !== key.code)
+				fail(`${key.code} reads "${legend}" on ${os} with no legend from its host, not its code`);
+			continue;
+		}
+		if (Model.keyLegend(key.code, given) !== legend)
+			fail(`named key ${key.code} took a host legend on ${os}`);
+		const named = /^<(layer_editor\.key\.[a-z_]+)>$/.exec(legend);
+		if (named) {
+			for (const locale of locales)
+				if (typeof locale.strings[named[1]] !== 'string' || locale.strings[named[1]].trim() === '')
+					fail(`${locale.name} has no "${named[1]}" for ${key.code}`);
+		} else if (legend === key.code && !/^F[0-9]{1,2}$/.test(key.code))
+			fail(`named key ${key.code} has no name on ${os}: it reads as its code`);
+	}
+	if (Model.keyLegend('KeyQ', given) !== 'a') fail(`a host legend is not shown on ${os}`);
+}
+if (worded < 300) fail(`only ${worded} key legends read`);
+
+let captions = 0;
+for (const locale of locales) {
+	const t = (key) => locale.strings[key];
+	for (const [id, action] of Object.entries(DATA.actions)) {
+		const label = t(action.label_key);
+		const caption = Model.splitCaption(label);
+		captions += 1;
+		const rebuilt = [caption.icon, caption.text].filter(Boolean).join(' ');
+		if (rebuilt !== label.trim().split(/\s+/).join(' '))
+			fail(`${locale.name}: "${label}" (${id}) splits into "${caption.icon}" + "${caption.text}"`);
+		if (caption.text === '')
+			fail(`${locale.name}: "${label}" (${id}) has no words to show on a key`);
+	}
+}
+if (captions < 21 * 30) fail(`only ${captions} captions read`);
+const w = Model.splitCaption('W ← Previous word');
+if (w.icon !== 'W ←' || w.text !== 'Previous word')
+	fail(`"W ← Previous word" splits into "${w.icon}" + "${w.text}"`);
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer editor model breaks its contract:\x1b[0m');

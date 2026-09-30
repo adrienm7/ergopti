@@ -25,6 +25,10 @@
  * 4. The host validates every saved file with its own loader on every OS;
  *    this model only offers what the generated data says exists on the OS it
  *    edits for, and says why the rest does not.
+ * 5. Legends follow the user's keyboard: a key that types a character shows
+ *    the one its host read from the active layout (or from the layout its
+ *    driver emulates), a named key its translated short name, and a key
+ *    neither knows its registry code, never a QWERTY guess.
  * ==============================================================================
  */
 
@@ -67,62 +71,54 @@ var LayerModel = (function () {
 		'# The values are the actions of _shared/keymap/layer_actions.toml.'
 	];
 
-	// Key legends a code does not spell out by itself. Letters, digits and
-	// function keys read from the code (KeyQ -> Q, Digit1 -> 1, F5 -> F5).
-	const LEGENDS = {
-		Escape: 'Esc',
-		Backquote: '`',
-		Minus: '-',
-		Equal: '=',
-		Backspace: '⌫',
-		Tab: '⇥',
-		BracketLeft: '[',
-		BracketRight: ']',
-		Backslash: '\\',
-		CapsLock: '⇪',
-		Semicolon: ';',
-		Quote: "'",
-		Enter: '↵',
-		ShiftLeft: '⇧',
-		ShiftRight: '⇧',
-		IntlBackslash: '<',
-		Comma: ',',
-		Period: '.',
-		Slash: '/',
-		Space: '␣',
-		ContextMenu: '☰',
-		Insert: 'Ins',
-		Delete: '⌦',
-		Home: '⇱',
-		End: '⇲',
-		PageUp: '⇞',
-		PageDown: '⇟',
+	// The keys that type no character, by the locale key of their short name
+	// (layer_editor.key.<name>). A key the registry marks `character` is not
+	// here: it types what the active layout puts on it, and its legend comes
+	// from the host (script.js init), never from this file.
+	const NAMED_KEYS = {
+		Escape: 'escape',
+		Backspace: 'backspace',
+		Tab: 'tab',
+		CapsLock: 'caps_lock',
+		Enter: 'enter',
+		ShiftLeft: 'shift',
+		ShiftRight: 'shift',
+		ControlLeft: 'ctrl',
+		ControlRight: 'ctrl',
+		AltLeft: 'alt',
+		AltRight: 'alt_gr',
+		Space: 'space',
+		ContextMenu: 'menu',
+		Insert: 'insert',
+		Delete: 'delete',
+		Home: 'home',
+		End: 'end',
+		PageUp: 'page_up',
+		PageDown: 'page_down',
+		NumLock: 'num_lock',
+		NumpadEnter: 'enter'
+	};
+
+	// Named keys every keyboard prints the same symbol on, in any language.
+	// Function keys and numpad digits read from their code (F5, Numpad7 -> 7).
+	const KEY_GLYPHS = {
 		ArrowUp: '↑',
 		ArrowDown: '↓',
 		ArrowLeft: '←',
 		ArrowRight: '→',
-		NumLock: 'Num',
 		NumpadDivide: '/',
 		NumpadMultiply: '*',
 		NumpadSubtract: '-',
 		NumpadAdd: '+',
-		NumpadEnter: '↵',
 		NumpadDecimal: '.',
 		AudioVolumeMute: '🔇',
 		AudioVolumeDown: '🔉',
 		AudioVolumeUp: '🔊'
 	};
 
-	// Legends that follow the OS's own keycaps.
-	const OS_LEGENDS = {
-		windows: {
-			ControlLeft: 'Ctrl',
-			ControlRight: 'Ctrl',
-			AltLeft: 'Alt',
-			AltRight: 'AltGr',
-			MetaLeft: 'Win',
-			MetaRight: 'Win'
-		},
+	// Keycaps each OS prints its own mark on, instead of the translated name.
+	const OS_KEY_GLYPHS = {
+		windows: { MetaLeft: 'Win', MetaRight: 'Win' },
 		macos: {
 			ControlLeft: '⌃',
 			ControlRight: '⌃',
@@ -131,23 +127,25 @@ var LayerModel = (function () {
 			MetaLeft: '⌘',
 			MetaRight: '⌘'
 		},
-		linux: {
-			ControlLeft: 'Ctrl',
-			ControlRight: 'Ctrl',
-			AltLeft: 'Alt',
-			AltRight: 'AltGr',
-			MetaLeft: 'Super',
-			MetaRight: 'Super'
-		}
+		linux: { MetaLeft: 'Super', MetaRight: 'Super' }
 	};
 
-	// Modifier names in a chord, and what joins them, as each OS writes them.
-	const MODIFIER_NAMES = {
-		windows: { ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Win', fn: 'Fn' },
-		macos: { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘', fn: 'fn' },
-		linux: { ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Super', fn: 'Fn' }
+	// A chord's modifiers: the locale key of the named key that holds it, or the
+	// mark the OS writes for it (⌘, Win…), and what joins them in a shortcut.
+	const MODIFIER_KEYS = {
+		ctrl: 'ControlLeft',
+		alt: 'AltLeft',
+		shift: 'ShiftLeft',
+		meta: 'MetaLeft'
 	};
+	const FN_NAMES = { windows: 'Fn', macos: 'fn', linux: 'Fn' };
+	const MACOS_MODIFIER_GLYPHS = { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘', fn: 'fn' };
 	const CHORD_JOINERS = { windows: '+', macos: '', linux: '+' };
+
+	// A caption token with fewer letters than this is part of a label's leading
+	// icon (✎, ⤒, the W of "W ← word") rather than of its words.
+	const MIN_WORD_LETTERS = 2;
+	const LETTER = /\p{L}/gu;
 
 	const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 	const isTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -591,56 +589,114 @@ var LayerModel = (function () {
 			: { ok: false, reason_key: rule.reason_key };
 	}
 
-	/** The keycap legend of a code on one OS. */
-	function keyLegend(code, os) {
-		const own = OS_LEGENDS[os] || {};
+	// A view is what the words of a key or a binding depend on:
+	// {os, data: LAYER_EDITOR_DATA, t: the page's translator, legends: the
+	// host's code -> character map for the keys marked `character`}.
+
+	/**
+	 * A key's legend as the user's keyboard shows it right now.
+	 * @param {string} code - The physical key.
+	 * @param {{os: string, data: object, t: Function, legends: Object<string, string>}} view
+	 * @returns {string} The character the active layout puts on a character
+	 *   key, as the host resolved it; a named key's translated short name or
+	 *   universal symbol; the registry code when neither is known, never blank.
+	 */
+	function keyLegend(code, view) {
+		const entry = keyEntry(code, view.data);
+		if (entry && entry.character === true) {
+			const legend = view.legends && view.legends[code];
+			return typeof legend === 'string' && legend !== '' ? legend : code;
+		}
+		const own = OS_KEY_GLYPHS[view.os] || {};
 		if (hasOwn(own, code)) return own[code];
-		if (hasOwn(LEGENDS, code)) return LEGENDS[code];
-		let m = /^Key([A-Z])$/.exec(code);
-		if (m) return m[1];
-		m = /^(?:Digit|Numpad)([0-9])$/.exec(code);
-		if (m) return m[1];
-		if (/^F[0-9]{1,2}$/.test(code)) return code;
+		if (hasOwn(NAMED_KEYS, code)) return view.t('layer_editor.key.' + NAMED_KEYS[code]);
+		if (hasOwn(KEY_GLYPHS, code)) return KEY_GLYPHS[code];
+		const digit = /^Numpad([0-9])$/.exec(code);
+		if (digit) return digit[1];
 		return code;
 	}
 
 	/** A modifier's name as the OS writes it on its keycaps and menus. */
-	function modifierName(mod, os) {
-		return MODIFIER_NAMES[os][mod];
+	function modifierName(mod, view) {
+		if (view.os === 'macos') return MACOS_MODIFIER_GLYPHS[mod];
+		if (mod === 'fn') return FN_NAMES[view.os];
+		return keyLegend(MODIFIER_KEYS[mod], view);
 	}
 
 	/** A chord list as the OS writes shortcuts: Ctrl+Shift+Home, ⇧⌘Z. */
-	function chordText(chords, os, data) {
-		const names = MODIFIER_NAMES[os];
+	function chordText(chords, view) {
+		const data = view.data;
 		return chords
 			.map((chord) => {
 				const mods = new Set(
-					chord.mods.map((m) => (m === 'primary' ? data.primary_modifier[os] : m))
+					chord.mods.map((m) => (m === 'primary' ? data.primary_modifier[view.os] : m))
 				);
 				const ordered =
-					os === 'macos' ? ['ctrl', 'alt', 'shift', 'meta', 'fn'] : data.modifier_order;
-				const parts = ordered.filter((m) => mods.has(m)).map((m) => names[m]);
-				parts.push(keyLegend(chord.key, os));
-				return parts.join(CHORD_JOINERS[os]);
+					view.os === 'macos' ? ['ctrl', 'alt', 'shift', 'meta', 'fn'] : data.modifier_order;
+				const parts = ordered.filter((m) => mods.has(m)).map((m) => modifierName(m, view));
+				// A shortcut presses the physical key, so it reads as what that key
+				// types on the active layout: Ctrl+KeyZ is Ctrl+W on AZERTY.
+				parts.push(keyLegend(chord.key, view));
+				return parts.join(CHORD_JOINERS[view.os]);
 			})
 			.join(', ');
 	}
 
 	/**
-	 * What a binding does, in words.
+	 * What a binding does, in words: the panel's and a key tooltip's text.
 	 * @param {any} value - A binding value, or undefined for none.
-	 * @param {string} os - The OS it is read for.
-	 * @param {object} data - LAYER_EDITOR_DATA.
-	 * @param {function(string, ...any): string} t - The page's translator.
+	 * @param {{os: string, data: object, t: Function, legends: object}} view
 	 * @returns {string}
 	 */
-	function describeBinding(value, os, data, t) {
+	function describeBinding(value, view) {
+		const t = view.t;
 		if (value === undefined) return t('layer_editor.value.native');
-		const binding = parseBinding(value, data);
+		const binding = parseBinding(value, view.data);
 		if (binding.type === 'invalid') return t('layer_editor.value.invalid', String(value));
-		if (binding.type === 'action') return t(data.actions[binding.id].label_key);
+		if (binding.type === 'action') return t(view.data.actions[binding.id].label_key);
 		if (binding.type === 'repeat_count') return t('layer_editor.value.repeat_count', binding.count);
-		return t('layer_editor.value.keystroke', chordText(binding.chords, os, data));
+		return t('layer_editor.value.keystroke', chordText(binding.chords, view));
+	}
+
+	/**
+	 * Splits a label into its leading icon (the catalogue labels start with one:
+	 * "✎ ⤒ Select to document start", "W ← Previous word") and its words. A
+	 * token belongs to the icon when it has no letter, or is a single letter
+	 * followed by a letterless token (the W of "W ←").
+	 * @param {string} label - A translated label.
+	 * @returns {{icon: string, text: string}} Either part may be empty.
+	 */
+	function splitCaption(label) {
+		const tokens = String(label).trim().split(/\s+/).filter(Boolean);
+		const letters = (token) => (token.match(LETTER) || []).length;
+		let split = 0;
+		while (split < tokens.length) {
+			const count = letters(tokens[split]);
+			const next = tokens[split + 1];
+			const iconic =
+				count === 0 || (count < MIN_WORD_LETTERS && next !== undefined && letters(next) === 0);
+			if (!iconic) break;
+			split += 1;
+		}
+		return { icon: tokens.slice(0, split).join(' '), text: tokens.slice(split).join(' ') };
+	}
+
+	/**
+	 * What a key shows of its binding: the action's catalogue label, or the
+	 * short form of a repeat count or a shortcut, split into icon and words.
+	 * @param {any} value - A binding value, or undefined for none.
+	 * @param {{os: string, data: object, t: Function, legends: object}} view
+	 * @returns {{icon: string, text: string}|null} null for an unbound key.
+	 */
+	function bindingCaption(value, view) {
+		if (value === undefined) return null;
+		const t = view.t;
+		const binding = parseBinding(value, view.data);
+		if (binding.type === 'repeat_count')
+			return splitCaption(t('layer_editor.caption.repeat_count', binding.count));
+		if (binding.type === 'keystroke')
+			return splitCaption(t('layer_editor.caption.keystroke', chordText(binding.chords, view)));
+		return splitCaption(describeBinding(value, view));
 	}
 
 	/**
@@ -667,6 +723,51 @@ var LayerModel = (function () {
 		return items;
 	}
 
+	// =====================================
+	// ======= 6/ What the host sent =======
+	// =====================================
+
+	// Where a host read the legends: the layout its driver emulates, or the OS's.
+	const LEGEND_SOURCES = ['emulation', 'os'];
+
+	/**
+	 * Reads the legends a host sends (init's `legends`, setLegends' argument):
+	 * {source: "emulation"|"os", keys: {code: character}}. A Lua host encodes an
+	 * empty map as [], which is no legend.
+	 * @param {any} legends - The host's payload.
+	 * @param {object} data - LAYER_EDITOR_DATA.
+	 * @returns {{source: string|null, keys: Object<string, string>, missing: string[]}}
+	 *   The legend of every character key the host resolved, and the character
+	 *   keys it did not (drawn with their registry code).
+	 */
+	function readLegends(legends, data) {
+		const given = isTable(legends) && isTable(legends.keys) ? legends.keys : {};
+		const out = {
+			source: isTable(legends) && LEGEND_SOURCES.includes(legends.source) ? legends.source : null,
+			keys: {},
+			missing: []
+		};
+		for (const key of data.keys) {
+			if (key.character !== true) continue;
+			const legend = given[key.code];
+			if (typeof legend === 'string' && legend !== '') out.keys[key.code] = legend;
+			else out.missing.push(key.code);
+		}
+		return out;
+	}
+
+	/**
+	 * Reads the physical keys whose hold enters the edited layer (init's
+	 * `layer_keys`), keeping registry codes only.
+	 * @param {any} codes - The host's list.
+	 * @param {object} data - LAYER_EDITOR_DATA.
+	 * @returns {string[]}
+	 */
+	function readLayerKeys(codes, data) {
+		if (!Array.isArray(codes)) return [];
+		return codes.filter((code) => typeof code === 'string' && keyEntry(code, data) !== undefined);
+	}
+
 	return {
 		SECTION_ALL,
 		parseToml,
@@ -685,6 +786,10 @@ var LayerModel = (function () {
 		modifierName,
 		chordText,
 		describeBinding,
-		pickerItems
+		splitCaption,
+		bindingCaption,
+		pickerItems,
+		readLegends,
+		readLayerKeys
 	};
 })();

@@ -14,8 +14,17 @@
  *   page -> host  "ready"                        the page can take init()
  *                 {action: "save", text}         validate, write, apply
  *                 {action: "cancel"}             close without saving
- *   host -> page  init({os, path, text, errors}) the user's file, once
+ *                 {action: "legends"}            the window is back in front:
+ *                                                read the layout again
+ *   host -> page  init({os, path, text, errors, legends, layer_keys})
+ *                                                the user's file, once
  *                 saveResult({saved, applied, errors})
+ *                 setLegends(legends)            the answer to "legends"
+ *   legends = {source: "emulation" | "os", keys: {code: character}}: what each
+ *   key marked `character` in the data types on the layout the user types
+ *   with (the one the driver emulates, else the OS's); layer_keys = the codes
+ *   of the keys whose hold enters the edited layer
+ *   (_shared/tests/corpus/layer_editor/legends.json pins both).
  *
  * FEATURES & RATIONALE:
  * 1. Recommended vs custom: every key shows whether it does what Ergopti's
@@ -26,9 +35,12 @@
  *    repeat count and a keyboard shortcut.
  * 3. Nothing is written by the page: the host validates the text with its own
  *    loader for every OS and refuses anything they would not all read.
- * 4. Readable keys: a key's action wraps over several lines of the key, whose
- *    rows are taller than its columns (KEY_HEIGHT_RATIO), and its tooltip
- *    carries the whole text when the lines cannot.
+ * 4. Readable keys: a key's legend sits small in its corner, in the user's
+ *    current layout; its action is the main text, the catalogue label's icon
+ *    then its words wrapped over the lines the key holds (the rows are taller
+ *    than the columns, KEY_HEIGHT_RATIO), and the tooltip carries the whole
+ *    text when the lines cannot. An unbound key shows only its legend; the key
+ *    that enters the layer is marked.
  * ==============================================================================
  */
 
@@ -41,6 +53,11 @@ var DATA = LAYER_EDITOR_DATA;
 
 var FORM_STORAGE_KEY = 'layer_editor.form';
 var DEFAULT_FORM = 'iso';
+// Whether the viewer asked to see the numeric keypad ("1") or not ("0"). Hidden
+// by default: its four columns out of 22.5 left every other key too narrow to
+// read its action. A bound keypad key shows it whatever the choice.
+var NUMPAD_STORAGE_KEY = 'layer_editor.numpad';
+var NUMPAD_GROUP = 'numpad';
 // The gap between the function row and the rest, in key units.
 var FUNCTION_ROW_GAP = 0.25;
 var BOARD_ROWS = 6;
@@ -66,6 +83,7 @@ var state = {
 	os: null,
 	path: '',
 	form: DEFAULT_FORM,
+	numpad: false,
 	doc: { layers: {} },
 	dirty: false,
 	saving: false,
@@ -74,11 +92,18 @@ var state = {
 	search: '',
 	fileProblem: null,
 	fileErrors: [],
-	status: ''
+	status: '',
+	legends: { source: null, keys: {}, missing: [] },
+	layerKeys: []
 };
 
 function el(id) {
 	return document.getElementById(id);
+}
+
+/** What the model needs to word a key or a binding for this page. */
+function view() {
+	return { os: state.os, data: DATA, t: _t, legends: state.legends.keys };
 }
 
 /**
@@ -100,21 +125,22 @@ function make(tag, className, text) {
 	return node;
 }
 
-function readStoredForm() {
+/** A per-viewer choice this page stored, when it is one of `allowed`. */
+function readStored(key, allowed, fallback) {
 	try {
-		var stored = window.localStorage.getItem(FORM_STORAGE_KEY);
-		return stored === 'iso' || stored === 'ansi' ? stored : DEFAULT_FORM;
+		var stored = window.localStorage.getItem(key);
+		return allowed.indexOf(stored) >= 0 ? stored : fallback;
 	} catch (e) {
-		return DEFAULT_FORM;
+		return fallback;
 	}
 }
 
-function storeForm(form) {
+function store(key, value) {
 	try {
-		window.localStorage.setItem(FORM_STORAGE_KEY, form);
+		window.localStorage.setItem(key, value);
 	} catch (e) {
-		// The keyboard form is a per-viewer convenience: a blocked storage only
-		// means the next window opens on the default form.
+		// The keyboard form and the keypad are per-viewer conveniences: a blocked
+		// storage only means the next window opens on their defaults.
 	}
 }
 
@@ -126,7 +152,8 @@ function storeForm(form) {
  * Receives the user's layer file. Only the first call counts: a host may push
  * twice (page "ready" and navigation completed), and a late second push must
  * not wipe edits already made.
- * @param {{os: string, path: string, text: string|null, errors: object[]}} payload
+ * @param {{os: string, path: string, text: string|null, errors: object[],
+ *   legends: object, layer_keys: string[]}} payload
  */
 function init(payload) {
 	if (state.os !== null) return;
@@ -142,7 +169,20 @@ function init(payload) {
 	state.doc = read.doc;
 	state.fileProblem = read.problem;
 	state.fileErrors = errorList(payload.errors);
+	state.legends = LayerModel.readLegends(payload.legends, DATA);
+	state.layerKeys = LayerModel.readLayerKeys(payload.layer_keys, DATA);
 	setEditable(true);
+	render();
+}
+
+/**
+ * Receives the legends of the layout the user types with now, the host's
+ * answer to {action: "legends"}. Edits are kept: only the keys' words change.
+ * @param {{source: string, keys: Object<string, string>}} legends
+ */
+function setLegends(legends) {
+	if (state.os === null) return;
+	state.legends = LayerModel.readLegends(legends, DATA);
 	render();
 }
 
@@ -280,6 +320,15 @@ function renderBanner() {
 	showBanner(lines, lines.length > 0);
 }
 
+/** Says which layout the keys are labelled with, and when some could not be. */
+function renderLegendSource() {
+	var lines = [];
+	if (state.legends.source === 'emulation') lines.push(_t('layer_editor.legends.emulation'));
+	else if (state.legends.source === 'os') lines.push(_t('layer_editor.legends.os'));
+	if (state.legends.missing.length > 0) lines.push(_t('layer_editor.legends.missing'));
+	el('legend-source').textContent = lines.join(' ');
+}
+
 /**
  * The state of one input on the current OS.
  * @returns {{value: any, recommended: any, className: string, reason: string|null}}
@@ -314,31 +363,69 @@ function inputState(code, current, recommended) {
 }
 
 function inputLabel(code) {
-	return INPUT_LABEL_KEYS[code] ? _t(INPUT_LABEL_KEYS[code]) : LayerModel.keyLegend(code, state.os);
+	return INPUT_LABEL_KEYS[code] ? _t(INPUT_LABEL_KEYS[code]) : LayerModel.keyLegend(code, view());
 }
 
 function bindingShort(value) {
-	return value === undefined ? '' : LayerModel.describeBinding(value, state.os, DATA, _t);
+	return value === undefined ? '' : LayerModel.describeBinding(value, view());
 }
 
-/** One clickable input, placed by the caller. */
+/**
+ * What a key shows as its main text: its binding's icon and words, or, for
+ * the unbound key that enters the layer, that it does.
+ * @returns {{icon: string, text: string}|null} null leaves the key quiet.
+ */
+function keyCaption(code, info) {
+	var caption = LayerModel.bindingCaption(info.value, view());
+	if (caption) return caption;
+	return state.layerKeys.indexOf(code) >= 0
+		? { icon: '', text: _t('layer_editor.layer_key') }
+		: null;
+}
+
+/** One clickable input, placed by the caller; `text` is its legend ('' for none). */
 function buildInput(code, info, text, extraClass) {
+	var layerKey = state.layerKeys.indexOf(code) >= 0;
 	var node = make(
 		'div',
-		['key', info.className, extraClass || '', state.selected === code ? 'selected' : '']
+		[
+			'key',
+			info.className,
+			info.value !== undefined ? 'bound' : '',
+			layerKey ? 'layer-key' : '',
+			extraClass || '',
+			state.selected === code ? 'selected' : ''
+		]
 			.join(' ')
 			.replace(/\s+/g, ' ')
 			.trim()
 	);
 	node.dataset.code = code;
-	var binding = bindingShort(info.value);
 	// A long action is clamped on the key: the tooltip carries all of it.
-	node.title = info.reason || binding;
+	node.title = [
+		info.reason || bindingShort(info.value),
+		layerKey ? _t('layer_editor.layer_key_hint') : ''
+	]
+		.filter(Boolean)
+		.join('\n');
 	// The slot fills the key's place on the board; the cap inside it is drawn a
-	// little smaller, which leaves the gap between two keys.
+	// little smaller, which leaves the gap between two keys. The ISO Enter's
+	// lower block repeats nothing of its upper one.
 	var cap = make('div', 'cap');
-	cap.appendChild(make('span', 'legend', text));
-	cap.appendChild(make('span', 'binding', binding));
+	if (text !== '') {
+		cap.appendChild(make('span', 'legend', text));
+		var caption = keyCaption(code, info);
+		if (caption) {
+			var action = make('span', caption.text === '' ? 'action iconic' : 'action');
+			// The space after the icon is where the line may break before the words.
+			if (caption.icon !== '')
+				action.appendChild(
+					make('span', 'icon', caption.text === '' ? caption.icon : caption.icon + ' ')
+				);
+			if (caption.text !== '') action.appendChild(make('span', 'words', caption.text));
+			cap.appendChild(action);
+		}
+	}
 	node.appendChild(cap);
 	node.addEventListener('click', function () {
 		select(code);
@@ -346,8 +433,7 @@ function buildInput(code, info, text, extraClass) {
 	return node;
 }
 
-function place(node, geo, row, col, width, height) {
-	var totalCols = boardColumns();
+function place(node, totalCols, row, col, width, height) {
 	var totalRows = BOARD_ROWS + FUNCTION_ROW_GAP;
 	var top = row + (row > 0 ? FUNCTION_ROW_GAP : 0);
 	node.style.left = (col / totalCols) * 100 + '%';
@@ -356,16 +442,30 @@ function place(node, geo, row, col, width, height) {
 	node.style.height = (height / totalRows) * 100 + '%';
 }
 
-function boardColumns() {
+/** Whether a key of the numeric keypad is bound on this OS. */
+function numpadBound(current) {
+	return DATA.keys.some(function (k) {
+		return k.group === NUMPAD_GROUP && current[k.code] !== undefined;
+	});
+}
+
+/** The keys the board draws: those of the chosen form, the keypad's when shown. */
+function boardKeys(current) {
+	var numpad = state.numpad || numpadBound(current);
+	return DATA.keys.filter(function (k) {
+		return k.geometry && k.geometry[state.form] && (numpad || k.group !== NUMPAD_GROUP);
+	});
+}
+
+function boardColumns(keys) {
 	var max = 0;
-	DATA.keys.forEach(function (k) {
-		var g = k.geometry && k.geometry[state.form];
-		if (g)
-			max = Math.max(
-				max,
-				g.col + g.width,
-				g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0
-			);
+	keys.forEach(function (k) {
+		var g = k.geometry[state.form];
+		max = Math.max(
+			max,
+			g.col + g.width,
+			g.bottom_col !== undefined ? g.bottom_col + g.bottom_width : 0
+		);
 	});
 	return max;
 }
@@ -373,27 +473,28 @@ function boardColumns() {
 function renderBoard(current, recommended) {
 	var board = el('board');
 	board.innerHTML = '';
+	var keys = boardKeys(current);
+	var columns = boardColumns(keys);
 	// A zero-height box whose padding carries the board's proportions: the keys'
 	// percentages resolve against that padding box, in every engine the three
 	// hosts embed (older WebKitGTK builds lack aspect-ratio).
 	board.style.paddingTop =
-		(((BOARD_ROWS + FUNCTION_ROW_GAP) * KEY_HEIGHT_RATIO) / boardColumns()) * 100 + '%';
-	DATA.keys.forEach(function (k) {
-		var geo = k.geometry && k.geometry[state.form];
-		if (!geo) return;
+		(((BOARD_ROWS + FUNCTION_ROW_GAP) * KEY_HEIGHT_RATIO) / columns) * 100 + '%';
+	keys.forEach(function (k) {
+		var geo = k.geometry[state.form];
 		var info = inputState(k.code, current, recommended);
 		var node = buildInput(k.code, info, inputLabel(k.code));
 		if (geo.bottom_col !== undefined) {
 			// The ISO Enter: a wide upper row and a narrower lower row, drawn as
 			// two blocks that select the same key.
-			place(node, geo, geo.row, geo.col, geo.width, 1);
+			place(node, columns, geo.row, geo.col, geo.width, 1);
 			board.appendChild(node);
 			var lower = buildInput(k.code, info, '', 'enter-lower');
-			place(lower, geo, geo.row + 1, geo.bottom_col, geo.bottom_width, 1);
+			place(lower, columns, geo.row + 1, geo.bottom_col, geo.bottom_width, 1);
 			board.appendChild(lower);
 			return;
 		}
-		place(node, geo, geo.row, geo.col, geo.width, geo.height || 1);
+		place(node, columns, geo.row, geo.col, geo.width, geo.height || 1);
 		board.appendChild(node);
 	});
 }
@@ -531,7 +632,7 @@ function renderKeystroke(panel, info) {
 		cb.checked = !!chord && chord.mods.indexOf(mod) >= 0;
 		boxes[mod] = cb;
 		label.appendChild(cb);
-		label.appendChild(make('span', '', LayerModel.modifierName(mod, state.os)));
+		label.appendChild(make('span', '', LayerModel.modifierName(mod, view())));
 		mods.appendChild(label);
 	});
 	box.appendChild(mods);
@@ -540,7 +641,7 @@ function renderKeystroke(panel, info) {
 	keySelect.id = 'keystroke-key';
 	DATA.keys.forEach(function (k) {
 		if (k.kind !== 'key') return;
-		var option = make('option', '', LayerModel.keyLegend(k.code, state.os) + '  (' + k.code + ')');
+		var option = make('option', '', LayerModel.keyLegend(k.code, view()) + '  (' + k.code + ')');
 		option.value = k.code;
 		keySelect.appendChild(option);
 	});
@@ -618,6 +719,10 @@ function render() {
 	recommendedDoc.layers[DATA.layer] = DATA.recommended;
 	var recommended = LayerModel.effective(recommendedDoc, DATA.layer, state.os);
 	el('form').value = state.form;
+	// A bound keypad key keeps the keypad on the board: it cannot be hidden.
+	el('numpad').checked = state.numpad || numpadBound(current);
+	el('numpad').disabled = numpadBound(current);
+	renderLegendSource();
 	renderBanner();
 	renderBoard(current, recommended);
 	renderMouse(current, recommended);
@@ -631,11 +736,21 @@ function render() {
 // ================================
 
 document.addEventListener('DOMContentLoaded', function () {
-	state.form = readStoredForm();
+	// The page's language is the interface's, so a word too long for its key
+	// breaks where that language hyphenates it (style.css .key .action).
+	if (typeof window._i18n_locale === 'string' && document.documentElement)
+		document.documentElement.lang = window._i18n_locale;
+	state.form = readStored(FORM_STORAGE_KEY, ['iso', 'ansi'], DEFAULT_FORM);
+	state.numpad = readStored(NUMPAD_STORAGE_KEY, ['0', '1'], '0') === '1';
 	setEditable(false);
 	el('form').addEventListener('change', function () {
 		state.form = el('form').value === 'ansi' ? 'ansi' : 'iso';
-		storeForm(state.form);
+		store(FORM_STORAGE_KEY, state.form);
+		render();
+	});
+	el('numpad').addEventListener('change', function () {
+		state.numpad = el('numpad').checked === true;
+		store(NUMPAD_STORAGE_KEY, state.numpad ? '1' : '0');
 		render();
 	});
 	el('btn-restore').addEventListener('click', restoreRecommended);
@@ -650,5 +765,10 @@ document.addEventListener('DOMContentLoaded', function () {
 	});
 	// Labels come from the locale file i18n.js loads; draw again once it has.
 	document.addEventListener('i18n:applied', render);
+	// The user may have switched layouts while the window was behind another:
+	// its host reads the layout again and answers with setLegends().
+	window.addEventListener('focus', function () {
+		if (state.os !== null) post({ action: 'legends' });
+	});
 	post('ready');
 });
