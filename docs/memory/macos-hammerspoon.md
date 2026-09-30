@@ -101,6 +101,25 @@ Unit tests get the real resolver over a modelled Mac through
 spawned executable's slices and fails on E2E_ROSETTA (`hardening-h-no-rosetta`).
 The App Cloner's own scripts still run `python3` from PATH/`/usr/bin`.
 
+### project-macos-download-children-read-the-system-network
+
+A child of Hammerspoon has no relay variables, and uv, Python and Ollama's
+Go client never read the macOS network settings; uv also trusts its bundled
+Mozilla roots unless told otherwise, and `SSL_CERT_FILE` overrides every
+store. The MLX installer exported `SSL_CERT_FILE=/etc/ssl/cert.pem`, so behind
+a TLS-inspecting company relay uv and curl refused every download ("error
+sending request for url"), and a company filter denying uv network access
+("tcp connect error: Operation not permitted") read as a file permission.
+Every macOS download child now sources `apply_system_network` from
+`modules/llm/network-retry.sh` (the scripts directly, the Ollama service and
+the MLX model download through `modules/llm/network_env.lua`): relay from
+`scutil --proxy`, loopback always in NO_PROXY, `UV_SYSTEM_CERTS=1`, and never
+a CA file. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
+Python 3.11–3.14 builds the venv without the managed interpreter download from
+GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
+offline) and `network.failure.*` sentences with their actions. Never log the
+word "proxy" in a normal line: the shared classifier matches it bare.
+
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with

@@ -25,6 +25,7 @@ local M = {}
 local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
+local NetworkEnv    = require("modules.llm.network_env")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
@@ -1114,6 +1115,12 @@ function M.install(ctx)
 			end
 
 			local clean_repo = repo:gsub("[%c%s]", "")
+			local network_prelude, network_err = NetworkEnv.prelude("MLX")
+			if not network_prelude then
+				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
+				do_cancel(true, "network_policy_missing")
+				return false
+			end
 			local script_path = "/tmp/hs_mlx_dl_" .. _rand_id .. ".sh"
 			local py_path     = "/tmp/hs_mlx_dl_" .. _rand_id .. ".py"
 			owner.partial.script_path = py_path
@@ -1240,8 +1247,10 @@ function M.install(ctx)
 			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
 			f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
 			f:write("export PYTHONUNBUFFERED=1\n")
-			f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
-			f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
+			-- The system relay and trust store (a company's inspection
+			-- certificate included, which truststore reads in the downloader);
+			-- no CA file overrides them.
+			f:write(network_prelude .. "\n")
 			f:write("export HF_HUB_DISABLE_XET=1\n")
 			-- Dependencies are pinned in pyproject.toml and installed by uv pip
 			-- sync — no runtime install/upgrade. Just verify the imports succeed.

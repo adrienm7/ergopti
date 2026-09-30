@@ -1202,16 +1202,13 @@ function M.install(ctx)
 			--      crash detector / ready probe) keeps working unchanged.
 			local bash_cmd =
 				"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
-				"export SSL_CERT_FILE=/etc/ssl/cert.pem; " ..
-				"export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; " ..
 				"export HF_HUB_DISABLE_XET=1; " ..
 				-- HF_HUB_OFFLINE=1 forces huggingface_hub to use ONLY the local cache
 				-- and skip every HTTPS call to huggingface.co. Required behind a
-				-- corporate proxy with a self-signed root CA, because the httpx
-				-- client used by huggingface_hub>=1.x ignores SSL_CERT_FILE /
-				-- REQUESTS_CA_BUNDLE and uses its own SSL context — a single
-				-- snapshot-validation call on first inference would fail with
-				-- CERTIFICATE_VERIFY_FAILED and crash mlx_lm's _generate thread.
+				-- corporate relay with its own root certificate: a single
+				-- snapshot-validation call on first inference would fail
+				-- certificate verification and crash mlx_lm's _generate thread.
+				-- The server needs no network, so it gets no CA file either.
 				-- TRANSFORMERS_OFFLINE=1 mirrors the policy for transformers.
 				"export HF_HUB_OFFLINE=1; " ..
 				"export TRANSFORMERS_OFFLINE=1; " ..

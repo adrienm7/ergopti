@@ -7,12 +7,16 @@
 --- model-manager launch paths. The pipeline captures only the stable log
 --- directory and resolves the dated ErgoptiPlus filename for every output line,
 --- so a daemon that survives midnight follows the logger's daily rollover.
+--- The service pulls the models itself: it starts with the system network
+--- settings (modules/llm/network_env.lua), since Ollama reads only its own
+--- relay variables and a managed network lets nothing else out.
 --- ==============================================================================
 
 local M = {}
 
 local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
+local NetworkEnv = require("modules.llm.network_env")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -56,8 +60,11 @@ function M.build(ollama_bin, unified_log_file, port)
 	end
 	local log_dir, dir_err = resolve_log_dir(unified_log_file)
 	if not log_dir then return nil, dir_err end
+	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER")
+	if not network then return nil, network_err end
 
 	return table.concat({
+		network,
 		"LOG_DIR=", text_utils.shell_quote(log_dir), "; ",
 		"OLLAMA_HOST=", text_utils.shell_quote(OLLAMA_HOST .. ":" .. tostring(port)), " ",
 		text_utils.shell_quote(ollama_bin), " serve 2>&1 | ",
