@@ -420,28 +420,27 @@ _LLM_Accept_DeferClaimRelease() {
 	SetTimer(_LLM_Accept_ReleaseClaim, -_LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS)
 }
 
-_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot) {
-	if !(IsPhysicalTabEvent is Integer) or IsPhysicalTabEvent != true
-		return false
-	if _LLM_Accept_HasDeclaredModifiers(Modifiers)
-		return false
-	if !(InputSnapshot is Map)
-		return false
-	static RequiredInputKeys := ["known", "tab_down", "ctrl_down", "alt_down",
-		"shift_down", "win_down", "current_hwnd", "current_control"]
-	for Key in RequiredInputKeys {
-		if !InputSnapshot.Has(Key)
-			return false
-	}
-	for Key in ["known", "tab_down", "ctrl_down", "alt_down", "shift_down", "win_down"] {
-		if !(InputSnapshot[Key] is Integer)
-			return false
-	}
-	if !InputSnapshot["known"] or !InputSnapshot["tab_down"]
-		return false
-	if _LLM_Accept_AnyModifierDown(InputSnapshot)
-		return false
-	return true
+; Whether a Tab is the user's own bare Tab key: the physical Tab, down now, or
+; the tap of a tap-hold key whose tap is Tab (the recommended AltGr), while the
+; dispatcher still runs that very tap (TapHoldTapProvenance). Anything else, a
+; gesture, a macro, a text send or a timer, carries no provenance. No modifier
+; may be declared or physically held (llm-accept-inserts).
+_LLM_Accept_IsBareUserTabEvent(TabProvenance, Modifiers, InputSnapshot) {
+	return _LLM_Accept_BareTabRefusal(TabProvenance, Modifiers, InputSnapshot) == ""
+}
+
+; The tap-hold key a Tab provenance names, or "" when it names none.
+_LLM_Accept_TapHoldTapKey(TabProvenance) {
+	if !(TabProvenance is Map) || TabProvenance.Get("kind", "") != "tap_hold_tap"
+		return ""
+	KeyId := TabProvenance.Get("key_id", "")
+	return (KeyId is String) ? KeyId : ""
+}
+
+; Whether a Tab comes from a key the user pressed, the only Tabs worth tracing.
+_LLM_Accept_IsUserTabProvenance(TabProvenance) {
+	return ((TabProvenance is Integer) && TabProvenance == true)
+		|| _LLM_Accept_TapHoldTapKey(TabProvenance) != ""
 }
 
 _LLM_Accept_AnyModifierDown(InputSnapshot) {
@@ -473,8 +472,8 @@ _LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource) {
 ; is the one published by the render, not the mutable source of the newest
 ; pending keystroke: a visible tooltip from control A must stay owned by A even
 ; after control B has armed another request.
-_LLM_Accept_IsAllowed(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSource) {
-	if !_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
+_LLM_Accept_IsAllowed(TabProvenance, Modifiers, InputSnapshot, RenderedSource) {
+	if !_LLM_Accept_IsBareUserTabEvent(TabProvenance, Modifiers, InputSnapshot)
 		return false
 	return _LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource)
 }
@@ -482,19 +481,23 @@ _LLM_Accept_IsAllowed(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSour
 ; Names the gate of the canonical policy that refuses a Tab, or "" when the
 ; policy admits it. It evaluates the same two predicates as _LLM_Accept_IsAllowed
 ; in the same order, so a refusal always has exactly one name.
-_LLM_Accept_RefusalGate(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSource) {
-	if !_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
-		return _LLM_Accept_BareTabRefusal(IsPhysicalTabEvent, Modifiers, InputSnapshot)
+_LLM_Accept_RefusalGate(TabProvenance, Modifiers, InputSnapshot, RenderedSource) {
+	Gate := _LLM_Accept_BareTabRefusal(TabProvenance, Modifiers, InputSnapshot)
+	if Gate != ""
+		return Gate
 	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource)
 		return "the focus is not the control the prediction was rendered for"
 	return ""
 }
 
-; The conjunct of _LLM_Accept_IsBarePhysicalTabEvent that fails, checked in its
-; own order. Only called once that predicate answered false.
-_LLM_Accept_BareTabRefusal(IsPhysicalTabEvent, Modifiers, InputSnapshot) {
-	if !(IsPhysicalTabEvent is Integer) or IsPhysicalTabEvent != true
-		return "the Tab is not a physical event"
+; The first condition of the bare user-Tab policy that fails, or "" when it
+; admits the Tab. The single implementation of that policy, so a refusal always
+; has exactly one name.
+_LLM_Accept_BareTabRefusal(TabProvenance, Modifiers, InputSnapshot) {
+	IsPhysical := (TabProvenance is Integer) && TabProvenance == true
+	TapKey := _LLM_Accept_TapHoldTapKey(TabProvenance)
+	if !IsPhysical && TapKey == ""
+		return "the Tab is neither the physical Tab nor a tap-hold's tap"
 	if _LLM_Accept_HasDeclaredModifiers(Modifiers)
 		return "the Tab declares modifiers"
 	if !(InputSnapshot is Map)
@@ -510,18 +513,23 @@ _LLM_Accept_BareTabRefusal(IsPhysicalTabEvent, Modifiers, InputSnapshot) {
 	}
 	if !InputSnapshot["known"]
 		return "the focus could not be verified"
-	if !InputSnapshot["tab_down"]
+	; The physical Tab is down while it is pressed; a tap-hold's tap runs on its
+	; key's release, so its proof is that the dispatcher still runs this tap.
+	if IsPhysical && !InputSnapshot["tab_down"]
 		return "Tab is not physically down"
+	if !IsPhysical && TapHoldTapInDispatch() != TapKey
+		return "the tap of " . TapKey . " is no longer being dispatched"
 	if _LLM_Accept_AnyModifierDown(InputSnapshot)
 		return "a modifier is physically held"
-	throw Error("The bare physical Tab policy refused a press none of its conditions refuses.")
+	return ""
 }
 
 /**
- * Traces at DEBUG the gate that refused a physical Tab while a prediction is on
- * screen. That refusal is otherwise invisible: the Tab reaches the application
- * or the key's tap-hold instead. Silent while no prediction is shown, which is
- * every ordinary Tab press, and while only the loading indicator is.
+ * Warns with the gate that refused the user's Tab (the physical Tab or a
+ * tap-hold's Tab tap) while a prediction is on screen. That refusal is
+ * otherwise invisible: the Tab reaches the application or the key's tap-hold
+ * instead. Silent while no prediction is shown, which is every ordinary Tab
+ * press, and while only the loading indicator is.
  * @param {String} Gate - What refused the press.
  * @returns {Boolean} True when the refusal was traced.
  */
@@ -530,22 +538,25 @@ LLM_Tooltip_ReportTabRefusal(Gate) {
 		throw ValueError("A refused Tab must name the gate that refused it.")
 	if !LLM_Tooltip_IsVisible() || LLM_Tooltip_IsLoading()
 		return false
-	try LoggerDebug("LLM", "Physical Tab not accepted over a shown prediction: {1}.", Gate)
+	try LoggerWarn("LLM", "Tab not accepted over a shown prediction: {1}.", Gate)
 	return true
 }
 
 /**
- * Canonical LLM acceptance primitive. Only an unmodified PHYSICAL Tab in the
- * exact HWND/control that owns the rendered prediction may inject it. Optional
+ * Canonical LLM acceptance primitive. Only the user's unmodified Tab key (the
+ * physical Tab, or a tap-hold's Tab tap while it is dispatched) in the exact
+ * HWND/control that owns the rendered prediction may inject it. Optional
  * snapshots/callbacks are deterministic unit-test seams; production call sites
- * and their physical-event provenance are exhaustively meta-guarded.
- * @param {boolean} IsPhysicalTabEvent - True only at a real Tab event source.
+ * and their event provenance are exhaustively meta-guarded.
+ * @param {boolean|Map} TabProvenance - True only at a real Tab event source,
+ *     the map TapHoldTapProvenance returns for a tap-hold's Tab tap, false
+ *     otherwise.
  * @param {Array|String} Modifiers - Declared TextPressKey modifiers.
  * @param {Map} InputSnapshot - Optional current physical/focus snapshot.
  * @param {Func} AcceptFn - Optional injection callback.
  * @returns {boolean} True when this Tab owns, or joins, the one active claim.
  */
-LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnapshot := unset, AcceptFn := unset) {
+LLM_Tooltip_TryAcceptTab(TabProvenance := false, Modifiers := [], InputSnapshot := unset, AcceptFn := unset) {
 	global _LLM_AcceptInProgress
 	; Snapshot one presented tuple before any OS/focus probe. The later claim
 	; revalidates this exact record, so navigation or a replacement render cannot
@@ -553,8 +564,8 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 	Presented := LLM_Tooltip_GetAcceptSnapshot()
 	if !IsSet(InputSnapshot)
 		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
-	; Only a physical Tab can accept, so only its refusal is worth a trace.
-	TraceRefusal := (IsPhysicalTabEvent is Integer) && IsPhysicalTabEvent == true
+	; Only the user's Tab key can accept, so only its refusal is worth a trace.
+	TraceRefusal := _LLM_Accept_IsUserTabProvenance(TabProvenance)
 	RefusedGate := ""
 	Joined := false
 	PreviousCritical := Critical("On")
@@ -563,17 +574,17 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 		; first callback owns injection; a sibling may join only when it proves the
 		; same bare physical-Tab profile. Chords and remaps keep their normal output.
 		if _LLM_AcceptInProgress {
-			Joined := _LLM_Accept_IsBarePhysicalTabEvent(
-				IsPhysicalTabEvent, Modifiers, InputSnapshot)
+			Joined := _LLM_Accept_IsBareUserTabEvent(
+				TabProvenance, Modifiers, InputSnapshot)
 			if !Joined
 				RefusedGate := "another acceptance owns the claim"
 		} else if !IsObject(Presented) {
 			RefusedGate := "the shown prediction offers no acceptable snapshot"
 		} else if !_LLM_Accept_IsAllowed(
-				IsPhysicalTabEvent, Modifiers, InputSnapshot,
+				TabProvenance, Modifiers, InputSnapshot,
 				Presented.AcceptSource) {
 			RefusedGate := TraceRefusal
-				? _LLM_Accept_RefusalGate(IsPhysicalTabEvent, Modifiers,
+				? _LLM_Accept_RefusalGate(TabProvenance, Modifiers,
 					InputSnapshot, Presented.AcceptSource)
 				: "the Tab is not a physical event"
 		}
@@ -676,25 +687,36 @@ LLM_Tooltip_TryAcceptSlot(ExpectedRecord, ExpectedSurface, SlotIdx,
 
 _LLM_Accept_SlotIsAllowed(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
 		InputSnapshot) {
+	return _LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface,
+		SlotIdx, InputSnapshot) == ""
+}
+
+; The first condition of the validation-chord policy that fails, or "" when it
+; admits the insertion: the single implementation of that policy, so a refused
+; insertion always has exactly one name (llm-accept-inserts).
+_LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
+		InputSnapshot) {
 	if !IsObject(Presented) || !IsObject(ExpectedRecord)
 			|| !IsObject(ExpectedSurface)
-		return false
+		return "no prediction offers an acceptable snapshot"
 	if ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)
 			|| ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)
-		return false
+		return "another prediction replaced the one the chord named"
 	if !(SlotIdx is Integer) || SlotIdx < 1
 			|| !(Presented.Slots is Array) || SlotIdx > Presented.Slots.Length
 			|| Presented.ActiveIdx != SlotIdx
-		return false
+		return "the chosen slot is not the active one"
 	if !(InputSnapshot is Map)
-		return false
+		return "the input snapshot is missing"
 	for Key in ["ctrl_down", "alt_down", "shift_down", "win_down"] {
 		if !InputSnapshot.Has(Key) || !(InputSnapshot[Key] is Integer)
-			return false
+			return "the input snapshot is incomplete"
 	}
 	if _LLM_Accept_AnyModifierDown(InputSnapshot)
-		return false
-	return _LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
+		return "a modifier is physically held"
+	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
+		return "the focus is not the control the prediction was rendered for"
+	return ""
 }
 
 ; Only the newest chord may insert: a second Alt+N while Alt is still held
@@ -749,7 +771,7 @@ _LLM_SlotAccept_Tick(State) {
 	}
 	if Step == "drop" {
 		if State is Map && State["generation"] == _LLM_SlotAccept_Generation
-			try LoggerDebug("LLM", "Validation chord insertion dropped: modifiers still held at the deadline.")
+			try LoggerWarn("LLM", "Validation chord did not insert prediction {1}: a modifier was still held at the deadline.", State["slot"])
 		return
 	}
 	SetTimer(_LLM_SlotAccept_Insert.Bind(State), -State["delay_ms"])
@@ -764,14 +786,21 @@ _LLM_SlotAccept_Insert(State) {
 		LLM_Engine_CancelTimer()
 		return
 	}
-	try LoggerDebug("LLM", "Validation chord insertion refused: the prediction, slot or focus changed.")
+	; The chord was consumed, so a refusal leaves the user with nothing typed:
+	; name the gate (llm-accept-inserts).
+	Gate := _LLM_Accept_SlotRefusal(LLM_Tooltip_GetAcceptSnapshot(),
+		State["record"], State["surface"], State["slot"],
+		_LLM_Accept_ReadInputSnapshot())
+	try LoggerWarn("LLM", "Validation chord did not insert prediction {1}: {2}.",
+		State["slot"], Gate != "" ? Gate : "another acceptance owned the claim")
 }
 
-; Emit Tab normally whenever canonical acceptance rejects it. This is used by
-; tap-hold/gesture remaps too: they retain the default non-physical provenance,
-; so they navigate as configured and can never accept an LLM prediction.
-LLM_Tooltip_FireTabOrAccept(Modifiers := [], IsPhysicalTabEvent := false) {
-	if LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent, Modifiers)
+; Emit Tab normally whenever canonical acceptance rejects it. A tap-hold's Tab
+; tap passes TapHoldTapProvenance(), the user's own key, and accepts like the
+; physical Tab; a gesture keeps the default false provenance, so it navigates as
+; configured and can never accept an LLM prediction (llm-accept-inserts).
+LLM_Tooltip_FireTabOrAccept(Modifiers := [], TabProvenance := false) {
+	if LLM_Tooltip_TryAcceptTab(TabProvenance, Modifiers)
 		return true
 	TextPressKey("Tab", Modifiers)
 	return false

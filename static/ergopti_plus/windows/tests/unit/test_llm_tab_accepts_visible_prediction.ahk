@@ -269,7 +269,7 @@ Test("LLM accept: a rendered prediction is accepted by a bare physical Tab in it
 _LTAV_RefusalGateNamesEachCondition() {
 	Source := Map("hwnd", 100, "control", 1001)
 	Vectors := [
-		[false, [], _LTAV_Input(), "the Tab is not a physical event"],
+		[false, [], _LTAV_Input(), "the Tab is neither the physical Tab nor a tap-hold's tap"],
 		[true, ["Ctrl"], _LTAV_Input(), "the Tab declares modifiers"],
 		[true, [], _LTAV_Input(100, 1001, false, false), "Tab is not physically down"],
 		[true, [], _LTAV_Input(100, 1001, true), "a modifier is physically held"],
@@ -308,10 +308,12 @@ _LTAV_RefusedPhysicalTabIsTracedOnlyOverAPrediction() {
 			"a physical Tab refused over a shown prediction must be traced")
 		Traced := 0
 		for Line in Captured {
-			if InStr(Line, "[DEBUG]") && InStr(Line, "Tab is not physically down")
+			if InStr(Line, "[WARNING]") && InStr(Line, "Tab is not physically down")
 				Traced++
 		}
-		AssertEqual(1, Traced, "the trace must be one DEBUG line naming the gate")
+		; A refused Tab leaves the user with a Tab typed and no prediction, so it
+		; is a warning the errors-first logs keep (llm-accept-inserts).
+		AssertEqual(1, Traced, "the trace must be one WARNING line naming the gate")
 		Captured.Length := 0
 		_Stub_LlmTooltipVisible := false
 		AssertFalse(LLM_Tooltip_ReportTabRefusal("the shown prediction offers no acceptable snapshot"),
