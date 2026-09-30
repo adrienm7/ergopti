@@ -22,6 +22,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Json = require("json")
 local ConfigPaths = require("infra.config_paths")
+local ConfigOutdated = require("config_outdated")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -122,11 +123,22 @@ local function valid_entry(raw)
 	}
 end
 
---- Loads the file once. A malformed file is kept aside, not overwritten.
+--- How a warning names a stored entry: its id when it has one, never its key.
+--- @param raw any The stored entry.
+--- @param index number Its position in the file.
+--- @return string
+local function entry_name(raw, index)
+	local id = type(raw) == "table" and type(raw.id) == "string" and raw.id ~= "" and raw.id or nil
+	return id and ("entries[id=" .. id .. "]") or ("entries[#" .. index .. "]")
+end
+
+--- Loads the file once. A malformed file is kept aside, not overwritten. An
+--- entry an older build wrote in another shape is outdated: warned once,
+--- left out, and written back unchanged, so its key is never deleted.
 --- @return table state
 local function state()
 	if _state then return _state end
-	_state = { version = VERSION, entries = {}, active_id = "" }
+	_state = { version = VERSION, entries = {}, active_id = "", outdated = {} }
 	local fh = io.open(M.path(), "r")
 	if not fh then return _state end
 	local text = fh:read("*a")
@@ -138,19 +150,32 @@ local function state()
 		Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
 		return _state
 	end
-	for _, raw in ipairs(root.entries) do
+	for index, raw in ipairs(root.entries) do
 		local entry = valid_entry(raw)
-		if entry then _state.entries[#_state.entries + 1] = entry end
+		if entry then
+			_state.entries[#_state.entries + 1] = entry
+		else
+			_state.outdated[#_state.outdated + 1] = raw
+			ConfigOutdated.report_in_file(M.path(), entry_name(raw, index),
+				"it lacks a text id, provider, label or token this build needs")
+		end
 	end
-	if type(root.active_id) == "string" and M.get(root.active_id) then _state.active_id = root.active_id end
+	if type(root.active_id) == "string" and M.get(root.active_id) then
+		_state.active_id = root.active_id
+	elseif type(root.active_id) == "string" and root.active_id ~= "" then
+		ConfigOutdated.report_in_file(M.path(), "active_id", "no usable entry has this id; no entry is active")
+	end
 	return _state
 end
 
---- Persists the current state.
+--- Persists the current state, the outdated entries included as they were.
 --- @return boolean
 local function persist()
+	local entries = {}
+	for _, entry in ipairs(state().entries) do entries[#entries + 1] = entry end
+	for _, raw in ipairs(state().outdated) do entries[#entries + 1] = raw end
 	local ok, err = write_private(M.path(), Json.encode({
-		version = VERSION, entries = state().entries, active_id = state().active_id,
+		version = VERSION, entries = entries, active_id = state().active_id,
 	}))
 	if not ok then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
