@@ -202,3 +202,35 @@ _KCP_EveryDeferredPastePairsOwnership() {
 	}
 }
 Test("keylogger clipboard: every deferred producer pairs shared ownership", _KCP_EveryDeferredPastePairsOwnership)
+
+; A key-state probe for the paste-chord classifier: the named keys are down.
+_KCP_KeysDown(Keys*) {
+	Down := Map()
+	for Key in Keys
+		Down[Key] := true
+	return (Name) => Down.Has(Name)
+}
+
+; The paste observer replaced the "~^v" and "~+Insert" hotkeys: the driver
+; declares every character key by scan code, so AutoHotkey's hook never looked
+; the virtual-key "~^v" up and no paste was ever recorded (hardening-c). The
+; chords keep the hotkeys' exact modifiers: Ctrl+Shift+V, AltGr+V and Ctrl+Insert
+; are other commands.
+_KCP_PasteChordsKeepTheirExactModifiers() {
+	V := KLClipConst.VK_V
+	Ins := KLClipConst.VK_INSERT
+	AssertTrue(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl")), "Ctrl+V must be a paste")
+	AssertTrue(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Shift")), "Shift+Insert must be a paste")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown()), "a bare V is typing, not a paste")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "Shift")),
+		"Ctrl+Shift+V is another chord, as it was for the ^v hotkey")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "Alt")),
+		"Ctrl+Alt+V (AltGr+V) types a character")
+	AssertFalse(_KL_Clip_IsPasteChord(V, _KCP_KeysDown("Ctrl", "LWin")), "Ctrl+Win+V is another chord")
+	AssertFalse(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Ctrl")), "Ctrl+Insert copies")
+	AssertFalse(_KL_Clip_IsPasteChord(Ins, _KCP_KeysDown("Ctrl", "Shift")),
+		"Ctrl+Shift+Insert is another chord, as it was for the +Insert hotkey")
+	AssertFalse(_KL_Clip_IsPasteChord(Ord("C"), _KCP_KeysDown("Ctrl")), "Ctrl+C is not a paste")
+}
+Test("keylogger clipboard: the paste observer keeps the exact Ctrl+V and Shift+Insert chords",
+	_KCP_PasteChordsKeepTheirExactModifiers)
