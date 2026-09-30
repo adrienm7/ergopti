@@ -250,6 +250,30 @@ local function delay_fits(key, value)
 	return true
 end
 
+--- The prompt profile ids a document can name: the shipped built-ins and the
+--- document's own [llm.profiles] user_profiles, plus the legacy ids the active
+--- profile's owner still migrates silently. nil when the shipped list cannot
+--- be read: nothing can then be proved gone, and every reference is kept.
+--- @param grouped table Decoded config.toml.
+--- @return table|nil ids Set of profile ids.
+--- @return table|nil legacy Set of legacy ids the active profile may hold.
+local function known_profile_ids(grouped)
+	local Selector = require("llm.profile_selector")
+	local builtins = Selector.load_built_in_profiles()
+	if type(builtins) ~= "table" or #builtins == 0 then return nil, nil end
+	local ids, legacy = {}, {}
+	for _, profile in ipairs(builtins) do
+		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
+	end
+	for old in pairs(Selector.load_legacy_ids()) do legacy[old] = true end
+	local llm = type(grouped.llm) == "table" and grouped.llm or {}
+	local profiles = type(llm.profiles) == "table" and llm.profiles or {}
+	for _, profile in ipairs(type(profiles.user_profiles) == "table" and profiles.user_profiles or {}) do
+		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
+	end
+	return ids, legacy
+end
+
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
@@ -569,6 +593,15 @@ local function flatten_from_disk(grouped, mark)
 	--- Takes one owned value, unless it cannot cross its unit boundary: such a
 	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
 	--- the whole file load as corrupt.
+	-- The profile ids this document can name, read once and only when needed.
+	local profile_ids, legacy_profile_ids, profile_ids_read = nil, nil, false
+	local function document_profile_ids()
+		if not profile_ids_read then
+			profile_ids, legacy_profile_ids = known_profile_ids(grouped)
+			profile_ids_read = true
+		end
+		return profile_ids, legacy_profile_ids
+	end
 	local function take_value(flat_key, value, ...)
 		local fits, detail = persisted_units_fit(KEY_MAP[flat_key], value)
 		local spec = KEY_MAP[flat_key]
@@ -579,8 +612,26 @@ local function flatten_from_disk(grouped, mark)
 				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
 		end
 		if fits then fits, detail = scalar_value_fits(flat_key, value) end
+		if fits and flat_key == "llm_active_profile" then
+			-- A deleted or renamed profile silently ran "basic" at every prediction.
+			local ids, legacy = document_profile_ids()
+			if ids and not ids[value] and not legacy[value] then
+				fits, detail = false, "no built-in or user profile has this id"
+			end
+		end
 		if not fits then
 			ConfigOutdated.report({ ... }, detail)
+			return
+		end
+		local ids = flat_key == "llm_profile_shortcuts" and type(value) == "table" and document_profile_ids() or nil
+		if ids then
+			-- A shortcut of a deleted profile was unbound with a WARNING at every
+			-- boot and never removed from disk.
+			flat[flat_key] = ConfigOutdated.partition({ ... }, value, function(id, shortcut)
+				if not ids[id] then return false, "no built-in or user profile has this id" end
+				if type(shortcut) ~= "table" then return false, "a profile shortcut is a table of mods and key" end
+				return true
+			end, mark)
 			return
 		end
 		flat[flat_key] = value
