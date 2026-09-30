@@ -3,16 +3,16 @@
 ; ==============================================================================
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys
 ; DESCRIPTION:
-; Owns the context-sensitive Tab hotkey that accepts the visible prediction
-; and the slot-navigation hotkeys (~Up / ~Down / val_modifiers + 1..9, 0) that
-; move the active slot when the tooltip shows multiple predictions. The hotkey
-; context is gated by ``LLM_Tooltip_GetText() != ""`` via ``#HotIf`` so the
-; Tab key reaches the underlying app unchanged whenever no prediction is on
-; screen.
+; Owns the slot-navigation hotkeys (~Up / ~Down / val_modifiers + 1..9, 0)
+; that move the active slot when the tooltip shows multiple predictions. The
+; physical Tab that accepts the visible prediction is an SC00F variant in
+; platform/remap/tab.ahk: AutoHotkey looks the physical Tab up by its scan code
+; once any SC00F hotkey exists, so a `Tab::` hotkey here never fired
+; (llm-tab-accepts-visible-prediction).
 ;
 ; FEATURES & RATIONALE:
-; 1. HotIf-gated Tab: when no tooltip is visible, Tab passes through to the
-;    active app — the user keeps the OS-native Tab behaviour everywhere
+; 1. Tab outside a prediction: when no tooltip offers text, Tab passes through
+;    to the active app — the user keeps the OS-native Tab behaviour everywhere
 ;    except when actively reviewing a prediction.
 ; 2. Cycle wraps around: ~Up past the first slot loops to the last, and
 ;    ~Down past the last loops back to the first — feels snappier than a
@@ -69,19 +69,14 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 
 
 
-; ====================================
-; ====================================
-; ======= 1/ Tab Accept Hotkey =======
-; ====================================
-; ====================================
+; ==================================
+; ==================================
+; ======= 1/ Slot Navigation =======
+; ==================================
+; ==================================
 
-; A bare physical Tab accepts only when the canonical source-control policy
-; succeeds. On any rejection the wrapper emits the native Tab instead.
-; The hotkey is context-sensitive: active only when the tooltip is shown.
-#HotIf LLM_Tooltip_GetText() != ""
-Tab:: {
-	LLM_Tooltip_FireTabOrAccept([], true)
-}
+; The physical Tab that accepts a prediction is not declared here: see the
+; module header and platform/remap/tab.ahk (8.5).
 
 ; ── Slot navigation ──
 ; When the tooltip shows multiple predictions, the user can cycle the

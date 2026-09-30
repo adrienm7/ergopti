@@ -32,22 +32,34 @@
 
 ; Helper predicates -------------------------------------------------------
 
-; A scan-code hotkey on SC00F shadows the `Tab::` acceptance HotIf, and the
-; canonical policy only accepts while Tab is physically down. So every tap-hold
-; variant offers the press itself to acceptance before any tap/hold resolution;
-; otherwise a visible prediction lost to the tap action (llm-tab-taphold-accept).
+; The physical Tab key has one hotkey identity, its scan code: once any SC00F
+; hotkey exists, AutoHotkey's hook resolves every physical Tab through SC00F and
+; never looks up a hotkey named by the virtual key, so a `Tab::` hotkey never
+; fires, even when no SC00F variant is eligible (hook.cpp: sc_takes_precedence).
+; Acceptance therefore lives on SC00F: every tap-hold variant offers the press
+; to it before any tap/hold resolution (llm-tab-taphold-accept), and so does the
+; variant that owns the key when no tap-hold does (8.5,
+; llm-tab-accepts-visible-prediction). The canonical policy only accepts while
+; Tab is physically down, so the offer happens on the press.
 ; @returns {Boolean} True when the press accepted the prediction and is consumed.
 _TabAcceptVisiblePrediction() {
-	; Cheap gate first, like the `Tab::` HotIf: the policy probes focus, which
-	; every ordinary Tab press must not pay for.
-	if LLM_Tooltip_GetText() == ""
+	; Cheap gate first: the policy probes focus, which every ordinary Tab press
+	; must not pay for. A prediction on screen that offers no acceptable text is
+	; traced, since the press then goes to the key's other owner.
+	if LLM_Tooltip_GetText() == "" {
+		LLM_Tooltip_ReportTabRefusal("the shown prediction offers no acceptable text")
 		return false
+	}
 	if !LLM_Tooltip_TryAcceptTab(true, [])
 		return false
 	; Same as the bridge's Tab path: a stale debounce must not re-show a tooltip.
 	LLM_Engine_CancelTimer()
-	; Swallow auto-repeat: once the tooltip hides, a repeat would fire the tap.
-	KeyWait("SC00F", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	; Swallow auto-repeat until the release. The press stays claimed meanwhile:
+	; once the tooltip hides, 8.5 is no longer eligible, and the repeat falls to
+	; the owned-press swallower (8.6) instead of typing Tabs after the text.
+	_TapHoldClaimPress("tab")
+	try KeyWait("SC00F", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	finally _TapHoldEndPressClaim("tab")
 	return true
 }
 
@@ -188,9 +200,37 @@ SC00F:: {
 
 
 
+; ==================================================================
+; ==================================================================
+; ======= 8.5) Visible AI prediction, no tap-hold on the key =======
+; ==================================================================
+; ==================================================================
+
+; The physical Tab accepts a visible prediction even when no tap-hold owns the
+; key: the neutral configuration leaves the Tab tap-hold off, and the scan-code
+; identity means no `Tab::` hotkey can take the press instead (see
+; _TabAcceptVisiblePrediction). AutoHotkey fires the earliest-created eligible
+; variant, so this one is declared after 8.1 to 8.4: a configured tap-hold keeps
+; the press and offers it to acceptance itself. A refused acceptance keeps the
+; key's native Tab, like a tap-hold with no tap action
+; (llm-tab-accepts-visible-prediction).
+#HotIf LLM_Tooltip_GetText() != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
+	TapHoldEmitKeyTap("Tab")
+}
+#HotIf
+
+
+
+
+
+
+
 ; ====================================
 ; ====================================
-; ======= 8.5) Own auto-repeat =======
+; ======= 8.6) Own auto-repeat =======
 ; ====================================
 ; ====================================
 
@@ -212,7 +252,7 @@ SC00F:: {
 
 ; =================================
 ; =================================
-; ======= 8.6) Tap dispatch =======
+; ======= 8.7) Tap dispatch =======
 ; =================================
 ; =================================
 

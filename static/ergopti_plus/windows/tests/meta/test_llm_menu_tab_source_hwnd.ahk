@@ -291,12 +291,13 @@ Test("LLM accept meta: every direct injection/accept call site is enumerated (AH
 
 _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 	DriverSrc := _DriverSourceNoComments()
-	MenuSrc := _DriverDirConcat("ui/menu/menu_llm")
 	GestureSrc := _DriverDirConcat("modules/gestures")
 	RemapSrc := _DriverDirConcat("platform/remap")
 
-	Assert(InStr(MenuSrc, "LLM_Tooltip_FireTabOrAccept([], true)") > 0,
-		"physical Tab HotIf must be the sole wrapper caller that declares physical provenance")
+	; The physical Tab accepts only through the SC00F handlers, which declare
+	; their provenance to the policy directly (_TabAcceptVisiblePrediction); the
+	; wrapper is left to the producers of a synthetic Tab, which must fail it
+	; (llm-tab-accepts-visible-prediction).
 	Assert(InStr(GestureSrc, "LLM_Tooltip_FireTabOrAccept([])") > 0,
 		"gesture Tab must pass through the same wrapper and fail physical-Tab validation")
 	Assert(InStr(RemapSrc, "return LLM_Tooltip_FireTabOrAccept(Modifiers)") > 0,
@@ -307,10 +308,10 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 		"RCtrl Tab remap must pass through canonical physical-Tab validation")
 
 	WrapperRefs := _TLTSH_Count(DriverSrc, "LLM_Tooltip_FireTabOrAccept")
-	AssertEqual(4, WrapperRefs,
-		"the guarded Tab wrapper must have one definition plus exactly the three enumerated menu/gesture/tap-hold references; inspect every new reference before updating this count")
-	AssertEqual(1, _TLTSH_Count(DriverSrc, "LLM_Tooltip_FireTabOrAccept([], true)"),
-		"only the physical Tab HotIf may opt the shared wrapper into physical-event acceptance")
+	AssertEqual(3, WrapperRefs,
+		"the guarded Tab wrapper must have one definition plus exactly the two enumerated gesture/tap-hold references; inspect every new reference before updating this count")
+	AssertEqual(0, RegExMatch(DriverSrc, "LLM_Tooltip_FireTabOrAccept\([^)\r\n]*,\s*true\)"),
+		"no caller may opt the shared wrapper into physical-event acceptance: the physical Tab accepts through its SC00F handlers")
 	AssertEqual(4, _TLTSH_Count(DriverSrc, "LLM_Bridge_FeedKeyDownIfActive("),
 		"the bridge feed must have one definition plus two PrefixWatcher branches and one dispatcher caller")
 }
@@ -318,11 +319,12 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 Test("LLM accept meta: every menu, gesture and tap-hold Tab producer is enumerated (AHK-05)",
 	_TLTSH_EveryTabProducerUsesTheGuardedWrapper)
 
-; A scan-code hotkey on SC00F shadows the `Tab::` acceptance HotIf, so a
+; A scan-code hotkey on SC00F shadows any hotkey named by the Tab key, so a
 ; tap-hold on the physical Tab key used to run its tap action (alt_tab_monitor,
 ; a layer...) over a visible prediction. Acceptance also needs Tab physically
 ; down, so it must happen on the press, before any tap/hold resolution
-; (llm-tab-taphold-accept).
+; (llm-tab-taphold-accept). The fifth handler owns the press when no tap-hold
+; does (llm-tab-accepts-visible-prediction).
 _TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
 	SplitPath(A_ScriptDir, , &Root)
 	; FileRead throws if the module moves, so the scan can never go vacuous.
@@ -339,8 +341,8 @@ _TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
 			"physical Tab handler #" . Handlers . " must accept a visible prediction before any tap-hold logic")
 		Pos += StrLen(Match[0])
 	}
-	AssertEqual(4, Handlers,
-		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only) must all be covered")
+	AssertEqual(5, Handlers,
+		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only) and the no-tap-hold acceptance variant must all be covered")
 }
 
 Test("LLM accept meta: physical Tab tap-holds accept a visible prediction on press (llm-tab-taphold-accept)",
