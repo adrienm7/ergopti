@@ -6,8 +6,9 @@
 --- Carries the hotstring choices that earlier Linux builds kept in storage.json
 --- into their canonical config.toml leaves, once, before any hotstring owner
 --- reads config.toml. Without it an existing install loses every category and
---- section it had switched on, its magic key and its repeat key at the update,
---- because the canonical readers resolve absence to the neutral state.
+--- section it had switched on, its magic key, its repeat key and its word
+--- delimiters at the update, because the canonical readers resolve absence to
+--- the neutral state.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Effective state, not raw keys. The legacy category set opened every gate
@@ -15,7 +16,9 @@
 ---    entry, so each such entry becomes one section choice and, when its gate
 ---    was open, one category choice. The repeat key defaulted on there.
 --- 2. config.toml wins. A leaf the file already sets explicitly is never
----    overwritten; the import only fills leaves the file leaves absent.
+---    overwritten; the import only fills leaves the file leaves absent. The
+---    user's own delimiters come as one list with their states: a file that
+---    already defines its list keeps it, and the legacy custom states with it.
 --- 3. One conditional write, then cleanup. Every leaf is published in one batch
 ---    against the exact bytes read; the legacy keys are removed only after that
 ---    write commits, so a refused import is retried at the next start and a
@@ -25,6 +28,7 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
+local TerminatorSettings = require("modules.hotstrings.terminator_settings")
 local Writer = require("toml_codec.writer")
 local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
@@ -44,6 +48,16 @@ local LEGACY_REPEAT_DEFAULT = true
 
 -- Legacy dynamic family switches were keyed by engine section.
 local LEGACY_FAMILY_PREFIX = "hotstrings.dynamic."
+
+-- The legacy word-delimiter lists: every delimiter's state, and the user's own
+-- delimiters, as records of fields joined by these two control characters.
+local LEGACY_STATE_KEY = "hotstrings.terminator_state"
+local LEGACY_CUSTOM_KEY = "hotstrings.custom_terminators"
+local RECORD_SEP = "\30"
+local FIELD_SEP = "\31"
+
+-- The canonical list of the user's own delimiters, which their states follow.
+local CUSTOM_PATH = { "hotstrings", "terminators" }
 
 
 
@@ -110,6 +124,63 @@ local function category_choices(raw)
 	return choices
 end
 
+--- Splits one legacy delimiter list into the fields of each record.
+--- @param raw string Stored list.
+--- @return table records Array of field arrays.
+local function records(raw)
+	local out = {}
+	for record in raw:gmatch("[^" .. RECORD_SEP .. "]+") do
+		local fields = {}
+		for field in record:gmatch("[^" .. FIELD_SEP .. "]+") do fields[#fields + 1] = field end
+		out[#out + 1] = fields
+	end
+	return out
+end
+
+--- Translates the legacy word-delimiter lists into canonical leaves, sparse
+--- against the catalogue defaults as their owner writes them.
+--- @param storage table Storage adapter: has, get.
+--- @param keys table Legacy keys present, appended to.
+--- @param choices table Canonical `{ path, value, custom }` leaves, appended to.
+local function terminator_choices(storage, keys, choices)
+	local states, custom, present = {}, {}, false
+	if storage.has(LEGACY_CUSTOM_KEY) then
+		keys[#keys + 1], present = LEGACY_CUSTOM_KEY, true
+		local raw = storage.get(LEGACY_CUSTOM_KEY, "")
+		if type(raw) ~= "string" then
+			Logger.warn(LOG, "Legacy '%s' is not a list and is not imported.", LEGACY_CUSTOM_KEY)
+		else
+			for _, fields in ipairs(records(raw)) do
+				if #fields >= 4 then
+					custom[#custom + 1] = { key = fields[1], char = fields[2], label = fields[3], consume = fields[4] == "1" }
+				else
+					Logger.warn(LOG, "An incomplete legacy custom delimiter is not imported.")
+				end
+			end
+		end
+	end
+	if storage.has(LEGACY_STATE_KEY) then
+		keys[#keys + 1], present = LEGACY_STATE_KEY, true
+		local raw = storage.get(LEGACY_STATE_KEY, "")
+		if type(raw) ~= "string" then
+			Logger.warn(LOG, "Legacy '%s' is not a list and is not imported.", LEGACY_STATE_KEY)
+		else
+			for _, fields in ipairs(records(raw)) do
+				if #fields == 2 and (fields[2] == "0" or fields[2] == "1") then
+					states[fields[1]] = fields[2] == "1"
+				else
+					Logger.warn(LOG, "A malformed legacy word-delimiter state is not imported.")
+				end
+			end
+		end
+	end
+	if not present then return end
+	local leaves = TerminatorSettings.leaves(states, custom, function(path, detail)
+		Logger.warn(LOG, "Legacy word delimiter '%s' is not imported: %s.", table.concat(path, "."), detail)
+	end)
+	for _, leaf in ipairs(leaves) do choices[#choices + 1] = leaf end
+end
+
 --- Collects every legacy key present and the canonical leaves it implies.
 --- @param storage table Storage adapter: has, get.
 --- @param families table Dynamic rule families: `{ id, section }` rows.
@@ -153,6 +224,9 @@ local function plan(storage, families)
 			scalar(REPEAT_PATH, REPEAT_PATH)
 		end
 	end
+	-- After the repeat rule: builds that had already imported their choices
+	-- kept writing only the delimiters, which say nothing about the repeat key.
+	terminator_choices(storage, keys, choices)
 	return keys, choices
 end
 
@@ -182,8 +256,9 @@ function M.import(options)
 		local document = Codec.decode(content or "")
 		assert(type(document) == "table", "configuration is malformed")
 		local operations = {}
+		local custom_defined = lookup(document, CUSTOM_PATH) ~= nil
 		for _, choice in ipairs(choices) do
-			if lookup(document, choice.path) == nil then
+			if lookup(document, choice.path) == nil and not (choice.custom and custom_defined) then
 				operations[#operations + 1] = { path = choice.path, value = choice.value }
 			end
 		end
