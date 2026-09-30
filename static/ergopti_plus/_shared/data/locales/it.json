@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Mai",
 	"menu.about.frequency_menu": "Frequenza di controllo",
 	"menu.about.open_releases_page": "Versioni — GitHub",
+	"menu.about.source_run_reason": "Versione locale (dai sorgenti): installare e disinstallare richiedono un ErgoptiPlus installato",
 	"menu.about.title": "Versione / Aggiornamenti",
 	"menu.about.update_checking": "Verifica…",
 	"menu.about.update_downloading": "Downloading…",

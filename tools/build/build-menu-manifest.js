@@ -58,40 +58,61 @@ const HEADER = {
 		"unavailable (rows restricted by platforms only): 'hide' = not applicable where the row " +
 		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
 		'there, drawn disabled with its label and its translated reason_key. A restricted row ' +
-		'without the field is hidden, as before the field existed.'
+		'without the field is hidden, as before the field existed. disabled_reason_key (command ' +
+		'rows with disabled_when): why disabled_when greys the row where it is drawn, rendered ' +
+		"like a 'grey' row: « label — head of the reason », with nothing to run."
 };
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 
 /**
- * Refuses an `unavailable` declaration the renderers cannot honour.
+ * Refuses a greyed-row declaration the renderers cannot honour.
  *
- * The maintainer's two cases for a row a platform lacks: NOT APPLICABLE there
- * (`hide`: it makes no sense on that OS, so nothing is drawn and no reason is
- * owed) and NOT YET PORTED there (`grey`: the feature exists elsewhere, so the
- * row is drawn disabled with its translated reason, which needs a label and a
- * reason to draw).
+ * One rule for a row greyed with a reason: it is drawn disabled as « label —
+ * head of the reason » (the translated reason's text before its first colon),
+ * with nothing to run, so it needs an i18n label and a reason key. The two
+ * cases differ only in how the condition is evaluated:
+ *   - a platform lacks the row: NOT APPLICABLE there (`unavailable = "hide"`:
+ *     nothing is drawn and no reason is owed) or NOT YET PORTED there
+ *     (`unavailable = "grey"`: greyed with its `reason_key`);
+ *   - its `disabled_when` greys it where it is drawn: greyed with its
+ *     `disabled_reason_key`, read on `command` rows. `reason_key` cannot carry
+ *     that reason too, since a restricted row keeps it for the platforms it
+ *     leaves out (the health check reads it there).
  * @param {object} menu The parsed [menu] tables.
  */
-function validateUnavailable(menu) {
+function validateGreyedRows(menu) {
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
 		for (const row of rows) {
-			if (!row || typeof row !== 'object' || row.unavailable === undefined) continue;
+			if (!row || typeof row !== 'object') continue;
 			const where = `menu.${key} row "${row.id || row.path || row.i18n || row.type}"`;
-			if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
-				throw new Error(`${where}: unavailable must be "hide" or "grey"`);
-			const restricted =
-				Array.isArray(row.platforms) && PLATFORMS.some((p) => !row.platforms.includes(p));
-			if (!restricted)
-				throw new Error(`${where}: unavailable needs platforms that leave some platform out`);
-			if (row.unavailable === 'hide' && row.reason_key !== undefined)
-				throw new Error(`${where}: a hidden row carries no reason_key`);
-			if (row.unavailable === 'grey') {
-				if (typeof row.reason_key !== 'string' || row.reason_key === '')
-					throw new Error(`${where}: a greyed row needs its reason_key`);
-				if (typeof row.i18n !== 'string' || row.i18n === '')
-					throw new Error(`${where}: a greyed row needs an i18n label`);
+			const labelled = typeof row.i18n === 'string' && row.i18n !== '';
+			if (row.unavailable !== undefined) {
+				if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
+					throw new Error(`${where}: unavailable must be "hide" or "grey"`);
+				const restricted =
+					Array.isArray(row.platforms) && PLATFORMS.some((p) => !row.platforms.includes(p));
+				if (!restricted)
+					throw new Error(`${where}: unavailable needs platforms that leave some platform out`);
+				if (row.unavailable === 'hide' && row.reason_key !== undefined)
+					throw new Error(`${where}: a hidden row carries no reason_key`);
+				if (row.unavailable === 'grey') {
+					if (typeof row.reason_key !== 'string' || row.reason_key === '')
+						throw new Error(`${where}: a greyed row needs its reason_key`);
+					if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);
+				}
+			}
+			if (row.disabled_reason_key !== undefined) {
+				if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
+					throw new Error(`${where}: disabled_reason_key must name a locale key`);
+				if (row.type !== 'command')
+					throw new Error(`${where}: disabled_reason_key is read on command rows only`);
+				if (!Array.isArray(row.disabled_when) || row.disabled_when.length === 0)
+					throw new Error(
+						`${where}: disabled_reason_key needs the disabled_when that greys the row`
+					);
+				if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);
 			}
 		}
 	}
@@ -152,7 +173,7 @@ function build() {
 	}
 
 	projectChoices(parsed.menu, raw);
-	validateUnavailable(parsed.menu);
+	validateGreyedRows(parsed.menu);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');

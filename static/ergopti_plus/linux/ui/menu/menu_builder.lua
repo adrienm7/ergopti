@@ -62,6 +62,9 @@ local PERSONAL_CATEGORY = "personal"
 -- Single source of the driver version and of the build identity.
 local Version = require("infra.version")
 
+-- The one answer to "installed build or source run".
+local Installation = require("infra.installation")
+
 -- The shared wording of the About version row.
 local VersionLabel = require("updater.version_label")
 
@@ -3694,7 +3697,17 @@ local function _about_update_rows(ctx)
 	-- "download" row that does nothing is indistinguishable from a broken one.
 	if up.get_state() == "available" then
 		local rel = up.get_cached_release()
-		if rel then
+		if rel and Installation.is_source_run() then
+			-- A source run offers the latest release to look at, but has no
+			-- installation to replace: the row stays, greyed, and the renderer
+			-- names why as on every greyed row with a reason, with no action a
+			-- click could start.
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				disabled = true,
+				disabled_reason_key = "menu.about.source_run_reason",
+			}
+		elseif rel then
 			out[#out + 1] = {
 				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
 				action = function()
@@ -3797,6 +3810,15 @@ local function _build_about(ctx)
 			pcall(function() os.execute("xdg-open " .. shell_quote(url) .. " 2>/dev/null &") end)
 		end,
 	}
+
+	-- A local version run from source has nothing to uninstall: the row stays,
+	-- greyed, and says why (the manifest's disabled_reason_key).
+	local getters = {}
+	for key, getter in pairs(type(render_ctx.state_getters) == "table" and render_ctx.state_getters or {}) do
+		getters[key] = getter
+	end
+	getters["installed_build"] = function() return not Installation.is_source_run() end
+	render_ctx.state_getters = getters
 
 	local rows = ManifestMenu
 		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {

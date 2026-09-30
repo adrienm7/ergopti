@@ -1564,6 +1564,9 @@ _Updater_RebuildMenu(PublishAuthorizeFn := 0, WorkerFn := 0) {
 ; Detected by checking A_IsCompiled, which is 1 only for .exe builds.
 ; This state takes priority over any user-selected channel — update checking
 ; is meaningless and channel selection is hidden when running from source.
+; The one answer to "installed build or source run" for every product
+; decision: update, install a chosen release, uninstall, start at login.
+; A_IsCompiled itself stays only where it picks how to launch this process.
 Updater_IsLocalSource() {
 	return !A_IsCompiled
 }

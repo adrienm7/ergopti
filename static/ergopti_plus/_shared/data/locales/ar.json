@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "أبدًا",
 	"menu.about.frequency_menu": "تردّد التحقّق",
 	"menu.about.open_releases_page": "الإصدارات — GitHub",
+	"menu.about.source_run_reason": "إصدار محلي (من الشيفرة المصدرية): التثبيت وإلغاء التثبيت يتطلبان ErgoptiPlus مثبّتًا",
 	"menu.about.title": "الإصدار / التحديثات",
 	"menu.about.update_checking": "جارٍ التحقق…",
 	"menu.about.update_downloading": "Downloading…",

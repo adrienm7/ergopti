@@ -1683,7 +1683,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	AssetUrl := Asset.Url
-	if !A_IsCompiled {
+	if Updater_IsLocalSource() {
 		; Running from source — replacing the .ahk would be wrong, and the
 		; user is almost certainly developing on this very tree. Bail with a
 		; friendly note rather than silently doing nothing.

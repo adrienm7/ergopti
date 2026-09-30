@@ -17,13 +17,21 @@ local owner = nil
 function M.run(deps)
 	if owner then return false end
 	deps = deps or {}
+	local logger = deps.logger or require("infra.logger")
+	-- On a source run the About row is greyed and names why, so a click that
+	-- still arrives does nothing: logged, with no failure dialog for a removal
+	-- that was never possible.
+	local updater = deps.updater or require("modules.updater")
+	if updater.is_local_source() then
+		logger.info("ui.menu.uninstall", "Uninstall ignored: this is a local version run from source, with nothing to remove.")
+		return false
+	end
 	local lifecycle = deps.lifecycle or require("infra.termination_coordinator")
 	if lifecycle.is_pending() then return false end
 	local i18n = deps.i18n or require("infra.i18n")
 	local dialog = deps.dialog or require("infra.dialog_util")
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
 	local shell = deps.shell or require("adapters.shell_runner")
-	local logger = deps.logger or require("infra.logger")
 	local title = i18n.get("menu.global.uninstall")
 	local failure = i18n.get("dialog.uninstall.failed")
 	local transaction = { buffer = "", phase = "confirming" }

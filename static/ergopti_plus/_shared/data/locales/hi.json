@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "कभी नहीं",
 	"menu.about.frequency_menu": "जाँच आवृत्ति",
 	"menu.about.open_releases_page": "रिलीज़ — GitHub",
+	"menu.about.source_run_reason": "स्थानीय संस्करण (स्रोत कोड से): इंस्टॉल और अनइंस्टॉल के लिए इंस्टॉल किया हुआ ErgoptiPlus चाहिए",
 	"menu.about.title": "संस्करण / अपडेट",
 	"menu.about.update_checking": "जाँच हो रही है…",
 	"menu.about.update_downloading": "Downloading…",

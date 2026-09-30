@@ -997,6 +997,7 @@
 	"menu.about.frequency.never": "Never",
 	"menu.about.frequency_menu": "Check frequency",
 	"menu.about.open_releases_page": "Releases — GitHub",
+	"menu.about.source_run_reason": "Local version (from source): installing and uninstalling need an installed ErgoptiPlus",
 	"menu.about.title": "Version / Updates",
 	"menu.about.update_checking": "Checking…",
 	"menu.about.update_downloading": "Downloading…",

@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Aldrig",
 	"menu.about.frequency_menu": "Tjekkefrekvens",
 	"menu.about.open_releases_page": "Versioner — GitHub",
+	"menu.about.source_run_reason": "Lokal version (fra kildekoden): installation og afinstallation kræver et installeret ErgoptiPlus",
 	"menu.about.title": "Version / Opdateringer",
 	"menu.about.update_checking": "Kontrollerer…",
 	"menu.about.update_downloading": "Downloading…",

@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Asla",
 	"menu.about.frequency_menu": "Denetim sıklığı",
 	"menu.about.open_releases_page": "Sürümler — GitHub",
+	"menu.about.source_run_reason": "Yerel sürüm (kaynak koddan): yükleme ve kaldırma için yüklü bir ErgoptiPlus gerekir",
 	"menu.about.title": "Sürüm / Güncellemeler",
 	"menu.about.update_checking": "Kontrol ediliyor…",
 	"menu.about.update_downloading": "Downloading…",

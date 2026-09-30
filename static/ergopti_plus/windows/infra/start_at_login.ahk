@@ -45,7 +45,7 @@ StartupApprovalEnabled(Value) {
 
 ; Reads the effective state without changing the Startup folder or registry.
 StartAtLoginEnabled(*) {
-	if !A_IsCompiled
+	if Updater_IsLocalSource()
 		return false
 	try {
 		if !StartupShortcutOwned(A_Startup . "\ErgoptiPlus.lnk", A_ScriptFullPath)
@@ -80,7 +80,7 @@ SetStartupShortcut(Enabled, Link, Target) {
 ; Menu mutation only: changing future login startup never exits the live driver.
 ToggleStartAtLogin(*) {
 	try {
-		if !A_IsCompiled
+		if Updater_IsLocalSource()
 			throw Error("Automatic startup requires the installed executable")
 		Enabled := StartAtLoginEnabled()
 		if !Enabled {

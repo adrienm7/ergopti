@@ -78,10 +78,13 @@ UninstallCommit(Reason) {
 
 ; The source checkout is never an uninstall target. Personal data and cached
 ; assets are deliberately outside this operation's single-file authority.
+; On a source run the About row is greyed and names why, so a click that still
+; arrives does nothing: it is logged, with no failure dialog for a removal that
+; was never possible.
 ShowUninstallErgopti(*) {
 	global _VendorDir
-	if !A_IsCompiled {
-		MsgBox(t("dialog.uninstall.failed"), t("menu.global.uninstall"), "Icon!")
+	if Updater_IsLocalSource() {
+		LoggerInfo("Uninstall", "Uninstall ignored: this is a local version run from source, with nothing to remove.")
 		return false
 	}
 	State := UninstallState()

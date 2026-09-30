@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "しない",
 	"menu.about.frequency_menu": "確認頻度",
 	"menu.about.open_releases_page": "リリース — GitHub",
+	"menu.about.source_run_reason": "ローカル版（ソースから実行）：インストールとアンインストールにはインストール済みの ErgoptiPlus が必要です",
 	"menu.about.title": "バージョン / アップデート",
 	"menu.about.update_checking": "確認中…",
 	"menu.about.update_downloading": "Downloading…",

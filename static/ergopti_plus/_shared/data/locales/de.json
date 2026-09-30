@@ -1002,6 +1002,7 @@
 	"menu.about.frequency.never": "Niemals",
 	"menu.about.frequency_menu": "Prüfintervall",
 	"menu.about.open_releases_page": "Versionen — GitHub",
+	"menu.about.source_run_reason": "Lokale Version (aus dem Quellcode): Installieren und Deinstallieren erfordern ein installiertes ErgoptiPlus",
 	"menu.about.title": "Version / Aktualisierungen",
 	"menu.about.update_checking": "Prüfen…",
 	"menu.about.update_downloading": "Downloading…",

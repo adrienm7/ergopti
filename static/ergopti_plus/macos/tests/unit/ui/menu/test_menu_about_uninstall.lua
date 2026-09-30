@@ -11,6 +11,12 @@
 --- while the script is paused. Configuration ends on login startup, with no
 --- dangling separator.
 ---
+--- On a local version run from source there is nothing to remove: the row
+--- stays in place, greyed like every row greyed with a reason, « Désinstaller
+--- Ergopti… — Version locale (depuis les sources) » (the head of the
+--- manifest's disabled_reason_key), with nothing to run, and is live again on
+--- the installed app.
+---
 --- Driven through Builder.generate with the real About module, so the
 --- assertion is on what the menu offers and on the action it is handed.
 --- ==============================================================================
@@ -30,9 +36,16 @@ end
 --- @param paused boolean ctx.paused for this build.
 --- @param fired table Action recorder.
 --- @param title_key string Locale key of the submenu's row.
+--- @param source_run boolean|nil What Updater.is_local_source answers (false by default).
 --- @return table|nil rows
-local function submenu(paused, fired, title_key)
+local function submenu(paused, fired, title_key, source_run)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
+	-- The About module reads the one installed-build owner; it is reloaded so it
+	-- binds the answer this case sets.
+	local Updater = require("modules.updater")
+	local real_is_local_source = Updater.is_local_source
+	Updater.is_local_source = function() return source_run == true end
+	package.loaded["ui.menu.menu_about"] = nil
 	local About = require("ui.menu.menu_about")
 	local i18n = require("infra.i18n")
 	i18n.get = function(key) return key end
@@ -40,6 +53,7 @@ local function submenu(paused, fired, title_key)
 	local owner = { get = function() return "dev" end, set = function() return true end, subscribe = function() end }
 	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused, channel_owner = owner },
 		{ about = About }, recording_actions(fired))
+	Updater.is_local_source = real_is_local_source
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(menu))
 	for _, item in ipairs(menu) do
 		if item.title == title_key then return item.menu end
@@ -66,6 +80,24 @@ helpers.describe("about submenu (macOS): Uninstall closes it", function()
 				helpers.assert_eq(fired, { "uninstall" }, "the row runs the session's uninstall action")
 			end)
 	end
+
+	helpers.it("is greyed on a source run, naming why, and live again on the installed app", function()
+		local fired = {}
+		local rows = submenu(false, fired, "menu.about.title", true)
+		helpers.assert_true(type(rows) == "table" and #rows >= 3, "the tray must carry the About submenu")
+		local last = rows[#rows]
+		-- Keys stand for their text here, and a key has no colon: the head of the
+		-- reason is the whole key.
+		helpers.assert_eq(last.title, "menu.global.uninstall — menu.about.source_run_reason",
+			"the row stays in place and names why, as every greyed row with a reason")
+		helpers.assert_eq(last.disabled, true, "a source run greys Uninstall")
+		helpers.assert_true(last.fn == nil, "with nothing to run")
+		helpers.assert_eq(#fired, 0, "building the menu runs nothing")
+		helpers.assert_eq(rows[#rows - 1].title, "-", "at the same place, after its separator")
+		local installed = submenu(false, {}, "menu.about.title", false)
+		helpers.assert_eq(installed[#installed].title, "menu.global.uninstall")
+		helpers.assert_true(installed[#installed].disabled ~= true, "the installed app keeps it live")
+	end)
 
 	helpers.it("is drawn once in the whole tray, never in Configuration", function()
 		local rows = submenu(false, {}, "menu.configuration.title")

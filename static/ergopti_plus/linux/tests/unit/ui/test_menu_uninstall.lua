@@ -33,9 +33,21 @@ local function fixture()
 end
 
 helpers.describe("Linux menu uninstall", function()
-	helpers.it("refuses a source checkout before any removal command (menu-uninstall)", function()
+	-- The About row is greyed on a source run; a click that still reaches the
+	-- action does nothing: no command, and no « could not be uninstalled ».
+	helpers.it("does nothing for a local version run from source (menu-uninstall)", function()
 		local opts, log = fixture()
 		opts.root = "/checkout/static/ergopti_plus/linux"
+		opts.version_source = "local"
+		helpers.assert_eq(Uninstall.run(opts), false)
+		helpers.assert_eq(#log.commands, 0)
+		helpers.assert_eq(log.quit, 0)
+		helpers.assert_eq(log.failures, 0, "no failure dialog for a removal that was never possible")
+	end)
+	helpers.it("refuses a stamped build outside every install layout (menu-uninstall)", function()
+		local opts, log = fixture()
+		opts.root = "/tmp/ergopti-release/linux"
+		opts.version_source = "build"
 		helpers.assert_eq(Uninstall.run(opts), false)
 		helpers.assert_eq(#log.commands, 0)
 		helpers.assert_eq(log.quit, 0)
