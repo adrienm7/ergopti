@@ -16,7 +16,10 @@ helpers.describe("shared Karabiner package manifest", function()
 		local received
 		with_manifest_decoder(function(content) received = content; return decoded end, function()
 			local manifest = dofile("vendor/karabiner-elements/manifest.lua")
-			helpers.assert_true(rawequal(manifest, decoded))
+			-- The codec returns a tree copy of what the decoder produced
+			-- (json-shared-tables), so the pin is compared by value.
+			helpers.assert_eq(manifest.version, decoded.version)
+			helpers.assert_eq(manifest.sha256, decoded.sha256)
 			helpers.assert_true(type(received) == "string" and received:find('"source_url"', 1, true) ~= nil)
 		end)
 	end)

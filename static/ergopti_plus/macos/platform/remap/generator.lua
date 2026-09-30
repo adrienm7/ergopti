@@ -38,6 +38,7 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
+local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
@@ -179,9 +180,11 @@ local function load_json_file(path)
 		Logger.error(LOG, "Cannot open file '%s'.", path)
 		return nil
 	end
-	local ok, data = pcall(hs.json.decode, raw)
-	if not ok or type(data) ~= "table" then
-		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(data))
+	-- The rules built from this data are edited in place (generation gate,
+	-- timings): the codec's tree gives each manipulator its own tables.
+	local data, decode_err = JsonCodec.decode(raw)
+	if type(data) ~= "table" then
+		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(decode_err or data))
 		return nil
 	end
 	return data
@@ -313,7 +316,11 @@ end
 
 --- Adds one exact atomic mode and tombstone condition to every manipulator.
 --- Validation completes before mutation so malformed generated data cannot
---- leave a partially gated configuration in the caller's table.
+--- leave a partially gated configuration in the caller's table. A rule,
+--- manipulator or conditions list reached twice would take the gate twice
+--- (hs.json.decode shares equal JSON values, see adapters/json_codec.lua):
+--- it is refused here, where the graph is built, instead of deploying a
+--- manipulator with duplicated gates.
 --- @param rules table Rules generated for one pause mode.
 --- @param token string Canonical generation token.
 --- @param mode string Managed mode (`normal` or `pause`).
@@ -328,10 +335,15 @@ local function gate_managed_rules(rules, token, mode)
 	end
 	if not is_dense_array(rules) then return nil, "managed rules must be a dense array" end
 
+	local gated = {}
 	for rule_index, rule in ipairs(rules) do
 		if type(rule) ~= "table" then
 			return nil, string.format("managed rule %d must be a table", rule_index)
 		end
+		if gated[rule] then
+			return nil, string.format("managed rule %d is the same table as an earlier rule", rule_index)
+		end
+		gated[rule] = true
 		if type(rule.description) ~= "string" or rule.description == "" then
 			return nil, string.format("managed rule %d must have a non-empty description", rule_index)
 		end
@@ -353,6 +365,15 @@ local function gate_managed_rules(rules, token, mode)
 					manipulator_index
 				)
 			end
+			if gated[manipulator] or (manipulator.conditions ~= nil and gated[manipulator.conditions]) then
+				return nil, string.format(
+					"managed rule %d manipulator %d shares a table with an earlier manipulator",
+					rule_index,
+					manipulator_index
+				)
+			end
+			gated[manipulator] = true
+			if manipulator.conditions ~= nil then gated[manipulator.conditions] = true end
 			for condition_index, condition in ipairs(manipulator.conditions or {}) do
 				if type(condition) ~= "table" then
 					return nil, string.format(
@@ -2791,8 +2812,10 @@ function M.merge_into_existing_config(
 		return nil, err
 	end
 
-	local decode_ok, existing = pcall(hs.json.decode, raw)
-	if not decode_ok or type(existing) ~= "table" then
+	-- A tree: the merge edits the selected profile in place, and equal lists
+	-- elsewhere in the file must not be edited with it.
+	local existing = JsonCodec.decode(raw)
+	if type(existing) ~= "table" then
 		local err = "existing karabiner.json is not valid JSON"
 		Logger.error(LOG, "Merge aborted: %s.", err)
 		return nil, err
