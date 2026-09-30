@@ -373,6 +373,47 @@ helpers.with_stub_scope(MODULES, function()
 			if not ok then error(err, 0) end
 		end)
 
+		helpers.it("unused keys: an outdated action parameter is never replayed and is offered (config-outdated-parameters)",
+			function()
+				-- The whole [gestures.action_parameters] table was marked as read,
+				-- and the boot replay dropped such an entry without a word.
+				local source = table.concat({
+					"[gestures.action_parameters]",
+					"tap_3__retired_action = \"x\"",
+					"tap_4__wrap_selection = \"retired pair\"",
+					"tap_5__open_url = \"https://example.com\"",
+					"",
+				}, "\n")
+				local saved = package.loaded["modules.gestures.actions"]
+				package.loaded["modules.gestures.actions"] = {
+					is_assignable = function() return true end,
+					split_action_parameter_key = function(key)
+						for _, action in ipairs({ "wrap_selection", "open_url" }) do
+							local suffix = "__" .. action
+							if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
+						end
+						return nil, nil
+					end,
+					validate_action_parameter = function(action, value)
+						if action == "wrap_selection" then return value == "()" end
+						return value:match("^https?://") ~= nil
+					end,
+				}
+				local ok, err = pcall(function()
+					local flat = Preferences.flatten_document(TomlCodec.decode(source))
+					helpers.assert_eq(flat.gesture_action_parameters, { tap_5__open_url = "https://example.com" })
+					local offered = {}
+					for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+						offered[#offered + 1] = key.section .. "." .. key.key
+					end
+					table.sort(offered)
+					helpers.assert_eq(offered, { "gestures.action_parameters.tap_3__retired_action",
+						"gestures.action_parameters.tap_4__wrap_selection" })
+				end)
+				package.loaded["modules.gestures.actions"] = saved
+				if not ok then error(err, 0) end
+			end)
+
 		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
 			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
 			-- must still win, or the warned entry could never be removed.
