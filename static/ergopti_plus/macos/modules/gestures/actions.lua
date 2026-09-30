@@ -405,12 +405,32 @@ local function invoke_ui(mod, method, ...)
 	end
 end
 
---- Switch to the previous application in the MRU list.
---- ke_lifecycle never exposed switch_to_previous_app, so the lazy-require branch
---- that used to sit here was dead and the keystroke below was the only path ever
---- taken. Removed rather than left as a shim, per the no-unused-fallback rule.
-local function switch_to_previous_application()
-	postKeyStroke({"cmd"}, "tab")
+--- Activates the most recently used other application directly.
+---
+--- This posted Cmd+Tab. The Dock commits its switcher only when Command itself
+--- is released, and a posted Tab keystroke carrying the Command flag releases
+--- nothing: one tap did nothing, a second one left the switcher open on screen.
+--- modules/gestures/app_switch.lua focuses the application's window instead.
+--- It runs off the dispatch callback, because listing the windows asks every
+--- application over the accessibility API, which an input callback must not
+--- wait on. Required at the call so a test can put its own desk behind it.
+--- @param scope string app_switch.SCOPE_ALL_SCREENS or SCOPE_THIS_SCREEN.
+--- @return boolean scheduled
+local function switch_to_previous_application(scope)
+	local scheduled = AuxOwner.after(0, "previous application", function()
+		return require("modules.gestures.app_switch").previous_app(scope)
+	end, current_action_parent())
+	return scheduled == true
+end
+
+--- Activates the least recently used application, what a Cmd+Shift+Tab tap
+--- selects. Posted, that keystroke switched nothing either.
+--- @return boolean scheduled
+local function switch_to_least_recent_application()
+	local scheduled = AuxOwner.after(0, "least recent application", function()
+		return require("modules.gestures.app_switch").least_recent_app()
+	end, current_action_parent())
+	return scheduled == true
 end
 
 --- Switch to the previous window of the frontmost application.
@@ -547,10 +567,6 @@ M.toggle_left_click       = function()
 	return Click.toggle_left_click(current_action_parent())
 end
 M.is_right_click_held     = Click.is_right_click_held
-
-local function show_application_switcher_overlay()
-    postKeyStroke({"cmd"}, "tab")
-end
 
 --- Navigates between windows of the current application.
 local function winNav(goNext)
@@ -799,8 +815,12 @@ sg("right_click_toggle",   M.toggle_right_click)
 sg("lookup", function()
 	return M.trigger_lookup(current_action_parent())
 end)
-sg("app_switcher",      show_application_switcher_overlay)
-sg("app_previous",      switch_to_previous_application)
+-- app_switcher posted the same Cmd+Tab as app_previous, with the same dead
+-- single tap; both switch directly until the duplicate leaves the catalogue.
+sg("app_switcher",      function() return switch_to_previous_application("all_screens") end)
+sg("app_previous",      function() return switch_to_previous_application("all_screens") end)
+sg("app_previous_screen", function() return switch_to_previous_application("this_screen") end)
+sg("cmd_shift_tab",     switch_to_least_recent_application)
 sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys

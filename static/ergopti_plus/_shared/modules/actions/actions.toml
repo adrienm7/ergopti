@@ -228,7 +228,13 @@ emit_ahk_key = "Tab"
 emit_ahk_mods = ["alt"]
 emit_linux = "alt+Tab"
 
+# The two previous-application scopes: every screen, and only the screen under
+# the cursor. macOS activates the application directly
+# (macos/modules/gestures/app_switch.lua): a posted Cmd+Tab never switched.
 [sg_actions.app_previous]
+platform = "hs"
+
+[sg_actions.app_previous_screen]
 platform = "hs"
 
 [sg_actions.app_window_previous]
@@ -1298,10 +1304,11 @@ platform = "hs"
 emit_hs_key = "forwarddelete"
 emit_hs_mods = ["cmd"]
 
+# What a Cmd+Shift+Tab tap selects: the least recently used application. A
+# posted Cmd+Shift+Tab switched nothing, like a posted Cmd+Tab, so macOS
+# activates it from Lua (macos/modules/gestures/app_switch.lua).
 [sg_actions.cmd_shift_tab]
 platform = "hs"
-emit_hs_key = "tab"
-emit_hs_mods = ["cmd", "shift"]
 
 # Ces trois-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie F17,
 # Shift+F17 et Alt+F17), donc le geste passe par le même chemin que la touche
@@ -1493,6 +1500,7 @@ items = [
     "lookup",
     "app_switcher",
     "app_previous",
+    "app_previous_screen",
     "app_window_previous",
     "alt_tab_apps",
     "alt_tab_windows",

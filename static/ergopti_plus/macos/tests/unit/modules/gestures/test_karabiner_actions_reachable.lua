@@ -154,9 +154,10 @@ helpers.describe("Karabiner catalogue actions: keystroke family", function()
 	helpers.it("cmd_delete_fwd deletes to the line end", function()
 		assert_keystroke("cmd_delete_fwd", "cmd", "forwarddelete")
 	end)
-	helpers.it("cmd_shift_tab walks the switcher backwards", function()
-		assert_keystroke("cmd_shift_tab", "cmd,shift", "tab")
-	end)
+	-- cmd_shift_tab is not in this family any more: a posted Cmd+Shift+Tab
+	-- switched nothing (the switcher follows the real Command release), so it
+	-- activates the least recent application from Lua. test_app_switch_direct.lua
+	-- drives it (app-switch-direct).
 
 	helpers.it("the three F17 actions reach the driver's own hotkeys", function()
 		-- These do NOT emit their behaviour directly: they press F17, which

@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab（モニター）",
 	"sg_actions.app_expose": "◱ アプリExposé",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — 前のアプリ",
+	"sg_actions.app_previous_screen": "⇥ 前のアプリ — この画面",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — 前のアプリ",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — 前のウィンドウ",
 	"sg_actions.arrow_down": "↓ 下矢印",

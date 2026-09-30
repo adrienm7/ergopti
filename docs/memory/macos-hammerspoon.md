@@ -581,6 +581,17 @@ key-down. Action: the modifier-type tap-hold keys and CapsLock accept
 Space, Return and Backspace accept only `caps_lock`, so a held modifier leaves
 them native (Cmd+Tab, Shift+Tab) as on Windows and Linux.
 
+### project-hs-synthetic-cmd-tab-never-switches
+
+A posted Cmd+Tab (`hs.eventtap.keyStroke`, a Tab event carrying only the
+Command flag) does not switch applications: on the maintainer's Mac (2026-09)
+one gesture did nothing and a quick second one left the switcher open. The
+switcher follows the Command key's own press and release, which the posted
+keystroke never sends; Karabiner's `cmd_tab` works because its virtual keyboard
+presses and releases Command. Action: switch applications from Lua
+(`modules/gestures/app_switch.lua`, window reads in
+`adapters/window_manager.lua`), never by posting Cmd+Tab or Cmd+Shift+Tab.
+
 ### project-hs-f17-actions-are-told-apart-by-modifiers
 
 `alt_tab_windows`, `alt_tab_apps`, `alt_tab_monitor` and `cycle_windows_in_app`

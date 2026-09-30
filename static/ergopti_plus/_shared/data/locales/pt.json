@@ -1904,6 +1904,7 @@
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ Exposé do App",
 	"sg_actions.app_previous": "⇥ ← Alt+Tab — App anterior",
+	"sg_actions.app_previous_screen": "⇥ App anterior — esta tela",
 	"sg_actions.app_switcher": "⇥ Alt+Tab — App anterior",
 	"sg_actions.app_window_previous": "⇥ ◱ ← Alt+Tab — Janela anterior",
 	"sg_actions.arrow_down": "↓ Seta para baixo",
