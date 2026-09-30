@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 右边的第二个键",
 	"menu.shortcuts.tap_keys.unassigned": "正常行为",
 	"menu.shortcuts.script_shortcuts": "脚本管理快捷键",
+	"menu.shortcuts.script_shortcuts_enable": "启用脚本管理快捷键",
 	"menu.shortcuts.submenu_cmd": "Cmd 快捷键",
 	"menu.shortcuts.submenu_ctrl": "Ctrl 快捷键",
 	"menu.shortcuts.title": "🎯 快捷键",

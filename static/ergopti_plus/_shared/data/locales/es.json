@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Segunda tecla a la derecha del 0",
 	"menu.shortcuts.tap_keys.unassigned": "comportamiento normal",
 	"menu.shortcuts.script_shortcuts": "Atajos de gestión del script",
+	"menu.shortcuts.script_shortcuts_enable": "Activar los atajos de gestión del script",
 	"menu.shortcuts.submenu_cmd": "Atajos Cmd",
 	"menu.shortcuts.submenu_ctrl": "Atajos Ctrl",
 	"menu.shortcuts.title": "🎯 Atajos",

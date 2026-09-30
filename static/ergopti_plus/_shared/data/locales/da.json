@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Anden tast til højre for 0",
 	"menu.shortcuts.tap_keys.unassigned": "normal funktion",
 	"menu.shortcuts.script_shortcuts": "Script-administrationsgenveje",
+	"menu.shortcuts.script_shortcuts_enable": "Aktivér script-administrationsgenveje",
 	"menu.shortcuts.submenu_cmd": "Cmd-genveje",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-genveje",
 	"menu.shortcuts.title": "🎯 Genveje",

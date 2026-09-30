@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Druhá klávesa vpravo od 0",
 	"menu.shortcuts.tap_keys.unassigned": "běžné chování",
 	"menu.shortcuts.script_shortcuts": "Zkratky správy skriptu",
+	"menu.shortcuts.script_shortcuts_enable": "Povolit zkratky správy skriptu",
 	"menu.shortcuts.submenu_cmd": "Zkratky Cmd",
 	"menu.shortcuts.submenu_ctrl": "Zkratky Ctrl",
 	"menu.shortcuts.title": "🎯 Zkratky",

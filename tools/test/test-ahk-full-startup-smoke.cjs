@@ -17,6 +17,11 @@
  *    config.toml files older releases wrote (the shared migration corpus).
  * 3. CI runs it in the Windows unit job with ERGOPTI_AHK_EXE set, which turns
  *    a missing interpreter into a failure instead of a skip.
+ * 4. script-chords-switch-2026-09-30: after ready, every script chord of
+ *    ScriptAltGrChordPlan exists under its criterion, and its slot runs an
+ *    action in every configuration that does not switch it off: the four
+ *    AltGr chords start on, a stored "none" keeps one off and the submenu's
+ *    switch off leaves them all to the system.
  * ==============================================================================
  */
 
@@ -50,6 +55,24 @@ for (const name of fs.readdirSync(CORPUS).sort()) {
 		SEEDED_CONFIGS[`older-release-${name}`] = path.join(CORPUS, name, 'input.toml');
 	}
 }
+// config.toml files that change the script chords, and the slots each leaves
+// running (every other fixture runs all four: they start with their preset).
+const SCRIPT_CHORD_SLOTS = [
+	'script_altgr_enter',
+	'script_altgr_backspace',
+	'script_altgr_delete',
+	'script_altgr_escape'
+];
+const CHORD_CONFIGS = {
+	'script-chords-off': {
+		toml: '[shortcuts.script_control]\nchords_enabled = false\n',
+		running: []
+	},
+	'script-chord-none': {
+		toml: '[shortcuts.script_control]\nscript_altgr_enter = "none"\n',
+		running: SCRIPT_CHORD_SLOTS.filter((slot) => slot !== 'script_altgr_enter')
+	}
+};
 if (Object.keys(SEEDED_CONFIGS).length < 4) {
 	throw new Error(
 		'full AHK startup smoke: the migration corpus holds fewer than three Windows releases'
@@ -102,6 +125,36 @@ function failOnLoggedErrors(label, configRoot) {
 	);
 }
 
+/**
+ * Checks the script-chord receipt a ready boot wrote: every hotkey of the plan
+ * exists under its criterion, and exactly the expected slots run an action.
+ * @param {string} configRoot
+ * @param {string[]|null} running Slots expected to run, or null to skip that part.
+ * @returns {string|null} The problem, or null when the receipt holds.
+ */
+function scriptChordReceiptProblem(configRoot, running) {
+	const receipt = path.join(configRoot, 'script-chords.txt');
+	if (!fs.existsSync(receipt)) return 'the boot wrote no script-chord receipt';
+	const rows = fs
+		.readFileSync(receipt, 'utf8')
+		.replace(/^\uFEFF/, '')
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.map((line) => line.split('|'));
+	if (rows.length !== 3 * SCRIPT_CHORD_SLOTS.length)
+		return `expected ${3 * SCRIPT_CHORD_SLOTS.length} script chord hotkeys, the plan registered ${rows.length}`;
+	const missing = rows.filter((row) => row[2] !== '1');
+	if (missing.length > 0)
+		return `script chords not registered: ${missing.map((r) => r.join('|')).join(', ')}`;
+	if (running === null) return null;
+	for (const [hotkey, slot, , runs] of rows) {
+		const expected = running.includes(slot) ? '1' : '0';
+		if (runs !== expected)
+			return `${hotkey} (${slot}) runs=${runs}, expected ${expected}: the chord ${expected === '1' ? 'must run its preset' : 'must stay with the system'}`;
+	}
+	return null;
+}
+
 function logTail(configRoot) {
 	// Under the smoke, boot puts the default logs folder at
 	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
@@ -143,7 +196,19 @@ function main() {
 		// from replacing a maintainer's live driver.
 		fs.writeFileSync(
 			wrapper,
-			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _LayoutExtensionSmokeReceipt\n#Include ErgoptiPlus.ahk\n' +
+			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n#Include ErgoptiPlus.ahk\n' +
+				'_StartupSmokeReceipts(*) {\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
+				'_ScriptChordSmokeReceipt() {\n' +
+				'\tglobal _ScriptAltGrChordRows\n' +
+				'\tLines := ""\n' +
+				'\tfor Row in _ScriptAltGrChordRows {\n' +
+				'\t\tHotIf(Row["criterion"])\n' +
+				'\t\ttry {\n\t\t\tHotkey(Row["hotkey"], "On")\n\t\t\tRegistered := 1\n' +
+				'\t\t} catch as Missing {\n\t\t\tRegistered := "0 (" . Missing.Message . ")"\n\t\t}\n' +
+				'\t\tHotIf()\n' +
+				'\t\tLines .= Row["hotkey"] . "|" . Row["slot"] . "|" . Registered . "|" . (ScriptShortcutSlotRunsAction(Row["slot"], false) ? 1 : 0) . "`n"\n' +
+				'\t}\n' +
+				'\tFileAppend(Lines, EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\script-chords.txt", "UTF-8")\n}\n' +
 				'_LayoutExtensionSmokeReceipt(*) {\n' +
 				'\tglobal Features, HSE_RegistryByGroup\n' +
 				'\tif !IsSet(Features) || !IsSet(HSE_RegistryByGroup)\n\t\treturn\n' +
@@ -162,6 +227,7 @@ function main() {
 			'extension-neutral',
 			'extension-enabled',
 			'extension-master-off',
+			...Object.keys(CHORD_CONFIGS),
 			...Object.keys(SEEDED_CONFIGS)
 		]) {
 			const configRoot = path.join(scratch, fixture);
@@ -170,6 +236,11 @@ function main() {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
 				fs.copyFileSync(SEEDED_CONFIGS[fixture], path.join(config, 'config.toml'));
+			}
+			if (CHORD_CONFIGS[fixture]) {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.writeFileSync(path.join(config, 'config.toml'), CHORD_CONFIGS[fixture].toml);
 			}
 			const extensionFixture = fixture.startsWith('extension-');
 			const selected = fixture !== 'extension-neutral';
@@ -230,6 +301,15 @@ function main() {
 						fixture + ': desired/group registration expected ' + expected + ', got ' + actual
 					);
 			}
+			const chords = scriptChordReceiptProblem(
+				configRoot,
+				CHORD_CONFIGS[fixture]
+					? CHORD_CONFIGS[fixture].running
+					: fixture.startsWith('older-release-')
+						? null
+						: SCRIPT_CHORD_SLOTS
+			);
+			if (chords) return fail(`${fixture}: ${chords}`);
 			if (markerBearing && fs.existsSync(marker)) {
 				return fail(`${fixture}: startup reached ready without consuming the suspend marker.`);
 			}
@@ -256,7 +336,8 @@ function main() {
 		}
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
-				'neutral-defaults and older-release boots reached ready with no error logged.\x1b[0m'
+				'script-chord, neutral-defaults and older-release boots reached ready with no error logged ' +
+				'and every script chord registered.\x1b[0m'
 		);
 		return 0;
 	} finally {

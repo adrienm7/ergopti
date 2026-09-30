@@ -409,6 +409,7 @@ professional_environment = false
 programmable_keyboard = false
 
 [shortcuts.script_control]
+chords_enabled = true
 script_altgr_backspace = "script_reload"
 script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"

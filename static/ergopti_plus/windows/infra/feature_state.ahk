@@ -109,6 +109,9 @@ global SCRIPT_SHORTCUT_SCAN_CODES := Map(
 		"script_altgr_delete", "SC153",
 		"script_altgr_escape", "SC001",
 )
+; The switch at the head of « Raccourcis de gestion du script »: off leaves
+; every chord to the system and keeps the slots' actions.
+global ScriptShortcutChordsOn := _FeatureStateRequireManifestDefault("shortcuts.script_control.chords_enabled")
 global ScriptShortcutAssignments := Map()
 for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 		ScriptShortcutAssignments[_FeatureStateSlot] := SCRIPT_SHORTCUT_DEFAULTS[_FeatureStateSlot]

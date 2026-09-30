@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 の右の 2 つ目のキー",
 	"menu.shortcuts.tap_keys.unassigned": "通常の動作",
 	"menu.shortcuts.script_shortcuts": "スクリプト管理ショートカット",
+	"menu.shortcuts.script_shortcuts_enable": "スクリプト管理ショートカットを有効にする",
 	"menu.shortcuts.submenu_cmd": "Cmdショートカット",
 	"menu.shortcuts.submenu_ctrl": "Ctrlショートカット",
 	"menu.shortcuts.title": "🎯 ショートカット",

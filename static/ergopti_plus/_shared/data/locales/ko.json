@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 오른쪽 두 번째 키",
 	"menu.shortcuts.tap_keys.unassigned": "기본 동작",
 	"menu.shortcuts.script_shortcuts": "스크립트 관리 단축키",
+	"menu.shortcuts.script_shortcuts_enable": "스크립트 관리 단축키 활성화",
 	"menu.shortcuts.submenu_cmd": "Cmd 단축키",
 	"menu.shortcuts.submenu_ctrl": "Ctrl 단축키",
 	"menu.shortcuts.title": "🎯 단축키",

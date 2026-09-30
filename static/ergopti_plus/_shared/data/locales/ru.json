@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Вторая клавиша справа от 0",
 	"menu.shortcuts.tap_keys.unassigned": "обычное поведение",
 	"menu.shortcuts.script_shortcuts": "Сочетания для управления скриптом",
+	"menu.shortcuts.script_shortcuts_enable": "Включить сочетания для управления скриптом",
 	"menu.shortcuts.submenu_cmd": "Сочетания Cmd",
 	"menu.shortcuts.submenu_ctrl": "Сочетания Ctrl",
 	"menu.shortcuts.title": "🎯 Сочетания клавиш",

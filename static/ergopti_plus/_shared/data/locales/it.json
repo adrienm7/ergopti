@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "Secondo tasto a destra dello 0",
 	"menu.shortcuts.tap_keys.unassigned": "comportamento normale",
 	"menu.shortcuts.script_shortcuts": "Scorciatoie gestione script",
+	"menu.shortcuts.script_shortcuts_enable": "Abilita le scorciatoie di gestione dello script",
 	"menu.shortcuts.submenu_cmd": "Scorciatoie Cmd",
 	"menu.shortcuts.submenu_ctrl": "Scorciatoie Ctrl",
 	"menu.shortcuts.title": "🎯 Scorciatoie",

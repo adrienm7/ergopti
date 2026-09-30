@@ -1571,6 +1571,7 @@
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 के दाईं ओर की दूसरी कुंजी",
 	"menu.shortcuts.tap_keys.unassigned": "सामान्य व्यवहार",
 	"menu.shortcuts.script_shortcuts": "स्क्रिप्ट प्रबंधन शॉर्टकट",
+	"menu.shortcuts.script_shortcuts_enable": "स्क्रिप्ट प्रबंधन शॉर्टकट सक्षम करें",
 	"menu.shortcuts.submenu_cmd": "Cmd शॉर्टकट",
 	"menu.shortcuts.submenu_ctrl": "Ctrl शॉर्टकट",
 	"menu.shortcuts.title": "🎯 शॉर्टकट",
