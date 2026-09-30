@@ -140,6 +140,72 @@ helpers.describe("api_entries: a private, durable store", function()
 		os.execute("rm -rf '" .. DIR .. "'")
 	end)
 
+	--- Writes api_keys.json as another build left it and captures the ERRORs.
+	--- @param document table Decoded file.
+	--- @param body function body(entries, errors, bytes)
+	local function with_stored(document, body)
+		fresh()
+		local Json = require("json")
+		os.execute("mkdir -p '" .. DIR .. "'")
+		local bytes = Json.encode(document)
+		local fh = assert(io.open(PATH, "w"))
+		fh:write(bytes)
+		fh:close()
+		local Logger = require("logger.shim")
+		local real_error, errors = Logger.error, {}
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(body, fresh(true), errors, bytes)
+		Logger.error = real_error
+		os.execute("rm -rf '" .. DIR .. "'")
+		if not ok then error(err, 0) end
+	end
+
+	--- The file's current bytes.
+	--- @return string
+	local function stored_bytes()
+		local fh = assert(io.open(PATH, "rb"))
+		local text = fh:read("*a")
+		fh:close()
+		return text
+	end
+
+	for label, document in pairs({
+		["entries keyed by id"] = { version = 1, active_id = "a",
+			entries = { a = { id = "a", provider = "cerebras", label = "A", token = "csk-keyed" } } },
+		["another version"] = { version = 2, active_id = "a",
+			entries = { { id = "a", provider = "cerebras", label = "A", token = "csk-v2", scopes = { "chat" } } } },
+	}) do
+		helpers.it("never rewrites a file it cannot write back whole: " .. label .. " (config-outdated-api-keys-write)",
+			function()
+				-- The next add, selection or removal wrote `entries: []` over a
+				-- keyed list, or a v1 file over a v2 one: every key lost.
+				with_stored(document, function(entries, errors, bytes)
+					helpers.assert_eq(entries.add({ provider = "cerebras", token = "csk-new", label = "New" }), nil)
+					helpers.assert_eq(entries.remove("a"), false)
+					helpers.assert_eq(stored_bytes(), bytes, "the file is left byte for byte")
+					helpers.assert_true(#errors >= 1, "the refusal is an ERROR")
+					for _, line in ipairs(errors) do helpers.assert_contains(line, PATH) end
+				end)
+			end)
+	end
+
+	helpers.it("writes back each entry's fields and a warned selection unchanged (config-outdated-api-keys-write)",
+		function()
+			with_stored({ version = 1, active_id = "gone", entries = {
+				{ id = "a", provider = "cerebras", label = "A", token = "csk-a", note = "keep me" },
+				{ id = "b", provider = "cerebras", label = "B", token = "csk-b" },
+			} }, function(entries, errors)
+				helpers.assert_true(entries.remove("b"))
+				local stored = require("json").decode(stored_bytes())
+				helpers.assert_eq(stored.entries[1].note, "keep me", "a field this build does not use is kept")
+				helpers.assert_eq(stored.active_id, "gone", "a warned selection is not replaced by an unrelated write")
+				helpers.assert_true(entries.set_active("a"))
+				helpers.assert_eq(require("json").decode(stored_bytes()).active_id, "a", "the user's choice replaces it")
+				helpers.assert_eq(errors, {})
+			end)
+		end)
+
 	helpers.it("warns about an older build's entry and never deletes its key (config-outdated-api-keys)", function()
 		fresh()
 		local Json = require("json")

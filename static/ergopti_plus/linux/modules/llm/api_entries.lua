@@ -132,13 +132,27 @@ local function entry_name(raw, index)
 	return id and ("entries[id=" .. id .. "]") or ("entries[#" .. index .. "]")
 end
 
+--- Whether a decoded value is a JSON list: consecutive integer keys from 1.
+--- @param value table
+--- @return boolean
+local function is_list(value)
+	local count = 0
+	for key in pairs(value) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 then return false end
+		count = count + 1
+	end
+	return count == #value
+end
+
 --- Loads the file once. A malformed file is kept aside, not overwritten. An
 --- entry an older build wrote in another shape is outdated: warned once,
---- left out, and written back unchanged, so its key is never deleted.
+--- left out, and written back unchanged, so its key is never deleted. A file
+--- this build cannot write back whole (another version, entries that are not
+--- a list) is read as far as it can be, and every write to it is refused.
 --- @return table state
 local function state()
 	if _state then return _state end
-	_state = { version = VERSION, entries = {}, active_id = "", outdated = {} }
+	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {} }
 	local fh = io.open(M.path(), "r")
 	if not fh then return _state end
 	local text = fh:read("*a")
@@ -150,10 +164,17 @@ local function state()
 		Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
 		return _state
 	end
+	if root.version ~= nil and root.version ~= VERSION then
+		_state.write_refusal = "it has version " .. tostring(root.version) .. ", which this build does not write"
+	elseif not is_list(root.entries) then
+		_state.write_refusal = "its entries are not a list, as this build writes them"
+	end
 	for index, raw in ipairs(root.entries) do
 		local entry = valid_entry(raw)
 		if entry then
 			_state.entries[#_state.entries + 1] = entry
+			-- Fields a later build added travel back with the entry.
+			_state.extras[entry.id] = raw
 		else
 			_state.outdated[#_state.outdated + 1] = raw
 			ConfigOutdated.report_in_file(M.path(), entry_name(raw, index),
@@ -163,19 +184,40 @@ local function state()
 	if type(root.active_id) == "string" and M.get(root.active_id) then
 		_state.active_id = root.active_id
 	elseif type(root.active_id) == "string" and root.active_id ~= "" then
+		-- Kept as written until the user chooses an entry.
+		_state.dangling_active_id = root.active_id
 		ConfigOutdated.report_in_file(M.path(), "active_id", "no usable entry has this id; no entry is active")
 	end
 	return _state
 end
 
+--- One entry as written back: its stored fields, this build's values over them.
+--- @param entry table A usable entry.
+--- @return table
+local function stored_form(entry)
+	local out = {}
+	for key, value in pairs(state().extras[entry.id] or {}) do out[key] = value end
+	for key, value in pairs(entry) do out[key] = value end
+	return out
+end
+
 --- Persists the current state, the outdated entries included as they were.
+--- A file this build cannot write back whole is never replaced: the write is
+--- refused with its bytes unchanged, since rewriting it would drop keys.
 --- @return boolean
 local function persist()
+	local current = state()
+	if current.write_refusal then
+		Logger.error(LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
+			.. "or rewriting it would lose its keys.", M.path(), current.write_refusal)
+		return false
+	end
 	local entries = {}
-	for _, entry in ipairs(state().entries) do entries[#entries + 1] = entry end
-	for _, raw in ipairs(state().outdated) do entries[#entries + 1] = raw end
+	for _, entry in ipairs(current.entries) do entries[#entries + 1] = stored_form(entry) end
+	for _, raw in ipairs(current.outdated) do entries[#entries + 1] = raw end
+	local active = current.active_id ~= "" and current.active_id or current.dangling_active_id or ""
 	local ok, err = write_private(M.path(), Json.encode({
-		version = VERSION, entries = entries, active_id = state().active_id,
+		version = VERSION, entries = entries, active_id = active,
 	}))
 	if not ok then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
@@ -250,6 +292,8 @@ function M.add(fields)
 		current.active_id = previous
 		return nil, "the entry could not be saved"
 	end
+	-- The user chose an entry: a stored selection nothing matched is replaced.
+	current.dangling_active_id = nil
 	Logger.info(LOG, "API entry '%s' (%s) added and selected.", entry.label, entry.provider)
 	return entry
 end
@@ -261,7 +305,10 @@ function M.set_active(id)
 	if not M.get(id) then return false end
 	local previous = state().active_id
 	state().active_id = id
-	if persist() then return true end
+	if persist() then
+		state().dangling_active_id = nil
+		return true
+	end
 	state().active_id = previous
 	return false
 end
