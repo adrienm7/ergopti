@@ -225,8 +225,23 @@ _ScopeOwnerRejectsPreset() {
 }
 Test("config-scope: separate-file presets refuse before any effects", _ScopeOwnerRejectsPreset)
 
+; The text of a native menu row at a zero-based position.
+_SGM_LabelAt(TargetMenu, Position) {
+	static MF_BYPOSITION := 0x400
+	Length := DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
+	Assert(Length >= 0, "GetMenuStringW must read row " . Position)
+	Buffer_ := Buffer((Length + 1) * 2, 0)
+	DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", Buffer_, "int", Length + 1, "uint", MF_BYPOSITION, "int")
+	return StrGet(Buffer_, "UTF-16")
+}
+
+; The real Gestures submenu opens with its switch, « Restaurer les valeurs
+; conseillées », « Tout effacer », then a separator (menu-first-group), and a
+; click on either scope row runs the gesture scope owner over the fixture.
 _ScopeGestureMenuOwnsParameters() {
-	global GestureActionParameters
+	global GestureActionParameters, _MenuDispatchCallbacks
 	SavedParameters := GestureActionParameters
 	Fixture := _ScopeOwnerFixture()
 	Source := '[gestures]`nenabled = false`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
@@ -243,7 +258,24 @@ _ScopeGestureMenuOwnsParameters() {
 	try {
 		for Mode in ["recommended", "clear"] {
 			Fixture.options["stamp"] := Mode
-			Receipt := _GES_ApplyScope(Mode, Fixture.options)
+			GMenu := BuildGesturesMenu(Fixture.options)
+			try {
+				AssertEqual(t("menu.gestures.enable"), _SGM_LabelAt(GMenu, 0), "the switch opens the menu")
+				AssertEqual(t("common.restore_recommended"), _SGM_LabelAt(GMenu, 1), "the restore follows it")
+				AssertEqual(t("common.clear_to_system"), _SGM_LabelAt(GMenu, 2), "the clear follows the restore")
+				Assert(TrayMenuIsSeparatorAt(GMenu, 3), "a separator closes the first group")
+				loop TrayMenuItemCount(GMenu) - 4 {
+					Label := TrayMenuIsSeparatorAt(GMenu, A_Index + 3) ? "" : _SGM_LabelAt(GMenu, A_Index + 3)
+					Assert(Label != t("common.restore_recommended") && Label != t("common.clear_to_system"),
+						"no scope row follows the first group")
+				}
+				ItemId := DllCall("GetMenuItemID", "ptr", GMenu.Handle, "int", Mode == "clear" ? 2 : 1, "uint")
+				Assert(_MenuDispatchCallbacks.Has(ItemId), "the scope row is a dispatched menu item")
+				Receipt := (_MenuDispatchCallbacks[ItemId])()
+			} finally {
+				GMenu.Delete()
+				MenuDispatcher_PruneMenu(GMenu)
+			}
 			AssertEqual(Receipt["status"], "pending")
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			Assert(!Parsed["action_parameters"].Has("gesture__tap_4__open_url"), "old binding parameters leave with their scope")
@@ -267,7 +299,8 @@ _ScopeGestureMenuOwnsParameters() {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("config-scope: gesture menu includes master and only its owned action parameters", _ScopeGestureMenuOwnsParameters)
+Test("config-scope: the gesture menu's first-group rows own the master and only its action parameters",
+	_ScopeGestureMenuOwnsParameters)
 
 _ScopeOwnerRetainsRollbackDebt() {
 	Fixture := _ScopeOwnerFixture()

@@ -8,8 +8,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (slot groups, separators, action buttons) is
 ---    read from ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.
----    Dynamic blocks (slot items, disable_all, restore_defaults) are supplied
----    as handlers so runtime state stays in Lua.
+---    Dynamic blocks (slot items) and the scope rows' behaviour (scope_restore,
+---    scope_clear) are supplied as handlers so runtime state stays in Lua.
 --- ==============================================================================
 
 local M = {}
@@ -410,8 +410,8 @@ function M.build(ctx)
 		end
 		return ctx.apply_gesture_scope(mode) == true
 	end
-	local function cmd_disable_all() return apply_scope("clear") end
-	local function cmd_restore_defaults() return apply_scope("recommended") end
+	local function cmd_scope_clear() return apply_scope("clear") end
+	local function cmd_scope_restore() return apply_scope("recommended") end
 
 	-- Build a slot group from the manifest gesture_slots table.
 	-- One provider per finger count. The slot ids come from the manifest's own
@@ -468,12 +468,13 @@ function M.build(ctx)
 		gestures_enabled = function() return state.gestures == true end,
 	}
 
-	-- The two whole-tree actions are `command` rows: the renderer builds them from
-	-- the declaration and this driver registers only the behaviour.
+	-- The scope's restore and clear are `command` rows of the first group: the
+	-- renderer builds them from the declaration, right after the switch, and
+	-- this driver registers only the behaviour.
 	render_ctx.commands = {}
 	render_ctx.commands["gestures_toggle"] = toggle_gestures
-	render_ctx.commands["disable_all"] = cmd_disable_all
-	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
+	render_ctx.commands["scope_restore"] = cmd_scope_restore
+	render_ctx.commands["scope_clear"] = cmd_scope_clear
 	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)

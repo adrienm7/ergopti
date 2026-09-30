@@ -1,15 +1,16 @@
 --- tests/unit/ui/menu/test_restore_recommended_no_confirm.lua
 
 --- ==============================================================================
---- MODULE: Restore Recommended Values Asks Nothing (macOS)
+--- MODULE: Restore And Clear Ask Nothing (macOS)
 --- DESCRIPTION:
 --- Regression restore-recommended-no-confirm. Every « Restaurer les valeurs
 --- conseillées » row used to open a default-No question before it applied,
 --- and the maintainer retired that step: a restore is recoverable through the
---- backup its owner writes first. Each case drives the real restore path with
---- every question answered No, so a question that came back would also stop
---- the restore, and checks that the recommended values were applied. The clear
---- row beside it removes the category's settings and keeps its question.
+--- backup its owner writes first. On 2026-09-30 he retired the « Tout effacer »
+--- question too, per menu and global alike (« action directe partout, la
+--- sauvegarde suffit »). Each case drives the real path with every question
+--- answered No, so a question that came back would also stop the row, and
+--- checks that the values were applied after the backup.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,8 +21,8 @@ local FileSystem = require("adapters.file_system")
 local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 	.. 'action_parameters = { tap_4__open_url = "https://apple.com" }\n[future]\nkeep = 42\n'
 
---- Builds the real gesture scope over an in-memory config.toml, with a
---- confirmation port that records each question and answers No.
+--- Builds the real gesture scope over an in-memory config.toml; a dialog
+--- double records each question and answers No.
 --- @return table fixture owner, gestures, files, state, asked, writes().
 local function gesture_fixture()
 	package.loaded["adapters.file_system"] = FileSystem
@@ -63,7 +64,6 @@ local function gesture_fixture()
 		preferences = prefs, checkpoint = checkpoint, demotions = demotions,
 		capture_preferences = function() return prefs.snapshot(state, {}, modules) end,
 		backup_path = function() return "backup" end,
-		confirm = function(mode) asked[#asked + 1] = mode; return false end,
 		paused = function() return false end,
 		admission = function(_, callback) return callback() end,
 	})
@@ -77,10 +77,15 @@ end
 local function gesture_commands(fixture)
 	local original_renderer = package.loaded["infra.manifest_menu"]
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
+	local original_dialog = package.loaded["infra.dialog_util"]
 	local commands
 	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, context)
 		commands = context.commands
 		return {}
+	end }
+	package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
+		fixture.asked[#fixture.asked + 1] = message
+		return no
 	end }
 	package.loaded["ui.menu.menu_gestures"] = nil
 	local ok, detail = pcall(function()
@@ -91,7 +96,12 @@ local function gesture_commands(fixture)
 	end)
 	package.loaded["infra.manifest_menu"] = original_renderer
 	package.loaded["ui.menu.menu_gestures"] = original_menu
-	if not ok then error(detail, 0) end
+	if not ok then
+		package.loaded["infra.dialog_util"] = original_dialog
+		error(detail, 0)
+	end
+	-- The dialog double stays for the click; the caller's run restores it.
+	fixture.restore_dialog = function() package.loaded["infra.dialog_util"] = original_dialog end
 	return commands
 end
 
@@ -99,7 +109,10 @@ helpers.describe("restore-recommended-no-confirm: Gestures (macOS)", function()
 	helpers.it("the restore row applies the recommended gestures without a question", function()
 		local fixture = gesture_fixture()
 		local commands = gesture_commands(fixture)
-		helpers.assert_eq(commands.restore_defaults(), true)
+		local ok, result = pcall(commands.scope_restore)
+		fixture.restore_dialog()
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result, true)
 		helpers.assert_eq(#fixture.asked, 0, "restoring the recommended values asks nothing")
 		for slot, value in pairs(fixture.gestures.RECOMMENDED_GESTURES) do
 			helpers.assert_eq(fixture.gestures.get_action(slot), value, slot)
@@ -109,13 +122,18 @@ helpers.describe("restore-recommended-no-confirm: Gestures (macOS)", function()
 		helpers.assert_eq(Codec.decode(fixture.files.config).future.keep, 42)
 	end)
 
-	helpers.it("the clear row still asks, and a No leaves every store untouched", function()
+	helpers.it("the clear row applies at once after its backup, without a question", function()
 		local fixture = gesture_fixture()
-		helpers.assert_eq(gesture_commands(fixture).disable_all(), false)
-		helpers.assert_eq(fixture.asked, { "clear" })
-		helpers.assert_eq(fixture.writes(), 0)
-		helpers.assert_eq(fixture.files.config, GESTURE_SOURCE)
-		helpers.assert_eq(fixture.gestures.get_action("tap_4"), "open_url")
+		local commands = gesture_commands(fixture)
+		local ok, result = pcall(commands.scope_clear)
+		fixture.restore_dialog()
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(#fixture.asked, 0, "clearing asks nothing either")
+		helpers.assert_eq(fixture.files.backup, GESTURE_SOURCE, "the backup is written before the clear")
+		helpers.assert_eq(fixture.gestures.get_action("tap_4"), "none")
+		helpers.assert_eq(fixture.state.gestures, false)
+		helpers.assert_eq(Codec.decode(fixture.files.config).future.keep, 42)
 	end)
 end)
 
@@ -165,7 +183,7 @@ end
 
 helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 	helpers.it("the restore row sends the recommended scope without a question", function()
-		local accepted, requests, asked, refreshes = run_tap_hold_row("reset_defaults")
+		local accepted, requests, asked, refreshes = run_tap_hold_row("scope_restore")
 		helpers.assert_eq(accepted, true)
 		helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
 		helpers.assert_eq(#requests, 1)
@@ -176,19 +194,23 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(refreshes, 1, "the menu refreshes once the terminal commits")
 	end)
 
-	helpers.it("the clear row still asks, and a No sends nothing", function()
-		local accepted, requests, asked = run_tap_hold_row("disable_all")
-		helpers.assert_eq(accepted, false)
-		helpers.assert_eq(asked, { "common.clear_to_system" })
-		helpers.assert_eq(#requests, 0)
+	helpers.it("the clear row sends the clear scope without a question", function()
+		local accepted, requests, asked, refreshes = run_tap_hold_row("scope_clear")
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(#asked, 0, "clearing asks nothing either")
+		helpers.assert_eq(#requests, 1)
+		helpers.assert_eq(requests[1].scope, "tap_holds")
+		helpers.assert_eq(requests[1].mode, "clear")
+		helpers.assert_true(requests[1].backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+			"the remap file is backed up first: " .. tostring(requests[1].backup_path))
+		helpers.assert_eq(refreshes, 1)
 	end)
 end)
 
 --- Builds the real global scope over synchronous owner doubles.
 --- @param trace table Receives each owner call.
---- @param asked table Receives each question's mode.
 --- @return table global
-local function global_scope(trace, asked)
+local function global_scope(trace)
 	local owners = {}
 	for _, name in ipairs({ "gestures", "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
 		local owner = {}
@@ -204,27 +226,20 @@ local function global_scope(trace, asked)
 		backup_path = function(scope) return "/remap.toml.global-" .. scope end,
 		defer = function(continuation) continuation(); return true end,
 		paused = function() return false end,
-		confirm = function(mode) asked[#asked + 1] = mode; return false end,
 		refresh = function() end,
 	})
 end
 
 helpers.describe("restore-recommended-no-confirm: Configuration (macOS)", function()
-	helpers.it("the global restore composes every category without a question", function()
-		local trace, asked = {}, {}
-		helpers.assert_eq(global_scope(trace, asked).apply("recommended"), true)
-		helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
-		table.sort(trace)
-		helpers.assert_eq(trace, { "gestures:recommended", "hotstrings:recommended", "keyboard_layout:recommended",
-			"llm:recommended", "metrics:recommended", "shortcuts:recommended" })
-	end)
-
-	helpers.it("the global clear still asks once, and a No runs no category", function()
-		local trace, asked = {}, {}
-		helpers.assert_eq(global_scope(trace, asked).apply("clear"), false)
-		helpers.assert_eq(asked, { "clear" })
-		helpers.assert_eq(trace, {})
-	end)
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("the global " .. mode .. " composes every category without a question", function()
+			local trace = {}
+			helpers.assert_eq(global_scope(trace).apply(mode), true)
+			table.sort(trace)
+			helpers.assert_eq(trace, { "gestures:" .. mode, "hotstrings:" .. mode, "keyboard_layout:" .. mode,
+				"llm:" .. mode, "metrics:" .. mode, "shortcuts:" .. mode })
+		end)
+	end
 end)
 
 --- Captures the options ui.menu.init hands to one scope owner module; the
@@ -243,7 +258,7 @@ local function capture_owner(captured, applied, name)
 end
 
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
-	helpers.it("no restore row asks, and every owner's question is the clear one", function()
+	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
 		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ui.menu.llm_scope",
 			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "ui.menu.scoped_preferences",
 			"ui.menu.global_scope" }
@@ -267,25 +282,25 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 			-- The Shortcuts and AI owners need runtimes this boot does not start.
 			package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return true end
 			ctx.llm_handler.scope_runtime = {}
-			helpers.assert_eq(ctx.apply_gesture_scope("recommended"), true)
-			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
-				helpers.assert_eq(ctx.apply_preference_scope(scope, "recommended"), true, scope)
+			for _, mode in ipairs({ "recommended", "clear" }) do
+				helpers.assert_eq(ctx.apply_gesture_scope(mode), true)
+				for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
+					helpers.assert_eq(ctx.apply_preference_scope(scope, mode), true, scope)
+				end
 			end
 			helpers.assert_eq(actions.reset_defaults(), true)
-			helpers.assert_eq(#asked, 0, "no restore of the recommended values asks")
+			helpers.assert_eq(actions.clear_to_system(), true, "the Configuration clear runs the global clear")
+			helpers.assert_eq(#asked, 0, "no restore or clear asks")
 			table.sort(applied)
-			helpers.assert_eq(applied, { "ui.menu.gesture_scope:recommended", "ui.menu.global_scope:recommended",
-				"ui.menu.hotstrings_scope:recommended", "ui.menu.llm_scope:recommended",
-				"ui.menu.metrics_scope:recommended", "ui.menu.scoped_preferences:recommended",
-				"ui.menu.shortcuts_scope:recommended" })
+			local expected = {}
 			for _, name in ipairs(owners) do
-				local options = captured[name]
-				helpers.assert_type(options and options.confirm, "function", name)
-				local before = #asked
-				helpers.assert_eq(options.confirm("clear"), false, name .. " reads the No")
-				helpers.assert_eq(#asked, before + 1, name .. " asks one question")
-				helpers.assert_eq(asked[#asked][2], "common.clear_to_system", name .. " asks about the clear")
-				helpers.assert_eq(asked[#asked][3], "onboarding.btn.no", name .. " defaults to No")
+				for _, mode in ipairs({ "clear", "recommended" }) do expected[#expected + 1] = name .. ":" .. mode end
+			end
+			table.sort(expected)
+			helpers.assert_eq(applied, expected)
+			for _, name in ipairs(owners) do
+				helpers.assert_type(captured[name], "table", name)
+				helpers.assert_nil(captured[name].confirm, name .. " is handed no question port")
 			end
 		end)
 	end)

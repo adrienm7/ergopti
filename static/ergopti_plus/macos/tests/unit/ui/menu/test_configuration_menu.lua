@@ -5,8 +5,10 @@
 --- DESCRIPTION:
 --- « Configuration » replaced « Actions globales » and the two top-level rows
 --- that opened the folders editor and the setup wizard. It holds, in order: the
---- restore of Ergopti's recommended values, the config.toml cleanup, a
---- separator, the folders editor, the setup wizard and login startup, and ends
+--- restore of Ergopti's recommended values and the clear to the system's
+--- behaviour (the first group of every settings menu), a separator, the
+--- config.toml cleanup, a separator, the folders editor, the setup wizard and
+--- login startup, and ends
 --- there: Uninstall moved to the bottom of the Version / Updates submenu
 --- (test_menu_about_uninstall.lua), with no separator left dangling here.
 ---
@@ -14,8 +16,8 @@
 --- axis for the whole pause window — pause_all() snapshots what was running and
 --- resume_all() restores that snapshot — so a row that rewrites the
 --- configuration mid-pause is either discarded on resume or breaks « pause =
---- tout éteint ». Those two rows are greyed AND stripped of their handler while
---- paused; the two that only open a window stay live, like every other tail row.
+--- tout éteint ». Those three rows are greyed AND stripped of their handler
+--- while paused; the rows that only open a window stay live.
 ---
 --- Driven through Builder.generate, so the assertion is on what the menu offers.
 --- ==============================================================================
@@ -25,6 +27,8 @@ local helpers = require("tests.helpers")
 -- The rows in the order the menu must draw them, by the key of their label.
 local EXPECTED = {
 	"common.restore_recommended",
+	"common.clear_to_system",
+	"-",
 	"menu.global.clean_unused_keys",
 	"-",
 	"menu.global.config_folder",
@@ -35,6 +39,7 @@ local EXPECTED = {
 -- The rows that rewrite the configuration, and the action each one runs.
 local GATED = {
 	["common.restore_recommended"]   = "reset_defaults",
+	["common.clear_to_system"]       = "clear_to_system",
 	["menu.global.clean_unused_keys"] = "clean_unused_keys",
 }
 
@@ -82,7 +87,7 @@ end
 -- ================================
 
 helpers.describe("configuration submenu (macOS): its rows, in order", function()
-	helpers.it("draws the five configuration rows in their declared groups", function()
+	helpers.it("draws the six configuration rows in their declared groups", function()
 		local rows = configuration_rows(false, {})
 		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
 		local drawn = {}
@@ -103,7 +108,7 @@ helpers.describe("configuration submenu (macOS): its rows, in order", function()
 				expected[#expected + 1] = action
 			end
 		end
-		helpers.assert_eq(#expected, 5, "all five rows must be drawn and wired")
+		helpers.assert_eq(#expected, 6, "all six rows must be drawn and wired")
 		helpers.assert_eq(table.concat(fired, ", "), table.concat(expected, ", "))
 	end)
 end)
@@ -118,7 +123,7 @@ end)
 -- ================================
 
 helpers.describe("configuration submenu (macOS): a pause gates what rewrites the configuration", function()
-	helpers.it("greys the two rewriting rows and keeps independent actions live", function()
+	helpers.it("greys the three rewriting rows and keeps independent actions live", function()
 		local fired = {}
 		local rows = configuration_rows(true, fired)
 		helpers.assert_true(type(rows) == "table", "the Configuration submenu stays reachable while paused")
@@ -134,7 +139,7 @@ helpers.describe("configuration submenu (macOS): a pause gates what rewrites the
 				helpers.assert_eq(type(row.fn), "function", row.title .. " must keep its handler")
 			end
 		end
-		helpers.assert_eq(gated, 2, "both rewriting rows must be drawn")
+		helpers.assert_eq(gated, 3, "the three rewriting rows must be drawn")
 		helpers.assert_eq(live, 3, "all independent rows must be drawn")
 		helpers.assert_eq(#fired, 0, "building the menu must not run any action")
 	end)
@@ -213,6 +218,8 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 			for index, row in ipairs(rows) do drawn[index] = row.title end
 			helpers.assert_eq(table.concat(drawn, ", "), table.concat({
 				"common.restore_recommended",
+				"common.clear_to_system",
+				"-",
 				"menu.global.clean_unused_keys",
 				"-",
 				"menu.global.config_folder",

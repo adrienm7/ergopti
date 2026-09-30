@@ -5,10 +5,9 @@
 --- DESCRIPTION:
 --- Restores Ergopti's recommended values, or clears every category to the
 --- system's own behaviour, by composing the per-scope owners through the shared
---- composition in the manifest's `[scopes.global]` order. The restore applies
---- at once; a clear asks one question that covers every category. Each owner
---- keeps its own backup, conflict detection and runtime acknowledgement, and a
---- refusal reverts every committed one.
+--- composition in the manifest's `[scopes.global]` order. Both apply at once,
+--- without a question: each owner keeps its own backup, conflict detection and
+--- runtime acknowledgement, and a refusal reverts every committed one.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Existing Owners: the config.toml categories are the scoped owners the
@@ -76,14 +75,16 @@ end
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), backup_path(scope),
----   defer(fn), confirm(mode) (asked before a clear only), paused() and
----   refresh(committed, report).
+---   defer(fn), paused() and refresh(committed, report).
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
-	for _, name in ipairs({ "backup_path", "defer", "confirm", "paused", "refresh" }) do
+	for _, name in ipairs({ "backup_path", "defer", "paused", "refresh" }) do
 		assert(type(options[name]) == "function", "the global scope needs " .. name)
 	end
+	-- Retired with the clear's question on 2026-09-30: a caller still wiring
+	-- one would expect it to be asked, so it is refused rather than ignored.
+	assert(options.confirm == nil, "the global scope asks no question: the confirm port is retired")
 	local function participants()
 		local registry = {}
 		for id, provider in pairs(options.owners) do
@@ -91,7 +92,7 @@ function M.new(options)
 			local owner = provider()
 			if owner ~= nil then
 				registry[id] = Participant.synchronous({
-					apply = function(mode) return owner.apply(mode, true) end,
+					apply = function(mode) return owner.apply(mode) end,
 					owner = function() return owner end,
 				})
 			end
@@ -107,8 +108,8 @@ function M.new(options)
 	local composition = Composition.new({ manifest = Manifest, scope = "global", logger = Logger, log = LOG,
 		participants = participants })
 	local owner = { pending = composition.pending, retry_restore = composition.retry_restore }
-	--- Applies one mode to every available category. A clear asks once first;
-	--- restoring the recommended values does not ask.
+	--- Applies one mode to every available category, at once for both modes:
+	--- the maintainer retired the clear's question on 2026-09-30.
 	--- @param mode string "recommended" or "clear".
 	--- @return boolean accepted True once the composition started.
 	function owner.apply(mode)
@@ -120,11 +121,6 @@ function M.new(options)
 				Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
 				return false
 			end
-		end
-		if mode == "clear" then
-			if options.confirm(mode) ~= true then return false end
-			-- The modal runs a native event loop; pause may start while it is open.
-			if options.paused() ~= false then return false end
 		end
 		return composition.apply(mode, function(committed, report)
 			options.refresh(committed == true, report)

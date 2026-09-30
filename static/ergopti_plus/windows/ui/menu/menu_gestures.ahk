@@ -15,28 +15,33 @@
 
 
 
-BuildGesturesMenu() {
+/**
+ * Builds the Gestures submenu from the manifest's gestures_menu array.
+ * @param {Map} Options Scope owner options, injected by the scope tests only;
+ *     the tray passes none, so its rows act on the real configuration.
+ * @returns {Menu} The rendered submenu.
+ */
+BuildGesturesMenu(Options := unset) {
+	ScopeOptions := IsSet(Options) ? Options : Map()
 	DynHandlers := Map(
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
 		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
 		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
 	)
-	; The two whole-tree actions are `command` rows since 2026-08-07: the renderer
-	; builds each row and its label from the declaration, and this driver
-	; registers only what the click does. All three drivers had been writing the
-	; same two rows with the same two labels.
-	; The two whole-tree actions joined them on the same day, and the two buttons
-	; below on 2026-08-07: each handler's whole body was one row with a static
-	; label, which the declaration already expresses.
+	; The scope's restore and clear are `command` rows of the first group since
+	; 2026-09-30 (switch, restore, clear, separator): the renderer builds each row
+	; and its label from the declaration, and this driver registers only what the
+	; click does. The two buttons below became `command` rows on 2026-08-07: each
+	; handler's whole body was one row with a static label.
 	; The category switch is the manifest's `gestures_toggle` row. Its command is
 	; the dedicated writer (gestures.enabled + reload) rather than the generic
 	; CategoryEnabled flip the master-gated menus register.
 	Commands := Map(
 		"gestures_toggle",  (*) => ToggleGesturesEnabled(),
 		"system_gesture_settings", (*) => GestureOpenTouchpadSettings(),
-		"disable_all",      (*) => _GES_SetEverySlot("none"),
-		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
+		"scope_restore",    (*) => _GES_ApplyScope("recommended", ScopeOptions),
+		"scope_clear",      (*) => _GES_ApplyScope("clear", ScopeOptions),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
@@ -55,16 +60,6 @@ _GES_IsEnabled() {
 
 
 ; Whole-scope actions use the manifest owner, including the master and parameters.
-_GES_SetEverySlot(ActionName) {
-	if ActionName != "none"
-		throw ValueError("The clear command cannot assign an arbitrary action.")
-	return _GES_ApplyScope("clear")
-}
-
-_GES_RestoreFactoryDefaults() {
-	return _GES_ApplyScope("recommended")
-}
-
 ; The receipt remains pending until the existing terminal reload acknowledges it.
 _GES_ApplyScope(Mode, Options := unset) {
 	Selected := IsSet(Options) ? Options.Clone() : Map()

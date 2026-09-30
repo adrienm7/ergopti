@@ -13,7 +13,7 @@ local Manifest = require("infra.manifest_reader")
 local Scope = require("infra.preferences_scope")
 
 --- Creates the session owner for the two existing whole-gesture menu commands.
---- @param options table Native, persistence, admission and confirmation ports.
+--- @param options table Native, persistence and admission ports.
 --- @return table owner Scope application and retained compensation operations.
 function M.new(options)
 	local gestures, state = options.gestures, options.state

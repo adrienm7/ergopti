@@ -263,8 +263,8 @@ check(
 	JSON.stringify(group) ===
 		JSON.stringify([
 			'toggle:script_control_toggle',
-			'command:restore_recommended',
-			'command:clear_to_system',
+			'command:scope_restore',
+			'command:scope_clear',
 			'---:',
 			'list:script_control_shortcuts'
 		]),
@@ -285,7 +285,7 @@ check(
 	'the slots belong to script_control_group, not to a bare Shortcuts row without a switch'
 );
 const menuSource = functionBody('_SC_ScriptControlCommands');
-for (const id of ['script_control_toggle', 'restore_recommended', 'clear_to_system']) {
+for (const id of ['script_control_toggle', 'scope_restore', 'scope_clear']) {
 	check(menuSource.includes(`"${id}",`), `_SC_ScriptControlCommands must register ${id}`);
 }
 check(

@@ -15,7 +15,7 @@ local Logger = require("infra.logger")
 local LOG = "scoped_preferences"
 
 --- Creates a scope owner with terminal native ports and ordinary-save compensation.
---- @param options table Scope, runtime, persistence, admission and confirmation ports.
+--- @param options table Scope, runtime, persistence and admission ports.
 --- @return table owner Scope application and retained compensation operations.
 function M.new(options)
 	local preferences, state = options.preferences, options.state
@@ -31,9 +31,12 @@ function M.new(options)
 	for _, name in ipairs({ "capture", "apply", "restore" }) do
 		assert(type(runtime[name]) == "function", "scope runtime port missing: " .. name)
 	end
-	for _, name in ipairs({ "admission", "confirm", "paused", "backup_path", "capture_preferences" }) do
+	for _, name in ipairs({ "admission", "paused", "backup_path", "capture_preferences" }) do
 		assert(type(options[name]) == "function", "scope port missing: " .. name)
 	end
+	-- Retired with the clear's question on 2026-09-30: a caller still wiring
+	-- one would expect it to be asked, so it is refused rather than ignored.
+	assert(options.confirm == nil, "a scope asks no question: the confirm port is retired")
 	local owner, transaction, active_snapshot = {}, nil, nil
 	-- What the writer fence retains while this owner owes an inverse. Only this
 	-- claim may settle the debt, and settling it through the fence is what hands
@@ -70,24 +73,16 @@ function M.new(options)
 	function owner.release()
 		if transaction ~= nil then transaction.release() end
 	end
-	--- Applies one mode. Restoring the recommended values applies at once:
-	--- the backup and the exact inverse already make it recoverable. Only a
-	--- clear, which removes the category's settings, asks first; a composed
-	--- clear asks once for every category, so it passes preconfirmed.
+	--- Applies one mode at once. Neither mode asks: the backup and the exact
+	--- inverse already make a restore or a clear recoverable (the maintainer
+	--- retired the clear's question on 2026-09-30).
 	--- @param mode string "recommended" or "clear".
-	--- @param preconfirmed boolean|nil True when the caller already asked.
 	--- @return boolean committed
-	function owner.apply(mode, preconfirmed)
+	function owner.apply(mode)
 		if mode ~= "clear" and mode ~= "recommended" then return false end
 		return options.admission("Preference scope: " .. options.scope, function()
 			if options.paused() ~= false then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
-			if mode == "clear" and preconfirmed ~= true then
-				if options.confirm(mode) ~= true then return false end
-				-- The modal runs a native event loop; pause may acquire the engine while
-				-- confirmation is open, so its admission must be checked again.
-				if options.paused() ~= false then return false end
-			end
 			transaction = (options.transaction_factory or Scope.new)({
 				manifest = Manifest,
 				path = options.path, backup_path = options.backup_path(), files = options.files,

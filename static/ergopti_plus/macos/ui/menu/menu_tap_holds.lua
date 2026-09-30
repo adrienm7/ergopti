@@ -263,22 +263,15 @@ end
 -- Makes each scope backup path unique within the session.
 local _scope_generation = 0
 
---- Applies one tap_holds scope mode through the remap transaction. A clear
---- asks first; restoring the recommended values does not.
+--- Applies one tap_holds scope mode through the remap transaction, at once for
+--- both modes: the backup it writes first is the way back, so a clear asks no
+--- question either (the maintainer's rule of 2026-09-30).
 --- The chords belong to the shortcuts scope and are not part of this request.
 --- @param karabiner table Remap facade.
 --- @param mode string "recommended" or "clear".
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean accepted
 local function run_scope(karabiner, mode, update_menu)
-	if mode == "clear" then
-		local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
-		if require("infra.dialog_util").block_alert(i18n.get("menu.tapholds.title"),
-			i18n.get("common.clear_to_system"), no, yes, "warning") ~= yes then
-			Logger.info(LOG, "Tap-hold scope %s declined.", mode)
-			return false
-		end
-	end
 	_scope_generation = _scope_generation + 1
 	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. ".tap_holds-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
@@ -1075,15 +1068,15 @@ function M.build(ctx)
 		end,
 	}
 
-	-- The two bulk commands are the ids Windows declares for its own tap-holds:
-	-- the same row, the same label, this engine's implementation behind it.
+	-- The scope's restore and clear, the first group after the switch: the same
+	-- rows and ids on every driver, this engine's implementation behind them.
 	-- Like there, they leave the key combinations of the Shortcuts group alone.
 	local commands = {
 		["tapholds_toggle"] = function()
 			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
 		end,
-		["disable_all"] = function() return run_scope(karabiner, "clear", update_menu) end,
-		["reset_defaults"] = function() return run_scope(karabiner, "recommended", update_menu) end,
+		["scope_restore"] = function() return run_scope(karabiner, "recommended", update_menu) end,
+		["scope_clear"] = function() return run_scope(karabiner, "clear", update_menu) end,
 		-- Required on the click: the editor loads the layer data and its window
 		-- stack, which a menu build has no use for.
 		["edit_nav_layer"] = function()

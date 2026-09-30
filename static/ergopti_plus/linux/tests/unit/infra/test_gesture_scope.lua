@@ -131,19 +131,20 @@ helpers.describe("Linux gesture scope transaction", function()
 		end)
 	end)
 
-	helpers.it("gesture-scope: the real menu confirms with No default and publishes only after Yes", function()
+	-- The maintainer's first group (2026-09-30): the switch, « Restaurer les
+	-- valeurs conseillées », « Tout effacer », then a separator; both scope rows
+	-- act at once, with no question, because the owner's backup is the way back.
+	helpers.it("gesture-scope: the real menu opens with switch, restore and clear, each applied at once", function()
 		with_scope(function(_, gestures, controls, path)
-			local menu_name, modal_name = "ui.menu.menu_builder", "ui.modal"
-			local previous_menu, previous_modal = package.loaded[menu_name], package.loaded[modal_name]
+			local menu_name = "ui.menu.menu_builder"
+			local previous_menu = package.loaded[menu_name]
 			local previous_execute = os.execute
 			local ok, err = pcall(function()
 				package.loaded[menu_name] = nil
-				package.loaded[modal_name] = { run = function(callback) return callback() end }
-				local calls, refreshes, accept, questions = 0, 0, false, {}
-				local pause_in_modal = false
+				local calls, refreshes, questions = {}, 0, 0
 				local apply = gestures.apply_scope
 				gestures.apply_scope = function(mode)
-					calls = calls + 1
+					calls[#calls + 1] = mode
 					local committed, detail, backup = apply(mode)
 					if backup then controls.backups[#controls.backups + 1] = backup end
 					return committed, detail, backup
@@ -152,46 +153,51 @@ helpers.describe("Linux gesture scope transaction", function()
 					_version = "scope-test", gestures = gestures,
 					on_menu_changed = function() refreshes = refreshes + 1 end,
 				})
-				local clear
 				local i18n = require("infra.i18n")
+				local submenu
 				for _, parent in ipairs(rows) do
-					if parent.title == i18n.get("menu.gestures.title") then
-						for _, row in ipairs(parent.menu or {}) do
-							if row.title == i18n.get("common.clear_to_system") then clear = row end
-						end
-					end
+					if parent.title == i18n.get("menu.gestures.title") then submenu = parent.menu end
 				end
-				helpers.assert_true(clear ~= nil and type(clear.fn) == "function", "the real gesture Clear row must exist")
+				helpers.assert_true(type(submenu) == "table", "the real Gestures submenu must exist")
+				local first = {}
+				for index = 1, 4 do first[index] = submenu[index] and submenu[index].title end
+				helpers.assert_eq(table.concat(first, " | "), table.concat({ i18n.get("menu.gestures.enable"),
+					i18n.get("common.restore_recommended"), i18n.get("common.clear_to_system"), "-" }, " | "))
+				for index = 5, #submenu do
+					helpers.assert_true(submenu[index].title ~= i18n.get("common.restore_recommended")
+						and submenu[index].title ~= i18n.get("common.clear_to_system"),
+						"no scope row may follow the first group")
+				end
+				local restore, clear = submenu[2], submenu[3]
+				helpers.assert_true(type(restore.fn) == "function" and type(clear.fn) == "function")
 				os.execute = function(command)
-					if command == "command -v zenity >/dev/null 2>&1" then return 0 end
-					helpers.assert_true(command:find("zenity --question", 1, true) ~= nil)
-					questions[#questions + 1] = command
-					if pause_in_modal then controls.paused = true end
-					return accept and 0 or 1
+					if command:find("zenity", 1, true) then questions = questions + 1 end
+					return 0
 				end
+				-- A pause refuses the owner's publication; the file stays whole.
+				controls.paused = true
 				clear.fn()
-				helpers.assert_eq(calls, 0)
-				helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
-				accept = true
-				pause_in_modal = true
-				clear.fn()
-				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(table.concat(calls, ","), "clear")
 				helpers.assert_eq(refreshes, 0)
 				helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
-				pause_in_modal, controls.paused = false, false
+				controls.paused = false
 				clear.fn()
-				helpers.assert_eq(calls, 2)
+				helpers.assert_eq(table.concat(calls, ","), "clear,clear")
 				helpers.assert_true(refreshes > 0)
 				helpers.assert_eq(gestures.is_enabled(), false)
-				helpers.assert_eq(#questions, 3)
-				for _, question in ipairs(questions) do
-					helpers.assert_true(question:find("--default-cancel", 1, true) ~= nil)
-					helpers.assert_true(question:find(i18n.get("menu.gestures.title"), 1, true) ~= nil,
-						"confirmation uses the translated gesture title")
-				end
+				local saved = Codec.decode(Sandbox.read_bytes(path))
+				helpers.assert_eq(saved.gestures and saved.gestures.enabled, nil)
+				helpers.assert_eq(saved.other.value, 42)
+				helpers.assert_eq(Sandbox.read_bytes(controls.backups[#controls.backups]), SOURCE,
+					"the clear backs the file up before it rewrites it")
+				restore.fn()
+				helpers.assert_eq(table.concat(calls, ","), "clear,clear,recommended")
+				local recommended = require("infra.manifest_reader").recommended_for("gestures.enabled")
+				helpers.assert_eq(gestures.is_enabled(), recommended)
+				helpers.assert_eq(questions, 0, "neither scope row asks a question")
 			end)
 			os.execute = previous_execute
-			package.loaded[menu_name], package.loaded[modal_name] = previous_menu, previous_modal
+			package.loaded[menu_name] = previous_menu
 			if not ok then error(err, 0) end
 		end)
 	end)

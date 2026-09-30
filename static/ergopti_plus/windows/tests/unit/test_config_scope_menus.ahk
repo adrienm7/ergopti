@@ -9,7 +9,7 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 	return _MR_RenderCommand(TargetMenu, Item, MenuKey, Commands, Map())
 }
 
-_ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
+_ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
 	Fixture := _ScopeOwnerFixture()
 	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
@@ -23,8 +23,8 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 	Fixture.options["reload"] := Launch
 	try {
 		Commands := %Factory%(Fixture.options)
-		; The AI menu offers the restore alone (ai-menu-no-clear).
-		Modes := Scope == "llm" ? ["recommended"] : ["recommended", "clear"]
+		if Modes.Length == 1
+			Assert(!Commands.Has("scope_clear"), MenuKey . " offers the restore alone")
 		for Mode in Modes {
 			Fixture.options["stamp"] := Mode
 			Id := Mode == "clear" ? "scope_clear" : "scope_restore"
@@ -78,9 +78,10 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey) {
 Test("config-scope-menu: layout commands publish only their scope and recover refusal",
 	_ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu"))
 Test("config-scope-menu: LLM commands preserve credentials and recover refusal",
-	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu"))
-Test("config-scope-menu: metrics commands preserve consent on restore and recover refusal",
-	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu"))
+	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"]))
+; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+Test("config-scope-menu: metrics restore preserves consent, recovers refusal, and has no clear",
+	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"]))
 
 _ScopeMenuAbsentConsent() {
 	for Factory in ["_LLM_ScopeCommands", "_MET_ScopeCommands"] {
