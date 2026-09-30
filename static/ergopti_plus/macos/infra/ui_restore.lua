@@ -73,7 +73,7 @@ local REGISTRY = {
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_typing")
 			if not ok or not m or type(m.show) ~= "function" then return false end
-			return m.show(hs.configdir .. "/logs") == true
+			return m.show() == true
 		end,
 	},
 	{
@@ -86,7 +86,7 @@ local REGISTRY = {
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_apps")
 			if not ok or not m or type(m.show) ~= "function" then return false end
-			return m.show(hs.configdir .. "/logs") == true
+			return m.show() == true
 		end,
 	},
 	{
