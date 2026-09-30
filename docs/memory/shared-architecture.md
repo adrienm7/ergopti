@@ -136,6 +136,20 @@ sigma and title digraphs are Lua-only vectors. Never case user text with Lua
 `string.upper`/`string.lower` (bytes only) or AHK `Format("{:T}")` (a capital
 after a digit, none after a hyphen).
 
+### project-api-entry-names-are-computed
+
+Maintainer rule (2026-09-30): the user never names a remote API entry. Every
+tray names it `<provider>/<model>`, with the model and base URL its requests
+use, adding the host and then the order when two entries share that name:
+`_shared/lua/llm/api_entry_names.lua` (macOS `api_panel`, Linux
+`llm_backend_rows`) and its Windows port `_LLM_ApiEntryNames` in
+`menu_api_entries.ahk`, all replaying
+`_shared/tests/corpus/llm/api_entry_names_vectors.json`. The stored name field
+(Windows `Name` and Linux `label`, which older builds still require, and the
+optional macOS `label`) is written with the automatic name or left as stored,
+and never read. Action: a new place that shows an entry names it through the
+driver's naming function over the whole entry list, never from a stored field.
+
 ### project-a-toggle-is-opt-in-per-driver
 
 A shared setting is not automatically supported by every driver. Add explicit

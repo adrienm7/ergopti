@@ -1308,7 +1308,6 @@
 	"menu.llm.api_edit_entry": "Изменить выбранный API",
 	"menu.llm.api_no_entry": "API не настроен",
 	"menu.llm.api_prompt_model": "Название модели:",
-	"menu.llm.api_prompt_name": "Имя (напр., «Мой ключ OpenAI»):",
 	"menu.llm.api_prompt_provider": "Идентификатор провайдера ({1}):",
 	"menu.llm.api_prompt_token": "Токен / ключ API (скрыто):",
 	"menu.llm.api_prompt_url": "Базовый URL:",

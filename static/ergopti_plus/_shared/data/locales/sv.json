@@ -1308,7 +1308,6 @@
 	"menu.llm.api_edit_entry": "Redigera vald API",
 	"menu.llm.api_no_entry": "Ingen API-slutpunkt konfigurerad",
 	"menu.llm.api_prompt_model": "Modellnamn:",
-	"menu.llm.api_prompt_name": "Namn (t.ex. 'Min OpenAI-nyckel'):",
 	"menu.llm.api_prompt_provider": "Leverantörs-ID ({1}):",
 	"menu.llm.api_prompt_token": "API-token / nyckel (dold):",
 	"menu.llm.api_prompt_url": "Bas-URL:",

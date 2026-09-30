@@ -1308,7 +1308,6 @@
 	"menu.llm.api_edit_entry": "ערוך את ה-API שנבחר",
 	"menu.llm.api_no_entry": "לא הוגדרה נקודת קצה API",
 	"menu.llm.api_prompt_model": "שם הדגם:",
-	"menu.llm.api_prompt_name": "שם (לדוגמה 'מפתח OpenAI שלי'):",
 	"menu.llm.api_prompt_provider": "מזהה ספק ({1}):",
 	"menu.llm.api_prompt_token": "טוקן / מפתח API (מוסתר):",
 	"menu.llm.api_prompt_url": "כתובת URL בסיסית:",

@@ -1308,7 +1308,6 @@
 	"menu.llm.api_edit_entry": "تعديل API المحدّد",
 	"menu.llm.api_no_entry": "لم يتم تكوين أي نقطة نهاية API",
 	"menu.llm.api_prompt_model": "اسم الطراز:",
-	"menu.llm.api_prompt_name": "الاسم (مثل «مفتاح OpenAI الخاص بي»):",
 	"menu.llm.api_prompt_provider": "معرّف المزوّد ({1}):",
 	"menu.llm.api_prompt_token": "رمز / مفتاح API (مخفي):",
 	"menu.llm.api_prompt_url": "عنوان URL الأساسي:",

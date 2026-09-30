@@ -1303,7 +1303,6 @@
 	"menu.llm.api_edit_entry": "Edit selected API",
 	"menu.llm.api_no_entry": "No API endpoint configured",
 	"menu.llm.api_prompt_model": "Model name:",
-	"menu.llm.api_prompt_name": "Friendly name (e.g. 'My OpenAI key'):",
 	"menu.llm.api_prompt_provider": "Provider id ({1}):",
 	"menu.llm.api_prompt_token": "API token / key (hidden):",
 	"menu.llm.api_prompt_url": "Base URL:",
