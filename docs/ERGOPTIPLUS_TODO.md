@@ -220,7 +220,9 @@ These are software implementations; final hardware verification remains below.
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
-      the wizard re-run on the three OSes.
+      the wizard re-run on the three OSes; on a Mac with an Ergopti layout,
+      startup logs no « Lease-bound input startup failed » ERROR and no
+      « Layout poll detected change » between the two names of one layout.
 - [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
   branch on 2026-09-30; agents must not create `backup/*` branches again. The
   finished agent worktrees under `.claude/worktrees/` can be removed; the
@@ -360,12 +362,6 @@ integrated, then publish one grouped release.
       an update by itself, it only notifies; on a run from the sources, «
       Désinstaller » and these buttons are greyed with their reason. Branch
       `feat/release-rollback`.
-- [ ] **59.** macOS v0.0.0-dev.155: "Lease-bound input startup failed:
-      prepared lease RESUME failed: lease-stopping" at startup. Cause: the layout
-      watcher compares the localised layout name with the HIToolbox name, sees a
-      phantom layout change about 2 s after boot, and stops the activation in
-      flight; that intentional stop is logged at ERROR. Branch
-      `fix/macos-lease-resume-stopping`.
 - [ ] **60.** Windows: the registry-layout emulation registers its dead-key
       resets by key name ("~" plus Enter, Escape, BackSpace, Tab), which the scan
       code declarations of the same keys shadow, so the resets never fire; the
