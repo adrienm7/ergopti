@@ -434,6 +434,15 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			return toggle_all_hotstrings()
 		end,
 	}
+	-- « Restore recommended » and « Clear » run the Hotstrings scope owner, which
+	-- asks first and changes config.toml and the override file as one
+	-- transaction; the ordinary save path never writes them.
+	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
+		hs_ctx.commands[command] = function()
+			if ctx.paused or type(ctx.apply_preference_scope) ~= "function" then return false end
+			return ctx.apply_preference_scope("hotstrings", mode) == true
+		end
+	end
 	-- Registered only when the module provides it: an unregistered command is
 	-- reported by the renderer and its row is not drawn, where an empty stand-in
 	-- drew a row that did nothing when clicked.

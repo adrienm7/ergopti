@@ -107,8 +107,9 @@ end
 
 --- Builds the real tray for one posture of every category.
 --- @param on boolean Whether every category starts switched on.
+--- @param extra table|nil Context fields to add, such as a scope port.
 --- @return table tray, table ctx, table observed, table errors
-local function build_tray(on)
+local function build_tray(on, extra)
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu, state)
 		state.llm_enabled = on
@@ -171,6 +172,7 @@ local function build_tray(on)
 		shortcuts  = shortcuts_double(observed),
 		llm_handler = { build_item = function() return llm_item end },
 	}
+	for key, value in pairs(extra or {}) do ctx[key] = value end
 	local actions = setmetatable({}, { __index = function() return function() end end })
 	local ok, tray = pcall(builder.generate, ctx, mods, actions)
 	ManifestMenu.render_rows = render_rows
@@ -287,5 +289,32 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 		helpers.assert_eq(observed.group_on, { rolls = true, autocorrection = true },
 			"the hotstrings master must switch every group")
 	end)
+
+	-- The Hotstrings scope rows sit under the switch, like the IA and Metrics
+	-- ones, and run the scope owner; they were declared nowhere, so no driver
+	-- offered « restore recommended » or « clear » for the hotstrings.
+	for _, paused in ipairs({ false, true }) do
+		helpers.it("draws the hotstrings restore and clear rows, routed to the scope (paused "
+			.. tostring(paused) .. ")", function()
+			local requests = {}
+			local tray, _, _, errors = build_tray(true, { paused = paused,
+				apply_preference_scope = function(scope, mode)
+					requests[#requests + 1] = scope .. ":" .. mode
+					return true
+				end })
+			local i18n = require("infra.i18n")
+			local rows = top_row(tray, "menu.hotstrings.title").menu
+			helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"))
+			helpers.assert_eq(rows[3].title, i18n.get("common.clear_to_system"))
+			for index = 2, 3 do
+				if type(rows[index].fn) == "function" then rows[index].fn() end
+			end
+			helpers.assert_eq(requests, paused and {} or { "hotstrings:recommended", "hotstrings:clear" },
+				"a paused session never reaches the scope")
+			for _, line in ipairs(errors) do
+				helpers.assert_true(line:find("scope_", 1, true) == nil, "the renderer reported: " .. line)
+			end
+		end)
+	end
 
 end)

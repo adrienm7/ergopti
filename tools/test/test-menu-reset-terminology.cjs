@@ -62,6 +62,7 @@ const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 const EXPECTED_ROWS = {
 	configuration_menu: [1, 0],
 	gestures_menu: [1, 1],
+	hotstrings_menu: [1, 1],
 	llm_menu: [1, 1],
 	metrics_menu: [1, 1],
 	tap_holds_menu: [1, 1]
