@@ -18,6 +18,7 @@ local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
 local AccessibilityPermission = require("adapters.accessibility_permission")
+local MouseControl = require("adapters.mouse_control")
 local LOG      = "gestures.engine"
 
 local _state      = nil
@@ -174,6 +175,7 @@ local function resetGS()
 	stopScrollBlock()
 	gs = {
 		active         = false,
+		pointerDrag    = false, -- Sticky until the last lift: a button went down, the contacts are a click-drag
 		startTime      = nil,
 		startPos       = nil,
 		endPos         = nil,
@@ -682,6 +684,27 @@ function M.process_frame(touches)
 
 	local n   = #touches
 	local now = hs.timer.secondsSinceEpoch()
+
+	-- A click-drag is never a gesture. Pressing the trackpad with one finger and
+	-- sliding another, or dragging after a tap to click, reports two or more
+	-- moving contacts: read as a swipe, they fired the two-finger action
+	-- (arrow_up in the recommended preset) or a three-finger tap in the middle of
+	-- a text selection, which lost it. From the first frame a button is seen
+	-- down to the last lift, the contacts belong to the pointer. One-finger
+	-- frames skip the read: they start no gesture.
+	if n > 0 and (gs.pointerDrag
+		or ((n >= 2 or gs.active) and MouseControl.any_button_down())) then
+		if not gs.pointerDrag then
+			Logger.debug(LOG, "A mouse button is down — %d contact(s) are a click-drag, not a gesture.", n)
+			gs.pointerDrag = true
+		end
+		stopScrollBlock()
+		return
+	end
+	if n == 0 and gs.pointerDrag then
+		resetGS()
+		return
+	end
 
 	if n == 0 then
 		stopScrollBlock()

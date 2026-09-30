@@ -419,7 +419,7 @@ M.features = {
 		path = "shortcuts.keyboard.hs_ctrl_space", id = "hs_ctrl_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", input_altering = true,
 	},
 	{
-		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screen_capture", input_altering = true,
+		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screenshot_fullscreen_save", input_altering = true,
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_right_1", id = "number_row_right_1", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_right_1", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
@@ -458,7 +458,7 @@ M.features = {
 		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "left_click_toggle", input_altering = true,
 	},
 	{
-		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "app_window_previous", input_altering = true,
+		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "win_app_next", input_altering = true,
 	},
 	{
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "arrow_up", input_altering = true,

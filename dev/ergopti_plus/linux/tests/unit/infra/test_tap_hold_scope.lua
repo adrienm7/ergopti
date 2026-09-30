@@ -278,4 +278,64 @@ helpers.describe("Linux tap-hold scope: refusals and revert", function()
 	end)
 end)
 
+-- A fresh install has no layers.toml, and an absent file binds no key: the
+-- restored left_alt entered an empty navigation layer. The restore now brings
+-- Ergopti's recommended layer along, never over a file the user has.
+helpers.describe("Linux tap-hold scope: the recommended navigation layer", function()
+	local PRESET = read(require("infra.paths").shared("keymap/layers.recommended.toml"))
+
+	helpers.it("(nav-layer-fresh-install-default) a restore creates layers.toml and the engine runs its layer", function()
+		with_scope(nil, nil, function(s)
+			helpers.assert_true(type(PRESET) == "string" and PRESET ~= "", "the shipped preset is readable")
+			helpers.assert_eq(s.owner().apply("recommended"), true)
+			helpers.assert_eq(read(s.dir .. "/layers.toml"), PRESET, "the preset's exact bytes")
+			local engine = s.installed[#s.installed]
+			helpers.assert_true(type(engine) == "table" and next(engine.nav_layer) ~= nil,
+				"the engine the restore installs binds the navigation layer")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is kept byte for byte", function()
+		for label, text in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
+			empty = "" }) do
+			with_scope(nil, nil, function(s)
+				write(s.dir .. "/layers.toml", text)
+				helpers.assert_eq(s.owner().apply("recommended"), true, label)
+				helpers.assert_eq(read(s.dir .. "/layers.toml"), text, label .. ": the user's file stays")
+			end)
+		end
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) clear neither creates nor removes a layer file", function()
+		with_scope(nil, nil, function(s)
+			helpers.assert_eq(s.owner().apply("clear"), true)
+			helpers.assert_nil(read(s.dir .. "/layers.toml"))
+		end)
+		with_scope(nil, nil, function(s)
+			write(s.dir .. "/layers.toml", PRESET)
+			helpers.assert_eq(s.owner().apply("clear"), true)
+			helpers.assert_eq(read(s.dir .. "/layers.toml"), PRESET)
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) a refused restore removes only the layer it created", function()
+		local config = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n'
+		with_scope(nil, config, function(s)
+			s.controls.refuse = s.config_path
+			helpers.assert_eq(s.owner().apply("recommended"), false)
+			helpers.assert_nil(read(s.dir .. "/layers.toml"), "no layer file outlives a refused restore")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) a reverted restore removes the layer it created", function()
+		with_scope(nil, nil, function(s)
+			local owner = s.owner()
+			helpers.assert_eq(owner.apply("recommended"), true)
+			helpers.assert_eq(read(s.dir .. "/layers.toml"), PRESET)
+			helpers.assert_eq(owner.revert(), true)
+			helpers.assert_nil(read(s.dir .. "/layers.toml"), "the created layer file is removed again")
+		end)
+	end)
+end)
+
 return true

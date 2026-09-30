@@ -98,11 +98,13 @@ return function(helpers)
 				helpers.assert_eq(ok, false, source)
 			end
 		end)
-		helpers.it("keeps cleanup conservative and quoted assignment keys unaddressable", function()
+		helpers.it("keeps cleanup conservative while the batch deletes a quoted assignment key", function()
 			local source = '[a."x"]\nv = true\n'
 			helpers.assert_eq(Scanner.scan_records(source).records[1].addressable, false)
-			local ok = prepare('[a."x"]\n"v" = true\n', { { section = "a.x", key = "v", delete = true } })
-			helpers.assert_eq(ok, false)
+			helpers.assert_eq(Scanner.scan_records('[a]\n"v" = true\n').records[1].addressable, false)
+			local ok, detail, content = prepare('[a."x"]\n"v" = true\nw = 1\n', { { section = "a.x", key = "v", delete = true } })
+			helpers.assert_eq(ok, true, detail)
+			helpers.assert_eq(content, '[a."x"]\nw = 1\n')
 		end)
 	end)
 end

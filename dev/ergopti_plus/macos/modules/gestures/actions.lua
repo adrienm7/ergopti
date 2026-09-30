@@ -405,20 +405,45 @@ local function invoke_ui(mod, method, ...)
 	end
 end
 
---- Switch to the previous application in the MRU list.
---- ke_lifecycle never exposed switch_to_previous_app, so the lazy-require branch
---- that used to sit here was dead and the keystroke below was the only path ever
---- taken. Removed rather than left as a shim, per the no-unused-fallback rule.
-local function switch_to_previous_application()
-	postKeyStroke({"cmd"}, "tab")
+--- Activates the most recently used other application directly.
+---
+--- This posted Cmd+Tab. The Dock commits its switcher only when Command itself
+--- is released, and a posted Tab keystroke carrying the Command flag releases
+--- nothing: one tap did nothing, a second one left the switcher open on screen.
+--- modules/gestures/app_switch.lua focuses the application's window instead.
+--- It runs off the dispatch callback, because listing the windows asks every
+--- application over the accessibility API, which an input callback must not
+--- wait on. Required at the call so a test can put its own desk behind it.
+--- @param scope string app_switch.SCOPE_ALL_SCREENS or SCOPE_THIS_SCREEN.
+--- @return boolean scheduled
+local function switch_to_previous_application(scope)
+	local scheduled = AuxOwner.after(0, "previous application", function()
+		return require("modules.gestures.app_switch").previous_app(scope)
+	end, current_action_parent())
+	return scheduled == true
 end
 
---- Switch to the previous window of the frontmost application.
---- This used to share cmd+tab with switch_to_previous_application, so the
---- "Prev. window" gesture silently performed an app switch. cmd+grave is the
---- macOS binding that actually cycles windows within the front app.
-local function switch_to_previous_window_precise()
-	postKeyStroke({"cmd"}, "`")
+--- Activates the least recently used application, what a Cmd+Shift+Tab tap
+--- selects. Posted, that keystroke switched nothing either.
+--- @return boolean scheduled
+local function switch_to_least_recent_application()
+	local scheduled = AuxOwner.after(0, "least recent application", function()
+		return require("modules.gestures.app_switch").least_recent_app()
+	end, current_action_parent())
+	return scheduled == true
+end
+
+--- Cycles the windows of the frontmost application directly. A posted Cmd+`
+--- depends on the keyboard layout carrying a backquote, which several non-US
+--- layouts do not; the remapped cycle_windows_in_app key (F17, watchers.lua)
+--- focuses windows itself for the same reason, but only with the remap layer.
+--- @param step number 1 for the next window, -1 for the previous one.
+--- @return boolean scheduled
+local function switch_application_window(step)
+	local scheduled = AuxOwner.after(0, "application window", function()
+		return require("modules.gestures.app_switch").app_window(step)
+	end, current_action_parent())
+	return scheduled == true
 end
 
 --- Triggers a macOS system-wide dictionary lookup/definition.
@@ -547,10 +572,6 @@ M.toggle_left_click       = function()
 	return Click.toggle_left_click(current_action_parent())
 end
 M.is_right_click_held     = Click.is_right_click_held
-
-local function show_application_switcher_overlay()
-    postKeyStroke({"cmd"}, "tab")
-end
 
 --- Navigates between windows of the current application.
 local function winNav(goNext)
@@ -799,9 +820,12 @@ sg("right_click_toggle",   M.toggle_right_click)
 sg("lookup", function()
 	return M.trigger_lookup(current_action_parent())
 end)
-sg("app_switcher",      show_application_switcher_overlay)
-sg("app_previous",      switch_to_previous_application)
-sg("app_window_previous",  switch_to_previous_window_precise)
+-- One action per target and scope. app_switcher, alt_tab_apps (Alt+F17),
+-- app_window_previous, win_prev and win_next did the same thing as one of
+-- these on macOS; config migration step v5_to_v6 maps a stored one to its twin.
+sg("app_previous",      function() return switch_to_previous_application("all_screens") end)
+sg("app_previous_screen", function() return switch_to_previous_application("this_screen") end)
+sg("cmd_shift_tab",     switch_to_least_recent_application)
 
 -- Keys
 -- ── Actions the shared catalogue describes for macOS ────────────────────────
@@ -967,8 +991,8 @@ sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "c
 -- Tabs
 
 -- Windows & Spaces
-sg("win_prev",            function() winNav(false) end)
-sg("win_next",              function() winNav(true) end)
+sg("win_app_prev",        function() return switch_application_window(-1) end)
+sg("win_app_next",        function() return switch_application_window(1) end)
 sg("snap_left",              function()
 	return apply_focused_window_action("Snap left", function(win)
 		return win:moveToUnit(hs.layout.left50)
@@ -2327,19 +2351,26 @@ function M.llm_prompt_choices()
 end
 
 --- The vision backends a llm_vision binding may name: the local server first,
---- then the API providers that take an image (modules/llm/provider_uses.lua),
+--- then the local OpenAI-compatible servers that answered the last sweep
+--- (modules/llm/local_servers.lua; their model goes in the binding), then the
+--- API providers that take an image (modules/llm/provider_uses.lua),
 --- in the catalogue's order, each with the vision model used when the binding
 --- names none ("" when the backend needs one).
 --- @return table Array of { value = backend id, label, defaultModel }.
 function M.llm_vision_choices()
 	local Remote = require("modules.llm.api_remote")
 	local ProviderUses = require("modules.llm.provider_uses")
+	local LocalServers = require("modules.llm.local_servers")
 	local defaults = require("modules.llm.screen_answer").config().default_models
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
 		label = i18n.get("llm.vision.local_backend"),
 		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
 	} }
+	for _, server_id in ipairs(ProviderUses.provider_ids(LocalServers.detected(), Remote.PROVIDERS,
+		ProviderUses.VISION)) do
+		choices[#choices + 1] = { value = server_id, label = Remote.PROVIDERS[server_id].label, defaultModel = "" }
+	end
 	for _, provider_id in ipairs(ProviderUses.provider_ids(Remote.PROVIDER_ORDER, Remote.PROVIDERS,
 		ProviderUses.VISION)) do
 		choices[#choices + 1] = {

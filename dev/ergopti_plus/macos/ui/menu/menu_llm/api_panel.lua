@@ -900,4 +900,98 @@ function M.build_model_picker(ctx)
 	return ManifestMenu.render_rows(rows, "llm_model")
 end
 
+--- Stores what the user chose for a local server (local_servers.json): its
+--- address, its key or its model, in the one API entry the server has. Before
+--- a model is chosen there is no entry: the address and the key wait in
+--- modules/llm/local_servers.lua. Choosing a model creates or updates the
+--- entry, makes it the active one and warms it up when the API backend is
+--- selected; a refused persistence restores the previous entries.
+--- @param ctx table { state, keymap, update_menu, WarmupCtrl }.
+--- @param server_id string A local server id.
+--- @param fields table { base_url = string|nil, token = string|nil, model = string|nil }.
+--- @param on_done function|nil Receives (committed) once settled.
+--- @return boolean started False when another entry change is in flight.
+function M.apply_local_server(ctx, server_id, fields, on_done)
+	local api_remote = llm_mod.api_remote
+	if not api_remote.is_local_server(server_id) or type(fields) ~= "table" then
+		error("api_panel.apply_local_server: a local server id and fields are required")
+	end
+	local LocalServers = require("modules.llm.local_servers")
+	local function done(committed)
+		if type(on_done) == "function" then pcall_log("apply_local_server(on_done)", on_done, committed) end
+	end
+	if _mutation_owner ~= nil then return false end
+	local provider = api_remote.PROVIDERS[server_id]
+	local existing = api_remote.local_server_entry(server_id)
+	fields = { base_url = fields.base_url, token = fields.token, model = fields.model }
+	-- The default address is stored as "", so a catalogue change reaches the entry
+	if fields.base_url == provider.base_url then fields.base_url = "" end
+	if not existing and fields.model == nil then
+		LocalServers.set_pending(server_id, fields)
+		done(true)
+		return true
+	end
+
+	local pending = LocalServers.pending(server_id)
+	local entry = {
+		id       = existing and existing.id or ("local-" .. server_id),
+		provider = server_id,
+		base_url = existing and existing.base_url or pending.base_url or "",
+		token    = existing and existing.token or pending.token or "",
+		model    = existing and existing.model or "",
+	}
+	for _, key in ipairs({ "base_url", "token", "model" }) do
+		if fields[key] ~= nil then entry[key] = fields[key] end
+	end
+	local previous_entries = {}
+	local staged = {}
+	for _, e in ipairs(api_remote.get_entries() or {}) do
+		previous_entries[#previous_entries + 1] = e
+		if e ~= existing then staged[#staged + 1] = e end
+	end
+	entry.label = unique_entry_label(provider.label .. "/" .. entry.model, staged)
+	staged[#staged + 1] = entry
+
+	local state = ctx.state
+	local previous_active_id = api_remote.get_active_entry_id()
+	local previous_model = state.llm_model
+	local becomes_active = fields.model ~= nil or (existing ~= nil and existing.id == previous_active_id)
+	-- New entries retire the API backend's predictions and readiness: only a
+	-- selected API backend has them to retire, a model slot to follow the
+	-- entry and a warmup to redo; otherwise the backend switch owns all three
+	local serving = state.llm_backend == "api"
+	if serving and reset_prediction_identity(ctx.keymap, "apply local server entry") ~= true then
+		return false
+	end
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	api_remote.set_entries(staged)
+	if becomes_active then api_remote.set_active_entry_id(entry.id) end
+	if serving and becomes_active then state.llm_model = entry.model end
+	-- A key the user removed leaves no Keychain item behind
+	local cleared_key = existing ~= nil and (existing.token or "") ~= "" and entry.token == ""
+	persist_entries("persist_api_entries(local server)", function(ok, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if ok == true or durable == true then
+			if ok ~= true then
+				Logger.error(LOG, "Local server entry committed with cleanup debt: %s", tostring(reason))
+			end
+			LocalServers.clear_pending(server_id)
+			Logger.info(LOG, "Local server '%s' entry stored (model %s).", server_id, entry.model)
+			if serving and ctx.WarmupCtrl then ctx.WarmupCtrl.warmup("local_server") end
+			pcall_log("update_menu(local server)", ctx.update_menu)
+			done(true)
+			return
+		end
+		api_remote.set_entries(previous_entries)
+		api_remote.set_active_entry_id(previous_active_id)
+		state.llm_model = previous_model
+		notify_persistence_failure("Local server entry")
+		pcall_log("update_menu(local server rollback)", ctx.update_menu)
+		done(false)
+	end, cleared_key and { delete_entry_ids = { entry.id } } or nil)
+	return true
+end
+
 return M

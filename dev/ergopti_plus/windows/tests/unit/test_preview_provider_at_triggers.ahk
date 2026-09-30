@@ -239,7 +239,8 @@ Test("hotstrings: a resolvable @ combo is both previewed and fired (at-triggers-
 
 ; The forbidding half for the personal resolver. "z" aliases no field, so the
 ; @ expansion must not be advertised. The canonical engine still owns its next
-; fallback: because z is mid-word, repeat legitimately wins and must be shown.
+; fallback: because z is mid-word, repeat legitimately wins, and the bubble
+; withholds that doubling (no-repeat-preview) without promoting anything else.
 _PIPP_UnresolvableComboYieldsToRepeat() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
 	Saved := _PIPP_Setup()
@@ -252,21 +253,23 @@ _PIPP_UnresolvableComboYieldsToRepeat() {
 		Rows := _PrefixCollectCandidates()
 		Assert(!IsObject(_PIPP_CandidateFor(Rows, "@npz" . MK)),
 			"'z' aliases no personal_info field, so the tooltip must not invent an @npz expansion")
-		AssertEqual(1, Rows.Length,
+		Decision := HSE_PreviewNextDecision(HSE_Buffer, MK)
+		Assert(IsObject(Decision) and Decision.Spec.HasOwnProp("TransientKind")
+			and Decision.Spec.TransientKind == "repeat",
 			"the declined personal resolver must yield to the one canonical fallback")
-		AssertEqual("z" . MK, Rows[1].Trigger,
-			"the actual repeat fallback must remain visible instead of being hidden by the failed @ resolver")
+		AssertEqual(0, Rows.Length,
+			"the repeat it yields to is a doubling, never previewed, and the failed @ resolver must not be shown in its place")
 
 		HSE_Buffer := "@npz" . MK
 		Assert(!IsObject(HSE_TryPersonalInfoCombo(MK)),
 			"the personal resolver must decline the same invalid tag")
 		Assert(IsObject(HSE_TryRepeatKey(MK)),
-			"sanity: the repeat fallback shown above must be fireable on the same completed buffer")
+			"sanity: the withheld repeat fallback must still fire on the same completed buffer")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: an unresolvable @ combo yields visibly to repeat (at-triggers-have-no-preview-candidate-source)",
+Test("hotstrings: an unresolvable @ combo yields to the unpreviewed repeat (at-triggers-have-no-preview-candidate-source)",
 	_PIPP_UnresolvableComboYieldsToRepeat)
 
 
@@ -303,8 +306,8 @@ Test("hotstrings: a personal preview renders the registered value snapshot durin
 
 ; The resolver declines a combo whole when any field is blank, because emitting
 ; the remaining fields would shift values into the wrong form controls. The
-; canonical preview must not assemble a partial row and must surface the repeat
-; fallback that really wins next.
+; canonical preview must not assemble a partial row; the repeat fallback that
+; really wins next is a doubling, which the bubble never offers.
 _PIPP_BlankFieldComboYieldsToRepeat() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation, PersonalInformation
 	Saved := _PIPP_Setup()
@@ -318,20 +321,22 @@ _PIPP_BlankFieldComboYieldsToRepeat() {
 		Rows := _PrefixCollectCandidates()
 		Assert(!IsObject(_PIPP_CandidateFor(Rows, "@npn" . MK)),
 			"@npn contains a blank first_name field, so the tooltip must not promise a partial personal expansion")
-		AssertEqual(1, Rows.Length,
-			"declining the personal combo must not hide the canonical repeat fallback")
-		AssertEqual("n" . MK, Rows[1].Trigger,
-			"the visible row must describe the repeat the engine will actually fire")
+		Decision := HSE_PreviewNextDecision(HSE_Buffer, MK)
+		Assert(IsObject(Decision) and Decision.Spec.HasOwnProp("TransientKind")
+			and Decision.Spec.TransientKind == "repeat",
+			"declining the personal combo must hand the magic key to the canonical repeat fallback")
+		AssertEqual(0, Rows.Length,
+			"that repeat is a doubling, never previewed, and no partial personal row may take its place")
 		HSE_Buffer := "@npn" . MK
 		Assert(!IsObject(HSE_TryPersonalInfoCombo(MK)),
 			"the engine declines the same combo whole; preview and fire must agree on the blank-field gate")
 		Assert(IsObject(HSE_TryRepeatKey(MK)),
-			"sanity: the shown repeat fallback must fire after the personal gate declines")
+			"sanity: the withheld repeat fallback must fire after the personal gate declines")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: a personal combo containing a blank field yields visibly to repeat",
+Test("hotstrings: a personal combo containing a blank field yields to the unpreviewed repeat",
 	_PIPP_BlankFieldComboYieldsToRepeat)
 
 

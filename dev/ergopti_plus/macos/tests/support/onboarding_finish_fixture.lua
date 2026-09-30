@@ -5,9 +5,11 @@
 --- DESCRIPTION:
 --- Drives the real onboarding finish-message handler with controlled
 --- persistence boundaries: the language store, the destination read, the
---- configuration writer, the folder resolver and the remap owner that imports
---- the tap-hold keys. Everything else (the catalogue, the manifest reader, the
---- answers contract and the config migration) is the production code.
+--- configuration writer, the folder resolver, the remap owner that imports
+--- the tap-hold keys and the layer file the navigation layer owner writes.
+--- Everything else (the catalogue, the manifest reader, the answers contract,
+--- the config migration, the shipped tap-hold presets and the rule that a
+--- key's preset enters the navigation layer) is the production code.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,12 +30,16 @@ local MODULE_NAMES = {
 	"infra.config_paths",
 	"infra.termination_coordinator",
 	"platform.remap",
+	"platform.remap.defaults",
+	"platform.remap.nav_layer",
 	"ui.menu.menu_paths",
 	"ui.onboarding",
 }
 
 -- Where the doubled path resolver puts the remap settings.
 M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/config_karabiner.toml"
+-- The configuration folder it resolves, which holds layers.toml.
+M.CONFIG_DIR = "/virtual/"
 
 --- Returns one named upvalue and its numeric slot.
 --- @param fn function
@@ -53,7 +59,9 @@ end
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
 ---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
 ---   remap = { initialized, running, hold_import, import_ok, save_ok, report }|nil,
----   reload = "accepted"|"refused"|nil, menu_paths = table|nil }`. A held
+---   reload = "accepted"|"refused"|nil, menu_paths = table|nil,
+---   layer = "fail"|nil }`. The navigation layer file is recorded in
+---   state.layer_imports (config folders) and state.layer_undos, never written. A held
 ---   import leaves its callback in state.import_callbacks for the scenario to
 ---   settle; `report` is what the owner reports of the tap-hold keys in force
 ---   (nil: unreadable). Deferred work is recorded in state.pending, never run,
@@ -77,6 +85,22 @@ function M.with_finish(opts, scenario)
 		writes = {},
 	}
 	local function noop() end
+	-- The shipped presets and the layer rule, read before the path doubles.
+	local RealDefaults = require("platform.remap.defaults")
+	local RealNavLayer = require("platform.remap.nav_layer")
+	state.layer_imports, state.layer_undos = {}, {}
+	package.loaded["platform.remap.defaults"] = RealDefaults
+	package.loaded["platform.remap.nav_layer"] = setmetatable({
+		import_recommended = function(options)
+			state.layer_imports[#state.layer_imports + 1] = options.config_dir
+			if opts.layer == "fail" then return nil, "disk full" end
+			return { status = "imported", path = options.config_dir .. "layers.toml" }
+		end,
+		undo_import = function(import)
+			if import ~= nil then state.layer_undos[#state.layer_undos + 1] = import end
+			return true
+		end,
+	}, { __index = RealNavLayer })
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.paths"] = { shared = function() return "/virtual/shared" end }
 	package.loaded["infra.text_utils"] = { applescript_format = string.format }
@@ -156,6 +180,7 @@ function M.with_finish(opts, scenario)
 			assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
 			return M.KARABINER_CONFIG_PATH
 		end,
+		get_config_dir = function() return M.CONFIG_DIR end,
 	}
 	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
 	package.loaded["infra.i18n"] = {

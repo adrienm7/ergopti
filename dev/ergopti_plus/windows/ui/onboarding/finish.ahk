@@ -10,6 +10,9 @@
 ; files. A refused reload rolls every file back and leaves the wizard open for
 ; a retry. A tap_hold.toml that cannot take the import leaves the other
 ; answers to be saved without it, as on macOS and Linux, and the user is told.
+; A key whose recommended hold enters the navigation layer brings Ergopti's
+; recommended layer along: layers.toml is created in the same transition when
+; the folder has none, and an existing one is never replaced.
 ;
 ; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
@@ -50,6 +53,42 @@ _Onboarding_TapHoldTarget(Path, Keys) {
 	if (Backup != "")
 		try LoggerInfo("Onboarding", "Backed up '{1}' to '{2}' before the tap-hold import.", Path, Backup)
 	return ConfigTransitionPresentTarget(Path, Image["content"], ExpectedOld)
+}
+
+; The layers.toml a wizard commit creates beside its tap-hold import: the
+; configuration folder's, when one of the imported keys' recommended hold
+; enters the layer Ergopti's recommended layer file binds.
+; @param ConfigDir string The configuration folder being set up.
+; @param Keys Array Validated key ids from OnboardingTapHoldKeys.
+; @returns {String} The layers.toml path, "" when no imported key enters the layer.
+; Throws when the shipped layer or tap-hold data cannot be read.
+_Onboarding_NavLayerPath(ConfigDir, Keys) {
+	global _SharedDir
+	Preset := TapHoldRecommendedLayer(_SharedDir)
+	if !TapHoldPresetEntersLayer(_SharedDir . "\tap_hold\defaults.toml", Keys, Preset["layer_id"])
+		return ""
+	return KeymapLayers_UserFilePathFromVocabulary(_SharedDir, ConfigDir)
+}
+
+; The transition target that creates layers.toml from the recommended layer.
+; An existing file is the user's: no target is returned for it.
+; @param Path string The folder's layers.toml.
+; @returns {Map|Integer|String} The target, 0 for a file kept as it is, or why
+;   the layer cannot be imported.
+_Onboarding_NavLayerTarget(Path) {
+	global _SharedDir
+	try Image := TapHoldLayerImportImage(_SharedDir, Path)
+	catch as Err {
+		try LoggerError("Onboarding",
+			"The recommended navigation layer cannot be imported into '{1}': {2}. The other answers are saved without it.",
+			Path, Err.Message)
+		return Err.Message
+	}
+	if (Image["content"] == Image["source_content"]) {
+		try LoggerInfo("Onboarding", "'{1}' is kept: the wizard never replaces a layer file.", Path)
+		return 0
+	}
+	return ConfigTransitionPresentTarget(Path, Image["content"], ConfigTransitionExpectedOld(0, ""))
 }
 
 ; The configuration rows a wizard commit writes: the chosen language, then the
@@ -125,8 +164,18 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 
 		updates := _Onboarding_CommitUpdates(Locale, Rows)
 		TapHoldPath := ""
-		if (TapHoldKeys.Length > 0)
+		LayersPath := ""
+		NavLayerRefused := false
+		if (TapHoldKeys.Length > 0) {
 			TapHoldPath := TapHoldConfigPathBeside(CandidateConfig)
+			try LayersPath := _Onboarding_NavLayerPath(CandidateDir, TapHoldKeys)
+			catch as Err {
+				NavLayerRefused := true
+				try LoggerError("Onboarding",
+					"The recommended navigation layer cannot be imported: {1}. The other answers are saved without it.",
+					Err.Message)
+			}
+		}
 
 		; The wizard is reachable from the live tray as well as first boot. Hold
 		; current config ownership from candidate write through paths.toml
@@ -136,6 +185,8 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 		TransitionPaths := [CandidateConfig]
 		if (TapHoldPath != "")
 			TransitionPaths.Push(TapHoldPath)
+		if (LayersPath != "")
+			TransitionPaths.Push(LayersPath)
 		if PathRedirectRequired
 			TransitionPaths.Push(_PathsFile)
 		AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
@@ -183,6 +234,15 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 				TapHoldsRefused := !(TapHoldTarget is Map)
 				if !TapHoldsRefused
 					TargetSpecs.Push(TapHoldTarget)
+				; The layer goes with its key: never into a folder whose keys
+				; were not imported.
+				if (!TapHoldsRefused && LayersPath != "") {
+					LayerTarget := _Onboarding_NavLayerTarget(LayersPath)
+					if (LayerTarget is Map)
+						TargetSpecs.Push(LayerTarget)
+					else if (LayerTarget is String)
+						NavLayerRefused := true
+				}
 			}
 			if PathRedirectRequired {
 				; The rewrite keeps the user's LogsDirPath.
@@ -215,6 +275,8 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 			; The other answers are saved: only now can the notice say so.
 			if TapHoldsRefused
 				_Onboarding_ShowError("onboarding.error.tap_holds_import")
+			else if NavLayerRefused
+				_Onboarding_ShowError("onboarding.error.nav_layer_import")
 
 			; Publish only the fully persisted state. The teardown callback runs from
 			; the reload hand-off only after every refusal gate accepts, so a failed

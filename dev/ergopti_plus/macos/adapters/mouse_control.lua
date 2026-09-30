@@ -176,4 +176,29 @@ function M.screen_frame_under_cursor()
 	return result
 end
 
+-- The button read runs on every trackpad frame: a failing read is reported
+-- once, not sixty times a second.
+local _button_read_failure_logged = false
+
+--- Tells whether any mouse button is physically held at this instant. Not part
+--- of the MouseControl port: the gesture engine reads it on every trackpad
+--- frame, because the contacts of a click-drag are never a gesture.
+--- @return boolean down True while at least one button is held.
+function M.any_button_down()
+	local ok, result = pcall(function()
+		for _, pressed in pairs(hs.eventtap.checkMouseButtons() or {}) do
+			if pressed == true then return true end
+		end
+		return false
+	end)
+	if not ok then
+		if not _button_read_failure_logged then
+			_button_read_failure_logged = true
+			Logger.error(LOG, "any_button_down(): the mouse buttons cannot be read — %s", tostring(result))
+		end
+		return false
+	end
+	return result
+end
+
 return M

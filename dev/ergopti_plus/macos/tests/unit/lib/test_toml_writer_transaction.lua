@@ -130,8 +130,10 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 	end)
 
 	helpers.it("batch_write rejects malformed documents and ambiguous quoted targets", function()
+		-- A lone quoted key is one key (toml-batch-existing-key); two spellings
+		-- the batch folds to one identity are still ambiguous.
 		for _, source in ipairs({ '[shortcuts]\nenabled = true\nenabled = false\n',
-			'[shortcuts]\n"enabled" = true\n' }) do
+			'[shortcuts]\n"enabled" = true\nEnabled = false\n' }) do
 			local writes = 0
 			local wrote = writer.batch_write("/controlled/invalid-sparse.toml", {
 				{ section = "shortcuts", key = "enabled", value = false },
@@ -146,14 +148,25 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 
 	helpers.it("batch_write never reports an unaddressable deletion as committed", function()
 		local writes = 0
-		local wrote = writer.batch_write("/controlled/quoted-delete.toml", {
+		local wrote = writer.batch_write("/controlled/inline-delete.toml", {
 			{ section = "shortcuts", key = "enabled", delete = true },
 		}, {
-			read_with_status = function() return '[shortcuts]\n"enabled" = true\n', "ok" end,
+			read_with_status = function() return 'shortcuts = { enabled = true }\n', "ok" end,
 			write = function() writes = writes + 1; return true end,
 		})
 		helpers.assert_eq(wrote, false)
 		helpers.assert_eq(writes, 0)
+		-- A quoted spelling of the same key is addressable, and its deletion
+		-- commits only with the key gone (toml-batch-existing-key).
+		local published = nil
+		local deleted = writer.batch_write("/controlled/quoted-delete.toml", {
+			{ section = "shortcuts", key = "enabled", delete = true },
+		}, {
+			read_with_status = function() return '[shortcuts]\n"enabled" = true\n', "ok" end,
+			write = function(_, content) published = content; return true end,
+		})
+		helpers.assert_eq(deleted, true)
+		helpers.assert_eq(published, '[shortcuts]\n')
 	end)
 
 	helpers.it("write refuses to rename after a returned write failure", function()
@@ -556,4 +569,5 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 end)
 
 require("test.toml_quoted_headers_contract")(helpers)
+require("test.toml_batch_existing_key_contract")(helpers)
 require("test.toml_leaf_rows_contract")(helpers)

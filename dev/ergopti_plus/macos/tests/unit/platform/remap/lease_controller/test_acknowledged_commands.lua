@@ -188,6 +188,71 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 		end)
 	end)
 
+	helpers.it("(lease-parked-run-loop) a PONG read after a dialog held the run loop keeps the lease", function()
+		-- A user saw "Karabiner lease … failed; fencing before publishing
+		-- failure: timeout waiting for PONG 159": a modal dialog parked the run
+		-- loop with a heartbeat in flight, and on dismissal its ACK timeout
+		-- fired before the PONG already waiting in the pipe was read.
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 45
+			ctx.fire_latest_timer()
+			helpers.assert_true(controller.status() ~= "fencing",
+				"a timeout held back by a parked run loop is not evidence of a dead worker")
+			ctx.chunk(1, "PONG 1\n")
+			helpers.assert_true(controller.status() ~= "fencing", "the waiting PONG settles the heartbeat")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG"), 0)
+		end)
+	end)
+
+	helpers.it("(lease-parked-run-loop) a PONG still missing after the grace fences the lease", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local variables = controller.variables()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 45
+			ctx.fire_latest_timer()
+			ctx.clock = ctx.clock + 1
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "fencing",
+				"a worker silent through the grace of running time is dead")
+			helpers.assert_not_nil(find_native_revoke(ctx, variables))
+		end)
+	end)
+
+	helpers.it("(lease-pong-budget) a PONG waits well past the worker's own command budget", function()
+		-- dev.152 still saw "timeout waiting for PONG 1" at start-up: the worker
+		-- answers within its private command budget of 1.75 s
+		-- (kPrivateCommandAckTimeoutSeconds in RemapLeaseWorker.swift), and the
+		-- 2.0 s deadline left 0.25 s for the pipe and a busy main thread.
+		local WORKER_COMMAND_BUDGET_SEC = 1.75
+		local MIN_LATENCY_MARGIN_SEC = 2.0
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			helpers.assert_eq(ctx.spawns[1].inputs[1], "PING 1\n")
+			local ack_timer = ctx.timers[#ctx.timers]
+			helpers.assert_true(not ack_timer.repeating, "the latest timer is the PONG deadline")
+			helpers.assert_true(ack_timer.delay >= WORKER_COMMAND_BUDGET_SEC + MIN_LATENCY_MARGIN_SEC,
+				"the PONG deadline must exceed the worker's budget by the latency margin, got "
+				.. tostring(ack_timer.delay))
+			ctx.clock = ctx.clock + 2.5
+			ctx.chunk(1, "PONG 1\n")
+			helpers.assert_true(controller.status() ~= "fencing", "a PONG 2.5 s later keeps the lease")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG"), 0)
+		end)
+	end)
+
 	helpers.it("treats PING_FAILED as negative transport and releases queued mode input", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()
@@ -461,8 +526,8 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			ctx.chunk(1, "READY\n")
 
 			controller.pause()
-			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 2.0,
-				"PAUSED/RESUMED cover one native CLI write")
+			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 3.75,
+				"PAUSED/RESUMED cover the worker's 1.75 s command budget plus 2 s of latency")
 			ctx.chunk(1, "PAUSED\n")
 
 			controller.stop("budget proof")

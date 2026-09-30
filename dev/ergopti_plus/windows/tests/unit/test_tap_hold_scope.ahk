@@ -121,3 +121,78 @@ _TapHoldDetachedImage() {
 	} finally _ScopeOwnerCleanup(Fixture)
 }
 Test("tap-hold-scope: detached file owner has no effects and rejects mismatched scope mode", _TapHoldDetachedImage)
+
+; A fresh install has no layers.toml, which binds no key: the restored left_alt
+; entered an empty navigation layer. A restore given the configuration folder
+; now owns its layers.toml, created from the recommended layer only when absent.
+_TapHoldScopeLayerImport() {
+	global _SharedDir
+	Fixture := _ScopeOwnerFixture()
+	Path := Fixture.directory . "\tap_hold.toml"
+	LayersPath := Fixture.directory . "\layers.toml"
+	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	try {
+		AssertEqual(1, TapHoldScopeOwner(Path, Defaults, "clear", Fixture.directory).paths.Length,
+			"clear never owns the layer file")
+		AssertEqual(1, TapHoldScopeOwner(Path, Defaults, "recommended").paths.Length,
+			"without a folder no layer file is owned")
+		Owner := TapHoldScopeOwner(Path, Defaults, "recommended", Fixture.directory)
+		AssertEqual(2, Owner.paths.Length)
+		AssertEqual(LayersPath, Owner.paths[2])
+		Images := Owner.Build()
+		AssertEqual(2, Images.Length, "one candidate per owned path")
+		AssertEqual(LayersPath, Images[2].path)
+		AssertEqual(0, Images[2].image["source_present"])
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), Images[2].image["content"],
+			"an absent layers.toml becomes the recommended layer's exact bytes")
+		Assert(!FileExist(LayersPath), "building a candidate publishes nothing")
+		Own := "# the user's own layer`n"
+		Assert(FSWriteDurable(LayersPath, Own))
+		Kept := TapHoldScopeOwner(Path, Defaults, "recommended", Fixture.directory).Build()
+		AssertEqual(Own, Kept[2].image["source_content"])
+		AssertEqual(Own, Kept[2].image["content"], "an existing layers.toml is unchanged, so no transition writes it")
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("tap-hold-scope: a restore owns the recommended layer only where layers.toml is absent (nav-layer-fresh-install-default)",
+	_TapHoldScopeLayerImport)
+
+; The restore publishes the layer in the tap-hold cohort and a refused reload
+; takes it back with the other files.
+_TapHoldScopeRestoreCreatesLayer() {
+	global TapHold, GestureActionParameters, _SharedDir
+	OldTapHold := IsSet(TapHold) ? TapHold : unset
+	OldParameters := GestureActionParameters
+	Fixture := _ScopeOwnerFixture()
+	TapPath := Fixture.directory . "\tap_hold.toml"
+	LayersPath := Fixture.directory . "\layers.toml"
+	Fixture.options["tap_hold_path"] := TapPath
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["layers_config_dir"] := Fixture.directory
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Assert(FSWriteDurable(TapPath, '[tap_hold]`ninherit_defaults = true`n'))
+		TapHold := LoadTapHoldToml(TapPath)
+		GestureActionParameters := Map()
+		Receipt := TapHoldScopeApply("recommended", Fixture.options)
+		AssertEqual("pending", Receipt["status"])
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), FSReadUtf8Exact(LayersPath),
+			"the restore creates the recommended layer beside the preset")
+		Assert(!_ConfigWriteLeaseTryAcquire(LayersPath, "intruder"), "the layer file is held with the cohort")
+		Refusal.Call("native close refused")
+		AssertEqual("refused", Receipt["status"])
+		Assert(!FileExist(LayersPath), "a refused restore takes the layer it created back")
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		TapHold := IsSet(OldTapHold) ? OldTapHold : unset
+		GestureActionParameters := OldParameters
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("tap-hold-scope: the restore publishes the layer with the preset and a refusal takes it back (nav-layer-fresh-install-default)",
+	_TapHoldScopeRestoreCreatesLayer)

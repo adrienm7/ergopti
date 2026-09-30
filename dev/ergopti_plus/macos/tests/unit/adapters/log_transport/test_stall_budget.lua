@@ -17,6 +17,11 @@
 --- 4. A pump tick that follows a frozen run loop defers its verdict, so an ACK
 ---    already waiting in the socket is read before the transport is declared dead.
 ---    It defers once per batch: a run loop that stays throttled still gets one.
+--- 5. The budget counts running pump time: a parked run loop (a modal dialog, a
+---    busy main thread) counts at most one longest resend interval. A user who
+---    read a blocking dialog for thirty seconds saw the driver exit with "did
+---    not ACK retained sequence 128 within the 30000 ms stall budget (3 sends)"
+---    (transport-parked-run-loop).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -230,10 +235,58 @@ helpers.describe("Log transport stall budget", function()
 			context.state.clock = context.state.clock + budget + 1
 			context.state.pump()
 			helpers.assert_eq(#context.state.failures, 0)
+			local resumed_at = context.state.clock
+			pump_until(context, resumed_at + budget + 5)
+			helpers.assert_eq(#context.state.failures, 1,
+				"a live pump after the freeze still enforces the budget")
+		end)
+	end)
+
+	helpers.it("(transport-parked-run-loop) a dialog read for longer than the budget is not fatal", function()
+		Fixture.with_fixture(function()
+			local context = Fixture.new_context()
+			Fixture.configure(context)
+			context.transport.enqueue("logged-just-before-a-dialog", "error")
+			context.state.pump()
+			local first_send_at = context.state.clock
+			local budget = context.transport.status().stall_budget_sec
+
+			-- Two resends go out, then a blocking dialog parks the run loop, the
+			-- pump and the ACK callback together until the user closes it.
+			pump_until(context, first_send_at + 1.6)
+			helpers.assert_eq(#sends_of(context, 1), 3, "the pump resent twice before the dialog")
+			context.state.clock = first_send_at + budget - 1
+			pump_until(context, first_send_at + budget + 3)
+			helpers.assert_eq(#context.state.failures, 0,
+				"the time the dialog held the run loop proves nothing about the worker")
+
+			context:ack(1)
 			context.state.clock = context.state.clock + 0.01
 			context.state.pump()
+			helpers.assert_eq(#context.state.failures, 0)
+			helpers.assert_eq(context.transport.status().queued, 0, "the answered batch is retired")
+		end)
+	end)
+
+	helpers.it("(transport-parked-run-loop) a dead worker is reported after the budget of running pump time", function()
+		Fixture.with_fixture(function()
+			local context = Fixture.new_context()
+			Fixture.configure(context)
+			context.transport.enqueue("never-acknowledged-around-a-dialog", "error")
+			context.state.pump()
+			local budget = context.transport.status().stall_budget_sec
+			local longest_resend = Timings.sec("logger", "ack_retry_cap_ms")
+
+			context.state.clock = context.state.clock + 10 * budget
+			context.state.pump()
+			local resumed_at = context.state.clock
+			pump_until(context, resumed_at + budget - longest_resend - 0.1)
+			helpers.assert_eq(#context.state.failures, 0,
+				"a parked run loop counts at most one longest resend interval")
+			pump_until(context, resumed_at + budget + 5)
 			helpers.assert_eq(#context.state.failures, 1,
-				"a live tick after the freeze still enforces the budget")
+				"a worker silent through the whole budget of running pump time is dead")
+			helpers.assert_contains(context.state.failures[1], "did not ACK retained sequence 1")
 		end)
 	end)
 

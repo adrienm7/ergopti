@@ -183,6 +183,10 @@ local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop mus
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _approval_presenter       = nil   -- Login Items steps the boot registered, or nil
+local _legacy_cleanup_presenter = nil   -- Legacy-rule cleanup dialog the boot registered, or nil
+local _legacy_conflicts         = nil   -- Untagged legacy rules the last deploy refused, while pending
+local _legacy_cleanup_offered   = {}    -- Conflict sets whose cleanup was offered in this launch
+local _legacy_offer_token       = nil   -- The one deferred cleanup offer { epoch }, inert once replaced
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
 local _bulk_guardian_waiters = {} -- Bulk terminal -> saver, run when the guardian is not ready
@@ -3070,6 +3074,160 @@ function M.set_approval_presenter(present)
 	return true
 end
 
+--- Identifies one legacy conflict set: the same rules at the same places.
+--- @param refusal table The merge's legacy-signature refusal.
+--- @return string key
+local function legacy_conflict_key(refusal)
+	local parts = {}
+	for index, conflict in ipairs(refusal.conflicts) do
+		parts[index] = string.format("%d:%d:%s", conflict.profile_index, conflict.rule_index,
+			tostring(conflict.description))
+	end
+	return table.concat(parts, "\n")
+end
+
+--- Offers the legacy-rule cleanup, once per launch for one conflict set.
+--- Runs from the timer scheduler, after the regeneration that found the
+--- rules has settled, so its dialog never runs inside a lease transaction.
+--- @param token table The offer's identity when it was scheduled.
+--- @param epoch integer Lifecycle that scheduled it.
+local function offer_legacy_cleanup(token, epoch)
+	if _legacy_offer_token ~= token then return end
+	_legacy_offer_token = nil
+	if not is_current_lifecycle(epoch) then return end
+	local record = _legacy_conflicts
+	if record == nil or record.epoch ~= epoch then
+		Logger.debug(LOG, "The legacy Karabiner rules were resolved before their cleanup was offered.")
+		return
+	end
+	if _legacy_cleanup_offered[record.key] then return end
+	if _legacy_cleanup_presenter == nil then
+		Logger.warn(LOG, "No legacy-rule cleanup dialog is registered; the Tap-Holds menu offers the removal.")
+		return
+	end
+	_legacy_cleanup_offered[record.key] = true
+	Logger.info(LOG, "Offering the removal of %d legacy Karabiner rule(s).", record.count)
+	local ok, err = xpcall(_legacy_cleanup_presenter, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "The legacy-rule cleanup dialog raised: %s.", tostring(err))
+	end
+end
+
+--- Keeps the legacy rules a deploy refused, with the context that classified
+--- them, and schedules the cleanup offer outside the regeneration.
+--- @param refusal table The merge's legacy-signature refusal.
+--- @param legacy_context table Context the refused merge used.
+local function record_legacy_conflicts(refusal, legacy_context)
+	local descriptions = {}
+	for index, description in ipairs(refusal.descriptions) do descriptions[index] = description end
+	local record = {
+		key = legacy_conflict_key(refusal),
+		count = refusal.count,
+		descriptions = descriptions,
+		legacy_context = legacy_context,
+		epoch = _lifecycle_epoch,
+	}
+	_legacy_conflicts = record
+	Logger.warn(LOG,
+		"%d untagged legacy rule(s) in karabiner.json block every deploy until they are removed.", record.count)
+	if _legacy_cleanup_offered[record.key] then return end
+	-- A pending offer reads the newest record when it runs. One left by an
+	-- earlier lifecycle never runs for this one, so it does not count.
+	if _legacy_offer_token ~= nil and _legacy_offer_token.epoch == _lifecycle_epoch then return end
+
+	local epoch = _lifecycle_epoch
+	local token = { epoch = epoch }
+	local schedule_ok, handle_or_err, committed = pcall(TimerScheduler.after, 0, function()
+		offer_legacy_cleanup(token, epoch)
+	end)
+	if schedule_ok and committed == true then
+		_legacy_offer_token = token
+		return
+	end
+	if schedule_ok and type(handle_or_err) == "table" then
+		local cancel_ok, cancelled = pcall(TimerScheduler.cancel, handle_or_err)
+		if not cancel_ok or cancelled ~= true then
+			Logger.warn(LOG, "An uncommitted legacy cleanup offer timer did not cancel; it stays inert.")
+		end
+	end
+	Logger.error(LOG, "The legacy-rule cleanup offer could not be scheduled: %s; the Tap-Holds menu offers it.",
+		tostring(schedule_ok and "timer-not-committed" or handle_or_err))
+end
+
+--- Registers the one presenter of the legacy-rule cleanup dialog, shown once
+--- per launch when a deploy is refused by rules an older release left behind.
+--- @param present function fn() -> boolean, true when the dialog reached the user.
+--- @return boolean registered False when a presenter is already registered.
+function M.set_legacy_cleanup_presenter(present)
+	if type(present) ~= "function" then
+		error("platform.remap.set_legacy_cleanup_presenter(): present must be a function", 2)
+	end
+	if _legacy_cleanup_presenter ~= nil then
+		Logger.error(LOG, "The legacy-rule cleanup presenter is already registered; keeping the first one.")
+		return false
+	end
+	_legacy_cleanup_presenter = present
+	Logger.debug(LOG, "Legacy-rule cleanup presenter registered.")
+	return true
+end
+
+--- The untagged legacy rules the last deploy refused, while they block it.
+--- @return table|nil conflicts { count, descriptions }, nil when none is pending.
+function M.legacy_rule_conflicts()
+	local record = _legacy_conflicts
+	if record == nil or not is_current_lifecycle(record.epoch) then return nil end
+	local descriptions = {}
+	for index, description in ipairs(record.descriptions) do descriptions[index] = description end
+	return { count = record.count, descriptions = descriptions }
+end
+
+--- Removes the untagged rules the last deploy refused (with a verified backup
+--- of karabiner.json), then requests a normal regeneration.
+--- @param on_done function|nil fn(ok, result) where result is { stage =
+---   "removal"|"regeneration", reason, removed_count, backup_path }.
+--- @return boolean accepted True when the rules were removed and the
+---   regeneration requested; its outcome reaches on_done.
+function M.remove_legacy_rules(on_done)
+	Logger.info(LOG, "Removal of the legacy Karabiner rules requested.")
+	local function settle(ok, result)
+		invoke_public_callback("remove legacy rules", on_done, ok, result)
+	end
+	if not require_state("remove_legacy_rules") then
+		settle(false, { stage = "removal", reason = "not-initialized", removed_count = 0 })
+		return false
+	end
+	local record = _legacy_conflicts
+	if record == nil or not is_current_lifecycle(record.epoch) then
+		Logger.warn(LOG, "No legacy Karabiner rule is pending removal.")
+		settle(false, { stage = "removal", reason = "no-legacy-rules-pending", removed_count = 0 })
+		return false
+	end
+	local call_ok, removed, detail, removed_count, backup_path = xpcall(function()
+		return ManagedRuleRemoval.remove_legacy_rules(KARABINER_OUT, record.legacy_context)
+	end, debug.traceback)
+	if not call_ok then
+		Logger.error(LOG, "Legacy-rule removal raised: %s.", tostring(removed))
+		settle(false, { stage = "removal", reason = "legacy-removal-raised", removed_count = 0 })
+		return false
+	end
+	if removed ~= true then
+		-- The removal owner logged the precise refusal.
+		settle(false, { stage = "removal", reason = tostring(detail), removed_count = 0 })
+		return false
+	end
+	if _legacy_conflicts == record then _legacy_conflicts = nil end
+	local count = removed_count or 0
+	M.regenerate(function(ok, reason)
+		settle(ok == true, {
+			stage = "regeneration",
+			reason = reason,
+			removed_count = count,
+			backup_path = backup_path,
+		})
+	end)
+	return true
+end
+
 --- Opens System Settings at Login Items, whatever the guardian status: the
 --- approval opener refuses every status but `requires_approval`, while an
 --- `unavailable` helper is fixed from that same pane.
@@ -4871,7 +5029,10 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- backed-up bytes, and the Karabiner terminal before success. « recommended »
 --- writes the shipped preset, « clear » the neutral none/none; the timings are
 --- parameters whose default is the recommendation. The master comes from the
---- manifest rows; every other table of the file is left untouched.
+--- manifest rows; every other table of the file is left untouched. The
+--- tap_holds « recommended » first creates layers.toml from Ergopti's
+--- recommended layer when the folder has none, so the regeneration deploys the
+--- layer the preset's key enters; a refused transaction removes that file.
 --- @param request table `{ scope = "tap_holds"|"shortcuts",
 ---   mode = "recommended"|"clear", backup_path = string }`.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
@@ -4893,6 +5054,21 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
+	local layer = nil
+	if request.scope == "tap_holds" and request.mode == "recommended" then
+		local import, layer_err = NavLayer.import_recommended()
+		if not import then
+			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
+				label, tostring(layer_err))
+			invoke_public_callback(label, on_done, false, "nav-layer-import-failed", 0)
+			return false
+		end
+		layer = import
+	end
+	local function settle(ok, reason, change_count)
+		if ok ~= true then NavLayer.undo_import(layer) end
+		if on_done then return on_done(ok, reason, change_count) end
+	end
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
@@ -4919,7 +5095,7 @@ function M.apply_scope(request, on_done)
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
-	end, on_done, nil, request.backup_path)
+	end, settle, nil, request.backup_path)
 end
 
 --- Restores the settings to defaults as one exact transaction: every setting,
@@ -5263,7 +5439,7 @@ function M.regenerate(
 
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
-	local deploy_ok, deployed, deploy_detail = xpcall(function()
+	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
 		return Generator.merge_and_deploy_config(
 			result,
 			KARABINER_OUT,
@@ -5275,8 +5451,18 @@ function M.regenerate(
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
 			KARABINER_OUT, tostring(deploy_failure))
+		-- Rules an older release left behind: the user can remove them from a
+		-- dialog, offered once this regeneration has settled.
+		if deploy_ok and type(deploy_refusal) == "table"
+			and deploy_refusal.kind == Generator.REFUSAL_LEGACY_CONFLICTS then
+			record_legacy_conflicts(deploy_refusal, legacy_context)
+		end
 		contain_ambiguous_deploy_failure(lease_token, deploy_failure, context)
 		return fail("deploy-failed")
+	end
+	if _legacy_conflicts ~= nil then
+		Logger.info(LOG, "karabiner.json deployed: no legacy rule blocks it any more.")
+		_legacy_conflicts = nil
 	end
 
 	-- Ensure the parent directory of the KC physical log exists before Karabiner

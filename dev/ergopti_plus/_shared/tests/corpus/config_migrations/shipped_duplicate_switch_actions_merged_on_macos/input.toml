@@ -1,0 +1,23 @@
+# _shared/tests/corpus/config_migrations/shipped_duplicate_switch_actions_merged_on_macos/input.toml
+
+[_meta]
+schema_version = 5
+
+[gestures]
+enabled = true
+swipe_2_left = "arrow_up"
+swipe_3_left = "win_prev"
+swipe_3_right = "win_next"
+swipe_4_down = "cycle_windows_in_app"
+swipe_4_up = "alt_tab_apps"
+tap_3 = "app_switcher"
+tap_4 = "app_window_previous"
+
+[shortcuts.keyboard]
+cmd_k = "app_switcher"
+
+[shortcuts.script_control]
+return_key = "win_next"
+
+[shortcuts.tap_keys]
+number_row_left = "app_switcher"

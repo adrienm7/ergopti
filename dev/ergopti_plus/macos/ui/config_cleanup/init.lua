@@ -104,7 +104,7 @@ function M.open(options)
 			frame = frame, title = require("infra.i18n").get("dialog.unused_keys.title"),
 			style_masks = masks.titled + masks.closable + masks.resizable,
 			assets_dir = require("infra.paths").shared("ui/config_cleanup") .. "/",
-			usercontent = owner.controller, allow_text_entry = false, allow_new_windows = false,
+			usercontent = owner.controller, allow_new_windows = false,
 			is_current = function() return active == owner end,
 			on_webview_created = function(view)
 				owner.view = view

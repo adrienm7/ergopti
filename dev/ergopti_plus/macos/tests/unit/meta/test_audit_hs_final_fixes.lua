@@ -103,7 +103,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	helpers.it("actions.lua leftMouseTap must not defer a re-toggle after mouseUp", function()
 		-- The synthetic click-hold subsystem was extracted into actions_click.lua;
 		-- read both so the guard assertion survives that move (move-resilient).
-		local src = (read_src("local function switch_to_previous_window_precise") or "") ..
+		local src = (read_src("local function switch_to_least_recent_application") or "") ..
 			"\n" .. (read_src("local function start_click_key_watcher") or "")
 		assert(src ~= "", "gestures actions/actions_click source must be readable")
 		-- The original fix guarded the deferred toggle. Removing that deferral is

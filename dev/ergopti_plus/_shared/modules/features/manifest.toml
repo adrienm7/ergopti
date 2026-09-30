@@ -2456,13 +2456,15 @@ description_key = "menu.shortcuts.keyboard.super_space"
 # action assigned to it (any catalogue action, through the shared picker) and
 # is swallowed; with a modifier held, on the AltGr layer, or set to "none", it
 # keeps its own character. Each driver's key identity is
-# _shared/modules/actions/tap_keys.json. The key left of 1 opens the system's
-# capture tool by default; the two right of 0 start unassigned.
+# _shared/modules/actions/tap_keys.json. The key left of 1 is recommended to
+# save every screen at once, with no selection to make: it exists to catch
+# something that is only on screen for a moment. The two right of 0 start
+# unassigned.
 [[features.shortcuts.tap_keys]]
 id = "number_row_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended = "screen_capture"
+recommended = "screenshot_fullscreen_save"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_left"
@@ -2590,7 +2592,7 @@ description_key = "menu.gestures.tap_3"
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous", linux = "none" }
+recommended_per_platform = { ahk = "screenshot_window_clipboard", hs = "win_app_next", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_4"
@@ -5918,9 +5920,16 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 "shortcuts.script_control.script_altgr_enter" = "sg_labels.script_altgr_enter"
 "shortcuts.script_control.script_altgr_escape" = "sg_labels.script_altgr_escape"
 "shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
-"shortcuts.script_control.return_key" = "menu.shortcuts.right_opt_return"
-"shortcuts.script_control.backspace" = "menu.shortcuts.right_opt_back"
-"shortcuts.script_control.escape" = "menu.shortcuts.right_opt_escape"
+"shortcuts.script_control.return_key" = "sg_labels.script_ropt_return"
+"shortcuts.script_control.backspace" = "sg_labels.script_ropt_backspace"
+"shortcuts.script_control.escape" = "sg_labels.script_ropt_escape"
+
+# What triggers a macOS built-in shortcut whose id spells no key combination,
+# as the Shortcuts menu names it; every other one of them shows the chord its id
+# spells, before the action it runs.
+[onboarding.pages.shortcuts.triggers]
+"shortcuts.keys.layer_scroll" = "menu.shortcuts.key_layer_scroll"
+"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.altgr_symbol"
 
 [onboarding.pages.gestures]
 title_key = "menu.gestures.title"
@@ -5954,6 +5963,16 @@ checklist = "hotstrings"
 file_path = { ahk = "category_enabled.{group}", hs = "hotstrings.groups.{stem}", linux = "hotstrings.groups.{stem}" }
 section_path = { ahk = "hotstrings.{group}.{section}.enabled", hs = "hotstrings.modules.{stem}.{section}", linux = "hotstrings.modules.{stem}.{section}" }
 neutral_label_key = "onboarding.hotstrings.all_languages"
+# The preview bubbles only show what a hotstring will type. The neutral defaults
+# leave them off and the groups above never import them, so every fresh
+# configuration showed no bubble at all. The AI bubble stays out, as it does
+# from the menu's restore (restore_exclude): its backend is not chosen yet.
+settings_label_key = "menu.hotstrings.preview_bubbles"
+
+[onboarding.pages.hotstrings.settings]
+"hotstrings.preview_star_enabled" = "menu.hotstrings.tooltip_magic"
+"hotstrings.preview_autocorrect_enabled" = "menu.hotstrings.tooltip_autocorrect"
+"hotstrings.preview_colored_tooltips" = "menu.hotstrings.tooltip_colored"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"

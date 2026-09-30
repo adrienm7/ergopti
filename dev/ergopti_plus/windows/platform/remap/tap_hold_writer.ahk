@@ -18,6 +18,11 @@
 ; 3. Preserves per-key ``time_activation_seconds`` already in TapHold —
 ;    the tray menu does not expose this, but hand-editing tap_hold.toml is
 ;    supported and survives writes.
+; 4. The layer comes with its key: an absent layers.toml binds no key, so the
+;    first-run wizard's import of a key whose recommended hold enters the
+;    navigation layer, and the Tap-Holds « Restore recommended values », also
+;    create layers.toml from Ergopti's recommended layer in the same
+;    transition. An existing layers.toml is the user's and is never replaced.
 ; ==============================================================================
 
 
@@ -899,7 +904,12 @@ _TH_TomlFormatLine(Key, Value) {
 	return Key . ' = "' . S . '"'
 }
 
-/** Publishes the tap-hold preset and its config master in one terminal transition. */
+/**
+ * Publishes the tap-hold preset and its config master in one terminal transition.
+ * Options "layers_config_dir" names the configuration folder whose layers.toml
+ * a restore creates from the recommended layer when it has none; without it
+ * no layer file is touched.
+ */
 TapHoldScopeApply(Mode, Options := unset) {
 	global TapHold, _SharedDir
 	InheritedCritical := A_IsCritical
@@ -913,28 +923,41 @@ TapHoldScopeApply(Mode, Options := unset) {
 	CandidateOptions := IsSet(Options) ? Options.Clone() : Map()
 	Path := CandidateOptions.Get("tap_hold_path", _TH_TapHoldConfigPath())
 	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
-	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode)
+	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode,
+		CandidateOptions.Get("layers_config_dir", ""))
 	return ConfigScopeApply("tap_holds", Mode,
 		Map("parameters", ConfigScopeActionParameterPaths), CandidateOptions)
 }
 
 ; This bounded owner is the only preset admitted by ConfigScopeApply. Its target
 ; participates in the same WAL, backup verification and terminal compensation.
+; A restore given the configuration folder also owns that folder's layers.toml:
+; it is created from the recommended layer when absent, in the same cohort, and
+; an existing one is returned unchanged, so no transition writes it.
 class TapHoldScopeOwner {
-	__New(Path, Defaults, Mode) {
+	__New(Path, Defaults, Mode, LayersConfigDir := "") {
+		global _SharedDir
 		if !(Path is String) || Path == "" || !(Defaults is String) || Defaults == ""
 			throw ValueError("Tap-hold scope requires explicit file paths.")
+		if !(LayersConfigDir is String)
+			throw ValueError("Tap-hold scope requires the layers folder as a path or an empty string.")
 		this.path := Path
 		this.paths := [Path]
 		this.defaults := Defaults
 		if !(Mode == "recommended" || Mode == "clear")
 			throw ValueError("Unknown tap-hold preset operation.")
 		this.mode := Mode
+		this.layers := ""
+		if (Mode == "recommended" && LayersConfigDir != "") {
+			this.layers := KeymapLayers_UserFilePathFromVocabulary(_SharedDir, LayersConfigDir)
+			this.paths.Push(this.layers)
+		}
 	}
 
 	; The coordinator owns admission, backup, expected-old checks and publication.
 	; This method only returns a detached candidate and cannot publish a file.
 	Build() {
+		global _SharedDir
 		Present := FileExist(this.path) ? 1 : 0
 		Source := Present ? FSReadUtf8Exact(this.path) : ""
 		if !(Source is String)
@@ -969,7 +992,10 @@ class TapHoldScopeOwner {
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
 			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
-		return [{ path: this.path, image: Image }]
+		Candidates := [{ path: this.path, image: Image }]
+		if (this.layers != "")
+			Candidates.Push({ path: this.layers, image: TapHoldLayerImportImage(_SharedDir, this.layers) })
+		return Candidates
 	}
 }
 
@@ -1155,4 +1181,72 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			|| Image["source_present"] != Present
 		throw Error("The tap-hold file '" . Path . "' could not be read or rendered.")
 	return Image
+}
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 7/ Recommended navigation layer =======
+; ===============================================
+; ===============================================
+
+; Reads Ergopti's recommended layer file (_shared/keymap/layers.recommended.toml):
+; its exact bytes and the one layer it binds, the layer a recommended key's
+; hold_layer names.
+; @param SharedDir string The _shared folder.
+; @returns {Map} Map("text", String, "layer_id", String).
+; Throws when the shipped file is missing, empty or does not bind one layer.
+TapHoldRecommendedLayer(SharedDir) {
+	Path := RTrim(SharedDir, "\/") . "\keymap\layers.recommended.toml"
+	Text := FSReadUtf8Exact(Path)
+	if !(Text is String) || Text == ""
+		throw Error("The recommended navigation layer '" . Path . "' cannot be read.")
+	LayerIds := Map()
+	Pos := 1
+	while (Pos := RegExMatch(Text, "m)^\[layers\.([a-z][a-z0-9_]*)\.", &Found, Pos)) {
+		LayerIds[Found[1]] := true
+		Pos += Found.Len
+	}
+	if (LayerIds.Count != 1)
+		throw Error("The recommended navigation layer '" . Path . "' must bind exactly one layer.")
+	for LayerId in LayerIds
+		return Map("text", Text, "layer_id", LayerId)
+}
+
+; Whether the shipped recommendation of one of the keys holds the layer.
+; @param Defaults string The shared defaults.toml holding the preset.
+; @param KeyIds Array Key ids of this driver's catalogue column.
+; @param LayerId string The layer the recommended layer file binds.
+; @returns {Boolean}
+TapHoldPresetEntersLayer(Defaults, KeyIds, LayerId) {
+	Preset := LoadTapHoldToml(Defaults)
+	for KeyId in KeyIds {
+		if (KeyId is String) && Preset["keys"].Has(KeyId)
+				&& Preset["keys"][KeyId].Get("hold_layer", "") == LayerId
+			return true
+	}
+	return false
+}
+
+; The image that brings Ergopti's recommended layer into a configuration
+; folder, in TOML_BuildUpdatedContent's shape: the preset's bytes over an
+; absent layers.toml. An existing layers.toml is the user's: its image is
+; unchanged (content equals source), so no transition writes it.
+; @param SharedDir string The _shared folder.
+; @param LayersPath string The user's layers.toml.
+; @returns {Map}
+; Throws when the shipped layer file cannot be read.
+TapHoldLayerImportImage(SharedDir, LayersPath) {
+	if FileExist(LayersPath) {
+		Source := FSReadUtf8Exact(LayersPath)
+		if !(Source is String)
+			Source := ""
+		return Map("status", "ok", "kind", "rendered", "source_present", 1,
+			"source_content", Source, "content", Source)
+	}
+	return Map("status", "ok", "kind", "rendered", "source_present", 0,
+		"source_content", "", "content", TapHoldRecommendedLayer(SharedDir)["text"])
 }

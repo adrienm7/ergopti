@@ -164,4 +164,76 @@ helpers.describe("remap scope transaction", function()
 	end)
 end)
 
+-- A fresh install has no layers.toml, which binds no key: the restored
+-- left_command held an empty navigation layer. The tap-holds restore now
+-- creates the recommended layer where there is none, before the regeneration
+-- that deploys it, and takes it back when the transaction is refused.
+helpers.describe("remap scope transaction: the recommended navigation layer", function()
+	local LAYERS = "tests/unit/platform/remap/no-layers-toml/layers.toml"
+
+	--- The shipped preset's bytes.
+	local function preset()
+		local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
+		local text = fh:read("*a")
+		fh:close()
+		return text
+	end
+
+	--- Lets the disk double remove a file, as the macOS adapter does.
+	local function removable(disk)
+		require("adapters.file_system").remove_exact = function(path)
+			disk.files[path] = nil
+			return true
+		end
+	end
+
+	helpers.it("(nav-layer-fresh-install-default) the restore creates layers.toml before the regeneration", function()
+		with_fixture(function(fixture)
+			local remap, _, disk = scoped_remap(fixture)
+			removable(disk)
+			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-7")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(disk.files[LAYERS], preset(), "the layer is on disk when the regeneration reads it")
+			disk.terminal(true, "ready")
+			helpers.assert_eq(settled, { { ok = true, reason = "ready" } })
+			helpers.assert_eq(disk.files[LAYERS], preset())
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
+		with_fixture(function(fixture)
+			local remap, _, disk = scoped_remap(fixture)
+			removable(disk)
+			disk.files[LAYERS] = "# the user's own layer\n"
+			helpers.assert_true(request(remap, "tap_holds", "recommended", "/remap/backup-8"))
+			disk.terminal(false, "activation-failed")
+			disk.terminal(true, "ready")
+			helpers.assert_eq(disk.files[LAYERS], "# the user's own layer\n", "kept, and kept by the refusal too")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) a refused restore takes the created layer back", function()
+		with_fixture(function(fixture)
+			local remap, _, disk = scoped_remap(fixture)
+			removable(disk)
+			local _, settled = request(remap, "tap_holds", "recommended", "/remap/backup-9")
+			disk.terminal(false, "activation-failed")
+			disk.terminal(true, "ready")
+			helpers.assert_eq(settled[1].ok, false)
+			helpers.assert_nil(disk.files[LAYERS], "no layer file outlives a refused restore")
+		end)
+	end)
+
+	helpers.it("(nav-layer-fresh-install-default) clear and the shortcuts scope never touch the layer", function()
+		for _, scope in ipairs({ { "tap_holds", "clear" }, { "shortcuts", "recommended" } }) do
+			with_fixture(function(fixture)
+				local remap, _, disk = scoped_remap(fixture)
+				helpers.assert_true(request(remap, scope[1], scope[2], "/remap/backup-10"))
+				disk.terminal(true, "ready")
+				helpers.assert_nil(disk.files[LAYERS], scope[1] .. " " .. scope[2])
+			end)
+		end
+	end)
+end)
+
 return true

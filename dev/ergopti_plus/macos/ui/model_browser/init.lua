@@ -313,7 +313,6 @@ function M.open(ctx)
 			frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 			title             = i18n.get("model_browser.window_title"),
 			style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
-			allow_text_entry  = true,
 			allow_new_windows = false,
 			usercontent       = usercontent,
 			html_string       = final_html,

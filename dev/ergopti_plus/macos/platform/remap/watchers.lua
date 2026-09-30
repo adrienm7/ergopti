@@ -65,6 +65,11 @@ local NANOSECONDS_PER_SECOND = 1000000000
 local CAPSWORD_CHECK_INTERVAL_NS = Timings.sec("ui", "capsword_check_interval_ms")
 	* NANOSECONDS_PER_SECOND
 
+-- karabiner_cli's exit status for options it does not recognise (cxxopts parse
+-- error, src/bin/cli/src/main.cpp). No released karabiner_cli has a
+-- --get-variable option, so the probe gets this status on every Mac.
+local KARABINER_CLI_UNKNOWN_OPTION_EXIT = 2
+
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
 local _input_source_timer = nil
@@ -126,6 +131,9 @@ local _capsword_last_check_ns = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
+-- Set once karabiner_cli refused the probe's option: no later pointer event
+-- spawns it again. A CapsWord this driver activated is still cancelled.
+local _capsword_probe_unsupported = false
 -- Max time to wait for the karabiner_cli probe to complete before force-releasing
 -- the pending lock. The async task only fires its callback on process EXIT, so a
 -- started-but-hung/zombied CLI would otherwise leave the lock set forever (F-L6).
@@ -392,6 +400,10 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 			tostring(my_probe_revision))
 		return
 	end
+	if _capsword_probe_unsupported then
+		_capsword_check_pending = false
+		return
+	end
 	local function abandon_probe(failed_task, reason)
 		if watcher_gen ~= _capsword_watcher_gen
 			or my_capsword_gen ~= _capsword_gen then return end
@@ -430,6 +442,15 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 				retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
 			end
 			_capsword_probe_watchdog = nil
+		end
+		if exit_code == KARABINER_CLI_UNKNOWN_OPTION_EXIT then
+			_capsword_check_pending = false
+			_capsword_probe_unsupported = true
+			Logger.warn(LOG,
+				"karabiner_cli cannot read variables (--get-variable is not one of its options, exit %d): "
+					.. "a pointer event now cancels only a CapsWord this driver activated.",
+				KARABINER_CLI_UNKNOWN_OPTION_EXIT)
+			return
 		end
 		if exit_code ~= 0 then
 			_capsword_check_pending = false

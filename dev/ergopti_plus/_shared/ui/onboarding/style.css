@@ -115,12 +115,6 @@ h1 {
 	margin: 0 0 6px;
 }
 
-.subtitle {
-	color: #888;
-	font-size: 12px;
-	margin: 0 0 14px;
-}
-
 .desc {
 	color: #555;
 	font-size: 12.5px;
@@ -427,6 +421,17 @@ h1 {
 	color: #333;
 	font-size: 12.5px;
 	line-height: 1.4;
+}
+
+/* The separator between a trigger and its action: the arrows inside gesture
+   and action labels must never read as it. */
+.value-separator {
+	color: #007aff;
+	font-weight: 700;
+}
+
+.check-row input[type='checkbox']:disabled + .check-label .value-separator {
+	opacity: 0.6;
 }
 
 /* ===================================== */

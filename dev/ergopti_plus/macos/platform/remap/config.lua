@@ -32,6 +32,7 @@ local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
+local JsonCodec  = require("adapters.json_codec")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
@@ -100,9 +101,11 @@ local function load_json_file(path)
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	local ok, data = pcall(hs.json.decode, raw)
-	if not ok or type(data) ~= "table" then
-		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(data))
+	-- A tree: the catalogues are resolved for the layout in place, and two
+	-- equal entries must not move together.
+	local data, decode_err = JsonCodec.decode(raw)
+	if type(data) ~= "table" then
+		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(decode_err or data))
 		return nil
 	end
 	return data
