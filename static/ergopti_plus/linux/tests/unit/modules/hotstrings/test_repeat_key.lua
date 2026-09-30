@@ -203,14 +203,31 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 		end)
 	end)
 
-	helpers.it("keeps malformed canonical data neutral instead of using a legacy value", function()
-		with_repeat('[hotstrings]\nrepeat_key_enabled = "bad"\n', function(subject, _, path, _, sandbox)
-			local before = sandbox.read_bytes(path)
-			helpers.assert_eq(subject.is_enabled(), false)
-			helpers.assert_eq(subject.set_enabled(false), false)
-			helpers.assert_eq(sandbox.read_bytes(path), before)
+	helpers.it("reads an outdated value as neutral, never a legacy value, and offers it (config-outdated-repeat-key)",
+		function()
+			with_repeat('[hotstrings]\nrepeat_key_enabled = "bad"\nunknown = "keep"\n', function(subject, _, path, _, sandbox)
+				require("config_outdated").reset_for_tests()
+				local reported = require("config_outdated").collect_reports(function()
+					helpers.assert_eq(subject.is_enabled(), false)
+				end)
+				helpers.assert_eq(reported, { ["hotstrings.repeat_key_enabled"] = true })
+				package.loaded["ui.menu.unused_keys_cleanup"] = nil
+				local scan = require("ui.menu.unused_keys_cleanup").find(path)
+				helpers.assert_eq(scan.status, "ok", "the cleanup scan never fails on it")
+				local offered = {}
+				for _, key in ipairs(scan.keys) do offered[table.concat(key.path, ".")] = true end
+				helpers.assert_true(offered["hotstrings.repeat_key_enabled"], "the outdated value is offered")
+				helpers.assert_true(subject.set_enabled(true), "a menu choice replaces the outdated value")
+				helpers.assert_true(subject.is_enabled())
+				helpers.assert_contains(sandbox.read_bytes(path), "repeat_key_enabled = true")
+			end)
+			with_repeat("hotstrings = true\n", function(subject, _, path)
+				helpers.assert_eq(subject.is_enabled(), false)
+				package.loaded["ui.menu.unused_keys_cleanup"] = nil
+				helpers.assert_eq(require("ui.menu.unused_keys_cleanup").find(path).status, "ok",
+					"an old scalar [hotstrings] never makes the cleanup scan unreadable")
+			end)
 		end)
-	end)
 
 	-- The typing path calls is_enabled() for every unmatched character inside the
 	-- keyboard hook's guarded callback, whose error handler emergency-stops the
@@ -252,7 +269,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("retains the last valid runtime when an explicit refresh refuses", function()
 		with_repeat(SOURCE, function(subject, _, path, _, sandbox)
 			helpers.assert_true(subject.is_enabled())
-			sandbox.write_bytes(path, '[hotstrings]\nrepeat_key_enabled = "bad"\n')
+			sandbox.write_bytes(path, '[hotstrings\nrepeat_key_enabled = "bad"\n')
 			helpers.assert_eq(subject.refresh(), false)
 			helpers.assert_true(subject.is_enabled())
 		end)
