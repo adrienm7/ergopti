@@ -497,8 +497,9 @@ function _renderLanguage() {
 	});
 	var selected = list.querySelector('.lang-item.selected');
 	if (selected) selected.scrollIntoView({ block: 'nearest' });
-	document.getElementById('language-title').textContent = _t('onboarding.welcome.title');
-	document.getElementById('language-subtitle').textContent = _t('onboarding.welcome.heading');
+	// The step's name is its heading, as on every later step: the window title
+	// already names the product and the wizard.
+	document.getElementById('language-title').textContent = _t('onboarding.welcome.heading');
 }
 
 /** Refreshes the configuration-folder step from the answers. */

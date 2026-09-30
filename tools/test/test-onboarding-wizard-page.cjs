@@ -1140,7 +1140,16 @@ function recommendedTapHoldKeys(driver) {
 		locale('fr')['onboarding.welcome.title'],
 		'title follows the previewed locale'
 	);
-	assert.equal(page.el('language-title').textContent, locale('fr')['onboarding.welcome.title']);
+	assert.equal(
+		page.el('language-title').textContent,
+		locale('fr')['onboarding.welcome.heading'],
+		'the language step is headed by its name, as every later step is'
+	);
+	assert.equal(
+		page.el('language-subtitle'),
+		undefined,
+		'the step does not repeat the window title'
+	);
 
 	// A stale reply for a locale the user already left must not retitle the page.
 	page.window.applyStrings({ locale: 'en', strings: locale('en') });

@@ -49,7 +49,7 @@ local MIGRATION_DRIVER = "hs"
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
 
 -- Brand-less window title. ui_builder prefixes the product name, and
--- onboarding.welcome.title already carries it (it is the page heading).
+-- onboarding.welcome.title already carries it (it is the document title).
 local WINDOW_TITLE_KEY       = "onboarding.window_title"
 
 -- Delay between the success notification and the reload that applies it.
