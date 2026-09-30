@@ -224,9 +224,13 @@ These are software implementations; final hardware verification remains below.
         `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by
         default) on every driver, config schema v5 migrating the Windows
         `magic_key_source_scan`, and a keyboard-layout menu row that captures
-        the next key pressed or lists the candidates. Remaining: review, the
-        CI run of the AutoHotkey suites, and real-device checks of the
-        capture and the remap on each OS.
+        the next key pressed or lists the candidates. Remaining: the CI run of
+        the AutoHotkey suites; real-device checks of the capture (Windows
+        reads the physical key state under the emulation) and the remap on
+        each OS; and three Linux review follow-ups: the Layout menu shows the
+        key row without the replace switch it depends on, holding the chosen
+        key types one ★ where the other drivers auto-repeat, and choosing
+        Backquote, Minus or Equal silently overrides a tap-key action there.
 31. [ ] HS-274 exact physical key accounting with an Ergopti-owned background
         Karabiner runtime (no Karabiner-Elements app). Plan and decisions in the
         overnight handoff; ~32–42 agent-days; not in the demo release.
