@@ -342,7 +342,8 @@ integrated, then publish one grouped release.
       confirmation for any clear (the backup is enough; Linux asks today).
       Configuration gains the global « Tout effacer » next to its restore, in one
       transaction. The macOS Gestures menu shows its conflicts row after that group.
-      Branch `feat/menu-first-group`.
+      Branch `feat/menu-first-group`. In Shortcuts, « Taper un symbole encadre la sélection » (renamed, no
+      AltGr) and « Symboles encadrants » form one group, with no separator.
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code; a row that does not apply to an OS is hidden there, a feature not
       yet ported is greyed with its reason. A ratchet gate counts the native menu
@@ -364,11 +365,6 @@ integrated, then publish one grouped release.
       an update by itself, it only notifies; on a run from the sources, «
       Désinstaller » and these buttons are greyed with their reason. Branch
       `feat/release-rollback`.
-- [ ] **58.** Windows: opening the versions window logs "tree-owned task output
-      deletion failed (32)". Another spawned process inherits the task's capture
-      handle (inherited handles without a handle list); pass only the task's own
-      handles and retry a locked temp file quietly. Branch
-      `fix/windows-shell-runner-sharing`.
 - [ ] **59.** macOS v0.0.0-dev.155: "Lease-bound input startup failed:
       prepared lease RESUME failed: lease-stopping" at startup. Cause: the layout
       watcher compares the localised layout name with the HIToolbox name, sees a
@@ -384,6 +380,13 @@ integrated, then publish one grouped release.
       it launches runs under Rosetta (likely an Intel Homebrew `python3` found first
       in the PATH, or a venv it created). Choose interpreters by architecture and
       repair an Intel venv with a button. Branch `fix/macos-intel-python`.
+
+- [ ] **62.** macOS: installing the MLX dependencies fails on a managed
+      company Mac ("operation not permitted", then uv "failed to download URL"
+      from GitHub after 3 retries). Use the system trust store and proxy for uv
+      and pip, avoid GitHub downloads when a suitable Python exists, install
+      where managed Macs allow it, and name the cause in the repair dialog.
+      Branch `fix/macos-intel-python`.
 
 ## Time estimate
 
