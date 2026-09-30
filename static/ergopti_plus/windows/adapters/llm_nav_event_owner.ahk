@@ -52,6 +52,19 @@ global _LLM_NavEventOwnerLifecycleResumePlan := 0
 global _LLM_NavEventOwnerLifecycleResumePort := 0
 global _LLM_NavEventOwnerRuntimeEpoch := 0
 global LLM_NAV_EVENT_OWNER_INPUT_LEVEL := 1
+; The DLL's plan contract (NavPlanIsValid) still demands one Up and one Down
+; cycle route that passes its key on, and changing it means rebuilding the DLL
+; with MSVC. The cycle is AutoHotkey's instead (menu_llm/tab_accept.ahk):
+; Windows calls the most recently installed keyboard hook first, and AutoHotkey
+; reinstalls its own around every SendInput, so a native cycle ran before the
+; hotkey that consumes the chord, or never when that hotkey swallowed the key
+; first (llm-nav-cycle-windows). Both routes are parked on extended scan code
+; zero, which no key produces and AutoHotkey never sends, while any other
+; injection is ineligible (NavInputIsEligible): the native owner never cycles.
+; Their modifier masks only keep them distinct, as the contract requires.
+global LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES := [
+	Map("axis", 2, "code", 0x100, "modifiers", 0x0F),
+	Map("axis", 2, "code", 0x100, "modifiers", 0x0E)]
 global LLM_NAV_EVENT_OWNER_QUARANTINE_RETRY_MS := 1000
 global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
 ; A profile receipt owns a SUPPRESSED physical key. Unlike a repaint, refusing to
@@ -2187,8 +2200,8 @@ LLM_NavEventOwner_SyncRecord(Record, AllowLifecycleResume := false) {
 ; Whether the native owner routes navigation for Record right now: started,
 ; not quarantined or fenced, holding a committed plan, and naming Record's token
 ; as its active owner. Unlike LLM_NavEventOwner_SyncRecord, an owner that is not
-; running answers false: nothing cycles then, so nothing may consume the
-; navigation chord on its behalf (llm-tooltip-nav-consumed).
+; running answers false: its validation chords are then the application's, and
+; the navigation chord must not be consumed either (llm-tooltip-nav-consumed).
 ; @param {Object} Record - Presented prediction record.
 ; @returns {Boolean}
 LLM_NavEventOwner_RoutesRecord(Record) {
@@ -2362,11 +2375,18 @@ _LLM_NavEventOwnerNativeGetTerminalCapture(Token) {
 		"release_kind", NumGet(Snapshot, 24, "UInt"))
 }
 
-_LLM_NavEventOwnerNativePreparePlan(Plan) {
+; The native routes of a navigation plan, in plan order. A validation digit is
+; its physical identity, consumed; the Up and Down cycle routes are parked
+; (LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES), since the chord's own hotkeys
+; cycle. Every entry must still carry a valid physical identity.
+; @param {Array} Plan - The twelve entries of a navigation plan.
+; @returns {Array|Integer} One Map per route, or 0 for a malformed plan.
+_LLM_NavEventOwnerNativeBindings(Plan) {
 	global LLM_NAV_EVENT_OWNER_INPUT_LEVEL
+	global LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES
 	if !(Plan is Array) || Plan.Length != 12
 		return 0
-	Bindings := Buffer(12 * 12, 0)
+	Bindings := []
 	Loop 12 {
 		if !Plan.Has(A_Index)
 			return 0
@@ -2379,28 +2399,44 @@ _LLM_NavEventOwnerNativePreparePlan(Plan) {
 			return 0
 		if Match[1] != ""
 			return 0
-		Modifiers := 0
-		Loop Parse, Match[2] {
-			Modifiers |= A_LoopField == "^" ? 0x01
-				: A_LoopField == "!" ? 0x02
-				: A_LoopField == "+" ? 0x04
-				: A_LoopField == "#" ? 0x08 : 0
+		if A_Index <= 2 {
+			Parked := LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES[A_Index]
+			Axis := Parked["axis"]
+			Code := Parked["code"]
+			Modifiers := Parked["modifiers"]
+		} else {
+			Modifiers := 0
+			Loop Parse, Match[2] {
+				Modifiers |= A_LoopField == "^" ? 0x01
+					: A_LoopField == "!" ? 0x02
+					: A_LoopField == "+" ? 0x04
+					: A_LoopField == "#" ? 0x08 : 0
+			}
+			Axis := StrLower(Match[3]) == "vk" ? 1 : 2
+			Code := Integer("0x" . Match[4])
 		}
-		Axis := StrLower(Match[3]) == "vk" ? 1 : 2
-		Code := Integer("0x" . Match[4])
-		Action := A_Index <= 2 ? 1 : 2
-		PassThrough := A_Index <= 2 ? 1 : 0
-		Delta := A_Index == 1 ? -1 : A_Index == 2 ? 1 : 0
 		Target := A_Index <= 2 ? 0 : Entry.Get("jump_idx", 0)
 		if !(Target is Integer) || Target < 0 || Target > 10
 			return 0
-		Offset := (A_Index - 1) * 12
-		NumPut("UChar", Axis, "UChar", Action,
-			"UChar", Modifiers, "UChar", PassThrough,
-			"UShort", Code, "Char", Delta,
-			"UChar", Target,
-			"UChar", LLM_NAV_EVENT_OWNER_INPUT_LEVEL,
-			Bindings, Offset)
+		Bindings.Push(Map("axis", Axis, "action", A_Index <= 2 ? 1 : 2,
+			"modifiers", Modifiers, "pass_through", A_Index <= 2 ? 1 : 0,
+			"code", Code, "delta", A_Index == 1 ? -1 : A_Index == 2 ? 1 : 0,
+			"target", Target, "input_level", LLM_NAV_EVENT_OWNER_INPUT_LEVEL))
+	}
+	return Bindings
+}
+
+_LLM_NavEventOwnerNativePreparePlan(Plan) {
+	Routes := _LLM_NavEventOwnerNativeBindings(Plan)
+	if !(Routes is Array)
+		return 0
+	Bindings := Buffer(12 * 12, 0)
+	for Index, Route in Routes {
+		NumPut("UChar", Route["axis"], "UChar", Route["action"],
+			"UChar", Route["modifiers"], "UChar", Route["pass_through"],
+			"UShort", Route["code"], "Char", Route["delta"],
+			"UChar", Route["target"], "UChar", Route["input_level"],
+			Bindings, (Index - 1) * 12)
 	}
 	Generation := 0
 	Status := DllCall(_LLM_NavEventOwnerNativeExport(

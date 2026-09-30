@@ -1252,6 +1252,8 @@ _LogBootProgress("keylogger modules + tests included")
 ; Reuses the navigation owner's deterministic native port and fixtures above.
 #Include unit/test_llm_tab_accepts_visible_prediction.ahk
 #Include unit/test_llm_tooltip_nav_consumed.ahk
+; Reuses the chord helpers of test_llm_tooltip_nav_consumed above.
+#Include unit/test_llm_nav_cycle_windows.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk

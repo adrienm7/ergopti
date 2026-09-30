@@ -17,11 +17,12 @@
 ; 2. Cycle wraps around: Up past the first slot loops to the last, and Down
 ;    past the last loops back to the first — feels snappier than a hard stop
 ;    at the boundary.
-; 3. Navigation is consumed: while the native owner cycles a multi-slot
-;    prediction, its Up / Down chord never reaches the application, like the
-;    macOS tooltip (handle_llm_keys). The native plan keeps passing the cycle
-;    chord (its route contract), and the hotkeys below, next in the hook
-;    chain, swallow it (llm-tooltip-nav-consumed).
+; 3. Navigation is consumed: while the native owner routes a multi-slot
+;    prediction, its Up / Down chord moves the marker and never reaches the
+;    application, like the macOS tooltip (handle_llm_keys). The hotkeys below
+;    perform the cycle themselves; the native owner never cycles, so the
+;    order in which Windows calls the two keyboard hooks cannot drop or
+;    double a press (llm-tooltip-nav-consumed, llm-nav-cycle-windows).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -79,32 +80,36 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ; The physical Tab that accepts a prediction is not declared here: see the
 ; module header and platform/remap/tab.ahk (8.5).
 ;
-; The native owner cycles the slot on the configured Up / Down chord, then
-; passes the key on: its plan contract requires a cycle route to pass through.
-; The AutoHotkey hook comes next in the chain, and these hotkeys swallow the
-; chord while that owner cycles a multi-slot prediction, so the caret never moves
-; in the application behind the tooltip (macOS consumes the arrows the same way).
-; The wildcard lets one hotkey serve every configured modifier; the criterion
-; demands the exact chord of the committed plan. #InputLevel 1 is the native
-; routes' own level: both take physical input and AutoHotkey output above it.
+; These hotkeys own the cycle: while the native owner routes a multi-slot
+; prediction, they move its marker and swallow the chord, so the caret never
+; moves in the application behind the tooltip (macOS consumes the arrows the
+; same way). Windows calls the most recently installed keyboard hook first, and
+; AutoHotkey reinstalls its own around every SendInput, so this hook runs before
+; or after the native owner's depending on what was typed last. The native owner
+; therefore never cycles: its cycle routes are parked on a key no keyboard has
+; (adapters/llm_nav_event_owner.ahk), and each press moves the marker exactly
+; once in either order (llm-nav-cycle-windows). The wildcard lets one hotkey
+; serve every configured modifier; the criterion demands the exact chord of the
+; committed plan. #InputLevel 1 is the native routes' own level: both take
+; physical input and AutoHotkey output above it.
 #InputLevel 1
 #HotIf LLM_Menu_NavCycleChordIsOwned("Up")
-*Up:: return
+*Up:: LLM_Menu_NavCycleChord("Up")
 #HotIf LLM_Menu_NavCycleChordIsOwned("Down")
-*Down:: return
+*Down:: LLM_Menu_NavCycleChord("Down")
 #HotIf
 #InputLevel 0
 
 ; Cycle routes of the committed plan (entries 1 and 2) by key, with the scan
-; code the wildcard hotkey above resolves the key to.
+; code the wildcard hotkey above resolves the key to and the slot step it moves.
 global LLM_NAV_CYCLE_ROUTES := Map(
-	"Up", Map("index", 1, "code", "sc0148"),
-	"Down", Map("index", 2, "code", "sc0150"))
+	"Up", Map("index", 1, "code", "sc0148", "delta", -1),
+	"Down", Map("index", 2, "code", "sc0150", "delta", 1))
 
 /**
  * The #HotIf of the hotkeys that consume the navigation chord: whether the Up
  * or Down press being resolved is the committed cycle chord, with exactly its
- * modifiers held, while the native owner cycles a multi-slot prediction. Any
+ * modifiers held, while the native owner routes a multi-slot prediction. Any
  * other modifier set, one slot, or an owner that is not routing leaves the key
  * to the application.
  * @param {String} Key - "Up" or "Down".
@@ -142,6 +147,23 @@ LLM_Menu_NavCycleChordIsOwned(Key, ModifierIsHeldFn := 0) {
 	if (InStr(Chord, "#") > 0) != (WinHeld ? true : false)
 		return false
 	return LLM_TooltipNavCycleIsOwned()
+}
+
+/**
+ * The action of the hotkeys that consume the navigation chord: moves the ▶
+ * marker one slot, to the previous one for Up and the next one for Down,
+ * wrapping around at both ends, and repaints the prediction in place. The
+ * native owner never cycles, so this is the only cycle of the press
+ * (llm-nav-cycle-windows).
+ * @param {String} Key - "Up" or "Down".
+ * @param {Func} SetActiveIdxFn - Test seam taking the target slot; the in-place
+ *     repaint when omitted.
+ * @returns {Integer} The slot the marker moved to, or 0 when none moved.
+ */
+LLM_Menu_NavCycleChord(Key, SetActiveIdxFn := 0) {
+	global LLM_NAV_CYCLE_ROUTES
+	return LLM_TooltipCycleActiveIdx(LLM_NAV_CYCLE_ROUTES[Key]["delta"],
+		SetActiveIdxFn)
 }
 
 ; ── Slot navigation ──
@@ -325,9 +347,9 @@ _LLM_Menu_BuildNavBindingPlan(MenuState) {
 	val_prefix := Prefixes["val_prefix"]
 	Plan := [
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Up",
-			(*) => _LLM_Nav_Cycle(-1)),
+			(*) => LLM_Menu_NavCycleChord("Up")),
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Down",
-			(*) => _LLM_Nav_Cycle(1))
+			(*) => LLM_Menu_NavCycleChord("Down"))
 	]
 	Loop 10 {
 		Digit := (A_Index == 10) ? "0" : String(A_Index)
@@ -586,20 +608,6 @@ _LLM_Menu_MakeNavJump(idx) {
 ; ======= 2/ Slot Navigation Helpers =======
 ; ==========================================
 ; ==========================================
-
-_LLM_Nav_Cycle(delta) {
-	slots := LLM_Tooltip_GetSlots()
-	if (slots.Length <= 1)
-		return
-	cur := LLM_Tooltip_GetActiveIdx()
-	new_idx := cur + delta
-	; Wrap around for a snappier feel — going past the end loops to the start.
-	if (new_idx < 1)
-		new_idx := slots.Length
-	else if (new_idx > slots.Length)
-		new_idx := 1
-	LLM_Tooltip_SetActiveIdx(new_idx)
-}
 
 _LLM_Nav_Jump(idx) {
 	slots := LLM_Tooltip_GetSlots()

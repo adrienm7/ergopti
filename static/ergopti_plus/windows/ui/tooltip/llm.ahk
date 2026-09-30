@@ -725,22 +725,57 @@ LLM_TooltipOwnsSurface() {
 	return IsObject(Record) and Record.Kind == "prediction"
 }
 
-; True while the native navigation owner cycles the prediction on screen: a real
-; prediction with at least two slots, no acceptance outcome yet, whose record the
-; owner routes. With one slot a cycle is refused and the arrow stays the
-; application's, as on macOS. Read from the #HotIf of the hotkeys that consume the
-; navigation chord (menu_llm/tab_accept.ahk, llm-tooltip-nav-consumed).
-LLM_TooltipNavCycleIsOwned() {
+; The prediction the navigation chord cycles: a real prediction on screen with at
+; least two slots, no acceptance outcome yet, whose record the native owner routes
+; (which also syncs its active slot from the owner). With one slot there is
+; nothing to move to and the arrow stays the application's, as on macOS.
+; @returns {Object} The presented record, or 0.
+_LLM_TooltipNavCycleRecord() {
 	Record := _LLM_TooltipGetCurrentRecord()
 	if !IsObject(Record) or Record.Kind != "prediction"
-		return false
+		return 0
 	if !(Record.Slots is Array) or Record.Slots.Length < 2
-		return false
+		return 0
 	if !Record.HasOwnProp("Lifecycle") or !IsObject(Record.Lifecycle)
 			or Record.Lifecycle.Outcome != ""
-		return false
-	return IsSet(LLM_NavEventOwner_RoutesRecord)
-		&& LLM_NavEventOwner_RoutesRecord(Record)
+		return 0
+	if !IsSet(LLM_NavEventOwner_RoutesRecord)
+			|| !LLM_NavEventOwner_RoutesRecord(Record)
+		return 0
+	return Record
+}
+
+; True while the navigation chord cycles the prediction on screen. Read from the
+; #HotIf of the hotkeys that consume the navigation chord
+; (menu_llm/tab_accept.ahk, llm-tooltip-nav-consumed).
+LLM_TooltipNavCycleIsOwned() {
+	return IsObject(_LLM_TooltipNavCycleRecord())
+}
+
+; Moves the ▶ marker of the prediction the navigation chord cycles by Delta
+; slots, wrapping around at both ends, and repaints it in place:
+; LLM_TooltipSetActiveIdx republishes the record to the native owner with its
+; new slot. The hotkeys that consume the chord are its only caller, and the
+; native owner never cycles, so a press moves the marker exactly once whichever
+; keyboard hook runs first (menu_llm/tab_accept.ahk, llm-nav-cycle-windows).
+; @param {Integer} Delta - -1 for the previous slot, 1 for the next one.
+; @param {Func} SetActiveIdxFn - Test seam taking the target slot; the in-place
+;     repaint when omitted.
+; @returns {Integer} The slot the marker moved to, or 0 when none moved.
+LLM_TooltipCycleActiveIdx(Delta, SetActiveIdxFn := 0) {
+	if !(Delta is Integer) or !(Delta == -1 or Delta == 1)
+		throw ValueError("A prediction cycle moves by exactly one slot.", -1)
+	Record := _LLM_TooltipNavCycleRecord()
+	if !IsObject(Record)
+		return 0
+	Target := Record.ActiveIdx + Delta
+	if (Target < 1)
+		Target := Record.Slots.Length
+	else if (Target > Record.Slots.Length)
+		Target := 1
+	if !HasMethod(SetActiveIdxFn, "Call")
+		SetActiveIdxFn := LLM_TooltipSetActiveIdx
+	return SetActiveIdxFn.Call(Target) ? Target : 0
 }
 
 ; True while a real prediction is still inside its minimum-display window. The
