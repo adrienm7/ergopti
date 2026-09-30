@@ -426,10 +426,11 @@ local function has_custom(key)
 end
 
 helpers.describe("hotstrings scope: word delimiters", function()
-	-- They lived in storage.json, which no scope reaches; both modes now return
-	-- them to the catalogue, as Windows removes its delimiter string.
+	-- They lived in storage.json, which no scope reaches. Both modes put the
+	-- shipped delimiters back on their defaults, as the delimiter submenu's own
+	-- restore row does, and keep the user's own delimiters, which are user data.
 	for _, mode in ipairs({ "recommended", "clear" }) do
-		helpers.it("returns the word delimiters to the catalogue on " .. mode, function()
+		helpers.it("returns the shipped word delimiters to the catalogue and keeps the user's on " .. mode, function()
 			with_scope(function(c)
 				local Terminators = require("keymap.terminators")
 				helpers.assert_eq(Terminators.is_terminator_enabled("space"), false, "the fixture delimiters are loaded")
@@ -440,17 +441,20 @@ helpers.describe("hotstrings scope: word delimiters", function()
 				local states = config.hotstrings.terminator_states or {}
 				helpers.assert_nil(states.space)
 				helpers.assert_nil(states.slash)
-				helpers.assert_nil(states["custom_¤"])
-				helpers.assert_nil(config.hotstrings.terminators)
+				helpers.assert_eq(states["custom_¤"], false, "a user delimiter keeps its state")
+				helpers.assert_eq(config.hotstrings.terminators,
+					{ { key = "custom_¤", char = "¤", label = "¤", consume = true } }, "a user delimiter is kept")
 				helpers.assert_eq(states.retired, true, "a state no delimiter owns is left for the cleanup")
 				helpers.assert_eq(config.hotstrings.unknown, "kept")
 				helpers.assert_eq(config.other.value, 1)
 				helpers.assert_eq(Terminators.is_terminator_enabled("space"), true, "the runtime follows the file")
 				helpers.assert_eq(Terminators.is_terminator_enabled("slash"), false)
-				helpers.assert_eq(has_custom("custom_¤"), false)
+				helpers.assert_true(has_custom("custom_¤"))
+				helpers.assert_eq(Terminators.is_terminator_enabled("custom_¤"), false)
 				helpers.assert_eq(read(c.config_path .. c.suffix), DELIMITER_CONFIG, "config.toml backup is exact")
+				local written = read(c.config_path)
 				helpers.assert_true(c.Terminators.persist(), "ordinary delimiter writes resume")
-				helpers.assert_nil(Codec.decode(read(c.config_path)).hotstrings.terminators)
+				helpers.assert_eq(read(c.config_path), written, "the file already holds the runtime's delimiters")
 			end, DELIMITER_CONFIG)
 		end)
 	end

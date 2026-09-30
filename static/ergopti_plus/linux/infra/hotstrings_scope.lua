@@ -22,10 +22,10 @@
 ---    explicit delay wherever the corpus inheritance differs from the manifest.
 --- 4. Only this driver's readers are written. A manifest row no Linux reader
 ---    consumes (a Windows feature row) is removed by both modes, never set.
---- 5. Word delimiters return to the catalogue in both modes, as Windows removes
----    its delimiter string: every state a delimiter owns and the user's own
----    delimiters are removed, and a state for an unknown key is left for the
----    config cleanup.
+--- 5. Shipped word delimiters return to their catalogue defaults in both modes,
+---    as the delimiter submenu's own « restore recommended » does. The user's
+---    own delimiters and their states are user data and are kept; a state for
+---    an unknown key is left for the config cleanup.
 --- ==============================================================================
 
 local M = {}
@@ -163,7 +163,7 @@ function M.new(options)
 					operations[#operations + 1] = { path = segments, value = row.value }
 				end
 			end
-			for _, segments in ipairs(Terminators.owned_leaves(Codec.decode(source.content or ""))) do
+			for _, segments in ipairs(Terminators.builtin_state_leaves(Codec.decode(source.content or ""))) do
 				operations[#operations + 1] = { path = segments, delete = true }
 			end
 			local prepared, detail = prepare_overrides(current_mode)

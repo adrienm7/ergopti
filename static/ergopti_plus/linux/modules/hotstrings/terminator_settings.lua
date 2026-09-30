@@ -278,31 +278,24 @@ function M.mark_config_reads(document, mark)
 	resolve(document, mark)
 end
 
---- The leaves a document holds that return the delimiters to the catalogue
---- once removed: the state of every built-in or listed custom delimiter, and
---- the custom list. A state no delimiter owns is outdated configuration and is
---- left for the cleanup, like any other unknown entry.
+--- The state leaves of the shipped delimiters a document holds: removing them
+--- returns every built-in delimiter to its catalogue default. The user's own
+--- delimiters and their states are user data and are never listed, like a
+--- state no delimiter owns, which is outdated configuration for the cleanup.
 --- @param document table Decoded config.toml.
 --- @return table paths Array of path segments.
-function M.owned_leaves(document)
+function M.builtin_state_leaves(document)
 	assert(type(document) == "table", "word-delimiter leaves need a decoded configuration")
 	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
-	local custom = hotstrings.terminators
-	local listed = type(custom) == "table" and (next(custom) == nil or #custom > 0)
-	local owned = builtins()
-	for _, record in ipairs(listed and custom or {}) do
-		if type(record) == "table" and type(record.key) == "string" then owned[record.key] = true end
-	end
-	local paths, keys = {}, {}
 	local states = hotstrings.terminator_states
-	if type(states) == "table" and (next(states) == nil or #states == 0) then
-		for key in pairs(states) do
-			if type(key) == "string" and owned[key] then keys[#keys + 1] = key end
-		end
+	if type(states) ~= "table" or (next(states) ~= nil and #states > 0) then return {} end
+	local shipped, keys = builtins(), {}
+	for key in pairs(states) do
+		if type(key) == "string" and shipped[key] then keys[#keys + 1] = key end
 	end
 	table.sort(keys)
+	local paths = {}
 	for _, key in ipairs(keys) do paths[#paths + 1] = { STATES_PATH[1], STATES_PATH[2], key } end
-	if listed then paths[#paths + 1] = { CUSTOM_PATH[1], CUSTOM_PATH[2] } end
 	return paths
 end
 
