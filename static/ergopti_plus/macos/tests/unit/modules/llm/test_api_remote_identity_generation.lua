@@ -107,4 +107,33 @@ helpers.describe("api_remote entry identity generation", function()
 		infer_client.post = original_post
 		if not ok then error(err) end
 	end)
+
+	helpers.it("(config-outdated-api-provider) names once an entry whose provider this build no longer has", function()
+		-- Warmup and predictions through it were off with a DEBUG line only.
+		local warmup_client = get_upvalue(ApiRemote.warmup, "_warmup_client")
+		local original_get = warmup_client.get
+		local requests = 0
+		warmup_client.get = function() requests = requests + 1 end
+		local Logger = get_upvalue(ApiRemote.warmup, "Logger") or require("infra.logger")
+		local real_warn, warnings = Logger.warn, {}
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			ApiRemote.set_entries({ { id = "entry-old", provider = "retired_provider", token = "secret-token",
+				model = "m", label = "Old" } })
+			ApiRemote.set_active_entry_id("entry-old")
+			ApiRemote.warmup()
+			ApiRemote.warmup()
+			helpers.assert_eq(requests, 0, "no request goes to a provider this build does not have")
+			local named = {}
+			for _, line in ipairs(warnings) do
+				if line:find("retired_provider", 1, true) then named[#named + 1] = line end
+			end
+			helpers.assert_eq(#named, 1, table.concat(warnings, " | "))
+			helpers.assert_true(named[1]:find("Old", 1, true) ~= nil, named[1])
+			helpers.assert_true(named[1]:find("secret-token", 1, true) == nil, "a token never reaches a log")
+		end)
+		Logger.warn = real_warn
+		warmup_client.get = original_get
+		if not ok then error(err) end
+	end)
 end)
