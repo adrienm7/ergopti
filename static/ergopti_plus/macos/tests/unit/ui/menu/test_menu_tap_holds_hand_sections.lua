@@ -110,8 +110,8 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		local rows = render()
 		local left = index_of(rows, "— menu.tapholds.left_hand_tap_hold —")
 		local right = index_of(rows, "— menu.tapholds.right_hand_tap_hold —")
-		helpers.assert_not_nil(left, "the « Main gauche — Tap / Hold » header")
-		helpers.assert_not_nil(right, "the « Main droite — Tap / Hold » header")
+		helpers.assert_not_nil(left, "the « Main gauche (tap/hold) » header")
+		helpers.assert_not_nil(right, "the « Main droite (tap/hold) » header")
 		helpers.assert_true(left < right, "the left hand comes first")
 
 		local fn = key_index(rows, "tap_hold.group.fn")

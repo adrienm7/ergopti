@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Tap-Hold Keys Listed By Hand
 ; DESCRIPTION:
-; The Tap-Hold submenu lists its keys under « Main gauche — Tap / Hold » and
-; « Main droite — Tap / Hold », with a separator between the two hands. Which
+; The Tap-Hold submenu lists its keys under « Main gauche (tap/hold) » and
+; « Main droite (tap/hold) », with a separator between the two hands. Which
 ; key goes under which hand is the shared key catalogue's ([tap_hold.catalog]
 ; in _shared/tap_hold/defaults.toml), read by TapHoldKeyDefs().
 ;
@@ -98,8 +98,8 @@ _THHS_MenuSeparatesTheHands() {
 	try {
 		LeftHeader := _THHS_PositionOf(Rendered, MenuSectionTitle(t("menu.tapholds.left_hand_tap_hold")))
 		RightHeader := _THHS_PositionOf(Rendered, MenuSectionTitle(t("menu.tapholds.right_hand_tap_hold")))
-		Assert(LeftHeader >= 0, "the « Main gauche — Tap / Hold » header is drawn")
-		Assert(RightHeader > LeftHeader, "the « Main droite — Tap / Hold » header follows it")
+		Assert(LeftHeader >= 0, "the « Main gauche (tap/hold) » header is drawn")
+		Assert(RightHeader > LeftHeader, "the « Main droite (tap/hold) » header follows it")
 		SpaceRow := _THHS_PositionOf(Rendered, "space")
 		Assert(SpaceRow > LeftHeader && SpaceRow < RightHeader, "Space is listed under the left hand")
 		Assert(TrayMenuIsSeparatorAt(Rendered, SpaceRow + 1),
