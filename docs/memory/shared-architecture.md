@@ -316,6 +316,24 @@ padding. Do not hardcode per-label widths.
 Tooltip style constants are shared. Per-driver alpha differences are
 intentional because native compositors blend differently.
 
+### project-llm-tooltip-chords-are-exact
+
+Maintainer rule (2026-09-30), every OS: while predictions are shown, the exact
+navigation chord (`nav_modifiers` + Up/Down) moves the active slot and the
+exact validation chord (`val_modifiers` + digit N) inserts slot N, and the
+application receives neither. Any other modifier set, an arrow over a single
+prediction (macOS, the reference, passes it and dismisses) and a digit beyond
+the shown slots reach the application. macOS has two consumers, the tooltip's
+per-render keyDown watcher and the keymap fallback `handle_llm_keys`, and tap
+restarts decide which runs first; the fallback must match the watcher (Up is
+the previous slot) and run before the keymap's idle word wipe, which resets the
+predictions. Windows swallows in AHK what the native owner cycles
+(`project-llm-nav-cycle-routes-pass-through`). Linux reads the digit by its
+physical digit-row key (`EvdevCodes.DIGIT_ROW_SLOT`): the typed character made
+Shift+2 an `@` that never matched. Only macOS also navigates with ←/→ and
+Shift+Tab. Action: change the rule on all three drivers with the
+`llm-tooltip-chords-consumed` matrix tests.
+
 ## Logging and observability
 
 ### errors-only-log-sink
