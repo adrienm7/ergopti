@@ -1559,6 +1559,15 @@
 						"master": {
 							"path": "category_enabled.shortcuts",
 							"default": false
+						},
+						"sub_switch": {
+							"path": "category_enabled.key_combinations",
+							"default": true,
+							"items": [
+								"shortcuts.alt_gr_lalt.ctrl_backspace",
+								"shortcuts.alt_gr_caps_lock.ctrl_delete",
+								"shortcuts.lalt_caps_lock.caps_word"
+							]
 						}
 					},
 					{

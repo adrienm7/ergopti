@@ -224,10 +224,12 @@ families the master gate reads from the group's `feature` rows and the
 Shortcuts master skips. Absent is on on both, because the sparse writer drops
 a value equal to the default and an absent key must keep the families. With
 Tap-Holds off, the generator gives each key 1 of a hold slot a passthrough
-rule that only tracks its held variable, since the hold slots read it.
-Action: never mark combo rules as Tap-Holds feature rules again, add a
-Windows family as a row of the group, not as a gate list, and never make that
-default off.
+rule that only tracks its held variable, since the hold slots read it. The
+Windows wizard's Shortcuts answer writes the switch through its page's
+`sub_switch` (No off, Yes on once a family is imported), whose families come
+from the same `feature` rows. Action: never mark combo rules as Tap-Holds
+feature rules again, add a Windows family as a row of the group, not as a gate
+list, and never make that default off.
 
 ### project-two-keys-for-one-row-is-two-menus
 

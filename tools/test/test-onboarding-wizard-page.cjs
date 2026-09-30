@@ -15,7 +15,8 @@
  *    against the driver's own generated manifest, not against the catalogue
  *    that produced it.
  * 3. A Yes imports the recommended items, a re-run starts from the values in
- *    force and writes only what the answers change.
+ *    force and writes only what the answers change. A page's sub-switch (the
+ *    Windows key combinations) follows the answer its master no longer reaches.
  * 4. The Tap-Holds page lists each engine's recommended keys from the shared
  *    tap-hold catalogue; their answers name keys, never configuration paths,
  *    and only a checked key under a Yes is imported.
@@ -419,6 +420,7 @@ function cataloguePaths(driver) {
 	const paths = new Set();
 	for (const page of CATALOGUE.platforms[driver].pages) {
 		if (page.master) paths.add(page.master.path);
+		if (page.sub_switch) paths.add(page.sub_switch.path);
 		if (page.magic_key) paths.add(page.magic_key.path);
 		(function walk(groups) {
 			for (const group of groups) {
@@ -476,12 +478,12 @@ function cataloguePaths(driver) {
 		assert.ok(asked >= 5, `${driver}: most pages ask their question`);
 		const done = page.messages.find((m) => m.action === 'finish');
 		assert.ok(done, `${driver}: the last page finishes`);
-		const masters = CATALOGUE.platforms[driver].pages
-			.filter((p) => p.master)
-			.map((p) => p.master.path);
+		const switches = CATALOGUE.platforms[driver].pages.flatMap((p) =>
+			[p.master, p.sub_switch].filter(Boolean).map((entry) => entry.path)
+		);
 		assert.deepEqual(
 			done.answers.operations,
-			masters.map((master) => ({ path: master, value: false })),
+			switches.map((switchPath) => ({ path: switchPath, value: false })),
 			`${driver}: declining everything writes each category switch off and nothing else`
 		);
 	}
@@ -565,6 +567,77 @@ function cataloguePaths(driver) {
 	assert.deepEqual(
 		done.answers.operations.find((operation) => operation.path === 'category_enabled.shortcuts'),
 		{ path: 'category_enabled.shortcuts', value: true }
+	);
+})();
+
+(function shortcutsAnswerWritesTheKeyCombinationsSwitch() {
+	// The key combinations follow only their own switch, which the Shortcuts
+	// master no longer reaches: a No must still leave them off, as it did.
+	const described = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'shortcuts');
+	const families = manifestToml.menu.key_combinations_group
+		.filter((row) => row.type === 'feature' && row.platforms.includes('ahk'))
+		.map((row) => row.path);
+	assert.ok(families.length >= 3, 'Windows has its AltGr / LAlt / CapsLock families');
+	const items = described.groups[0].items.filter((item) =>
+		families.some((family) => item.path.startsWith(family + '.'))
+	);
+	assert.deepEqual(described.sub_switch, {
+		path: 'category_enabled.key_combinations',
+		default: true,
+		items: families.flatMap((family) =>
+			items.filter((item) => item.path.startsWith(family + '.')).map((item) => item.path)
+		)
+	});
+	for (const driver of ['macos', 'linux']) {
+		assert.ok(
+			CATALOGUE.platforms[driver].pages.every((page) => page.sub_switch === undefined),
+			`${driver}: no page lists a key combination`
+		);
+	}
+	const combinations = (operations) =>
+		operations.filter((op) => op.path === 'category_enabled.key_combinations');
+
+	const declined = openWizard({ platform: 'windows' });
+	declined.platform = 'windows';
+	goToPage(declined, 'shortcuts');
+	answer(declined, true);
+	answer(declined, false);
+	assert.deepEqual(
+		combinations(finish(declined).answers.operations),
+		[{ path: 'category_enabled.key_combinations', value: false }],
+		'a No turns the key combinations off'
+	);
+
+	const accepted = openWizard({ platform: 'windows' });
+	accepted.platform = 'windows';
+	goToPage(accepted, 'shortcuts');
+	answer(accepted, true);
+	assert.deepEqual(
+		combinations(finish(accepted).answers.operations),
+		[{ path: 'category_enabled.key_combinations', value: true }],
+		'a Yes that imports a family turns them on'
+	);
+
+	const without = openWizard({
+		platform: 'windows',
+		current: { 'category_enabled.key_combinations': false }
+	});
+	without.platform = 'windows';
+	goToPage(without, 'shortcuts');
+	answer(without, true);
+	const labels = new Set(items.map((item) => locale('en')[item.label[0].key]));
+	const familyRows = checkRows(without).filter((row) => labels.has(row.text));
+	assert.equal(familyRows.length, items.length, 'each family item has its row');
+	familyRows.forEach(toggle);
+	const operations = finish(without).answers.operations;
+	assert.deepEqual(
+		combinations(operations),
+		[],
+		'a Yes without any family leaves the switch alone'
+	);
+	assert.ok(
+		items.every((item) => !operations.some((op) => op.path === item.path)),
+		'and imports no family item'
 	);
 })();
 

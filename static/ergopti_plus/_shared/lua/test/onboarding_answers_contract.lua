@@ -158,6 +158,20 @@ function M.register(helpers, opts)
 			helpers.assert_true(count >= 7, "the Tap-Holds page lists the recommended keys")
 		end)
 
+		-- The Windows Shortcuts page writes the key-combinations switch its master
+		-- no longer reaches; a Lua host must accept the same catalogue shape.
+		helpers.it("claims a page's sub-switch as a switch the answer writes", function()
+			local synthetic = Answers.load('{"schema_version":1,"platforms":{"' .. driver .. '":{"pages":['
+				.. '{"id":"llm","master":{"path":"llm.enabled","default":false},'
+				.. '"sub_switch":{"path":"gestures.enabled","default":false,"items":[]},"groups":[]}]}}}', driver)
+			helpers.assert_eq(synthetic.entries["gestures.enabled"].kind, "switch")
+			local rows = assert(Answers.rows(synthetic, { { path = "gestures.enabled", value = true } }, Manifest))
+			helpers.assert_eq(rows[1].value, true)
+			local refused, why = Answers.rows(synthetic, { { path = "gestures.enabled", value = "on" } }, Manifest)
+			helpers.assert_nil(refused)
+			helpers.assert_contains(tostring(why), "true or false")
+		end)
+
 		helpers.it("routes a checked tap-hold key to the tap-hold writer, never to config.toml", function()
 			local tap_holds = page(index, "tap_holds")
 			local first, second = tap_holds.groups[1].items[1], tap_holds.groups[1].items[2]

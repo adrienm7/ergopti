@@ -5868,6 +5868,11 @@ restore_exclude = []
 #   note_key     Per-platform explanation for a page without a question.
 #   consent      The answer is a privacy consent: never pre-selected.
 #   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
+#   sub_switch   Per-platform switch of part of the checklist that the category
+#                switch does not reach: `path` names it and `menu_group` the
+#                menu group whose `feature` rows are the sections it governs.
+#                The answer writes it too: No turns it off, Yes turns it on
+#                once one of those items is imported.
 # The wizard persists only manifest paths, except the tap-hold keys: no driver
 # keeps those in config.toml, so each host imports a checked key's shipped
 # recommendation through its own tap-hold writer. A checklist's pre-selection is
@@ -5894,6 +5899,12 @@ master = { ahk = "category_enabled.shortcuts", hs = "shortcuts.enabled", linux =
 checklist = "recommended"
 # The user's own shortcut toggles: their labels come from the personal file.
 exclude = ["shortcuts.personal"]
+# The key combinations follow only their own switch (decision of 2026-09-29),
+# which the Shortcuts master no longer reaches, while this page still lists the
+# Windows AltGr / LAlt / CapsLock families: a re-run answered No must leave
+# them off as the master once did. macOS lists no combination here and Linux
+# has no combination engine.
+sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = "key_combinations_group" } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"

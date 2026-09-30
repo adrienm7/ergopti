@@ -299,6 +299,23 @@ function _magicValue(page) {
 }
 
 /**
+ * The value a page's sub-switch takes from its answer, or null when the answer
+ * leaves it alone: off for a No, as the category switch once turned those items
+ * off, on for a Yes that imports one of its items, untouched by a Yes that
+ * imports none of them.
+ * @param {object} page
+ * @param {object} state Page state.
+ * @returns {boolean|null}
+ */
+function _subSwitchValue(page, state) {
+	if (!state.answer) return false;
+	var imported = page.sub_switch.items.some(function (itemPath) {
+		return state.checked[itemPath] === true;
+	});
+	return imported ? true : null;
+}
+
+/**
  * The manifest paths and values the answers change. The category switch is
  * always explicit; items are written only where the answer differs from the
  * configuration in force, so a value set elsewhere is never overwritten by a
@@ -310,6 +327,10 @@ function _operations() {
 	_pages.forEach(function (page) {
 		var state = _pageState[page.id];
 		if (page.master) operations.push({ path: page.master.path, value: state.answer });
+		if (page.sub_switch) {
+			var subSwitch = _subSwitchValue(page, state);
+			if (subSwitch !== null) operations.push({ path: page.sub_switch.path, value: subSwitch });
+		}
 		if (!state.answer) return;
 		_eachItem(page.groups, function (item) {
 			var wanted = state.checked[item.path] === true;
