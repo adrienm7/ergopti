@@ -16,6 +16,7 @@ local Selector = require("llm.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
 local RegistryCodec = require("modules.llm.profile_registry_codec")
 local Json = require("json")
+local Codec = require("toml_codec")
 
 local LOG = "modules.llm.profile_settings"
 local PREF_PREFIX = "llm.profiles."
@@ -46,12 +47,17 @@ local _registry_source = nil
 local _unreadable_profiles = {}
 -- The unreadable entries already named, so each is warned once per process.
 local _reported_profiles = {}
+-- Whether the stored llm.user_profiles is an older build's shape as a whole
+-- (no versioned envelope, or not text at all). Its profiles cannot be read
+-- back, so no write may replace it: the cleanup removes it first.
+local _registry_outdated = false
 local _profile_serial = 0
 
 local function forget_registry(refresh_values)
 	_user_profiles = nil
 	_registry_source = nil
 	_unreadable_profiles = {}
+	_registry_outdated = false
 	if refresh_values then _values = {} end
 end
 
@@ -169,9 +175,15 @@ local function load_user_profiles()
 	local values, source = Storage.get_many({ USER_PROFILES_KEY })
 	assert(type(source) == "table", "user profiles require an exact source snapshot")
 	local stored = {}
-	if RegistryCodec.is_outdated(values[USER_PROFILES_KEY]) then
-		-- An older build's registry, without the versioned envelope: outdated as
-		-- a whole, offered by the cleanup, replaced by the next profile saved.
+	-- The value as stored, before the manifest type check read a wrong-typed
+	-- one (a TOML array an older build wrote) as absent.
+	local document = Codec.decode(source.content or "")
+	local llm = type(document) == "table" and type(document.llm) == "table" and document.llm or {}
+	local raw = llm[USER_PROFILES_KEY:match("^llm%.(.+)$")]
+	local outdated = raw ~= nil and (type(raw) ~= "string" or RegistryCodec.is_outdated(raw))
+	if outdated then
+		-- An older build's registry: outdated as a whole, offered by the cleanup.
+		-- Its profiles are not readable here, so writes refuse until it is gone.
 		ConfigOutdated.report(USER_PROFILES_KEY, ConfigOutdated.REFUSED, Logger)
 	else
 		stored = RegistryCodec.decode(values[USER_PROFILES_KEY])
@@ -179,6 +191,7 @@ local function load_user_profiles()
 	_user_profiles = {}
 	_registry_source = source
 	_unreadable_profiles = {}
+	_registry_outdated = outdated
 	local seen = {}
 	for index, candidate in ipairs(stored) do
 		local profile = normalize_user_profile(candidate, true)
@@ -432,6 +445,19 @@ function M.next_user_profile_id()
 	until false
 end
 
+--- Refuses a registry write while the stored registry is an older build's
+--- shape as a whole: rewriting it would erase every profile it holds. The file
+--- is left byte for byte; the user removes the old registry with « Nettoyer
+--- config.toml » (it is offered there) before saving a profile again.
+--- @param action string What was refused, for the log.
+--- @return boolean refused
+local function refuse_over_outdated_registry(action)
+	if not _registry_outdated then return false end
+	Logger.error(LOG, "%s refused: config.toml llm.user_profiles holds an older build's profile registry "
+		.. "this build cannot read, and writing would erase it; remove it with the config cleanup first.", action)
+	return true
+end
+
 --- Persists one detached user profile, optionally selecting a newly-created one.
 --- @param candidate table
 --- @param activate boolean|nil
@@ -446,7 +472,9 @@ function M.save_user_profile(candidate, activate, expected_existing)
 
 	local next_profiles = {}
 	local replaced = false
-	for _, existing in ipairs(load_user_profiles()) do
+	local current = load_user_profiles()
+	if refuse_over_outdated_registry("Saving user profile '" .. profile.id .. "'") then return false end
+	for _, existing in ipairs(current) do
 		if existing.id == profile.id then
 			next_profiles[#next_profiles + 1] = profile
 			replaced = true
@@ -491,7 +519,9 @@ function M.delete_user_profile(profile_id)
 	if type(profile_id) ~= "string" or profile_id == "" then return false end
 	local next_profiles = {}
 	local found = false
-	for _, profile in ipairs(load_user_profiles()) do
+	local current = load_user_profiles()
+	if refuse_over_outdated_registry("Deleting user profile '" .. profile_id .. "'") then return false end
+	for _, profile in ipairs(current) do
 		if profile.id == profile_id then
 			found = true
 		else
@@ -526,6 +556,7 @@ function M._reset()
 	_user_profiles = nil
 	_registry_source = nil
 	_unreadable_profiles = {}
+	_registry_outdated = false
 	_reported_profiles = {}
 	_profile_serial = 0
 	ModelProfile._reset()
@@ -547,7 +578,7 @@ end
 --- @return table snapshot
 function M.configuration_snapshot()
 	return { values = _values, users = _user_profiles, source = _registry_source,
-		unreadable = _unreadable_profiles }
+		unreadable = _unreadable_profiles, outdated = _registry_outdated }
 end
 
 --- Restores an owner-issued registry/cache snapshot without serialization.
@@ -556,6 +587,7 @@ end
 function M.restore_configuration(snapshot)
 	_values, _user_profiles = snapshot.values, snapshot.users
 	_registry_source, _unreadable_profiles = snapshot.source, snapshot.unreadable
+	_registry_outdated = snapshot.outdated == true
 	return true
 end
 
