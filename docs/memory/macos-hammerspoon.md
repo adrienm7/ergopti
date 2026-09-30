@@ -227,6 +227,20 @@ identity from the shared codec. The conversion owner is
 [LuaSkin Skin.m](https://github.com/Hammerspoon/hammerspoon/blob/master/LuaSkin/LuaSkin/Skin.m),
 used by the native JSON extension.
 
+### project-hs-json-decode-shares-equal-values
+
+`hs.json.decode` returns one Lua table for every array or object equal to one
+met earlier in the same document: LuaSkin's `alreadySeenObjects` is an
+`NSMutableDictionary`, so its lookup goes by `isEqual:`. Editing a decoded
+value in place edits every equal one. dev.148 refused every Karabiner deploy
+(« generated rule 1 manipulator 3 has inconsistent managed conditions »)
+because CapsWord's 30 identical conditions lists were one table and each
+manipulator's generation gate was appended to it. `adapters/json_codec.lua`
+returns a tree; decode through it. The test stub shares equal values the same
+way (`tests/unit/adapters/test_json_codec_tree.lua`), and
+`tests/meta/test_json_decode_through_codec.lua` ratchets the remaining direct
+calls, which only read what they decode.
+
 ### project-hs-native-task-lifecycle-contract
 
 Task construction, start, callback, timeout, and teardown are distinct failure
