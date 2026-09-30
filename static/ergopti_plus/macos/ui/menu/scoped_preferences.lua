@@ -35,9 +35,22 @@ function M.new(options)
 		assert(type(options[name]) == "function", "scope port missing: " .. name)
 	end
 	local owner, transaction, active_snapshot = {}, nil, nil
-	function owner.pending() return transaction ~= nil and transaction.pending() end
-	function owner.retry_restore()
+	-- What the writer fence retains while this owner owes an inverse. Only this
+	-- claim may settle the debt, and settling it through the fence is what hands
+	-- the fence back to every other writer: a retry outside it left the fence
+	-- retained after the debt was paid, refusing a composed rollback's other
+	-- reverts, every save and Quit/Reload until this owner happened to run again.
+	local claim = {}
+	function claim.pending() return transaction ~= nil and transaction.pending() end
+	function claim.retry_restore()
 		return transaction == nil or transaction.retry_restore() == true
+	end
+	function owner.pending() return claim.pending() end
+	--- Settles a retained inverse under the writer fence, which releases the
+	--- fence once nothing is owed; a debt that stays owed keeps it refused.
+	--- @return boolean settled
+	function owner.retry_restore()
+		return options.admission("Preference scope retry: " .. options.scope, claim.retry_restore, claim) == true
 	end
 	--- Undoes the last commit under the global writer fence; the transaction
 	--- restores the runtime, the staged source and checkpoint, then the file.
@@ -51,7 +64,7 @@ function M.new(options)
 				Logger.warn(LOG, "Scope %s revert did not settle: %s.", options.scope, tostring(detail))
 			end
 			return reverted == true
-		end, owner)
+		end, claim)
 	end
 	--- Forgets the last commit's inverse once its composition has committed.
 	function owner.release()
@@ -66,7 +79,7 @@ function M.new(options)
 		if mode ~= "clear" and mode ~= "recommended" then return false end
 		return options.admission("Preference scope: " .. options.scope, function()
 			if options.paused() ~= false then return false end
-			if owner.pending() and owner.retry_restore() ~= true then return false end
+			if claim.pending() and claim.retry_restore() ~= true then return false end
 			if preconfirmed ~= true and options.confirm(mode) ~= true then return false end
 			-- The modal runs a native event loop; pause may acquire the engine while
 			-- confirmation is open, so its admission must be checked again.
@@ -122,7 +135,7 @@ function M.new(options)
 			local committed, detail = transaction.apply(options.scope, mode)
 			if committed ~= true then Logger.warn(LOG, "Scope %s did not commit: %s.", options.scope, tostring(detail)) end
 			return committed, detail
-		end, owner)
+		end, claim)
 	end
 	return owner
 end
