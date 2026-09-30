@@ -402,7 +402,8 @@ end
 
 --- Validates the canonical entry-array shape shared by legacy migration,
 --- combined-state load, and runtime publication. The legacy path alone may
---- contain cleartext; every durable combined entry must carry an opaque ref.
+--- contain cleartext; every durable combined entry must carry an opaque ref,
+--- except the empty token of a local server the user gave no key to.
 --- @param entries any Candidate dense array.
 --- @param allow_plaintext boolean Whether historical cleartext is accepted.
 --- @param active_id string Candidate active identity.
@@ -415,7 +416,8 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 			or type(entry.id) ~= "string" or entry.id == ""
 			or type(entry.provider) ~= "string" or entry.provider == ""
 			or type(entry.model) ~= "string" or entry.model == ""
-			or type(entry.token) ~= "string" or entry.token == ""
+			or type(entry.token) ~= "string"
+			or (entry.token == "" and not ApiRemote.is_local_server(entry.provider))
 			or (entry.base_url ~= nil and type(entry.base_url) ~= "string")
 			or (entry.label ~= nil and type(entry.label) ~= "string")
 			or ids[entry.id] == true then
@@ -428,7 +430,7 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 				tostring(entry.id))
 			return false
 		end
-		if not allow_plaintext and not encrypted then
+		if not allow_plaintext and not encrypted and entry.token ~= "" then
 			Logger.error(LOG, "Persisted API state contains a plaintext token; refusing the snapshot.")
 			return false
 		end

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Coordinates communication with local (Ollama, MLX) and remote LLM backends. Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/modules/llm/defaults.json` so the same tuning applies on every driver.
+Coordinates communication with local (Ollama, MLX) and remote LLM backends, and with the local OpenAI-compatible servers the user runs (oMLX, LM Studio, llama.cpp / LocalAI, Jan: `local_servers.lua` detects them from `_shared/modules/llm/local_servers.json`, and `api_remote.lua` sends their requests without a key). Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/modules/llm/defaults.json` so the same tuning applies on every driver.
 
 ## Ports used (`_shared/core/ports/`)
 

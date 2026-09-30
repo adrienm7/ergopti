@@ -41,6 +41,18 @@ chain_fallback_ms = 500
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
+# Deadline of one models probe of a local OpenAI-compatible server
+# (_shared/modules/llm/local_servers.json). A running server on loopback
+# answers in milliseconds; an absent one refuses the connection at once, so
+# the deadline only bounds a server that accepted and hangs.
+# HS: api_remote.lua detect_local_servers (each probe client).
+local_server_probe_timeout_ms = 1500
+
+# Age after which the AI menu sweeps the local servers again when it is built.
+# The menu's Search again row sweeps at any time.
+# HS: local_servers.lua is_stale().
+local_server_detection_max_age_ms = 30000
+
 # Hard deadline for one macOS Keychain security(1) subprocess. This does not
 # block input, but it bounds every credential CRUD callback and owned task.
 # HS: api_token_crypto.lua OPERATION_TIMEOUT_SEC.

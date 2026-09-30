@@ -2327,19 +2327,26 @@ function M.llm_prompt_choices()
 end
 
 --- The vision backends a llm_vision binding may name: the local server first,
---- then the API providers that take an image (modules/llm/provider_uses.lua),
+--- then the local OpenAI-compatible servers that answered the last sweep
+--- (modules/llm/local_servers.lua; their model goes in the binding), then the
+--- API providers that take an image (modules/llm/provider_uses.lua),
 --- in the catalogue's order, each with the vision model used when the binding
 --- names none ("" when the backend needs one).
 --- @return table Array of { value = backend id, label, defaultModel }.
 function M.llm_vision_choices()
 	local Remote = require("modules.llm.api_remote")
 	local ProviderUses = require("modules.llm.provider_uses")
+	local LocalServers = require("modules.llm.local_servers")
 	local defaults = require("modules.llm.screen_answer").config().default_models
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
 		label = i18n.get("llm.vision.local_backend"),
 		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
 	} }
+	for _, server_id in ipairs(ProviderUses.provider_ids(LocalServers.detected(), Remote.PROVIDERS,
+		ProviderUses.VISION)) do
+		choices[#choices + 1] = { value = server_id, label = Remote.PROVIDERS[server_id].label, defaultModel = "" }
+	end
 	for _, provider_id in ipairs(ProviderUses.provider_ids(Remote.PROVIDER_ORDER, Remote.PROVIDERS,
 		ProviderUses.VISION)) do
 		choices[#choices + 1] = {
