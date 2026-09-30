@@ -917,7 +917,11 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	end
 
 	if not Timer or Timer.HAS_ASYNC ~= true then
-		Logger.error(LOG, "Asynchronous timer capability unavailable — background checks disabled.")
+		-- luv is optional: install.sh installs it where the distribution packages
+		-- it for LuaJIT and degrades without it. A missing optional capability is a
+		-- degraded feature, not a fault: as an ERROR it opened the error window at
+		-- every start of such an install (hardening-a-startup-zero-error).
+		Logger.warn(LOG, "Asynchronous timers are unavailable (luv is not installed) — background update checks disabled.")
 		return false
 	end
 
