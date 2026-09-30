@@ -20,6 +20,12 @@
 --- 7. A slow native worker is not a failure: only a whole stall budget without
 ---    an exact ACK is. While stalled, DEBUG/TRACE/DONE records beyond a small
 ---    backlog are shed and counted, and the recovery is reported once.
+--- 8. The budget counts the time the pump was running, not the wall clock. A
+---    modal dialog (hs.dialog.blockAlert, an AppleScript prompt) or a busy
+---    main thread parks this pump and the ACK callback together: that time
+---    proves nothing about the worker, and a user reading a dialog for thirty
+---    seconds made the driver exit with "did not ACK … within the 30000 ms
+---    stall budget (3 sends)".
 --- ==============================================================================
 
 local M = {}
@@ -826,15 +832,25 @@ local function resend_interval(sends)
 	return math.min(ACK_RETRY_SEC * (2 ^ doublings), ACK_RETRY_CAP_SEC)
 end
 
+--- Counts one pump interval against the retained batch's stall budget. A gap
+--- longer than the longest resend interval is a parked run loop (a modal
+--- dialog, a busy main thread): the ACK callback could not run either, so
+--- that gap counts only as that interval. Resends are not progress.
+--- @param gap number Seconds since the previous pump tick.
+local function count_stall_wait(gap)
+	local batch = _inflight
+	if type(batch) ~= "table" or type(batch.first_sent_at) ~= "number" then return end
+	batch.waited = (batch.waited or 0) + math.min(math.max(gap, 0), ACK_RETRY_CAP_SEC)
+end
+
 --- Reports, once, a retained batch that stayed unacknowledged for the whole
---- stall budget. Measured from its first send: resends are not progress.
---- @param at number Monotonic time of this pump tick.
+--- stall budget of running pump time since its first send.
 --- @param run_loop_live boolean Whether the previous tick ran shortly before.
-local function report_exhausted_stall_budget(at, run_loop_live)
+local function report_exhausted_stall_budget(run_loop_live)
 	local batch = _inflight
 	if type(batch) ~= "table" or batch.failure_reported == true
 		or type(batch.first_sent_at) ~= "number" then return end
-	if at - batch.first_sent_at < STALL_FATAL_SEC then return end
+	if (batch.waited or 0) < STALL_FATAL_SEC then return end
 	-- After a frozen run loop this timer can fire before the socket callback
 	-- that holds the awaited ACK, so that tick hands the verdict to the next
 	-- one. Only once per batch: under App Nap or a saturated main thread every
@@ -875,8 +891,10 @@ local function pump(owner)
 	if _delivery_active then return end
 	if not _active or _socket == nil then return end
 	local tick_at = now()
-	local run_loop_live = _last_pump_at ~= nil and (tick_at - _last_pump_at) <= ACK_RETRY_SEC
+	local gap = _last_pump_at ~= nil and (tick_at - _last_pump_at) or 0
+	local run_loop_live = _last_pump_at ~= nil and gap <= ACK_RETRY_SEC
 	_last_pump_at = tick_at
+	count_stall_wait(gap)
 	invoke_failure_callback(owner)
 	if owner ~= _diagnostics or not _active then return end
 	deliver_rejected_errors()
@@ -889,7 +907,7 @@ local function pump(owner)
 	if _inflight ~= nil then
 		local sent_at = _inflight.sent_at
 		if sent_at ~= nil and (tick_at - sent_at) < resend_interval(_inflight.attempts) then
-			report_exhausted_stall_budget(tick_at, run_loop_live)
+			report_exhausted_stall_budget(run_loop_live)
 			return
 		end
 		-- The retained batch missed its ACK deadline: the worker is stalled
@@ -920,7 +938,7 @@ local function pump(owner)
 		return
 	end
 	_inflight.attempts = (_inflight.attempts or 0) + 1
-	report_exhausted_stall_budget(_inflight.sent_at, run_loop_live)
+	report_exhausted_stall_budget(run_loop_live)
 end
 
 local function pump_boundary(owner)
