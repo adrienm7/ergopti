@@ -7,8 +7,11 @@
 --- backend row that may install a runtime, and only that backend's runtime.
 --- These cases drive the real menu toggle through the activation fixture:
 --- 1. An API enable installs nothing and offers nothing.
---- 2. A declined Ollama offer keeps the AI off, durably, with one notice.
---- 3. An accepted offer installs Ollama exactly once, then checks the model.
+--- 2. A declined Ollama install keeps the AI off, durably, with one explanation.
+--- 3. An accepted install installs Ollama exactly once, then checks the model.
+--- A missing Ollama is offered through the error that says it does not answer
+--- (unreachable_backend_offer.lua, llm-enable-unreachable-local): its install
+--- button is the consent, and the AI is never committed on before it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -26,31 +29,38 @@ helpers.describe("AI enable installs only its backend's runtime (ai-runtime-enab
 		end)
 	end)
 
-	helpers.it("keeps the AI off, durably and with one notice, when the offer is declined", function()
+	helpers.it("keeps the AI off, durably and with one explanation, when the install is declined", function()
 		with_activation("ollama", { true, true }, {
 			ollama_installed = false,
-			ollama_offer_choice = "ollama.offer_website",
+			offer_pick = function() return nil end,
 		}, function(action, state, calls)
 			action()
-			helpers.assert_eq(calls.offers, 1)
+			helpers.assert_eq(#calls.offer_dialogs, 1, "one error explains and offers the install")
+			helpers.assert_true(calls.offer_dialogs[1].message:find("llm.unreachable.body_missing", 1, true) ~= nil,
+				"the error itself says the AI stays off without Ollama")
+			helpers.assert_eq(calls.offers, 0, "no second question")
 			helpers.assert_eq(calls.ollama_installs, 0, "a decline never downloads")
 			helpers.assert_eq(state.llm_enabled, false, "a decline keeps the AI off")
-			helpers.assert_eq(calls.saves, 2,
-				"the enabled candidate must be durably compensated after the decline")
+			helpers.assert_eq(calls.saves, 0,
+				"durable by construction: the enabled candidate is never committed before the install")
 			helpers.assert_eq(calls.get_runtime_enabled(), false)
-			helpers.assert_eq(calls.runtime_notices, { "ollama.runtime_missing_body" })
+			helpers.assert_eq(calls.runtime_notices, {}, "the dialog was the one explanation")
 			helpers.assert_eq(calls.requirements, 0)
 			helpers.assert_eq(calls.notifications, 0)
 		end)
 	end)
 
-	helpers.it("installs Ollama once when the offer is accepted, then checks the model", function()
+	helpers.it("installs Ollama once when the install is accepted, then checks the model", function()
 		with_activation("ollama", { true }, {
 			ollama_installed = false,
-			ollama_offer_choice = "ollama.offer_download",
+			offer_pick = function(dialog)
+				helpers.assert_eq(dialog.choices, { "llm.unreachable.install|Ollama" })
+				return 1
+			end,
 		}, function(action, state, calls)
 			action()
-			helpers.assert_eq(calls.offers, 1)
+			helpers.assert_eq(#calls.offer_dialogs, 1)
+			helpers.assert_eq(calls.offers, 0, "the install button was the consent")
 			helpers.assert_eq(calls.ollama_installs, 1)
 			helpers.assert_eq(calls.bootstrap, 0, "an Ollama enable must not bootstrap MLX")
 			helpers.assert_eq(calls.requirements, 0,

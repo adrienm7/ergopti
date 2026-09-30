@@ -56,6 +56,19 @@ local OWNED_MODULES = {
 	"infra.dialog_util",
 	"adapters.shell_runner",
 	"infra.deferred_work",
+	"ui.menu.menu_llm.local_server_panel",
+	"ui.menu.menu_llm.unreachable_backend_offer",
+	"modules.llm.local_servers",
+	"modules.llm.ollama_endpoint",
+}
+
+-- The local OpenAI-compatible servers of _shared/modules/llm/local_servers.json
+local LOCAL_SERVER_ORDER = { "omlx", "lmstudio", "llamacpp", "jan" }
+local LOCAL_SERVERS = {
+	omlx = { label = "oMLX", base_url = "http://localhost:8000/v1" },
+	lmstudio = { label = "LM Studio", base_url = "http://localhost:1234/v1" },
+	llamacpp = { label = "llama.cpp / LocalAI", base_url = "http://localhost:8080/v1" },
+	jan = { label = "Jan", base_url = "http://localhost:1337/v1" },
 }
 
 local function build_fixture(backend, save_results, options)
@@ -137,8 +150,10 @@ local function build_fixture(backend, save_results, options)
 	}
 	calls.runtime_notices = {}
 	calls.offers = 0
+	calls.notices = {}
 	package.loaded["infra.notifications"] = {
-		notify = function(message, body)
+		notify = function(message, body, kind, on_click)
+			calls.notices[#calls.notices + 1] = { title = message, body = body, kind = kind, on_click = on_click }
 			if message == "notify.llm_enabled" or message == "notify.llm_disabled" then
 				calls.notifications = calls.notifications + 1
 			elseif message == "ollama.runtime_missing_title"
@@ -149,18 +164,86 @@ local function build_fixture(backend, save_results, options)
 		end,
 	}
 	-- The Ollama download offer: the choice is the button label, as i18n echoes keys.
+	-- The unreachable-backend error picks through options.offer_pick(dialog),
+	-- which returns the chosen index, or nil to keep the AI off.
+	calls.offer_dialogs = {}
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
 			return options.ollama_offer_choice or "ollama.offer_website"
 		end,
+		choose = function(title, message, choices, cancel_label, ok_label)
+			local dialog = {
+				title = title, message = message, choices = choices,
+				cancel = cancel_label, ok = ok_label,
+			}
+			calls.offer_dialogs[#calls.offer_dialogs + 1] = dialog
+			if type(options.offer_pick) ~= "function" then return nil end
+			return options.offer_pick(dialog)
+		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	-- format keeps its arguments visible: "key|arg1|arg2"
+	package.loaded["infra.i18n"] = {
+		get = function(key) return key end,
+		format = function(key, ...)
+			local parts = { key }
+			local args = table.pack(...)
+			for index = 1, args.n do parts[#parts + 1] = tostring(args[index]) end
+			return table.concat(parts, "|")
+		end,
+	}
+	-- The local servers answer only once swept, as a real sweep publishes them
+	calls.sweeps = 0
+	local swept = false
+	local function local_verdict(id)
+		local models = type(options.local_servers_up) == "table" and options.local_servers_up[id] or nil
+		if not swept or models == nil then
+			return { status = "down", base_url = LOCAL_SERVERS[id].base_url, models = {} }
+		end
+		return { status = "up", base_url = LOCAL_SERVERS[id].base_url, models = models }
+	end
+	package.loaded["modules.llm.local_servers"] = {
+		ORDER = LOCAL_SERVER_ORDER,
+		SERVERS = LOCAL_SERVERS,
+		STATUS_UP = "up",
+		STATUS_NEEDS_KEY = "needs_key",
+		STATUS_DOWN = "down",
+		result = local_verdict,
+		detected = function()
+			local ids = {}
+			for _, id in ipairs(LOCAL_SERVER_ORDER) do
+				if local_verdict(id).status ~= "down" then ids[#ids + 1] = id end
+			end
+			return ids
+		end,
+	}
+	-- The engine menu's switch to a server: stores its entry, selects the API backend
+	calls.server_switches = {}
+	package.loaded["ui.menu.menu_llm.local_server_panel"] = {
+		rows = function() return {} end,
+		set_agent_context = noop,
+		use_server = function(id, model, on_selected)
+			calls.server_switches[#calls.server_switches + 1] = { id = id, model = model }
+			state.llm_backend = "api"
+			runtime_backend = "api"
+			if type(on_selected) == "function" then on_selected(true) end
+			return true
+		end,
+	}
 	package.loaded["ui.menu.shortcut_utils"] = {}
 	package.loaded["modules.llm"] = {
+		api_remote = {
+			detect_local_servers = function(on_done)
+				calls.sweeps = calls.sweeps + 1
+				swept = true
+				if type(on_done) == "function" then on_done(true) end
+				return true
+			end,
+		},
 		DEFAULT_STATE = {
 			llm_enabled = false,
 			llm_backend = "ollama",
+			llm_ollama_port = 11434,
 			llm_model_mlx = "",
 			llm_model_ollama = "",
 			llm_num_predictions = 1,
@@ -284,7 +367,12 @@ local function build_fixture(backend, save_results, options)
 		}
 	end
 	package.loaded["modules.llm.api_mlx"] = {}
-	package.loaded["ui.menu.menu_llm.startup_controller"] = { new = function() return noop end }
+	package.loaded["ui.menu.menu_llm.startup_controller"] = {
+		new = function(ctx)
+			calls.startup_ctx = ctx
+			return noop
+		end,
+	}
 	package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
 		new = function()
 			return {

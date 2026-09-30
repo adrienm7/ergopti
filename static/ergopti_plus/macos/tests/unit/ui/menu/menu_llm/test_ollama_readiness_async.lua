@@ -548,14 +548,18 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 		end)
 
 		with_fixture({}, function(fixture)
-			local cancellations = {}
-			fixture.manager.check_requirements("demo", function() end, function(reason)
+			local cancellations, details = {}, {}
+			fixture.manager.check_requirements("demo", function() end, function(reason, detail)
 				cancellations[#cancellations + 1] = reason
+				details[#details + 1] = detail
 			end, {is_current = function() return true end})
 			fixture.spawns[1].complete(28, "", "timeout")
 			fixture.spawns[2].complete(7, "", "restart failed")
 			fixture.spawns[2].complete(0, "", "duplicate")
-			helpers.assert_eq(cancellations, {"restart_failed"})
+			-- A failed restart leaves nothing at the endpoint: one reason for every
+			-- caller (llm-enable-unreachable-local), the step that gave up as detail
+			helpers.assert_eq(cancellations, {require("modules.llm.ollama_endpoint").UNREACHABLE})
+			helpers.assert_eq(details, {"restart_failed"})
 			helpers.assert_eq(#fixture.timers, 0,
 				"a failed restart cannot schedule readiness work from a duplicate completion")
 		end)
@@ -896,6 +900,51 @@ helpers.describe("HS-035 Ollama requirement pull terminal delivery", function()
 			helpers.assert_eq(terminal.successes, 1)
 			helpers.assert_eq(terminal.failures, 0)
 			helpers.assert_eq(terminal.reasons, {})
+		end)
+	end)
+end)
+
+--- Counts the generic "Ollama failed" notices.
+--- @param fixture table The real-manager fixture.
+--- @return integer count
+local function failure_notices(fixture)
+	local count = 0
+	for _, notice in ipairs(fixture.notifications) do
+		if notice[1] == "ollama.fail_title" then count = count + 1 end
+	end
+	return count
+end
+
+helpers.describe("A silent Ollama is one reason, told once (llm-enable-unreachable-local)", function()
+	helpers.it("a start that never answers cancels as unreachable, with its caller's error only (llm-enable-unreachable-local)",
+		function()
+			with_fixture({}, function(fixture)
+				local cancellations, details = {}, {}
+				fixture.manager.check_requirements("demo", function() end, function(reason, detail)
+					cancellations[#cancellations + 1] = reason
+					details[#details + 1] = detail
+				end, {is_current = function() return true end, reports_unreachable = true})
+				fixture.spawns[1].complete(7, "", "connection refused")
+				fixture.spawns[2].complete(0, "", "")
+				for _ = 1, 30 do
+					local timer = fixture.timers[#fixture.timers]
+					timer.fire()
+					fixture.spawns[#fixture.spawns].complete(7, "", "connection refused")
+				end
+				helpers.assert_eq(cancellations, {require("modules.llm.ollama_endpoint").UNREACHABLE})
+				helpers.assert_eq(details, {"readiness_timeout"})
+				helpers.assert_eq(failure_notices(fixture), 0,
+					"the caller's error names the fix; a second, generic notice would repeat it")
+			end)
+		end)
+
+	helpers.it("a caller that does not report it still gets the generic notice (llm-enable-unreachable-local)", function()
+		with_fixture({}, function(fixture)
+			fixture.manager.check_requirements("demo", function() end, function() end,
+				{is_current = function() return true end})
+			fixture.spawns[1].complete(7, "", "connection refused")
+			fixture.spawns[2].complete(7, "", "restart failed")
+			helpers.assert_eq(failure_notices(fixture), 1, "nobody else tells the user")
 		end)
 	end)
 end)

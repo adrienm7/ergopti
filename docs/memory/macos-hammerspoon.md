@@ -130,6 +130,27 @@ The engine menu gets its rows through `ctx.local_server_rows`, not a
 `backend_panel` require, because the backend fixtures stub `modules.llm`
 without `api_remote`. Extend `test_local_openai_backends.lua`.
 
+### project-macos-unreachable-ai-backend-is-explained
+
+dev.152 showed "Disabling LLM (requirements check failed)" (the error window)
+and, in the diagnostics, "Network request failed" for a local AI. Three causes
+hid behind that ERROR in `startup_controller`: a missing runtime, an Ollama that
+never answered its start, and the API backend, because
+`models_manager.check_requirements` sent every non-MLX backend, a local
+OpenAI server included, to Ollama's check. The AI switch also published "AI
+enabled" before that check and stayed on when Ollama never answered. Now the
+API backend has no local requirement; every readiness failure that leaves
+nothing at the endpoint cancels with `OllamaEndpoint.UNREACHABLE` (the step
+as detail), without the generic notice when each waiter passes
+`reports_unreachable`; the switch and the startup turn the AI off with a WARN
+and call `unreachable_backend_offer.lua`. Its dialog (`dialog_util.choose`: an
+AppleScript alert holds three buttons, more become a list) names Ollama and its
+URL, then offers each answering local server first, start or install. On
+macOS the neutral backend is MLX, so Ollama is always an explicit choice (W1):
+a server is only ever a confirmed button. Action: route a new local-backend
+failure through that offer and keep unexplained ones ERROR
+(`llm-requirements-error-kept`); extend `test_llm_enable_unreachable_local.lua`.
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units
