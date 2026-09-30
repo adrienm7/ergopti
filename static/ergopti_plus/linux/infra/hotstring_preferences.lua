@@ -57,6 +57,10 @@ for _, path in ipairs(OWNED) do
 end
 
 local _document = nil
+-- Bumped on every change of _document, so a reader that caches what it derived
+-- from a leaf (the physical magic key's evdev code, asked on every grabbed
+-- key-down) knows when to derive it again.
+local _generation = 0
 local _scope_owner = nil
 local _file = nil
 
@@ -70,6 +74,14 @@ local _file = nil
 -- =========================================
 
 local function file() return _file or ConfigPaths.config("config.toml") end
+
+--- Makes a document the cached one.
+--- @param document table|false|nil Decoded document; false after a refused
+---   first read, nil to read again.
+local function publish(document)
+	_document = document
+	_generation = _generation + 1
+end
 
 local function clone(value)
 	if type(value) ~= "table" then return value end
@@ -167,7 +179,7 @@ function M.refresh()
 		Logger.error(LOG, "Hotstring preferences were not refreshed: %s.", tostring(document))
 		return false
 	end
-	_document = document
+	publish(document)
 	return true
 end
 
@@ -179,7 +191,7 @@ end
 local function current()
 	if _document == nil and not M.refresh() then
 		Logger.error(LOG, "Hotstring preferences are unreadable; every owned leaf stays neutral.")
-		_document = false
+		publish(false)
 	end
 	return _document or {}
 end
@@ -192,6 +204,13 @@ function M.get(path)
 	local value = lookup(current(), path)
 	if value == nil then return Manifest.default_for(path) end
 	return value
+end
+
+--- The generation of the cached document: it changes whenever the document
+--- does (a write, a refresh, a scope's adoption or restoration).
+--- @return number
+function M.generation()
+	return _generation
 end
 
 --- Whether an owned leaf is explicitly present in the cached document.
@@ -257,7 +276,7 @@ function M.set_many(values)
 		end
 		local written, why, content = Writer.batch_write(file(), rows, nil, source)
 		if written ~= true then return false, why end
-		_document = decode(content)
+		publish(decode(content))
 		return true
 	end)
 	if called and committed == true then return true end
@@ -336,7 +355,7 @@ function M.adopt(owner, document)
 		Logger.error(LOG, "Candidate hotstring preferences were refused: %s.", tostring(validated))
 		return false
 	end
-	_document = clone(validated)
+	publish(clone(validated))
 	return true
 end
 
@@ -346,7 +365,7 @@ end
 --- @return boolean restored
 function M.restore(owner, snapshot)
 	if _scope_owner ~= owner or type(snapshot) ~= "table" or type(snapshot.document) ~= "table" then return false end
-	_document = clone(snapshot.document)
+	publish(clone(snapshot.document))
 	return true
 end
 
@@ -356,7 +375,7 @@ end
 function M._set_file_for_test(path)
 	if path ~= nil and (type(path) ~= "string" or path:sub(1, 1) ~= "/") then return false end
 	_file = path
-	_document = nil
+	publish(nil)
 	return true
 end
 

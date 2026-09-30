@@ -35,7 +35,7 @@ require("test.magic_key_source_contract")(helpers, Shared, {
 
 --- Runs body against fresh owners whose config.toml is a private file.
 --- @param content string|nil Initial config.toml; nil is an absent file.
---- @param body function body(Source, Preferences)
+--- @param body function body(Source, Preferences, path)
 local function with_source(content, body)
 	local saved = {
 		preferences = package.loaded["infra.hotstring_preferences"],
@@ -52,7 +52,7 @@ local function with_source(content, body)
 		package.loaded["modules.hotstrings.magic_key_source"] = nil
 		local Preferences = helpers.load_module("infra.hotstring_preferences")
 		assert(Preferences._set_file_for_test(path))
-		body(require("modules.hotstrings.magic_key_source"), Preferences)
+		body(require("modules.hotstrings.magic_key_source"), Preferences, path)
 	end)
 	package.loaded["infra.hotstring_preferences"] = saved.preferences
 	package.loaded["modules.hotstrings.magic_key_source"] = saved.source
@@ -154,6 +154,34 @@ helpers.describe("magic key source: the keyboard hook decision", function()
 			local ok = pcall(wire, Source, state)
 			helpers.assert_eq(ok, false, "a second initialization is refused")
 			Source._reset_for_test()
+		end)
+	end)
+
+	helpers.it("(magic-key-source) a keystroke reads no preference; a new document is followed at once", function()
+		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source, Preferences, path)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			local real_get, reads = Preferences.get, 0
+			Preferences.get = function(leaf)
+				reads = reads + 1
+				return real_get(leaf)
+			end
+			local ok, err = pcall(function()
+				for _ = 1, 50 do Source.on_key({ code = KEY_C, mods = {} }) end
+				helpers.assert_true(reads <= 1,
+					"the evdev code is derived once per document, not on each of 50 key-downs: " .. reads)
+				helpers.assert_eq(Source.evdev_code(), KEY_J)
+				helpers.assert_true(Source.set("Semicolon"))
+				helpers.assert_eq(Source.evdev_code(), 39, "a choice is followed on the next press")
+				local handle = assert(io.open(path, "w"))
+				handle:write("[hotstrings]\nmagic_key_source = \"KeyQ\"\n")
+				handle:close()
+				helpers.assert_eq(Source.evdev_code(), 39, "an unread edit changes nothing yet")
+				helpers.assert_true(Preferences.refresh())
+				helpers.assert_eq(Source.evdev_code(), 16, "a refreshed document is followed")
+			end)
+			Preferences.get = real_get
+			Source._reset_for_test()
+			if not ok then error(err, 0) end
 		end)
 	end)
 
