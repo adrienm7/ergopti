@@ -381,6 +381,31 @@ _TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp() {
 Test("onboarding answers: the tap-hold import keeps the user's keys and backs up (onboarding-answers-windows)",
 	_TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp)
 
+; A tap_hold.toml that could not take the import threw out of the commit, which
+; then saved none of the other answers: the target now says why instead.
+_TOAN_TapHoldTargetNeverCostsTheOtherAnswers() {
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\tap_hold.toml"
+	Source := '[tap_hold.keys.left_alt]`ntap_action = "escape"`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Refused := _Onboarding_TapHoldTarget(Path, ["caps_lock", "left_alt"])
+		AssertTrue(Refused is String, "a file that cannot take the import is reported, never thrown")
+		AssertContains(Refused, "left_alt")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the user's file is left as it was")
+		Target := _Onboarding_TapHoldTarget(Path, ["caps_lock"])
+		AssertTrue(Target is Map, "a free key becomes the transition's tap-hold target")
+		AssertEqual(Path, Target["path"])
+		AssertContains(Target["new_content"], "[tap_hold.keys.caps_lock]")
+		AssertTrue(Target["expected_old"] is Map, "the transition replaces only the bytes the import read")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "preparing the target publishes nothing")
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("onboarding answers: a tap-hold file that cannot take the import never costs the other answers (onboarding-answers-windows)",
+	_TOAN_TapHoldTargetNeverCostsTheOtherAnswers)
+
 
 
 
