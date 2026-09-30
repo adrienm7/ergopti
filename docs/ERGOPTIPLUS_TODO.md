@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-09-29 (overnight). Integration branch: `integration-2` → `dev`. This ordered checklist is the
+Updated: 2026-09-30. Published to `dev` from `integration-3` in one release. This ordered checklist is the
 current handoff; older workflow task-status files are historical evidence.
 Update the completed item and its verification before moving to the next item.
 
@@ -34,7 +34,8 @@ authorized and must be deleted after the final push.
 instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
 were implemented in parallel on `wip/*` branches, adversarially reviewed, fixed
 on `wip/*-fix` branches and integrated in order on the local branch
-`integration-2` (pushed as `backup/integration-2b`). Nothing is on `dev` yet.
+`integration-2`, then `integration-3` after a container restart; the whole
+batch was published to `dev` in one release on 2026-09-30.
 The maintainer demos Ergopti on 2026-09-30 in the afternoon. Read
 [the overnight handoff](handovers/2026-09-29-overnight/README.md) first: it
 lists every branch, the in-flight fixes, the maintainer's decisions and the
@@ -138,20 +139,21 @@ These are software implementations; final hardware verification remains below.
     Legend: `[x]` implemented, reviewed and integrated on `integration-2`
     (published only once `dev` is pushed); `[~]` integrated with the precise
     remainder recorded in the item or in the overnight handoff.
-14. [ ] Run final cross-driver, shared, encoding, convention and 21-locale gates;
+14. [x] Run final cross-driver, shared, encoding, convention and 21-locale gates;
         record real-device checks still unavailable on this Windows host.
-        Local gates on `integration-2` @85708c92: JS 316/317 (the only red is the
+        Local gates on the released tip: JS 319/320, macOS Lua 12231/12231, Linux 4289/4289, macOS E2E and Linux E2E all scenarios, strict conventions, AHK encoding (1738 files) and gen:check (39 outputs of 22 generators, no drift). The only JS red is the
         container-only "Linux install.sh … sandboxed real run", which refuses
-        root), macOS Lua 12044/12044, Linux 4249/4249, macOS E2E 67/67, Linux
-        E2E 115/115, gen:check, strict conventions, AHK encoding, false-green
-        ratchet, Windows bundle and macOS payload guards. Windows AHK suites
-        only run in CI.
+        root. Full CI without release (run 36649301758 (CI #619)) was green on the same tip,
+        including the Windows AHK suites, packaging and install-and-launch on
+        the three OSes. Real-device checks remain: macOS tap-holds and the
+        guardian's Login Items approval, Windows tooltip rendering.
 15. [x] Finish storage cleanup after all useful work is recoverable from GitHub.
         `C:/ewt`, `C:/ewtb` and `D:/ewt` are deleted. Their unique commits,
         pending patches and specifications are in the handoff package; their
         full-tree exports differed from `dev` only by formatting.
-16. [ ] Publish final corrective commits, verify CI and release assets, and write
-        the final report with completed scope, limitations and manual test results.
+16. [~] Publish final corrective commits, verify CI and release assets, and write
+    the final report with completed scope, limitations and manual test results.
+    Published on 2026-09-30; the maintainer's manual test results remain.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
@@ -166,39 +168,58 @@ These are software implementations; final hardware verification remains below.
     extraction deadline. Integrated.
 21. [~] Lighter bundles: Windows bundle 556 → 228 files; macOS zip 99.3 → 46.6 MB
     (unused Karabiner-Elements.pkg dropped, payload manifest, zip -9).
-    Integrated. In flight: no bundled Ollama; Ollama and MLX runtimes
-    installed only the first time each is selected as AI backend
-    (`wip/macos-lazy-ai-runtimes`). After the demo: `.tar.xz` archive.
+    No bundled Ollama; Ollama and MLX runtimes are installed only the first
+    time each is selected as AI backend. Integrated. After the demo: `.tar.xz`
+    archive.
 22. [ ] Delta updates: macOS Sparkle deltas ready on `wip/delta-updates`
         (held until after the demo because its CI step only runs on real
         releases); then Windows and Linux per ADR 010.
-23. [ ] Ergopti-only hotstring groups (SFB reduction, rolls, repeat corrections)
-        moved into the Ergopti extension, shown under « Hotstrings Ergopti »,
-        available when the extension/layout is installed
-        (`wip/ergopti-hotstrings-ext`, in flight).
-24. [ ] macOS tap-hold outage: a not-ready remap guardian held every Karabiner
-        regeneration forever and pinned the first bulk edit (Restore defaults),
-        refusing later edits and Reload (`wip/remap-guardian-bulk-fix`, in
-        flight). Then guardian approval UX: register automatically, and when
-        macOS requires approval open the Login Items pane and show the native
-        permission dialog at boot.
-25. [ ] Config policy: an unknown/retired key or a value naming something that
-        no longer exists is one WARNING, ignored, and offered by the config
-        cleanup — never an ERROR (fixes the dev.146 startup ERROR
-        « M.enable(): unknown hotkey 'at_hash' »). `wip/config-unknown-keys-warn`.
-26. [ ] Diagnostics window showed raw translation keys (possibly because boot
-        failed first); it must show real text even in a degraded boot.
-        `wip/diag-ui-i18n`.
-27. [ ] Every Ergopti window is only focused when opened, never always-on-top
-        (overlays exempt), with a guard test. `wip/ui-focus-not-topmost`.
-28. [ ] macOS permission instructions in a native dialog, never a one-line
-        hs.alert banner. `wip/macos-permission-dialog`.
-29. [ ] force_quit_frontmost asks for confirmation; key combinations governed only
-        by their own switch on every OS. `wip/forcequit-confirm-combos-switch`.
+23. [~] Ergopti-only hotstring groups (SFB reduction, rolls, repeat corrections)
+    moved into the Ergopti extension, shown under « Hotstrings Ergopti ».
+    Integrated. Open maintainer decisions: "installed" currently means
+    "shipped with the app" (the submenu shows for every user); other
+    Ergopti-looking groups (distancesreduction `qu`, `comma_j`,
+    `comma_far_letters`, `ê` sections, French `suffixes_a`, magickey `replace`)
+    were not moved.
+24. [~] macOS tap-hold outage: a not-ready remap guardian held every Karabiner
+    regeneration forever and pinned the first bulk edit (Restore defaults),
+    refusing later edits and Reload. Fixed, with a Tap-Hold menu row saying
+    why tap-holds wait. Guardian approval UX: registration was already
+    automatic; a requires_approval answer now opens numbered Login Items steps
+    in the native permission dialog (once per launch, after the Accessibility
+    dialog, closed automatically on approval; not while Tap-Holds are off,
+    where the banner stays). Integrated; verify on a Mac.
+25. [~] Config policy: an unknown/retired key or a value naming something that
+    no longer exists is one WARNING, ignored, and offered by the config
+    cleanup — never an ERROR (fixes the dev.146 startup ERROR
+    « M.enable(): unknown hotkey 'at_hash' »). Integrated for config.toml on
+    the three drivers. Remaining: files other than config.toml (layers.toml,
+    installed.json, storage.json, tap_hold.toml, api_keys.json, Karabiner
+    files), quoted keys the cleanup cannot cut, and two maintainer decisions
+    (config_migrate's fail-closed guard for invalid stamps; a migrations.toml
+    exception for key removals handled by the cleanup).
+26. [~] Diagnostics window showed raw translation keys (possibly because boot
+    failed first); it must show real text even in a degraded boot.
+    Integrated.
+27. [~] Every Ergopti window is only focused when opened, never always-on-top
+    (overlays exempt), with a guard test. Integrated.
+28. [~] macOS permission instructions in a native dialog, never a one-line
+    hs.alert banner. Integrated.
+29. [~] force_quit_frontmost asks for confirmation; key combinations governed only
+    by their own switch on every OS. Integrated. After the demo: the Windows
+    wizard's Shortcuts answer should also write the key-combinations switch.
 30. [ ] Physical magic-key setting on all three OSes (after the demo).
 31. [ ] HS-274 exact physical key accounting with an Ergopti-owned background
         Karabiner runtime (no Karabiner-Elements app). Plan and decisions in the
         overnight handoff; ~32–42 agent-days; not in the demo release.
+32. [ ] Post-demo test hygiene: AutoHotkey `AssertThrows` closures over a
+        for-loop variable pass whatever the product does
+        (`test_virtual_desktops.ahk`, `test_config_migrate.ahk`,
+        `test_config_scope_manifest.ahk`,
+        `test_config_window_patch_toml_meta_error.ahk`,
+        `test_layout_catalogue.ahk`); extend `test-ahk-loop-capture.cjs` to
+        in-loop closures. The OS-purity ratchet core baseline can drop from 253
+        to 252.
 
 ## Time estimate
 

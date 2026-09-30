@@ -24,33 +24,35 @@ the only safe release procedure. The ordered checklist stays in
 All branches below exist locally and are mirrored on GitHub as
 `backup/<same name>` (for example `backup/wip/d3-desktops`).
 
-| Branch                                      | Content                                                                              | State                                |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
-| `integration-2` (`backup/integration-2b`)   | `c3005e0` + everything below marked integrated                                       | Local gates green (see TODO item 14) |
-| `wip/ci-windows-launch-smoke(-fix)`         | Windows smoke test detects a startup dialog, 120 s hang guard                        | Integrated                           |
-| `wip/about-menu`                            | Channel submenu, version + commit, Uninstall under Version                           | Integrated                           |
-| `wip/win-tooltip-border`                    | Tooltip border z-order and ring region                                               | Integrated                           |
-| `wip/win-bundle-trim`                       | Windows bundle manifest, 556 → 228 files                                             | Integrated                           |
-| `wip/d3-desktops(-fix)`                     | Desktop prev/next with and without wrap; `space_wrap` retired                        | Integrated                           |
-| `wip/d5-system-actions(-fix)`               | Approved system actions with confirmation                                            | Integrated                           |
-| `wip/d4-ai-prediction`                      | AI prediction action, labels; Windows trigger shortcut retired (config v4)           | Integrated                           |
-| `wip/c4-update-check(-fix)`                 | Shared update-check window on 3 OSes                                                 | Integrated                           |
-| `wip/a4-taphold-menu(-fix)`                 | Tap-hold menu by hand + separator, key combinations group                            | Integrated                           |
-| `wip/f2-karabiner-touchpad(-fix)`           | Karabiner switch (`integration_enabled`), touchpad registry owner                    | Integrated                           |
-| `wip/w1-taphold-global(-fix)`               | Tap-hold scopes, global composition (fix commit `a30b4001` deliberately NOT applied) | Integrated                           |
-| `wip/w1-hotstrings(-fix)`                   | Hotstrings scopes, Linux storage.json import                                         | Integrated                           |
-| `wip/l4-layouts(-fix)`                      | Extension packs on macOS, bindings, magic key                                        | Integrated                           |
-| `wip/w2-wizard(-fix)`                       | Seven-page wizard (`085f1368` partially applied, see its message)                    | Integrated                           |
-| `wip/macos-size(-fix)`                      | macOS payload manifest, 99.3 → 46.6 MB                                               | Integrated                           |
-| `wip/delta-updates`                         | Sparkle deltas + ADR 010                                                             | HELD until after the demo            |
-| `wip/remap-guardian-bulk-fix(-fix)`         | macOS tap-hold outage (TODO 24)                                                      | In flight                            |
-| `wip/config-unknown-keys-warn(-fix)`        | Unknown config → WARNING + cleanup (TODO 25)                                         | In flight                            |
-| `wip/diag-ui-i18n(-fix)`                    | Diagnostics raw keys (TODO 26)                                                       | In flight                            |
-| `wip/ui-focus-not-topmost(-fix)`            | Focus-only windows (TODO 27)                                                         | In flight                            |
-| `wip/macos-permission-dialog(-fix)`         | Native permission dialog (TODO 28)                                                   | In flight                            |
-| `wip/forcequit-confirm-combos-switch(-fix)` | TODO 29                                                                              | In flight                            |
-| `wip/ergopti-hotstrings-ext(-fix)`          | TODO 23 (built on `wip/l4-layouts`)                                                  | In flight                            |
-| `wip/macos-lazy-ai-runtimes(-fix)`          | No bundled Ollama; lazy Ollama/MLX (built on `wip/macos-size`)                       | In flight                            |
+| Branch                                      | Content                                                                              | State                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------- |
+| `integration-3` (published to `dev`)        | `c3005e0` + everything below marked integrated                                       | Released 2026-09-30 (TODO item 14) |
+| `wip/ci-windows-launch-smoke(-fix)`         | Windows smoke test detects a startup dialog, 120 s hang guard                        | Integrated                         |
+| `wip/about-menu`                            | Channel submenu, version + commit, Uninstall under Version                           | Integrated                         |
+| `wip/win-tooltip-border`                    | Tooltip border z-order and ring region                                               | Integrated                         |
+| `wip/win-bundle-trim`                       | Windows bundle manifest, 556 → 228 files                                             | Integrated                         |
+| `wip/d3-desktops(-fix)`                     | Desktop prev/next with and without wrap; `space_wrap` retired                        | Integrated                         |
+| `wip/d5-system-actions(-fix)`               | Approved system actions with confirmation                                            | Integrated                         |
+| `wip/d4-ai-prediction`                      | AI prediction action, labels; Windows trigger shortcut retired (config v4)           | Integrated                         |
+| `wip/c4-update-check(-fix)`                 | Shared update-check window on 3 OSes                                                 | Integrated                         |
+| `wip/a4-taphold-menu(-fix)`                 | Tap-hold menu by hand + separator, key combinations group                            | Integrated                         |
+| `wip/f2-karabiner-touchpad(-fix)`           | Karabiner switch (`integration_enabled`), touchpad registry owner                    | Integrated                         |
+| `wip/w1-taphold-global(-fix)`               | Tap-hold scopes, global composition (fix commit `a30b4001` deliberately NOT applied) | Integrated                         |
+| `wip/w1-hotstrings(-fix)`                   | Hotstrings scopes, Linux storage.json import                                         | Integrated                         |
+| `wip/l4-layouts(-fix)`                      | Extension packs on macOS, bindings, magic key                                        | Integrated                         |
+| `wip/w2-wizard(-fix)`                       | Seven-page wizard (`085f1368` partially applied, see its message)                    | Integrated                         |
+| `wip/macos-size(-fix)`                      | macOS payload manifest, 99.3 → 46.6 MB                                               | Integrated                         |
+| `wip/delta-updates`                         | Sparkle deltas + ADR 010                                                             | HELD until after the demo          |
+| `wip/remap-guardian-bulk-fix(-fix)`         | macOS tap-hold outage (TODO 24)                                                      | Integrated                         |
+| `wip/config-unknown-keys-warn(-fix)`        | Unknown config → WARNING + cleanup (TODO 25)                                         | Integrated                         |
+| `wip/diag-ui-i18n(-fix)`                    | Diagnostics raw keys (TODO 26)                                                       | Integrated                         |
+| `wip/ui-focus-not-topmost(-fix)`            | Focus-only windows (TODO 27)                                                         | Integrated                         |
+| `wip/macos-permission-dialog(-fix)`         | Native permission dialog (TODO 28)                                                   | Integrated                         |
+| `wip/forcequit-confirm-combos-switch(-fix)` | TODO 29                                                                              | Integrated                         |
+| `wip/ergopti-hotstrings-ext(-fix)`          | TODO 23 (built on `wip/l4-layouts`)                                                  | Integrated                         |
+| `wip/macos-lazy-ai-runtimes(-fix)`          | No bundled Ollama; lazy Ollama/MLX (built on `wip/macos-size`)                       | Integrated                         |
+| `wip/windows-ci-fixes(-fix)`                | Eight Windows AHK CI failures, shell-runner settle ceiling                           | Integrated                         |
+| `wip/guardian-approval-ux`                  | Login Items steps when the guardian awaits approval (TODO 24)                        | Integrated                         |
 
 `wip/macos-no-ollama` and `wip/macos-stale-shortcut-keys` are empty leftovers
 of restarted runs; ignore them.
