@@ -48,7 +48,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 4
+current_version = 5
 unstamped_version = 2
 
 
@@ -83,4 +83,67 @@ ops = [
 	{ op = "delete", section = "llm.trigger", key = "shortcut" },
 	{ op = "delete", section = "llm.trigger.shortcut" },
 	{ op = "delete", section = "llm", key = "trigger_shortcut" },
+]
+
+[steps.v4_to_v5]
+from = 4
+to = 5
+drivers = ["ahk"]
+reason = "The physical magic key is one setting on every driver: the Windows scan code becomes the KeyboardEvent.code of [hotstrings] magic_key_source."
+# One map_value per candidate key of the manifest's hotstrings.magic_key_source,
+# in both spellings the Windows reader accepted (it upper-cased the value), then
+# the rename. A scan code of no candidate key keeps its value under the new name,
+# where every driver reports it as outdated and reads the automatic key.
+# tools/test/test-magic-key-source.cjs pins this map to the manifest candidates
+# and to their scan codes in _shared/data/keycodes/physical_keys.json.
+ops = [
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC029", to = "Backquote" }, { from = "sc029", to = "Backquote" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC002", to = "Digit1" }, { from = "sc002", to = "Digit1" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC003", to = "Digit2" }, { from = "sc003", to = "Digit2" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC004", to = "Digit3" }, { from = "sc004", to = "Digit3" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC005", to = "Digit4" }, { from = "sc005", to = "Digit4" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC006", to = "Digit5" }, { from = "sc006", to = "Digit5" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC007", to = "Digit6" }, { from = "sc007", to = "Digit6" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC008", to = "Digit7" }, { from = "sc008", to = "Digit7" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC009", to = "Digit8" }, { from = "sc009", to = "Digit8" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00A", to = "Digit9" }, { from = "sc00a", to = "Digit9" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00B", to = "Digit0" }, { from = "sc00b", to = "Digit0" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00C", to = "Minus" }, { from = "sc00c", to = "Minus" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00D", to = "Equal" }, { from = "sc00d", to = "Equal" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC010", to = "KeyQ" }, { from = "sc010", to = "KeyQ" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC011", to = "KeyW" }, { from = "sc011", to = "KeyW" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC012", to = "KeyE" }, { from = "sc012", to = "KeyE" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC013", to = "KeyR" }, { from = "sc013", to = "KeyR" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC014", to = "KeyT" }, { from = "sc014", to = "KeyT" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC015", to = "KeyY" }, { from = "sc015", to = "KeyY" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC016", to = "KeyU" }, { from = "sc016", to = "KeyU" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC017", to = "KeyI" }, { from = "sc017", to = "KeyI" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC018", to = "KeyO" }, { from = "sc018", to = "KeyO" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC019", to = "KeyP" }, { from = "sc019", to = "KeyP" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01A", to = "BracketLeft" }, { from = "sc01a", to = "BracketLeft" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01B", to = "BracketRight" }, { from = "sc01b", to = "BracketRight" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01E", to = "KeyA" }, { from = "sc01e", to = "KeyA" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01F", to = "KeyS" }, { from = "sc01f", to = "KeyS" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC020", to = "KeyD" }, { from = "sc020", to = "KeyD" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC021", to = "KeyF" }, { from = "sc021", to = "KeyF" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC022", to = "KeyG" }, { from = "sc022", to = "KeyG" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC023", to = "KeyH" }, { from = "sc023", to = "KeyH" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC024", to = "KeyJ" }, { from = "sc024", to = "KeyJ" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC025", to = "KeyK" }, { from = "sc025", to = "KeyK" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC026", to = "KeyL" }, { from = "sc026", to = "KeyL" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC027", to = "Semicolon" }, { from = "sc027", to = "Semicolon" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC028", to = "Quote" }, { from = "sc028", to = "Quote" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02B", to = "Backslash" }, { from = "sc02b", to = "Backslash" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC056", to = "IntlBackslash" }, { from = "sc056", to = "IntlBackslash" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02C", to = "KeyZ" }, { from = "sc02c", to = "KeyZ" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02D", to = "KeyX" }, { from = "sc02d", to = "KeyX" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02E", to = "KeyC" }, { from = "sc02e", to = "KeyC" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02F", to = "KeyV" }, { from = "sc02f", to = "KeyV" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC030", to = "KeyB" }, { from = "sc030", to = "KeyB" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC031", to = "KeyN" }, { from = "sc031", to = "KeyN" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC032", to = "KeyM" }, { from = "sc032", to = "KeyM" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC033", to = "Comma" }, { from = "sc033", to = "Comma" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC034", to = "Period" }, { from = "sc034", to = "Period" }] },
+	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC035", to = "Slash" }, { from = "sc035", to = "Slash" }] },
+	{ op = "rename", section = "hotstrings", key = "magic_key_source_scan", to_key = "magic_key_source" },
 ]

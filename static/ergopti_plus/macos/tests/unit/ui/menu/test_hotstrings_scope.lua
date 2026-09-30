@@ -194,6 +194,8 @@ local function fake_keymap(controls)
 	function km.set_repeat_feature_enabled(value) km.repeat_enabled = value; return true end
 	function km.get_base_delay() return km.base end
 	function km.set_base_delay(value) km.base = value; return true end
+	function km.get_magic_key_source() return km.magic_key_source end
+	function km.set_magic_key_source(value) km.magic_key_source = value; return true end
 	function km.get_trigger_char() return km.trigger end
 	function km.set_trigger_char(value)
 		if controls.refuse_trigger then

@@ -77,6 +77,9 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" }, recommended = "★", input_altering = false,
 	},
 	{
+		path = "hotstrings.magic_key_source", id = "magic_key_source", section = "hotstrings", default = "auto", type = "enum", description_key = "menu.hotstrings.magic_key_source", platforms = { "ahk", "hs", "linux" }, recommended = "auto", input_altering = false, enum_values = { "auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash" },
+	},
+	{
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
@@ -890,10 +893,7 @@ M.unavailable = {
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
 	},
 	{
-		path = "hotstrings.magic_key_source_scan", section = "hotstrings", reason_key = "platform_reason.magic_key_source_is_windows", platforms = { "ahk" },
-	},
-	{
-		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_source_is_windows", platforms = { "ahk" },
+		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_detection_is_windows", platforms = { "ahk" },
 	},
 	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },

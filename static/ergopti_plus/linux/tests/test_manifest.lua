@@ -205,6 +205,7 @@ return {
 	"tests.unit.modules.hotstrings.test_loader_catalogue",
 	"tests.unit.modules.hotstrings.test_magic_key",
 	"tests.unit.modules.hotstrings.test_magic_key_catalogue",
+	"tests.unit.modules.hotstrings.test_magic_key_source",
 	"tests.unit.modules.hotstrings.test_section_opt_in_defaults",
 	"tests.unit.modules.hotstrings.test_output_transaction",
 	"tests.unit.modules.hotstrings.test_personal_info_combo_resolver",

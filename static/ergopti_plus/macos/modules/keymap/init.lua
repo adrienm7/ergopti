@@ -33,6 +33,7 @@ local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
+local MagicKeySource = require("modules.keymap.magic_key_source")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
@@ -95,6 +96,7 @@ M.DEFAULT_STATE = {
 	preview_autocorrect_enabled = Manifest.default_for("hotstrings.preview_autocorrect_enabled"),
 	preview_ai_enabled          = Manifest.default_for("hotstrings.preview_ai_enabled"),
 	preview_colored_tooltips    = Manifest.default_for("hotstrings.preview_colored_tooltips"),
+	magic_key_source            = Manifest.default_for("hotstrings.magic_key_source"),
 }
 
 
@@ -539,6 +541,31 @@ function M.set_trigger_char(char)
 	end
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
 	return true
+end
+
+--- Chooses the physical key that types the magic key (`hotstrings.magic_key_source`):
+--- a KeyboardEvent.code, or the automatic value that lets the input source type
+--- it. Takes effect on the next press; nothing is re-registered.
+--- @param value string|nil Stored value; an outdated one reads as automatic.
+--- @return boolean applied
+function M.set_magic_key_source(value)
+	MagicKeySource.set(value)
+	return true
+end
+
+--- The physical magic key in effect (`hotstrings.magic_key_source`).
+--- @return string
+function M.get_magic_key_source()
+	return MagicKeySource.get()
+end
+
+--- Whether the magic key's replace section asks for the physical key: the
+--- `magic_key` group and its `replace` section, the gates the keyboard-layout
+--- menu shows on the replace row.
+--- @return boolean
+local function magic_key_replace_on()
+	return Registry.is_group_enabled("magic_key") == true
+		and Registry.is_section_enabled("magic_key", "replace") == true
 end
 
 --- Ignores a specific window title from hotstring processing.
@@ -1164,6 +1191,15 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- no application ever receives one, and publish the signal in-process.
 	if ControlSentinels.is_sentinel(keyCode)
 		and ControlSentinels.claim_key(keyCode, true, e:getFlags()) then return true end
+	-- The physical magic key: a plain press of the chosen key types the magic key.
+	-- The event itself carries it from here, so the one-shot Shift, the buffer and
+	-- the application all see the magic key, in ignored and secure windows too,
+	-- like a key of the layout. Every other key pays one integer compare: the
+	-- flags are read only for the chosen key.
+	if keyCode == MagicKeySource.keycode()
+		and MagicKeySource.remaps(keyCode, e:getFlags(), magic_key_replace_on) then
+		e:setUnicodeString(CoreState.magic_key)
+	end
 	if _one_shot_shift and _one_shot_shift.key_down(e, keyCode) then return true end
 
 	-- O(1) fast-exit for synthetic signals and Karabiner/layer sentinels.

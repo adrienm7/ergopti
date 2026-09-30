@@ -41,6 +41,7 @@
 		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:config-migrations": "node ./tools/test/test-config-migrations.cjs",
+		"test:magic-key-source": "node ./tools/test/test-magic-key-source.cjs",
 		"test:locale-order": "node ./tools/test/test-locale-order-single-source.cjs",
 		"test:model-hw-calc": "uv run python static/ergopti_plus/macos/data/test_generate_models_calc.py",
 		"test:ahk-encoding": "node ./tools/test/test-ahk-encoding.cjs",

@@ -49,6 +49,7 @@ local OWNERS = {
 	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
 	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
 	{ key = "trigger_char", setter = "set_trigger_char", getter = "get_trigger_char" },
+	{ key = "magic_key_source", setter = "set_magic_key_source", getter = "get_magic_key_source" },
 	{ key = "preview_star_enabled", setter = "set_preview_star_enabled" },
 	{ key = "preview_autocorrect_enabled", setter = "set_preview_autocorrect_enabled" },
 	{ key = "preview_colored_tooltips", setter = "set_preview_colored_tooltips" },

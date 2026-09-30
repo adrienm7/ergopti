@@ -76,11 +76,21 @@ Test("feature-state startup: scalar overrides preserve schema types (AHK-095)",
 	TestFeatureStateBootRejectsInvalidScalarOverrides)
 
 TestFeatureStateBootRejectsInvalidMagicSourceKeys() {
-	_FeatureStateBootRunFails("invalid_source_scan")
 	_FeatureStateBootRunFails("invalid_source_char")
 }
-Test("feature-state startup: magic source keys fail closed (AHK-096)",
+Test("feature-state startup: the magic source character fails closed (AHK-096)",
 	TestFeatureStateBootRejectsInvalidMagicSourceKeys)
+
+; The shared [hotstrings] magic_key_source replaced the Windows-only scan code
+; (config schema v5). A value naming no candidate key is outdated configuration:
+; one warning from the loader and an offer from the cleanup, read as the
+; automatic key here and never a boot failure.
+TestFeatureStateBootOutdatedMagicSourceKeyReadsAutomatic() {
+	_FeatureStateBootRun("outdated_source_key")
+	_FeatureStateBootRun("retired_source_scan")
+}
+Test("feature-state startup: an outdated magic source key reads as the automatic key (magic-key-source)",
+	TestFeatureStateBootOutdatedMagicSourceKeyReadsAutomatic)
 
 TestFeatureStateBootRejectsInvalidCategoryGates() {
 	_FeatureStateBootRunFails("invalid_category_string")
