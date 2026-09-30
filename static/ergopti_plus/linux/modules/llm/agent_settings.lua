@@ -32,6 +32,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ConfigOutdated = require("config_outdated")
 local Json = require("json")
 local Vision = require("llm.vision")
 local Agent = require("llm.agent")
@@ -65,9 +66,6 @@ local ZONEINFO_MARKER = "zoneinfo/"
 local _config = nil
 -- The settings read so far, by path
 local _values = {}
--- The invalid stored values already reported, so a hand-edited setting is
--- logged once and not at every keystroke
-local _reported_invalid = {}
 
 
 
@@ -167,14 +165,12 @@ local function write(path, value)
 	return true
 end
 
---- Logs an invalid stored value once.
+--- Names a stored value this build no longer accepts (a retired mode, a spec
+--- today's grammar refuses): an outdated entry, warned once with the cleanup's
+--- own words, read as off and offered by « Nettoyer config.toml ».
 --- @param path string
---- @param value any
-local function report_invalid(path, value)
-	local key = path .. "\0" .. tostring(value)
-	if _reported_invalid[key] then return end
-	_reported_invalid[key] = true
-	Logger.warn(LOG, "Stored '%s' is invalid (%s) — read as off.", path, tostring(value))
+local function report_invalid(path)
+	ConfigOutdated.report(path, ConfigOutdated.REFUSED, Logger)
 end
 
 --- Reports whether a system setting value is valid: "" (off) or a backend spec.
@@ -192,7 +188,7 @@ function M.get_spec(system)
 	if not path then error("agent_settings: unknown system " .. tostring(system), 2) end
 	local value = read(path)
 	if not M.is_valid_spec(value) then
-		report_invalid(path, value)
+		report_invalid(path)
 		return ""
 	end
 	return value
@@ -238,7 +234,7 @@ end
 function M.get_mode()
 	local value = read(MODE_PATH)
 	if not KNOWN_MODES[value] then
-		report_invalid(MODE_PATH, value)
+		report_invalid(MODE_PATH)
 		return "off"
 	end
 	return value
@@ -266,7 +262,7 @@ function M.get_disabled_apps()
 	local value = read(DISABLED_APPS_PATH)
 	local list = {}
 	if type(value) ~= "table" then
-		report_invalid(DISABLED_APPS_PATH, value)
+		report_invalid(DISABLED_APPS_PATH)
 		return list
 	end
 	for _, app in ipairs(value) do
@@ -338,8 +334,13 @@ end
 --- @param mark function Consumed-key collector.
 function M.mark_config_reads(document, mark)
 	local preferences = require("infra.llm_preferences")
-	for _, path in pairs(M.SYSTEM_PATHS) do preferences.mark_config_read(document, path, mark) end
-	preferences.mark_config_read(document, MODE_PATH, mark)
+	-- The readers' own rules, so what they read as off is what the cleanup offers.
+	for system, path in pairs(M.SYSTEM_PATHS) do
+		preferences.mark_config_read(document, path, mark, function(value)
+			return M.is_valid_spec(value) and (value == "" or backend_fits(system, Vision.parse(value).backend))
+		end)
+	end
+	preferences.mark_config_read(document, MODE_PATH, mark, function(value) return KNOWN_MODES[value] == true end)
 	preferences.mark_config_read(document, DISABLED_APPS_PATH, mark)
 end
 
@@ -363,7 +364,7 @@ function M.resolve(system)
 	if not config then return nil, "off" end
 	local parsed = Vision.parse(spec)
 	if not backend_fits(system, parsed.backend) then
-		report_invalid(M.SYSTEM_PATHS[system], spec)
+		report_invalid(M.SYSTEM_PATHS[system])
 		return nil, "wrong_use"
 	end
 	local model = Agent.resolve_model(parsed, config, M.providers_catalogue())
@@ -475,11 +476,10 @@ function M.timezone()
 	return nil
 end
 
---- Forgets the loaded file, the cached settings and the reported values (tests).
+--- Forgets the loaded file and the cached settings (tests).
 function M._reset_for_test()
 	_config = nil
 	_values = {}
-	_reported_invalid = {}
 end
 
 return M
