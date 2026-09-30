@@ -340,6 +340,19 @@ These are software implementations; final hardware verification remains below.
         why the proof fails from the backed-up file, then offer the removal of
         such rules in the app (listed, confirmed, backed up) instead of an
         abort.
+44. [ ] CapsWord is no longer cancelled by the pointer when Karabiner activated
+        it (AltGr + CapsLock): the watcher probed the variable with
+        `karabiner_cli --get-variable`, an option karabiner_cli has never had
+        (exit 2), so it only ever worked for a CapsWord this driver activated;
+        since dev.150 it stops probing after that refusal
+        (`capsword-probe-unsupported`). Give the activation a way to tell
+        Hammerspoon (for example a sentinel key the activation rule emits,
+        like the script-control ones) so every CapsWord is cancelled.
+45. [ ] v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
+        `gh release create` listed the file and exited 0, but GitHub kept 12
+        of 13 assets, and published releases are immutable. Create the
+        release as a draft, verify every expected asset by name (re-upload a
+        missing one), then publish; fail the job if one is still missing.
 
 ## Time estimate
 
