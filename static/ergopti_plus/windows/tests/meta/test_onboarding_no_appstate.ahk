@@ -139,12 +139,14 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		. "onboarding.error.commit_unexpected`n"
 		. "onboarding.error.commit_rollback`n",
 		Listed, "the complete onboarding commit failure class must remain enumerated, branch by branch")
-	; A tap_hold.toml that cannot take the import is no commit failure: the
-	; other answers are saved, then one notice in the same language says so.
+	; A tap_hold.toml that cannot take the import, or a navigation layer that
+	; cannot be written beside it, is no commit failure: the other answers are
+	; saved, then one notice in the same language says which import failed.
 	Notices := _ONA_LiteralKeys(CommitBody, "_Onboarding_ShowError", &NoticeCount)
-	AssertEqual(1, NoticeCount, "the commit shows one notice outside its failures")
-	AssertEqual("onboarding.error.tap_holds_import`n", Notices,
-		"the tap-hold notice passes its literal i18n key to the renderer that follows the wizard's language")
+	AssertEqual(2, NoticeCount, "the commit shows two notices outside its failures")
+	AssertEqual("onboarding.error.tap_holds_import`n"
+		. "onboarding.error.nav_layer_import`n", Notices,
+		"each import notice passes its literal i18n key to the renderer that follows the wizard's language")
 	Assert(InStr(ErrorBody, "IsSet(_ob_locale)") > 0
 		&& InStr(ErrorBody, '_Onboarding_Translate(Code, Key)') > 0
 		&& InStr(ErrorBody,
