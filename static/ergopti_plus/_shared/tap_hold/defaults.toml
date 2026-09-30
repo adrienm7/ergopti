@@ -179,7 +179,7 @@ hold_modifier = "alt"
 # (platform/remap/data/tap_hold_keys.json), `linux` for Linux (KEY_CODES of
 # platform/remap/tap_hold_engine.lua) — and a driver without it has no id. The
 # Tap-Hold submenu lists a driver's keys in this order under two headers,
-# « Main gauche — Tap / Hold » and « Main droite — Tap / Hold », picked by `hand`.
+# « Main gauche (tap/hold) » and « Main droite (tap/hold) », picked by `hand`.
 #
 # It replaces three lists that each claimed to mirror a menu-manifest key,
 # `tap_hold_keys_catalog`, that never existed: Windows' _TH_KeyDefs, Linux's
