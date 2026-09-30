@@ -134,6 +134,22 @@ letter, so its row was constant noise. It still fires. Windows keeps it in
 is an engine fallback outside the registry: never fold it into their preview.
 `repeat_corrections` entries (ê → u after a doubled letter) are not doublings.
 
+### project-the-windows-time-gate-times-every-observed-key
+
+Every Windows hotstring loaded from TOML is time-gated: `LoadHotstringsSection`
+applies `HotstringsResolve().Delay`, which falls back to the shared 0.75 s.
+`_HSE_PrepareDispatchDecision` fails closed when `LastSentCharacterKeyTime`
+has no entry for the trigger's previous key, for the preview oracle and for
+dispatch alike. Only the layout emulation stamped that map, so with the
+emulation off (the W1 neutral layout setting) nothing delayed fired or
+previewed. The ungated repeat doubling was the only bubble left, then none
+once it was withheld. The prefix watcher now stamps each observed character
+through `AppState_TouchLastSentKey` (`infra/hotstrings/hotstring_send.ahk`)
+before feeding the engine. Action: a new path that feeds the engine a
+character already on screen stamps it through that owner. Never write the map
+elsewhere, and never push the ring (`_LSCPush`) from the watcher: the emulation
+has already pushed that character.
+
 ### project-a-driver-that-types-also-types-into-its-own-keylogger
 
 Synthetic text can re-enter metrics and preview hooks. Filter by owned provenance

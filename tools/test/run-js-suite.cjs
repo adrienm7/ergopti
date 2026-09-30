@@ -1698,6 +1698,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-llm-nav-cycle'
 	},
 	{
+		name: 'Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation',
+		cmd: 'node',
+		args: ['tools/test/test-windows-hotstring-preview-shows.cjs'],
+		repro: 'npm run test:windows-hotstring-preview-shows'
+	},
+	{
 		name: 'the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays',
 		cmd: 'node',
 		args: ['tools/test/test-send-input-vectors-shared.cjs'],

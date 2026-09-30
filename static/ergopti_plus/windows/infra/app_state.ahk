@@ -24,7 +24,9 @@
 ; 2. The repetition counter is mutated only through SetNumberOfRepetitions /
 ;    ResetNumberOfRepetitions in infra/nav_layer_helpers.ahk.
 ; 3. last_sent_key_time tracking (write + size-bounded pruning) lives only in
-;    UpdateLastSentCharacter / _PruneLastSentKeyTime in modules/keymap/layout.ahk.
+;    AppState_TouchLastSentKey in infra/hotstrings/hotstring_send.ahk, called by
+;    the layout emulation (UpdateLastSentCharacter, modules/keymap/layout.ahk)
+;    and by the prefix watcher for every character it observes.
 ;
 ; RULE: do not reintroduce a parallel state container here. If a future refactor
 ; genuinely consolidates these globals, move the declarations into a single
