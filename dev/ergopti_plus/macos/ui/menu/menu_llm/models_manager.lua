@@ -812,6 +812,19 @@ function M.new(deps)
 			and ollama_ok == true and ollama_settled == true,
 			mlx_had == true or ollama_had == true
 	end
+	--- Downloads a model as the local Ollama server names it (the AI agent's
+	--- and the screen reading's local models) through the Ollama download
+	--- window, whatever backend the AI menu uses for predictions.
+	--- @param model string Ollama model name.
+	--- @param on_success function|nil Called once the model is pulled.
+	--- @param on_cancel function|nil Receives the reason of a failed or cancelled pull.
+	--- @return boolean accepted
+	function obj.pull_ollama_model(model, on_success, on_cancel)
+		if type(model) ~= "string" or model == "" then
+			error("models_manager.pull_ollama_model: a model name is required")
+		end
+		return ollama.pull_model(model, model, on_success, on_cancel) == true
+	end
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)
 		return mlx.check_requirements(target_model, on_success, on_cancel,

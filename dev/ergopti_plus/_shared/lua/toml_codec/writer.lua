@@ -464,6 +464,47 @@ end
 -- ===== 3.2) Batch Write Method =====
 -- ===================================
 
+--- Whether two decoded TOML values are equal, tables compared by content.
+--- @param left any
+--- @param right any
+--- @return boolean
+local function same_value(left, right)
+	if type(left) ~= type(right) then return false end
+	if type(left) ~= "table" then return left == right end
+	for key, value in pairs(left) do
+		if not same_value(value, right[key]) then return false end
+	end
+	for key in pairs(right) do
+		if left[key] == nil then return false end
+	end
+	return true
+end
+
+--- The decoded key path a normalized batch row addresses.
+--- @param row table Row with `segments` and `key`.
+--- @return table path Table segments followed by the key.
+local function row_path(row)
+	local path = {}
+	for index, segment in ipairs(row.segments) do path[index] = segment end
+	path[#path + 1] = row.key
+	return path
+end
+
+--- Whether prefix is a leading run of segments.
+--- @param segments table
+--- @param prefix table
+--- @param fold boolean Compare without regard to letter case, as batch identities do.
+--- @return boolean
+local function has_prefix(segments, prefix, fold)
+	if #prefix > #segments then return false end
+	for index, segment in ipairs(prefix) do
+		local left, right = segments[index], segment
+		if fold then left, right = left:lower(), right:lower() end
+		if left ~= right then return false end
+	end
+	return true
+end
+
 --- Prepares updates to a simple INI-style TOML file without publishing it
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
 --- Each entry in `updates` is a table `{section, key, value}` where:
@@ -474,7 +515,11 @@ end
 ---   - `delete = true` removes the complete assignment instead of setting it.
 ---
 --- Existing keys in the file are updated in-place; new sections and keys are
---- appended. Lines not matching any update are preserved verbatim.
+--- appended. Lines not matching any update are preserved verbatim. A key held
+--- by table headers (`[t.key]`, `[t.key.sub]`, `[[t.key]]`) is replaced as one
+--- value: those header lines and their assignments go, comments stay. A value
+--- the file already holds in any spelling is left untouched, and a changed key
+--- inside an inline table or a root-level entry is refused with its path.
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @param file_adapter table|nil Classified platform file adapter.
@@ -647,22 +692,54 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		end
 	end
 
-	-- Append any updates that were not found in the existing file.
-	-- Group by section so we don't emit duplicate section headers
+	-- A key no `key = value` line holds may still exist in another spelling.
+	-- Older macOS builds wrote every empty map as its own header, and structured
+	-- values (a shortcut's mods and key) or a hand-written [[list]] are table
+	-- headers too: the ordinary save addresses those keys as whole values. The
+	-- same value needs no change; otherwise the header lines and their
+	-- assignments go (comments and blank lines stay) and the new value is one
+	-- line. An inline table or a root-level entry cannot be patched by line.
 	local pending = {}   -- section_original → list of update entries
 	for _, u in ipairs(updates) do
 		local sl = u.section:lower()
 		local kl = u.key:lower()
-		if not applied[sl .. "\0" .. kl] then
+		local identity = sl .. "\0" .. kl
+		if not applied[identity] then
 			local node = decoded
 			for _, segment in ipairs(u.segments) do
 				node = type(node) == "table" and node[segment] or nil
 			end
-			if type(node) == "table" and node[u.key] ~= nil then
-				return false, "the batch cannot address an existing quoted or nested key"
+			local existing = nil
+			if type(node) == "table" then existing = node[u.key] end
+			if existing ~= nil and not u.delete and same_value(existing, u.value) then
+				applied[identity] = true
+			elseif existing ~= nil then
+				local path = row_path(u)
+				local owned = {}
+				for _, header in ipairs(scanned.headers) do
+					if header.segments and has_prefix(header.segments, path, false) then owned[header] = true end
+				end
+				if next(owned) == nil then
+					return false, "the batch cannot address " .. KeyPath.render(path)
+						.. ": an inline table or a root-level entry holds it; write it under a ["
+						.. u.section .. "] header"
+				end
+				for _, other in ipairs(updates) do
+					local inner = row_path(other)
+					if other ~= u and #inner > #path and has_prefix(inner, path, true) then
+						return false, "the batch replaces " .. KeyPath.render(path)
+							.. " and also writes " .. KeyPath.render(inner) .. " inside it"
+					end
+				end
+				for header in pairs(owned) do removed[header.index] = true end
+				for _, record in ipairs(scanned.records) do
+					if record.header and owned[record.header] then
+						for index = record.first, record.last do removed[index] = true end
+					end
+				end
 			end
 		end
-		if not u.delete and not applied[sl .. "\0" .. kl] then
+		if not u.delete and not applied[identity] then
 			if not pending[u.section] then pending[u.section] = {} end
 			pending[u.section][#pending[u.section] + 1] = u
 		end
@@ -670,7 +747,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 
 	local insertions = {}
 	for _, header in ipairs(scanned.headers) do
-		if header.section and not header.array then
+		if header.section and not header.array and not removed[header.index] then
 			for section, entries in pairs(pending) do
 				if section:lower() == header.section:lower() then
 					insertions[header.index] = entries

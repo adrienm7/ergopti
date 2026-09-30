@@ -6,7 +6,9 @@
 --- Removes every rule carrying the exact ErgoptiPlus ownership marker from the
 --- user's karabiner.json, in every profile, while every other byte of the file
 --- stays as it was. Used when « Ergopti uses Karabiner » is off and by the
---- explicit « Remove Ergopti from Karabiner » command.
+--- explicit « Remove Ergopti from Karabiner » command. Also removes, on the
+--- user's confirmation, the untagged rules an older release left behind that
+--- the merge refuses to replace (remove_legacy_rules).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Byte-identical personal rules: the file is never decoded and re-encoded.
@@ -26,6 +28,10 @@
 --- 6. Ports resolved per call: the filesystem and JSON adapters are looked up
 ---    when a removal runs, so a caller always acts through the adapters that
 ---    are installed at that moment.
+--- 7. One legacy verdict: the untagged rules removed on request are exactly
+---    those the generator's merge reports as historical-signature conflicts
+---    (Generator.find_legacy_signature_conflicts), after a verified backup of
+---    the original bytes is written next to karabiner.json.
 --- ==============================================================================
 
 local M = {}
@@ -293,12 +299,14 @@ local function decode_or_fail(text, label)
 	return value
 end
 
---- Removes every exactly marked ErgoptiPlus rule from a karabiner.json text.
---- Pure: no filesystem access, so the byte guarantee is testable directly.
+--- Removes the rules a selector picks from a karabiner.json text, in every
+--- profile. Pure: no filesystem access, so the byte guarantee is testable.
 --- @param text string Complete karabiner.json content.
---- @return string|nil stripped New content (the input itself when nothing is marked).
+--- @param is_selected function fn(rule, profile_index, rule_index) -> boolean, given
+---        each rule decoded on its own; it may raise { scan_error = detail }.
+--- @return string|nil stripped New content (the input itself when nothing is selected).
 --- @return integer|string removed_or_error Count of removed rules, or the refusal.
-function M.strip_managed_rules(text)
+local function strip_selected_rules(text, is_selected)
 	if type(text) ~= "string" then return nil, "karabiner.json content must be a string" end
 	local ok, result, removed_count = pcall(function()
 		local root_first = skip_whitespace(text, 1)
@@ -342,8 +350,7 @@ function M.strip_managed_rules(text)
 						end
 						local rule = decode_or_fail(text:sub(rule_node.first, rule_node.last),
 							string.format("%s rule %d", path, rule_index))
-						if type(rule) == "table"
-							and LeaseContract.parse_managed_description(rule.description) then
+						if type(rule) == "table" and is_selected(rule, profile_index, rule_index) then
 							removed[rule_index] = true
 							removed_here = removed_here + 1
 						end
@@ -367,7 +374,7 @@ function M.strip_managed_rules(text)
 		end
 
 		-- The scan is only trusted when the result decodes to exactly the
-		-- original document minus the marked rules
+		-- original document minus the selected rules
 		local expected = decode_or_fail(text, "the original karabiner.json")
 		for profile_index, removed in pairs(removed_by_profile) do
 			local rules = expected.profiles[profile_index].complex_modifications.rules
@@ -377,7 +384,7 @@ function M.strip_managed_rules(text)
 		end
 		local actual = decode_or_fail(stripped, "the stripped karabiner.json")
 		if not deep_equal(expected, actual) then
-			error({ scan_error = "the stripped document differs beyond the marked rules" }, 0)
+			error({ scan_error = "the stripped document differs beyond the selected rules" }, 0)
 		end
 		return stripped, total
 	end)
@@ -386,6 +393,17 @@ function M.strip_managed_rules(text)
 		return nil, "managed-rule scan raised: " .. tostring(result)
 	end
 	return result, removed_count
+end
+
+--- Removes every exactly marked ErgoptiPlus rule from a karabiner.json text.
+--- Pure: no filesystem access, so the byte guarantee is testable directly.
+--- @param text string Complete karabiner.json content.
+--- @return string|nil stripped New content (the input itself when nothing is marked).
+--- @return integer|string removed_or_error Count of removed rules, or the refusal.
+function M.strip_managed_rules(text)
+	return strip_selected_rules(text, function(rule)
+		return LeaseContract.parse_managed_description(rule.description) ~= nil
+	end)
 end
 
 
@@ -443,6 +461,123 @@ function M.remove_managed_rules(karabiner_out)
 	Logger.success(LOG, "Removed %d ErgoptiPlus rule(s) from karabiner.json; personal rules are byte-identical.",
 		removed_or_error)
 	return true, "removed", removed_or_error
+end
+
+-- Distinguishes two backups written within the same second of one launch.
+local _legacy_backup_serial = 0
+
+--- Writes the exact original bytes to a new file next to karabiner.json and
+--- reads them back. An existing file of that name is never replaced.
+--- @param FileSystem table File-system adapter.
+--- @param karabiner_out string Absolute path to karabiner.json.
+--- @param raw string Original content.
+--- @return string|nil backup_path Path of the verified backup.
+--- @return string|nil error_message Why no verified backup exists.
+local function write_legacy_backup(FileSystem, karabiner_out, raw)
+	_legacy_backup_serial = _legacy_backup_serial + 1
+	local backup_path = string.format("%s.ergoptiplus-legacy-%s-%d.bak",
+		karabiner_out, os.date("%Y%m%d-%H%M%S"), _legacy_backup_serial)
+	local create_ok, created, create_status, create_detail = pcall(FileSystem.create_if_absent,
+		backup_path, raw)
+	if not create_ok then
+		return nil, "backup creation raised: " .. tostring(created)
+	end
+	if created ~= true then
+		return nil, string.format("backup '%s' was not created (%s): %s", backup_path,
+			tostring(create_status), tostring(create_detail))
+	end
+	local observed, observed_status = FileSystem.read_with_status(backup_path)
+	if observed_status ~= "ok" or observed ~= raw then
+		return nil, string.format("backup '%s' does not read back as the original bytes (%s)",
+			backup_path, tostring(observed_status))
+	end
+	return backup_path
+end
+
+--- Removes, from every profile, the untagged rules an older ErgoptiPlus left
+--- in karabiner.json that the merge refuses to replace: exactly those
+--- Generator.find_legacy_signature_conflicts reports. Personal rules and
+--- managed-tagged rules keep their bytes. A verified backup of the original
+--- file is written first; the new content is published only over the exact
+--- bytes that were read and classified.
+--- @param karabiner_out string Absolute path to karabiner.json.
+--- @param legacy_context table Fourth return value of Generator.build_karabiner_json.
+--- @return boolean ok True when no such rule remains in the published file.
+--- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
+--- @return integer removed_count Number of rules removed.
+--- @return string|nil backup_path The verified backup, when one was written.
+function M.remove_legacy_rules(karabiner_out, legacy_context)
+	Logger.start(LOG, "Removing legacy ErgoptiPlus rules from karabiner.json…")
+	local function refuse(detail, backup_path)
+		Logger.error(LOG, "Legacy-rule removal refused — %s. karabiner.json was left untouched.", detail)
+		return false, detail, 0, backup_path
+	end
+	if type(karabiner_out) ~= "string" or karabiner_out == "" then
+		return refuse("the karabiner.json path is not resolved")
+	end
+	if type(legacy_context) ~= "table" then
+		return refuse("the legacy migration context is missing")
+	end
+	local FileSystem = require("adapters.file_system")
+	local raw, status, read_detail = FileSystem.read_with_status(karabiner_out)
+	if status == "absent" then
+		Logger.success(LOG, "No karabiner.json at '%s' — no legacy ErgoptiPlus rule to remove.", karabiner_out)
+		return true, "absent", 0
+	end
+	if status ~= "ok" or type(raw) ~= "string" then
+		return refuse("karabiner.json could not be read: " .. tostring(read_detail or status))
+	end
+
+	-- A tree, like the merge's: classification must see the file the merge sees.
+	local tree, decode_err = require("adapters.json_codec").decode(raw)
+	if decode_err ~= nil or type(tree) ~= "table" then
+		return refuse("karabiner.json is not valid JSON: " .. tostring(decode_err or "not an object"))
+	end
+	local conflicts, classify_err = require("platform.remap.generator")
+		.find_legacy_signature_conflicts(tree, legacy_context)
+	if not conflicts then
+		return refuse("karabiner.json cannot be classified: " .. tostring(classify_err))
+	end
+	if #conflicts == 0 then
+		Logger.success(LOG, "karabiner.json holds no legacy ErgoptiPlus rule — nothing to remove.")
+		return true, "unchanged", 0
+	end
+
+	local expected = {}
+	for _, conflict in ipairs(conflicts) do
+		expected[conflict.profile_index] = expected[conflict.profile_index] or {}
+		expected[conflict.profile_index][conflict.rule_index] = conflict.description
+	end
+	local stripped, removed_or_error = strip_selected_rules(raw, function(rule, profile_index, rule_index)
+		local description = expected[profile_index] and expected[profile_index][rule_index]
+		if description == nil then return false end
+		-- The byte scan and the decoded tree must agree on which rule this is.
+		if LeaseContract.parse_managed_description(rule.description)
+			or tostring(rule.description) ~= description then
+			error({ scan_error = string.format(
+				"profile %d rule %d is not the classified legacy rule", profile_index, rule_index) }, 0)
+		end
+		return true
+	end)
+	if stripped == nil then return refuse(tostring(removed_or_error)) end
+	if removed_or_error ~= #conflicts then
+		return refuse(string.format("the byte scan found %d of the %d legacy rules",
+			removed_or_error, #conflicts))
+	end
+
+	local backup_path, backup_err = write_legacy_backup(FileSystem, karabiner_out, raw)
+	if not backup_path then return refuse(backup_err) end
+
+	local write_ok, written, write_detail = pcall(FileSystem.write_if_unchanged, karabiner_out, stripped,
+		{ status = "ok", content = raw })
+	if not write_ok or written ~= true then
+		return refuse("karabiner.json publication refused: "
+			.. tostring(write_ok and (write_detail or "write failed") or written), backup_path)
+	end
+	Logger.success(LOG,
+		"Removed %d legacy ErgoptiPlus rule(s) from karabiner.json; the original is kept at '%s'.",
+		#conflicts, backup_path)
+	return true, "removed", #conflicts, backup_path
 end
 
 return M

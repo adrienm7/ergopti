@@ -18,7 +18,6 @@
 --- ==============================================================================
 
 return {
-	{ id = "alt_tab_apps", key = "f17", mods = { "alt" } },
 	{ id = "alt_tab_monitor", key = "f17", mods = { "ctrl" } },
 	{ id = "alt_tab_windows", key = "f17", mods = { "shift" } },
 	{ id = "arrow_down", key = "down", mods = {  } },
@@ -29,8 +28,6 @@ return {
 	{ id = "close_window", key = "w", mods = { "cmd" } },
 	{ id = "cmd_backspace", key = "delete", mods = { "cmd" } },
 	{ id = "cmd_delete_fwd", key = "forwarddelete", mods = { "cmd" } },
-	{ id = "cmd_shift_tab", key = "tab", mods = { "cmd", "shift" } },
-	{ id = "cycle_windows_in_app", key = "f17", mods = {  } },
 	{ id = "delete", key = "forwarddelete", mods = {  } },
 	{ id = "doc_end", key = "down", mods = { "cmd" } },
 	{ id = "doc_start", key = "up", mods = { "cmd" } },

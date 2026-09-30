@@ -598,8 +598,12 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			if not paused and type(keymap.is_processing_paused) == "function" and keymap.is_processing_paused() then
 				if type(keymap.resume_processing) == "function" then try("hotstrings", "keymap.resume_processing", keymap.resume_processing) end
 			end
-		else
-			if type(keymap.stop) == "function" then try("hotstrings", "keymap.stop", keymap.stop) end
+		elseif type(keymap.stop) == "function" and not try_exact("hotstrings", "keymap.stop", keymap.stop) then
+			-- Boot starts the taps before this sync: a refused stop may leave them
+			-- typing, and the Hotstrings tick reads this switch. It shows ON, and
+			-- clicking it retries the stop, rather than claiming a silence the
+			-- engine never reached.
+			demote("hotstrings", "keymap", true, "the typing engine did not stop")
 		end
 	end
 	if gestures then

@@ -24,12 +24,6 @@ var CATALOGUE_SCHEMA_VERSION = 1;
 var STEP_LANGUAGE = 'language';
 var STEP_CONFIG = 'config';
 
-// Placeholder a label key fills with the value label ("Right Opt + Return → %s").
-var VALUE_PLACEHOLDER = '%s';
-
-// Separator between a slot's label and its action when the key has no placeholder.
-var VALUE_SEPARATOR = ' → ';
-
 // Radio value of the custom trigger-character row.
 var CUSTOM_MAGIC_VALUE = '__custom__';
 
@@ -75,13 +69,18 @@ function _t(key) {
 }
 
 /**
- * Resolves one catalogue label segment in the selected locale.
- * @param {{key?: string, text?: string, text_ref?: string}} segment
+ * Resolves one catalogue label segment in the selected locale: a locale key, a
+ * literal, a data-file translation, or a template filled with labels.
+ * @param {{key?: string, text?: string, text_ref?: string, template?: string,
+ *   args?: Array<Array<object>>}} segment
  * @returns {string}
  */
 function _segment(segment) {
 	if (typeof segment.key === 'string') return _t(segment.key);
 	if (typeof segment.text === 'string') return segment.text;
+	if (typeof segment.template === 'string') {
+		return _format(_t(segment.template), segment.args.map(_label));
+	}
 	var translations = _catalogue().texts[segment.text_ref];
 	return translations && translations[_selectedLocale]
 		? translations[_selectedLocale]
@@ -98,17 +97,17 @@ function _label(segments) {
 }
 
 /**
- * The label of a checklist item, with the imported action when it is a slot.
+ * What a checklist item shows: the trigger it binds and the action it imports,
+ * or its one label when it imports no action. A key the user configured shows
+ * only its name: the page keeps that setting, not the recommended action.
  * @param {object} item
- * @returns {string}
+ * @returns {{text: string}|{trigger: string, action: string}}
  */
-function _itemLabel(item) {
-	var base = _label(item.label);
-	if (!item.value_label) return base;
-	var value = _segment(item.value_label);
-	// split/join, not replace: a label containing "$&" must stay literal.
-	if (base.indexOf(VALUE_PLACEHOLDER) !== -1) return base.split(VALUE_PLACEHOLDER).join(value);
-	return base + VALUE_SEPARATOR + value;
+function _itemParts(item) {
+	var name = _label(item.label);
+	if (_customised(item)) return { text: _format(_t('onboarding.checklist.customised'), [name]) };
+	if (!item.value_label) return { text: name };
+	return { trigger: name, action: _label(item.value_label) };
 }
 
 /**
@@ -497,8 +496,9 @@ function _renderLanguage() {
 	});
 	var selected = list.querySelector('.lang-item.selected');
 	if (selected) selected.scrollIntoView({ block: 'nearest' });
-	document.getElementById('language-title').textContent = _t('onboarding.welcome.title');
-	document.getElementById('language-subtitle').textContent = _t('onboarding.welcome.heading');
+	// The step's name is its heading, as on every later step: the window title
+	// already names the product and the wizard.
+	document.getElementById('language-title').textContent = _t('onboarding.welcome.heading');
 }
 
 /** Refreshes the configuration-folder step from the answers. */
@@ -698,7 +698,7 @@ function _groupNode(page, group, state, depth) {
 	if (group.label) {
 		var counts = _countItems(group, state);
 		var header = _checkRow(
-			_label(group.label),
+			{ text: _label(group.label) },
 			state.answer && counts.checked === counts.total && counts.total > 0,
 			state.answer && counts.checked > 0 && counts.checked < counts.total,
 			!state.answer,
@@ -713,12 +713,9 @@ function _groupNode(page, group, state, depth) {
 		node.appendChild(header);
 	}
 	(group.items || []).forEach(function (item) {
-		var text = _customised(item)
-			? _format(_t('onboarding.checklist.customised'), [_itemLabel(item)])
-			: _itemLabel(item);
 		node.appendChild(
 			_checkRow(
-				text,
+				_itemParts(item),
 				state.answer && state.checked[item.path] === true,
 				false,
 				!state.answer || _locked(item),
@@ -736,15 +733,16 @@ function _groupNode(page, group, state, depth) {
 }
 
 /**
- * One checkbox row.
- * @param {string} text
+ * One checkbox row. A trigger and its action are drawn apart, around the
+ * catalogue's separator, so an arrow inside either label never reads as it.
+ * @param {{text: string}|{trigger: string, action: string}} parts
  * @param {boolean} checked
  * @param {boolean} mixed
  * @param {boolean} disabled
  * @param {function(boolean): void} onChange
  * @returns {object} The row element.
  */
-function _checkRow(text, checked, mixed, disabled, onChange) {
+function _checkRow(parts, checked, mixed, disabled, onChange) {
 	var row = document.createElement('label');
 	row.className = 'check-row';
 	var box = document.createElement('input');
@@ -757,10 +755,30 @@ function _checkRow(text, checked, mixed, disabled, onChange) {
 	});
 	var label = document.createElement('span');
 	label.className = 'check-label';
-	label.textContent = text;
+	if (typeof parts.text === 'string') {
+		label.textContent = parts.text;
+	} else {
+		label.appendChild(_textSpan('item-trigger', parts.trigger));
+		// Spaces inside the separator keep a line break possible on each side.
+		label.appendChild(_textSpan('value-separator', ' ' + _catalogue().value_separator + ' '));
+		label.appendChild(_textSpan('item-action', parts.action));
+	}
 	row.appendChild(box);
 	row.appendChild(label);
 	return row;
+}
+
+/**
+ * A span showing a text literally.
+ * @param {string} className
+ * @param {string} text
+ * @returns {object} The span.
+ */
+function _textSpan(className, text) {
+	var span = document.createElement('span');
+	span.className = className;
+	span.textContent = text;
+	return span;
 }
 
 // ======================================

@@ -22,6 +22,7 @@
 			"llm",
 			"metrics"
 		],
+		"value_separator": "➔",
 		"texts": {
 			"hotstrings/distancesreduction.toml": {
 				"ar": "تقليل المسافات",
@@ -904,6 +905,23 @@
 											{
 												"key": "tap_hold.group.tab"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.alt_tab_monitor"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.alt"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -916,6 +934,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.enter"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.ctrl"
+														}
+													]
+												]
 											}
 										]
 									},
@@ -930,6 +965,23 @@
 											{
 												"key": "tap_hold.group.left_shift"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.copy"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.shift"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -943,6 +995,23 @@
 											{
 												"key": "tap_hold.group.left_ctrl"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.paste"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.ctrl"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -955,6 +1024,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.left_alt"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.backspace"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.nav_layer"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -978,6 +1064,23 @@
 											{
 												"key": "tap_hold.group.alt_gr"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.tab"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.alt_gr"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -990,6 +1093,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.right_ctrl"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.one_shot_shift"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.shift"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -1273,9 +1393,11 @@
 												"key": "sg_labels.script_altgr_backspace"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_reload"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_reload"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.script_altgr_delete",
@@ -1287,9 +1409,11 @@
 												"key": "sg_labels.script_altgr_delete"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.open_personal_shortcuts"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.open_personal_shortcuts"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.script_altgr_enter",
@@ -1301,9 +1425,11 @@
 												"key": "sg_labels.script_altgr_enter"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_pause_toggle"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_pause_toggle"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.script_altgr_escape",
@@ -1315,9 +1441,11 @@
 												"key": "sg_labels.script_altgr_escape"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_quit"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_quit"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.ctrl_b",
@@ -1329,9 +1457,11 @@
 												"text": "Ctrl + B"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.microsoft_bold"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.microsoft_bold"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.ctrl_shift_v",
@@ -1343,9 +1473,11 @@
 												"text": "Ctrl + Shift + V"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.paste_plain"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.paste_plain"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_a",
@@ -1357,9 +1489,11 @@
 												"text": "Win + A"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.select_line"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.select_line"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_d",
@@ -1371,9 +1505,11 @@
 												"text": "Win + D"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.open_hotstrings_editor"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.open_hotstrings_editor"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_g",
@@ -1385,9 +1521,11 @@
 												"text": "Win + G"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.open_url"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.open_url"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_h",
@@ -1399,9 +1537,11 @@
 												"text": "Win + H"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screen_capture"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screen_capture"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_m",
@@ -1413,9 +1553,11 @@
 												"text": "Win + M"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.activity_simulation"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.activity_simulation"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_n",
@@ -1427,9 +1569,11 @@
 												"text": "Win + N"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.take_note"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.take_note"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_o",
@@ -1441,9 +1585,11 @@
 												"text": "Win + O"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.surround_parens"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_s",
@@ -1455,9 +1601,11 @@
 												"text": "Win + S"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.search_web"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.search_web"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_sc029",
@@ -1469,9 +1617,11 @@
 												"text": "Win + ²"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screen_capture_instant"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screen_capture_instant"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_t",
@@ -1483,9 +1633,11 @@
 												"text": "Win + T"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.teleport_mouse"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.teleport_mouse"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_u",
@@ -1497,9 +1649,11 @@
 												"text": "Win + U"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.uppercase_selection"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.uppercase_selection"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_w",
@@ -1511,9 +1665,11 @@
 												"text": "Win + W"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.titlecase_selection"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.titlecase_selection"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_x",
@@ -1525,9 +1681,11 @@
 												"text": "Win + X"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.pick_color"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.pick_color"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.win_space",
@@ -1542,13 +1700,15 @@
 												"key": "common.key_space"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.llm_generate_prediction"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.llm_generate_prediction"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1556,9 +1716,11 @@
 												"key": "menu.shortcuts.tap_keys.number_row_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screen_capture"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screenshot_fullscreen_save"
+											}
+										]
 									}
 								]
 							}
@@ -1596,9 +1758,11 @@
 												"key": "menu.gestures.swipe_3_down"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_close"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_close"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_left",
@@ -1610,9 +1774,11 @@
 												"key": "menu.gestures.swipe_3_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_prev"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_prev"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
@@ -1624,9 +1790,11 @@
 												"key": "menu.gestures.swipe_3_right"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_next"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_up",
@@ -1638,9 +1806,11 @@
 												"key": "menu.gestures.swipe_3_up"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_new"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_new"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_4_down",
@@ -1652,9 +1822,11 @@
 												"key": "menu.gestures.swipe_4_down"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.win_app_prev"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_prev"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_4_left",
@@ -1666,9 +1838,11 @@
 												"key": "menu.gestures.swipe_4_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.desktop_prev"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.desktop_prev"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_4_right",
@@ -1680,9 +1854,11 @@
 												"key": "menu.gestures.swipe_4_right"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.desktop_next"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.desktop_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_4_up",
@@ -1694,9 +1870,11 @@
 												"key": "menu.gestures.swipe_4_up"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.win_app_next"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.tap_3",
@@ -1708,9 +1886,11 @@
 												"key": "menu.gestures.tap_3"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.left_click_toggle"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.left_click_toggle"
+											}
+										]
 									},
 									{
 										"path": "gestures.tap_4",
@@ -1722,9 +1902,11 @@
 												"key": "menu.gestures.tap_4"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screenshot_window_clipboard"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screenshot_window_clipboard"
+											}
+										]
 									}
 								]
 							}
@@ -2584,6 +2766,23 @@
 											{
 												"key": "tap_hold.group.tab"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.alt_tab_windows"
+														}
+													],
+													[
+														{
+															"text": "Fn"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -2596,6 +2795,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.enter"
+														}
+													],
+													[
+														{
+															"text": "Cmd"
+														}
+													]
+												]
 											}
 										]
 									},
@@ -2610,6 +2826,23 @@
 											{
 												"key": "tap_hold.group.left_shift"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.copy"
+														}
+													],
+													[
+														{
+															"text": "Shift"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -2622,6 +2855,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.fn"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.paste"
+														}
+													],
+													[
+														{
+															"text": "Cmd"
+														}
+													]
+												]
 											}
 										]
 									},
@@ -2636,6 +2886,23 @@
 											{
 												"key": "tap_hold.group.left_ctrl"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.cut"
+														}
+													],
+													[
+														{
+															"text": "Ctrl"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -2649,6 +2916,23 @@
 											{
 												"key": "tap_hold.group.left_option"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.delete"
+														}
+													],
+													[
+														{
+															"text": "Cmd+Shift"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -2661,6 +2945,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.left_command"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.backspace"
+														}
+													],
+													[
+														{
+															"text": "Layer (hold)"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -2684,6 +2985,23 @@
 											{
 												"key": "tap_hold.group.right_command"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.tab"
+														}
+													],
+													[
+														{
+															"text": "AltGr"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -2696,6 +3014,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.right_option"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.sticky_shift"
+														}
+													],
+													[
+														{
+															"text": "Shift"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -2723,16 +3058,21 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "menu.shortcuts.keyboard.hs_ctrl_space"
+												"text": "Ctrl + "
+											},
+											{
+												"key": "common.key_space"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.llm_generate_prediction"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.llm_generate_prediction"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -2740,9 +3080,11 @@
 												"key": "menu.shortcuts.tap_keys.number_row_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screen_capture"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screenshot_fullscreen_save"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.enabled",
@@ -2762,12 +3104,14 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "menu.shortcuts.right_opt_return"
+												"key": "sg_labels.script_ropt_return"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_pause_toggle"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_pause_toggle"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.backspace",
@@ -2776,12 +3120,14 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "menu.shortcuts.right_opt_back"
+												"key": "sg_labels.script_ropt_backspace"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_reload"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_reload"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.script_control.escape",
@@ -2790,12 +3136,14 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "menu.shortcuts.right_opt_escape"
+												"key": "sg_labels.script_ropt_escape"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.script_quit"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.script_quit"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keys.layer_scroll",
@@ -2803,6 +3151,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"key": "menu.shortcuts.key_layer_scroll"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_layer_scroll"
 											}
@@ -2815,6 +3168,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"key": "menu.shortcuts.altgr_symbol"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_wrap_text"
 											}
 										]
@@ -2825,6 +3183,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + A"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_a"
 											}
@@ -2837,6 +3200,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + D"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_d"
 											}
 										]
@@ -2847,6 +3215,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + E"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_e"
 											}
@@ -2859,6 +3232,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + G"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_g"
 											}
 										]
@@ -2869,6 +3247,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + H"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_h"
 											}
@@ -2881,6 +3264,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + I"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_i"
 											}
 										]
@@ -2891,6 +3279,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + M"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_m"
 											}
@@ -2903,6 +3296,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + O"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_o"
 											}
 										]
@@ -2913,6 +3311,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + P"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_p"
 											}
@@ -2925,6 +3328,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + S"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_s"
 											}
 										]
@@ -2935,6 +3343,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + T"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_t"
 											}
@@ -2947,6 +3360,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + U"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_u"
 											}
 										]
@@ -2957,6 +3375,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + W"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_w"
 											}
@@ -2969,6 +3392,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + X"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_x"
 											}
 										]
@@ -2979,6 +3407,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + CapsLock"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_capslock"
 											}
@@ -2991,6 +3424,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + L"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_l"
 											}
 										]
@@ -3001,6 +3439,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Ctrl + ."
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_ctrl_period"
 											}
@@ -3013,6 +3456,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Ctrl + '"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_ctrl_quote"
 											}
 										]
@@ -3024,6 +3472,11 @@
 										"recommended": true,
 										"label": [
 											{
+												"text": "Cmd + Shift + V"
+											}
+										],
+										"value_label": [
+											{
 												"key": "shortcuts.label_cmd_shift_v"
 											}
 										]
@@ -3034,6 +3487,11 @@
 										"default": false,
 										"recommended": true,
 										"label": [
+											{
+												"text": "Cmd + ★"
+											}
+										],
+										"value_label": [
 											{
 												"key": "shortcuts.label_cmd_star"
 											}
@@ -3066,9 +3524,11 @@
 												"key": "menu.gestures.swipe_3_down"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_next"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_left",
@@ -3080,9 +3540,11 @@
 												"key": "menu.gestures.swipe_3_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.sel_word_prev"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.sel_word_prev"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
@@ -3094,9 +3556,11 @@
 												"key": "menu.gestures.swipe_3_right"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.sel_word_next"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.sel_word_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_up",
@@ -3108,9 +3572,11 @@
 												"key": "menu.gestures.swipe_3_up"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.tab_prev"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.tab_prev"
+											}
+										]
 									},
 									{
 										"path": "gestures.tap_3",
@@ -3122,13 +3588,15 @@
 												"key": "menu.gestures.tap_3"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.left_click_toggle"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.left_click_toggle"
+											}
+										]
 									},
 									{
 										"path": "gestures.tap_4",
-										"value": "app_window_previous",
+										"value": "win_app_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3136,9 +3604,11 @@
 												"key": "menu.gestures.tap_4"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.app_window_previous"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_next"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_2_left",
@@ -3150,9 +3620,11 @@
 												"key": "menu.gestures.swipe_2_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.arrow_up"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.arrow_up"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_3_horiz",
@@ -3164,9 +3636,11 @@
 												"key": "menu.gestures.swipe_3_horiz"
 											}
 										],
-										"value_label": {
-											"key": "ax_actions.words"
-										}
+										"value_label": [
+											{
+												"key": "ax_actions.words"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_4_horiz",
@@ -3178,9 +3652,11 @@
 												"key": "menu.gestures.swipe_4_horiz"
 											}
 										],
-										"value_label": {
-											"key": "ax_actions.spaces"
-										}
+										"value_label": [
+											{
+												"key": "ax_actions.spaces"
+											}
+										]
 									},
 									{
 										"path": "gestures.swipe_5_horiz",
@@ -3192,9 +3668,11 @@
 												"key": "menu.gestures.swipe_5_horiz"
 											}
 										],
-										"value_label": {
-											"key": "ax_actions.windows"
-										}
+										"value_label": [
+											{
+												"key": "ax_actions.windows"
+											}
+										]
 									}
 								]
 							}
@@ -3919,6 +4397,49 @@
 										"text": "🇫🇷 Français"
 									}
 								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.hotstrings.preview_bubbles"
+									}
+								],
+								"select_all": true,
+								"items": [
+									{
+										"path": "hotstrings.preview_star_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_magic"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_autocorrect_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_autocorrect"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_colored_tooltips",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_colored"
+											}
+										]
+									}
+								]
 							}
 						],
 						"master": {
@@ -4003,6 +4524,23 @@
 											{
 												"key": "tap_hold.group.tab"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.alt_tab_monitor"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.alt"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -4015,6 +4553,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.enter"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.ctrl"
+														}
+													]
+												]
 											}
 										]
 									},
@@ -4029,6 +4584,23 @@
 											{
 												"key": "tap_hold.group.left_shift"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.copy"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.shift"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -4042,6 +4614,23 @@
 											{
 												"key": "tap_hold.group.left_ctrl"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.paste"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.ctrl"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -4054,6 +4643,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.left_alt"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.backspace"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.nav_layer"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -4077,6 +4683,23 @@
 											{
 												"key": "tap_hold.group.alt_gr"
 											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.tab"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.alt_gr"
+														}
+													]
+												]
+											}
 										]
 									},
 									{
@@ -4089,6 +4712,23 @@
 										"label": [
 											{
 												"key": "tap_hold.group.right_ctrl"
+											}
+										],
+										"value_label": [
+											{
+												"template": "onboarding.checklist.tap_hold",
+												"args": [
+													[
+														{
+															"key": "sg_actions.one_shot_shift"
+														}
+													],
+													[
+														{
+															"key": "tap_hold.hold.shift"
+														}
+													]
+												]
 											}
 										]
 									}
@@ -4130,9 +4770,11 @@
 												"text": "Ctrl + G"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.open_chatgpt"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.open_chatgpt"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.keyboard.super_space",
@@ -4141,16 +4783,21 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "menu.shortcuts.keyboard.super_space"
+												"text": "Super + "
+											},
+											{
+												"key": "common.key_space"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.llm_generate_prediction"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.llm_generate_prediction"
+											}
+										]
 									},
 									{
 										"path": "shortcuts.tap_keys.number_row_left",
-										"value": "screen_capture",
+										"value": "screenshot_fullscreen_save",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -4158,9 +4805,11 @@
 												"key": "menu.shortcuts.tap_keys.number_row_left"
 											}
 										],
-										"value_label": {
-											"key": "sg_actions.screen_capture"
-										}
+										"value_label": [
+											{
+												"key": "sg_actions.screenshot_fullscreen_save"
+											}
+										]
 									}
 								]
 							}
@@ -4895,6 +5544,49 @@
 								"label": [
 									{
 										"text": "🇫🇷 Français"
+									}
+								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.hotstrings.preview_bubbles"
+									}
+								],
+								"select_all": true,
+								"items": [
+									{
+										"path": "hotstrings.preview_star_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_magic"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_autocorrect_enabled",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_autocorrect"
+											}
+										]
+									},
+									{
+										"path": "hotstrings.preview_colored_tooltips",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.hotstrings.tooltip_colored"
+											}
+										]
 									}
 								]
 							}

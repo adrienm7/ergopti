@@ -45,6 +45,7 @@ local function fake_config(opts)
 	return {
 		get_groups = function() return { "rolls", "personal" } end,
 		is_group_enabled = function() return all_enabled end,
+		any_enabled = function() return all_enabled end,
 		toggle_group = function(id) log.toggled[#log.toggled + 1] = id end,
 		enable_all = function() log.enabled_all = log.enabled_all + 1 end,
 		disable_all = function() log.disabled_all = log.disabled_all + 1 end,

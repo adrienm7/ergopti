@@ -38,6 +38,7 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
+local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
@@ -67,6 +68,10 @@ local ALWAYS_ON_RULES = {
 -- It is no longer deployed: it is the anchor that proves an older, unleased
 -- ErgoptiPlus block in karabiner.json, which the legacy migration then removes.
 local LEGACY_LAYER_KEYS_FILE = "legacy_layer_keys.json"
+
+-- The kind of merge refusal the user can resolve from the app: untagged rules
+-- carrying a historical ErgoptiPlus signature that no released block proves.
+M.REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts"
 
 -- The eight modifier keys: Shift, Control, Option and Command on each side.
 local ACTUAL_MODIFIER_KEY_CODES = {
@@ -179,9 +184,11 @@ local function load_json_file(path)
 		Logger.error(LOG, "Cannot open file '%s'.", path)
 		return nil
 	end
-	local ok, data = pcall(hs.json.decode, raw)
-	if not ok or type(data) ~= "table" then
-		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(data))
+	-- The rules built from this data are edited in place (generation gate,
+	-- timings): the codec's tree gives each manipulator its own tables.
+	local data, decode_err = JsonCodec.decode(raw)
+	if type(data) ~= "table" then
+		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(decode_err or data))
 		return nil
 	end
 	return data
@@ -313,7 +320,11 @@ end
 
 --- Adds one exact atomic mode and tombstone condition to every manipulator.
 --- Validation completes before mutation so malformed generated data cannot
---- leave a partially gated configuration in the caller's table.
+--- leave a partially gated configuration in the caller's table. A rule,
+--- manipulator or conditions list reached twice would take the gate twice
+--- (hs.json.decode shares equal JSON values, see adapters/json_codec.lua):
+--- it is refused here, where the graph is built, instead of deploying a
+--- manipulator with duplicated gates.
 --- @param rules table Rules generated for one pause mode.
 --- @param token string Canonical generation token.
 --- @param mode string Managed mode (`normal` or `pause`).
@@ -328,10 +339,15 @@ local function gate_managed_rules(rules, token, mode)
 	end
 	if not is_dense_array(rules) then return nil, "managed rules must be a dense array" end
 
+	local gated = {}
 	for rule_index, rule in ipairs(rules) do
 		if type(rule) ~= "table" then
 			return nil, string.format("managed rule %d must be a table", rule_index)
 		end
+		if gated[rule] then
+			return nil, string.format("managed rule %d is the same table as an earlier rule", rule_index)
+		end
+		gated[rule] = true
 		if type(rule.description) ~= "string" or rule.description == "" then
 			return nil, string.format("managed rule %d must have a non-empty description", rule_index)
 		end
@@ -353,6 +369,15 @@ local function gate_managed_rules(rules, token, mode)
 					manipulator_index
 				)
 			end
+			if gated[manipulator] or (manipulator.conditions ~= nil and gated[manipulator.conditions]) then
+				return nil, string.format(
+					"managed rule %d manipulator %d shares a table with an earlier manipulator",
+					rule_index,
+					manipulator_index
+				)
+			end
+			gated[manipulator] = true
+			if manipulator.conditions ~= nil then gated[manipulator.conditions] = true end
 			for condition_index, condition in ipairs(manipulator.conditions or {}) do
 				if type(condition) ~= "table" then
 					return nil, string.format(
@@ -2688,6 +2713,140 @@ local function format_legacy_signature_conflicts(conflicts)
 	)
 end
 
+--- Describes the legacy-signature refusal as data, so a caller can offer the
+--- removal without parsing the diagnostic.
+--- @param conflicts table Dense cross-profile conflict array.
+--- @return table refusal { kind, count, descriptions, conflicts }.
+local function legacy_conflict_refusal(conflicts)
+	local descriptions = {}
+	local locations = {}
+	for index, conflict in ipairs(conflicts) do
+		descriptions[index] = conflict.description
+		locations[index] = {
+			profile_index = conflict.profile_index,
+			rule_index = conflict.rule_index,
+			description = conflict.description,
+		}
+	end
+	return {
+		kind = M.REFUSAL_LEGACY_CONFLICTS,
+		count = #conflicts,
+		descriptions = descriptions,
+		conflicts = locations,
+	}
+end
+
+--- Validates every existing profile, then classifies the rules of each one.
+--- The merge and the legacy cleanup both read their verdicts from here, so
+--- the cleanup removes exactly the rules the merge refuses.
+--- @param existing table Decoded karabiner.json tree.
+--- @param target_index integer Index of the selected profile.
+--- @param incoming_rules table Rules the selected profile receives.
+--- @param legacy_context table|nil Historical reconstruction context.
+--- @return table|nil classified_profiles Profile index -> { existing_rules, incoming_rules, removal_set }.
+--- @return table|string conflicts_or_error Dense conflict array, or the refusal.
+--- @return integer|nil failing_profile Profile whose historical proof failed.
+local function classify_existing_profiles(existing, target_index, incoming_rules, legacy_context)
+	-- Validate every profile before mutating any of them. Stale managed rules may
+	-- live in an inactive profile and become active again after a user switch
+	for profile_index, profile in ipairs(existing.profiles) do
+		local complex = profile.complex_modifications
+		if complex ~= nil and type(complex) ~= "table" then
+			return nil, string.format(
+				"existing profile %d complex_modifications must be a table",
+				profile_index
+			)
+		end
+		if type(complex) == "table"
+			and complex.rules ~= nil
+			and not is_dense_array(complex.rules) then
+			return nil, string.format(
+				"existing profile %d complex_modifications.rules must be a table",
+				profile_index
+			)
+		end
+	end
+
+	-- State-independent reconstruction is needed for every untagged rule. An exact
+	-- current-state fingerprint is only a candidate fragment, never ownership
+	-- proof by itself: only the complete historical block may be removed.
+	-- A fully migrated config therefore avoids rebuilding catalogue indices on
+	-- every settings/layout regeneration.
+	local needs_legacy_reconstruction = false
+	if legacy_context ~= nil then
+		for _, profile in ipairs(existing.profiles) do
+			local complex = profile.complex_modifications
+			for _, rule in ipairs(type(complex) == "table" and complex.rules or {}) do
+				local token = type(rule) == "table"
+					and parse_managed_description(rule.description) or nil
+				if not token then
+					needs_legacy_reconstruction = true
+					break
+				end
+			end
+			if needs_legacy_reconstruction then break end
+		end
+	end
+
+	local prepared_legacy = nil
+	if needs_legacy_reconstruction then
+		local context_err
+		prepared_legacy, context_err = prepare_legacy_context(legacy_context)
+		if not prepared_legacy then return nil, context_err end
+	end
+
+	local classified_profiles = {}
+	local signature_conflicts = {}
+	for profile_index, profile in ipairs(existing.profiles) do
+		local is_selected = profile_index == target_index
+		local complex = profile.complex_modifications
+		if complex == nil and is_selected then complex = {} end
+		if complex then
+			local existing_rules = complex.rules
+			if existing_rules ~= nil or is_selected then
+				local removal_set, classify_err, profile_conflicts = classify_managed_rules(
+					existing_rules or {},
+					complex,
+					prepared_legacy
+				)
+				if not removal_set then return nil, classify_err, profile_index end
+				for _, conflict in ipairs(profile_conflicts) do
+					conflict.profile_index = profile_index
+					signature_conflicts[#signature_conflicts + 1] = conflict
+				end
+				classified_profiles[profile_index] = {
+					existing_rules = existing_rules or {},
+					incoming_rules = is_selected and incoming_rules or {},
+					removal_set = removal_set,
+				}
+			end
+		end
+	end
+	return classified_profiles, signature_conflicts
+end
+
+--- Lists every untagged rule the merge refuses as a historical ErgoptiPlus
+--- signature, in every profile, with the merge's own validation.
+--- @param existing table Decoded karabiner.json tree (adapters.json_codec).
+--- @param legacy_context table Fourth return value from build_karabiner_json.
+--- @return table|nil conflicts Dense { profile_index, rule_index, description, reasons } array.
+--- @return string|nil error_message Why the file cannot be classified.
+function M.find_legacy_signature_conflicts(existing, legacy_context)
+	if type(legacy_context) ~= "table" then
+		return nil, "legacy migration context must be a table"
+	end
+	local selected_profile, target_index_or_err = find_unique_selected_profile(existing, "existing")
+	if not selected_profile then return nil, target_index_or_err end
+	local classified, conflicts_or_err = classify_existing_profiles(
+		existing,
+		target_index_or_err,
+		{},
+		legacy_context
+	)
+	if not classified then return nil, conflicts_or_err end
+	return conflicts_or_err
+end
+
 --- Replaces exact managed rules while preserving personal-rule order.
 --- The replacement block occupies the first stale managed position; if no
 --- managed or exact historical block exists, it is appended after every
@@ -2733,6 +2892,8 @@ end
 --- @return string|nil error_message Validation or read failure.
 --- @return table|nil source_snapshot Exact classified source used for the merge.
 --- @return boolean|nil changed Whether managed rules differ from the source.
+--- @return table|nil refusal On a legacy-signature refusal only:
+---   { kind = M.REFUSAL_LEGACY_CONFLICTS, count, descriptions, conflicts }.
 function M.merge_into_existing_config(
 	hs_config,
 	karabiner_out,
@@ -2791,8 +2952,10 @@ function M.merge_into_existing_config(
 		return nil, err
 	end
 
-	local decode_ok, existing = pcall(hs.json.decode, raw)
-	if not decode_ok or type(existing) ~= "table" then
+	-- A tree: the merge edits the selected profile in place, and equal lists
+	-- elsewhere in the file must not be edited with it.
+	local existing = JsonCodec.decode(raw)
+	if type(existing) ~= "table" then
 		local err = "existing karabiner.json is not valid JSON"
 		Logger.error(LOG, "Merge aborted: %s.", err)
 		return nil, err
@@ -2804,95 +2967,25 @@ function M.merge_into_existing_config(
 		return nil, target_index_or_err
 	end
 
-	-- Validate every profile before mutating any of them. Stale managed rules may
-	-- live in an inactive profile and become active again after a user switch
-	for profile_index, profile in ipairs(existing.profiles) do
-		local complex = profile.complex_modifications
-		if complex ~= nil and type(complex) ~= "table" then
-			local err = string.format(
-				"existing profile %d complex_modifications must be a table",
-				profile_index
-			)
-			Logger.error(LOG, "Merge aborted: %s.", err)
-			return nil, err
+	local classified_profiles, conflicts_or_err, failing_profile = classify_existing_profiles(
+		existing,
+		target_index_or_err,
+		generated_complex.rules,
+		legacy_context
+	)
+	if not classified_profiles then
+		if failing_profile then
+			Logger.error(LOG, "Merge aborted in profile %d: %s.", failing_profile, conflicts_or_err)
+		else
+			Logger.error(LOG, "Merge aborted: %s.", conflicts_or_err)
 		end
-		if type(complex) == "table"
-			and complex.rules ~= nil
-			and not is_dense_array(complex.rules) then
-			local err = string.format(
-				"existing profile %d complex_modifications.rules must be a table",
-				profile_index
-			)
-			Logger.error(LOG, "Merge aborted: %s.", err)
-			return nil, err
-		end
+		return nil, conflicts_or_err
 	end
-
-	-- State-independent reconstruction is needed for every untagged rule. An exact
-	-- current-state fingerprint is only a candidate fragment, never ownership
-	-- proof by itself: only the complete historical block may be removed.
-	-- A fully migrated config therefore avoids rebuilding catalogue indices on
-	-- every settings/layout regeneration.
-	local needs_legacy_reconstruction = false
-	if legacy_context ~= nil then
-		for _, profile in ipairs(existing.profiles) do
-			local complex = profile.complex_modifications
-			for _, rule in ipairs(type(complex) == "table" and complex.rules or {}) do
-				local token = type(rule) == "table"
-					and parse_managed_description(rule.description) or nil
-				if not token then
-					needs_legacy_reconstruction = true
-					break
-				end
-			end
-			if needs_legacy_reconstruction then break end
-		end
-	end
-
-	local prepared_legacy = nil
-	if needs_legacy_reconstruction then
-		local context_err
-		prepared_legacy, context_err = prepare_legacy_context(legacy_context)
-		if not prepared_legacy then
-			Logger.error(LOG, "Merge aborted: %s.", context_err)
-			return nil, context_err
-		end
-	end
-
-	local classified_profiles = {}
-	local signature_conflicts = {}
-	for profile_index, profile in ipairs(existing.profiles) do
-		local is_selected = profile_index == target_index_or_err
-		local complex = profile.complex_modifications
-		if complex == nil and is_selected then complex = {} end
-		if complex then
-			local existing_rules = complex.rules
-			if existing_rules ~= nil or is_selected then
-				local removal_set, classify_err, profile_conflicts = classify_managed_rules(
-					existing_rules or {},
-					complex,
-					prepared_legacy
-				)
-				if not removal_set then
-					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, classify_err)
-					return nil, classify_err
-				end
-				for _, conflict in ipairs(profile_conflicts) do
-					conflict.profile_index = profile_index
-					signature_conflicts[#signature_conflicts + 1] = conflict
-				end
-				classified_profiles[profile_index] = {
-					existing_rules = existing_rules or {},
-					incoming_rules = is_selected and generated_complex.rules or {},
-					removal_set = removal_set,
-				}
-			end
-		end
-	end
+	local signature_conflicts = conflicts_or_err
 	if #signature_conflicts > 0 then
 		local detail = format_legacy_signature_conflicts(signature_conflicts)
 		Logger.error(LOG, "Merge aborted: %s.", detail)
-		return nil, detail
+		return nil, detail, nil, nil, legacy_conflict_refusal(signature_conflicts)
 	end
 
 	local changed = false
@@ -2930,6 +3023,8 @@ end
 --- @return boolean deployed Whether the current merge was published.
 --- @return string detail Human-readable result or failure.
 --- @return integer attempts Number of publication attempts made.
+--- @return table|nil refusal The merge's structured legacy-signature refusal,
+---   nil for every other result.
 function M.merge_and_deploy_config(
 	hs_config,
 	karabiner_out,
@@ -2950,7 +3045,7 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
-	local merge_ok, merged, merge_err, source_snapshot, merge_changed = pcall(
+	local merge_ok, merged, merge_err, source_snapshot, merge_changed, merge_refusal = pcall(
 		M.merge_into_existing_config,
 		hs_config,
 		karabiner_out,
@@ -2960,7 +3055,9 @@ function M.merge_and_deploy_config(
 	if not merge_ok or type(merged) ~= "table" then
 		local detail = "merge failed: " .. tostring(merge_ok and merge_err or merged)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
-		return false, detail, 1
+		local refusal = merge_ok and type(merge_refusal) == "table"
+			and merge_refusal.kind == M.REFUSAL_LEGACY_CONFLICTS and merge_refusal or nil
+		return false, detail, 1, refusal
 	end
 	if type(source_snapshot) ~= "table"
 		or (source_snapshot.status ~= "ok" and source_snapshot.status ~= "absent")

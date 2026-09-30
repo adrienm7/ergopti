@@ -187,4 +187,133 @@ function M.getFocused()
 	return type(result) == "table" and result or empty
 end
 
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 2/ Direct application switch =======
+-- ============================================
+-- ============================================
+
+-- Not part of the WindowManager port: the reads and the focus call that
+-- modules/gestures/app_switch.lua needs to switch applications and windows
+-- directly. A synthetic Cmd+Tab never did that: the Dock only commits its
+-- switcher when Command itself is released, which a posted Tab keystroke
+-- carrying the Command flag does not do.
+
+--- Reads one on-screen window into a plain record. A window that closes while
+--- it is read throws on its next accessibility call; that window alone is
+--- skipped, as the Windows twin skips it (window_utils.ahk _AltTabCycle).
+--- @param win userdata hs.window object.
+--- @return table|nil record { window, id, pid, screen_id, standard, minimized }.
+local function window_record(win)
+	local ok, record = pcall(function()
+		local app = win:application()
+		local screen = win:screen()
+		return {
+			window    = win,
+			id        = win:id(),
+			pid       = app and app:pid() or nil,
+			screen_id = screen and screen:id() or nil,
+			standard  = win:isStandard() == true,
+			minimized = win:isMinimized() == true,
+		}
+	end)
+	if not ok then
+		Logger.debug(LOG, "ordered_windows(): skipped a window that could not be read: %s", tostring(record))
+		return nil
+	end
+	return record
+end
+
+--- Lists the on-screen windows of the current Space, front to back. Hidden
+--- applications and minimised windows are not on screen, so they never lead.
+--- @return table records Array of window records, most recently used first.
+function M.ordered_windows()
+	local ok, result = pcall(function()
+		local records = {}
+		for _, win in ipairs(hs.window.orderedWindows() or {}) do
+			local record = window_record(win)
+			if record then records[#records + 1] = record end
+		end
+		return records
+	end)
+	if not ok then
+		Logger.error(LOG, "ordered_windows(): error — %s", tostring(result))
+		return {}
+	end
+	return result
+end
+
+--- Lists every window of one application, including minimised ones.
+--- @param pid number Process id of the application.
+--- @return table records Array of window records, in the application's order.
+function M.application_windows(pid)
+	if type(pid) ~= "number" then error("application_windows: pid must be a number", 2) end
+	local ok, result = pcall(function()
+		local records = {}
+		local app = hs.application.applicationForPID(pid)
+		if not app then return records end
+		for _, win in ipairs(app:allWindows() or {}) do
+			local record = window_record(win)
+			if record then records[#records + 1] = record end
+		end
+		return records
+	end)
+	if not ok then
+		Logger.error(LOG, "application_windows(): error — %s", tostring(result))
+		return {}
+	end
+	return result
+end
+
+--- @return number|nil id The id of the focused window, nil when none has focus.
+function M.focused_window_id()
+	local ok, result = pcall(function()
+		local win = hs.window.focusedWindow()
+		return win and win:id() or nil
+	end)
+	if not ok then
+		Logger.error(LOG, "focused_window_id(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+--- @return number|nil pid Process id of the frontmost application.
+function M.frontmost_pid()
+	local ok, result = pcall(function()
+		local app = hs.application.frontmostApplication()
+		return app and app:pid() or nil
+	end)
+	if not ok then
+		Logger.error(LOG, "frontmost_pid(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+--- @return number pid Process id of this runtime, which is never a switch target.
+function M.own_pid()
+	return hs.processInfo.processID
+end
+
+--- Focuses the window of a record and activates its application.
+--- @param record table A record returned by ordered_windows or application_windows.
+--- @return boolean focused
+function M.focus_window(record)
+	local ok, result = pcall(function()
+		if record.minimized then record.window:unminimize() end
+		-- hs.window:focus() returns the window for chaining, not a boolean.
+		return record.window:focus()
+	end)
+	if not ok then
+		Logger.warn(LOG, "focus_window(): window %s refused focus — %s", tostring(record.id), tostring(result))
+		return false
+	end
+	return result ~= nil and result ~= false
+end
+
 return M

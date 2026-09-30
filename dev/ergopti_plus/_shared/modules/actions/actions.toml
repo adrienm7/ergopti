@@ -222,19 +222,29 @@ platform = "hs"
 
 # --- Navigation applications ---
 
+# The operating system's own Alt+Tab keystroke. macOS no longer offers it: a
+# posted Cmd+Tab never switched there, and app_previous is what it meant
+# (config migration step v5_to_v6 maps a stored one).
 [sg_actions.app_switcher]
-platform = "all"
+platform = "ahk,linux"
 emit_ahk_key = "Tab"
 emit_ahk_mods = ["alt"]
 emit_linux = "alt+Tab"
 
+# The two previous-application scopes: every screen, and only the screen under
+# the cursor. macOS activates the application directly
+# (macos/modules/gestures/app_switch.lua): a posted Cmd+Tab never switched.
 [sg_actions.app_previous]
 platform = "hs"
 
+[sg_actions.app_previous_screen]
+platform = "hs"
+
 [sg_actions.app_window_previous]
-# Linux runs it through its emit row; declared "hs" alone, the Linux picker
-# could not offer a binding its driver has always performed.
-platform = "hs,linux"
+# Linux runs it through its emit row (Alt+Escape: the next window, with no
+# switcher). On macOS it posted Cmd+` like win_next did, so both became
+# win_app_next there (config migration step v5_to_v6).
+platform = "linux"
 emit_linux = "alt+Escape"
 
 # --- Editing (Windows and Linux; macOS uses Cmd+C/V/X in cmd_*) ---
@@ -379,19 +389,26 @@ platform = "ahk"
 
 # --- Fenêtres ---
 
+# Every window of every application, in turn. macOS cycled the active
+# application's windows under these ids, which is what win_app_prev and
+# win_app_next name on Windows, so it offers those instead (config migration
+# step v5_to_v6 maps a stored one).
 [sg_actions.win_prev]
-platform = "all"
+platform = "ahk,linux"
 emit_linux = "alt+shift+Tab"
 
 [sg_actions.win_next]
-platform = "all"
+platform = "ahk,linux"
 emit_linux = "alt+Tab"
 
+# The windows of the active application, in turn. macOS focuses them directly
+# (macos/modules/gestures/app_switch.lua), since a posted Cmd+` depends on a
+# layout carrying a backquote.
 [sg_actions.win_app_prev]
-platform = "ahk"
+platform = "ahk,hs"
 
 [sg_actions.win_app_next]
-platform = "ahk"
+platform = "ahk,hs"
 
 [sg_actions.close_window]
 platform = "all"
@@ -716,6 +733,9 @@ platform = "all"
 [sg_actions.screenshot_fullscreen_clipboard]
 platform = "all"
 
+# Every screen, saved at once with no selection: the recommended action of the
+# number-row key left of 1. Windows captures the virtual screen, Linux the
+# whole desktop, macOS one file per display.
 [sg_actions.screenshot_fullscreen_save]
 platform = "all"
 
@@ -922,8 +942,7 @@ emit_ahk = "^{Right}^+{Left}"
 # Opens the operating system's own capture tool through the shortcut the OS
 # reserves for it: the Snipping Tool overlay (Win+Shift+S), the macOS
 # Screenshot toolbar (Cmd+Shift+5), and whatever the Linux desktop binds to
-# Print (GNOME's screenshot UI, KDE Spectacle, Xfce Screenshooter). The
-# number-row tap key left of 1 runs it by default.
+# Print (GNOME's screenshot UI, KDE Spectacle, Xfce Screenshooter).
 platform = "all"
 emit_ahk = "#+s"
 emit_hs_key = "5"
@@ -1298,19 +1317,17 @@ platform = "hs"
 emit_hs_key = "forwarddelete"
 emit_hs_mods = ["cmd"]
 
+# What a Cmd+Shift+Tab tap selects: the least recently used application. A
+# posted Cmd+Shift+Tab switched nothing, like a posted Cmd+Tab, so macOS
+# activates it from Lua (macos/modules/gestures/app_switch.lua).
 [sg_actions.cmd_shift_tab]
 platform = "hs"
-emit_hs_key = "tab"
-emit_hs_mods = ["cmd", "shift"]
 
-# Ces trois-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie F17,
-# Shift+F17 et Alt+F17), donc le geste passe par le même chemin que la touche
-# remappée au lieu de réimplémenter le cyclage une deuxième fois.
-[sg_actions.alt_tab_apps]
-platform = "hs"
-emit_hs_key = "f17"
-emit_hs_mods = ["alt"]
-
+# Ces deux-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie
+# Shift+F17 et Ctrl+F17), donc le geste passe par le même chemin que la touche
+# remappée au lieu de réimplémenter le cyclage une deuxième fois. Les deux
+# autres accords F17 (alt_tab_apps, cycle_windows_in_app) sont des alias :
+# app_previous et win_app_next font la même chose sans la couche de remap.
 [sg_actions.alt_tab_windows]
 platform = "hs,ahk"
 emit_hs_key = "f17"
@@ -1327,11 +1344,6 @@ platform = "all"
 emit_hs_key = "f17"
 emit_hs_mods = ["ctrl"]
 emit_linux = "alt+Tab"
-
-[sg_actions.cycle_windows_in_app]
-platform = "hs"
-emit_hs_key = "f17"
-emit_hs_mods = []
 
 [sg_actions.home]
 platform = "hs,linux"
@@ -1450,10 +1462,16 @@ is_header = true
 #
 #   return            ≡ enter          (return)
 #   delete_fwd        ≡ delete         (forwarddelete)
-#   cmd_tab           ≡ app_switcher   (cmd+tab)
-#   alt_tab_apps_list ≡ app_switcher   (cmd+tab — Karabiner déclare lui-même
+#   cmd_tab           ≡ app_previous   (cmd+tab)
+#   alt_tab_apps_list ≡ app_previous   (cmd+tab — Karabiner déclare lui-même
 #                                       deux ids pour un « karabiner_to »
 #                                       identique)
+#
+# Deux autres depuis que macOS bascule sans raccourci (étape de migration
+# v5_to_v6) : la même action, atteinte par F17 depuis une touche remappée.
+#
+#   alt_tab_apps         ≡ app_previous  (alt+F17)
+#   cycle_windows_in_app ≡ win_app_next  (F17)
 #
 # Les déclarer comme lignes aurait mis quatre doublons dans le picker de
 # gestes : « ⌦ Suppr. avant » deux fois, à deux endroits, pour la même touche.
@@ -1471,8 +1489,10 @@ is_header = true
 [karabiner_aliases]
 return = "enter"
 delete_fwd = "delete"
-cmd_tab = "app_switcher"
-alt_tab_apps_list = "app_switcher"
+cmd_tab = "app_previous"
+alt_tab_apps_list = "app_previous"
+alt_tab_apps = "app_previous"
+cycle_windows_in_app = "win_app_next"
 
 
 # ==============================================================================
@@ -1493,8 +1513,8 @@ items = [
     "lookup",
     "app_switcher",
     "app_previous",
+    "app_previous_screen",
     "app_window_previous",
-    "alt_tab_apps",
     "alt_tab_windows",
     "alt_tab_monitor",
     "cmd_shift_tab",
@@ -1540,7 +1560,6 @@ items = [
     "win_next",
     "win_app_prev",
     "win_app_next",
-    "cycle_windows_in_app",
     "close_window",
     "fullscreen",
     "snap_left",

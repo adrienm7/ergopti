@@ -294,8 +294,16 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		Logger.info(LOG, "Screen read (%d char(s)); drafting %d answer(s).", #screen, #answer_set)
 		draft_answers(generation, engine, session, config, answer_set, screen)
 	end
-	local function on_fail(reason)
+	local function on_fail(reason, detail)
 		if not is_current(generation, "transcription") then return end
+		local Offer = require("modules.llm.local_model_offer")
+		if Offer.is_missing(reason, detail) then
+			-- Named, with its Download button, instead of the vague failure
+			Logger.warn(LOG, "Screen reading failed: the local server does not hold model %s.", detail.model)
+			engine.close_answer_surface(session)
+			Offer.offer(detail.model)
+			return
+		end
 		fail("the vision model gave no answer (" .. tostring(reason) .. ")")
 	end
 	if backend.kind == "local" then

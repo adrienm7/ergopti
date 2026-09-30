@@ -173,19 +173,19 @@ TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
 		HSE_Buffer := "ok"
 		HSE_StartIsWordBoundary := true
 
-		Rows := _PrefixCollectCandidates()
-		AssertEqual(1, Rows.Length,
-			"the collector must expose only the canonical repeat decision")
-		AssertEqual("k" . MK, Rows[1].Trigger,
-			"the tooltip must advertise the repeat fallback, never the rejected no-op mapping")
-		Assert(Rows[1].FireDecision.Spec.HasOwnProp("TransientKind")
-			and Rows[1].FireDecision.Spec.TransientKind == "repeat",
-			"the row must transport the engine-owned repeat decision, not rebuild a lookalike from the rejected candidate")
+		Decision := HSE_PreviewNextDecision(HSE_Buffer, MK)
+		Assert(IsObject(Decision) and Decision.Spec.HasOwnProp("TransientKind")
+			and Decision.Spec.TransientKind == "repeat",
+			"the engine must reject the no-op mapping and hand the magic key to its repeat fallback")
+		; The repeat winner is never offered (no-repeat-preview). Withholding it
+		; must leave the bubble empty rather than promote the no-op it beat.
+		AssertEqual(0, _PrefixCollectCandidates().Length,
+			"the tooltip must advertise neither the rejected no-op mapping nor the doubling that beats it")
 	} finally {
 		HSE_RepeatEnabled := SavedRepeat
 		HSE_RegistryClear()
 		HSE_HardReset()
 	}
 }
-Test("preview: a no-op candidate cannot hide the canonical repeat winner",
+Test("preview: a no-op candidate cannot stand in for the withheld repeat winner",
 	TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback)

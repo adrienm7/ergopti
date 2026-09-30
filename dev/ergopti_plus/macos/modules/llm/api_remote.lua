@@ -62,7 +62,13 @@ local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ResponseClassifier = require("modules.llm.remote_response_classifier")
 local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
+local LocalServers   = require("modules.llm.local_servers")
 local LOG            = "llm.api_remote"
+-- One probe client per local server, created at its first sweep with the
+-- registry's local_server_probe_timeout_ms and pinned for the life of the
+-- module, so a sweep probes every server at once and a newer sweep supersedes
+-- each probe
+local _local_probe_clients = {}
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -265,6 +271,45 @@ end
 
 local MODEL_PRICES
 M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST, M.DECISIONS_TEST = load_api_providers()
+
+--- Registers the local servers of local_servers.json as providers of the
+--- openai format that need no key. They stay out of PROVIDER_ORDER: the menus
+--- list a local server only while it answers (modules/llm/local_servers.lua).
+local function register_local_servers()
+	for _, id in ipairs(LocalServers.ORDER) do
+		local server = LocalServers.SERVERS[id]
+		if M.PROVIDERS[id] ~= nil then
+			Logger.error(LOG, "local_servers.json: '%s' is already a provider of api_providers.json — the local server is skipped.", id)
+		else
+			M.PROVIDERS[id] = {
+				label         = server.label,
+				base_url      = server.base_url,
+				default_model = "",
+				format        = "openai",
+				model_extras  = {},
+				local_server  = true,
+			}
+		end
+	end
+end
+register_local_servers()
+
+--- Tells whether a provider id names a local server (local_servers.json).
+--- @param provider_id any
+--- @return boolean
+function M.is_local_server(provider_id)
+	local provider = type(provider_id) == "string" and M.PROVIDERS[provider_id] or nil
+	return type(provider) == "table" and provider.local_server == true
+end
+
+--- Tells whether an entry cannot be sent without a key: every provider needs
+--- one except a local server, which takes one only when the user gave it.
+--- @param entry table API entry.
+--- @return boolean missing
+local function key_missing(entry)
+	if M.is_local_server(entry.provider) then return false end
+	return type(entry.token) ~= "string" or entry.token == ""
+end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
 --- the catalogue's order.
@@ -814,7 +859,7 @@ function M.resolve_active_entry(callback)
 		return settled_token_lease()
 	end
 	local stored = entry.token
-	if type(stored) ~= "string" or stored == "" then
+	if key_missing(entry) then
 		invoke_token_callback(callback, false, nil, "missing_token")
 		return settled_token_lease()
 	end
@@ -826,6 +871,11 @@ function M.resolve_active_entry(callback)
 		return copy
 	end
 
+	-- A local server the user gave no key to is sent none
+	if type(stored) ~= "string" or stored == "" then
+		invoke_token_callback(callback, true, resolved_copy(""), nil)
+		return settled_token_lease()
+	end
 	if not TokenCrypto.is_encrypted(stored) then
 		invoke_token_callback(callback, true, resolved_copy(stored), nil)
 		return settled_token_lease()
@@ -1537,7 +1587,7 @@ function M.warmup(_model_name, _profile, on_acquired)
 			return
 		end
 		local token = entry.token or ""
-		if token == "" then
+		if key_missing(entry) then
 			_warmup_active = false
 			accepted = false
 			Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
@@ -1577,6 +1627,16 @@ function M.warmup(_model_name, _profile, on_acquired)
 				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
 					tostring(type(r) == "table" and r.status or nil),
 					tostring(entry.provider))
+			end
+			if M.is_local_server(entry.provider) then
+				local status = type(r) == "table" and tonumber(r.status) or 0
+				if _is_ready then
+					LocalServers.report_success(entry.provider)
+				elseif status == 0 or status == 401 or status == 403 then
+					-- A models probe answering 404 means a wrong address, not a
+					-- missing model: only an absent server or a wanted key is reported
+					LocalServers.report_failure(entry.provider, status, nil, entry.model)
+				end
 			end
 		end
 		local dispatch_ok, dispatched_or_err = xpcall(function()
@@ -1769,7 +1829,7 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 			finish_availability_owner(owner, "missing", true)
 			return
 		end
-		if (entry.token or "") == "" then
+		if key_missing(entry) then
 			accepted = false
 			finish_availability_owner(owner, "missing", true)
 			return
@@ -1943,9 +2003,13 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 					status = tonumber(status) or 0,
 					message = extract_server_message(body) or "",
 				}
+				if provider.local_server == true then
+					LocalServers.report_failure(entry.provider, detail.status, detail.message, model)
+				end
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail) end
 				return
 			end
+			if provider.local_server == true then LocalServers.report_success(entry.provider) end
 
 			local classified = ResponseClassifier.classify(provider.format, body)
 			classified.usage.est_cost_usd = estimate_cost(tostring(model),
@@ -2101,9 +2165,33 @@ end
 
 --- Finds the API entry a vision request to a provider runs with: the active
 --- entry when it belongs to that provider, else the first one configured for it.
+--- A local server needs no entry: without one, its requests go to the address
+--- and with the key typed for it this session, else to its default address
+--- with no key.
 --- @param provider_id string Provider id of api_providers.json.
 --- @return table|nil entry
 local function find_provider_entry(provider_id)
+	local active = find_active_entry()
+	if active and active.provider == provider_id then return active end
+	for _, entry in ipairs(_entries) do
+		if entry.provider == provider_id then return entry end
+	end
+	if M.is_local_server(provider_id) then
+		local pending = LocalServers.pending(provider_id)
+		return {
+			id = "local:" .. provider_id, provider = provider_id,
+			base_url = pending.base_url or "", token = pending.token or "", model = "",
+		}
+	end
+	return nil
+end
+
+--- The API entry that holds a local server's address, key and model, if the
+--- user chose one of its models.
+--- @param provider_id string Server id of local_servers.json.
+--- @return table|nil entry
+function M.local_server_entry(provider_id)
+	if not M.is_local_server(provider_id) then return nil end
 	local active = find_active_entry()
 	if active and active.provider == provider_id then return active end
 	for _, entry in ipairs(_entries) do
@@ -2126,7 +2214,7 @@ function M.provider_status(provider_id, use)
 	if not M.provider_serves(provider_id, use) then return false, "unsupported" end
 	local entry = find_provider_entry(provider_id)
 	if not entry then return false, "no_entry" end
-	if type(entry.token) ~= "string" or entry.token == "" then return false, "missing_token" end
+	if key_missing(entry) then return false, "missing_token" end
 	return true, nil
 end
 
@@ -2166,13 +2254,9 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	end
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
-	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
-		if decrypted ~= true or type(token) ~= "string" or token == "" then
-			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
-				label, provider_id, tostring(entry.id), tostring(token_reason))
-			fail("missing_token")
-			return
-		end
+	--- Hands over the request once its key is known.
+	--- @param token string The cleartext key, "" for a local server given none.
+	local function with_token(token)
 		local base, base_error = resolve_base_url(entry, provider)
 		if not base then
 			log_endpoint_refusal(label:lower(), entry, base_error)
@@ -2180,6 +2264,20 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 			return
 		end
 		on_ready(provider, entry, token, base)
+	end
+	if type(entry.token) ~= "string" or entry.token == "" then
+		-- key_missing() let it through: a local server given no key
+		with_token("")
+		return true
+	end
+	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
+		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
+				label, provider_id, tostring(entry.id), tostring(token_reason))
+			fail("missing_token")
+			return
+		end
+		with_token(token)
 	end)
 	return true
 end
@@ -2256,11 +2354,16 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 				if not r.ok then
+					local message = extract_server_message(r.body)
 					Logger.error(LOG, "%s request to provider '%s' failed in %dms: HTTP %s (%s).",
-						label, provider_id, ms, tostring(r.status), tostring(extract_server_message(r.body) or r.error or ""))
+						label, provider_id, ms, tostring(r.status), tostring(message or r.error or ""))
+					if provider.local_server == true then
+						LocalServers.report_failure(provider_id, r.status, message, model)
+					end
 					fail("http_" .. tostring(r.status or "unknown"))
 					return
 				end
+				if provider.local_server == true then LocalServers.report_success(provider_id) end
 				local text = Parser.strip_thinking(ResponseClassifier.classify(provider.format, r.body).text)
 				if type(text) ~= "string" or text == "" then
 					Logger.warn(LOG, "%s answer of provider '%s' holds no text (%dms).", label, provider_id, ms)
@@ -2683,5 +2786,77 @@ end
 --- without running the exact helpers used by the production request path.
 M.__redact_url_for_test = redact_url
 M.__parse_response_for_test = parse_response
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 7/ Local Servers ==============
+-- =======================================
+-- =======================================
+
+--- Validates a base URL the user typed for a local server, with the rules of
+--- every remote base URL.
+--- @param raw any Candidate base URL.
+--- @return string|nil normalized Valid HTTP(S) base without trailing slashes.
+--- @return string reason Privacy-safe refusal reason.
+function M.normalize_base_url(raw)
+	return normalize_base_url(raw)
+end
+
+--- Where a local server is probed and with which stored key: its API entry's
+--- address and key, else those typed this session, else its default address.
+--- @param provider_id string Server id of local_servers.json.
+--- @return table target { id, base_url, token } (token "" or a stored reference).
+function M.local_server_target(provider_id)
+	local provider = M.PROVIDERS[provider_id]
+	local entry = M.local_server_entry(provider_id)
+	local pending = LocalServers.pending(provider_id)
+	local base_url = entry and entry.base_url or ""
+	if base_url == "" then base_url = pending.base_url or provider.base_url end
+	local token = entry and entry.token or pending.token or ""
+	return { id = provider_id, base_url = base_url, token = token }
+end
+
+--- Sweeps every local server's models endpoint at once, with the rules of the
+--- remote availability check (dispatch_probe), and publishes which answer
+--- (modules/llm/local_servers.lua). Never blocks: each probe is asynchronous
+--- and bounded by local_server_probe_timeout_ms.
+--- @param on_done function|nil Receives (changed) when every server settled.
+--- @return boolean started
+function M.detect_local_servers(on_done)
+	local targets = {}
+	for _, id in ipairs(LocalServers.ORDER) do
+		if M.is_local_server(id) then targets[#targets + 1] = M.local_server_target(id) end
+	end
+	return LocalServers.sweep(targets, function(target, settle)
+		local base, reason = normalize_base_url(target.base_url)
+		if not base then
+			Logger.warn(LOG, "Local server '%s' has an invalid address: %s.", target.id, reason)
+			return false
+		end
+		local client = _local_probe_clients[target.id]
+		if not client then
+			-- A running server on loopback answers at once: the deadline is short
+			client = _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms") })
+			_local_probe_clients[target.id] = client
+		end
+		local function probe(token)
+			return dispatch_probe(client, base, "openai", token, settle)
+		end
+		if target.token == "" then return probe("") end
+		TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)
+			if decrypted ~= true or type(token) ~= "string" or token == "" then
+				Logger.warn(LOG, "Local server '%s' key is unreadable: %s.", target.id, tostring(token_reason))
+				-- Probed without its key, the server says whether it wants one
+				token = ""
+			end
+			if probe(token) ~= true then settle(nil) end
+		end)
+		return true
+	end, on_done)
+end
 
 return M

@@ -352,7 +352,6 @@ local function ensure_webview(title)
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
-				allow_text_entry  = false,
 				allow_new_windows = false,
 				usercontent       = controller,
 				assets_dir        = ASSETS_DIR,

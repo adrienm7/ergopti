@@ -32,6 +32,7 @@ local Paths      = require("infra.paths")
 local dialog     = require("infra.dialog_util")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
+local ConfigPaths = require("infra.config_paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "metrics_apps"
@@ -405,8 +406,14 @@ end
 
 local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
-local CONFIG_DIR      = hs.configdir .. "/data"
-local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
+--- The user's category overrides live in the configuration folder, beside
+--- config.toml. They lived in hs.configdir's data folder, which an installed
+--- app has inside its read-only bundle: the missing folder made every read an
+--- error, so the dashboard refused to render and showed nothing.
+--- @return string Absolute path of the category overrides file.
+local function categories_file()
+	return ConfigPaths.get_config_dir() .. "app_categories.json"
+end
 --- Fallback category assigned to an uncategorised app on first edit.
 ---
 --- A FUNCTION rather than a module-level constant, and it reads the same i18n key
@@ -464,7 +471,7 @@ end
 -- ==========================================
 
 local function load_categories()
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, CATEGORIES_FILE)
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, categories_file())
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "App categories read did not commit; edit refused — %s.",
 			tostring(read_ok and read_detail or content))
@@ -498,7 +505,7 @@ local function save_categories(data, source_snapshot)
 
 	local write_ok, committed = pcall(
 		FileSystem.write_if_unchanged,
-		CATEGORIES_FILE,
+		categories_file(),
 		encoded,
 		source_snapshot
 	)

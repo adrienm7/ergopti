@@ -54,6 +54,8 @@ local function with_persistence_fixture(options, body)
 		set_active_entry_id = function(value) active_id = value end,
 		get_active_entry_id = function() return active_id end,
 		prewarm_active_entry_decrypt = function() end,
+		-- No fixture provider is a local server: every entry needs its key
+		is_local_server = function() return false end,
 	}
 
 	package.loaded["modules.llm.profiles"] = { BUILTIN_PROFILES = {} }

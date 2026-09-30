@@ -13,6 +13,7 @@ local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
 	"adapters.file_system",
+	"adapters.mouse_control",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
@@ -49,6 +50,8 @@ local function with_subject(options, scenario)
 		-- by test_screen_capture_verdicts.lua.
 		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
 	}
+	-- A whole-screen save names one file per display; this desk has one.
+	package.loaded["adapters.mouse_control"] = { getMonitorCount = function() return 1 end }
 	package.loaded["adapters.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,

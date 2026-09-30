@@ -30,6 +30,7 @@ local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local LiveModePanel    = require("ui.menu.menu_llm.live_mode_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
+local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
@@ -915,6 +916,13 @@ local function create_menu(deps)
 						-- reading instead of leaking it into the API backend's status
 						-- dot display (F-LOW-6).
 						reset_llm_health_status = M.reset_llm_health_status,
+						-- The local OpenAI-compatible servers that answer, below the API row
+						local_server_rows = function(activate_api)
+								return LocalServerPanel.rows({
+										state = state, paused = paused, keymap = keymap, update_menu = update_menu,
+										WarmupCtrl = WarmupCtrl, activate_api = activate_api,
+								})
+						end,
 				})
 
 				row_for("llm_backend", {
@@ -1691,8 +1699,17 @@ local function create_menu(deps)
 		-- The AI agent's top-level menu shares this menu's setting transaction: its
 		-- settings live in [llm] and are reset with the AI scope.
 		local function build_agent_item()
-				return AgentPanel.build({ state = state, settings_mgr = settings_mgr })
+				return AgentPanel.build({ state = state, settings_mgr = settings_mgr, update_menu = update_menu })
 		end
+		-- The local models the agent and the screen reading name are
+		-- downloaded by this menu's models manager, in its download window;
+		-- a completed download changes what the AI agent menu shows.
+		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
+				return models_mgr.pull_ollama_model(model, function()
+						on_done(true)
+						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
+				end, function(reason) on_done(false, reason) end)
+		end)
 		-- The llm_agent_auto_toggle action persists the mode it switches to
 		-- through the same transaction as the menu.
 		require("modules.llm.agent_runner").set_mode_persister(function(mode)

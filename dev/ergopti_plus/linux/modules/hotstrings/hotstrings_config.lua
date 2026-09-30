@@ -1485,6 +1485,16 @@ function M.disable_all()
 	return #changes
 end
 
+--- Whether any category gate is open, over the very inventory disable_all
+--- closes: once the Hotstrings switch turned them all off, it reads off.
+--- @return boolean
+function M.any_enabled()
+	for _, id in ipairs(known_categories()) do
+		if M.is_group_enabled(id) then return true end
+	end
+	return false
+end
+
 --- Whether a category's gate is open.
 --- @param group_name string
 --- @return boolean

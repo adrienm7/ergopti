@@ -123,6 +123,49 @@ local function _json_decode(s)
 	-- hand-rolled stub parser does not skip it, so it silently returned 0 keys
 	-- for every locale file (PF-3 fix). Strip it before parsing.
 	s = s:gsub("^\239\187\191", "")
+	-- LuaSkin converts a decoded document through one NSMutableDictionary of
+	-- the objects it already pushed (Skin.m, pushNSObject:withOptions:
+	-- alreadySeenObjects:), so its lookup goes by isEqual:. Every array or
+	-- object equal to one met earlier in the same document therefore comes
+	-- back as THAT Lua table, not a copy: CapsWord's 30 identical conditions
+	-- lists were one table in the app while this stub made 30. The stub shares
+	-- them the same way, so code that mutates decoded data in place fails here
+	-- as it does under Hammerspoon.
+	local interned = {}
+	local canonical = {}
+	local function value_key(value)
+		local kind = type(value)
+		if kind == "table" then return canonical[value] end
+		if kind == "number" then
+			-- NSNumber compares by value: 1 and 1.0 are equal.
+			if math.type(value) == "float" and value == math.floor(value) and math.abs(value) < 2 ^ 53 then
+				value = math.tointeger(value)
+			end
+			return "n" .. tostring(value)
+		end
+		if kind == "string" then return "s" .. string.format("%q", value) end
+		return kind:sub(1, 1) .. tostring(value)
+	end
+	local function intern(tbl, key)
+		local existing = interned[key]
+		if existing then return existing end
+		interned[key] = tbl
+		canonical[tbl] = key
+		return tbl
+	end
+	local function intern_array(arr)
+		local parts = {}
+		for index = 1, #arr do parts[index] = value_key(arr[index]) end
+		return intern(arr, "a[" .. table.concat(parts, ",") .. "]")
+	end
+	local function intern_object(obj)
+		local names = {}
+		for name in pairs(obj) do names[#names + 1] = name end
+		table.sort(names)
+		local parts = {}
+		for index, name in ipairs(names) do parts[index] = value_key(name) .. "=" .. value_key(obj[name]) end
+		return intern(obj, "o{" .. table.concat(parts, ",") .. "}")
+	end
 	-- Minimal JSON parser sufficient for fixture-based tests
 	local pos = 1
 	local function skip_ws() while pos <= #s and s:sub(pos, pos):match("%s") do pos = pos + 1 end end
@@ -153,26 +196,26 @@ local function _json_decode(s)
 	local function parse_array()
 		pos = pos + 1 ; skip_ws()
 		local arr = {}
-		if s:sub(pos, pos) == ']' then pos = pos + 1 ; return arr end
+		if s:sub(pos, pos) == ']' then pos = pos + 1 ; return intern_array(arr) end
 		while true do
 			skip_ws() ; arr[#arr + 1] = parse_value() ; skip_ws()
 			local c = s:sub(pos, pos)
 			if c == ',' then pos = pos + 1
-			elseif c == ']' then pos = pos + 1 ; return arr
+			elseif c == ']' then pos = pos + 1 ; return intern_array(arr)
 			else error("expected , or ] at " .. pos) end
 		end
 	end
 	local function parse_object()
 		pos = pos + 1 ; skip_ws()
 		local obj = {}
-		if s:sub(pos, pos) == '}' then pos = pos + 1 ; return obj end
+		if s:sub(pos, pos) == '}' then pos = pos + 1 ; return intern_object(obj) end
 		while true do
 			skip_ws() ; local k = parse_string() ; skip_ws()
 			assert(s:sub(pos, pos) == ':') ; pos = pos + 1 ; skip_ws()
 			obj[k] = parse_value() ; skip_ws()
 			local c = s:sub(pos, pos)
 			if c == ',' then pos = pos + 1
-			elseif c == '}' then pos = pos + 1 ; return obj
+			elseif c == '}' then pos = pos + 1 ; return intern_object(obj)
 			else error("expected , or } at " .. pos) end
 		end
 	end
@@ -670,6 +713,8 @@ M.eventtap = {
 		end,
 	},
 	checkKeyboardModifiers = function() return {} end,
+	-- Like the real call, a table of the buttons held at this instant.
+	checkMouseButtons = function() return {} end,
 	keyRepeatInterval = function() return 0.05 end,
 	keyRepeatDelay = function() return 0.5 end,
 	__keystrokes = KEYSTROKES,
