@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Actieve lijst upgraden naar v%s (installeer eerst v%s)",
 	"menu.layout.update_list_ok": "Lijst met invoerbronnen bijgewerkt.",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s bijwerken",
-	"menu.llm.about": "Over Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Intelligente toetsenbordvoorstellen\nBackend: Ollama (lokaal)\nVersie: 1.0",
 	"menu.llm.add_custom_model": "Een aangepast model toevoegen",
 	"menu.llm.add_model_entry": "➕ Een aangepast model toevoegen…",
 	"menu.llm.after_hotstring": "Suggestie nadat een hotstring-ballon verloopt",

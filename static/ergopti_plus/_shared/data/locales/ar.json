@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "ترقية القائمة النشطة إلى v%s (ثبّت v%s أولًا)",
 	"menu.layout.update_list_ok": "تم تحديث قائمة مصادر الإدخال.",
 	"menu.layout.update_version": "تحديث Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "حول Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — اقتراحات لوحة مفاتيح ذكية\nالخادم الخلفي: Ollama (محلي)\nالإصدار: 1.0",
 	"menu.llm.add_custom_model": "إضافة نموذج مخصص",
 	"menu.llm.add_model_entry": "➕ إضافة نموذج مخصص…",
 	"menu.llm.after_hotstring": "اقتراح بعد انتهاء فقاعة السلسلة النصية",

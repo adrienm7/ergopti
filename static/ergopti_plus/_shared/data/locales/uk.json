@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Оновити активний список до v%s (спочатку встановіть v%s)",
 	"menu.layout.update_list_ok": "Список джерел введення оновлено.",
 	"menu.layout.update_version": "Оновити Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "Про Ergopti ШІ",
-	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури\nБекенд: Ollama (локально)\nВерсія: 1.0",
 	"menu.llm.add_custom_model": "Додати власну модель",
 	"menu.llm.add_model_entry": "➕ Додати власну модель…",
 	"menu.llm.after_hotstring": "Пропозиція після зникнення бульбашки хотстрингу",

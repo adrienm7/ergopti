@@ -164,11 +164,6 @@ LLM_Menu_BuildSubmenu() {
 	for _i, _row in _rows
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational, _MR_Get(_row, "health_dot", false))
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
-
-	MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "about", [
-		Map("separator", true),
-		Map("label", t("menu.llm.about"), "action", LLM_Menu_OnAbout)
-	])
 	} catch as e {
 		if IsObject(SavedHandle)
 			_LLM_Menu_Handle := SavedHandle

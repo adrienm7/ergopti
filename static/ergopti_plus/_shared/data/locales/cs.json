@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Upgradovat aktivní seznam na v%s (nejprve nainstalujte v%s)",
 	"menu.layout.update_list_ok": "Seznam zdrojů vstupu aktualizován.",
 	"menu.layout.update_version": "Aktualizovat Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "O aplikaci Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Chytrá klávesnicová napovídání\nBackend: Ollama (lokálně)\nVerze: 1.0",
 	"menu.llm.add_custom_model": "Přidat vlastní model",
 	"menu.llm.add_model_entry": "➕ Přidat vlastní model…",
 	"menu.llm.after_hotstring": "Návrh po expiraci bubliny hotstringu",

@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Обновить активный список до v%s (сначала установите v%s)",
 	"menu.layout.update_list_ok": "Список источников ввода обновлён.",
 	"menu.layout.update_version": "Обновить Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "О Ergopti ИИ",
-	"menu.llm.about_body": "Ergopti ИИ — Умные подсказки клавиатуры\nБэкенд: Ollama (локально)\nВерсия: 1.0",
 	"menu.llm.add_custom_model": "Добавить пользовательскую модель",
 	"menu.llm.add_model_entry": "➕ Добавить пользовательскую модель…",
 	"menu.llm.after_hotstring": "Предложение после исчезновения пузырька хотстринга",

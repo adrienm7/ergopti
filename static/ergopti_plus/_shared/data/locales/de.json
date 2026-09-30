@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "Aktive Liste auf v%s aktualisieren (zuerst v%s installieren)",
 	"menu.layout.update_list_ok": "Eingabequellenliste aktualisiert.",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s aktualisieren",
-	"menu.llm.about": "Über Ergopti KI",
-	"menu.llm.about_body": "Ergopti KI — Intelligente Tastaturvorschläge\nBackend: Ollama (lokal)\nVersion: 1.0",
 	"menu.llm.add_custom_model": "Benutzerdefiniertes Modell hinzufügen",
 	"menu.llm.add_model_entry": "➕ Benutzerdefiniertes Modell hinzufügen…",
 	"menu.llm.after_hotstring": "Vorschlag nach Ablauf einer Hotstring-Blase",

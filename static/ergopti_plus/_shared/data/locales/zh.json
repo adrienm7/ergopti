@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "将激活列表升级到 v%s（请先安装 v%s）",
 	"menu.layout.update_list_ok": "输入源列表已更新。",
 	"menu.layout.update_version": "更新 Ergopti (%s) v%s → v%s",
-	"menu.llm.about": "关于 Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — 智能键盘建议\n后端: Ollama (本地)\n版本: 1.0",
 	"menu.llm.add_custom_model": "添加自定义模型",
 	"menu.llm.add_model_entry": "➕ 添加自定义模型…",
 	"menu.llm.after_hotstring": "Hotstring气泡过期后的建议",

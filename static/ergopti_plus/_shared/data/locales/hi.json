@@ -1300,8 +1300,6 @@
 	"menu.layout.update_list_install_first": "सक्रिय सूची को v%s में अपग्रेड करें (पहले v%s स्थापित करें)",
 	"menu.layout.update_list_ok": "इनपुट स्रोत सूची अपडेट की गई।",
 	"menu.layout.update_version": "Ergopti (%s) v%s → v%s अपडेट करें",
-	"menu.llm.about": "Ergopti AI के बारे में",
-	"menu.llm.about_body": "Ergopti AI — स्मार्ट कीबोर्ड सुझाव\nबैकएंड: Ollama (स्थानीय)\nसंस्करण: 1.0",
 	"menu.llm.add_custom_model": "कस्टम मॉडल जोड़ें",
 	"menu.llm.add_model_entry": "➕ कस्टम मॉडल जोड़ें…",
 	"menu.llm.after_hotstring": "hotstring बुलबुले समाप्त होने के बाद सुझाव",
