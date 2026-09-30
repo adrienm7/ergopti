@@ -14,6 +14,12 @@ local Codec = require("toml_codec")
 
 local FAMILIES = { { id = "date_fr", section = "datefr" }, { separator = true } }
 
+-- The legacy word-delimiter lists and the two separators their records used.
+local STATE_KEY = "hotstrings.terminator_state"
+local CUSTOM_KEY = "hotstrings.custom_terminators"
+local RECORD = "\30"
+local FIELD = "\31"
+
 --- An in-memory storage adapter.
 --- @param values table Initial keys.
 --- @return table adapter
@@ -46,7 +52,8 @@ end
 --- @param body function body(Import, path, Preferences)
 local function with_config(content, body)
 	local previous = {}
-	for _, name in ipairs({ "infra.hotstring_preferences", "infra.legacy_hotstring_storage" }) do
+	for _, name in ipairs({ "infra.hotstring_preferences", "modules.hotstrings.terminator_settings",
+		"infra.legacy_hotstring_storage" }) do
 		previous[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
@@ -139,10 +146,69 @@ helpers.describe("legacy hotstring storage import", function()
 	helpers.it("keeps the legacy keys for the next start when config.toml refuses the write", function()
 		local source = "[hotstrings\nbroken"
 		with_config(source, function(Import, path)
-			local adapter = storage({ ["hotstrings.disabled_categories"] = "+autocorrection.caps" })
+			local adapter = storage({ ["hotstrings.disabled_categories"] = "+autocorrection.caps",
+				[STATE_KEY] = "space" .. FIELD .. "0" })
 			helpers.assert_eq(Import.import({ path = path, storage = adapter }), false)
 			helpers.assert_eq(read(path), source)
 			helpers.assert_eq(adapter.values["hotstrings.disabled_categories"], "+autocorrection.caps")
+			helpers.assert_eq(adapter.values[STATE_KEY], "space" .. FIELD .. "0")
+		end)
+	end)
+end)
+
+helpers.describe("legacy hotstring storage import: word delimiters", function()
+	helpers.it("carries the delimiters over as sparse config.toml leaves the owner reads", function()
+		with_config('[hotstrings]\nunknown = "kept"\n', function(Import, path)
+			local adapter = storage({
+				[STATE_KEY] = table.concat({ "space" .. FIELD .. "0", "comma" .. FIELD .. "1", "slash" .. FIELD .. "1",
+					"custom_§" .. FIELD .. "0", "retired" .. FIELD .. "1" }, RECORD),
+				[CUSTOM_KEY] = table.concat({ "custom_§" .. FIELD .. "§" .. FIELD .. "§" .. FIELD .. "1",
+					"custom_comma" .. FIELD .. "," .. FIELD .. "," .. FIELD .. "0" }, RECORD),
+			})
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			local hotstrings = Codec.decode(read(path)).hotstrings
+			helpers.assert_eq(hotstrings.terminators, { { key = "custom_§", char = "§", label = "§", consume = true } },
+				"a custom delimiter that takes a built-in character is not imported")
+			helpers.assert_eq(hotstrings.terminator_states.space, false)
+			helpers.assert_eq(hotstrings.terminator_states.slash, true)
+			helpers.assert_eq(hotstrings.terminator_states["custom_§"], false)
+			helpers.assert_nil(hotstrings.terminator_states.comma, "a delimiter on its default stays sparse")
+			helpers.assert_nil(hotstrings.terminator_states.retired, "an unknown delimiter is not imported")
+			helpers.assert_nil(hotstrings.repeat_key_enabled, "the delimiters say nothing about the repeat key")
+			helpers.assert_eq(hotstrings.unknown, "kept")
+			helpers.assert_nil(adapter.values[STATE_KEY], "a settled import removes its keys")
+			helpers.assert_nil(adapter.values[CUSTOM_KEY])
+
+			-- The owner reads exactly what was imported.
+			local Settings = require("modules.hotstrings.terminator_settings")
+			local Terminators = require("keymap.terminators")
+			local before = Settings.snapshot()
+			local paths = require("infra.config_paths")
+			local config = paths.config
+			paths.config = function() return path end
+			local called, loaded = pcall(Settings.load)
+			local space, custom = Terminators.is_terminator_enabled("space"), Terminators.is_terminator_enabled("custom_§")
+			paths.config = config
+			helpers.assert_true(Settings.restore_configuration(before))
+			helpers.assert_true(called and loaded)
+			helpers.assert_eq(space, false)
+			helpers.assert_eq(custom, false)
+		end)
+	end)
+
+	helpers.it("keeps the delimiter list config.toml already defines, with its states", function()
+		local source = '[hotstrings]\nterminators = [{ key = "custom_x", char = "¤", label = "¤", consume = false }]\n'
+		with_config(source, function(Import, path)
+			local adapter = storage({
+				[STATE_KEY] = "space" .. FIELD .. "0" .. RECORD .. "custom_§" .. FIELD .. "0",
+				[CUSTOM_KEY] = "custom_§" .. FIELD .. "§" .. FIELD .. "§" .. FIELD .. "1",
+			})
+			helpers.assert_true(Import.import({ path = path, storage = adapter }))
+			local hotstrings = Codec.decode(read(path)).hotstrings
+			helpers.assert_eq(hotstrings.terminators, { { key = "custom_x", char = "¤", label = "¤", consume = false } })
+			helpers.assert_eq(hotstrings.terminator_states.space, false)
+			helpers.assert_nil(hotstrings.terminator_states["custom_§"], "a legacy custom state follows its list")
+			helpers.assert_eq(next(adapter.values), nil)
 		end)
 	end)
 end)
