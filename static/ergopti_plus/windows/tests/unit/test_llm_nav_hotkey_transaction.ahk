@@ -101,9 +101,12 @@ _LNHT_PredicateSlot(Predicate) {
 	return 0
 }
 
+; The native spec the navigation plan freezes for LogicalSpec: its digits are
+; their digit-row keys (_LLM_Menu_NavDigitRowKey), on every host layout.
 _LNHT_NativeSpec(LogicalSpec, KeyResolverFn := 0) {
 	Descriptor := HotkeyRegistrarResolvedNativeDescriptor(LogicalSpec,
-		KeyResolverFn)
+		_LLM_Menu_NavDigitRowKey.Bind(
+			_LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)))
 	return Descriptor is Map ? Descriptor["native_spec"] : LogicalSpec
 }
 

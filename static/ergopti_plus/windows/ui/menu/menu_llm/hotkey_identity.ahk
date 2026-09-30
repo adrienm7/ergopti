@@ -182,6 +182,24 @@ _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn := 0) {
 		KeyResolverFn is Map ? KeyResolverFn : 0)
 }
 
+; Resolves a key of the navigation plan through the layout snapshot, except
+; that a digit names its digit-row key, VK_0 to VK_9, without the modifier the
+; layout needs to type it. The validation chord is the key labelled N, as the
+; macOS keycodes and the Linux digit-row codes are. The layout's own answer
+; bound it to the character: on an AZERTY host '1' is Shift+VK_1, while the
+; recommended digit-row emulation (direct_access_digits) types 1 with the bare
+; key, so the chord never matched and the digit was typed (llm-accept-inserts).
+; The snapshot still answers first: a layout it cannot resolve fails closed.
+; @param {Func} LayoutResolver - Resolver snapshot of one keyboard layout.
+; @param {String} Key - Key part of a plan spec.
+; @returns {Map|Boolean} The physical key descriptor, or the snapshot's refusal.
+_LLM_Menu_NavDigitRowKey(LayoutResolver, Key) {
+	Resolved := LayoutResolver.Call(Key)
+	if !(Resolved is Map) || !(Key is String) || !RegExMatch(Key, "^[0-9]$")
+		return Resolved
+	return Map("axis", "vk", "code", Ord(Key), "implicit_modifiers", "")
+}
+
 _LLM_Menu_HotkeyResolvedDescriptor(Spec, KeyResolverFn := 0) {
 	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
 	if !HasMethod(KeyResolverFn, "Call")
