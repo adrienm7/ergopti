@@ -51,5 +51,14 @@ reports (keyDown `kc`, flagsChanged `modifier_press`/`modifier_hold`) and
 counted twice (HS-274), once as its physical key and once as its output. Once a
 producer stream owner selects the stream, neither legacy source credits
 anything: an admitted complete capture credits `physical_press`, and without
-one the source is an explicit gap, never a fallback. The output keycode is
+one, the source is an explicit gap, never a fallback. The output keycode is
 never suppressed instead, because it is also a real key.
+
+The stream credits the macOS keycode Quartz would report for the same key:
+`physical_key_identity.lua` resolves a raw HID usage through the generated
+`_generated/hid_key_identity.lua` (from the shared registry), using the device's
+keyboard type only for the ISO swap pair, and maps fn/globe to the fn keycode.
+`physical_delivery.lua` tallies a press it cannot attribute in `uncounted()`
+instead of retiring the capture, and `physical_baseline.lua` admits only the
+version-2 baseline, whose device rows carry the keyboard type and whose key rows
+carry their usage page.

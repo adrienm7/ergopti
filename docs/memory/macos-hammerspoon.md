@@ -820,6 +820,35 @@ predate it. Build a matching producer before testing the changed consumer. A hel
 native probe without Hammerspoon cannot validate held-state consumer handoff.
 Normal production startup and exclusive physical accounting remain unintegrated.
 
+Since 2026-09-30 the Lua consumer admits only baseline version 2: each device row
+declares `keyboard_type` (`ansi`, `iso` or `jis` for a device with keyboard-page
+elements, `none` otherwise) and each key row its usage `page`, so fn/globe (Apple
+vendor pages 0x00FF and 0xFF01) and Consumer-page keys are tracked like keyboard
+keys (`physical_wire.lua` `KEY_PAGES`). The C++ pages writer, the native attach
+path and the Python fixture reader still speak version 1, which the consumer
+refuses: align all three in WP4 before any native run can admit a capture. A
+press the key-identity policy cannot attribute is tallied in the receiver's
+`uncounted()` coverage, never a reason to retire the capture.
+
+### project-hs-physical-key-identity
+
+The stream credits the macOS virtual keycode Quartz would have reported for the
+same physical key, so history and the heatmap keep one identity:
+`modules/keylogger/physical_key_identity.lua` resolves through
+`_generated/hid_key_identity.lua`, generated from the registry's `hid`, `hs` and
+`macos_iso.hs` (`npm run codegen:hid-key-identity:hs`). The registry places a
+usage by the USB HID usage tables, so only 0x35 (left of 1) and 0x64 (left of Z)
+depend on the device's keyboard type (the ISO swap); a JIS device, which the
+registry has no form for, leaves only those two uncounted. That raw usages follow
+the standard positions on Apple ISO hardware, while Karabiner rules name the key
+left of 1 `non_us_backslash` there, is an assumption: check it on the
+maintainer's internal keyboard in WP9 by comparing the stream's usage with the
+Quartz keycode. fn/globe resolves to `keycodes.FUNCTION` (63). Media keys the
+registry lacks (play/pause, track skips, brightness) have no macOS virtual
+keycode and are tallied uncounted; counting them, as the maintainer decided,
+needs an identity chosen together with the event-tap path, which sees them as
+system-defined events rather than keycodes.
+
 ### project-hs-native-remapping-fixture-boundary
 
 Native HID inventories identify elements by cookie within a device, not by

@@ -34,7 +34,7 @@ helpers.describe("physical context (hs274)", function()
 		local emitted = {}
 		local receiver = Delivery.new({ batch_limit = 3, admit = function() return "context-test" end,
 			context = function(ticks) return context.resolve(assert(math.tointeger(tonumber(ticks)))) end,
-			keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
+			keycode = Frames.keycode,
 			emit = function(press) emitted[#emitted + 1] = press end,
 		})
 		local frames = Frames.new("context-test", "1", { "1", "2" })

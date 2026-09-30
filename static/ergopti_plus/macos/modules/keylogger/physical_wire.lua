@@ -11,6 +11,20 @@ M.PAGE_CONSUMER = 0x0C
 M.PAGE_APPLE_VENDOR_TOP_CASE = 0x00FF
 M.PAGE_APPLE_VENDOR_KEYBOARD = 0xFF01
 
+--- Pages whose button elements the capture inventories as keys. The producer
+--- must enumerate every button element on these pages; rows on any other page
+--- are not key presses.
+M.KEY_PAGES = {
+	[M.PAGE_KEYBOARD] = true,
+	[M.PAGE_CONSUMER] = true,
+	[M.PAGE_APPLE_VENDOR_TOP_CASE] = true,
+	[M.PAGE_APPLE_VENDOR_KEYBOARD] = true,
+}
+
+--- Keyboard types a device with keyboard-page elements may declare, as macOS
+--- classifies physical keyboards (ANSI, ISO, JIS).
+M.KEYBOARD_TYPES = { ansi = true, iso = true, jis = true }
+
 --- Validates a canonical unsigned decimal string.
 ---@param value string Wire value.
 ---@param positive boolean Require a nonzero value.
