@@ -140,4 +140,39 @@ helpers.describe("api_entries: a private, durable store", function()
 		os.execute("rm -rf '" .. DIR .. "'")
 	end)
 
+	helpers.it("warns about an older build's entry and never deletes its key (config-outdated-api-keys)", function()
+		fresh()
+		local Json = require("json")
+		os.execute("mkdir -p '" .. DIR .. "'")
+		local fh = assert(io.open(PATH, "w"))
+		fh:write(Json.encode({ version = 1, active_id = "gone", entries = {
+			{ id = "old-1", provider = "openai", label = "Old", key = "sk-legacy-secret" },
+			{ id = "new-1", provider = "cerebras", label = "Cerebras", token = "csk-live" },
+		} }))
+		fh:close()
+		local Logger = require("logger.shim")
+		local real_warn, real_error, warnings, errors = Logger.warn, Logger.error, {}, {}
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		require("config_outdated").reset_for_tests()
+		local ok, err = pcall(function()
+			local entries = fresh(true)
+			helpers.assert_eq(#entries.list(), 1, "the usable entry still loads")
+			helpers.assert_nil(entries.active(), "a dangling selection selects nothing")
+			helpers.assert_eq(errors, {})
+			local text = table.concat(warnings, "\n")
+			helpers.assert_eq(#warnings, 2, text)
+			helpers.assert_contains(text, "'entries[id=old-1]' in '" .. PATH .. "'")
+			helpers.assert_contains(text, "'active_id' in '" .. PATH .. "'")
+			helpers.assert_true(text:find("sk-legacy-secret", 1, true) == nil, "a key never reaches a log")
+			helpers.assert_true(entries.set_active("new-1"))
+			local stored = Json.decode(assert(io.open(PATH, "r")):read("*a"))
+			helpers.assert_eq(#stored.entries, 2, "a save keeps the outdated entry")
+			helpers.assert_eq(stored.entries[2].key, "sk-legacy-secret", "its key is never deleted")
+		end)
+		Logger.warn, Logger.error = real_warn, real_error
+		os.execute("rm -rf '" .. DIR .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 end)
