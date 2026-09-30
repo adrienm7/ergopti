@@ -263,6 +263,25 @@ const ERROR = {
 	}
 }
 
+// error-dialog-report-on-the-right: Close alone on the left, reporting last on
+// the right as the primary action, so users are drawn to report the error.
+{
+	const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
+	const css = fs.readFileSync(path.join(PAGE, 'style.css'), 'utf8');
+	const footer = /<footer class="buttons">([\s\S]*?)<\/footer>/.exec(html);
+	const order = footer ? [...footer[1].matchAll(/id="(btn-[a-z-]+)"/g)].map((m) => m[1]) : [];
+	if (order.join(',') !== 'btn-close,btn-copy,btn-report')
+		fail(`the footer must read Close, Copy, Report from left to right; found ${order.join(', ')}`);
+	if (
+		!/id="btn-report"[\s\S]*?class="primary"|class="primary"[\s\S]*?id="btn-report"/.test(
+			footer ? footer[1] : ''
+		)
+	)
+		fail('Report must stay the primary button');
+	if (!/#btn-close\s*\{[^}]*margin-right:\s*auto/.test(css))
+		fail('Close must stand alone on the left (margin-right: auto)');
+}
+
 if (failures.length > 0) {
 	console.error(`[FAIL] error window page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);
