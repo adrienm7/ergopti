@@ -220,6 +220,13 @@ These are software implementations; final hardware verification remains below.
     by their own switch on every OS. Integrated. After the demo: the Windows
     wizard's Shortcuts answer should also write the key-combinations switch.
 30. [ ] Physical magic-key setting on all three OSes (after the demo).
+        Implemented on the unpublished branch `next/magic-key-3os`: one
+        `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by
+        default) on every driver, config schema v5 migrating the Windows
+        `magic_key_source_scan`, and a keyboard-layout menu row that captures
+        the next key pressed or lists the candidates. Remaining: review, the
+        CI run of the AutoHotkey suites, and real-device checks of the
+        capture and the remap on each OS.
 31. [ ] HS-274 exact physical key accounting with an Ergopti-owned background
         Karabiner runtime (no Karabiner-Elements app). Plan and decisions in the
         overnight handoff; ~32–42 agent-days; not in the demo release.
