@@ -42,7 +42,6 @@ require("test.magic_key_source_contract")(helpers, Shared, {
 	entry = Manifest.find_entry_by_path(PATH),
 	registry = registry(),
 	field = "hs",
-	override = "macos_" .. require("platform.remap.nav_layer").KEYBOARD_FORM,
 })
 
 --- Loads the real keymap with a recording keyDown eventtap.
@@ -112,6 +111,33 @@ helpers.describe("magic key source: the macOS owner", function()
 			helpers.assert_eq(Source.remaps(KEYCODE_J, {}, function() return false end), false,
 				"nothing is remapped while the replace section is off")
 			Source.set("auto")
+		end)
+	end)
+end)
+
+-- The key left of 1 reaches the tap as 50 behind Karabiner's ANSI virtual
+-- keyboard and on an ANSI board, as 10 on a bare ISO board; the key left of Z
+-- the other way round. Read in the ISO form alone, Backquote remapped the key
+-- left of Z in the driver's own Karabiner setup.
+helpers.describe("magic key source: the two keys ISO boards swap", function()
+	helpers.it("(magic-key-source) Backquote and IntlBackslash answer to both keycodes", function()
+		helpers.with_fresh_modules({ "modules.keymap.magic_key_source" }, function()
+			local Source = require("modules.keymap.magic_key_source")
+			local on = function() return true end
+			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do
+				Source.set(code)
+				helpers.assert_true(Source.remaps(50, {}, on), code .. " behind Karabiner's ANSI keyboard (50)")
+				helpers.assert_true(Source.remaps(10, {}, on), code .. " on a bare ISO board (10)")
+				helpers.assert_eq(Source.remaps(38, {}, on), false, "and no other key")
+			end
+			Source.set("Backquote")
+			helpers.assert_eq(Source.keycode(), 50, "the key left of 1 as the driver's Karabiner setup sends it")
+			Source.set("KeyJ")
+			helpers.assert_true(Source.owns(KEYCODE_J))
+			helpers.assert_eq(Source.owns(50), false, "a key no board swaps has one keycode")
+			helpers.assert_eq(Source.owns(10), false)
+			Source.set("auto")
+			helpers.assert_eq(Source.owns(50), false, "the automatic key owns no keycode")
 		end)
 	end)
 end)

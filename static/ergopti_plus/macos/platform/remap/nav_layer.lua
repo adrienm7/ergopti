@@ -55,10 +55,7 @@ local ENOENT = 2
 -- ============================
 
 -- The registry form the key codes are read for (physical_keys.json "forms").
--- Exported: the physical magic key (modules/keymap/magic_key_source.lua) reads
--- the same form, so one keyboard shape names every macOS key.
 local KEYBOARD_FORM = "iso"
-M.KEYBOARD_FORM = KEYBOARD_FORM
 
 -- The Karabiner variable the hold actions set while the layer is held.
 local LAYER_ACTIVE_VAR_NAME = "layer_active"

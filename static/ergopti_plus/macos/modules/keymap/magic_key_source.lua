@@ -4,7 +4,7 @@
 --- MODULE: Physical Magic Key (macOS)
 --- DESCRIPTION:
 --- Owns the physical key that types the magic key on this driver: the
---- `hotstrings.magic_key_source` value in effect, its virtual keycode, and the
+--- `hotstrings.magic_key_source` value in effect, its virtual keycodes, and the
 --- per-press decision the keymap event tap applies. With the automatic value
 --- nothing is remapped and the input source types the magic key itself, as it
 --- always did (the Ergopti+ keylayouts put ★ on KeyC).
@@ -12,12 +12,18 @@
 --- FEATURES & RATIONALE:
 --- 1. The shared rules (_shared/lua/keymap/magic_key_source.lua) decide which
 ---    values are keys and which keycode a value names, from the manifest entry
----    and the physical-key registry, read in the ISO form the navigation layer
----    uses (platform/remap/nav_layer.lua), so a key captured by pressing it
----    round-trips to the same keycode.
---- 2. Nothing on the typing path. The keycode is resolved when the value is set;
----    the tap compares one integer and asks nothing more of any other key.
---- 3. An outdated stored value is automatic here; infra/preferences.lua reports
+---    and the physical-key registry.
+--- 2. Two keycodes for the two keys ISO boards swap. The event tap sees the
+---    key left of 1 as kVK_ANSI_Grave (50) behind Karabiner's ANSI virtual
+---    keyboard (platform/remap/generator.lua) and on an ANSI board, but as
+---    kVK_ISO_Section (10) on a bare ISO board, and the key left of Z the other
+---    way round; nothing on the tap says which is in play. Backquote and
+---    IntlBackslash therefore each answer to both keycodes, as the number-row
+---    tap keys do (modules/shortcuts/tap_keys.lua): the key chosen always types
+---    the magic key, and on an ISO board its swapped twin does too.
+--- 3. Nothing on the typing path. The keycodes are resolved when the value is
+---    set; the tap looks one integer up and asks nothing more of any other key.
+--- 4. An outdated stored value is automatic here; infra/preferences.lua reports
 ---    it once and leaves it to the config cleanup.
 --- ==============================================================================
 
@@ -29,7 +35,6 @@ local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local Json       = require("json")
 local Shared     = require("keymap.magic_key_source")
-local NavLayer   = require("platform.remap.nav_layer")
 
 local LOG = "keymap.magic_key_source"
 
@@ -37,11 +42,18 @@ local LOG = "keymap.magic_key_source"
 M.PATH = "hotstrings.magic_key_source"
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
+-- The registry record holding a key's keycode on a bare ISO board, where the
+-- key left of 1 and the key left of Z trade keycodes.
+local ISO_FORM = "macos_iso"
+
 -- Built on first use: the registry is 37 KB of JSON nobody needs while the
 -- automatic value is in effect and no menu asks for the candidates.
+local _registry = nil
 local _resolver = nil
 local _value = AUTOMATIC
 local _keycode = nil
+-- Every keycode the chosen key can arrive as (keycode -> true), nil while automatic.
+local _keycodes = nil
 
 
 
@@ -53,22 +65,42 @@ local _keycode = nil
 -- ===========================
 -- ===========================
 
---- The shared resolver for macOS keycodes, built once.
---- @return table resolver
-function M.resolver()
-	if _resolver then return _resolver end
+--- The decoded physical-key registry, read once.
+--- @return table registry
+local function registry()
+	if _registry then return _registry end
 	local path = Paths.shared("data/keycodes/physical_keys.json")
 	local text = path and FileSystem.read(path)
 	if type(text) ~= "string" then
 		error("the physical-key registry is unreadable: " .. tostring(path))
 	end
+	_registry = Json.decode(text)
+	return _registry
+end
+
+--- The shared resolver for macOS keycodes, built once. Its keycodes are the
+--- ones the event tap sees behind Karabiner's ANSI virtual keyboard, the
+--- driver's own setup, so a captured key names the key it is there.
+--- @return table resolver
+function M.resolver()
+	if _resolver then return _resolver end
 	_resolver = Shared.new({
 		entry    = Manifest.find_entry_by_path(M.PATH),
-		registry = Json.decode(text),
+		registry = registry(),
 		field    = "hs",
-		override = "macos_" .. NavLayer.KEYBOARD_FORM,
 	})
 	return _resolver
+end
+
+--- Every keycode a candidate can arrive as: its own, and on a bare ISO board
+--- the keycode of the key it swaps with.
+--- @param value string A candidate code.
+--- @return table keycodes keycode -> true.
+local function keycodes_of(value)
+	local keycodes = { [M.resolver().native(value)] = true }
+	local iso = registry().keys[value][ISO_FORM]
+	if type(iso) == "table" and type(iso.hs) == "number" then keycodes[iso.hs] = true end
+	return keycodes
 end
 
 
@@ -88,7 +120,7 @@ function M.set(value)
 	-- Every boot applies the stored value: the automatic one, by far the most
 	-- common, remaps nothing and needs no registry.
 	if value == nil or value == AUTOMATIC then
-		_value, _keycode = AUTOMATIC, nil
+		_value, _keycode, _keycodes = AUTOMATIC, nil, nil
 		Logger.info(LOG, "Physical magic key: %s.", AUTOMATIC)
 		return AUTOMATIC
 	end
@@ -101,6 +133,7 @@ function M.set(value)
 	end
 	_value = applied
 	_keycode = resolver.native(applied)
+	_keycodes = _keycode and keycodes_of(applied) or nil
 	Logger.info(LOG, "Physical magic key: %s.", _keycode and (applied .. " (keycode " .. _keycode .. ")") or applied)
 	return applied
 end
@@ -111,10 +144,18 @@ function M.get()
 	return _value
 end
 
---- The virtual keycode remapped to the magic key, nil while automatic.
+--- The keycode of the chosen key behind Karabiner's ANSI virtual keyboard,
+--- nil while automatic.
 --- @return number|nil
 function M.keycode()
 	return _keycode
+end
+
+--- Whether a keycode can be the chosen key: the tap's one cheap question.
+--- @param key_code number Virtual keycode of the press.
+--- @return boolean
+function M.owns(key_code)
+	return _keycodes ~= nil and _keycodes[key_code] == true
 end
 
 --- Whether a key press must type the magic key: the chosen key, pressed with no
@@ -124,7 +165,7 @@ end
 --- @param replace_on function Returns whether the replace section is on.
 --- @return boolean
 function M.remaps(key_code, flags, replace_on)
-	if _keycode == nil or key_code ~= _keycode then return false end
+	if not M.owns(key_code) then return false end
 	return Shared.unmodified(flags) and replace_on() == true
 end
 
