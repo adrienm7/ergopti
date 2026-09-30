@@ -376,6 +376,34 @@ These are software implementations; final hardware verification remains below.
         server. Their neutral backend is Ollama (`llm.models.selected`
         `default_per_platform`), so once item 47 lands a server that answers is
         the natural first button there; the switch must still be confirmed (W1).
+49. [ ] Windows keyboard-hook order audit: AutoHotkey removes and reinstalls
+        its own low-level keyboard hook around every SendInput (upstream
+        `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first
+        send its hook runs before the native arbiter's. Windows guarantees no
+        order anyway: a program that hooks later runs first, and a hook that
+        exceeds `LowLevelHooksTimeout` is dropped. The prediction navigation
+        no longer depends on it (`llm-nav-cycle-windows`), but the paced
+        expansion terminal capture still assumes the native hook runs first
+        (the comment above `LLM_NavEventOwner_EnsureStarted()` in
+        `ErgoptiPlus.ahk`). Audit every native arbiter route, make each one
+        order-independent, and test both hook orders like
+        `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+50. [ ] Measure SendEvent against SendInput on Windows. While the native
+        arbiter's low-level hook is installed, SendInput is interruptible
+        anyway, which is the only reason AutoHotkey removes its own hook, so
+        SendInput now only costs the rehook of item 49. `ErgoptiPlus.ahk`
+        sets `SendMode("Event")`, yet `hotstring_send.ahk`,
+        `hotstring_dispatch.ahk`, `text_sender.ahk` and `config_io.ahk` still
+        call SendInput. Measure long expansions, pastes and accepted
+        predictions (latency, dropped or interleaved keys) before switching;
+        not before the demo.
+51. [ ] Windows checks on a real machine for the 2026-09-30 evening fixes
+        (AutoHotkey cannot run in the Linux sessions): the arrows over a
+        multi-slot AI prediction move the marker once per press, wrap at both
+        ends and never move the caret, also right after a reload and with
+        `nav_modifiers` set to ctrl; Tab then inserts the chosen slot; the
+        hotstring bubbles and the delayed expansions work with the layout
+        emulation off and on; an accepted prediction no longer types "eeee".
 
 ## Time estimate
 
