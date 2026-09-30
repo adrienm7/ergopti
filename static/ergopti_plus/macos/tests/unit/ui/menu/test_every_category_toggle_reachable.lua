@@ -147,19 +147,24 @@ local function build_tray(on, extra)
 		mods[key] = require(name)
 	end
 	local observed = { tapholds = on, gesture_calls = {}, shortcut_calls = {}, saves = 0,
-		starts = 0, start_result = true }
+		starts = 0, start_result = true, stops = 0, stop_result = true }
 	local groups = { "rolls", "autocorrection" }
 	local group_on = { rolls = on, autocorrection = on }
 	local ctx = {
 		config     = { log_level = 2 },
 		base_dir   = helpers.driver_root(),
-		state      = { shortcuts = on, gestures = on, keylogger_enabled = on, hotstrings = {} },
+		-- `keymap` is hotstrings.enabled, the typing engine the Hotstrings switch runs.
+		state      = { shortcuts = on, gestures = on, keylogger_enabled = on, keymap = on, hotstrings = {} },
 		hotfiles   = groups,
 		get_group_name = function(name) return name end,
 		keymap     = {
 			start = function()
 				observed.starts = observed.starts + 1
 				return observed.start_result
+			end,
+			stop = function()
+				observed.stops = observed.stops + 1
+				return observed.stop_result
 			end,
 			is_group_enabled = function(name) return group_on[name] == true end,
 			enable_group = function(name) group_on[name] = true end,
@@ -287,31 +292,45 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 		helpers.assert_true(observed.saves > 0, "and persist it")
 	end)
 
-	helpers.it("the hotstrings switch turns every category group on", function()
-		local tray, _, observed = build_tray(false)
-		local switch = top_row(tray, "menu.hotstrings.title").menu[1]
-		switch.fn()
+	-- The switch is the typing engine's master, hotstrings.enabled, as on
+	-- Windows: it used to switch every category, so its tick read « every
+	-- category on » while the engine ran for the one section the wizard's
+	-- recommendation imports (hotstrings-master-tick). « All sections » is the
+	-- row that switches every category.
+	helpers.it("the hotstrings switch stops the typing engine and keeps each category's choice", function()
+		local tray, ctx, observed = build_tray(true)
+		top_row(tray, "menu.hotstrings.title").menu[1].fn()
+		helpers.assert_eq(observed.stops, 1, "switching off stops the engine, so nothing expands")
+		helpers.assert_eq(ctx.state.keymap, false, "and publishes its switch for the save")
 		helpers.assert_eq(observed.group_on, { rolls = true, autocorrection = true },
-			"the hotstrings master must switch every group")
+			"the categories keep their choice under the master")
+		helpers.assert_true(observed.saves > 0)
+	end)
+
+	helpers.it("the hotstrings switch changes nothing when the typing engine refuses to stop", function()
+		local tray, ctx, observed = build_tray(true)
+		observed.stop_result = false
+		top_row(tray, "menu.hotstrings.title").menu[1].fn()
+		helpers.assert_eq(ctx.state.keymap, true, "an engine that may still type keeps its tick")
+		helpers.assert_eq(observed.saves, 0, "a refused stop publishes nothing")
 	end)
 
 	-- « Clear » stops the typing engine (hotstrings.enabled is off by default).
 	-- The switch then turned every group on and left the engine stopped: ticked,
 	-- yet nothing fired, predictions went silent too, and the next start kept
 	-- the engine off because its switch was never published.
-	helpers.it("the hotstrings switch starts a stopped typing engine before turning groups on", function()
+	helpers.it("the hotstrings switch starts a stopped typing engine and keeps each category's choice", function()
 		local tray, ctx, observed = build_tray(false)
-		ctx.state.keymap = false
 		top_row(tray, "menu.hotstrings.title").menu[1].fn()
 		helpers.assert_eq(observed.starts, 1, "the engine is started through the shared gate")
 		helpers.assert_eq(ctx.state.keymap, true, "and its switch published, so the save keeps it on")
-		helpers.assert_eq(observed.group_on, { rolls = true, autocorrection = true })
+		helpers.assert_eq(observed.group_on, { rolls = false, autocorrection = false },
+			"the categories keep their choice under the master")
 		helpers.assert_true(observed.saves > 0)
 	end)
 
 	helpers.it("the hotstrings switch changes nothing when the typing engine refuses to start", function()
 		local tray, ctx, observed = build_tray(false)
-		ctx.state.keymap = false
 		observed.start_result = false
 		top_row(tray, "menu.hotstrings.title").menu[1].fn()
 		helpers.assert_eq(observed.group_on, { rolls = false, autocorrection = false })

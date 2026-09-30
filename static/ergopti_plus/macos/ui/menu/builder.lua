@@ -225,59 +225,30 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local grand_total       = counts.grand
 	local grand_has_count   = counts.has_grand
 
-	-- Détection de l’état global : tous les hotstrings activés ?
-	local all_enabled = true
-	local any_enabled = false
-	if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
-		for _, f in ipairs(ctx.hotfiles) do
-			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			if name ~= "custom" and name ~= "personal" then
-				local enabled = false
-				if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
-					enabled = ctx.keymap.is_group_enabled(name)
-				elseif ctx.state and ctx.state.hotstrings then
-					enabled = ctx.state.hotstrings[name] ~= false
-				end
-				if enabled then any_enabled = true else all_enabled = false end
-			end
-		end
-	end
+	-- The master is the typing engine's switch, hotstrings.enabled: the value
+	-- the boot synchronization starts or stops the engine from, published only
+	-- once a start or a stop committed. The tick used to be « every category
+	-- on », a different question: the wizard's Yes turns the master on with one
+	-- recommended section, so a fresh configuration showed Hotstrings unticked
+	-- while ★ expanded, and a click then switched every category on.
+	local master_on = ctx.state.keymap == true
 
-	local function toggle_all_hotstrings()
-		if not ctx or not ctx.hotfiles or type(ctx.hotfiles) ~= "table" then return end
-		local enable = not all_enabled
-		-- Switching on starts the typing engine first, like every section switch:
-		-- after « Clear » it is stopped, and groups turned on without it fire
-		-- nothing. The gate also publishes state.keymap, which the save persists.
-		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstrings") then return false end
-		for _, f in ipairs(ctx.hotfiles) do
-			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			if name ~= "custom" and name ~= "personal" then
-				if ctx.keymap and type(ctx.keymap.enable_group) == "function" and type(ctx.keymap.disable_group) == "function" then
-					if enable then
-						-- Also enable every individual section so sub-menus appear checked
-						if type(ctx.keymap.get_sections) == "function"
-						and type(ctx.keymap.enable_section) == "function" then
-							local secs = ctx.keymap.get_sections(name)
-							if type(secs) == "table" then
-								for _, sec in ipairs(secs) do
-									if type(sec) == "table" and sec.name and sec.name ~= "-" then
-										pcall(ctx.keymap.enable_section, name, sec.name)
-									end
-								end
-							end
-						end
-						pcall(ctx.keymap.enable_group, name)
-					else
-						pcall(ctx.keymap.disable_group, name)
-					end
-				end
-				if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
-			end
+	--- Switches the typing engine, keeping every category's choice under it
+	--- as Windows' category gate does; « all sections » switches the choices.
+	--- @return boolean committed
+	local function toggle_hotstrings_master()
+		local enable = not master_on
+		local switched
+		if enable then
+			switched = KeymapLifecycle.ensure_started(ctx, "enable hotstrings")
+		else
+			switched = KeymapLifecycle.ensure_stopped(ctx, "disable hotstrings")
 		end
+		if not switched then return false end
 		if ctx.save_prefs() ~= true then return false end
 		ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
 		ctx.updateMenu()
+		return true
 	end
 
 	local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
@@ -436,7 +407,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
 				return false
 			end
-			return toggle_all_hotstrings()
+			return toggle_hotstrings_master()
 		end,
 	}
 	-- « Restore recommended » and « Clear » run the Hotstrings scope owner, which
@@ -462,7 +433,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	end
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
-	hs_ctx.state_getters["hotstrings_enabled"] = function() return all_enabled end
+	hs_ctx.state_getters["hotstrings_enabled"] = function() return master_on end
 	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function()
 		return all_sections ~= nil and all_sections.checked == true
 	end
@@ -523,7 +494,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	return { {
 		label = hotstrings_title,
 		submenu = hotstrings_menu,
-		checked = all_enabled or nil,
+		checked = master_on or nil,
 	} }
 end
 
