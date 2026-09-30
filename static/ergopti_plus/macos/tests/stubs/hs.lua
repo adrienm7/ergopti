@@ -713,6 +713,8 @@ M.eventtap = {
 		end,
 	},
 	checkKeyboardModifiers = function() return {} end,
+	-- Like the real call, a table of the buttons held at this instant.
+	checkMouseButtons = function() return {} end,
 	keyRepeatInterval = function() return 0.05 end,
 	keyRepeatDelay = function() return 0.5 end,
 	__keystrokes = KEYSTROKES,
