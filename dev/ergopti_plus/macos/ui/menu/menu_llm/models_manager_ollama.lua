@@ -932,11 +932,19 @@ function M.new(deps, presets, ram_getter)
 		local operation = begin_maintenance("Ollama installed-model refresh")
 		if operation == nil then return false end
 		_installed_loading = true
-		local bin = require_ollama_path("refresh installed models")
+		-- Ollama is optional: it is installed only once its backend is chosen
+		-- (project-macos-ai-runtimes-install-on-selection). Without it no model is
+		-- installed, which is the answer, not a failure: this refresh runs at every
+		-- start, and an ERROR here opened the error window on every Mac without
+		-- Ollama (hardening-a-startup-zero-error).
+		local bin = get_ollama_path()
 		if not bin then
+			_installed_cache = {}
+			_installed_cache_time = hs.timer.secondsSinceEpoch()
 			_installed_loading = false
-			operation.finish(nil, "Ollama installed-model refresh path refusal")
-			return false
+			operation.finish(nil, "Ollama installed-model refresh without Ollama")
+			Logger.debug(LOG, "Installed Ollama models: none, Ollama is not installed.")
+			return true
 		end
 		-- hs.task is non-blocking unlike hs.execute.
 		-- Pinned to _active_tasks so the GC cannot SIGTERM it before the callback

@@ -20,6 +20,7 @@ local OWNERS = {
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
 	"desktop_navigation",
+	"infra.config_paths",
 	"infra.i18n",
 	"infra.logger",
 	"infra.manifest_reader",
@@ -79,6 +80,7 @@ local function fresh_actions(options)
 		"infra.termination_coordinator",
 		"infra.logger",
 		"infra.paths",
+		"infra.config_paths",
 		"infra.timings",
 		"infra.i18n",
 	}) do package.loaded[name] = nil end
@@ -609,6 +611,17 @@ local function fresh_actions(options)
 	}, { __index = function() return function() return true end end })
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
 	package.loaded["infra.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
+	-- The user's files the open_* actions name live in the configuration folder,
+	-- never in hs.configdir (the script folder, the bundle once installed).
+	local config_files = {
+		ConfigTomlPath = "config.toml",
+		PersonalInfoTomlPath = "personal_info.toml",
+		PersonalShortcutsLuaPath = "personal_shortcuts.lua",
+		PersonalTomlPath = "hotstrings/personal_hotstrings.toml",
+	}
+	package.loaded["infra.config_paths"] = {
+		get = function(key) return config_files[key] and ("/fixture/config/" .. config_files[key]) or nil end,
+	}
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 	local logger = helpers.make_logger_stub()
 	logger.error = function(module_name, message, ...)

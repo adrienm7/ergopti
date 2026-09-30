@@ -92,18 +92,26 @@ _LNEO_RealNativeAbiRoundTripDoesNotStartHook() {
 			DigitReceipt["seq"], OwnerToken, 7),
 			"completion must marshal sequence, token, and applied index")
 
-		ArrowDecision := _LLM_NavEventOwnerNativeTestDispatch(
-			_LNEO_NativeEvent(0x26, 0x148, 0x01, 1))
-		AssertEqual(_LNEO_DISPOSITION_PASS, ArrowDecision["disposition"],
-			"Ctrl+Up navigation must remain pass-through")
-		AssertEqual(1, ArrowDecision["receipt_created"],
-			"a pass-through arrow must still own one navigation receipt")
-		ArrowReceipt := _LLM_NavEventOwnerNativePollReceipt()
-		AssertEqual(6, ArrowReceipt["target_idx"],
-			"Ctrl+Up must cycle owner index seven to six")
-		AssertTrue(_LLM_NavEventOwnerNativeCompleteReceipt(
-			ArrowReceipt["seq"], OwnerToken, 6),
-			"the pass-through arrow receipt must complete exactly once")
+		; The consuming AutoHotkey hotkey owns the cycle, and it may run before or
+		; after this hook: the marshaled cycle routes are parked, so the native
+		; owner passes every arrow untouched and a press never cycles twice
+		; (llm-nav-cycle-windows).
+		for Arrow in [[0x26, 0x148], [0x28, 0x150]] {
+			for Modifiers in [0x01, 0x00] {
+				_LNEO_AssertNativePassWithoutReceipt(
+					_LLM_NavEventOwnerNativeTestDispatch(_LNEO_NativeEvent(
+						Arrow[1], Arrow[2], Modifiers, 1)),
+					"the native owner never cycles an arrow")
+				_LNEO_AssertNativePassWithoutReceipt(
+					_LLM_NavEventOwnerNativeTestDispatch(_LNEO_NativeEvent(
+						Arrow[1], Arrow[2], Modifiers, _LNEO_EVENT_UP)),
+					"arrow key-up after pass-through")
+			}
+		}
+		AssertEqual(0, _LLM_NavEventOwnerNativePollReceipt(),
+			"no arrow may queue a navigation receipt")
+		AssertEqual(7, _LLM_NavEventOwnerNativeGetOwner(OwnerToken),
+			"no arrow may move the native owner")
 
 		SendLevelBase := 0xFFC3D44D
 		LowDown := _LNEO_NativeEvent(0x31, 0x002, 0x02, 1, 1,
@@ -116,7 +124,7 @@ _LNEO_RealNativeAbiRoundTripDoesNotStartHook() {
 				_LNEO_NativeEvent(0x31, 0x002, 0x02,
 					_LNEO_EVENT_UP, 1, SendLevelBase - 1)),
 			"keyup after fail-open SendLevel")
-		AssertEqual(6, _LLM_NavEventOwnerNativeGetOwner(OwnerToken),
+		AssertEqual(7, _LLM_NavEventOwnerNativeGetOwner(OwnerToken),
 			"ineligible injection must leave native owner state unchanged")
 		_LNEO_AssertNativePassWithoutReceipt(
 			_LLM_NavEventOwnerNativeTestDispatch(
@@ -127,7 +135,7 @@ _LNEO_RealNativeAbiRoundTripDoesNotStartHook() {
 				_LNEO_NativeEvent(0x31, 0x002, 0x02,
 					_LNEO_EVENT_UP, 2)),
 			"lower-integrity injected keyup")
-		AssertEqual(6, _LLM_NavEventOwnerNativeGetOwner(OwnerToken),
+		AssertEqual(7, _LLM_NavEventOwnerNativeGetOwner(OwnerToken),
 			"lower-integrity input must never navigate the native owner")
 
 		HighDown := _LNEO_NativeEvent(0x31, 0x002, 0x02, 1, 1,
