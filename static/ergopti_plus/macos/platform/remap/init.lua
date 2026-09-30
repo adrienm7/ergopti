@@ -4489,6 +4489,15 @@ function M.is_initialized()
 	return _state ~= nil
 end
 
+--- Whether the running bridge still owes a settings save: a bulk candidate or
+--- its retained inverse, or an enabled-state transition. It makes that save to
+--- the settings path in force when it saves, and a wizard that moves the
+--- configuration folder makes the new folder's file that path at once.
+--- @return boolean pending
+function M.has_pending_settings_save()
+	return _bulk_settings_transaction ~= nil or _enabled_transition ~= nil or _enabled_preflight ~= nil
+end
+
 --- A key's binding as the first-run wizard sees it: nil when it holds nothing,
 --- "recommended" when it is exactly the shipped preset (with no per-key delay,
 --- as the preset has none), "customised" for any other setting.
@@ -4610,6 +4619,8 @@ end
 --- is backed up first and the save replaces only those exact bytes; an unsafe
 --- file is refused, never replaced, a key holding the user's own setting
 --- refuses the import, and « Ergopti uses Karabiner » is left as the file has it.
+--- While the running bridge still owes a settings save it is refused too: that
+--- later save would land on the moved folder's file and undo this one.
 --- @param request table `{ keys = { key id, ... }, path = string, backup_path = string }`.
 --- @return boolean saved
 --- @return string|nil err Why nothing was saved.
@@ -4619,6 +4630,11 @@ function M.save_recommended_keys(request)
 	if type(path) ~= "string" or path == "" or type(request.backup_path) ~= "string"
 		or request.backup_path == "" then
 		return false, "no settings file or backup to save with"
+	end
+	if M.has_pending_settings_save() then
+		Logger.error(LOG, "%s refused: the running bridge still owes a settings save that would overwrite '%s'.",
+			label, path)
+		return false, "the running bridge still owes a settings save"
 	end
 	local key_defs = Config.load_tap_hold_keys(TAP_HOLD_FILE)
 	local mod_combos = Config.load_mod_combos(MOD_COMBOS_FILE)
