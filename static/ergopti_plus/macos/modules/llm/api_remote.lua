@@ -325,6 +325,22 @@ local _token_cleanup_debt = false
 local _token_cleanup_in_progress = false
 local _availability_pause_cleanup_pending = false
 local _warmup_client_recovery_token = nil
+-- Entries already named for a provider this build no longer has, so each is
+-- warned once rather than at every warmup, check and prediction.
+local _retired_provider_reported = {}
+
+--- Names a stored API entry whose provider this build no longer has. It is
+--- ignored, so warmup and predictions through it are off; the entries live in
+--- the app's settings, not a file, so the user replaces or deletes it from the
+--- AI menu. Only a DEBUG line said so before.
+--- @param entry table The stored entry (its token is never logged).
+local function report_retired_provider(entry)
+	local key = tostring(entry.id) .. "\0" .. tostring(entry.provider)
+	if _retired_provider_reported[key] then return end
+	_retired_provider_reported[key] = true
+	Logger.warn(LOG, "API entry '%s' names provider '%s', which this build no longer has; it is ignored — "
+		.. "replace or delete it in the AI menu.", tostring(entry.label or entry.id), tostring(entry.provider))
+end
 
 --- Completes one availability owner exactly once without conflating
 --- cancellation with a reachable-but-invalid endpoint.
@@ -1508,7 +1524,7 @@ function M.warmup(_model_name, _profile, on_acquired)
 		if not provider then
 			_warmup_active = false
 			accepted = false
-			Logger.debug(LOG, "warmup: unknown provider '%s'.", tostring(entry.provider))
+			report_retired_provider(entry)
 			report_acquisition(false)
 			return
 		end
@@ -1742,6 +1758,7 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 		local provider = M.PROVIDERS[entry.provider]
 		if not provider then
 			accepted = false
+			report_retired_provider(entry)
 			finish_availability_owner(owner, "missing", true)
 			return
 		end
@@ -1831,6 +1848,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	local my_identity = _identity_generation
 	local identity_entry = find_active_entry()
 	if not provider then
+		report_retired_provider(entry)
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
