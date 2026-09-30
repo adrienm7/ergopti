@@ -347,9 +347,9 @@ _LLM_Menu_BuildNavBindingPlan(MenuState) {
 	val_prefix := Prefixes["val_prefix"]
 	Plan := [
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Up",
-			(*) => LLM_Menu_NavCycleChord("Up")),
+			(*) => _LLM_Nav_Cycle(-1)),
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Down",
-			(*) => LLM_Menu_NavCycleChord("Down"))
+			(*) => _LLM_Nav_Cycle(1))
 	]
 	Loop 10 {
 		Digit := (A_Index == 10) ? "0" : String(A_Index)
@@ -608,6 +608,19 @@ _LLM_Menu_MakeNavJump(idx) {
 ; ======= 2/ Slot Navigation Helpers =======
 ; ==========================================
 ; ==========================================
+
+; The cycle callback of a plan bound as AutoHotkey hotkeys: moves the ▶ marker
+; one slot through the public tooltip API, like the digit jumps below. The
+; native owner never fires it, since its cycle routes are parked
+; (LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES): the consuming *Up / *Down hotkeys
+; cycle the prediction it routes through LLM_Menu_NavCycleChord instead.
+_LLM_Nav_Cycle(delta) {
+	slots := LLM_Tooltip_GetSlots()
+	if (slots.Length <= 1)
+		return
+	LLM_Tooltip_SetActiveIdx(LLM_TooltipWrapSlot(LLM_Tooltip_GetActiveIdx(),
+		delta, slots.Length))
+}
 
 _LLM_Nav_Jump(idx) {
 	slots := LLM_Tooltip_GetSlots()
