@@ -34,8 +34,12 @@ local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then abort("lua-luv is not installed (the curl adapter runs on it).") end
 local Gtk = lgi.require("Gtk", "3.0")
 
--- The newest release, straight from GitHub, to compare the page with.
-local pipe = io.popen("curl -fsS --max-time 20 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=1'")
+-- The newest release, straight from GitHub, to compare the page with. CI
+-- passes its token: an anonymous call shares the runner's rate limit and was
+-- refused with HTTP 403 on a release run. The shell expands the variable.
+local auth = os.getenv("GITHUB_TOKEN") and " -H \"Authorization: Bearer $GITHUB_TOKEN\"" or ""
+local pipe = io.popen("curl -fsS --max-time 20" .. auth
+	.. " 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=1'")
 local latest_json = pipe and pipe:read("*a") or ""
 if pipe then pipe:close() end
 local latest = latest_json:match('"tag_name"%s*:%s*"([^"]+)"')
