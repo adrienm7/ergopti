@@ -105,8 +105,14 @@ callback everything it reads, so a failure's cause must be kept while it
 streams (`mlx_bootstrap_diagnosis.new_tail`); the completion's own output was
 empty and every MLX failure read "cause inconnue". Every failure goes to
 `ui/menu/menu_llm/mlx_repair_offer.lua`, whose dialog names the cause and
-carries the button (`mlx-bootstrap-*`). The Ollama checker still builds its
-failure tail from the completion alone.
+carries the button (`mlx-bootstrap-*`). An absent runtime (the import probe,
+or a click on the boot notice of `notify_if_missing`) opens the same offer
+with kind `missing`: its install button runs `select_mlx()` without the repair
+flag, and a failed install comes back with its cause and the repair button
+(`mlx-runtime-missing-install`). Never post a runtime notice that names a menu
+row instead of carrying the click that opens its fix: hardening-g scans
+notifications as well as dialogs. The Ollama checker still builds its failure
+tail from the completion alone.
 The Ollama installer publishes the whole release archive (CLI plus the
 ggml/MLX libraries it loads from its own folder, as in
 `Ollama.app/Contents/Resources`) into the folder
