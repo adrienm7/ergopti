@@ -31,6 +31,16 @@ async function main() {
 		'one ordered scopes registry must own every configuration action'
 	);
 	let inputCount = 0;
+	// The declared exceptions to "an empty configuration alters no input": the
+	// script-management chords the maintainer switched on (2026-09-30). A new
+	// entry joins this list by a deliberate decision, never by a default edit.
+	const APPROVED_ACTIVE_BY_DEFAULT = [
+		'shortcuts.script_control.script_altgr_backspace',
+		'shortcuts.script_control.script_altgr_delete',
+		'shortcuts.script_control.script_altgr_enter',
+		'shortcuts.script_control.script_altgr_escape'
+	];
+	const activeByDefault = [];
 	for (const entry of manifest.entries) {
 		const name = `${entry.section}.${entry.id}`;
 		assert.notEqual(
@@ -48,7 +58,15 @@ async function main() {
 			const recommended = entry.recommended_per_platform?.[platform] ?? entry.recommended;
 			if (neutral === undefined) continue; // Ancestor platform restrictions are resolved by codegen.
 			assert.notEqual(recommended, undefined, `${name}: recommended value missing for ${platform}`);
-			if (entry.input_altering) {
+			if (entry.input_altering && entry.active_by_default === true) {
+				inputCount++;
+				if (!activeByDefault.includes(name)) activeByDefault.push(name);
+				assert.deepEqual(
+					neutral,
+					recommended,
+					`${name}: an entry active by default starts with its preset on ${platform}`
+				);
+			} else if (entry.input_altering) {
 				inputCount++;
 				const enabled = entry.type === 'feature' ? neutral.enabled : neutral;
 				assert(
@@ -63,6 +81,11 @@ async function main() {
 	assert(
 		inputCount > 100,
 		'activation coverage must include real shortcuts, gestures and hotstrings'
+	);
+	assert.deepEqual(
+		activeByDefault.sort(),
+		[...APPROVED_ACTIVE_BY_DEFAULT].sort(),
+		'only the approved script-management chords may be active in an empty configuration'
 	);
 	const linuxGestures = fs.readFileSync(
 		paths.shared('..', 'linux', 'modules', 'gestures', 'manager.lua'),
