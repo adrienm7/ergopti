@@ -1662,9 +1662,9 @@ SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
 
 ; The rows that put « Raccourcis de gestion du script » back to its preset
 ; ("recommended": every slot and the switch; an entry equal to its default is a
-; deletion) or clear it to the system's behaviour ("clear": every slot "none",
-; written explicitly because an absent slot starts with its preset). Both drop
-; the parameters of script bindings.
+; deletion) or clear it to the system's behaviour ("clear": every slot's
+; manifest `cleared` value, "none", written explicitly because an absent slot
+; starts with its preset). Both drop the parameters of script bindings.
 ; @param Mode {String} "recommended" or "clear".
 ; @return {Array} Sparse configuration rows.
 ScriptShortcutScopeRows(Mode) {
@@ -1674,7 +1674,8 @@ ScriptShortcutScopeRows(Mode) {
 		Rows := []
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
 				Path := "shortcuts.script_control." . Slot
-				Rows.Push(ManifestSparseOperation(Path, Mode == "clear" ? "none" : ManifestRecommendedFor(Path)))
+				Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, ManifestValueFor(Path, "cleared"))
+						: ManifestSparseOperation(Path, ManifestRecommendedFor(Path)))
 		}
 		if (Mode == "recommended")
 				Rows.Push(ManifestSparseOperation("shortcuts.script_control.chords_enabled",

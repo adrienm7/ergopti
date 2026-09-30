@@ -304,9 +304,30 @@ check(
 );
 const scopeRows = functionBody('ScriptShortcutScopeRows');
 check(
-	/Mode == "clear" \? "none"/.test(scopeRows),
-	'the clear must write "none" explicitly: deleting the key would restore the preset'
+	/Mode == "clear" \? ManifestConfigRow\(Path, ManifestValueFor\(Path, "cleared"\)\)/.test(
+		scopeRows
+	),
+	"the clear must write each slot's declared off value: deleting the key would restore the preset"
 );
+// The Shortcuts clear and the global clear build their rows from the manifest
+// scope, which deleted every key: they switched the chords back on
+// (script-chords-three-os-2026-09-30).
+const scopeOperations = functionBody('ManifestScopeOperations');
+check(
+	/if Mode == "clear" && Entry\.Has\("cleared"\) \{\s*Rows\.Push\(ManifestConfigRow\(Entry\["path"\], Entry\["cleared"\]\)\)/.test(
+		scopeOperations
+	),
+	"ManifestScopeOperations must write an entry's declared off value in a clear, never delete it"
+);
+for (const slot of manifestSlots) {
+	const entry = manifest.entries.find(
+		(e) => e.section === 'shortcuts.script_control' && e.id === slot
+	);
+	check(
+		entry.active_by_default === true && entry.cleared === 'none',
+		`${slot} must start with its preset and declare "none" as the value a clear writes`
+	);
+}
 
 // ==================================================
 // ==================================================

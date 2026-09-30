@@ -76,6 +76,25 @@ _NeutralConfigScopesExcludeConsent() {
 }
 Test("neutral-config: shared scopes never restore metrics or AI consent", _NeutralConfigScopesExcludeConsent)
 
+; The Shortcuts clear and the global clear deleted every key of their scope,
+; and a deleted script chord starts with its preset: « Tout effacer » switched
+; the chords back on. They write each slot's declared off value instead
+; (script-chords-three-os-2026-09-30).
+_NeutralConfigClearWritesChordsOff() {
+	for Scope in ["shortcuts", "global"] {
+		Found := Map()
+		for Row in ManifestScopeOperations(Scope, "clear") {
+			if Row.Section != "shortcuts.script_control" || !InStr(Row.Key, "script_altgr_")
+				continue
+			Assert(!Row.HasOwnProp("Delete"), Scope . " clear must not delete " . Row.Key)
+			AssertEqual("none", Row.Value, Scope . " clear leaves " . Row.Key . " to the system")
+			Found[Row.Key] := true
+		}
+		AssertEqual(4, Found.Count, Scope . " clear covers the four script chords")
+	}
+}
+Test("neutral-config: every clear writes the script chords off (script-chords-three-os-2026-09-30)", _NeutralConfigClearWritesChordsOff)
+
 _NeutralConfigMissingTapHold() {
 	global _SharedDir
 	Preset := _SharedDir . "\tap_hold\defaults.toml"

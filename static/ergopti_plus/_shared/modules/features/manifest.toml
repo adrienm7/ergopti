@@ -47,6 +47,10 @@
 #                               entry defaults to off (false / "none" / "");
 #                               tools/test/test-defaults-single-source.cjs
 #                               pins the approved list.
+#       cleared                 Required with active_by_default, forbidden
+#                               without it: the off value a clear writes
+#                               explicitly, since deleting the key of such an
+#                               entry restores its preset.
 #       superseded_reason_key   Optional, Windows-only booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
@@ -2241,7 +2245,7 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 # 2026-09-30, because they pause, reload, quit and edit the driver and are no
 # typing feature. They are the declared exception to "every input-altering
 # feature is off by default" (active_by_default); a config.toml that names
-# "none" for a slot keeps it off.
+# "none" for a slot keeps it off, which is what every clear writes (cleared).
 #
 # chords_enabled is the switch at the head of their submenu: off leaves every
 # chord to the system while the slots keep their actions. Like the
@@ -2263,6 +2267,7 @@ default = "script_reload"
 recommended = "script_reload"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_backspace"
 
@@ -2273,6 +2278,7 @@ default = "open_personal_shortcuts"
 recommended = "open_personal_shortcuts"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_delete"
 
@@ -2283,6 +2289,7 @@ default = "script_pause_toggle"
 recommended = "script_pause_toggle"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_enter"
 
@@ -2293,6 +2300,7 @@ default = "script_quit"
 recommended = "script_quit"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
