@@ -32,6 +32,34 @@
 ; ======================================
 ; ======================================
 
+; Replays one fuzz vector through the loader, which must not raise on it.
+; Bound per vector at registration: the nested function this replaces read
+; copies of the loop's values, one slot every iteration overwrote, so every
+; registered test replayed the last vector of the corpus.
+; @param VecId {String} The vector id, which also names its temp file.
+; @param Input {String} The TOML text to parse.
+_TomlFuzz_RunVector(VecId, Input) {
+	TmpFile := A_Temp . "\toml_fuzz_" . VecId . ".toml"
+	try FileDelete(TmpFile)
+	try FileAppend(Input, TmpFile, "UTF-8")
+
+	; Call the parser inside a try/catch — a crash here is a test failure
+	Crashed := false
+	ParseOk := false
+	try {
+		Result := ParseTomlFile(TmpFile)
+		ParseOk := true
+	} catch as e {
+		Crashed := (e.Message != "")
+	}
+
+	try FileDelete(TmpFile)
+
+	; A crash (unhandled exception propagated through try) is always failure
+	AssertTrue(!Crashed,
+		"[" . VecId . "] ParseTomlFile raised an unhandled exception — crash is never allowed")
+}
+
 _TomlFuzz_RunAll() {
 	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\toml\fuzz_corpus.json"
 
@@ -78,37 +106,7 @@ _TomlFuzz_RunAll() {
 			continue
 		}
 
-		; Write input to a temp file
-		TmpFile := A_Temp . "\toml_fuzz_" . VecId . ".toml"
-		try FileDelete(TmpFile)
-		try FileAppend(Input, TmpFile, "UTF-8")
-
-		; Call the parser inside a try/catch — a crash here is a test failure
-		VecIdCopy   := VecId
-		InputCopy   := Input
-		ExpectCopy  := Expect
-		TmpCopy     := TmpFile
-
-		_TomlFuzz_OneVector() {
-			try FileDelete(TmpCopy)
-			try FileAppend(InputCopy, TmpCopy, "UTF-8")
-
-			Crashed := false
-			ParseOk := false
-			try {
-				Result := ParseTomlFile(TmpCopy)
-				ParseOk := true
-			} catch as e {
-				Crashed := (e.Message != "")
-			}
-
-			try FileDelete(TmpCopy)
-
-			; A crash (unhandled exception propagated through try) is always failure
-			AssertTrue(!Crashed,
-				"[" . VecIdCopy . "] ParseTomlFile raised an unhandled exception — crash is never allowed")
-		}
-		Test("[corpus:TOML-" . VecId . "] " . Descr, _TomlFuzz_OneVector)
+		Test("[corpus:TOML-" . VecId . "] " . Descr, _TomlFuzz_RunVector.Bind(VecId, Input))
 	}
 
 	; Summary test
