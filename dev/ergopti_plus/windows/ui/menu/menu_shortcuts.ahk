@@ -105,8 +105,8 @@ _SC_ScriptControlCommands(Options := unset) {
 	return Map(
 		"script_control_toggle", (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
 			OwnedOptions.Get("path", ""), OwnedOptions.Get("toggle_reload", 0)),
-		"restore_recommended", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
-		"clear_to_system", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
+		"scope_restore", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: extensions shortcuts submenus.

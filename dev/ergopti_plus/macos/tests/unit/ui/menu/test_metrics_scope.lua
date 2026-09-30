@@ -76,7 +76,7 @@ local function fixture(demoted)
 		demotions = demotions, core = core, menubar = display(bar), widget = display(widget),
 		capture_preferences = function() return Preferences.snapshot(state, {}, {}) end,
 		admission = function(_, callback) return callback() end, paused = function() return false end,
-		confirm = function() return control.confirm ~= false end, backup_path = function() return "backup" end,
+		backup_path = function() return "backup" end,
 		activation_pending = function() return control.pending == true end,
 		capture_shortcuts = function() return clone(shortcuts) end,
 		apply_shortcut = function(name, mods, key) shortcuts[name] = key and { mods = mods, key = key } or false; return true end,
@@ -124,10 +124,10 @@ helpers.describe("macOS complete Metrics scope", function()
 		helpers.assert_eq(save(), true)
 		helpers.assert_eq(Codec.decode(files.config).metrics.enabled, nil)
 	end)
-	helpers.it("cancellation and pending native activation refuse before backup", function()
-		for _, field in ipairs({ "confirm", "pending", "conversion" }) do
+	helpers.it("pending native activation refuses before backup", function()
+		for _, field in ipairs({ "pending", "conversion" }) do
 			local owner, _, files, control, _, _, _, writes, original = fixture()
-			control[field] = field ~= "confirm"
+			control[field] = true
 			helpers.assert_eq(owner.apply("clear"), false)
 			helpers.assert_eq(writes(), 0)
 			helpers.assert_eq(files.config, original)
@@ -157,7 +157,9 @@ package.loaded["adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("Metrics scope provider", function()
-	helpers.it("routes both common commands through the actual Metrics scope port", function()
+	-- The restore alone since the maintainer retired the Metrics clear on
+	-- 2026-09-30; the owner's clear above stays for the Configuration clear.
+	helpers.it("routes the restore through the actual Metrics scope port, and registers no clear", function()
 		local renderer = require("infra.manifest_menu")
 		local old, captured = renderer.build
 		renderer.build = function(_, _, _, _, ctx) captured = ctx; return {} end
@@ -169,13 +171,13 @@ helpers.describe("Metrics scope provider", function()
 				script_control = { is_paused = function() return paused == true end },
 				save_prefs = function() error("only the scope transaction publishes") end,
 				apply_preference_scope = function(scope, value) selected, mode = scope, value; return true end })
-			helpers.assert_eq(captured.commands.scope_clear(), true)
-			helpers.assert_eq(selected, "metrics")
-			helpers.assert_eq(mode, "clear")
+			helpers.assert_nil(captured.commands.scope_clear, "the Metrics menu offers no clear")
 			helpers.assert_eq(captured.commands.scope_restore(), true)
+			helpers.assert_eq(selected, "metrics")
 			helpers.assert_eq(mode, "recommended")
-			paused = true
-			helpers.assert_eq(captured.commands.scope_clear(), false)
+			paused, mode = true, nil
+			helpers.assert_eq(captured.commands.scope_restore(), false)
+			helpers.assert_nil(mode, "a paused session runs no scope")
 		end, debug.traceback)
 		renderer.build = old
 		if not ok then error(err, 0) end

@@ -189,3 +189,62 @@ _MM_RowValues(SectionKey, Key) {
 	}
 	return Joined
 }
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= Rows declared greyed or hidden =========
+; ================================================
+; ================================================
+
+; The text of a native menu row at a zero-based position.
+_MUR_LabelAt(TargetMenu, Position) {
+	static MF_BYPOSITION := 0x400
+	Length := DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
+	Assert(Length >= 0, "GetMenuStringW must read row " . Position)
+	Buffer_ := Buffer((Length + 1) * 2, 0)
+	DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", Buffer_, "int", Length + 1, "uint", MF_BYPOSITION, "int")
+	return StrGet(Buffer_, "UTF-16")
+}
+
+; The maintainer's rule of 2026-09-30: a row declared `unavailable = "grey"`
+; that this platform lacks is drawn disabled, labelled with its label and the
+; short head of its reason; one declared "hide" is not drawn.
+_MUR_GreyedAndHiddenRows() {
+	static KEY := "_test_unavailable_menu", MF_BYPOSITION := 0x400, GREYED := 0x3
+	Root := _MR_GetManifestRoot()
+	Assert(Root is Map, "the shared menu manifest must load")
+	Reason := "platform_reason.shortcuts_restore_is_composed_on_macos"
+	Root[KEY] := [
+		Map("type", "command", "id", "ported", "i18n", "common.restore_recommended"),
+		Map("type", "command", "id", "not_yet", "i18n", "common.clear_to_system",
+			"platforms", ["hs", "linux"], "unavailable", "grey", "reason_key", Reason),
+		Map("type", "command", "id", "not_here", "i18n", "menu.gestures.enable",
+			"platforms", ["hs"], "unavailable", "hide")]
+	try {
+		Rendered := MenuRenderer_Build(KEY, "Test", "", "", "",
+			Map("ported", (*) => 0, "not_yet", (*) => 0, "not_here", (*) => 0))
+	} finally Root.Delete(KEY)
+	try {
+		AssertEqual(2, TrayMenuItemCount(Rendered), "the ported row and the greyed stand-in, nothing hidden")
+		AssertEqual(t("common.restore_recommended"), _MUR_LabelAt(Rendered, 0))
+		Head := _MR_ReasonHead(t(Reason))
+		Assert(Head != "" && !InStr(Head, ":"), "the stand-in carries the short head of its reason")
+		AssertEqual(t("common.clear_to_system") . " — " . Head, _MUR_LabelAt(Rendered, 1))
+		State := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 1, "uint", MF_BYPOSITION, "uint")
+		Assert((State & GREYED) != 0, "the stand-in is disabled")
+	} finally {
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+	AssertEqual("Not on macOS yet", _MR_ReasonHead("Not on macOS yet: its key combinations"))
+	AssertEqual("暂不适用于 macOS", _MR_ReasonHead("暂不适用于 macOS：在"))
+	AssertEqual("Catalogue reload — Linux only", _MR_ReasonHead("Catalogue reload — Linux only"))
+}
+Test("menu: a greyed row is drawn disabled with its reason, a hidden one is not (menu-unavailable-rows)",
+	_MUR_GreyedAndHiddenRows)

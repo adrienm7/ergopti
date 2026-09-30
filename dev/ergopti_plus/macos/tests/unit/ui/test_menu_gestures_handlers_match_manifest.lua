@@ -28,8 +28,6 @@ local function make_dyn_handlers()
 	end
 
 	return {
-		disable_all      = noop_handler,
-		restore_defaults = noop_handler,
 		gesture_slots_2 = noop_handler,
 		gesture_slots_3 = noop_handler,
 		gesture_slots_4 = noop_handler,
@@ -87,5 +85,31 @@ helpers.describe("menu_gestures: every id-bearing row is rendered by the manifes
 		helpers.assert_true(fired,
 			"and clicking it must run the command the driver registered, not a no-op: a row " ..
 			"rendered with no behaviour looks identical to one that works")
+	end)
+
+	-- The maintainer's first group (2026-09-30): the switch, « Restaurer les
+	-- valeurs conseillées », « Tout effacer », then a separator. The two scope
+	-- rows stood below the system rows until then.
+	helpers.it("ManifestMenu.build opens the menu with the switch, the restore and the clear", function()
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+		local i18n = require("infra.i18n")
+		local fired = {}
+		local function record(name) return function() fired[#fired + 1] = name end end
+		local built = ManifestMenu.build("gestures_menu", "Gestures", make_dyn_handlers(), nil, {
+			commands = { gestures_toggle = record("toggle"), scope_restore = record("restore"),
+				scope_clear = record("clear"), system_gesture_settings = record("settings") },
+			state_getters = { gestures_enabled = function() return true end },
+		})
+		helpers.assert_eq(built[1].title, i18n.get("menu.gestures.enable"))
+		helpers.assert_eq(built[2].title, i18n.get("common.restore_recommended"))
+		helpers.assert_eq(built[3].title, i18n.get("common.clear_to_system"))
+		helpers.assert_eq(built[4].title, "-")
+		for index = 5, #built do
+			helpers.assert_true(built[index].title ~= built[2].title and built[index].title ~= built[3].title,
+				"no scope row may follow the first group")
+		end
+		built[2].fn()
+		built[3].fn()
+		helpers.assert_eq(fired, { "restore", "clear" }, "each row runs the command registered under its id")
 	end)
 end)

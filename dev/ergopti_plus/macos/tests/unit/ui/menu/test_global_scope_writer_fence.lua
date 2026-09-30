@@ -67,7 +67,7 @@ local function fixture()
 			capture_preferences = function() return {} end,
 			backup_path = function() generation = generation + 1; return path .. "-backup-" .. generation end,
 			admission = fence.run_exclusive,
-			paused = function() return false end, confirm = function() return true end,
+			paused = function() return false end,
 			runtime = {
 				capture = function() return {} end,
 				apply = function() return true end,
@@ -93,7 +93,6 @@ local function fixture()
 		backup_path = function(scope) return "remap-" .. scope end,
 		defer = function(continuation) continuation(); return true end,
 		paused = function() return false end,
-		confirm = function() return true end,
 		refresh = function(committed, report) refreshes[#refreshes + 1] = { committed, report } end,
 	})
 	return { global = global, fence = fence, owners = owners, files = files, sources = sources,

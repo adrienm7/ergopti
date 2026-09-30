@@ -1,13 +1,15 @@
 --- tests/unit/menu/test_menu_off_platform_rows_hidden.lua
 
 --- ==============================================================================
---- MODULE: Off-Platform Rows Are Hidden On macOS
+--- MODULE: Off-Platform Rows Are Hidden On macOS, Unless Declared Greyed
 --- DESCRIPTION:
 --- The macOS tray showed the rows other drivers have as greyed stand-ins with a
 --- long explanation: "… — Linux only" rows, and the Windows registry options
 --- under Gestures. They made the tray very wide and none of them could be used.
 --- Renders every menu of the real shared manifest for hs and fails on any row
---- whose title carries a `platform_reason.*` text. The fixture cases for every
+--- whose title carries a `platform_reason.*` text, except the stand-in of a row
+--- declared `unavailable = "grey"` (not yet ported here, the maintainer's rule
+--- of 2026-09-30): the Shortcuts restore and clear. The fixture cases for every
 --- row shape live in the Linux suite, which runs the same shared renderer.
 --- ==============================================================================
 
@@ -30,7 +32,7 @@ helpers.describe("menu: no off-platform explanation is rendered on macOS", funct
 
 	helpers.it("renders every manifest menu for macOS without a platform_reason text", function()
 		package.loaded["menu.renderer"] = nil
-		local found, rendered = leaks.reason_leaks(require("menu.renderer"), {
+		local found, rendered, greyed = leaks.reason_leaks(require("menu.renderer"), {
 			platform      = PLATFORM,
 			manifest_path = MANIFEST_PATH,
 			json_decode   = require("json").decode,
@@ -38,6 +40,7 @@ helpers.describe("menu: no off-platform explanation is rendered on macOS", funct
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
 		helpers.assert_eq(found, {}, "a row another platform has must not reach the macOS tray")
+		helpers.assert_eq(greyed, 2, "the Shortcuts restore and clear are drawn greyed with their reason")
 	end)
 
 end)

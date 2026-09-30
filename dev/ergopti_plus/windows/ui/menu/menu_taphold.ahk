@@ -411,15 +411,16 @@ _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 	return 1
 }
 
-; Existing shared menu identities now reach one compensated two-file owner.
-; The tray's restore also creates the configuration folder's layers.toml from
-; the recommended layer when it has none; injected options name their own.
+; The first group's restore and clear (the same scope_restore / scope_clear
+; ids as every settings menu) reach one compensated two-file owner. The tray's
+; restore also creates the configuration folder's layers.toml from the
+; recommended layer when it has none; injected options name their own.
 _TH_ScopeCommands(Options := unset) {
 	global _ConfigDir
 	OwnedOptions := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
 		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
-		"reset_defaults", (*) => TapHoldScopeApply("recommended", OwnedOptions),
-		"disable_all", (*) => TapHoldScopeApply("clear", OwnedOptions),
+		"scope_restore", (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		"scope_clear", (*) => TapHoldScopeApply("clear", OwnedOptions),
 		"edit_nav_layer", LayerEditor_Open)
 }

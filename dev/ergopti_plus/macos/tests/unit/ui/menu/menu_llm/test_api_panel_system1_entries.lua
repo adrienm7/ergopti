@@ -148,7 +148,7 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 	helpers.it("adds a Jev entry without making it the prediction backend, after the decisions probe", function()
 		helpers.with_fresh_modules(FRESH, function()
 			local world = install({ entries = { OPENAI }, active_id = "chat",
-				prompts = { CATALOGUE.providers.typesafe.base_url, "k-new", "jev-latest", "My Jev" } })
+				prompts = { CATALOGUE.providers.typesafe.base_url, "k-new", "jev-latest" } })
 			local _, rows = world.panel.build(world.ctx)
 			local typesafe_row = row_starting(add_rows(rows), "➕ TypeSafe (Jev)")
 			helpers.assert_true(typesafe_row.action() == true, "the probe is sent")
@@ -167,7 +167,7 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 	helpers.it("rolls a refused Jev entry back with the provider's verdict", function()
 		helpers.with_fresh_modules(FRESH, function()
 			local world = install({ entries = { OPENAI }, active_id = "chat", test_verdict = false,
-				prompts = { CATALOGUE.providers.typesafe.base_url, "k-bad", "jev-latest", "Bad Jev" } })
+				prompts = { CATALOGUE.providers.typesafe.base_url, "k-bad", "jev-latest" } })
 			local _, rows = world.panel.build(world.ctx)
 			row_starting(add_rows(rows), "➕ TypeSafe (Jev)").action()
 			helpers.assert_eq(#world.entries, 1, "rolled back")
@@ -183,17 +183,18 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 		helpers.with_fresh_modules(FRESH, function()
 			local world = install({ entries = { OPENAI, JEV }, active_id = "chat" })
 			local _, rows = world.panel.build(world.ctx)
-			helpers.assert_nil(row_starting(rows, "Jev"), "not selectable as the prediction backend")
-			helpers.assert_true(row_starting(rows, "Chat") ~= nil)
+			-- Every entry is named after its provider and model (api-entry-auto-name)
+			helpers.assert_nil(row_starting(rows, "typesafe/jev-latest"), "not selectable as the prediction backend")
+			helpers.assert_true(row_starting(rows, "openai/gpt-4o-mini") ~= nil)
 			for _, row in ipairs(world.panel.build_model_picker(world.ctx)) do
-				helpers.assert_true(row.label ~= "Jev", "absent from the model picker")
+				helpers.assert_true(row.label ~= "typesafe/jev-latest", "absent from the model picker")
 			end
 
-			local test = row_starting(rows, "menu.llm.api_test_entry (Jev)")
+			local test = row_starting(rows, "menu.llm.api_test_entry (typesafe/jev-latest)")
 			helpers.assert_true(test.action() == true)
 			helpers.assert_eq(world.tests[1].entry.id, "jev", "the Jev entry is probed, not the active one")
 
-			local remove = row_starting(rows, "🗑️ menu.llm.api_remove_entry (Jev)")
+			local remove = row_starting(rows, "🗑️ menu.llm.api_remove_entry (typesafe/jev-latest)")
 			helpers.assert_true(remove.action() == true)
 			helpers.assert_eq(#world.entries, 1)
 			helpers.assert_eq(world.entries[1].id, "chat")
@@ -205,7 +206,7 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 	helpers.it("shows the verdict of the probe offered after adding a chat entry", function()
 		helpers.with_fresh_modules(FRESH, function()
 			local world = install({ entries = {}, prompts = { "https://api.groq.com/openai/v1", "k-groq",
-				"llama-3.3-70b-versatile", "Groq" } })
+				"llama-3.3-70b-versatile" } })
 			local _, rows = world.panel.build(world.ctx)
 			row_starting(add_rows(rows), "➕ Groq").action()
 			helpers.assert_eq(world.checks, 1, "the chat availability check")

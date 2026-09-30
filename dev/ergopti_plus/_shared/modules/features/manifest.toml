@@ -4007,23 +4007,23 @@ checked_when = ["llm_enabled"]
 disabled_when = ["llm_toggle_ready"]
 category = "LLM"
 
+# The restore alone: the maintainer retired the AI menu's « Tout effacer » on
+# 2026-09-30, because clearing the AI section leaves nothing the system would
+# do in its place. The AI scope still takes part in the global composition.
 [[menu.llm_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 
 [[menu.llm_menu]]
-type = "command"
-id = "scope_clear"
-i18n = "common.clear_to_system"
-
-[[menu.llm_menu]]
 type = "---"
 
+# No i18n: the row names the backend selected in its submenu, the option's
+# label cut before its em dash (« API 🌐 »), as the maintainer asked on
+# 2026-09-30 in place of « Backend : api ».
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
-i18n = "menu.llm.model_backend"
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]
@@ -4204,14 +4204,24 @@ id = "locales"
 # « Tout désactiver » were retired, and the two top-level rows that opened the
 # folders editor and the setup wizard.
 #
-# Restores Ergopti's recommended values: each driver composes every category's
-# own scope owner in the [scopes.global] order, all or nothing, at once — every
-# owner writes its backup first, so no row asks before a restore. AI and metrics
-# consent are never granted by it.
+# The global scope's restore and clear, the first group like every settings
+# menu's (Configuration has no switch). Each driver composes every category's
+# own scope owner in the [scopes.global] order, all or nothing, at once. Every
+# owner writes its backup first, so neither row asks: the backup is the undo
+# (the maintainer retired the clear's question on 2026-09-30). AI and metrics
+# consent are never granted by the restore.
 [[menu.configuration_menu]]
 type = "command"
-id = "restore_recommended"
+id = "scope_restore"
 i18n = "common.restore_recommended"
+
+[[menu.configuration_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+
+[[menu.configuration_menu]]
+type = "---"
 
 # Lists the config.toml keys the driver does not use and offers to remove them
 # after a backup. Each driver applies its own reader's rule: Windows the boot
@@ -4222,8 +4232,8 @@ type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
 
-# Set apart by a separator: the two rows above rewrite the configuration, the
-# two below open a window onto it.
+# Set apart by a separator: the rows above rewrite the configuration, the rows
+# below open a window onto it.
 [[menu.configuration_menu]]
 type = "---"
 
@@ -4360,16 +4370,27 @@ i18n = "menu.shortcuts.enable"
 checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
 
-# The Shortcuts scope's restore, beside its switch like the other categories.
-# Windows and Linux register it on their scope owners, which back up
-# config.toml and publish the whole scope in one transaction. macOS keeps the
-# key combinations in the Karabiner settings, which only the Configuration
-# restore composes with the shortcut preferences so far.
+# The Shortcuts scope's restore and clear, right after its switch like every
+# category's (the first group: switch, restore, clear, separator). Windows and
+# Linux register both on their scope owners, which back up config.toml and
+# publish the whole scope in one transaction. macOS keeps the key combinations
+# in the Karabiner settings, which only the Configuration rows compose with the
+# shortcut preferences so far: not yet ported there, so macOS draws both rows
+# greyed with that reason.
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 platforms = ["ahk", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
+
+[[menu.shortcuts_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+platforms = ["ahk", "linux"]
+unavailable = "grey"
 reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
@@ -4396,6 +4417,10 @@ id = "tap_keys"
 [[menu.shortcuts_menu]]
 type = "---"
 
+# « Taper un symbole encadre la sélection » and « Symboles encadrants » below it
+# form one group, with no separator between them (the maintainer's request of
+# 2026-09-30): the switch and the symbols it wraps with go together. The label
+# names no AltGr, since only Ergopti puts the symbols there.
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
@@ -4638,14 +4663,14 @@ reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.script_control_group]]
 type = "command"
-id = "restore_recommended"
+id = "scope_restore"
 i18n = "common.restore_recommended"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.script_control_group]]
 type = "command"
-id = "clear_to_system"
+id = "scope_clear"
 i18n = "common.clear_to_system"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
@@ -4674,15 +4699,14 @@ i18n = "menu.metrics.enable"
 checked_when = ["keylogger_enabled"]
 category = "Metrics"
 
+# The restore alone: the maintainer retired the Metrics clear on 2026-09-30,
+# because clearing these settings to the system's behaviour means nothing (there
+# is no system behaviour for typing metrics). The Configuration clear still
+# composes the metrics scope owner, so its settings join a global clear.
 [[menu.metrics_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-
-[[menu.metrics_menu]]
-type = "command"
-id = "scope_clear"
-i18n = "common.clear_to_system"
 
 [[menu.metrics_menu]]
 type = "---"
@@ -4903,15 +4927,23 @@ category = "Layout"
 platforms = ["ahk"]
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
-# The keyboard-layout scope's restore, beside the switch Windows shows. Windows
-# and macOS register it on their scope owners; the layout settings do not exist
-# on Linux.
+# The keyboard-layout scope's restore and clear, right after the switch Windows
+# shows (the first group). Windows and macOS register both on their scope
+# owners. Not applicable on Linux, which has none of these settings (it types
+# through the XKB layout the system selects), so the rows are hidden there.
 [[menu.layout_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
 platforms = ["ahk", "hs"]
-reason_key = "platform_reason.no_layout_settings_on_linux"
+unavailable = "hide"
+
+[[menu.layout_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
 
 # Two sections, so a user reads at a glance which rows are about the custom
 # layout (the registry layouts the layout manager installs, the one typing
@@ -5100,7 +5132,7 @@ i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
 
-# The Hotstrings scope, beside its switch like the IA and Metrics ones. Each
+# The Hotstrings scope, beside its switch like the Metrics one. Each
 # driver registers both commands on its scope owner, which changes config.toml
 # and the override file as one transaction: recommended delays are written
 # where the corpus inheritance differs, and the Ergopti extension's bound
@@ -5303,6 +5335,21 @@ i18n = "menu.gestures.enable"
 checked_when = ["gestures_enabled"]
 category = "Gestures"
 
+# The Gestures scope's restore and clear, right after its switch (the first
+# group of every settings menu: switch, restore, clear, separator). Each driver
+# registers both on its scope owner, which backs up config.toml and applies the
+# whole scope in one transaction. They stood below the system rows until
+# 2026-09-30, as `restore_defaults` and `disable_all`.
+[[menu.gestures_menu]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+
+[[menu.gestures_menu]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+
 [[menu.gestures_menu]]
 type = "---"
 
@@ -5329,22 +5376,6 @@ id = "manual_tutorial"
 i18n = "menu.gestures.manual_tutorial"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
-
-# `command` since 2026-08-07: the row, its label and its position are the
-# manifest's, and each driver supplies only what the click does. It was an
-# `action` before, which hands the id back and had all three building the same
-# two rows with the same two labels.
-[[menu.gestures_menu]]
-type = "command"
-id = "disable_all"
-i18n = "common.clear_to_system"
-platforms = ["hs", "ahk", "linux"]
-
-[[menu.gestures_menu]]
-type = "command"
-id = "restore_defaults"
-i18n = "common.restore_recommended"
-platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
 type = "---"
@@ -5431,22 +5462,20 @@ category = "TapHolds"
 # the key and chord rows are greyed under the karabiner_off_hint row.
 # Linux takes the engine out of its keyboard hook, keeping every assignment.
 
-[[menu.tap_holds_menu]]
-type = "---"
-
-# `command` since 2026-08-07, not `action`. Both were handlers whose whole body
-# was "add a button, and log that the action just happened" — at MENU BUILD time,
-# so the log claimed every tap-hold override had been reset each time the user
-# opened the tray. The declaration draws the button now and the log moved to the
-# function that does the work.
+# The Tap-Holds scope's restore and clear, right after its switch (the first
+# group). Each driver registers both on its scope owner, which backs up the
+# tap-hold file with config.toml and publishes them in one transaction. They
+# sat after a separator as `reset_defaults` and `disable_all` until 2026-09-30.
+# `command` since 2026-08-07, not `action`: both were handlers whose whole body
+# was "add a button, and log that the action just happened" at MENU BUILD time.
 [[menu.tap_holds_menu]]
 type = "command"
-id = "reset_defaults"
+id = "scope_restore"
 i18n = "common.restore_recommended"
 
 [[menu.tap_holds_menu]]
 type = "command"
-id = "disable_all"
+id = "scope_clear"
 i18n = "common.clear_to_system"
 
 # macOS rows below: its engine takes one global tap / hold delay and a sticky
@@ -6023,7 +6052,7 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 # spells, before the action it runs.
 [onboarding.pages.shortcuts.triggers]
 "shortcuts.keys.layer_scroll" = "menu.shortcuts.key_layer_scroll"
-"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.altgr_symbol"
+"shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.selection_symbol"
 
 [onboarding.pages.gestures]
 title_key = "menu.gestures.title"

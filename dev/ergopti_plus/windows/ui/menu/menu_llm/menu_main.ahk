@@ -120,9 +120,7 @@ LLM_Menu_BuildSubmenu() {
 		Map("llm_toggle", LLM_Menu_OnToggle),
 		Map("llm_enabled", () => _LLM_Menu["enabled"],
 			"llm_toggle_ready", () => !A_IsSuspended))
-	ScopeCommands := _LLM_ScopeCommands()
-	for Id in ["scope_restore", "scope_clear"]
-		MenuRenderer_AppendCommand(_LLM_Menu_Handle, "llm_menu", Id, ScopeCommands)
+	MenuRenderer_AppendCommand(_LLM_Menu_Handle, "llm_menu", "scope_restore", _LLM_ScopeCommands())
 	_LLM_Menu_Handle.Add()  ; separator after the switch, as the manifest declares
 
 	; Warning row — surfaces when the feature is ON but the active backend
@@ -340,8 +338,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	switch id {
 	case "llm_backend":
-		_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s",
-			_LLM_Menu_BackendDisplayName(_LLM_Menu["backend"])), LLM_Menu_BuildBackendMenu(), disabled)
+		_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), LLM_Menu_BuildBackendMenu(), disabled)
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
@@ -395,12 +392,11 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	}
 }
 
-; The terminal owner preserves credential stores and explicit consent.
+; The terminal owner preserves credential stores and explicit consent. The AI
+; menu offers the restore alone: its « Tout effacer » row was retired.
 _LLM_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
-	return Map(
-		"scope_restore", (*) => _LLM_ApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => _LLM_ApplyScope("clear", OwnedOptions))
+	return Map("scope_restore", (*) => _LLM_ApplyScope("recommended", OwnedOptions))
 }
 
 _LLM_ApplyScope(Mode, Options) {

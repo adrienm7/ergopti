@@ -76,7 +76,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		helpers.assert_true(is_separator(rows[at - 2]), "and a separator must precede that header")
 	end)
 
-	helpers.it("configuration: rewriting rows, a separator, then the two windows", function()
+	helpers.it("configuration: restore and clear, the cleanup, then the two windows", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local i18n = require("infra.i18n")
 		local shown = {}
@@ -94,6 +94,8 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		for index, row in ipairs(rows) do drawn[index] = is_separator(row) and "-" or row.title end
 		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
 			i18n.get("common.restore_recommended"),
+			i18n.get("common.clear_to_system"),
+			"-",
 			i18n.get("menu.global.clean_unused_keys"),
 			"-",
 			i18n.get("menu.global.config_folder"),
@@ -101,7 +103,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			i18n.get("menu.global.start_at_login"),
 		}, " | "), "Uninstall moved to the Version / Updates submenu; no separator is left dangling")
 		-- The folders editor, as on the other two drivers, not the file manager.
-		local folder = rows[4]
+		local folder = rows[6]
 		local fn = folder.fn or folder.action
 		helpers.assert_eq(type(fn), "function", "the folders row must act")
 		fn()

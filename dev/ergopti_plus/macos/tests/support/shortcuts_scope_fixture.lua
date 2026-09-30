@@ -143,10 +143,6 @@ local function run_fixture(body, source)
 		idle = function() return controls.idle ~= false end,
 		capture_preferences = function() return prefs.snapshot(state, {}, modules) end,
 		backup_path = function() return "backup" end,
-		confirm = function()
-			if controls.on_confirm then controls.on_confirm() end
-			return controls.confirm ~= false
-		end,
 		paused = function() return controls.paused == true end,
 		admission = function(_, callback)
 			if busy then return false end

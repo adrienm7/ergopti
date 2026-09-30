@@ -13,13 +13,13 @@ local helpers = require("tests.helpers")
 
 local COMMAND_CASES = {
 	{
-		id = "disable_all",
+		id = "scope_clear",
 		label = "common.clear_to_system",
 		method = "apply_scope",
 		request = { scope = "tap_holds", mode = "clear" },
 	},
 	{
-		id = "reset_defaults",
+		id = "scope_restore",
 		label = "common.restore_recommended",
 		method = "apply_scope",
 		request = { scope = "tap_holds", mode = "recommended" },
@@ -73,8 +73,9 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 
 -- Transaction test harness
 
--- The clear row asks first and both scope rows name a backup under the remap
--- file; both boundaries are doubles for the whole module, restored at its end.
+-- Neither scope row asks (a question would be counted here) and both name a
+-- backup under the remap file; both boundaries are doubles for the whole
+-- module, restored at its end.
 local SAVED_DIALOGS = package.loaded["infra.dialog_util"]
 local SAVED_PATHS = package.loaded["infra.config_paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
@@ -393,25 +394,41 @@ helpers.describe("karabiner manifest bulk commands wait for exact settlement", f
 		end
 	end)
 
-	-- The restore row asked as well until restore-recommended-no-confirm.
-	helpers.it("W1 asks before the clear row only and a declined question sends nothing", function()
+	-- The restore row asked until restore-recommended-no-confirm, the clear row
+	-- until the maintainer retired its question too on 2026-09-30: the backup
+	-- each request writes first is the way back.
+	helpers.it("W1 runs both scope rows at once, without a question", function()
 		for _, case in ipairs({ COMMAND_CASES[1], COMMAND_CASES[2] }) do
 			local built, observations = build_menu("pending")
 			local asked = CONFIRMATION.asked
-			local asks = case.request.mode == "clear"
 			CONFIRMATION.answer = "no"
 			local ok, result = pcall(row_action(find_item(built, case.label)))
 			CONFIRMATION.answer = "yes"
 			helpers.assert_true(ok, tostring(result))
-			helpers.assert_eq(result, not asks)
-			helpers.assert_eq(CONFIRMATION.asked, asked + (asks and 1 or 0))
-			helpers.assert_eq(observations.calls.apply_scope, asks and 0 or 1,
-				case.id .. (asks and " must not run after No" or " runs without a question"))
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(CONFIRMATION.asked, asked, case.id .. " must not ask")
+			helpers.assert_eq(observations.calls.apply_scope, 1, case.id .. " runs at once")
 			helpers.assert_true(row_action(find_item(built, case.label))())
 			local first = observations.arguments.apply_scope.backup_path
 			helpers.assert_true(row_action(find_item(built, case.label))())
 			helpers.assert_true(observations.arguments.apply_scope.backup_path ~= first,
 				"each request names a new backup")
+		end
+	end)
+
+	-- The maintainer's first group (2026-09-30): the switch, the restore, the
+	-- clear, then a separator, and no scope row below it.
+	helpers.it("draws the switch, the restore and the clear as the first group", function()
+		local built = build_menu("pending")
+		local rows = built.submenu or built.menu or built.items or {}
+		local titles = {}
+		for index = 1, 4 do titles[index] = rows[index] and (rows[index].title or rows[index].label) end
+		helpers.assert_eq(table.concat(titles, " | "),
+			"menu.tapholds.enable | common.restore_recommended | common.clear_to_system | -")
+		for index = 5, #rows do
+			local title = rows[index].title or rows[index].label
+			helpers.assert_true(title ~= "common.restore_recommended" and title ~= "common.clear_to_system",
+				"no scope row may follow the first group")
 		end
 	end)
 

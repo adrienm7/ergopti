@@ -83,7 +83,7 @@ local function fixture(demoted)
 		demotions = demotions, runtime = runtime, profiles = function() if control.registry_unavailable then return nil end; return { { id = "basic" } } end,
 		capture_preferences = function() return Preferences.snapshot(state, {}, {}) end,
 		admission = function(_, callback) return callback() end, paused = function() return false end,
-		confirm = function() return control.confirm ~= false end, backup_path = function() return "backup" end,
+		backup_path = function() return "backup" end,
 	})
 	return owner, state, files, control, save, demotions, function() return enabled, starts, hotkeys, core_state end,
 		function() return writes end, original, values
@@ -131,10 +131,10 @@ helpers.describe("macOS complete LLM scope", function()
 		helpers.assert_eq(Codec.decode(files.config).llm.enabled, true)
 	end)
 
-	helpers.it("refuses cancellation and busy native owners before writing a backup", function()
-		for _, field in ipairs({ "confirm", "busy" }) do
+	helpers.it("refuses busy native owners before writing a backup", function()
+		for _, field in ipairs({ "busy" }) do
 			local owner, _, files, control, _, _, _, writes, original = fixture()
-			control[field] = field ~= "confirm"
+			control[field] = true
 			helpers.assert_eq(owner.apply("clear"), false)
 			helpers.assert_eq(writes(), 0)
 			helpers.assert_eq(files.config, original)

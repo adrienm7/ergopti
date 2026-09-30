@@ -2637,10 +2637,10 @@ local function backend_target(quiet)
 		end
 		local provider = remote.provider(entry.provider)
 		if provider and not remote.serves(entry.provider, "chat") then
-			return refuse("predict(): API entry '%s' is no chat model (the agent's System 1 only).", entry.label)
+			return refuse("predict(): API entry '%s' is no chat model (the agent's System 1 only).", entry.id)
 		end
 		local model = entry.model ~= "" and entry.model or (provider and provider.default_model) or nil
-		if not model or model == "" then return refuse("predict(): API entry '%s' names no model.", entry.label) end
+		if not model or model == "" then return refuse("predict(): API entry '%s' names no model.", entry.id) end
 		return remote, entry, model
 	end
 	local ollama, profiles = get_ollama(), get_profiles()

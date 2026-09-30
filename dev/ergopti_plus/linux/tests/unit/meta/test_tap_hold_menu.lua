@@ -104,7 +104,7 @@ end
 
 helpers.describe("Linux Tap-Holds menu", function()
 
-	helpers.it("has the Windows rows: switch, reset, disable all, and one row per key", function()
+	helpers.it("has the Windows rows: switch, restore, clear, and one row per key", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
@@ -119,32 +119,39 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_not_nil(reset, "the recommended restore row")
 			helpers.assert_not_nil(disable, "the clear-to-system row")
 			helpers.assert_not_nil(toggle, "the feature switch")
+			-- The maintainer's first group (2026-09-30): switch, restore, clear,
+			-- then a separator, and no scope row below it.
+			helpers.assert_eq(section.menu[1], toggle)
+			helpers.assert_eq(section.menu[2], reset)
+			helpers.assert_eq(section.menu[3], disable)
+			helpers.assert_eq(section.menu[4].title, "-")
+			for index = 5, #section.menu do
+				local title = section.menu[index].title
+				helpers.assert_true(title ~= reset.title and title ~= disable.title,
+					"no scope row may follow the first group")
+			end
 			local asked = {}
 			local execute = os.execute
 			os.execute = function(command)
-				if command:find("command -v zenity", 1, true) then return 0 end
-				if command:find("zenity --question", 1, true) then
+				if command:find("zenity", 1, true) then
 					asked[#asked + 1] = command
-					return #asked == 2 and 1 or 0
+					return 1
 				end
 				return execute(command)
 			end
 			local ran, raised = pcall(function()
 				reset.fn()
 				disable.fn()
-				disable.fn()
 			end)
 			os.execute = execute
 			if not ran then error(raised, 0) end
 			toggle.fn()
-			-- The restore applies at once (restore-recommended-no-confirm); the
-			-- clear keeps its default-No question.
-			helpers.assert_eq(#asked, 2, "only the clear row asks first")
-			helpers.assert_contains(asked[1], i18n.get("common.clear_to_system"))
-			helpers.assert_contains(asked[1], "--default-cancel")
+			-- Both apply at once, after the scope's backups: the restore since
+			-- restore-recommended-no-confirm, the clear since 2026-09-30.
+			helpers.assert_eq(#asked, 0, "no scope row asks")
 			helpers.assert_eq(calls[1], { "scope", "recommended", false })
 			helpers.assert_eq(calls[2], { "scope", "clear", false })
-			helpers.assert_eq(calls[3][1], "set_enabled", "a declined confirmation runs nothing")
+			helpers.assert_eq(calls[3][1], "set_enabled")
 			helpers.assert_eq(calls[3][2], false, "the switch was on, a click turns it off")
 		end)
 		restore(Manager)

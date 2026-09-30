@@ -3,10 +3,11 @@
 --- ==============================================================================
 --- MODULE: Global Scope (Linux)
 --- DESCRIPTION:
---- Configuration › « Restore recommended values » composes the daemon's live
---- scope owners, all or nothing: it asks first, registers only the owners the
---- daemon runs, reports the categories it has no owner for, and reverts a real
---- committed owner when a later category refuses.
+--- Configuration › « Restore recommended values » and « Clear all » compose
+--- the daemon's live scope owners, all or nothing and without a question:
+--- they register only the owners the daemon runs, report the categories they
+--- have no owner for, and revert a real committed owner when a later category
+--- refuses.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -221,6 +222,119 @@ helpers.describe("Linux global scope: the Configuration row", function()
 		if not ok then error(err, 0) end
 		helpers.assert_eq(asked, 0)
 		helpers.assert_eq(calls, {})
+	end)
+end)
+
+--- Runs body with the real tap-hold manager over an isolated configuration
+--- folder whose tap_hold.toml holds `source`.
+--- @param source string The tap-hold file's bytes.
+--- @param body function Receives the manager, the folder, tap_hold.toml's path and config.toml's path.
+local function with_real_tap_holds(source, body)
+	local names = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
+		"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "infra.config_paths", "infra.global_scope",
+		"ui.menu.menu_builder" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+	local dir = os.tmpname()
+	os.remove(dir)
+	local made = os.execute('mkdir "' .. dir .. '"')
+	assert(made == true or made == 0, "the isolated configuration folder must exist")
+	local tap_path, config_path = dir .. "/tap_hold.toml", dir .. "/config.toml"
+	local fh = assert(io.open(tap_path, "w"))
+	fh:write(source)
+	fh:close()
+	local ok, err = pcall(function()
+		-- Only config.toml's folder moves; the tray's other readers keep the real paths.
+		local real_paths = require("infra.config_paths")
+		package.loaded["infra.config_paths"] = setmetatable(
+			{ config = function(name) return dir .. "/" .. name end }, { __index = real_paths })
+		local Manager = require("platform.remap.tap_hold_manager")
+		Manager.init({
+			keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
+				held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
+				held_shortcut_modifier_codes = function() return {} end },
+			execute_action = function() end, on_text_injected = function() end,
+			action_names = function() return {} end, defaults_path = DEFAULTS, user_path = tap_path,
+		})
+		body(Manager, dir, tap_path, config_path)
+		Manager._reset_for_test()
+	end)
+	os.execute('rm -f "' .. dir .. '"/* && rmdir "' .. dir .. '"')
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+--- Reads one whole file.
+--- @param path string
+--- @return string|nil content
+local function read_file(path)
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
+helpers.describe("Linux global scope: the Configuration clear", function()
+	-- « Tout effacer » beside the restore since 2026-09-30: the same
+	-- composition in clear mode, one transaction whose owners back up first.
+	helpers.it("clears the real tap-hold file to neutral after its backup, without a question", function()
+		local source = '[tap_hold]\ninherit_defaults = true\n[other]\nkeep = true\n'
+		with_real_tap_holds(source, function(Manager, dir, tap_path)
+			local execute, asked = os.execute, 0
+			local ran, raised = pcall(function()
+				os.execute = function(command)
+					if command:find("zenity", 1, true) then asked = asked + 1; return 1 end
+					return execute(command)
+				end
+				local i18n = require("infra.i18n")
+				local items = require("ui.menu.menu_builder").build({ _version = "test", on_quit = function() end,
+					is_paused = function() return false end, tap_holds = Manager })
+				local rows
+				for _, item in ipairs(items) do
+					if item.title == i18n.get("menu.configuration.title") then rows = item.menu end
+				end
+				helpers.assert_true(type(rows) == "table", "the Configuration submenu")
+				helpers.assert_eq(rows[1].title, i18n.get("common.restore_recommended"))
+				helpers.assert_eq(rows[2].title, i18n.get("common.clear_to_system"))
+				rows[2].fn()
+			end)
+			os.execute = execute
+			if not ran then error(raised, 0) end
+			helpers.assert_eq(asked, 0, "the global clear asks nothing")
+			local after = Codec.decode(read_file(tap_path))
+			helpers.assert_true(after.tap_hold == nil or after.tap_hold.inherit_defaults ~= true,
+				"the preset is no longer inherited")
+			helpers.assert_true(after.tap_hold == nil or after.tap_hold.keys == nil or next(after.tap_hold.keys) == nil,
+				"no key is remapped any more")
+			helpers.assert_eq(after.other.keep, true)
+			local listing = io.popen('ls "' .. dir .. '"')
+			local backups = {}
+			for name in listing:lines() do
+				if name:find("^tap_hold%.toml%.tap_holds%-.*%.bak$") then backups[#backups + 1] = name end
+			end
+			listing:close()
+			helpers.assert_eq(#backups, 1, "the tap-hold file is backed up before the clear")
+			helpers.assert_eq(read_file(dir .. "/" .. backups[1]), source)
+		end)
+	end)
+
+	helpers.it("puts the cleared tap-hold file back byte for byte when a later category refuses", function()
+		local source = '[tap_hold]\ninherit_defaults = true\n[other]\nkeep = true\n'
+		with_real_tap_holds(source, function(_, _, tap_path, config_path)
+			local trace = {}
+			local GlobalScope = require("infra.global_scope")
+			local committed, report = GlobalScope.apply("clear", {
+				tap_holds = require("infra.tap_hold_scope").participant(function() return false end),
+				llm = stub(trace, "llm", true),
+			})
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(report.failed, "llm")
+			helpers.assert_eq(report.applied, { "tap_holds" })
+			helpers.assert_eq(report.reverted, true)
+			helpers.assert_eq(read_file(tap_path), source, "the cleared tap-hold file is put back")
+			helpers.assert_nil(read_file(config_path), "config.toml was never created")
+		end)
 	end)
 end)
 

@@ -1077,7 +1077,7 @@ local function create_menu(deps)
 				local model_text
 				if state.llm_backend == "api" then
 						-- The local llm_model slot is stale on this backend: show the
-						-- active API entry's configured name instead, without
+						-- active API entry's automatic name instead, without
 						-- local-model badges.
 						local entry_name = nil
 						if type(ApiPanel.active_entry_display_name) == "function" then
@@ -1719,16 +1719,13 @@ local function create_menu(deps)
 												end
 										end
 								end
+								-- The restore alone: the AI menu's clear row was retired.
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
 											["scope_restore"] = function()
 												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
 												return deps.apply_preference_scope("llm", "recommended") == true
-											end,
-											["scope_clear"] = function()
-												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
-												return deps.apply_preference_scope("llm", "clear") == true
 											end,
 										},
 										state_getters = {

@@ -21,6 +21,9 @@
 ; 4. Token validation round-trip: after every save, hit the provider's
 ;    /models endpoint and surface success/failure via TrayTip so the user
 ;    finds out NOW (not mid-typing).
+; 5. Automatic names: every entry reads <provider>/<model>, told apart by host
+;    then order when two share it (_shared/lua/llm/api_entry_names.lua, which
+;    this file ports). The user no longer types a name (2026-09-30).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -54,11 +57,11 @@ _LLM_Menu_ApiEntriesRows() {
 		Rows.Push(Map("label", t("menu.llm.api_no_entry")))
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-		for entry in entries {
+		Names := _LLM_Menu_ApiEntryNameList(entries)
+		for Index, entry in entries {
 			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
-			name := _LLM_MenuApiEntryGet(entry, "Name", "(unnamed)")
 			Rows.Push(Map(
-				"label",   name,
+				"label",   Names[Index],
 				"checked", (id == active_id),
 				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
 		}
@@ -83,27 +86,79 @@ _LLM_Menu_ApiEntriesRows() {
 	return Rows
 }
 
-; Returns a name unused by the entries: the base, then base (2), ... The
-; entry being edited keeps its own name without suffix via ExcludeId.
-_LLM_Menu_UniqueApiEntryName(Base, Entries, ExcludeId := "") {
-	if (Base == "")
-		return Base
-	Taken := Map()
-	if (Entries is Array) {
-		for Entry in Entries {
-			if (_LLM_MenuApiEntryGet(Entry, "Id", "") == ExcludeId)
-				continue
-			Name := _LLM_MenuApiEntryGet(Entry, "Name", "")
-			if (Name != "")
-				Taken[Name] := true
-		}
+; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"
+; gives "api.x.ai". Port of api_entry_names.lua's M.host.
+; @param {String} Url The resolved base URL.
+; @returns {String} The host, "" when the URL names none.
+_LLM_ApiEntryHost(Url) {
+	if !(Url is String)
+		return ""
+	Rest := Trim(Url, " `t`r`n")
+	Rest := RegExReplace(Rest, "^[A-Za-z][A-Za-z0-9+.-]*://")
+	Rest := RegExReplace(Rest, "^[^/?#@]*@")
+	RegExMatch(Rest, "^[^/?#]*", &Found)
+	return StrLower(Found[0])
+}
+
+; The automatic names of resolved entries, in their order: <provider>/<model>,
+; with the host and then the order added where two entries share one. Port of
+; api_entry_names.lua's M.names, pinned by api_entry_names_vectors.json.
+; @param {Array} Resolved Maps of "provider", "model" and "base_url", resolved
+;     as the entries' requests are sent.
+; @returns {Array} One name per entry.
+_LLM_ApiEntryNames(Resolved) {
+	Bases := [], Uses := Map()
+	for Entry in Resolved {
+		Base := Entry["provider"] . "/" . Entry["model"]
+		Bases.Push(Base)
+		Uses[Base] := Uses.Get(Base, 0) + 1
 	}
-	if !Taken.Has(Base)
-		return Base
-	Counter := 2
-	while Taken.Has(Base . " (" . Counter . ")")
-		Counter += 1
-	return Base . " (" . Counter . ")"
+	Names := [], Seen := Map()
+	for Index, Entry in Resolved {
+		Name := Bases[Index]
+		if (Uses[Name] > 1) {
+			Host := _LLM_ApiEntryHost(Entry["base_url"])
+			Key := Name . "`n" . Host
+			Seen[Key] := Seen.Get(Key, 0) + 1
+			Qualifier := Host
+			if (Seen[Key] > 1)
+				Qualifier .= ((Qualifier != "") ? ", " : "") . Seen[Key]
+			if (Qualifier != "")
+				Name .= " (" . Qualifier . ")"
+		}
+		Names.Push(Name)
+	}
+	return Names
+}
+
+; One entry as its requests are sent: the provider's model and base URL stand
+; in for empty fields. The stored Name is never read.
+; @param {Map} Entry API entry record.
+; @returns {Map} "provider", "model" and "base_url".
+_LLM_Menu_ResolveApiEntry(Entry) {
+	global LLM_API_PROVIDERS
+	ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
+	Descriptor := ((LLM_API_PROVIDERS is Map) && LLM_API_PROVIDERS.Has(ProviderId)
+		&& (LLM_API_PROVIDERS[ProviderId] is Map)) ? LLM_API_PROVIDERS[ProviderId] : Map()
+	Model := _LLM_MenuApiEntryGet(Entry, "Model", "")
+	if (Model == "")
+		Model := Descriptor.Get("DefaultModel", "")
+	BaseUrl := _LLM_MenuApiEntryGet(Entry, "BaseUrl", "")
+	if (BaseUrl == "")
+		BaseUrl := Descriptor.Get("BaseUrl", "")
+	return Map("provider", ProviderId, "model", Model, "base_url", BaseUrl)
+}
+
+; The automatic name of every entry, in the list's order.
+; @param {Array} Entries API entry records.
+; @returns {Array} One name per entry.
+_LLM_Menu_ApiEntryNameList(Entries) {
+	Resolved := []
+	if (Entries is Array) {
+		for Entry in Entries
+			Resolved.Push(_LLM_Menu_ResolveApiEntry(Entry))
+	}
+	return _LLM_ApiEntryNames(Resolved)
 }
 
 _LLM_MenuApiEntryGet(Entry, Key, Default := "") {
@@ -188,7 +243,8 @@ _LLM_Menu_AskTestNewApiEntry() {
 ; dialog creates a new entry; otherwise it loads the matching record and
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
 ; so it works on the AHK v2 baseline with no custom Gui — same UX as the
-; existing single-field prompts the menu already uses.
+; existing single-field prompts the menu already uses. It asks no name: the
+; entry is named after its provider and model.
 ; @param {Map} providers Provider id -> descriptor, as the catalogue publishes.
 ; @param {Array} order The ids in the catalogue's provider_order; 0 lists the
 ;     Map's own order.
@@ -276,26 +332,11 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
 		return
 
-	; Step 5 — friendly name, LAST so its default is provider/model. The
-	; default is deduped against the other entries so rows stay distinct.
-	if (existing != "") {
-		def_name := _LLM_MenuApiEntryGet(existing, "Name", "")
-		name_exclude := _LLM_MenuApiEntryGet(existing, "Id", "")
-	} else {
-		def_name := provider_id . "/" . new_model
-		name_exclude := ""
-	}
-	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
-		"w420 h130", def_name)
-	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &typed_name)
-		return
-	new_name := _LLM_Menu_UniqueApiEntryName(typed_name,
-		_LLM_Menu["api_entries"], name_exclude)
-
-	; Persist.
+	; Persist. Name holds the automatic name only because builds before
+	; 2026-10 refuse an entry without one; no build reads it any more.
 	new_entry := Map(
 		"Id",       existing != "" ? _LLM_MenuApiEntryGet(existing, "Id", _LLM_Menu_NewApiId()) : _LLM_Menu_NewApiId(),
-		"Name",     new_name,
+		"Name",     provider_id . "/" . new_model,
 		"Provider", provider_id,
 		"BaseUrl",  new_url,
 		"Token",    new_token,
@@ -308,6 +349,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
 	if !Committed
 		return false
+	new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
 
 	; Creation only: offer the full end-to-end probe on the just-saved
 	; entry, so a bad token or model surfaces here with its server message
@@ -420,7 +462,7 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 		for Entry in _LLM_Menu.Get("api_entries", []) {
 			if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
 				Matches += 1
-				CurrentName := _LLM_MenuApiEntryGet(Entry, "Name", Name)
+				CurrentName := _LLM_Menu_ApiEntryDisplayName(Entry)
 			}
 		}
 		if Matches != 1 || !LLM_AuxFinish(Owner)
@@ -459,10 +501,10 @@ _LLM_Menu_RemoveActiveApiEntry() {
 			break
 		}
 	}
-	entry_name := _LLM_MenuApiEntryGet(active_entry, "Name", active_id)
+	entry_name := (active_entry != "") ? _LLM_Menu_ApiEntryDisplayName(active_entry) : active_id
 	confirm := MsgBox(
-		StrReplace(t("menu.llm.api_remove_confirm_body"), "%s", entry_name),
-		t("menu.llm.api_remove_confirm_title"),
+		t("menu.llm.api_remove_confirm_body"),
+		StrReplace(t("menu.llm.api_remove_confirm_title"), "%s", entry_name),
 		"4 48"  ; Yes/No + warning icon
 	)
 	if (confirm != "Yes")
@@ -708,7 +750,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	}
 	spec := LLM_REMOTE_TEST_REQUEST
 	EntryId := snapshot["Id"]
-	Name := snapshot["Name"]
+	Name := _LLM_Menu_ApiEntryDisplayName(entry)
 	Owner := ""
 	try Owner := LLM_AuxBegin("api_test:" . EntryId, Map(
 		"backend", "api",
@@ -881,6 +923,9 @@ _LLM_Menu_ApiEntryFieldsAreSafe(Entry) {
 ; Parses and validates the complete persisted image before any row becomes
 ; visible. A malformed sibling invalidates the whole authority: publishing a
 ; prefix would make selection and credential identity depend on parser order.
+; Name stays a required field so a file this build writes still loads in the
+; builds before 2026-10; its value, a name the user typed in those builds, is
+; never read: every row shows the automatic name.
 _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 	global LLM_API_PROVIDERS
 	if !IsSet(Providers)

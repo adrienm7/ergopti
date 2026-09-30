@@ -72,7 +72,7 @@ Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off 
 _LMDG_EmitRowAppliesGreying() {
 	Seg := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(Seg != "", "_LLM_Menu_EmitRow() must exist in menu_main.ahk")
-	Assert(InStr(Seg, "_LLM_Menu_AddRow(StrReplace(t(" . Chr(34) . "menu.llm.model_backend") > 0,
+	Assert(InStr(Seg, "_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), LLM_Menu_BuildBackendMenu(), disabled)") > 0,
 		"_LLM_Menu_EmitRow must emit the backend row via _LLM_Menu_AddRow so its greying follows the spec-resolved flag")
 	Assert(InStr(Seg, "model_menu, disabled)") > 0,
 		"_LLM_Menu_EmitRow must emit the model row with the resolved 'disabled' flag (not a hardcoded value) so the spec policy drives greying")

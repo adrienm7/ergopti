@@ -94,7 +94,7 @@ helpers.describe("API panel runtime identity transaction", function()
 			rows = ApiPanel.build_model_picker(context)
 			local entry_b_action
 			for _, row in ipairs(rows) do
-				if type(row.label) == "string" and row.label:find("Entry B", 1, true) then
+				if row.label == "openai/model-b" then
 					entry_b_action = row.action
 				end
 			end
@@ -111,7 +111,7 @@ helpers.describe("API panel runtime identity transaction", function()
 			rows = ApiPanel.build_model_picker(context)
 			local entry_a_action
 			for _, row in ipairs(rows) do
-				if type(row.label) == "string" and row.label:find("Entry A", 1, true) then
+				if row.label == "openai/model-a" then
 					entry_a_action = row.action
 				end
 			end
@@ -125,7 +125,9 @@ helpers.describe("API panel runtime identity transaction", function()
 		if not ok then error(err) end
 	end)
 
-	helpers.it("lists entries by their defined name only", function()
+	-- api-entry-auto-name: the picker names an entry <provider>/<model>; the
+	-- label an earlier build stored is not read.
+	helpers.it("lists entries by their automatic name only", function()
 		local module_names = {
 			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
@@ -164,13 +166,10 @@ helpers.describe("API panel runtime identity transaction", function()
 			})
 			local found = false
 			for _, row in ipairs(rows) do
-				if type(row.label) == "string" and row.label:find("Entry A", 1, true) then
-					found = true
-					helpers.assert_eq(row.label, "Entry A",
-						"the picker row shows the defined name only, never provider/model")
-				end
+				helpers.assert_true(row.label ~= "Entry A", "the stored label is never shown")
+				if row.label == "openai/model-a" then found = true end
 			end
-			helpers.assert_true(found, "the entry row must list the defined name")
+			helpers.assert_true(found, "the entry row must list provider/model")
 		end, debug.traceback)
 		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
 		if not ok then error(err) end

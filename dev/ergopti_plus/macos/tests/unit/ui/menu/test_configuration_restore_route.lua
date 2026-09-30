@@ -1,12 +1,12 @@
 --- tests/unit/ui/menu/test_configuration_restore_route.lua
 
 --- ==============================================================================
---- MODULE: Configuration › Restore Recommended Values Route (macOS)
+--- MODULE: Configuration › Restore And Clear Route (macOS)
 --- DESCRIPTION:
---- Boots the real ui.menu.start and proves the Configuration row restores the
---- recommended values through the global scope composition over every
---- category owner, never through the factory reset that moves the whole
---- configuration aside (which leaves the system behaviour, not the preset).
+--- Boots the real ui.menu.start and proves the Configuration rows restore the
+--- recommended values, or clear every category, through the global scope
+--- composition over every category owner, never through the factory reset
+--- that moves the whole configuration aside.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -35,9 +35,14 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 			-- Hotstrings take part like every config.toml category: a skipped one
 			-- left its choices, delays and engine switch outside the restore.
 			helpers.assert_eq(ids, { "gestures", "hotstrings", "keyboard_layout", "llm", "metrics", "shortcuts" })
-			for _, name in ipairs({ "backup_path", "confirm", "paused", "refresh" }) do
+			for _, name in ipairs({ "backup_path", "paused", "refresh" }) do
 				helpers.assert_type(requested.options[name], "function")
 			end
+			helpers.assert_nil(requested.options.confirm, "neither Configuration row asks")
+			-- « Tout effacer », beside it since 2026-09-30: the same composition,
+			-- in clear mode, one transaction whose owners each back up first.
+			helpers.assert_eq(actions.clear_to_system(), true)
+			helpers.assert_eq(requested.mode, "clear")
 			helpers.assert_type(actions.factory_reset, "function",
 				"the factory reset stays exported, bound to no row")
 		end)

@@ -158,6 +158,15 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			if (FilteredId != "" and DynamicHandlers is Map and DynamicHandlers.Has(FilteredId)) {
 				try LoggerDebug("MenuRenderer", "Item '{1}' in '{2}' is platform-filtered out but a handler is registered for it — manifest/driver drift.", FilteredId, ManifestKey)
 			}
+			; Hidden unless declared `unavailable = "grey"`: not yet ported here, so
+			; drawn disabled with the short form of its reason (the maintainer's
+			; rule of 2026-09-30); a hidden row is not applicable here.
+			if _MR_Get(Item, "unavailable") == "grey" {
+				if PendingSep and ItemCount > 0
+					Result.Add()
+				PendingSep := false
+				ItemCount += _MR_RenderGreyedStandIn(Result, Item, ManifestKey)
+			}
 			continue
 		}
 
@@ -590,6 +599,35 @@ _MR_NormalizeSeparators(TargetMenu) {
 	if (Count > 0 and PreviousWasSep) {
 		TargetMenu.Delete(Count . "&")
 	}
+}
+
+; The short form of a translated reason: the text before its first colon,
+; ASCII or full-width, which every platform reason opens with, or the whole
+; text when it has none.
+_MR_ReasonHead(Text) {
+	Cut := 0
+	for _, Mark in [":", "："] {
+		At := InStr(Text, Mark, true)
+		if At && (Cut == 0 || At < Cut)
+			Cut := At
+	}
+	return Trim(Cut ? SubStr(Text, 1, Cut - 1) : Text)
+}
+
+; Render the disabled stand-in of a row this platform has not yet ported: its
+; label and the short form of its translated reason. Returns 1 once drawn.
+_MR_RenderGreyedStandIn(ResultMenu, Item, ManifestKey) {
+	I18nKey := _MR_Get(Item, "i18n")
+	ReasonKey := _MR_Get(Item, "reason_key")
+	if (I18nKey == "" or ReasonKey == "") {
+		try LoggerError("MenuRenderer", "Greyed row '{1}' in '{2}' lacks its label or reason — not drawn.",
+			_MR_Get(Item, "id"), ManifestKey)
+		return 0
+	}
+	Label := t(I18nKey) . " — " . _MR_ReasonHead(t(ReasonKey))
+	ResultMenu.Add(Label, (*) => "")
+	ResultMenu.Disable(Label)
+	return 1
 }
 
 ; Render a disabled section header label (visual grouping, not clickable).

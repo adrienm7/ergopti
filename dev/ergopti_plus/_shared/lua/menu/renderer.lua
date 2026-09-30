@@ -213,6 +213,37 @@ function M.new(deps)
 		return false
 	end
 
+	--- The short form of a translated reason: the text before its first colon,
+	--- ASCII or full-width, which every platform reason opens with (« Not on
+	--- macOS yet: … »), or the whole text when it has none.
+	--- @param text string Translated reason.
+	--- @return string head
+	local function reason_head(text)
+		local cut = nil
+		for _, mark in ipairs({ ":", "\239\188\154" }) do
+			local at = text:find(mark, 1, true)
+			if at and (cut == nil or at < cut) then cut = at end
+		end
+		local head = cut and text:sub(1, cut - 1) or text
+		return (head:gsub("^%s+", ""):gsub("%s+$", ""))
+	end
+
+	--- The disabled stand-in of a row this platform has not yet ported: its
+	--- label and the short form of its translated reason. The manifest generator
+	--- refuses a `grey` row without both keys, so a missing one here is a stale
+	--- manifest, reported and not drawn.
+	--- @param manifest_key string Menu definition key, for the report.
+	--- @param item table Manifest entry declaring `unavailable = "grey"`.
+	--- @return table|nil row
+	local function greyed_stand_in(manifest_key, item)
+		if type(item.i18n) ~= "string" or type(item.reason_key) ~= "string" then
+			Logger.error(LOG, "Greyed row '%s' in '%s' lacks its label or reason — not drawn.",
+				tostring(item.id or item.i18n), manifest_key)
+			return nil
+		end
+		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
+	end
+
 
 
 
@@ -452,10 +483,19 @@ function M.new(deps)
 
 		for _, item in ipairs(menu_def) do
 			if not is_for_platform(item) then
-				-- A row this platform does not have is never shown, even when the
-				-- manifest explains why in a `reason_key`. Greyed stand-ins carrying
-				-- that explanation made the tray wide and full of rows the user cannot
-				-- use; the health check is where those explanations are read.
+				-- A row this platform does not have is hidden: not applicable here
+				-- (`unavailable = "hide"`), or not yet classified. A row declared
+				-- `unavailable = "grey"` is not yet ported here, and the maintainer
+				-- wants it seen: a disabled stand-in with the short form of its
+				-- reason, the full one staying in the health check.
+				if item.unavailable == "grey" then
+					local stand_in = greyed_stand_in(manifest_key, item)
+					if stand_in then
+						flush_sep()
+						table.insert(result, stand_in)
+						item_count = item_count + 1
+					end
+				end
 				goto continue
 			end
 
