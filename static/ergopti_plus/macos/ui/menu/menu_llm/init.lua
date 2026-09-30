@@ -31,6 +31,8 @@ local LiveModePanel    = require("ui.menu.menu_llm.live_mode_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
+local UnreachableOffer = require("ui.menu.menu_llm.unreachable_backend_offer")
+local OllamaEndpoint   = require("modules.llm.ollama_endpoint")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
@@ -880,6 +882,59 @@ local function create_menu(deps)
 					results[3] == true
 			end,
 		})
+
+		-- The last menu build's switch, which the fixes of an unreachable backend
+		-- run to turn the AI on: it knows the pause and the activation owner
+		local enable_from_offer = nil
+
+		--- Turns the AI on through the switch, for a fix the user pressed.
+		--- @param opts table|nil { install_ollama = true } when the install button was pressed.
+		--- @return boolean accepted
+		local function enable_ai(opts)
+				if type(enable_from_offer) ~= "function" then
+						Logger.error(LOG, "The AI cannot be turned on: its menu was never built.")
+						return false
+				end
+				return enable_from_offer(opts) == true
+		end
+
+		--- Tells the user that the Ollama backend does not answer and offers the
+		--- buttons that fix it (unreachable_backend_offer.lua).
+		--- @param automatic boolean True for a failure found in the background:
+		---   a notification whose click opens the dialog.
+		--- @return boolean offered
+		local function offer_unreachable_ollama(automatic)
+				return UnreachableOffer.offer({
+						backend = "ollama",
+						automatic = automatic == true,
+						actions = {
+								-- Switching to a server that answers is the user's confirmed choice
+								use_server = function(id, model)
+										return LocalServerPanel.use_server(id, model, function(selected)
+												if selected then enable_ai(nil) end
+										end)
+								end,
+								-- Enabling the AI starts Ollama through its usual owner
+								start = function()
+										if state.llm_backend ~= "ollama" then
+												Logger.warn(LOG, "Ollama start refused: the backend is now '%s'.",
+													tostring(state.llm_backend))
+												return false
+										end
+										return enable_ai(nil)
+								end,
+								install = function()
+										if state.llm_backend ~= "ollama" then
+												Logger.warn(LOG, "Ollama install refused: the backend is now '%s'.",
+													tostring(state.llm_backend))
+												return false
+										end
+										return enable_ai({ install_ollama = true })
+								end,
+						},
+				})
+		end
+
 		local function build_item()
 				Logger.debug(LOG, "Building LLM menu item (build_item)…")
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
@@ -1283,7 +1338,11 @@ local function create_menu(deps)
 							or "the activation owner is not ready")
 						return false
 				end
-				local toggle_action = toggle_ready and function()
+				--- Runs one switch transaction.
+				--- @param opts table|nil { install_ollama = true } when the user pressed
+				---   the install button of the unreachable-backend error.
+				local function run_toggle(opts)
+						local install_consented = type(opts) == "table" and opts.install_ollama == true
 						activation_generation = activation_generation + 1
 						local my_generation = activation_generation
 						local activation_backend = state.llm_backend
@@ -1354,12 +1413,20 @@ local function create_menu(deps)
 								end)
 						end
 
-						local function compensate_activation(reason)
+						--- @param reason string Why the AI goes back off, for the log.
+						--- @param expected boolean|nil True when the user gets an error
+						---   that names the fix: a warning, not an unexplained failure.
+						local function compensate_activation(reason, expected)
 								if activation_terminal then return false end
 								activation_terminal = true
 								if token ~= nil then activation_controller.complete(token) end
-								Logger.error(LOG, "LLM activation failed (%s); restoring disabled state.",
-									tostring(reason))
+								if expected == true then
+										Logger.warn(LOG, "LLM activation stopped (%s); restoring disabled state.",
+											tostring(reason))
+								else
+										Logger.error(LOG, "LLM activation failed (%s); restoring disabled state.",
+											tostring(reason))
+								end
 								if commit_enabled(false) ~= true then
 										Logger.error(LOG,
 											"Could not persist the compensating LLM disable after activation failure.")
@@ -1381,6 +1448,15 @@ local function create_menu(deps)
 								if activation_published then return true end
 								activation_published = true
 								publish_toggle()
+								return true
+						end
+
+						--- A start of Ollama that never answered turns the AI back off, then
+						--- posts the error that offers its fixes: this failure arrives after
+						--- the click, maybe while the user types, so never a modal.
+						local function settle_unreachable()
+								compensate_activation("Ollama does not answer at its endpoint", true)
+								offer_unreachable_ollama(true)
 								return true
 						end
 
@@ -1432,6 +1508,7 @@ local function create_menu(deps)
 												attempt.requirements_stale = true
 												return true
 										end
+										if reason == OllamaEndpoint.UNREACHABLE then return settle_unreachable() end
 										activation_terminal = true
 										activation_controller.complete(token)
 										return true
@@ -1441,6 +1518,8 @@ local function create_menu(deps)
 									models_mgr.check_requirements, state.llm_model,
 									on_success, on_cancel, {
 										requirement_owner = activation_requirement_owner,
+										-- A start that never answers ends in this menu's error
+										reports_unreachable = true,
 										is_current = function()
 											return activation_is_current(authorization)
 										end,
@@ -1467,6 +1546,9 @@ local function create_menu(deps)
 											or not activation_is_current(authorization) then
 												attempt.requirements_stale = true
 												return true
+										end
+										if terminal_cancel_reason == OllamaEndpoint.UNREACHABLE then
+												return settle_unreachable()
 										end
 										activation_terminal = true
 										activation_controller.complete(token)
@@ -1522,6 +1604,9 @@ local function create_menu(deps)
 														if activation_controller.complete(token) ~= true then return false end
 														return publish_activation_once()
 												end
+												if requirements_terminal.reason == OllamaEndpoint.UNREACHABLE then
+														return settle_unreachable()
+												end
 												if requirements_terminal.reason ~= "stale" then
 														activation_terminal = true
 														return activation_controller.complete(token) == true
@@ -1537,6 +1622,15 @@ local function create_menu(deps)
 						end
 
 						if target_enabled then
+								-- Without Ollama nothing can answer at its endpoint: the AI stays
+								-- off, nothing is committed, and the error names the fixes, a
+								-- local server that answers first. Its install button comes back
+								-- here with the consent the download needs.
+								if state.llm_backend == "ollama" and not install_consented
+									and not runtime_install_offer.is_installed("ollama") then
+										Logger.warn(LOG, "AI not enabled: Ollama is not installed; offering the fixes.")
+										return offer_unreachable_ollama(false)
+								end
 								-- Global Disable All mutates the shared preference outside
 								-- this closure.  Its old token is already fenced by state,
 								-- but must settle exactly before a new enable can own work.
@@ -1550,19 +1644,26 @@ local function create_menu(deps)
 								end
 
 								-- Enabling the AI selects its backend: MLX always settles its
-								-- runtime first, and a missing Ollama is offered for download
-								-- before anything else runs. A decline keeps the AI off.
+								-- runtime first, and a missing Ollama is installed, with the
+								-- consent of the error's install button, before anything else runs.
 								local runtime_backend = state.llm_backend
 								if runtime_backend == "mlx" or (runtime_backend == "ollama"
 									and not runtime_install_offer.is_installed("ollama")) then
 										attempt.phase = "bootstrap"
 										Logger.info(LOG, "Activating LLM — settling the %s runtime first.",
 											tostring(runtime_backend))
+										local select_runtime = runtime_install_offer.select
+										if runtime_backend == "ollama" then
+												-- The install button was the question: never ask it twice
+												select_runtime = function(_, on_complete)
+														return runtime_install_offer.install_ollama(on_complete)
+												end
+										end
 										local bootstrap_dispatching = true
 										local bootstrap_terminal = false
 										local bootstrap_ok, bootstrap_accepted = pcall_log(
 											"runtime_install_offer.select",
-											runtime_install_offer.select, runtime_backend, function(ok)
+											select_runtime, runtime_backend, function(ok)
 													if bootstrap_terminal then return false end
 													bootstrap_terminal = true
 													attempt.bootstrap_result = ok == true
@@ -1590,7 +1691,14 @@ local function create_menu(deps)
 						if commit_enabled(false) ~= true then return false end
 						publish_toggle()
 						return true
-				end or refuse_toggle
+				end
+				local toggle_action = toggle_ready and function() return run_toggle(nil) end
+					or refuse_toggle
+				enable_from_offer = function(opts)
+						if state.llm_enabled == true then return true end
+						if not toggle_ready then return refuse_toggle() end
+						return run_toggle(opts)
+				end
 
 				local main_menu = {}
 				do
@@ -1654,6 +1762,8 @@ local function create_menu(deps)
 				activate_hotkey            = activate_hotkey,
 				mlx_deps_checker           = mlx_deps_checker,
 				runtime_installed          = runtime_install_offer.is_installed,
+				-- A backend found silent at startup is told with its fixes, never a modal
+				offer_unreachable_ollama   = function() return offer_unreachable_ollama(true) end,
 				deps                       = deps,
 				prediction_locks           = prediction_locks,
 				get_startup_silence        = get_startup_silence,
