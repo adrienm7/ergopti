@@ -67,6 +67,25 @@ _MetaListAhkFilesCC(Dir) {
 ; =====================================
 ; =====================================
 
+; One registered failure per conflict. Bound at registration: the nested
+; function this replaces read copies of the loop's values, one slot every
+; iteration overwrote, so every failing test described the last conflict.
+; @param ClassName {String} The class name declared global.
+; @param DeclFile {String} The file holding the `global` declaration.
+; @param ClassFiles {Array} The files defining the class.
+_MetaConflictFail(ClassName, DeclFile, ClassFiles) {
+	FileList := ""
+	for F in ClassFiles {
+		FileList .= F . ", "
+	}
+	Msg := "global " . ClassName
+		. " in " . DeclFile
+		. " conflicts with class defined in: "
+		. SubStr(FileList, 1, -2)
+	; AssertEqual("", non-empty) fails with the conflict description as the diff
+	AssertEqual("", Msg)
+}
+
 _MetaRunClassGlobalConflictTests() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
@@ -146,25 +165,9 @@ _MetaRunClassGlobalConflictTests() {
 			. ClassNames.Count . " classes scanned)", _MetaNoConflict)
 	} else {
 		for Conflict in Conflicts {
-			; Capture loop variables for the closure
-			_ConflictName  := Conflict.name
-			_ConflictFile  := Conflict.file
-			_ConflictFiles := ClassNames[Conflict.name]
-			_MetaConflictFail() {
-				FileList := ""
-				for F in _ConflictFiles {
-					FileList .= F . ", "
-				}
-				Msg := "global " . _ConflictName
-					. " in " . _ConflictFile
-					. " conflicts with class defined in: "
-					. SubStr(FileList, 1, -2)
-				; AssertEqual("", non-empty) fails with the conflict description as the diff
-				AssertEqual("", Msg)
-			}
 			Test(
 				"meta class/global conflict: `global " . Conflict.name . "` in " . Conflict.file,
-				_MetaConflictFail
+				_MetaConflictFail.Bind(Conflict.name, Conflict.file, ClassNames[Conflict.name])
 			)
 		}
 	}
