@@ -16,9 +16,10 @@
 --- 2. Fresh servers: the local servers are swept when the error is shown
 ---    (modules/llm/local_servers.lua), so a server started a moment ago is
 ---    offered and a stopped one is not.
---- 3. Confirmed, never silent: on macOS the neutral backend (W1) is MLX, so an
----    Ollama backend is always the user's explicit choice. It is never replaced
----    behind the user's back; a server that answers is only the first button.
+--- 3. Confirmed, never silent: the Ollama backend is the user's choice, or on an
+---    Intel Mac the platform default (the neutral backend (W1) is MLX on Apple
+---    silicon only). It is never replaced behind the user's back; a server that
+---    answers is only the first button.
 --- 4. Never while typing: a failure found in the background (startup, a start
 ---    that timed out) posts one notification whose click opens the dialog, as
 ---    modules/llm/local_model_offer.lua does.
