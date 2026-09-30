@@ -553,6 +553,15 @@ do
 	if home then os.execute("rm -rf " .. sh_quoted(home)) end
 end
 
+do
+	print("\n--- Installed-driver start-up scenarios (real main(), every module loaded) ---")
+	dofile(driver_root .. "/tests/e2e/startup_scenarios.lua").run({
+		pass = pass,
+		fail = fail,
+		skip = function(label) print(string.format("  SKIP  %s", label)) end,
+	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit" })
+end
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
