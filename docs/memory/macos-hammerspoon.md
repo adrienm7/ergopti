@@ -93,9 +93,20 @@ another backend, or after an update: only `install_for_selection()` of
 (Ollama: `ollama_binary.resolve()`; MLX: venv `bin/python` plus
 `.last_sync_hash`), so a new `uv.lock` in an update never re-syncs the venv.
 When the MLX import probe then fails on an installed venv,
-`mlx_deps_checker.invalidate_runtime()` removes only `.last_sync_hash`: the
-runtime reads as not installed and the next MLX selection runs the script's
-full staged rebuild. Never re-sync from the probe itself.
+`mlx_deps_checker.invalidate_runtime(cause)` flags it broken in memory first
+(a refused `.last_sync_hash` removal once left it "installed", so re-selecting
+MLX did nothing), then removes the fingerprint; the next MLX selection, or the
+repair button, runs the script with `ERGOPTI_MLX_REPAIR=1`. Never re-sync from
+the probe itself. The script publishes a venv, and exits 0, only after its
+interpreter imported `MLX_IMPORT_PROBE` (keep it equal to the Lua probe of
+`models_manager_mlx`); the repair removes only the venv it derives, never a
+link or a folder without a Python environment. hs.task hands the streaming
+callback everything it reads, so a failure's cause must be kept while it
+streams (`mlx_bootstrap_diagnosis.new_tail`); the completion's own output was
+empty and every MLX failure read "cause inconnue". Every failure goes to
+`ui/menu/menu_llm/mlx_repair_offer.lua`, whose dialog names the cause and
+carries the button (`mlx-bootstrap-*`). The Ollama checker still builds its
+failure tail from the completion alone.
 The Ollama installer publishes the whole release archive (CLI plus the
 ggml/MLX libraries it loads from its own folder, as in
 `Ollama.app/Contents/Resources`) into the folder
