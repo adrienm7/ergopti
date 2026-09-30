@@ -7,7 +7,9 @@
 --- The page answers with manifest paths and values; the shared
 --- onboarding_answers contract validates them against the generated catalogue
 --- and they reach config.toml in one versioned batch, after which the daemon
---- restarts so every module starts from the file.
+--- restarts so every module starts from the file. The Tap-Holds page's checked
+--- keys are imported into the chosen folder's tap_hold.toml by the tap-hold
+--- writer, which also switches the feature on there.
 --- ==============================================================================
 
 local M = {}
@@ -191,8 +193,8 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
---- Tells the user why the wizard saved nothing, as the other hosts' dialogs do;
---- the window stays open for a retry.
+--- Tells the user what the wizard could not save, as the other hosts' dialogs
+--- do; a refused commit leaves the window open for a retry.
 --- @param state table Daemon state.
 --- @param key string Locale key of the message.
 local function report_failure(state, key)
@@ -245,6 +247,32 @@ local function prepare_destination(path)
 	return true
 end
 
+--- Imports the checked tap-hold keys into the chosen folder's tap_hold.toml.
+--- The answers are already committed: a refused import is reported and leaves
+--- that file as it was, and the daemon still restarts on the saved answers.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param target_dir string The configuration folder the wizard set up.
+--- @param keys table The engine's key ids to import, at least one.
+--- @return boolean imported
+local function import_tap_holds(state, target_dir, keys)
+	local writer = dependency(state, "tap_hold_writer", "platform.remap.tap_hold_writer")
+	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	if not writer or not loader then
+		Logger.error(LOG, "The tap-hold keys were not imported: the tap-hold writer is unavailable.")
+		report_failure(state, "onboarding.error.tap_holds_import")
+		return false
+	end
+	local ok, imported, detail = pcall(function()
+		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		return writer.import_recommended(target_dir .. "/" .. writer.FILE_NAME, keys, preset)
+	end)
+	if ok and imported == true then return true end
+	Logger.error(LOG, "The tap-hold keys were not imported: %s.",
+		tostring(ok and detail or imported))
+	report_failure(state, "onboarding.error.tap_holds_import")
+	return false
+end
+
 local function finish(state, answers)
 	local authorities = {
 		i18n = dependency(state, "i18n", "infra.i18n"),
@@ -273,6 +301,7 @@ local function finish(state, answers)
 		return { done = false }
 	end
 	local rows, refusal = Answers.rows(index, answers.operations, authorities.manifest)
+	local tap_hold_keys = rows and Answers.tap_hold_keys(index, answers.operations, authorities.manifest)
 	local target_dir = normalize_config_dir(authorities.config_paths, answers.config_dir)
 	if not rows or not locale_available(authorities.i18n, answers.locale) or not target_dir then
 		Logger.error(LOG, "Onboarding finish refused — %s.",
@@ -313,6 +342,7 @@ local function finish(state, answers)
 		return { done = false }
 	end
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
+	if #tap_hold_keys > 0 then import_tap_holds(state, target_dir, tap_hold_keys) end
 
 	local manager = webview(state)
 	if manager and type(manager.hide) == "function" then pcall(manager.hide, APP_NAME) end

@@ -126,11 +126,16 @@ These are software implementations; final hardware verification remains below.
    Keep independent base/Shift, AltGr/ShiftAltGr and number-row emulation.
 7. [~] Complete W2: seven-page first-run opt-in wizard, per-category recommended
    choices, consistent WebView behavior and genuine translations in 21 locales.
-   Still open: the tap-holds page has no per-key checklist, so a Yes imports
-   no key (Windows sets only `category_enabled.tap_holds`; macOS and Linux
-   show a note). Import keys through each driver's tap-hold writer. Until W1
-   moves them into config.toml, Linux applies its hotstring sections through
-   hotstrings_config (storage.json) and leaves the trigger to its tray.
+   The tap-holds page lists each engine's recommended keys from the shared
+   tap-hold catalogue and imports only the checked ones through each driver's
+   tap-hold writer: Windows renders them into the tap_hold.toml beside
+   config.toml in the wizard's own transition, macOS goes through the remap
+   owner's settings transaction (a file save before the bridge starts or for a
+   moved folder), Linux through tap_hold_writer into the chosen folder, where
+   macOS and Linux also switch the Tap-Holds on. The Windows part is statically
+   checked only until its CI run. Until W1 moves them into config.toml, Linux
+   applies its hotstring sections through hotstrings_config (storage.json) and
+   leaves the trigger to its tray.
 8. [x] Complete A4: TapHold menu grouped by hand, shared catalogue, key
        combinations under Shortcuts, with the actual configuration/runtime owners.
 9. [x] Complete C4: shared centered update-check WebView, checking/current/new

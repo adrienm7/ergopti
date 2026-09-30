@@ -4480,6 +4480,116 @@ function M.set_mod_combos_enabled(value)
 	return committed
 end
 
+--- Whether M.init() has built the live settings. The first-run wizard runs
+--- before it, and a wizard that moves the configuration folder runs while it
+--- still holds the previous folder's settings.
+--- @return boolean initialized
+function M.is_initialized()
+	return _state ~= nil
+end
+
+--- The shipped recommendation of each key the first-run wizard imports.
+--- @param key_ids any The wizard's key ids.
+--- @param key_defs table Available key definitions (tap_hold_keys.json).
+--- @return table|nil bindings key id -> { tap, hold }.
+--- @return string|nil err Why the keys were refused.
+local function recommended_bindings(key_ids, key_defs)
+	if type(key_ids) ~= "table" or #key_ids == 0 then return nil, "no key to import" end
+	local known = {}
+	for _, key_def in ipairs(key_defs or {}) do known[key_def.id] = true end
+	local bindings = {}
+	for _, key_id in ipairs(key_ids) do
+		if type(key_id) ~= "string" or not known[key_id] then
+			return nil, "unknown tap-hold key '" .. tostring(key_id) .. "'"
+		end
+		if bindings[key_id] then return nil, "'" .. key_id .. "' is imported twice" end
+		local preset = Defaults.tap_hold[key_id]
+		local tap = type(preset) == "table" and preset[1] or "none"
+		local hold = type(preset) == "table" and preset[2] or "none"
+		if tap == "none" and hold == "none" then
+			return nil, "the shipped defaults recommend nothing for '" .. key_id .. "'"
+		end
+		bindings[key_id] = { tap = tap, hold = hold }
+	end
+	return bindings
+end
+
+--- Writes the imported keys into a detached settings candidate: each key
+--- becomes exactly its recommendation (no per-key delay, as in the preset) and
+--- the Tap-Holds switch turns on; every other key keeps its binding.
+--- @param candidate table Detached settings state.
+--- @param bindings table From recommended_bindings().
+local function apply_recommended_bindings(candidate, bindings)
+	candidate.tap_holds_enabled = true
+	for key_id, binding in pairs(bindings) do
+		candidate.tap_hold_config[key_id] = { tap = binding.tap, hold = binding.hold }
+	end
+end
+
+--- Imports the shipped recommendation of the given keys and switches the
+--- Tap-Holds on, as one exact settings transaction of the running bridge: the
+--- first-run wizard's Tap-Holds answer when the bridge runs the folder it set
+--- up. Keys the wizard left unchecked keep their bindings.
+--- @param key_ids table Key ids of tap_hold_keys.json, at least one.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True when candidate regeneration was accepted.
+function M.import_recommended_keys(key_ids, on_done)
+	local label = "Recommended tap-hold import"
+	if not require_state(label) then
+		invoke_public_callback(label, on_done, false, "not-initialized", 0)
+		return false
+	end
+	local bindings, refusal = recommended_bindings(key_ids, M.TAP_HOLD_KEYS)
+	if not bindings then
+		Logger.error(LOG, "%s refused: %s.", label, tostring(refusal))
+		invoke_public_callback(label, on_done, false, "invalid-keys", 0)
+		return false
+	end
+	Logger.debug(LOG, "%s transaction requested for %d key(s).", label, #key_ids)
+	return apply_bulk_settings_transaction(label, function(candidate)
+		apply_recommended_bindings(candidate, bindings)
+		return #key_ids
+	end, on_done)
+end
+
+--- Saves the same import to a config_karabiner.toml the running bridge does
+--- not own: before M.init() (the first-run wizard reloads before the bridge
+--- starts) or for the folder a wizard moves the configuration to. Nothing is
+--- live to publish or deploy there; the next M.init() reads the file. An unsafe
+--- file is refused, never replaced, and « Ergopti uses Karabiner » is left as
+--- the file has it.
+--- @param key_ids table Key ids of tap_hold_keys.json, at least one.
+--- @param path string The config_karabiner.toml of the folder being set up.
+--- @return boolean saved
+--- @return string|nil err Why nothing was saved.
+function M.save_recommended_keys(key_ids, path)
+	local label = "Recommended tap-hold save"
+	if type(path) ~= "string" or path == "" then return false, "no settings file to save to" end
+	local key_defs = Config.load_tap_hold_keys(TAP_HOLD_FILE)
+	local mod_combos = Config.load_mod_combos(MOD_COMBOS_FILE)
+	if not key_defs or not mod_combos then return false, "the remap data files are unreadable" end
+	local bindings, refusal = recommended_bindings(key_ids, key_defs)
+	if not bindings then
+		Logger.error(LOG, "%s refused: %s.", label, tostring(refusal))
+		return false, refusal
+	end
+	Logger.start(LOG, "%s: %d key(s) into '%s'…", label, #key_ids, path)
+	local state, status = Config.load_user_config(key_defs, mod_combos, path)
+	if type(state) ~= "table" or status == "error" then
+		Logger.error(LOG, "%s refused: '%s' is unsafe.", label, path)
+		return false, "'" .. path .. "' is unsafe"
+	end
+	apply_recommended_bindings(state, bindings)
+	-- A settings-only save carries no integration decision.
+	state.enabled = nil
+	if Config.save_user_config(state, path) ~= true then
+		Logger.error(LOG, "%s: '%s' was not written.", label, path)
+		return false, "'" .. path .. "' was not written"
+	end
+	Logger.success(LOG, "%s: %d key(s) saved into '%s'.", label, #key_ids, path)
+	return true
+end
+
 --- Copies exactly the settings persisted in config_karabiner.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.

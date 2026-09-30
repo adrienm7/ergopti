@@ -885,7 +885,110 @@
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
 						"consent": false,
-						"groups": [],
+						"groups": [
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.left_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.tab",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "tab",
+										"label": [
+											{
+												"key": "tap_hold.group.tab"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.caps_lock",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "caps_lock",
+										"label": [
+											{
+												"key": "tap_hold.group.caps_lock"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_shift",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_shift",
+										"label": [
+											{
+												"key": "tap_hold.group.left_shift"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_ctrl",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_ctrl",
+										"label": [
+											{
+												"key": "tap_hold.group.left_ctrl"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_alt",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_alt",
+										"label": [
+											{
+												"key": "tap_hold.group.left_alt"
+											}
+										]
+									}
+								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.right_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.alt_gr",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "alt_gr",
+										"label": [
+											{
+												"key": "tap_hold.group.alt_gr"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.right_ctrl",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "right_ctrl",
+										"label": [
+											{
+												"key": "tap_hold.group.right_ctrl"
+											}
+										]
+									}
+								]
+							}
+						],
 						"master": {
 							"path": "category_enabled.tap_holds",
 							"default": false
@@ -2446,8 +2549,134 @@
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
 						"consent": false,
-						"groups": [],
-						"note_key": "onboarding.page.tap_holds.menu_note"
+						"groups": [
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.left_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.tab",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "tab",
+										"label": [
+											{
+												"key": "tap_hold.group.tab"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.caps_lock",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "caps_lock",
+										"label": [
+											{
+												"key": "tap_hold.group.caps_lock"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_shift",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_shift",
+										"label": [
+											{
+												"key": "tap_hold.group.left_shift"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.fn",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "fn",
+										"label": [
+											{
+												"key": "tap_hold.group.fn"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_control",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_control",
+										"label": [
+											{
+												"key": "tap_hold.group.left_ctrl"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_option",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_option",
+										"label": [
+											{
+												"key": "tap_hold.group.left_option"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_command",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_command",
+										"label": [
+											{
+												"key": "tap_hold.group.left_command"
+											}
+										]
+									}
+								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.right_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.right_command",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "right_command",
+										"label": [
+											{
+												"key": "tap_hold.group.right_command"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.right_option",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "right_option",
+										"label": [
+											{
+												"key": "tap_hold.group.right_option"
+											}
+										]
+									}
+								]
+							}
+						]
 					},
 					{
 						"id": "shortcuts",
@@ -3726,8 +3955,110 @@
 						"question_key": "menu.tapholds.enable",
 						"description_key": "onboarding.page.tap_holds.description",
 						"consent": false,
-						"groups": [],
-						"note_key": "onboarding.page.tap_holds.menu_note"
+						"groups": [
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.left_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.tab",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "tab",
+										"label": [
+											{
+												"key": "tap_hold.group.tab"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.caps_lock",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "caps_lock",
+										"label": [
+											{
+												"key": "tap_hold.group.caps_lock"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_shift",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_shift",
+										"label": [
+											{
+												"key": "tap_hold.group.left_shift"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_ctrl",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_ctrl",
+										"label": [
+											{
+												"key": "tap_hold.group.left_ctrl"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.left_alt",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "left_alt",
+										"label": [
+											{
+												"key": "tap_hold.group.left_alt"
+											}
+										]
+									}
+								]
+							},
+							{
+								"label": [
+									{
+										"key": "menu.tapholds.right_hand_tap_hold"
+									}
+								],
+								"items": [
+									{
+										"path": "tap_holds.keys.alt_gr",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "alt_gr",
+										"label": [
+											{
+												"key": "tap_hold.group.alt_gr"
+											}
+										]
+									},
+									{
+										"path": "tap_holds.keys.right_ctrl",
+										"value": true,
+										"default": false,
+										"recommended": true,
+										"tap_hold_key": "right_ctrl",
+										"label": [
+											{
+												"key": "tap_hold.group.right_ctrl"
+											}
+										]
+									}
+								]
+							}
+						]
 					},
 					{
 						"id": "shortcuts",

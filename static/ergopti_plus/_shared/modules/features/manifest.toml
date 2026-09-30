@@ -5858,6 +5858,8 @@ restore_exclude = []
 #                whose recommendation differs from its neutral default.
 #                "hotstrings": every bundled section, language -> file ->
 #                section from _shared/modules/hotstrings/_index.toml.
+#                "tap_holds": every key of the platform's column of the shared
+#                tap-hold catalogue its engine ships a recommendation for.
 #                "none": the question alone (AI and metrics consent).
 #   exclude      Scope prefixes left out of a "recommended" checklist.
 #   labels       Label keys for recommended items whose manifest description
@@ -5866,8 +5868,10 @@ restore_exclude = []
 #   note_key     Per-platform explanation for a page without a question.
 #   consent      The answer is a privacy consent: never pre-selected.
 #   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
-# The wizard persists only manifest paths. A checklist's pre-selection is the
-# manifest `recommended` value, and every question starts at No.
+# The wizard persists only manifest paths, except the tap-hold keys: no driver
+# keeps those in config.toml, so each host imports a checked key's shipped
+# recommendation through its own tap-hold writer. A checklist's pre-selection is
+# the manifest `recommended` value, and every question starts at No.
 [onboarding]
 order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
 
@@ -5875,11 +5879,12 @@ order = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", 
 title_key = "menu.tapholds.title"
 question_key = "menu.tapholds.enable"
 description_key = "onboarding.page.tap_holds.description"
-master = { ahk = "category_enabled.tap_holds" }
-checklist = "none"
 # macOS keeps the switch in config_karabiner.toml and Linux in tap_hold.toml,
-# both written by their Tap-Holds menu: a config.toml answer would never be read.
-note_key = { hs = "onboarding.page.tap_holds.menu_note", linux = "onboarding.page.tap_holds.menu_note" }
+# where a config.toml answer would never be read: there, importing a checked
+# key switches the Tap-Holds on in that file, and a No or an empty list writes
+# nothing.
+master = { ahk = "category_enabled.tap_holds" }
+checklist = "tap_holds"
 
 [onboarding.pages.shortcuts]
 title_key = "menu.shortcuts.title"

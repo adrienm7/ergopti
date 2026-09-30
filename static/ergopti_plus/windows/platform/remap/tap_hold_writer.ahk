@@ -972,3 +972,74 @@ class TapHoldScopeOwner {
 		return [{ path: this.path, image: Image }]
 	}
 }
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 6/ First-run wizard import =======
+; ==========================================
+; ==========================================
+
+; The tap_hold.toml of the configuration folder whose config.toml is ConfigPath:
+; both live in the driver's folder of the configuration directory.
+; @param ConfigPath string A config.toml path.
+; @returns {String}
+TapHoldConfigPathBeside(ConfigPath) {
+	SplitPath(ConfigPath, , &Folder)
+	return Folder . "\tap_hold.toml"
+}
+
+; Renders the first-run wizard's Tap-Holds answer into a tap_hold.toml image
+; without publishing it: each key named takes exactly the shipped preset's
+; fields, the owned fields it had are replaced as one, and nothing else in the
+; file changes, so a key the user left unchecked keeps whatever it had. The
+; wizard publishes the image in its own configuration transition, beside the
+; config.toml whose category switch turns the Tap-Holds on.
+; @param Path string The tap_hold.toml of the folder being set up.
+; @param Defaults string The shared defaults.toml holding the preset.
+; @param KeyIds Array Key ids of this driver's catalogue column, at least one.
+; @returns {Map} The rendered image of TOML_BuildUpdatedContent.
+; Throws when a key has no recommendation or a source cannot be read.
+TapHoldImportImage(Path, Defaults, KeyIds) {
+	if !(Path is String) || Path == "" || !(Defaults is String) || Defaults == ""
+			|| !(KeyIds is Array) || KeyIds.Length == 0
+		throw ValueError("The tap-hold import requires its file, the preset and at least one key.")
+	if !FileExist(Defaults)
+		throw Error("The canonical tap-hold preset is missing.")
+	Preset := LoadTapHoldToml(Defaults)
+	if TOML_UnreadableFile(Defaults) || Preset["keys"].Count == 0
+		throw Error("The canonical tap-hold preset is unreadable or empty.")
+	Present := FileExist(Path) ? 1 : 0
+	Existing := Present ? TOML_ParseFreshFile(Path) : Map()
+	Kinds := TapHoldFieldKinds()
+	Rows := []
+	Imported := Map()
+	for KeyId in KeyIds {
+		if !(KeyId is String) || !Preset["keys"].Has(KeyId)
+			throw ValueError("The shipped preset recommends nothing for tap-hold key '" . String(KeyId) . "'.")
+		if Imported.Has(KeyId)
+			throw ValueError("Tap-hold key '" . KeyId . "' is imported twice.")
+		Imported[KeyId] := true
+		Section := "tap_hold.keys." . KeyId
+		if Existing.Has(Section) {
+			for Field in Existing[Section] {
+				if Kinds.Has(Field)
+					Rows.Push({ Section: Section, Key: Field, Delete: true })
+			}
+		}
+		for Field, Value in Preset["keys"][KeyId] {
+			if !Kinds.Has(Field)
+				throw Error("The canonical tap-hold preset contains an unknown field.")
+			Serialized := Kinds[Field] == "boolean" ? TOML_Bool(Value) : Value
+			Rows.Push({ Section: Section, Key: Field, Value: Serialized })
+		}
+	}
+	Image := TOML_BuildUpdatedContent(Path, Rows)
+	if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
+			|| Image["source_present"] != Present
+		throw Error("The tap-hold file '" . Path . "' could not be read or rendered.")
+	return Image
+}

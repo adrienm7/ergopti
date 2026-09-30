@@ -4,10 +4,11 @@
 ; MODULE: Onboarding / Config Write + Reload
 ; DESCRIPTION:
 ; Commits the wizard's validated answers: one transactional write of the
-; candidate config.toml (and of paths.toml when the configuration folder
-; moves), stamped with this build's schema version, then a single Reload so
-; every module starts from the new file. A refused reload rolls both files back
-; and leaves the wizard open for a retry.
+; candidate config.toml (with the imported tap-hold keys' tap_hold.toml, and
+; paths.toml when the configuration folder moves), stamped with this build's
+; schema version, then a single Reload so every module starts from the new
+; files. A refused reload rolls every file back and leaves the wizard open for
+; a retry.
 ;
 ; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
@@ -42,12 +43,16 @@ _Onboarding_CommitUpdates(Locale, Rows) {
 ; the FilePathsEditor dialog (infra/onboarding-independent helper in
 ; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
 ; structurally identical files.
+; The Tap-Holds page's checked keys are imported by the tap-hold writer into
+; the tap_hold.toml beside the candidate config.toml, in the same transition,
+; so a key never lands in a folder whose answers were not saved.
 ; @param Locale string Locale code the user picked.
 ; @param ConfigDir string Folder typed on the config page; "" is the OS default.
 ; @param Rows Array Validated rows from OnboardingAnswerRows.
+; @param TapHoldKeys Array Validated key ids from OnboardingTapHoldKeys.
 ; @param BeforeReloadFn Func|0 Teardown lent to the accepted reload hand-off.
 ; @returns {Boolean} False when nothing was committed or the reload was refused.
-_Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
+_Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 	; If the user picked a custom config directory on the config page, persist
 	; its candidate config before pointing paths.toml at it.
 	; The boot path resolver will then route ConfigurationFile to the new location
@@ -57,7 +62,7 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 	; is currently redirected elsewhere it has to be moved back and paths.toml
 	; rewritten, or the user's ask to leave that folder is silently dropped.
 	global _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile, _AhkSubDir
-	global _DefaultLogsDir
+	global _DefaultLogsDir, _SharedDir
 	PreviousCritical := Critical("Off")
 	try {
 	try {
@@ -90,6 +95,9 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 		}
 
 		updates := _Onboarding_CommitUpdates(Locale, Rows)
+		TapHoldPath := ""
+		if (TapHoldKeys.Length > 0)
+			TapHoldPath := TapHoldConfigPathBeside(CandidateConfig)
 
 		; The wizard is reachable from the live tray as well as first boot. Hold
 		; current config ownership from candidate write through paths.toml
@@ -97,6 +105,8 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 		; an already-open menu dialog commit to whichever path the partial
 		; transition exposed.
 		TransitionPaths := [CandidateConfig]
+		if (TapHoldPath != "")
+			TransitionPaths.Push(TapHoldPath)
 		if PathRedirectRequired
 			TransitionPaths.Push(_PathsFile)
 		AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
@@ -138,6 +148,28 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, BeforeReloadFn := 0) {
 			}
 			TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig,
 				CandidateResult["content"], ExpectedCandidateOld)]
+			if (TapHoldPath != "") {
+				try TapHoldImage := TapHoldImportImage(TapHoldPath,
+					_SharedDir . "\tap_hold\defaults.toml", TapHoldKeys)
+				catch as Err {
+					try LoggerError("Onboarding",
+						"Could not render the tap-hold import into '{1}': {2}.",
+						TapHoldPath, Err.Message)
+					_Onboarding_CommitError(
+						"onboarding.error.commit_candidate_render")
+					return false
+				}
+				ExpectedTapHoldOld := ConfigTransitionExpectedOld(
+					TapHoldImage["source_present"],
+					TapHoldImage["source_content"])
+				if !(ExpectedTapHoldOld is Map) {
+					_Onboarding_CommitError(
+						"onboarding.error.commit_source_verification")
+					return false
+				}
+				TargetSpecs.Push(ConfigTransitionPresentTarget(TapHoldPath,
+					TapHoldImage["content"], ExpectedTapHoldOld))
+			}
 			if PathRedirectRequired {
 				; The rewrite keeps the user's LogsDirPath.
 				try LocatorContent := ConfigTransitionPathsTomlContent(
