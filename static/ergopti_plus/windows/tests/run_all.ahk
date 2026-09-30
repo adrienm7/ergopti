@@ -580,6 +580,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
+#Include unit/test_llm_accept_injects_exact_text.ahk
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
 #Include unit/test_magic_key_source_menu.ahk

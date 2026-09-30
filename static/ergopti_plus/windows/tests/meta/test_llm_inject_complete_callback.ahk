@@ -116,7 +116,7 @@ _LICC_OutputStateCommitsOnlyOnSuccessfulCompletion() {
 
 	Assert(InStr(Accept, "_LLM_Bridge_Buffer .= text") = 0 && InStr(Accept, "LLM_Tooltip_Hide(true)") = 0,
 		"LLM_Bridge_OnAccept must not hide/commit state before an async TextSend completes")
-	SenderPos := InStr(Atomic, "SenderFn.Call()")
+	SenderPos := InStr(Atomic, "_TextSenderAtSendLevel(SenderFn)")
 	CommitPos := InStr(Atomic, "AtomicCommit.Call()", true, SenderPos)
 	RestorePos := InStr(Atomic, "Critical(PreviousCritical)", true, CommitPos)
 	Assert(SenderPos > 0 and CommitPos > SenderPos and RestorePos > CommitPos,
