@@ -123,15 +123,32 @@ _MMNDS_EveryMenuHasNoMisplacedSeparator() {
 Test("menu: no manifest menu renders a misplaced separator (layout-menu-double-separator)",
 	_MMNDS_EveryMenuHasNoMisplacedSeparator)
 
-; The bug as reported: layout_menu opens with its toggle and then a "---".
+; The bug as reported: layout_menu opens with its toggle, and a "---" closes that
+; leading group. Rows may sit between them (the recommended restore does), but
+; the group must still end in a declared separator, or the probe above no longer
+; covers the reported case.
 _MMNDS_LayoutMenuDeclaresToggleThenSeparator() {
 	Def := _MR_GetMenuDef("layout_menu")
 	Assert(Def.Length > 1, "layout_menu must be declared in the shared manifest")
-	Assert(_MR_Get(Def[1], "type") == "toggle" and _MR_Get(Def[2], "type") == "---",
-		"layout_menu must open with its toggle followed by '---' -- if that changed, "
+	Assert(_MR_Get(Def[1], "type") == "toggle",
+		"layout_menu must open with its toggle -- if that changed, "
+		. "the probe above no longer covers the reported case")
+	ClosingIndex := 0
+	for Index, Item in Def {
+		Type := _MR_Get(Item, "type")
+		if (Type == "---") {
+			ClosingIndex := Index
+			break
+		}
+		Assert(Index == 1 or Type == "command",
+			"layout_menu's leading group must hold only its toggle and commands before its '---', got '"
+			. Type . "' at row " . Index)
+	}
+	Assert(ClosingIndex > 1,
+		"layout_menu must close its toggle's group with '---' -- if that changed, "
 		. "the probe above no longer covers the reported case")
 }
-Test("menu: layout_menu opens with a toggle then '---' (layout-menu-double-separator)",
+Test("menu: layout_menu opens with a toggle group closed by '---' (layout-menu-double-separator)",
 	_MMNDS_LayoutMenuDeclaresToggleThenSeparator)
 
 _MMNDS_NormalizeDropsMisplacedSeparators() {
