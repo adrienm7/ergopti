@@ -281,6 +281,27 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
 		end)
 
+		helpers.it("unused keys: a retired agent mode or icon variant is never loaded and is offered (config-outdated-closed-values)",
+			function()
+				-- The mode reached the boot replay, whose refusal logged an ERROR at
+				-- every start; the icon variant was drawn with an ERROR. Both were
+				-- marked as read, so the cleanup never offered them.
+				local source = "[llm]\nagent_mode = \"suggest\"\nenabled = true\n[ui]\nmenubar_icon = \"v9\"\n"
+				local scan = Engine.find_in_source(source, Cleanup.collect)
+				helpers.assert_eq(scan.status, "ok")
+				local offered = {}
+				for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "llm.agent_mode", "ui.menubar_icon" })
+				Sandbox.with_config(source, function(path)
+					local flat, status = Preferences.load(path)
+					helpers.assert_eq(status, "ok")
+					helpers.assert_nil(flat.llm_agent_mode, "the state keeps the agent's default mode")
+					helpers.assert_nil(flat.menubar_icon, "the state keeps the default icon")
+					helpers.assert_eq(flat.llm_enabled, true, "the rest of the file loads")
+				end)
+			end)
+
 		helpers.it("unused keys: plain keyboard and tap_keys values are offered (config-outdated-shortcut-shape)", function()
 			local source = "[shortcuts]\nkeyboard = \"x\"\ntap_keys = \"y\"\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)

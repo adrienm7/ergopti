@@ -52,7 +52,7 @@ local DISABLED_APPS_PATH = "llm.agent_disabled_apps"
 
 -- The agent's modes, in menu order
 M.MODES = { "off", "action", "auto" }
-local KNOWN_MODES = { off = true, action = true, auto = true }
+local KNOWN_MODES = Agent.MODES
 
 -- English weekday names by os.date("*t").wday: the prompt is English, and
 -- os.date("%A") would follow LC_TIME

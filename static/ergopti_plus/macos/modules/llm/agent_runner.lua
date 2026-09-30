@@ -74,7 +74,10 @@ local PAUSED_KEY = "llm.manual_prediction.paused"
 M.MODE_OFF    = "off"
 M.MODE_ACTION = "action"
 M.MODE_AUTO   = "auto"
-local MODES = { [M.MODE_OFF] = true, [M.MODE_ACTION] = true, [M.MODE_AUTO] = true }
+local MODES = Agent.MODES
+for _, mode in ipairs({ M.MODE_OFF, M.MODE_ACTION, M.MODE_AUTO }) do
+	assert(MODES[mode], "the shared agent modes lack '" .. mode .. "'")
+end
 
 -- The runtime keys of the settings, as the preference owner names them
 local SETTING_KEYS = {
