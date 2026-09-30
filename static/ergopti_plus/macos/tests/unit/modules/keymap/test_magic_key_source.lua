@@ -116,6 +116,28 @@ helpers.describe("magic key source: the macOS owner", function()
 	end)
 end)
 
+helpers.describe("magic key source: boot cost", function()
+	helpers.it("(magic-key-source) the automatic key is applied without reading the key registry", function()
+		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "adapters.file_system" }, function()
+			local real = require("adapters.file_system")
+			local reads = 0
+			package.loaded["adapters.file_system"] = setmetatable({
+				read = function(path)
+					reads = reads + 1
+					return real.read(path)
+				end,
+			}, { __index = real })
+			local Source = require("modules.keymap.magic_key_source")
+			helpers.assert_eq(Source.set(nil), "auto")
+			helpers.assert_eq(Source.set("auto"), "auto")
+			helpers.assert_eq(reads, 0, "every boot applies the automatic key: no 37 KB JSON decode for it")
+			helpers.assert_eq(Source.set("KeyJ"), "KeyJ")
+			helpers.assert_eq(reads, 1, "a chosen key reads the registry once")
+			Source.set("auto")
+		end)
+	end)
+end)
+
 helpers.describe("magic key source: the keymap keyDown tap", function()
 	helpers.it("(magic-key-source) a plain press of the chosen key carries the magic key", function()
 		local keymap, tap = load_keymap()
