@@ -735,6 +735,7 @@ local function _dispatch_event(ev, source)
 			code = ev.code,
 			value = ev.value,
 			mods = M.held_modifiers(),
+			shift_side = M.held_shift_side(),
 		})
 		if not ok_consume then
 			-- A missing verdict is not a suppression: the event still belongs
@@ -1069,6 +1070,28 @@ function M.held_text_modifier_codes()
 		if role == "shift" or role == "altgr" then held[#held + 1] = entry.code end
 	end
 	return held
+end
+
+--- The side of the one Shift held, for a chord that tells the two apart: the
+--- prediction tooltip's Shift+Tab steps back with the left Shift and forward
+--- with the right one. Nil when no Shift, both, or a key only remapped to Shift
+--- is held, since none of those names a side.
+--- @return string|nil "left" or "right".
+function M.held_shift_side()
+	local left, right, other = false, false, false
+	for _, entry in ipairs(_modifier_order) do
+		if _modifier_down[entry.key] == "shift" then
+			if entry.code == EvdevCodes.KEY_LEFTSHIFT then
+				left = true
+			elseif entry.code == EvdevCodes.KEY_RIGHTSHIFT then
+				right = true
+			else
+				other = true
+			end
+		end
+	end
+	if other or left == right then return nil end
+	return left and "left" or "right"
 end
 
 --- Shortcut modifiers (Ctrl, Alt, Super) the user is holding, in press order.

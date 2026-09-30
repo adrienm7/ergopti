@@ -2434,9 +2434,38 @@ local function offer_visible()
 	return true
 end
 
---- Consumes the chords of the offer on screen: the navigation chord (Up or
---- Down with the navigation modifiers) and the validation chord (a digit with
---- the validation modifiers), each exact and bare by default.
+-- Step of each arrow through the offered predictions: Up and Left to the
+-- previous one, Down and Right to the next, as the shared menu.llm.nav_label
+-- (↑/← and ↓/→) and the macOS ARROW_NAVIGATION_DELTA say.
+local ARROW_NAVIGATION_DELTA = {
+	[EvdevCodes.KEY_UP] = -1,
+	[EvdevCodes.KEY_LEFT] = -1,
+	[EvdevCodes.KEY_DOWN] = 1,
+	[EvdevCodes.KEY_RIGHT] = 1,
+}
+
+-- Step of each side of the Shift+Tab chord, as the Windows and macOS tooltip
+-- footers say (⇧G + Tab, ⇧D + Tab): the left Shift to the previous prediction,
+-- the right one to the next, whatever the navigation modifiers are.
+local SHIFT_TAB_NAVIGATION_DELTA = { left = -1, right = 1 }
+
+--- The step of a Shift+Tab chord: Tab with one Shift and no other modifier.
+--- @param detail table { code, mods, shift_side }
+--- @return integer|nil The step, nil for any other key or chord.
+local function shift_tab_step(detail)
+	if detail.code ~= EvdevCodes.KEY_TAB then return nil end
+	local mods = type(detail.mods) == "table" and detail.mods or {}
+	if not mods.shift then return nil end
+	for name, held in pairs(mods) do
+		if held and name ~= "shift" then return nil end
+	end
+	return SHIFT_TAB_NAVIGATION_DELTA[detail.shift_side]
+end
+
+--- Consumes the chords of the offer on screen: the navigation chord (an arrow
+--- with the navigation modifiers, or Shift+Tab on either side) and the
+--- validation chord (a digit with the validation modifiers), each exact and
+--- bare by default.
 ---
 --- The navigation chord moves the active prediction while several are shown.
 --- A digit that numbers a shown prediction is the instruction to insert it,
@@ -2449,11 +2478,17 @@ end
 function M.handle_shortcut(detail)
 	if _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
-	local navigation = detail.code == EvdevCodes.KEY_UP and -1 or detail.code == EvdevCodes.KEY_DOWN and 1 or nil
+	local navigation = ARROW_NAVIGATION_DELTA[detail.code]
 	if navigation then
 		if #_suggestions < 2 or not (_overlay and type(_overlay.move) == "function")
 			or not NavigationSettings.matches_navigation(detail.mods) then return false end
 		_overlay.move(navigation)
+		return true
+	end
+	local shift_tab = shift_tab_step(detail)
+	if shift_tab then
+		if #_suggestions < 2 or not (_overlay and type(_overlay.move) == "function") then return false end
+		_overlay.move(shift_tab)
 		return true
 	end
 	-- Tab accepts live mode's rewrite or runs the selected agent action, and

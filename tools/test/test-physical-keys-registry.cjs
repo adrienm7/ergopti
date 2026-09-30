@@ -351,7 +351,9 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 		ENTER: 'Enter',
 		ESC: 'Escape',
 		UP: 'ArrowUp',
-		DOWN: 'ArrowDown'
+		DOWN: 'ArrowDown',
+		LEFT: 'ArrowLeft',
+		RIGHT: 'ArrowRight'
 	};
 	const consts = {};
 	for (const m of src.matchAll(/^M\.KEY_([A-Z]+)\s*=\s*(\d+)/gm)) consts[m[1]] = Number(m[2]);
