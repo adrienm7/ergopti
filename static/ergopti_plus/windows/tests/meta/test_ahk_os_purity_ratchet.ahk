@@ -201,6 +201,15 @@ Test("meta: windows/ OS-call purity ratchet — entry point", _AOPR_RatchetEntry
 ; regression in the other, which is the same reason the three trees already
 ; carry separate numbers.
 
+; Native API identity is a token, not a suffix of a domain helper's name.
+; Calls allow whitespace before '('; references such as SetTimer remain visible.
+_AOPR_FamilyApiToken(Line, Needle) {
+	IsCall := SubStr(Needle, StrLen(Needle), 1) == "("
+	Name := IsCall ? SubStr(Needle, 1, StrLen(Needle) - 1) : Needle
+	Pattern := "i)(?<![A-Za-z0-9_])" . Name . "(?![A-Za-z0-9_])"
+	return RegExMatch(Line, Pattern . (IsCall ? "\s*\(" : "")) != 0
+}
+
 _AOPR_CountFamilies(Files) {
 	Categories := Map(
 		"Timer",    ["SetTimer"],
@@ -221,7 +230,7 @@ _AOPR_CountFamilies(Files) {
 				continue
 			for Cat, Needles in Categories {
 				for Needle in Needles {
-					if InStr(Line, Needle) {
+					if _AOPR_FamilyApiToken(Line, Needle) {
 						Result[Cat] += 1
 						break
 					}
@@ -263,9 +272,15 @@ _AOPR_AssertFamilies(Label, Files, Baseline) {
 ; modules+lib: 773 (Timer=193 Binding=312 GuiMenu=63  Process=43 Window=58 KeyState=104)
 ; ui:          280 (Timer=76  Binding=17  GuiMenu=156 Process=15 Window=16 KeyState=0)
 ; entry point:  11 (Timer=8   Binding=1   GuiMenu=0   Process=1  Window=0  KeyState=1)
-_AOPR_FAMILY_BASELINE_CORE  := 773
-_AOPR_FAMILY_BASELINE_UI    := 280
-_AOPR_FAMILY_BASELINE_ENTRY := 11
+; Complete-token census, 2026-10-01: helper suffixes excluded and whitespace
+; calls included. Tighten the old substring budgets so they cannot pay for new
+; native calls after the corrected detector stops counting domain helpers.
+; core: 601 (Timer=202 Binding=241 GuiMenu=30 Process=29 Window=47 KeyState=52)
+; ui:   186 (Timer=107 Binding=19 GuiMenu=46 Process=5 Window=7 KeyState=2)
+; entry: 10 (Timer=8 Binding=1 GuiMenu=0 Process=0 Window=0 KeyState=1)
+_AOPR_FAMILY_BASELINE_CORE  := 601
+_AOPR_FAMILY_BASELINE_UI    := 186
+_AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
@@ -286,3 +301,35 @@ _AOPR_FamilyRatchetEntry() {
 	_AOPR_AssertFamilies("windows/ErgoptiPlus.ahk", [Entry], _AOPR_FAMILY_BASELINE_ENTRY)
 }
 Test("meta: windows/ platform-API family ratchet — entry point", _AOPR_FamilyRatchetEntry)
+
+_AOPR_FamiliesCountNativeTokensOnly() {
+	Path := A_Temp . "\ergopti_native_tokens_" . A_ScriptHwnd . "_" . A_TickCount . ".txt"
+	Lines := [
+		"; Menu(), Run(), SetTimer, Hotkey(), WinActivate, KeyWait",
+		"_MET_RebuildWidgetMenu()", "RebuildTrayMenu()", "CreateGui()",
+		"OwnedRun()", "OwnedRunWait()", "OwnedSetTimer()",
+		"OwnedHotkey()", "OwnedHotstring()", "OwnedHotIf()",
+		"OwnedWinActivate()", "OwnedGetKeyState()", "OwnedKeyWait()",
+		"SetTimer (Callback, 1)", "TimerPort := SetTimer",
+		"Hotkey (Key, Callback)", "#HotIf Condition",
+		"Target := Menu ()", "Surface := Gui()",
+		"Run (Command)", "RunWait (Command)", "WinActivate (Title)",
+		"GetKeyState (Key)", "KeyWait (Key)",
+	]
+	Body := ""
+	for Line in Lines
+		Body .= Line . "`n"
+	try {
+		FileAppend(Body, Path, "UTF-8-RAW")
+		Counts := _AOPR_CountFamilies([Path])
+		for Family, Expected in Map("Timer", 2, "Binding", 2, "GuiMenu", 2,
+			"Process", 2, "Window", 1, "KeyState", 2)
+			AssertEqual(Expected, Counts[Family],
+				Family . " must count native tokens and whitespace calls, excluding domain suffixes and comments")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("OS-purity family census: domain helper suffixes are not native APIs",
+	_AOPR_FamiliesCountNativeTokensOnly)
