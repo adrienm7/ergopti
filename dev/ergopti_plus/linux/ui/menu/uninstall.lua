@@ -6,12 +6,18 @@
 --- Hands a confirmed removal to an independent worker, then asks the daemon to
 --- finish its normal shutdown. The worker waits for that exact process before
 --- invoking the package manager or removing installer-owned standalone files.
+--- A local version run from source has nothing to remove: the About row is
+--- greyed there, and a click that still arrives does nothing.
 --- ==============================================================================
 
 local M = {}
 
 local ShellRunner = require("adapters.shell_runner")
 local Paths = require("infra.paths")
+local Installation = require("infra.installation")
+local Logger = require("logger.shim")
+
+local LOG = "ui.menu.uninstall"
 
 --- Reads one complete file without treating a missing file as empty content.
 --- @param path string
@@ -25,7 +31,8 @@ local function read_file(path)
 end
 
 --- Requests removal after the menu's own localized confirmation.
---- @param opts table { confirm, fail, quit, title, confirmation, failure }
+--- @param opts table { confirm, fail, quit, title, confirmation, failure }; tests
+---   also pass root, version_source, run, read and getenv.
 --- @return boolean launched
 function M.run(opts)
 	local root = opts.root or Paths.driver_root()
@@ -33,8 +40,14 @@ function M.run(opts)
 	local read = opts.read or read_file
 	local getenv = opts.getenv or os.getenv
 	local quote = ShellRunner.quote
-	local prefix = root:match("^(.*)/lib/ergopti/linux$")
-	if root ~= "/usr/lib/ergopti" and not prefix then
+	if Installation.is_source_run(root, opts.version_source) then
+		-- No failure dialog: the row already says there is nothing to remove.
+		Logger.info(LOG, "Uninstall ignored: this is a local version run from source, with nothing to remove.")
+		return false
+	end
+	local layout = Installation.layout(root)
+	local prefix = layout.prefix
+	if not layout.system and not prefix then
 		opts.fail(opts.failure)
 		return false
 	end

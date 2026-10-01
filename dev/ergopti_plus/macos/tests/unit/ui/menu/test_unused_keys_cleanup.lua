@@ -340,7 +340,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)", function()
 			-- The inline table was one record kept by its live member, so the
 			-- warned at_hash was never offered: warned and offered differed.
-			local source = "[shortcuts]\nkeys = { at_hash = true, layer_scroll = true }\n"
+			local source = "[shortcuts]\nkeys = { at_hash = true, cmd_star = true }\n"
 			Sandbox.with_config(source, function(path)
 				local before = driver_state(path)
 				local keys = Cleanup.find(path, IoAdapter).keys
@@ -350,7 +350,7 @@ helpers.with_stub_scope(MODULES, function()
 					file_adapter = IoAdapter })
 				helpers.assert_eq(result.status, "removed")
 				helpers.assert_eq(result.removed, 1)
-				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { layer_scroll = true }\n")
+				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { cmd_star = true }\n")
 				helpers.assert_eq(driver_state(path), before, "the live member keeps its value")
 				helpers.assert_eq(#Cleanup.find(path, IoAdapter).keys, 0)
 			end)
@@ -366,8 +366,8 @@ helpers.with_stub_scope(MODULES, function()
 				"tap_4 = \"open_url\"",
 				"",
 				"[shortcuts.script_control]",
-				"backspace = \"retired_action_xyz\"",
-				"escape = \"script_quit\"",
+				"script_altgr_backspace = \"retired_action_xyz\"",
+				"script_altgr_escape = \"script_quit\"",
 				"",
 				"[shortcuts.keyboard]",
 				"cmd_k = \"retired_action_xyz\"",
@@ -385,14 +385,14 @@ helpers.with_stub_scope(MODULES, function()
 			local ok, err = pcall(function()
 				local flat = Preferences.flatten_document(TomlCodec.decode(source))
 				helpers.assert_eq(flat.gesture_actions, { tap_4 = "open_url" })
-				helpers.assert_eq(flat.script_control_shortcuts, { escape = "script_quit" })
+				helpers.assert_eq(flat.script_control_shortcuts, { script_altgr_escape = "script_quit" })
 				local offered = {}
 				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
 					offered[#offered + 1] = key.section .. "." .. key.key
 				end
 				table.sort(offered)
 				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.cmd_k",
-					"shortcuts.script_control.backspace", "shortcuts.tap_keys.number_row_left" })
+					"shortcuts.script_control.script_altgr_backspace", "shortcuts.tap_keys.number_row_left" })
 			end)
 			package.loaded["modules.gestures.actions"] = saved
 			if not ok then error(err, 0) end
@@ -487,12 +487,12 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
-			-- The setup wizard marks shortcuts.keys.layer_scroll; the owner's report
+			-- The setup wizard marks shortcuts.keys.cmd_star; the owner's report
 			-- must still win, or the warned entry could never be removed.
-			local source = "[shortcuts.keys]\nlayer_scroll = \"yes\"\n"
+			local source = "[shortcuts.keys]\ncmd_star = \"yes\"\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
 			helpers.assert_eq(#scan.keys, 1)
-			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "layer_scroll" })
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "cmd_star" })
 		end)
 
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()

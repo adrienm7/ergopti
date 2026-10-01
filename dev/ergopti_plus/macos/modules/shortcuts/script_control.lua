@@ -3,18 +3,28 @@
 --- ==============================================================================
 --- MODULE: Script Control
 --- DESCRIPTION:
---- Manages global shortcuts for the Ergopti+ script lifecycle:
----   AltGr (Right Option) + Return    → Toggle pause / resume all modules.
----   AltGr (Right Option) + Backspace → Reload the Hammerspoon configuration.
----
---- Each key slot is configurable: the user can bind any of the 14 listed actions
---- to either key via the menu.
+--- Manages the script-management chords every driver shares
+--- (_shared/modules/actions/script_chords.json), AltGr (the right Option key)
+--- with Return, Backspace, Delete (fn+Delete on a Mac keyboard without the key)
+--- or Escape, each on its slot of [shortcuts.script_control]:
+---   Return    → toggle pause / resume all modules.
+---   Delete    → open the personal shortcuts.
+---   Backspace → reload the Hammerspoon configuration.
+---   Escape    → quit.
+--- Each slot is configurable from the menu with any catalogue action.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Right-Alt Detection: Distinguishes the physical right Option key from the
 ---    left one using rawFlags, so left-Alt shortcuts in apps are never stolen.
 --- 2. Safe Pause: Uses pause_processing() rather than stop() on the keymap so
 ---    the script-control eventtap itself stays reachable while paused.
+--- 3. A chord belongs to the driver only while its slot runs an action
+---    (_shared/lua/script_chords.lua): an unassigned slot, every slot while the
+---    submenu's switch is off, and while paused every action outside script
+---    management leave the key combination to the system. Karabiner emits a
+---    slot's sentinel only then (platform/remap/script_chord_rules.lua): this
+---    module hands it the plan (karabiner_chords) and asks for a regeneration
+---    whenever the plan changes.
 --- ==============================================================================
 
 local M = {}
@@ -31,6 +41,8 @@ local i18n          = require("infra.i18n")
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
 local KeyState  = require("adapters.key_state")
+local ScriptChords = require("script_chords")
+local ChordCatalogue = require("infra.script_chord_catalogue")
 
 local LOG = "shortcuts.script_control"
 
@@ -44,24 +56,37 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
--- Sentinel keycodes emitted by Karabiner's script-control rules
--- (platform/remap/init.lua → build_script_control_sentinel_rules).
--- These fire ONLY when the user physically presses right_command + one of the
--- three target keys. Tap actions that happen to emit backspace/return/escape
--- (e.g. left_command tap → backspace) can NEVER activate these sentinels,
--- because rule outputs bypass Karabiner's rule engine.
-local KEYCODE_RETURN_SENTINEL    = Keycodes.F13_KARABINER_RETURN
-local KEYCODE_BACKSPACE_SENTINEL = Keycodes.F14_KARABINER_BACKSPACE
-local KEYCODE_ESCAPE_SENTINEL    = Keycodes.F15_KARABINER_ESCAPE
 local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
 
--- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
--- running the sentinels above are the sole dispatch mechanism; this fallback
--- only exists so the user can still un-pause by pressing right_command + key
--- when KE's altgr remap is gone.
-local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
-local KEYCODE_RETURN    = Keycodes.RETURN
-local KEYCODE_ESCAPE    = Keycodes.ESCAPE
+-- Sentinel keycode -> script chord slot, built at the first key event.
+-- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
+-- emit a slot's sentinel ONLY when the user physically presses right_command
+-- (or, paused, Option) with the slot's key. Tap actions that happen to emit
+-- backspace/return/escape (e.g. left_command tap → backspace) can NEVER
+-- activate these sentinels, because rule outputs bypass Karabiner's rule engine.
+local _sentinel_slots = nil
+
+-- Physical keycode -> slot, for the Karabiner-paused fallback path below. When
+-- KE is running the sentinels above are the sole dispatch mechanism; this
+-- fallback only exists so the user can still un-pause by pressing
+-- right_command + key when KE's altgr remap is gone.
+local _physical_slots = nil
+
+--- Builds both keycode maps once, from the shared catalogue and the sentinel
+--- constant each slot names (Keycodes.SCRIPT_CHORD_SENTINELS).
+--- @return table sentinel_slots, table physical_slots
+local function chord_keycodes()
+	if _sentinel_slots then return _sentinel_slots, _physical_slots end
+	local sentinels, physical = {}, {}
+	for _, slot in ipairs(ChordCatalogue.get().slots) do
+		local code = Keycodes[Keycodes.SCRIPT_CHORD_SENTINELS[slot.id] or ""]
+		assert(type(code) == "number", "script control: no sentinel for " .. slot.id)
+		sentinels[code] = slot.id
+		physical[slot.hs] = slot.id
+	end
+	_sentinel_slots, _physical_slots = sentinels, physical
+	return sentinels, physical
+end
 
 --- Prefix of the binding key every script-control dispatch passes to the gesture
 --- action layer, so a script key and a gesture slot of the same name cannot
@@ -95,7 +120,15 @@ local _tap_committed   = false
 local _tap_watchdog    = nil
 local _tap_watchdog_committed = false
 local _tap_generation  = 0
-local _key_actions     = {return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit"}
+-- Slot id -> action and the submenu's switch, on an empty configuration's
+-- values (read at first use) until the menu applies the user's
+-- (set_shortcut_action, set_chords_enabled). The switch off keeps every
+-- slot's action.
+local _key_actions, _chords_on = nil, nil
+-- The key of the last plan Karabiner read (M.karabiner_chords), and whether a
+-- regeneration for a newer one is already queued.
+local _karabiner_plan_key = nil
+local _karabiner_sync_queued = false
 local _on_pause_change = nil
 local _extras          = {}
 
@@ -141,13 +174,10 @@ local _karabiner  = nil
 -- Pre-pause snapshots: only re-enable sub-systems that were active before the
 -- pause, so a user-disabled gesture or shortcut set stays off after unpause.
 -- The dedicated script-control tap deliberately survives a pause so the user
--- can recover or terminate the host. Only lifecycle actions keep that privilege;
--- an arbitrary UI/gesture action assigned to the same three physical slots must
--- remain subject to the pause that stopped every other Ergopti feature.
-local PAUSED_ACTION_ALLOWLIST = {
-	script_reload = true,
-	script_quit   = true,
-}
+-- can recover or terminate the host. Only the script-management actions of the
+-- shared catalogue (paused_actions) keep that privilege; an arbitrary UI or
+-- gesture action assigned to a chord must remain subject to the pause that
+-- stopped every other Ergopti feature.
 
 
 
@@ -1319,6 +1349,15 @@ local function call_extra(name)
 	return false
 end
 
+--- The slots' actions and the switch, on an empty configuration's values
+--- until the menu applies the user's.
+--- @return table actions Slot id -> action (live table).
+--- @return boolean chords_on
+local function chord_state()
+	if _key_actions == nil then _key_actions, _chords_on = ChordCatalogue.defaults() end
+	return _key_actions, _chords_on
+end
+
 local function dispatch_action(action, binding)
 	if type(action) ~= "string" or action == "none" or action == "--" then return false end
 
@@ -1329,7 +1368,7 @@ local function dispatch_action(action, binding)
 		return true
 	end
 
-	if _is_paused and PAUSED_ACTION_ALLOWLIST[action] ~= true then
+	if _is_paused and ChordCatalogue.get().paused_actions[action] ~= true then
 		Logger.debug(LOG, "Ignoring non-lifecycle script-control action while paused: %s.", action)
 		return true
 	end
@@ -1361,16 +1400,38 @@ local function log_shortcut_if_available(label)
 	end
 end
 
+--- Whether a chord slot runs its action now: the switch is on, the slot holds
+--- an action and, while paused, a script-management one.
+--- @param slot_id string A catalogue slot id.
+--- @param paused boolean|nil The pause state to judge by; the live one by default.
+--- @return boolean runs
+local function slot_runs(slot_id, paused)
+	if paused == nil then paused = _is_paused end
+	local actions, chords_on = chord_state()
+	return ScriptChords.runs(ChordCatalogue.get(), actions[slot_id], chords_on, paused)
+end
+
+--- The keylogger label of a slot's chord ("Alt+Enter"), stable across the
+--- slot's action so the dashboard groups every press of the chord.
+--- @param slot_id string
+--- @return string label
+local function chord_label(slot_id)
+	local key = slot_id:gsub("^script_altgr_", "")
+	return "Alt+" .. key:sub(1, 1):upper() .. key:sub(2)
+end
+
 --- Handles incoming keyDown events; consumes the event when it matches a configured slot.
 ---
 --- Two independent dispatch paths:
----   1. Sentinel keycodes (F13/F14/F15) — emitted by Karabiner's script-control
----      rules on physical right_command + return/backspace/escape. This is the
----      primary path when KE is running and cannot be spoofed by tap actions,
----      because KE rule outputs bypass further rule matching.
+---   1. Sentinel keycodes (Keycodes.SCRIPT_CHORD_SENTINELS) — emitted by
+---      Karabiner's script-control rules on physical right_command + a slot's
+---      key, only for a slot that runs an action. This is the primary path when
+---      KE is running and cannot be spoofed by tap actions, because KE rule
+---      outputs bypass further rule matching.
 ---   2. Right-command fallback — when KE is paused/killed, physical right_command
----      fires as cmd (not alt), so we accept rcmd + backspace/return/escape
----      directly so the user can still un-pause without reloading.
+---      fires as cmd (not alt), so we accept rcmd + a slot's key directly so the
+---      user can still un-pause without reloading. A slot that runs nothing
+---      leaves that key to the system.
 ---
 --- @param e userdata The hs.eventtap.event object.
 --- @return boolean True to consume the keystroke, false to pass it through.
@@ -1386,74 +1447,54 @@ local function handle_key(e)
 	local ok, code = pcall(function() return e:getKeyCode() end)
 	if not ok or type(code) ~= "number" then return finish(false) end
 
-	local function defer_dispatch(log_format, label, action, binding)
-		return SyntheticInput.defer_after_callback("script control " .. binding,
+	local function defer_dispatch(log_format, slot_id)
+		return SyntheticInput.defer_after_callback("script control " .. slot_id,
 			function()
+				local action = chord_state()[slot_id]
+				-- A pause or a new assignment between the press and this run: the
+				-- chord was taken, and running its action now would be wrong.
+				if not slot_runs(slot_id) then
+					Logger.info(LOG, "Script slot '%s' no longer runs '%s'; the chord does nothing.",
+						slot_id, tostring(action))
+					return false
+				end
 				Logger.info(LOG, log_format, tostring(action))
-				log_shortcut_if_available(label)
-				return dispatch_action(action, M.BINDING_PREFIX .. binding)
+				log_shortcut_if_available(chord_label(slot_id))
+				return dispatch_action(action, M.BINDING_PREFIX .. slot_id)
 			end)
 	end
 
-	local function defer_rejected_sentinel(name, keycode)
+	local function defer_rejected_sentinel(slot_id, keycode)
 		SyntheticInput.defer_after_callback("rejected script-control sentinel",
 			function()
 				Logger.info(LOG,
 					"%s sentinel (%s) seen without an authoritative Ergopti modifier — passing through (%s).",
-					name, keycode, KeyState.describe_held_modifiers())
+					slot_id, keycode, KeyState.describe_held_modifiers())
 			end)
 	end
 
 	-- Primary path: sentinel keycodes from KE's script-control rules. These ARE
-	-- the physical F13/F14/F15 keycodes, so a bare function-key press on an
+	-- physical function-key keycodes, so a bare function-key press on an
 	-- extended keyboard would otherwise dispatch pause/reload/QUIT with no
 	-- modifier. Require a right-hand AltGr to be physically held — the invariant
 	-- of every genuine KE sentinel — and pass a stray function key through.
-	if code == KEYCODE_BACKSPACE_SENTINEL then
+	local sentinel_slots, physical_slots = chord_keycodes()
+	local sentinel_slot = sentinel_slots[code]
+	if sentinel_slot ~= nil then
 		if not sentinel_is_genuine(e) then
-			defer_rejected_sentinel("Backspace", "F14")
+			defer_rejected_sentinel(sentinel_slot, code)
 			return finish(false)
 		end
-		return finish(defer_dispatch("Backspace sentinel (F14) — dispatching '%s'.",
-			"Alt+Backspace", _key_actions.backspace, "backspace"))
-	end
-	if code == KEYCODE_RETURN_SENTINEL then
-		if not sentinel_is_genuine(e) then
-			defer_rejected_sentinel("Return", "F13")
-			return finish(false)
-		end
-		return finish(defer_dispatch("Return sentinel (F13) — dispatching '%s'.",
-			"Alt+Enter", _key_actions.return_key, "return_key"))
-	end
-	if code == KEYCODE_ESCAPE_SENTINEL then
-		if not sentinel_is_genuine(e) then
-			defer_rejected_sentinel("Escape", "F15")
-			return finish(false)
-		end
-		return finish(defer_dispatch("Escape sentinel (F15) — dispatching '%s'.",
-			"Alt+Escape", _key_actions.escape, "escape"))
+		return finish(defer_dispatch("Script chord sentinel (" .. sentinel_slot .. ") — dispatching '%s'.",
+			sentinel_slot))
 	end
 
-	-- Fallback path: KE paused — physical right_command + target key.
+	-- Fallback path: KE paused — physical right_command + a slot's key.
 	if not is_right_cmd_only(e) then return finish(false) end
-
-	if code == KEYCODE_BACKSPACE then
-		return finish(defer_dispatch(
-			"Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.",
-			"Alt+Backspace", _key_actions.backspace, "backspace"))
-	end
-	if code == KEYCODE_RETURN then
-		return finish(defer_dispatch(
-			"Right-cmd + Return (KE-paused fallback) — dispatching '%s'.",
-			"Alt+Enter", _key_actions.return_key, "return_key"))
-	end
-	if code == KEYCODE_ESCAPE then
-		return finish(defer_dispatch(
-			"Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.",
-			"Alt+Escape", _key_actions.escape, "escape"))
-	end
-
-	return finish(false)
+	local physical_slot = physical_slots[code]
+	if physical_slot == nil or not slot_runs(physical_slot) then return finish(false) end
+	return finish(defer_dispatch(
+		"Right-cmd + " .. physical_slot .. " (KE-paused fallback) — dispatching '%s'.", physical_slot))
 end
 
 --- Starts one exact eventtap and verifies that it is enabled before commit.
@@ -1712,7 +1753,7 @@ end
 --- @return table actions Slot identifiers mapped to their configured actions.
 function M.get_shortcut_actions()
 	local actions = {}
-	for key, value in pairs(_key_actions) do actions[key] = value end
+	for key, value in pairs((chord_state())) do actions[key] = value end
 	return actions
 end
 
@@ -1807,18 +1848,113 @@ function M.get_pause_epoch()
 	return _pause_epoch
 end
 
---- Configures the action triggered by a specific key slot.
---- @param keyname string "return_key", "backspace", or "escape".
---- @param action string One of the recognised action ids.
+--- The key of a plan, to tell whether Karabiner already read it.
+--- @param plan table { normal = slot -> true, paused = slot -> true }
+--- @return string key
+local function plan_key(plan)
+	local parts = {}
+	for _, slot in ipairs(ChordCatalogue.get().slots) do
+		parts[#parts + 1] = (plan.normal[slot.id] and "1" or "0") .. (plan.paused[slot.id] and "1" or "0")
+	end
+	return table.concat(parts, ",")
+end
+
+--- The script chords Karabiner must turn into sentinels now, and the source
+--- of every regeneration (platform/remap set_script_chords_source).
+--- @return table plan { normal = slot -> true, paused = slot -> true }
+function M.karabiner_chords()
+	local plan = ScriptChords.plan(ChordCatalogue.get(), chord_state())
+	_karabiner_plan_key = plan_key(plan)
+	return plan
+end
+
+--- Asks Karabiner, once per run-loop turn, for the rules of a plan it has not
+--- read yet: a slot that stopped running an action must give its chord back to
+--- the system, and one that started must get its sentinel. The remap refuses a
+--- regeneration while paused or switched off, and its next one reads the plan;
+--- before its first build nothing is asked, since that build reads the plan.
+local function sync_karabiner_chords()
+	if _karabiner_sync_queued or _karabiner_plan_key == nil
+		or type(_karabiner) ~= "table" or type(_karabiner.regenerate) ~= "function" then
+		return
+	end
+	local plan = ScriptChords.plan(ChordCatalogue.get(), chord_state())
+	if plan_key(plan) == _karabiner_plan_key then return end
+	_karabiner_sync_queued = true
+	local ok_schedule, handle, committed = pcall(TimerScheduler.after, 0, function()
+		_karabiner_sync_queued = false
+		Logger.start(LOG, "Redeploying the script chords' Karabiner rules…")
+		local ok_call, accepted = pcall(_karabiner.regenerate, function(ok, reason)
+			if ok == true then
+				Logger.success(LOG, "Script chords' Karabiner rules redeployed.")
+			else
+				Logger.warn(LOG, "Script chords' Karabiner rules not redeployed yet: %s.", tostring(reason))
+			end
+		end)
+		if not ok_call then
+			Logger.error(LOG, "Script chords' Karabiner redeploy raised: %s.", tostring(accepted))
+		end
+	end)
+	if not ok_schedule or committed ~= true then
+		_karabiner_sync_queued = false
+		Logger.error(LOG, "Script chords' Karabiner redeploy could not be scheduled: %s.", tostring(handle))
+	end
+end
+
+--- Configures the action a chord slot runs.
+--- @param slot_id string A slot of _shared/modules/actions/script_chords.json.
+--- @param action string An action id, or "none" to leave the chord to the system.
 --- @return boolean committed
-function M.set_shortcut_action(keyname, action)
-	if type(keyname) ~= "string" or type(action) ~= "string" then
-		Logger.error(LOG, "set_shortcut_action(): both keyname and action must be strings.")
+function M.set_shortcut_action(slot_id, action)
+	if type(slot_id) ~= "string" or type(action) ~= "string" then
+		Logger.error(LOG, "set_shortcut_action(): both slot and action must be strings.")
 		return false
 	end
-	_key_actions[keyname] = action
-	Logger.debug(LOG, "Key slot '%s' → '%s'.", keyname, action)
+	if ChordCatalogue.get().by_id[slot_id] == nil then
+		Logger.error(LOG, "set_shortcut_action(): '%s' is not a script chord slot.", slot_id)
+		return false
+	end
+	chord_state()[slot_id] = action
+	Logger.debug(LOG, "Script chord slot '%s' → '%s'.", slot_id, action)
+	sync_karabiner_chords()
 	return true
+end
+
+--- Turns the chords' switch on or off. Off leaves every chord to the system and
+--- keeps every slot's action.
+--- @param on boolean
+--- @return boolean committed
+function M.set_chords_enabled(on)
+	if type(on) ~= "boolean" then
+		Logger.error(LOG, "set_chords_enabled(): the switch must be a boolean.")
+		return false
+	end
+	chord_state()
+	_chords_on = on
+	Logger.debug(LOG, "Script chords switched %s.", on and "on" or "off")
+	sync_karabiner_chords()
+	return true
+end
+
+--- Whether the chords' switch is on.
+--- @return boolean
+function M.chords_enabled()
+	local _, chords_on = chord_state()
+	return chords_on
+end
+
+--- Whether a chord slot runs its action now (switch, assignment, pause).
+--- @param slot_id string
+--- @param paused boolean|nil The pause state to judge by; the live one by default.
+--- @return boolean
+function M.slot_runs(slot_id, paused)
+	return slot_runs(slot_id, paused)
+end
+
+--- The chord slots in menu order, as catalogue rows (id, hs, karabiner...).
+--- @return table slots
+function M.slots()
+	return ChordCatalogue.get().slots
 end
 
 --- Registers a callback invoked whenever the pause state changes.

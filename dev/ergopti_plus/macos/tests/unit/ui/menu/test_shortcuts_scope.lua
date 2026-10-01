@@ -22,7 +22,7 @@ helpers.describe("terminal macOS shortcut scopes", function()
 			helpers.assert_eq(decoded.future.keep, 7)
 			helpers.assert_nil(decoded.gestures.action_parameters.keyboard__cmd_a__send_text)
 			helpers.assert_nil(decoded.gestures.action_parameters.tap_key__number_row_left__send_text)
-			helpers.assert_nil(decoded.gestures.action_parameters.script__return_key__open_url)
+			helpers.assert_nil(decoded.gestures.action_parameters.script__script_altgr_enter__open_url)
 			helpers.assert_eq(decoded.gestures.action_parameters.tap_4__open_url, "https://apple.com")
 			helpers.assert_eq(decoded.gestures.action_parameters.future.keep, 9)
 			helpers.assert_eq(f.gestures.get_action_parameter("keyboard__cmd_a", "send_text"), "")
@@ -33,7 +33,14 @@ helpers.describe("terminal macOS shortcut scopes", function()
 			helpers.assert_eq(f.keyboard.get_action("cmd_a"), "none")
 			helpers.assert_eq(f.taps.get_action("number_row_left"), "none")
 			helpers.assert_eq(f.state.shortcuts, false)
-			helpers.assert_eq(f.script.get_shortcut_actions().return_key, "none")
+			-- script-chords-three-os-2026-09-30: an absent chord starts with its
+			-- preset, so the clear writes each slot off and the chords stay native.
+			for _, slot in ipairs({ "script_altgr_enter", "script_altgr_backspace", "script_altgr_delete",
+				"script_altgr_escape" }) do
+				helpers.assert_eq(decoded.shortcuts.script_control[slot], "none", slot)
+				helpers.assert_eq(f.script.get_shortcut_actions()[slot], "none", slot)
+				helpers.assert_eq(f.script.slot_runs(slot), false, slot)
+			end
 			helpers.assert_eq(f.script.is_started(), true)
 			helpers.assert_eq(f.prefs.source_snapshot("config").content, f.files.config)
 			helpers.assert_eq(f.save(), true)
@@ -72,7 +79,7 @@ helpers.describe("terminal macOS shortcut scopes", function()
 			helpers.assert_eq(f.keyboard.is_started(), true)
 			helpers.assert_eq(f.keyboard.get_action("cmd_a"), "send_text")
 			helpers.assert_eq(f.taps.get_action("number_row_left"), "send_text")
-			helpers.assert_eq(f.script.get_shortcut_actions().return_key, "open_url")
+			helpers.assert_eq(f.script.get_shortcut_actions().script_altgr_enter, "open_url")
 			helpers.assert_eq(f.gestures.get_action_parameter("keyboard__cmd_a", "send_text"), "keyboard")
 			helpers.assert_eq(f.prefs.source_snapshot("config").content, before)
 			local restored = f.checkpoint.capture()
@@ -249,4 +256,57 @@ helpers.describe("terminal macOS shortcut scopes", function()
 			helpers.assert_eq(f.bindings.is_started(), false)
 		end)
 	end)
+end)
+
+-- script-chords-three-os-2026-09-30: the four chords are one set on every
+-- driver, their preset is their default, and the submenu's restore and clear
+-- apply at once to the chords alone.
+local PRESETS = {
+	script_altgr_enter = "script_pause_toggle",
+	script_altgr_backspace = "script_reload",
+	script_altgr_delete = "open_personal_shortcuts",
+	script_altgr_escape = "script_quit",
+}
+
+helpers.describe("macOS script chords in the Shortcuts scope", function()
+	helpers.it("script-chord: the restore brings the four presets back", function()
+		Fixture.run(function(f)
+			local committed, detail = f.owner.apply("recommended")
+			helpers.assert_eq(committed, true, detail)
+			local chords = Codec.decode(f.files.config).shortcuts.script_control
+			for slot, preset in pairs(PRESETS) do
+				helpers.assert_nil(chords[slot], slot .. " back on its preset is a deletion")
+				helpers.assert_eq(f.script.get_shortcut_actions()[slot], preset, slot)
+				helpers.assert_eq(f.state.script_control_shortcuts[slot], preset, slot)
+				helpers.assert_eq(f.script.slot_runs(slot), true, slot)
+			end
+			helpers.assert_eq(f.script.chords_enabled(), true)
+		end)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("script-chord: the submenu's " .. mode .. " touches the chords only and asks nothing", function()
+			Fixture.run(function(f)
+				local asked = 0
+				f.controls.on_confirm = function() asked = asked + 1 end
+				local committed, detail = f.owner.apply(mode, require("ui.menu.shortcuts_scope").script_chord_rows)
+				helpers.assert_eq(committed, true, detail)
+				helpers.assert_eq(asked, 0, "the submenu's rows apply without a question")
+				local decoded = Codec.decode(f.files.config)
+				for slot, preset in pairs(PRESETS) do
+					helpers.assert_eq(decoded.shortcuts.script_control[slot], mode == "clear" and "none" or nil, slot)
+					helpers.assert_eq(f.script.get_shortcut_actions()[slot], mode == "clear" and "none" or preset, slot)
+				end
+				helpers.assert_nil(decoded.gestures.action_parameters.script__script_altgr_enter__open_url)
+				helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_a__send_text, "keyboard")
+				helpers.assert_eq(decoded.shortcuts.keyboard.cmd_a, "send_text")
+				helpers.assert_eq(decoded.shortcuts.tap_keys.number_row_left, "send_text")
+				helpers.assert_eq(decoded.shortcuts.enabled, true)
+				helpers.assert_eq(f.keyboard.get_action("cmd_a"), "send_text")
+				helpers.assert_eq(f.taps.get_action("number_row_left"), "send_text")
+				helpers.assert_eq(f.bindings.is_started(), true)
+				helpers.assert_eq(f.script.is_started(), true)
+			end)
+		end)
+	end
 end)

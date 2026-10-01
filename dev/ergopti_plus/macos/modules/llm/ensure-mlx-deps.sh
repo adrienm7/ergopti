@@ -11,13 +11,14 @@
 # is needed — no Homebrew, no pre-installed Python, no pre-installed uv.
 #
 # FEATURES & RATIONALE:
-# 1. Self-bootstrapping uv: when 'uv' is missing from PATH and from the usual
-#    install locations (~/.local/bin, ~/.cargo/bin), the script downloads and
-#    runs the official Astral installer. The user does not need to install
-#    anything by hand on a fresh-out-of-the-box Mac.
-# 2. Self-bootstrapping Python: uv can download and manage its own Python
-#    interpreters, so we never depend on the system Python. If 3.11 is not
-#    available, 'uv python install 3.11' fetches it automatically.
+# 1. Self-bootstrapping uv: when no native 'uv' is in PATH or in the usual
+#    install locations (~/.local/bin, ~/.cargo/bin), the script installs the
+#    pinned uv wheel from PyPI (uv-release.sh), checked against its SHA-256.
+#    The user does not need to install anything by hand.
+# 2. Python without GitHub when possible: a native Python 3.11 to 3.14 the
+#    Lua caller found (ERGOPTI_NATIVE_PYTHONS) builds the venv, and uv then
+#    downloads no interpreter; only without one does uv fetch its managed
+#    Apple silicon build, which comes from GitHub.
 # 3. Single source of truth: all package versions live in pyproject.toml — this
 #    script never pins a version inline.
 # 4. Project-local venv only: no system Python, no $HOME/.mlx_py_env, no
@@ -54,6 +55,15 @@
 # 12. Repair: ERGOPTI_MLX_REPAIR=1 removes Ergopti's own venv (only that
 #    folder, never a link or a folder without a Python environment) and
 #    rebuilds it from freshly downloaded packages.
+# 13. Never Rosetta: a uv or a venv interpreter whose Mach-O lacks a slice for
+#    the processor the app runs on (ERGOPTI_NATIVE_ARCH, from the Lua caller)
+#    is never started; macOS would run it under Rosetta and announce an Intel
+#    app. Such a uv is skipped and such a venv rebuilt (hardening-h-no-rosetta).
+# 14. Managed networks: every child gets the relay of the system network
+#    settings and trusts the system store, where a company installs its
+#    inspection certificate (apply_system_network in network-retry.sh). No
+#    CA file overrides it: the Mozilla bundle this script once forced made uv
+#    and curl refuse every download behind a TLS-inspecting company relay.
 # ==============================================================================
 
 set -eu
@@ -64,19 +74,20 @@ set -eu
 # aborting silently.
 set -o pipefail 2>/dev/null || true
 
-export SSL_CERT_FILE=/etc/ssl/cert.pem
-export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem
-export PIP_CERT=/etc/ssl/cert.pem
 export HF_HUB_DISABLE_XET=1
 
 # Resolve the driver root independently of the caller's current directory.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
-if [ ! -f "$NETWORK_RETRY_LIB" ]; then
-	printf "[MLX-DEPS] ERROR: Shared network policy is missing at %s.\n" "$NETWORK_RETRY_LIB" >&2
-	exit 1
-fi
+UV_RELEASE_FILE="$SCRIPT_DIR/uv-release.sh"
+for dependency_file in "$NETWORK_RETRY_LIB" "$UV_RELEASE_FILE"; do
+	if [ ! -f "$dependency_file" ]; then
+		printf "[MLX-DEPS] ERROR: Required bootstrap source is missing at %s.\n" "$dependency_file" >&2
+		exit 1
+	fi
+done
 . "$NETWORK_RETRY_LIB"
+. "$UV_RELEASE_FILE"
 
 # Network robustness — these env vars are honoured by uv (Rust HTTP client)
 # and indirectly by curl/python downloads. Set generously so a flaky tether
@@ -101,7 +112,6 @@ PYTHON_VERSION="3.11"
 # under Rosetta) could never install it. System and Homebrew interpreters are
 # never used: they can be externally managed or disappear on an upgrade.
 PYTHON_REQUEST="cpython-${PYTHON_VERSION}-macos-aarch64-none"
-export UV_PYTHON_PREFERENCE=only-managed
 
 # The statement both this script and the Lua import probe of
 # ui/menu/menu_llm/models_manager_mlx.lua run: a venv that cannot import these
@@ -167,25 +177,47 @@ clear_quarantine() {
 	fi
 }
 
+# The system relay and trust store reach every child from here on.
+apply_system_network
+
+# The processor the app runs on, as the Lua caller names it
+# (adapters/python_interpreter.lua); uname answers when run by hand.
+NATIVE_ARCH="${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}"
+
+# Succeeds only for a Mach-O executable without a slice for NATIVE_ARCH, one
+# macOS would start under Rosetta. A script or an unreadable file is left to
+# the command that runs it.
+lacks_native_slice() {
+	local description
+	description="$(/usr/bin/file -bL "$1" 2>/dev/null)" || return 1
+	case "$description" in
+		*Mach-O*) ;;
+		*) return 1 ;;
+	esac
+	case "$description" in
+		*"$NATIVE_ARCH"*) return 1 ;;
+	esac
+	return 0
+}
+
 # Locates uv in PATH or in the well-known install directories. Prints the
-# absolute path on success, returns non-zero on failure.
+# absolute path on success, returns non-zero on failure. A uv built for
+# another processor (an Intel Homebrew's /usr/local/bin/uv on Apple silicon)
+# is skipped: starting it would run it under Rosetta.
 locate_uv() {
-	if command -v uv >/dev/null 2>&1; then
-		command -v uv
+	local candidate
+	for candidate in "$(command -v uv 2>/dev/null || true)" "${UV_INSTALL_DIR:+$UV_INSTALL_DIR/uv}" \
+		"$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv"; do
+		if [ -z "$candidate" ] || [ ! -x "$candidate" ]; then
+			continue
+		fi
+		if lacks_native_slice "$candidate"; then
+			log_info "Skipping $candidate: it is built for another processor than $NATIVE_ARCH."
+			continue
+		fi
+		echo "$candidate"
 		return 0
-	fi
-	if [ -n "${UV_INSTALL_DIR:-}" ] && [ -x "$UV_INSTALL_DIR/uv" ]; then
-		echo "$UV_INSTALL_DIR/uv"
-		return 0
-	fi
-	if [ -x "$HOME/.local/bin/uv" ]; then
-		echo "$HOME/.local/bin/uv"
-		return 0
-	fi
-	if [ -x "$HOME/.cargo/bin/uv" ]; then
-		echo "$HOME/.cargo/bin/uv"
-		return 0
-	fi
+	done
 	return 1
 }
 
@@ -250,48 +282,64 @@ fi
 # ====================================
 # ====================================
 
+# Installs the pinned uv wheel's executable into the install folder: PyPI's
+# own file, checked against its SHA-256, and no installer script.
+install_pinned_uv() {
+	local target_dir="${UV_INSTALL_DIR:-$HOME/.local/bin}"
+	local work wheel digest
+	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-uv.XXXXXX")" || return 1
+	wheel="$work/uv.whl"
+	if ! curl_resilient -o "$wheel" "$UV_WHEEL_ARM64_URL" >&2; then
+		rm -rf "$work"
+		return 1
+	fi
+	digest="$(shasum -a 256 "$wheel" | awk '{print $1}')"
+	if [ "$digest" != "$UV_WHEEL_ARM64_SHA256" ]; then
+		log_error "The uv $UV_RELEASE_VERSION wheel does not match its pinned SHA-256 (got $digest)."
+		rm -rf "$work"
+		return 1
+	fi
+	if ! /usr/bin/unzip -q -o "$wheel" "uv-$UV_RELEASE_VERSION.data/scripts/uv" -d "$work/unpacked" >&2; then
+		log_error "The uv $UV_RELEASE_VERSION wheel could not be unpacked."
+		rm -rf "$work"
+		return 1
+	fi
+	mkdir -p "$target_dir" \
+		&& mv -f "$work/unpacked/uv-$UV_RELEASE_VERSION.data/scripts/uv" "$target_dir/uv" \
+		&& chmod 755 "$target_dir/uv"
+	local rc=$?
+	rm -rf "$work"
+	return "$rc"
+}
+
 UV_BIN=""
 if UV_BIN="$(locate_uv)"; then
 	:
 else
-	# uv is not present anywhere we know about — install it via the official
-	# Astral installer. We emit the marker BEFORE running curl so the Lua
-	# side can immediately tell the user "Installation de uv…" rather than
-	# leaving them staring at a frozen menu bar for 30 s.
+	# uv is not present anywhere we know about: install the pinned wheel. The
+	# marker comes BEFORE the download so the Lua side can tell the user
+	# "Installation de uv…" at once.
 	emit_marker "UV_INSTALLING"
-	log_info "Installation automatique de uv via l'installeur officiel Astral…"
-
-	if ! command -v curl >/dev/null 2>&1; then
-		log_error "'curl' introuvable — impossible de télécharger uv. Vérifiez l'installation de macOS."
+	if [ "$NATIVE_ARCH" != "arm64" ]; then
+		log_error "MLX needs Apple silicon; this Mac runs $NATIVE_ARCH."
 		exit 1
 	fi
-
-	# The installer writes uv to UV_INSTALL_DIR under the launcher, else to
-	# ~/.local/bin on recent versions and to ~/.cargo/bin on older ones.
-	# locate_uv() checks each of them explicitly. Verbose progress from the
-	# installer goes to stderr so the Lua side surfaces it via Logger.info.
-	# curl flags add resilience for slow / flaky connections: --connect-timeout
-	# avoids hanging on a dead DNS, --max-time bounds the total install
-	# duration, --retry covers transient network blips with exponential
-	# backoff inside curl itself, and --retry-all-errors retries even on
-	# partial transfer failures. The outer retry_network loop adds a second
-	# layer of resilience on top of curl's own retries.
-	curl_uv_install() {
-		curl_resilient https://astral.sh/uv/install.sh | sh >&2
-	}
-	if [ -n "${UV_INSTALL_DIR:-}" ]; then
-		mkdir -p "$UV_INSTALL_DIR"
-	fi
-	if ! retry_network curl_uv_install; then
+	log_info "Installation de uv $UV_RELEASE_VERSION depuis PyPI…"
+	if ! retry_network install_pinned_uv; then
 		log_error "Téléchargement / installation de uv impossible. Vérifiez votre connexion réseau (ou un éventuel pare-feu)."
 		exit 1
 	fi
-
 	if ! UV_BIN="$(locate_uv)"; then
-		log_error "uv installé mais introuvable dans le PATH (~/.local/bin ou ~/.cargo/bin). Installation bloquée — exit."
+		log_error "uv installé mais introuvable (~/.local/bin ou le dossier d'Ergopti). Installation bloquée — exit."
 		exit 1
 	fi
 	emit_marker "UV_INSTALLED"
+fi
+
+# A uv older than --system-certs reads the system trust store through the
+# setting it replaced.
+if ! "$UV_BIN" --help 2>/dev/null | grep -q -- "--system-certs"; then
+	export UV_NATIVE_TLS=1
 fi
 
 # Sanity-check that uv actually runs. A binary on disk that segfaults or
@@ -313,22 +361,48 @@ fi
 # ===========================================
 # ===========================================
 
-# 'uv python find' returns non-zero when no managed or system interpreter
-# matching the constraint is available. In that case we ask uv to download
-# one — the user does not need a system Python.
-if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
-	emit_marker "PYTHON_INSTALLING"
-	log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
-	# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
-	# it verbatim so the live log shows real download progress. Wrapped in
-	# retry_network so a tethered / throttled connection doesn't fail the
-	# whole bootstrap on a single TCP reset.
-	uv_python_install() { "$UV_BIN" python install "$PYTHON_REQUEST" >&2; }
-	if ! retry_network uv_python_install; then
-		log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
-		exit 1
+# A native Python 3.11 to 3.14 the Lua caller found (its Mach-O carries this
+# processor's slice) builds the venv, and uv downloads no interpreter: the
+# managed builds come from GitHub, which company networks often block. The
+# versions are those MLX publishes wheels for in uv.lock.
+SYSTEM_PYTHON=""
+if [ -n "${ERGOPTI_NATIVE_PYTHONS:-}" ]; then
+	saved_ifs="$IFS"
+	IFS=":"
+	for candidate_python in $ERGOPTI_NATIVE_PYTHONS; do
+		if [ -z "$SYSTEM_PYTHON" ] && [ -x "$candidate_python" ] && ! lacks_native_slice "$candidate_python" \
+			&& "$candidate_python" -c 'import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 14) else 1)' \
+				>/dev/null 2>&1; then
+			SYSTEM_PYTHON="$candidate_python"
+		fi
+	done
+	IFS="$saved_ifs"
+fi
+
+if [ -n "$SYSTEM_PYTHON" ]; then
+	PYTHON_FOR_VENV="$SYSTEM_PYTHON"
+	export UV_PYTHON_PREFERENCE=only-system
+	export UV_PYTHON_DOWNLOADS=never
+	log_info "Using the native Python $SYSTEM_PYTHON: no interpreter download."
+else
+	PYTHON_FOR_VENV="$PYTHON_REQUEST"
+	export UV_PYTHON_PREFERENCE=only-managed
+	# 'uv python find' returns non-zero when no managed interpreter matching
+	# the request is available. In that case we ask uv to download one.
+	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
+		emit_marker "PYTHON_INSTALLING"
+		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
+		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
+		# it verbatim so the live log shows real download progress. Wrapped in
+		# retry_network so a tethered / throttled connection doesn't fail the
+		# whole bootstrap on a single TCP reset.
+		uv_python_install() { "$UV_BIN" python install "$PYTHON_REQUEST" >&2; }
+		if ! retry_network uv_python_install; then
+			log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
+			exit 1
+		fi
+		emit_marker "PYTHON_INSTALLED"
 	fi
-	emit_marker "PYTHON_INSTALLED"
 fi
 
 
@@ -407,7 +481,14 @@ fi
 # `uv pip sync pyproject.toml` was a silent no-op, or a venv whose libraries
 # macOS refuses to load), and a hash-only check would then keep skipping work
 # forever. When the imports fail, the slow path rebuilds it below.
-if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
+# A venv built on an interpreter for another processor is never started, not
+# even to probe it: it is rebuilt on uv's own interpreter below.
+VENV_NOT_NATIVE=0
+if [ -e "$VENV_DIR/bin/python" ] && lacks_native_slice "$VENV_DIR/bin/python"; then
+	VENV_NOT_NATIVE=1
+	log_info "The installed venv's Python is built for another processor than $NATIVE_ARCH — rebuilding it."
+fi
+if [ "$VENV_NOT_NATIVE" = "0" ] && [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 	LAST_HASH="$(cat "$SYNC_HASH_FILE" 2>/dev/null || true)"
 	if [ "$LAST_HASH" = "$DEPS_FINGERPRINT" ]; then
 		# Cheap disk check before the python import probe: globbing the
@@ -416,7 +497,11 @@ if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 		# for several seconds — long enough to make the menubar feel frozen
 		# on every reload. We only fall back to the slower import probe
 		# when the disk check passes.
-		SP_DIR="$VENV_DIR/lib/python$PYTHON_VERSION/site-packages"
+		# The venv's own version: a native system Python may be 3.11 to 3.14.
+		SP_DIR=""
+		for candidate_sp in "$VENV_DIR"/lib/python3.*/site-packages; do
+			if [ -d "$candidate_sp" ]; then SP_DIR="$candidate_sp"; fi
+		done
 		if [ -d "$SP_DIR/mlx_lm" ] && [ -d "$SP_DIR/huggingface_hub" ] \
 			&& [ -d "$SP_DIR/jinja2" ] && [ -d "$SP_DIR/safetensors" ] \
 				&& [ -d "$SP_DIR/truststore" ]; then
@@ -473,7 +558,7 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 log_info "Création du virtualenv candidat : $STAGING_VENV"
-if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_REQUEST" >&2; then
+if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_FOR_VENV" >&2; then
 	log_error "Impossible de créer le virtualenv candidat via 'uv venv'."
 	exit 1
 fi

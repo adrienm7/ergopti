@@ -298,6 +298,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.python_interpreter",
+		contract = { "resolve", "inspect", "native_arch", "parse_header" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.http_client",
 		contract = { "get", "post" },
 		wired    = true,

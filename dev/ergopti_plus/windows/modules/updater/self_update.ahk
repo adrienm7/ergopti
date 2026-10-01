@@ -1492,6 +1492,50 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 ; ===== 2.4) Download + swap (binary replacement) =====
 ; =====================================================
 
+; The Versions window's observer of the install it asked for (a release chosen
+; there, modules/updater/release_install.ahk), or 0. While one is set, the
+; phases and failures of the transaction go to that window, which shows them
+; with a Retry button, instead of a modal box. Called as (Phase, ReasonKey).
+global _UpdaterInstallObserver := 0
+
+; Tells the Versions window one phase of the install it follows: "installing",
+; "restarting" or "failed" (which ends the following).
+; @param Phase {String}
+; @param ReasonKey {String} Page locale key of a failure.
+; @returns {Boolean} True when a window follows this install.
+_Updater_NotifyInstallPhase(Phase, ReasonKey := "") {
+	global _UpdaterInstallObserver
+	Observer := _UpdaterInstallObserver
+	if !IsObject(Observer)
+		return false
+	if (Phase == "failed")
+		_UpdaterInstallObserver := 0
+	try Observer.Call(Phase, ReasonKey)
+	catch as Err
+		try LoggerError("Updater", "The Versions window's install observer raised: {1}.", Err.Message)
+	return true
+}
+
+; Reports an install failure to the Versions window that follows the install,
+; or in the modal box an update from the menu or the prompt has always shown.
+; @param MessageKey {String} Updater locale key of the modal box.
+; @param ReasonKey {String} Page locale key of the window's failure.
+; @param Icon {String} Modal box icon option.
+_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!") {
+	if _Updater_NotifyInstallPhase("failed", ReasonKey)
+		return
+	MsgBox(t(MessageKey), t("updater.title_update"), Icon)
+}
+
+; Whether the staging worker's ERR line is a refused verification (a missing or
+; different SHA-256 digest, an executable too small to be one) rather than a
+; failed or truncated download.
+; @param Stdout {String}
+; @returns {Boolean}
+_Updater_StagingFailureIsVerification(Stdout) {
+	return (Stdout is String) && (InStr(Stdout, "SHA-256") || InStr(Stdout, "too small"))
+}
+
 ; Dispatches the whole staging transaction to a child process. AHK's one
 ; interpreter thread is also the keyboard hook thread, so response-body COM,
 ; disk persistence, integrity checks and swap-script creation must never run here.
@@ -1591,7 +1635,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
 		return false
 	}
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
@@ -1602,7 +1646,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected")
 		return false
 	}
 	; Re-entrancy guard: two independent "Update now" triggers (the TrayTip
@@ -1615,6 +1659,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; (updater-download-reentrancy).
 	if _UpdaterDownloadInProgress {
 		try LoggerWarn("Updater", "Download already in progress -- ignoring duplicate Updater_DownloadAndInstall call.")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
@@ -1634,11 +1679,11 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		MsgBox(t("updater.install_error_no_asset"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error_no_asset", "changelog_window.install_error_no_asset")
 		return false
 	}
 	AssetUrl := Asset.Url
-	if !A_IsCompiled {
+	if Updater_IsLocalSource() {
 		; Running from source — replacing the .ahk would be wrong, and the
 		; user is almost certainly developing on this very tree. Bail with a
 		; friendly note rather than silently doing nothing.
@@ -1648,7 +1693,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		MsgBox(t("updater.install_local_source"), t("updater.title_update"), "Iconi")
+		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi")
 		return false
 	}
 
@@ -1666,7 +1711,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	if (LocalAppData == "") {
-		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
 		return false
 	}
 	StagingDir := LocalAppData . "\Ergopti\updates"
@@ -1685,11 +1730,13 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	if Reservation.RecoveryBusy {
 		if _Updater_RequestMayPublish(Request, BoundarySuspended, NotifyFn)
-			MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
 		return false
 	}
-	if Reservation.DuplicateDownload
+	if Reservation.DuplicateDownload {
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
 		return false
+	}
 	if !Reservation.Reserved
 		return false
 	StagingEpoch := Reservation.Epoch
@@ -1891,7 +1938,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		} else {
 			try LoggerError("Updater", "Could not launch the isolated update staging worker.")
 		}
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
@@ -2003,6 +2050,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		_Updater_RequestMayPublish(Request, true)
 	if HadTransaction {
 		try LoggerError("Updater", LogMessage)
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
 		if RebuildMenu
 			try TimerArmOneShotMs((*) => _Updater_RebuildMenu(), 50)
 	}
@@ -2042,24 +2090,31 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	SetTimer(_Updater_MonitorStagingWorker, 0)
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	if (ExitCode != 0 or Stdout != "READY") {
 		try LoggerError("Updater", "Update staging worker failed (exit {1}): {2}.", ExitCode, Stdout)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		; The worker reports a digest or size refusal in its ERR line: that is a
+		; failed verification, anything else a failed download.
+		_Updater_ReportInstallFailure("updater.install_error_download",
+			_Updater_StagingFailureIsVerification(Stdout)
+				? "changelog_window.install_error_verify" : "changelog_window.install_error_download")
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
+	_Updater_NotifyInstallPhase("installing")
 	if !_Updater_StartSwapTransaction(SwapScriptPath, NewExe, CurrentExe, Tag,
 		StagingEpoch) {
 		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 			return
-		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
+	_Updater_NotifyInstallPhase("restarting")
 	global UPDATER_LAST_NOTIFIED_TAG := ""
 }
 
@@ -2715,7 +2770,7 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 	_Updater_CloseSwapOwner(Owner, true)
 	try LoggerError("Updater", "Swap transaction {1} aborted: {2}.", TransactionId, Message)
 	if ShowUi {
-		try MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		try _Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
 	} else {
 		TimerArmOneShotMs(_Updater_ShowDeferredSwapFailureNotice, 1)
 	}

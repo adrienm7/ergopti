@@ -52,6 +52,7 @@ local function load_fixture()
 		F16_LLM_CHAIN_SIGNAL = 106,
 		F17_CYCLE_WINDOWS = 64,
 		F20_LAYER_NAV_ENTERED = 90,
+		F19_LAYER_NAV_EXITED  = 80,
 		LAYER_SYN_1 = 79,
 		LAYER_SYN_2 = 80,
 		LAYER_SYN_3 = 81,

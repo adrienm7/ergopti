@@ -11,6 +11,10 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"_generated.action_catalogue",
+	-- The shared script chords' paused actions, read by the control-plane
+	-- admission of a script chord's action.
+	"infra.script_chord_catalogue",
+	"script_chords",
 	"app_parameter",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",

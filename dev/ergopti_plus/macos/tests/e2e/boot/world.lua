@@ -29,6 +29,11 @@
 ---    its names, how long the Karabiner lease worker takes to answer, and what
 ---    happens while the boot's first RESUME is in flight (layout-name-forms,
 ---    lease-stop-supersedes-activation).
+--- 7. Every process has a processor: each started task is recorded with the
+---    architectures its executable carries, as the Mach-O header of the
+---    modelled file declares them (hardening-h-no-rosetta). On Apple silicon a
+---    task whose executable has no arm64 slice runs under Rosetta, and macOS
+---    tells the user an Intel app is starting: recorded as E2E_ROSETTA.
 --- ==============================================================================
 
 local M = {}
@@ -187,8 +192,9 @@ end
 -- ==================================================
 
 -- System folders the boot probes. They resolve inside the scenario's root so a
--- CI runner's own /Applications cannot change what the boot sees.
-local SYSTEM_PREFIXES = { "/Applications/", "/Library/", "/usr/local/", "/opt/homebrew/" }
+-- CI runner's own /Applications cannot change what the boot sees; /var/db holds
+-- the xcode-select link that names the active developer tools.
+local SYSTEM_PREFIXES = { "/Applications/", "/Library/", "/usr/local/", "/opt/homebrew/", "/var/db/" }
 
 --- Maps a system path into the scenario's machine root.
 --- @param machine_root string
@@ -221,6 +227,136 @@ function M.install_karabiner(machine_root, home)
     ]
 }
 ]])
+end
+
+-- Mach-O CPU types (<mach/machine.h>) of the processors a Mac runs.
+local CPU_TYPES = { x86_64 = 0x01000007, arm64 = 0x0100000C }
+local CPU_NAMES = { [0x01000007] = "x86_64", [0x0100000C] = "arm64" }
+
+-- Executables of the sealed system volume: Apple ships every one with both
+-- slices, so they never need Rosetta.
+local SYSTEM_EXECUTABLE_PREFIXES = { "/usr/bin/", "/bin/", "/usr/sbin/", "/sbin/", "/usr/libexec/", "/System/" }
+
+-- The xcode-select shims of /usr/bin: the code they run is the same tool of
+-- the active developer folder, whatever processor that copy was built for.
+local DEVELOPER_SHIMS = { ["/usr/bin/python3"] = "usr/bin/python3" }
+
+-- Where the shims look when neither DEVELOPER_DIR nor the xcode-select link
+-- names a developer folder, in the order libxcselect tries them.
+local DEFAULT_DEVELOPER_DIRS = { "/Applications/Xcode.app/Contents/Developer", "/Library/Developer/CommandLineTools" }
+
+--- Encodes one unsigned 32-bit integer.
+--- @param value integer
+--- @param big_endian boolean
+--- @return string bytes
+local function u32(value, big_endian)
+	local bytes = {}
+	for index = 1, 4 do
+		bytes[index] = math.floor(value / 256 ^ (index - 1)) % 256
+	end
+	if big_endian then bytes = { bytes[4], bytes[3], bytes[2], bytes[1] } end
+	return string.char(bytes[1], bytes[2], bytes[3], bytes[4])
+end
+
+--- Writes the Mach-O header of an executable built for the given processors:
+--- a thin 64-bit header for one, a universal (fat) header for several.
+--- @param path string File to write (already mapped into the machine root).
+--- @param archs table Architecture names, e.g. { "x86_64" } or { "x86_64", "arm64" }.
+function M.write_macho(path, archs)
+	local content
+	if #archs == 1 then
+		content = u32(0xFEEDFACF, false) .. u32(assert(CPU_TYPES[archs[1]], archs[1]), false)
+			.. u32(0, false) .. u32(2, false) .. string.rep("\0", 16)
+	else
+		local parts = { u32(0xCAFEBABE, true), u32(#archs, true) }
+		for index, arch in ipairs(archs) do
+			parts[#parts + 1] = u32(assert(CPU_TYPES[arch], arch), true) .. u32(0, true)
+				.. u32(4096 * index, true) .. u32(4096, true) .. u32(12, true)
+		end
+		content = table.concat(parts)
+	end
+	M.write_file(path, content)
+	assert(sh("chmod 755 " .. sh_quote(path)), "cannot make " .. path .. " executable")
+end
+
+--- Reads the processors a modelled executable file declares.
+--- @param file_path string Path already mapped into the machine root.
+--- @return table|nil archs, string|nil reason ("missing", "script:<interpreter>", "unknown")
+local function file_archs(file_path)
+	local fh = io.open(file_path, "rb")
+	if not fh then return nil, "missing" end
+	local head = fh:read(4096) or ""
+	fh:close()
+	if head:sub(1, 2) == "#!" then
+		return nil, "script:" .. (head:match("^#!%s*(%S+)") or "")
+	end
+	local function be(offset)
+		local a, b, c, d = head:byte(offset, offset + 3)
+		return ((a * 256 + b) * 256 + c) * 256 + d
+	end
+	local function le(offset)
+		local a, b, c, d = head:byte(offset, offset + 3)
+		return ((d * 256 + c) * 256 + b) * 256 + a
+	end
+	if #head < 8 then return nil, "unknown" end
+	if be(1) == 0xCAFEBABE then
+		local archs = {}
+		for index = 1, be(5) do
+			archs[#archs + 1] = CPU_NAMES[be(9 + (index - 1) * 20)] or "other"
+		end
+		return archs
+	end
+	if le(1) == 0xFEEDFACF then return { CPU_NAMES[le(5)] or "other" } end
+	return nil, "unknown"
+end
+
+--- The processors an executable the boot starts declares on this machine.
+--- @param machine_root string
+--- @param path string Executable as production names it.
+--- @param depth integer|nil Script interpreters followed so far.
+--- @return table|nil archs, string detail Where the answer came from.
+function M.declared_archs(machine_root, path, depth)
+	local shim_tool = DEVELOPER_SHIMS[path]
+	if shim_tool then
+		local developer = os.getenv("DEVELOPER_DIR")
+		if type(developer) ~= "string" or developer == "" then
+			local reader = io.popen("readlink " .. sh_quote(redirect(machine_root, "/var/db/xcode_select_link"))
+				.. " 2>/dev/null")
+			local target = reader and reader:read("*l") or nil
+			if reader then reader:close() end
+			developer = (type(target) == "string" and target ~= "") and target or nil
+		end
+		if developer == nil then
+			for _, candidate in ipairs(DEFAULT_DEVELOPER_DIRS) do
+				if developer == nil and file_archs(redirect(machine_root, candidate .. "/" .. shim_tool)) then
+					developer = candidate
+				end
+			end
+		end
+		if developer == nil then return nil, "no developer tools behind " .. path end
+		local tool = developer .. "/" .. shim_tool
+		return (file_archs(redirect(machine_root, tool))), tool
+	end
+	for _, prefix in ipairs(SYSTEM_EXECUTABLE_PREFIXES) do
+		if path:sub(1, #prefix) == prefix then return { "x86_64", "arm64" }, "system volume" end
+	end
+	local archs, reason = file_archs(redirect(machine_root, path))
+	local interpreter = type(reason) == "string" and reason:match("^script:(.+)$")
+	if interpreter and (depth or 0) < 2 then
+		return M.declared_archs(machine_root, interpreter, (depth or 0) + 1)
+	end
+	return archs, reason or path
+end
+
+--- Gives the machine the developer tools a current macOS installs: the
+--- Command Line Tools with a universal python3, unless the scenario already
+--- modelled another copy.
+--- @param machine_root string
+function M.install_developer_tools(machine_root)
+	local python = machine_root .. "/Library/Developer/CommandLineTools/usr/bin/python3"
+	local fh = io.open(python, "rb")
+	if fh then fh:close(); return end
+	M.write_macho(python, { "x86_64", "arm64" })
 end
 
 -- The answers of the commands a set-up Mac runs for the boot, by executable.
@@ -379,7 +515,19 @@ local function machine_answer(path, args, helper)
 	if path == "/usr/bin/defaults" and args[1] == "read" and args[3] == "AppleSelectedInputSources" then
 		return { code = 0, stdout = selected_input_sources(_selected_layout) }
 	end
-	if path == "/usr/bin/python3" then return { code = 0, stdout = '["' .. _selected_layout.hitoolbox .. '"]\n' } end
+	if path == "/usr/bin/defaults" and args[1] == "read" and args[3] == "AppleEnabledInputSources" then
+		return { code = 0, stdout = selected_input_sources(_selected_layout) }
+	end
+	if path:match("/python[%d.]*$") and args[1] == "-c" then
+		local source = tostring(args[2])
+		-- The active-layout probe of releases before hardening-h, and the
+		-- display-mirror helper on a single screen.
+		if source:find("AppleEnabledInputSources", 1, true) then
+			return { code = 0, stdout = '["' .. _selected_layout.hitoolbox .. '"]\n' }
+		end
+		if source:find("CGGetOnlineDisplayList", 1, true) then return { code = 0, stdout = "single_screen\n" } end
+		return { code = 0, stdout = "" }
+	end
 	if path == "/usr/bin/shortcuts" then return { code = 0, stdout = "" } end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
@@ -474,6 +622,9 @@ local function install_launcher(hs, env)
 	local real_getenv = os.getenv
 	os.getenv = function(name)
 		if env[name] ~= nil then return env[name] end
+		-- A GUI launch carries no DEVELOPER_DIR; a CI runner's own must not choose
+		-- the developer tools of the modelled Mac.
+		if name == "DEVELOPER_DIR" then return nil end
 		return real_getenv(name)
 	end
 	hs.application.__set_for_pid(tonumber(env.ERGOPTI_LAUNCHER_PID), handle({
@@ -512,7 +663,8 @@ end
 --- @param hs table The hs stub.
 --- @param env table launcher_environment().
 --- @param arch string One of M.ARCHITECTURES.
-local function install_natives(hs, env, arch)
+--- @param machine_root string
+local function install_natives(hs, env, arch, machine_root)
 	hs.accessibilityState = function() return true end
 	hs.settings.getKeys = function()
 		local keys = {}
@@ -661,6 +813,14 @@ local function install_natives(hs, env, arch)
 		task.start = function(self)
 			running = true
 			record("TASK", path .. " " .. table.concat(args, " "):sub(1, 200))
+			local archs, source = M.declared_archs(machine_root, path)
+			local listed = archs and table.concat(archs, ",") or "unknown"
+			record("SPAWN_ARCH", path .. " [" .. listed .. "] (" .. tostring(source) .. ")")
+			if arch == "arm64" and archs then
+				local native = false
+				for _, slice in ipairs(archs) do native = native or slice == "arm64" end
+				if not native then record("ROSETTA", path .. " [" .. listed .. "] (" .. tostring(source) .. ")") end
+			end
 			local answer = machine_answer(path, args, helper)
 			if answer.interactive then
 				local api = {
@@ -909,7 +1069,8 @@ function M.install(hs, options)
 	install_log_transport()
 	install_timers(hs)
 	install_launcher(hs, env)
-	install_natives(hs, env, options.arch)
+	M.install_developer_tools(options.machine_root)
+	install_natives(hs, env, options.arch, options.machine_root)
 	install_extension_searcher(hs)
 	install_file_system(hs, options)
 	hs.configdir = env.ERGOPTI_CONFIG_DIR

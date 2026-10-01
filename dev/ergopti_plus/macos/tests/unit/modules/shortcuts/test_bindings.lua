@@ -21,7 +21,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 -- the two fields that system.lua actually needs.
 package.loaded["infra.keycodes"] = {
 	F18_WAKE_OS             = 79,
-	F19_VOLUME_SCROLL_MODIFIER = 80,
+	F19_LAYER_NAV_EXITED    = 80,
 	to_name = function(code)
 		local MAP = { [79] = "f18", [80] = "f19" }
 		return MAP[code] or ("keycode_" .. tostring(code))
@@ -246,12 +246,13 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		helpers.assert_true(seen.cmd_shift_v)
 	end)
 
-	helpers.it("includes the standalone tap_keys and layer_scroll entries", function()
+	helpers.it("includes the standalone tap_keys and layer_wheel entries", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
 		helpers.assert_true(seen.tap_keys)
 		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
-		helpers.assert_true(seen.layer_scroll)
+		helpers.assert_true(seen.layer_wheel)
+		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
 	helpers.it("orders ctrl+letter entries before ctrl+punctuation", function()
@@ -273,7 +274,7 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		local idx = {}
 		for i, entry in ipairs(list) do idx[entry.id] = i end
 		helpers.assert_true(idx.cmd_star < idx.tap_keys)
-		helpers.assert_true(idx.cmd_star < idx.layer_scroll)
+		helpers.assert_true(idx.cmd_star < idx.layer_wheel)
 	end)
 end)
 
@@ -384,7 +385,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 	local function make_bindings_with_ctrl_g_spy()
 		package.loaded["infra.keycodes"] = {
 			F18_WAKE_OS                = 79,
-			F19_VOLUME_SCROLL_MODIFIER = 80,
+			F19_LAYER_NAV_EXITED       = 80,
 			to_name = function(code)
 				local MAP = { [79] = "f18", [80] = "f19" }
 				return MAP[code] or ("keycode_" .. tostring(code))

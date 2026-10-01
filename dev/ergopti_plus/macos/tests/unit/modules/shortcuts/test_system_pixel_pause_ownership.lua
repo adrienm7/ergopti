@@ -181,6 +181,7 @@ local function fresh_pixel_owner()
 	}
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["adapters.screen_capture"] = nil
+	package.loaded["adapters.python_interpreter"] = helpers.healthy_python_resolver()
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	package.loaded["modules.shortcuts.actions.system_pixel"] = nil
 	subject = require("modules.shortcuts.actions.system_pixel")

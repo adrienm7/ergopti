@@ -28,7 +28,8 @@ local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
+local OpenStepPlist = require("infra.openstep_plist")
+local PythonInterpreter = require("adapters.python_interpreter")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -37,7 +38,7 @@ local version_gt         = install.version_gt
 local USER_LAYOUTS_DIR   = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR = install.SYSTEM_LAYOUTS_DIR
 
--- Throttle window for the async active-layout refresh (seconds). Bounds python3
+-- Throttle window for the async active-layout refresh (seconds). Bounds probe
 -- spawns even if the user reopens the menu rapidly.
 local ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC = 5
 
@@ -47,7 +48,7 @@ local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 	Timings.sec("ui", "input_source_operation_timeout_ms")
 
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
--- computed; refreshed asynchronously so menu opens never pay the python3 cost.
+-- computed; refreshed asynchronously so menu opens never pay a subprocess.
 local _active_layouts_cache = nil
 -- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
 local _active_layouts_last_refresh = 0
@@ -328,43 +329,19 @@ end
 --- can fall back to a "no layout" placeholder without having to handle
 --- nil. Pure-Lua test runs without the native task adapter hit this branch silently.
 --- @return table List of input-source records (possibly empty).
---- Reads AppleEnabledInputSources from HIToolbox via a Python plist parser and
---- returns a list of records {id, name, selected} for every enabled keyboard
---- layout. Using Python avoids the regex-on-XML fragility that caused duplicate
---- entries when the same KeyboardLayout Name appeared in multiple plist sections.
---- HIToolbox is the macOS source of truth — changes in System Settings are
---- reflected immediately, without the TIS cache lag from osascript/hs.keycodes.
--- The python that reads AppleEnabledInputSources from HIToolbox via cfprefsd.
--- Kept as a module constant so the probe can run ASYNCHRONOUSLY (hs.task) off the
--- menu-open path instead of blocking the click with a python3 cold start. Reading
--- via `defaults export` (cfprefsd) reflects System Settings changes immediately,
--- unlike reading the plist file directly which can return stale entries.
-local ACTIVE_LAYOUTS_PY = [[
-import subprocess, sys, plistlib, json
-
-DOMAIN = "com.apple.HIToolbox"
-KEY    = "AppleEnabledInputSources"
-CHILD_TIMEOUT = float(sys.argv[1])
-
-# Read via cfprefsd (defaults export) — reflects System Settings changes
-# immediately, unlike reading the plist file directly which can be stale.
-try:
-    raw = subprocess.check_output(
-        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL,
-        timeout=CHILD_TIMEOUT)
-    prefs = plistlib.loads(raw)
-except Exception as e:
-    print("ERR:" + str(e)); sys.exit(1)
-
-sources = prefs.get(KEY, [])
-out = []
-for s in sources:
-    kind = s.get("InputSourceKind", "")
-    name = s.get("KeyboardLayout Name", "")
-    if name and (kind == "Keyboard Layout" or kind == ""):
-        out.append(name)
-print(json.dumps(out))
-]]
+--- Reads AppleEnabledInputSources from HIToolbox and returns a list of records
+--- {id, name, selected} for every enabled keyboard layout. HIToolbox is the
+--- macOS source of truth, read through cfprefsd: changes in System Settings are
+--- reflected immediately, without the TIS cache lag from osascript/hs.keycodes
+--- and without the stale entries a direct read of the plist file can return.
+-- The probe is the system's own `defaults`, which prints the one key as an
+-- old-style property list that infra.openstep_plist decodes; reading the key
+-- alone avoids the duplicate entries a regex over the whole domain once gave.
+-- It never runs Python: this probe runs at every boot, and /usr/bin/python3
+-- runs the active developer folder's python3, x86_64 only on a Mac migrated
+-- from Intel, where macOS then announced an Intel app (hardening-h-no-rosetta).
+local ACTIVE_LAYOUTS_EXECUTABLE = "/usr/bin/defaults"
+local ACTIVE_LAYOUTS_ARGS = { "read", "com.apple.HIToolbox", "AppleEnabledInputSources" }
 
 --- Returns whether a record is the currently-selected layout, comparing the raw
 --- KeyboardLayout Name and the localised display against the current layout name.
@@ -382,23 +359,25 @@ local function is_record_selected(kl_name, display, current_name)
 	return display_no_space == current_lower
 end
 
---- Parses the JSON array of KeyboardLayout Names emitted by the HIToolbox probe
---- into menu records. Pure (no I/O), so it is unit-testable and never runs a
+--- Parses the enabled input sources the HIToolbox probe printed into menu
+--- records: every entry whose kind is a keyboard layout (or unset) and that
+--- names its layout. Pure (no I/O), so it is unit-testable and never runs a
 --- subprocess. `selected` is computed live against current_name.
---- @param raw_out string|nil Probe stdout (a JSON array of strings).
+--- @param raw_out string|nil Probe stdout (`defaults read` of the array).
 --- @param current_name string|nil hs.keycodes.currentLayout() value.
---- @return table|nil records, or nil when raw_out is not a parseable array.
+--- @return table|nil records, or nil when raw_out is not a well-formed array of entries.
 local function parse_active_layouts(raw_out, current_name)
-	if type(raw_out) ~= "string" or not raw_out:match("^%s*%[") then return nil end
-	local names, decode_err = JsonCodec.decode(raw_out)
-	if decode_err ~= nil or type(names) ~= "table" then return nil end
-	local count = 0
-	for index, name in pairs(names) do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1
-			or index > #names or type(name) ~= "string" or name == "" then return nil end
-		count = count + 1
+	if type(raw_out) ~= "string" then return nil end
+	local sources = OpenStepPlist.decode(raw_out)
+	if not OpenStepPlist.is_array(sources) then return nil end
+	local names = {}
+	for _, source in ipairs(sources) do
+		if type(source) ~= "table" or OpenStepPlist.is_array(source) then return nil end
+		local kind = source.InputSourceKind or ""
+		local name = source["KeyboardLayout Name"] or ""
+		if type(kind) ~= "string" or type(name) ~= "string" then return nil end
+		if name ~= "" and (kind == "Keyboard Layout" or kind == "") then names[#names + 1] = name end
 	end
-	if count ~= #names then return nil end
 	local out = {}
 	for _, kl_name in ipairs(names) do
 		-- For Ergopti entries the localised name is produced by format_ergopti_display
@@ -513,7 +492,7 @@ end
 
 
 --- Refreshes _active_layouts_cache asynchronously through one deadline-owned
---- python3 process. Concurrent callers join the same owner. A timed-out task
+--- `defaults` process. Concurrent callers join the same owner. A timed-out task
 --- remains pinned by ShellRunner but loses cache authority before a successor is
 --- admitted, so a late native callback cannot clear or overwrite that successor.
 --- @param on_done function|nil Callback invoked after this logical probe settles.
@@ -544,9 +523,7 @@ local function refresh_active_layouts_async(on_done)
 	if type(on_done) == "function" then owner.waiters[1] = on_done end
 	_active_probe_owner = owner
 
-	local child_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
-	local handle = ShellRunner.spawn("/usr/bin/python3",
-		{ "-c", ACTIVE_LAYOUTS_PY, tostring(child_timeout) },
+	local handle = ShellRunner.spawn(ACTIVE_LAYOUTS_EXECUTABLE, ACTIVE_LAYOUTS_ARGS,
 		function(exit_code, stdout, _stderr)
 			if owner.retired == true or owner.timed_out == true then return end
 			owner.completion_received = true
@@ -625,8 +602,8 @@ end
 --- Serves the memoised HIToolbox result when available (recomputing the live
 --- `selected` flag so a layout switch reflects instantly), otherwise an in-process
 --- fast list. Either way it schedules a throttled async refresh so the cache is
---- accurate for the next open. This call used to run python3 SYNCHRONOUSLY here,
---- which is what made the menubar take ~1 s to open.
+--- accurate for the next open. This call used to run a python3 probe
+--- SYNCHRONOUSLY here, which is what made the menubar take ~1 s to open.
 --- @return table List of input-source records (possibly empty).
 local function list_active_keyboard_layouts()
 	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
@@ -905,7 +882,15 @@ print("OK")
 local function edit_enabled_list_async(mode, target, display, accepted, on_done)
 	local label = mode == "enable" and "enable_source" or "disable_source"
 	local nested_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
-	return run_bounded_process("Edit enabled keyboard input sources", "/usr/bin/python3",
+	-- Only an interpreter this Mac runs natively: none starts nothing and
+	-- offers the install (hardening-h-no-rosetta).
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done(label .. ".done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	return run_bounded_process("Edit enabled keyboard input sources", python_bin,
 		{ "-c", ENABLED_LIST_SCRIPT, mode, target, tostring(nested_timeout) },
 		function(process_ok, out, reason)
 			local out_text = tostring(out or ""):gsub("[\r\n]+$", "")

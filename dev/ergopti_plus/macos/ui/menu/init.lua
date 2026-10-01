@@ -1050,15 +1050,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				updateMenu()
 			end)
 		end
-		if state.script_control_enabled then
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", state.script_control_shortcuts.return_key)
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  state.script_control_shortcuts.backspace)
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     state.script_control_shortcuts.escape)
-		else
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", "none")
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  "none")
-			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
+		-- The script chords: every slot's action and the switch, which keeps the
+		-- actions when off. Each setter asks Karabiner for the new plan's rules.
+		for slot_id, action in pairs(state.script_control_shortcuts) do
+			pcall(core_mods.shortcuts_mod.set_shortcut_action, slot_id, action)
 		end
+		pcall(core_mods.shortcuts_mod.set_script_chords_enabled, state.script_control_enabled == true)
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function()
 				return DeferredWork.after(0, function()
@@ -1487,6 +1484,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return committed
 	end
+	--- « Restaurer » and « Tout effacer » of the script chords' submenu: the
+	--- Shortcuts scope narrowed to the chords, at once and without a question
+	--- (the maintainer's decision of 2026-09-30); the clear writes "none" in
+	--- every slot, since an absent slot starts with its preset.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean committed
+	local function apply_script_chords_scope(mode)
+		local owner = preference_scope_owner("shortcuts")
+		if not owner then return false end
+		local committed = owner.apply(mode, require("ui.menu.shortcuts_scope").script_chord_rows)
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
 	local global_scope = nil
 	apply_global_scope = function(mode)
 		if read_only_reason ~= nil then return false end
@@ -1535,6 +1548,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
+		apply_script_chords_scope = apply_script_chords_scope,
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,

@@ -17,13 +17,15 @@ local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatg
 
 --- Uses real state owners and only controlled native/file publication ports.
 --- @param body function Test body.
-local function with_scope(body)
+--- @param source string|nil config.toml content; SOURCE by default.
+local function with_scope(body, source)
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
-		Sandbox.with_config(SOURCE, function(path)
+		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.gestures.manager", "infra.shortcuts_scope", "ui.menu.menu_builder" }) do
+				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
+				"infra.shortcuts_scope", "ui.menu.menu_builder" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
@@ -78,10 +80,15 @@ local function with_scope(body)
 				if controls.refuse_restore and state.keyboard__ctrl_j__open_url then return false end
 				return apply_parameters(token, state)
 			end
+			local chords = require("modules.shortcuts.script_chords")
+			chords.init({ is_paused = function() return controls.paused end,
+				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
 			local backup = path .. ".shortcuts-test-backup"
 			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
 				files = files, is_paused = function() return controls.paused end })
-			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures }
+			controls.files = files
+			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures,
+				chords = chords }
 			local passed, failure = pcall(body, scope, owners, controls, path, backup)
 			for _, created in ipairs(controls.backups) do os.remove(created); os.remove(created .. ".tmp") end
 			os.remove(backup)
@@ -470,5 +477,127 @@ helpers.describe("Linux terminal shortcut scope revert", function()
 			os.remove(backup)
 			helpers.assert_true(scope.apply("clear"), "every dispatch port is released after a revert")
 		end)
+	end)
+end)
+
+-- script-chords-three-os-2026-09-30: an absent chord starts with its preset, so
+-- every clear writes "none" in each slot and « Restaurer » deletes them; the
+-- submenu's own restore and clear touch the chords and nothing else.
+local SLOTS = { "script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape" }
+local CHORDS_SOURCE = SOURCE .. '[shortcuts.script_control]\nchords_enabled = false\nscript_altgr_enter = "open_url"\n'
+	.. 'script_altgr_escape = "none"\n'
+local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
+
+helpers.describe("Linux script chords in the Shortcuts scope", function()
+	helpers.it("script-chord: the Shortcuts clear writes the four chords off and leaves them to the application", function()
+		with_scope(function(scope, owners, _, path)
+			helpers.assert_true(scope.apply("clear"))
+			local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control
+			for _, slot in ipairs(SLOTS) do
+				helpers.assert_eq(saved[slot], "none", slot .. " is written off, since absence is the preset")
+				helpers.assert_eq(owners.chords.get_action(slot), "none")
+			end
+			helpers.assert_eq(owners.chords.on_key({ code = 28, mods = { altgr = true } }), false,
+				"AltGr + Enter reaches the application after a clear")
+		end)
+	end)
+
+	helpers.it("script-chord: the Shortcuts restore brings the four presets and the switch back", function()
+		with_scope(function(scope, owners, _, path)
+			helpers.assert_eq(owners.chords.chords_enabled(), false)
+			helpers.assert_true(scope.apply("recommended"))
+			local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control or {}
+			for _, slot in ipairs(SLOTS) do
+				helpers.assert_eq(saved[slot], nil, slot .. " back on its preset is a deletion")
+				helpers.assert_eq(owners.chords.get_action(slot), Manifest.recommended_for("shortcuts.script_control." .. slot))
+			end
+			helpers.assert_eq(saved.chords_enabled, nil)
+			helpers.assert_eq(owners.chords.chords_enabled(), true)
+		end, CHORDS_SOURCE)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("script-chord: the submenu's " .. mode .. " touches the chords and nothing else", function()
+			with_scope(function(_, owners, controls, path, backup)
+				Sandbox.write_bytes(path, Sandbox.read_bytes(path):gsub("%[gesture_parameters%]\n",
+					"[gesture_parameters]\n" .. CHORD_PARAMETER .. ' = "https://script.example"\n', 1))
+				owners.chords._reset()
+				owners.chords.init({ is_paused = function() return controls.paused end,
+					defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
+				local narrowed = require("infra.shortcuts_scope").new({ path = path, backup_path = backup .. ".chords",
+					files = controls.files, is_paused = function() return controls.paused end, only = "script_chords" })
+				helpers.assert_true(narrowed.apply(mode))
+				local config = Codec.decode(Sandbox.read_bytes(path))
+				local chords = config.shortcuts.script_control or {}
+				for _, slot in ipairs(SLOTS) do
+					helpers.assert_eq(chords[slot], mode == "clear" and "none" or nil, slot)
+				end
+				helpers.assert_eq(owners.chords.chords_enabled(), true)
+				helpers.assert_eq(config.gesture_parameters[CHORD_PARAMETER], nil, "the chords' parameters go with them")
+				helpers.assert_eq(config.shortcuts.keyboard.ctrl_j, "open_url", "the keyboard slots are untouched")
+				helpers.assert_eq(config.shortcuts.tap_keys.number_row_left, "send_text", "the tap keys are untouched")
+				helpers.assert_eq(config.shortcuts.enabled, true)
+				helpers.assert_eq(config.gesture_parameters.keyboard__ctrl_j__open_url, "https://old.example")
+				helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+				os.remove(backup .. ".chords")
+			end, CHORDS_SOURCE)
+		end)
+	end
+
+	helpers.it("script-chord: the tray draws the shared submenu, ticks it from the switch and asks nothing", function()
+		with_scope(function(_, owners, controls, path)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top, execute = root.top_level, os.execute
+			local questions, changed = 0, 0
+			local passed, err = pcall(function()
+				root.top_level = {{ id = "shortcuts" }}
+				os.execute = function(command)
+					if command:find("command -v zenity", 1, true) then return 0 end
+					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					return execute(command)
+				end
+				local i18n = require("infra.i18n")
+				local function group()
+					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+						is_paused = function() return controls.paused end,
+						on_menu_changed = function() changed = changed + 1 end })
+					for _, item in ipairs(menu) do
+						if item.title == i18n.get("menu.shortcuts.title") then
+							for _, row in ipairs(item.menu or {}) do
+								if row.title == i18n.get("menu.shortcuts.script_shortcuts") then return row end
+							end
+						end
+					end
+				end
+				local row = group()
+				helpers.assert_eq(type(row), "table", "the Shortcuts submenu draws « Raccourcis de gestion du script »")
+				helpers.assert_eq(row.checked, false, "the title mirrors the switch, off in this configuration")
+				local titles = {}
+				for _, sub in ipairs(row.menu) do titles[#titles + 1] = sub.title end
+				helpers.assert_eq(titles[1], i18n.get("menu.shortcuts.script_shortcuts_enable"))
+				helpers.assert_eq(titles[2], i18n.get("common.restore_recommended"))
+				helpers.assert_eq(titles[3], i18n.get("common.clear_to_system"))
+				helpers.assert_eq(titles[4], "-")
+				helpers.assert_eq(#titles, 8, "the switch, restore, clear, a separator and the four slots")
+				for index, slot in ipairs(SLOTS) do
+					helpers.assert_true(titles[4 + index]:find(i18n.get("sg_labels." .. slot), 1, true) == 1, titles[4 + index])
+				end
+				row.menu[1].fn()
+				helpers.assert_eq(owners.chords.chords_enabled(), true)
+				helpers.assert_eq(group().checked, true, "the title follows the switch")
+				row.menu[3].fn()
+				helpers.assert_eq(questions, 0, "the submenu's clear asks nothing")
+				local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control
+				for _, slot in ipairs(SLOTS) do helpers.assert_eq(saved[slot], "none", slot) end
+				group().menu[2].fn()
+				helpers.assert_eq(questions, 0, "the submenu's restore asks nothing")
+				helpers.assert_eq(owners.chords.get_action("script_altgr_escape"), "script_quit")
+				helpers.assert_eq(changed, 3)
+			end)
+			root.top_level, os.execute = top, execute
+			if not passed then error(err, 0) end
+		end, CHORDS_SOURCE)
 	end)
 end)

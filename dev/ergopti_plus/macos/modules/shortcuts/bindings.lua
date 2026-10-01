@@ -73,7 +73,7 @@ local rebind_recovery_intent = false
 
 local EXACT_RELEASE_IDS = {
 	tap_keys = true,
-	layer_scroll = true,
+	layer_wheel = true,
 	cmd_star = true,
 	wrap_text_if_selected = true,
 }
@@ -281,9 +281,47 @@ local function has_tap_key_assignments()
 	return TapKeys.has_assignments()
 end
 
-hotkey_labels.layer_scroll = i18n.get("shortcuts.label_layer_scroll")
-hotkey_defs.layer_scroll   = function()
-	return sys_acts.bind_layer_scroll(delivery_admitted)
+-- The navigation layer's wheel bindings (layers.toml WheelUp, WheelDown…),
+-- which Karabiner cannot take. Not a toggle and not a preference: like the tap
+-- keys, the owner is derived from the file, so a layer that binds no wheel
+-- direction holds no scroll tap, and a direction it leaves unbound scrolls.
+-- Read when the owner is bound: layers.toml writers reconcile it
+-- (M.reconcile_layer_wheel), and a hand edit applies at the next start.
+local layer_wheel_slots = { vertical = {}, horizontal = {} }
+
+--- Reads the layer's wheel bindings from layers.toml.
+--- @return boolean bound True when the layer binds at least one wheel direction.
+local function load_layer_wheel()
+	-- Required here, not at load: the layer data reads the configuration folder.
+	local ok, layer = xpcall(function() return require("platform.remap.nav_layer").load() end,
+		debug.traceback)
+	if not ok or type(layer) ~= "table" or type(layer.wheel) ~= "table" then
+		-- NavLayer.load() raises only on a broken shipped registry or vocabulary,
+		-- which the Karabiner regeneration reports too: no wheel runs meanwhile.
+		Logger.error(LOG, "The navigation layer's wheel bindings could not be read: %s.", tostring(layer))
+		layer_wheel_slots = { vertical = {}, horizontal = {} }
+		return false
+	end
+	layer_wheel_slots = layer.wheel
+	for _, directions in pairs(layer_wheel_slots) do
+		if next(directions) ~= nil then return true end
+	end
+	return false
+end
+
+--- The loaded binding for one direction of the wheel. Memory only: asked
+--- inside the scroll eventtap.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction number 1 or -1.
+--- @return table|nil slot
+local function layer_wheel_slot(axis, direction)
+	local directions = layer_wheel_slots[axis]
+	return directions and directions[direction] or nil
+end
+
+hotkey_labels.layer_wheel = i18n.get("layer_editor.window_title")
+hotkey_defs.layer_wheel   = function()
+	return sys_acts.bind_layer_wheel(delivery_admitted, layer_wheel_slot)
 end
 
 hotkey_labels.wrap_text_if_selected = i18n.get("shortcuts.label_wrap_text")
@@ -402,8 +440,10 @@ end
 -- neutral desired value and may later be enabled explicitly behind any fence.
 for name in pairs(hotkey_defs) do
 	-- Dispatcher ownership is derived from assignments when the layer starts;
-	-- there is deliberately no shortcuts.keys.tap_keys preference.
-	_disabled_set[name] = name == "tap_keys" or not Manifest.default_for("shortcuts.keys." .. name)
+	-- there is deliberately no shortcuts.keys.tap_keys preference, nor one for
+	-- the layer's wheel, derived from layers.toml.
+	_disabled_set[name] = name == "tap_keys" or name == "layer_wheel"
+		or not Manifest.default_for("shortcuts.keys." .. name)
 end
 
 
@@ -725,6 +765,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 	end
 
 	_disabled_set.tap_keys = not has_tap_key_assignments()
+	_disabled_set.layer_wheel = not load_layer_wheel()
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
 		-- via M.disable() — the _disabled_set persists across stop/start cycles
@@ -1023,6 +1064,7 @@ function M.enable(name)
 		return false
 	end
 	if name == "tap_keys" and not has_tap_key_assignments() then return M.disable(name) end
+	if name == "layer_wheel" and not load_layer_wheel() then return M.disable(name) end
 	if not admission_open() then
 		_disabled_set[name] = nil
 		Logger.debug(LOG, "Hotkey '%s' enabled while the layer is paused — it binds on resume.", name)
@@ -1110,6 +1152,21 @@ function M.reconcile_tap_keys()
 	return M.enable("tap_keys")
 end
 
+--- Reconciles the navigation layer's wheel owner after layers.toml was written:
+--- reads the file's wheel bindings again, which a bound owner runs from its
+--- next turn of the wheel, and binds or releases the owner as the file binds
+--- a direction or none. A stopped or paused layer retains the intent, and its
+--- start reads the file again.
+--- @return boolean committed
+function M.reconcile_layer_wheel()
+	if start_attempt ~= nil then return false end
+	if not started or not admission_open() then
+		_disabled_set.layer_wheel = not load_layer_wheel() or nil
+		return true
+	end
+	return M.enable("layer_wheel")
+end
+
 --- Returns the user's preference for a named hotkey, whatever the layer's
 --- lifecycle. This is what config.toml persists and the menu checks: a pause,
 --- Shortcuts OFF or a layout rebind releases the native hotkey, never the
@@ -1131,7 +1188,7 @@ end
 ---   1) ctrl + single letter (ctrl_a … ctrl_z)
 ---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
 ---   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
----   4) everything else (tap_keys, layer_scroll — extracted separately by the menu)
+---   4) everything else (tap_keys, layer_wheel — never listed by the menu)
 --- Within each group items sort alphabetically by id.
 --- @param id string The shortcut identifier.
 --- @return string Opaque sort key.

@@ -20,8 +20,8 @@
 # the OS tables: a repeat count on Windows, F1-F12, Spotlight and window
 # cycling on macOS, nothing on Linux. macOS also keeps Escape on the right
 # Command key, which sits where the right Alt key sits on a PC board. The wheel
-# is volume on Windows only: the other layers cannot intercept wheel input
-# ([source_kinds.wheel] in layer_actions.toml).
+# is volume on Windows and macOS; the Linux layer cannot intercept wheel input
+# ([source_kinds.wheel] in layer_actions.toml), so it is no `all` entry.
 #
 # The layer id is the value a tap-hold key's hold_layer names
 # (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
@@ -111,8 +111,12 @@ schema_version = 1
 # The Karabiner generator (macos/platform/remap/nav_layer.lua) sends every F1-F12
 # keystroke with Fn added while macOS treats the top row as media keys, so the
 # number row reaches the function keys in either mode. The right Command key is
-# Escape on a tap and Option+Shift while held.
+# Escape on a tap and Option+Shift while held. Hammerspoon, not Karabiner, runs
+# the wheel.
 [layers.nav.macos]
+# The wheel: volume instead of scroll.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
 "Digit1" = "keystroke:F1"
 "Digit2" = "keystroke:F2"
 "Digit3" = "keystroke:F3"

@@ -85,6 +85,7 @@ graph TD
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
+        MACOS_python_interpreter["PythonInterpreter.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]
         MACOS_shell_runner["ShellRunner.lua"]

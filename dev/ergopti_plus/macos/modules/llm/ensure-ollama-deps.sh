@@ -101,6 +101,10 @@ for required_command in curl shasum tar mktemp; do
 	fi
 done
 
+# The relay of the system network settings and the system trust store reach
+# the download (network-retry.sh).
+apply_system_network
+
 INSTALL_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ollama.XXXXXX")"
 archive_path="$INSTALL_TEMP/ollama-darwin.tgz"
 archive_url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_RELEASE_VERSION/ollama-darwin.tgz"

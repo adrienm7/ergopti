@@ -60,9 +60,59 @@ return function(helpers)
 			for _, path in ipairs({ "llm.enabled", "metrics.enabled", "metrics.metrics_enabled", "hotstrings.preview_ai_enabled" }) do
 				helpers.assert_eq(indexed[path], nil, path)
 			end
-			for _, operation in pairs(rows("global", "clear", { "shortcuts.personal.sparse_probe" })) do
-				helpers.assert_eq(operation.delete, true)
-				helpers.assert_eq(operation.value, nil)
+			-- An entry active by default (the script chords) is the one exception:
+			-- its clear writes the declared off value, checked below.
+			local cleared = {}
+			for _, entry in ipairs(manifest.features) do
+				if entry.cleared ~= nil then cleared[entry.path] = entry.cleared end
+			end
+			for path, operation in pairs(rows("global", "clear", { "shortcuts.personal.sparse_probe" })) do
+				if cleared[path] ~= nil then
+					helpers.assert_eq(operation.delete, nil, path)
+					helpers.assert_eq(operation.value, cleared[path], path)
+				else
+					helpers.assert_eq(operation.delete, true, path)
+					helpers.assert_eq(operation.value, nil, path)
+				end
+			end
+		end)
+		-- script-chords-three-os-2026-09-30: an entry active by default restores
+		-- its preset when its key is deleted, so a clear that deleted it (the
+		-- Shortcuts clear, the global clear) switched the chords back on.
+		helpers.it("writes the off value of an entry active by default during clear", function()
+			local demo = require("config_defaults").new({
+				features = {
+					{ path = "demo.chords.slot", type = "action", default = "script_reload",
+						recommended = "script_reload", cleared = "none" },
+					{ path = "demo.chords.switch", type = "boolean", default = true, recommended = true },
+					{ path = "demo.other", type = "action", default = "none", recommended = "script_quit" },
+				},
+				scopes = { demo = { prefixes = { "demo" }, restore_exclude = {} } },
+			})
+			local indexed = {}
+			for _, operation in ipairs(demo.scope_operations("demo", "clear")) do
+				indexed[operation.section .. "." .. operation.key] = operation
+			end
+			helpers.assert_eq(indexed["demo.chords.slot"].value, "none")
+			helpers.assert_eq(indexed["demo.chords.slot"].delete, nil)
+			helpers.assert_eq(indexed["demo.chords.switch"].delete, true)
+			helpers.assert_eq(indexed["demo.other"].delete, true)
+			indexed = {}
+			for _, operation in ipairs(demo.scope_operations("demo", "recommended")) do
+				indexed[operation.section .. "." .. operation.key] = operation
+			end
+			helpers.assert_eq(indexed["demo.chords.slot"].delete, true)
+			helpers.assert_eq(indexed["demo.other"].value, "script_quit")
+		end)
+		helpers.it("writes every declared off value in the scopes that own it", function()
+			for _, entry in ipairs(manifest.features) do
+				if entry.cleared ~= nil then
+					for _, scope in ipairs({ "shortcuts", "global" }) do
+						local operation = rows(scope, "clear")[entry.path]
+						helpers.assert_not_nil(operation, scope .. " " .. entry.path)
+						helpers.assert_eq(operation.value, entry.cleared, scope .. " " .. entry.path)
+					end
+				end
 			end
 		end)
 	end)

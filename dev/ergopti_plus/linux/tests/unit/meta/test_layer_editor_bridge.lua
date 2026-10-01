@@ -18,6 +18,13 @@
 ---    reload, the window closes, and the installed native daemon engine emits
 ---    every Linux keyboard edit.
 --- 5. A remap restart that fails keeps the window open.
+--- 6. Legends (layer-editor-current-layout-legends): init() carries what the
+---    loaded keymap types on every character key (the shared corpus
+---    _shared/tests/corpus/layer_editor/legends.json, compiled into an XKB
+---    keymap the real keyboard_layout adapter loads), leaves out and reports
+---    once the keys it types nothing printable on, names the key whose hold
+---    enters the layer in the shipped tap-hold defaults, and answers "legends"
+---    with the keymap loaded then.
 --- ==============================================================================
 
 local helpers     = require("tests.helpers")
@@ -28,6 +35,7 @@ local Manager = require("platform.remap.tap_hold_manager")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
+local LEGENDS = SHARED_ROOT .. "/tests/corpus/layer_editor/legends.json"
 
 
 
@@ -86,8 +94,24 @@ local function make_state(dir)
 		paths = { shared_root = function() return SHARED_ROOT end },
 		config_paths = { get_config_dir = function() return dir end },
 		i18n = { get = function(key) return key end },
+		keyboard_layout = { base_symbol = function() return nil end, is_ready = function() return false end },
 	}
 	return world
+end
+
+--- An XKB keymap typing, at level 1, each character of `layout` (code -> text)
+--- on its registry key: what `xkbcli dump-keymap` prints, cut to those keys.
+local function xkb_keymap(layout)
+	local Registry = Json.decode(read_file(SHARED_ROOT .. "/data/keycodes/physical_keys.json"))
+	local keycodes, symbols = {}, {}
+	for code, text in pairs(layout) do
+		local evdev = Registry.keys[code].evdev
+		local first = utf8.codepoint(text, 1)
+		keycodes[#keycodes + 1] = string.format("\t<K%d> = %d;", evdev, evdev + 8)
+		symbols[#symbols + 1] = string.format("\tkey <K%d> { [ U%04X ] };", evdev, first)
+	end
+	return table.concat({ "xkb_keymap {", 'xkb_keycodes "(unnamed)" {', table.concat(keycodes, "\n"), "};",
+		'xkb_symbols "(unnamed)" {', table.concat(symbols, "\n"), "};", "};" }, "\n")
 end
 
 --- The payload of the last call the page received to one of its functions.
@@ -167,6 +191,78 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		helpers.assert_eq(world.restarts, 0, "a refused save restarts nothing")
 		helpers.assert_eq(world.hidden, 0, "a refused save keeps the window open")
 		helpers.assert_nil(Bridge.on_message({ action = "format_disk" }, world.state), "an unknown action does nothing")
+	end)
+
+	helpers.it("sends the loaded keymap's legends and the layer key (layer-editor-current-layout-legends)", function()
+		local corpus = Json.decode(read_file(LEGENDS))
+		local Layout = helpers.load_module("adapters.keyboard_layout")
+		local LayerEditor = require("keymap.layer_editor")
+		-- The bridge, loaded over a logger that records its warnings.
+		local warnings = {}
+		local recorder = helpers.make_logger_stub()
+		recorder.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+		local previous_logger = package.loaded["logger.shim"]
+		package.loaded["logger.shim"] = recorder
+		local Recorded = helpers.load_module("ui.layer_editor.bridge")
+		package.loaded["logger.shim"] = previous_logger
+		for _, case in ipairs(corpus.cases) do
+			local dir = make_config_dir()
+			local world = make_state(dir)
+			local hook = { key_text = function() return nil end,
+				held_modifiers = function() return {} end,
+				held_text_modifier_codes = function() return {} end,
+				held_shortcut_modifier_codes = function() return {} end,
+				set_remapper = function() end }
+			-- The shipped tap-hold keys in force, as the recommended import leaves them.
+			local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
+			config:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n")
+			config:close()
+			Manager._reset_for_test()
+			Manager.init({ keyboard_hook = hook, execute_action = function() end,
+				action_names = function() return {} end, on_text_injected = function() end,
+				defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+			world.state.tap_hold = Manager
+			world.state.keyboard_layout = Layout
+			Layout._load_keymap_for_test(xkb_keymap(case.layout))
+			LayerEditor._reset_for_test()
+			local ok, err = pcall(function()
+				local outcome = Recorded.on_message("ready", world.state)
+				helpers.assert_eq(outcome.pushed, true)
+				Recorded.on_message("ready", world.state)
+				local init = last_call(world, "init")
+				helpers.assert_type(init.legends, "table", "init() must carry the legends of the keymap")
+				helpers.assert_eq(init.legends.source, case.source)
+				local count = 0
+				for code, text in pairs(case.expected) do
+					count = count + 1
+					helpers.assert_eq(init.legends.keys[code], text, case.name .. ": " .. code)
+				end
+				for code in pairs(init.legends.keys) do
+					helpers.assert_not_nil(case.expected[code], case.name .. ": " .. code .. " must not have a legend")
+				end
+				helpers.assert_true(count >= 40, "only " .. count .. " legends compared")
+				helpers.assert_eq(table.concat(init.layer_keys, ","), table.concat(corpus.recommended_layer_keys.linux, ","),
+					"the key whose hold enters the layer")
+
+				-- Another layout loaded, then the window comes back to the front.
+				Layout._load_keymap_for_test(xkb_keymap({ KeyQ = "q" }))
+				local answer = Recorded.on_message({ action = "legends" }, world.state)
+				helpers.assert_eq(answer.pushed, true)
+				local refreshed = last_call(world, "setLegends")
+				helpers.assert_eq(refreshed.keys.KeyQ, "q")
+			end)
+			Layout._load_keymap_for_test(nil)
+			Manager._reset_for_test()
+			remove_config_dir(dir)
+			helpers.assert_true(ok, tostring(err))
+			local warned = 0
+			for _, text in ipairs(warnings) do
+				if text:match("registry code") and text:find(table.concat(case.unresolved, ", "), 1, true) then
+					warned = warned + 1
+				end
+			end
+			helpers.assert_eq(warned, 1, "the keys without a legend are reported once")
+		end
 	end)
 
 	helpers.it("saves the page's session and the live daemon applies every keyboard edit (e2e)", function()

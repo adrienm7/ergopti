@@ -202,6 +202,35 @@ local active_stub_scope
 --- @param module_name string Dotted Lua module name to require.
 --- @param hs_overrides table|nil Optional table merged onto the default `hs` stub.
 --- @return any The module's return value.
+-- The interpreter the modelled Mac of load_with_stubs resolves: the universal
+-- python3 of its Command Line Tools.
+M.HEALTHY_PYTHON = "/Library/Developer/CommandLineTools/usr/bin/python3"
+
+local _python_resolver_chunk = nil
+
+--- A fresh real adapters.python_interpreter over a modelled Apple silicon Mac
+--- whose only interpreter is HEALTHY_PYTHON, universal.
+--- @return table resolver
+function M.healthy_python_resolver()
+	if _python_resolver_chunk == nil then
+		_python_resolver_chunk = assert(loadfile(M.driver_root() .. "adapters/python_interpreter.lua"))
+	end
+	local resolver = _python_resolver_chunk()
+	local universal = "\202\254\186\190" .. "\0\0\0\2"
+		.. "\1\0\0\7" .. string.rep("\0", 16) .. "\1\0\0\12" .. string.rep("\0", 16)
+	resolver._set_deps({
+		read_head = function(path)
+			if path == M.HEALTHY_PYTHON then return universal end
+			return nil
+		end,
+		realpath = function(path) return path end,
+		getenv = function() return nil end,
+		select_link_target = function() return nil end,
+		process_arch = function() return "arm64" end,
+	})
+	return resolver
+end
+
 function M.load_with_stubs(module_name, hs_overrides)
 	local loaded = package.loaded
 	local scope = active_stub_scope
@@ -417,6 +446,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 			return M.driver_root() .. "../../" .. relative_target
 		end,
 	}
+
+	-- adapters.python_interpreter reads the host's own interpreters, which a CI
+	-- runner has (an Intel /usr/local, its Command Line Tools) and a Linux host
+	-- lacks. Every other module under test gets the REAL resolver over a
+	-- modelled Apple silicon Mac whose developer tools hold a universal python3
+	-- (HEALTHY_PYTHON); a test of a refusal replaces its deps with _set_deps.
+	if module_name ~= "adapters.python_interpreter" then
+		loaded["adapters.python_interpreter"] = M.healthy_python_resolver()
+	end
 
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
 	-- the same tables as `hs.json`. Some production modules call require("hs.*")

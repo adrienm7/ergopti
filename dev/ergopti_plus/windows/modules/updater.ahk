@@ -29,6 +29,8 @@
 ;   updater/core.ahk        -- Config, version compare, release fetch + parse.
 ;   updater/changelog.ahk   -- Menu actions, one-click update, changelog window.
 ;   updater/self_update.ahk -- Download, executable swap, background polling.
+;   updater/config_backup.ahk -- Configuration backup and restore (Versions window).
+;   updater/release_install.ahk -- One-click install of a chosen release.
 
 #Include ../_generated/update_channels.ahk
 #Include updater/channels.ahk
@@ -37,3 +39,5 @@
 #Include updater/core.ahk
 #Include updater/changelog.ahk
 #Include updater/self_update.ahk
+#Include updater/config_backup.ahk
+#Include updater/release_install.ahk

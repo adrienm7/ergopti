@@ -112,8 +112,8 @@ helpers.describe("every manifest setting survives config.toml load and save (pre
 			helpers.assert_true(#cases >= 50, "the round trip must cover the manifest, got " .. #cases)
 			local covered = {}
 			for _, case in ipairs(cases) do covered[case.path] = case end
-			helpers.assert_true(covered["shortcuts.script_control.enabled"] ~= nil
-				and covered["shortcuts.script_control.enabled"].scalar ~= nil,
+			helpers.assert_true(covered["shortcuts.script_control.chords_enabled"] ~= nil
+				and covered["shortcuts.script_control.chords_enabled"].scalar ~= nil,
 				"the shared script-control table must be part of the round trip")
 
 			local source = as_sections(cases)

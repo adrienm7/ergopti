@@ -321,6 +321,13 @@ enabled = false
 chatgpt_url = "https://chat.openai.com"
 wrap_text_if_selected = false
 
+[shortcuts.script_control]
+chords_enabled = true
+script_altgr_backspace = "script_reload"
+script_altgr_delete = "open_personal_shortcuts"
+script_altgr_enter = "script_pause_toggle"
+script_altgr_escape = "script_quit"
+
 [shortcuts.keyboard]
 ctrl_g = "none"
 super_space = "none"

@@ -77,10 +77,15 @@ helpers.describe("empty configuration boot projection", function()
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local state = preferences.build_initial_state({ "french_autocorrection.toml" }, {}, modules)
 		for _, key in ipairs({ "keymap", "shortcuts", "gestures", "keylogger_enabled",
-			"dynamichotstrings_enabled", "script_control_enabled", "preview_ai_enabled",
+			"dynamichotstrings_enabled", "preview_ai_enabled",
 			"preview_autocorrect_enabled", "preview_star_enabled" }) do
 			helpers.assert_eq(state[key], false, "empty configuration must leave " .. key .. " off")
 		end
+		-- The declared exception (script-chords-three-os-2026-09-30): the script
+		-- chords are no typing feature and start with their preset.
+		helpers.assert_eq(state.script_control_enabled, true)
+		helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "script_pause_toggle")
+		helpers.assert_eq(state.script_control_shortcuts.script_altgr_delete, "open_personal_shortcuts")
 		helpers.assert_eq(state.hotstrings.french_autocorrection, false)
 		for _, action in pairs(modules.gestures.DEFAULT_GESTURES) do
 			helpers.assert_eq(action, "none", "a master switch must not implicitly import gesture bindings")

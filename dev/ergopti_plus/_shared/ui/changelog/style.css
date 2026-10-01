@@ -158,6 +158,18 @@ body {
 	color: #30d158;
 }
 
+/* The build that runs: the row is marked and has no install button. */
+.badge-installed {
+	background: rgba(255, 214, 10, 0.12);
+	border: 1px solid rgba(255, 214, 10, 0.4);
+	color: #ffd60a;
+	margin-left: 4px;
+}
+
+.release-item.installed .release-item-tag {
+	color: #ffd60a;
+}
+
 /* ============================================= */
 /* ============================================= */
 /* ======= 3/ Content pane (markdown view) ===== */
@@ -258,6 +270,89 @@ body {
 
 #btn-github:hover {
 	background: rgba(48, 209, 88, 0.2);
+}
+
+/* Installs the selected release in one click; the host backs up first. */
+#btn-install {
+	background: rgba(10, 132, 255, 0.14);
+	border: 1px solid rgba(10, 132, 255, 0.5);
+	border-radius: 7px;
+	color: #4da6ff;
+	cursor: pointer;
+	display: none;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 5px 12px;
+	transition: background 0.15s;
+	white-space: nowrap;
+	-webkit-app-region: no-drag;
+}
+
+#btn-install:hover {
+	background: rgba(10, 132, 255, 0.24);
+}
+
+#btn-install:disabled {
+	cursor: default;
+	opacity: 0.45;
+}
+
+#install-note {
+	background: #1c1c1e;
+	border-bottom: 1px solid #2c2c2e;
+	color: #8e8e93;
+	flex-shrink: 0;
+	font-size: 12px;
+	padding: 6px 20px;
+}
+
+#install-panel,
+#restore-banner {
+	align-items: center;
+	background: rgba(10, 132, 255, 0.08);
+	border-bottom: 1px solid rgba(10, 132, 255, 0.3);
+	color: #c8c8cc;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	font-size: 12px;
+	gap: 10px;
+	padding: 8px 20px;
+}
+
+#install-panel.failed,
+#restore-banner.failed {
+	background: rgba(255, 69, 58, 0.08);
+	border-bottom-color: rgba(255, 69, 58, 0.4);
+}
+
+#install-text,
+#restore-text {
+	flex: 1;
+	min-width: 0;
+	white-space: pre-line;
+}
+
+#btn-install-retry,
+#btn-restore {
+	background: rgba(10, 132, 255, 0.18);
+	border: 1px solid rgba(10, 132, 255, 0.55);
+	border-radius: 6px;
+	color: #4da6ff;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 4px 10px;
+	white-space: nowrap;
+}
+
+#btn-install-retry:hover,
+#btn-restore:hover {
+	background: rgba(10, 132, 255, 0.28);
+}
+
+#btn-restore:disabled {
+	cursor: default;
+	opacity: 0.5;
 }
 
 #release-body {

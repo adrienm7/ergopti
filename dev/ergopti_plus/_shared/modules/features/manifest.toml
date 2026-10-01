@@ -47,6 +47,10 @@
 #                               entry defaults to off (false / "none" / "");
 #                               tools/test/test-defaults-single-source.cjs
 #                               pins the approved list.
+#       cleared                 Required with active_by_default, forbidden
+#                               without it: the off value a clear writes
+#                               explicitly, since deleting the key of such an
+#                               entry restores its preset.
 #       superseded_reason_key   Optional, Windows-only booleans. i18n key of
 #                               why the feature is off while a registry layout
 #                               is emulated (layout.emulated_layout): the master
@@ -250,7 +254,7 @@ platforms = ["ahk"]
 
 [sections.shortcuts.script_control]
 description_key = "menu.shortcuts.script_control"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
@@ -2236,20 +2240,26 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 # ===== 3.5.9 shortcuts.script_control =====
 # ==========================================
 
-# The script-management chords (AltGr + Enter, BackSpace, Delete, Escape) start
-# with their preset in an empty configuration: the maintainer's decision of
-# 2026-09-30, because they pause, reload, quit and edit the driver and are no
-# typing feature. They are the declared exception to "every input-altering
+# The script-management chords start with their preset in an empty
+# configuration: the maintainer's decision of 2026-09-30, because they pause,
+# reload, quit and edit the driver and are no typing feature. The same four
+# slots on the three drivers (the maintainer's decision of 2026-09-30, « On met
+# tout en commun sur les 3 OS »): AltGr on Windows and Linux, the right Option
+# key on macOS, with Enter, Backspace, Delete (fn+Delete on a Mac keyboard
+# without the key) or Escape. _shared/modules/actions/script_chords.json names
+# each slot's key on every driver and the actions a paused driver still runs. They are the declared exception to "every input-altering
 # feature is off by default" (active_by_default); a config.toml that names
-# "none" for a slot keeps it off.
+# "none" for a slot keeps it off, which is what every clear writes (cleared).
 #
 # chords_enabled is the switch at the head of their submenu: off leaves every
 # chord to the system while the slots keep their actions. Like the
 # key-combinations switch it only narrows what the slots enable, so it is a
-# parameter and starts on.
+# parameter and starts on. It replaced the macOS-only `enabled` in config
+# schema v7 (migrations.toml), as the four slots replaced its return_key,
+# backspace and escape.
 [[features.shortcuts.script_control]]
 id = "chords_enabled"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 default = true
 recommended = true
 input_altering = false
@@ -2258,41 +2268,45 @@ description_key = "menu.shortcuts.script_shortcuts_enable"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_backspace"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 default = "script_reload"
 recommended = "script_reload"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_backspace"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_delete"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 default = "open_personal_shortcuts"
 recommended = "open_personal_shortcuts"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_delete"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_enter"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 default = "script_pause_toggle"
 recommended = "script_pause_toggle"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_enter"
 
 [[features.shortcuts.script_control]]
 id = "script_altgr_escape"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 default = "script_quit"
 recommended = "script_quit"
 input_altering = true
 active_by_default = true
+cleared = "none"
 type = "action"
 description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
@@ -4139,10 +4153,19 @@ i18n = "menu.about.open_releases_page"
 [[menu.about_menu]]
 type = "---"
 
+# A local version run from source has nothing to remove: the row stays in place,
+# greyed by `disabled_when`, and says why. A row greyed with a reason is drawn
+# as « label — head of the reason » (the reason's text before its first colon,
+# 1 to 40 characters in every locale), with nothing to run: `reason_key` where
+# the row's platforms leave it out (`unavailable = "grey"`), `disabled_reason_key`
+# on a `command` row where its `disabled_when` greys it. Each driver answers
+# `installed_build` from its one installed-build-or-source-run owner.
 [[menu.about_menu]]
 type = "command"
 id = "uninstall"
 i18n = "menu.global.uninstall"
+disabled_when = ["installed_build"]
+disabled_reason_key = "menu.about.source_run_reason"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the
@@ -4510,18 +4533,14 @@ i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
-# « Raccourcis de gestion du script »: the AltGr script chords, a group whose
-# title is ticked while its first-row switch is on. Its rows are
-# script_control_group. AHK-only, on the same evidence as personal_shortcuts
-# below: the features.shortcuts.script_control entries it lists are each
-# Windows-only, so on macOS and Linux it had nothing to enumerate.
+# « Raccourcis de gestion du script »: the script chords, a group whose title
+# is ticked while its first-row switch is on. Its rows are
+# script_control_group, the same on the three drivers.
 [[menu.shortcuts_menu]]
 type = "group"
 id = "script_control"
 i18n = "menu.shortcuts.script_shortcuts"
 checked_when = ["script_control_enabled"]
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.shortcuts_menu]]
 type = "dynamic"
@@ -4650,42 +4669,35 @@ reason_key = "platform_reason.chord_families_are_each_platforms"
 # the clear to the system's behaviour, then the four slots. Off keeps every
 # slot's action and leaves every chord to the system; the clear sets every slot
 # to "none" explicitly, since an absent slot starts with its preset.
-# `category` names the switch, as a toggle row must; it is the Windows
+# `category` names the switch, as a toggle row must; it is the
 # shortcuts.script_control.chords_enabled feature, not a [category_enabled] gate.
+# The restore and the clear apply at once, without a question (the
+# maintainer's decision of 2026-09-30), through the Shortcuts scope owner.
 [[menu.script_control_group]]
 type = "toggle"
 id = "script_control_toggle"
 i18n = "menu.shortcuts.script_shortcuts_enable"
 checked_when = ["script_control_enabled"]
 category = "ScriptControl"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.script_control_group]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.script_control_group]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.script_control_group]]
 type = "---"
-platforms = ["ahk"]
 
-# One row per slot, labelled « AltGr + Entrée : <action> », each opening the
-# shared action picker.
+# One row per slot, labelled « AltGr + Entrée : <action> » (« Opt droit +
+# Entrée » on macOS), each opening the shared action picker.
 [[menu.script_control_group]]
 type = "list"
 id = "script_control_shortcuts"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
@@ -5547,51 +5559,6 @@ type = "boolean"
 description_key = "menu.tap_holds"
 platforms = ["hs", "linux"]
 
-[[features.shortcuts.script_control]]
-id = "enabled"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts"
-platforms = ["hs"]
-
-[[features.shortcuts.script_control]]
-id = "return_key"
-default = "none"
-recommended = "script_pause_toggle"
-input_altering = true
-type = "action"
-description_key = "menu.shortcuts"
-platforms = ["hs"]
-
-[[features.shortcuts.script_control]]
-id = "backspace"
-default = "none"
-recommended = "script_reload"
-input_altering = true
-type = "action"
-description_key = "menu.shortcuts"
-platforms = ["hs"]
-
-[[features.shortcuts.script_control]]
-id = "escape"
-default = "none"
-recommended = "script_quit"
-input_altering = true
-type = "action"
-description_key = "menu.shortcuts"
-platforms = ["hs"]
-
-[[features.shortcuts.keys]]
-id = "layer_scroll"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_layer_scroll"
-platforms = ["hs"]
-
 [[features.shortcuts.keys]]
 id = "wrap_text_if_selected"
 default = false
@@ -6042,16 +6009,11 @@ sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = 
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"
-"shortcuts.script_control.enabled" = "menu.shortcuts.script_shortcuts"
-"shortcuts.script_control.return_key" = "sg_labels.script_ropt_return"
-"shortcuts.script_control.backspace" = "sg_labels.script_ropt_backspace"
-"shortcuts.script_control.escape" = "sg_labels.script_ropt_escape"
 
 # What triggers a macOS built-in shortcut whose id spells no key combination,
 # as the Shortcuts menu names it; every other one of them shows the chord its id
 # spells, before the action it runs.
 [onboarding.pages.shortcuts.triggers]
-"shortcuts.keys.layer_scroll" = "menu.shortcuts.key_layer_scroll"
 "shortcuts.keys.wrap_text_if_selected" = "menu.shortcuts.selection_symbol"
 
 [onboarding.pages.gestures]

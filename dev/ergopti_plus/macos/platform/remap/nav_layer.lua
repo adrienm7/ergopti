@@ -25,9 +25,10 @@
 ---    none on macOS and raises.
 --- 5. No binding, no rule: Karabiner refuses a rule without manipulators, and
 ---    an absent layers.toml means the keys behave natively.
---- 6. The wheel stays out: Karabiner takes no wheel input, the loader reports a
----    wheel binding unavailable on macOS, and the Layer + Scroll shortcut keeps
----    the volume on the wheel.
+--- 6. The wheel stays out of the Karabiner rule, which cannot take wheel input:
+---    load() turns the wheel bindings into the strokes Hammerspoon posts while
+---    the layer is held (wheel_slots, run by modules/shortcuts/actions/system.lua
+---    bind_layer_wheel between the F20 and F19 sentinels).
 --- 7. The layer comes with its key: importing the recommended key whose hold
 ---    enters the layer (the first-run wizard, the Tap-Holds « Restore
 ---    recommended values ») also creates layers.toml from Ergopti's recommended
@@ -64,7 +65,9 @@ local ENOENT = 2
 -- ============================
 
 -- The registry form the key codes are read for (physical_keys.json "forms").
+-- The layer editor host reads the keys' legends in the same form.
 local KEYBOARD_FORM = "iso"
+M.KEYBOARD_FORM = KEYBOARD_FORM
 
 -- The Karabiner variable the hold actions set while the layer is held.
 local LAYER_ACTIVE_VAR_NAME = "layer_active"
@@ -85,6 +88,17 @@ local NO_OP_KEY_CODE = "vk_none"
 local EVENT_FIELDS = { "key_code", "consumer_key_code", "pointing_button" }
 
 local RULE_DESCRIPTION = "Navigation layer — generated from layers.toml, active while layer_active == 1"
+
+-- The registry kind of a wheel direction, and the keys a wheel stroke sends as
+-- system-defined media events (hs.eventtap.event.newSystemKeyEvent), which a
+-- plain key event cannot drive.
+local WHEEL_KIND = "wheel"
+local SYSTEM_KEYS = {
+	AudioVolumeUp = "SOUND_UP", AudioVolumeDown = "SOUND_DOWN", AudioVolumeMute = "MUTE",
+}
+
+-- Hammerspoon's modifier names for the layer vocabulary's modifiers.
+local HS_MODIFIERS = { ctrl = "ctrl", alt = "alt", shift = "shift", meta = "cmd", fn = "fn" }
 
 
 
@@ -248,7 +262,11 @@ function M.build_rule(bindings, registry)
 		error("nav_layer.build_rule needs the bindings and the physical-key registry", 2)
 	end
 	local codes = {}
-	for code in pairs(bindings) do codes[#codes + 1] = code end
+	for code in pairs(bindings) do
+		-- A wheel direction is Hammerspoon's to run (M.wheel_slots).
+		local entry = registry.keys[code]
+		if not (type(entry) == "table" and entry.kind == WHEEL_KIND) then codes[#codes + 1] = code end
+	end
 	if #codes == 0 then return nil end
 	-- Sorted: Lua tables have no order, and a stable rule keeps the deployed
 	-- karabiner.json identical from one regeneration to the next.
@@ -266,9 +284,74 @@ end
 
 
 
+-- ===================================
+-- ===================================
+-- ======= 5/ The wheel slots ========
+-- ===================================
+-- ===================================
+
+--- The strokes of one wheel binding: what Hammerspoon posts for a turn of the
+--- wheel while the layer is held.
+--- @param code string A registry wheel code.
+--- @param resolution table Its macOS resolution.
+--- @param registry table Decoded physical_keys.json.
+--- @return table|nil strokes Array of { system = "SOUND_UP" } or
+---   { mods = { "cmd", … }, keycode = n }; empty for `none`.
+--- @return string|nil problem Why the binding cannot run on the wheel.
+local function wheel_strokes(code, resolution, registry)
+	if resolution.kind == "none" then return {} end
+	if resolution.kind ~= "keystroke" then
+		return nil, "a " .. tostring(resolution.kind) .. " resolution is no stroke a wheel turn can send"
+	end
+	local strokes = {}
+	for _, chord in ipairs(resolution.chords) do
+		local system = SYSTEM_KEYS[chord.key]
+		if system and #chord.mods == 0 then
+			strokes[#strokes + 1] = { system = system }
+		else
+			local entry = registry.keys[chord.key]
+			local override = type(entry) == "table" and entry["macos_" .. KEYBOARD_FORM]
+			local keycode = type(override) == "table" and override.hs or (type(entry) == "table" and entry.hs)
+			if type(keycode) ~= "number" then
+				return nil, tostring(chord.key) .. " has no macOS keycode to send for " .. code
+			end
+			local mods = {}
+			for _, mod in ipairs(chord.mods) do mods[#mods + 1] = HS_MODIFIERS[mod] end
+			strokes[#strokes + 1] = { mods = mods, keycode = keycode }
+		end
+	end
+	return strokes
+end
+
+--- The wheel bindings of a layer, by axis and direction.
+--- @param bindings table Key code -> resolution, resolved for macOS.
+--- @param registry table Decoded physical_keys.json.
+--- @return table slots { vertical = { [1] = slot, [-1] = slot }, horizontal = … },
+---   a slot being { code, strokes }; a direction the layer leaves unbound, or
+---   binds to what a wheel turn cannot send (logged), has none.
+function M.wheel_slots(bindings, registry)
+	local slots = { vertical = {}, horizontal = {} }
+	for code, resolution in pairs(bindings) do
+		local entry = registry.keys[code]
+		if type(entry) == "table" and entry.kind == WHEEL_KIND then
+			local strokes, problem = wheel_strokes(code, resolution, registry)
+			if strokes and slots[entry.axis] then
+				slots[entry.axis][entry.direction] = { code = code, strokes = strokes }
+			else
+				Logger.warn(LOG, "The wheel binding %s is left out: %s.", code, tostring(problem))
+			end
+		end
+	end
+	return slots
+end
+
+
+
+
+
 -- ===============================
 -- ===============================
--- ======= 5/ Loading ============
+-- ======= 6/ Loading ============
 -- ===============================
 -- ===============================
 
@@ -305,7 +388,8 @@ end
 
 --- Loads the navigation layer's bindings from the user's layers.toml.
 --- @param opts table|nil { shared_root, config_dir }; each defaults to the driver's own.
---- @return table layer { bindings = key code -> resolution for macOS, registry = physical_keys.json }
+--- @return table layer { bindings = key code -> resolution for macOS, registry =
+---   physical_keys.json, wheel = M.wheel_slots of the bindings }
 function M.load(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("infra.paths").shared_root()
@@ -338,7 +422,7 @@ function M.load(opts)
 	-- START, and no SUCCESS may follow it for a layer that binds nothing.
 	if not result.ok and next(result.layers) == nil then
 		Logger.error(LOG, "'%s' could not be used as a whole: the navigation layer binds no key.", result.path)
-		return { bindings = {}, registry = ctx.registry }
+		return { bindings = {}, registry = ctx.registry, wheel = M.wheel_slots({}, ctx.registry) }
 	end
 	for layer_id in pairs(result.layers) do
 		if layer_id ~= M.NAV_LAYER_ID then
@@ -349,8 +433,9 @@ function M.load(opts)
 	local bindings = result.layers[M.NAV_LAYER_ID] or {}
 	local count = 0
 	for _ in pairs(bindings) do count = count + 1 end
+	local wheel = M.wheel_slots(bindings, ctx.registry)
 	Logger.success(LOG, "Navigation layer loaded: %d key(s) bound.", count)
-	return { bindings = bindings, registry = ctx.registry }
+	return { bindings = bindings, registry = ctx.registry, wheel = wheel }
 end
 
 
@@ -359,7 +444,7 @@ end
 
 -- ===========================================
 -- ===========================================
--- ======= 6/ Recommended layer import =======
+-- ======= 7/ Recommended layer import =======
 -- ===========================================
 -- ===========================================
 

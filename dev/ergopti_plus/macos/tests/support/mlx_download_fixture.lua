@@ -18,6 +18,7 @@ local MODULES = {
 	"infra.logger",
 	"infra.notifications",
 	"modules.llm",
+	"modules.llm.network_env",
 	"ui.download_window",
 	"ui.download_window.javascript",
 	"ui.ui_builder",
@@ -496,6 +497,12 @@ local function with_fixture(plan, callback)
 				package.loaded["ui.download_window"] = nil
 				controls.real_window = require("ui.download_window")
 			end
+			-- The download script exports the system network settings first; the
+			-- fixture's file system has no shared policy file to source.
+			package.loaded["modules.llm.network_env"] = {
+				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
+				prelude = function() return "", nil end,
+			}
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
 				set_active_profile = function() return true end,

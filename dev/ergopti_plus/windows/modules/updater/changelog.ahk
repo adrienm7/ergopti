@@ -253,16 +253,21 @@ Updater_ShowChangelog(*) {
 ; Updates the "Install this version" button label and enabled state to reflect
 ; the currently selected release. Disabled when: no release is selected, the
 ; app is running from local source, or the selected tag is already the running
-; version (installing it would be a no-op). Called on every ListBox Change event.
+; version (installing it would be a no-op). An older release than the running
+; build reads « Go back to this version », as on the shared Versions page.
+; Called on every ListBox Change event.
 _Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal) {
 	if (IsLocal or Idx <= 0) {
 		BtnInstall.Enabled := false
 		BtnInstall.Text    := t("updater.changelog_install")
 		return
 	}
-	IsCurrent := (_Updater_NormalizeTag(Releases[Idx].Tag) == _Updater_NormalizeTag(Updater_CurrentVersion()))
+	Current := Updater_CurrentVersion()
+	IsCurrent := (_Updater_NormalizeTag(Releases[Idx].Tag) == _Updater_NormalizeTag(Current))
 	BtnInstall.Enabled := !IsCurrent
-	BtnInstall.Text    := IsCurrent ? t("updater.changelog_install_current") : t("updater.changelog_install")
+	BtnInstall.Text    := IsCurrent ? t("updater.changelog_install_current")
+		: (_Updater_CompareVersions(Releases[Idx].Tag, Current) < 0)
+			? t("changelog_window.rollback_release") : t("updater.changelog_install")
 }
 
 _Updater_OpenSelectedReleaseUrl(ListBox, Releases, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
@@ -550,7 +555,7 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	; Capture Idx before _Updater_CloseGui(G) — Lb.Value returns 0 once the window is gone.
 	InstallSelected := (*) => (
 		((Idx2 := Lb.Value) > 0 and !IsLocal)
-			? _Updater_OpenSelectedReleasePrompt(G, Releases[Idx2])
+			? _Updater_InstallChosenRelease(G, Releases[Idx2])
 			: ""
 	)
 
@@ -591,7 +596,12 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	}
 }
 
-_Updater_OpenSelectedReleasePrompt(G, Release) {
+; Installs the release chosen in the native Versions window in one click, in
+; the order of the shared page: configuration backup first, then the update
+; path. The window closes; a refusal or a failure is shown in a modal box that
+; names the reason and the backup.
+; @returns {Boolean} Whether the update path started.
+_Updater_InstallChosenRelease(G, Release) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if A_IsSuspended
 		return _Updater_RefuseManualWhileSuspended()
@@ -601,11 +611,44 @@ _Updater_OpenSelectedReleasePrompt(G, Release) {
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	_Updater_CloseGui(G)
-	if !_Updater_RequestMayPublish(Request)
-		return false
-	Updater_ShowUpdatePrompt(Release, Request)
-	return true
+	Deps := Map(
+		"busy", () => _UpdaterDownloadInProgress || _UpdaterRecoveryPublishTarget != "",
+		"blocked", () => Updater_IsLocalSource() ? "changelog_window.install_blocked_source" : "",
+		"find", (Tag) => Map("release", Release),
+		"backup", (Chosen) => ConfigBackup_Create(_ConfigDir, "pre_install", Chosen.Tag, Updater_CurrentVersion()),
+		"asset", (Chosen) => _Updater_FindAsset(Chosen.RawJson, BUNDLE_RELEASE_ASSET, Chosen.Tag),
+		"install", (Chosen, Observer) => _Updater_StartObservedInstall(Chosen, Observer, Request),
+		"report", _Updater_ReportChosenInstall)
+	return ReleaseInstall_Start(Release.Tag, "", Deps)
 }
+
+; Hands a chosen release to the update path with an install observer.
+; @returns {Boolean} Whether the update path started.
+_Updater_StartObservedInstall(Release, Observer, Request) {
+	global _UpdaterInstallObserver
+	_UpdaterInstallObserver := Observer
+	Started := false
+	try {
+		Started := Updater_DownloadAndInstall(Release, Request) == true
+	} finally {
+		if !Started && IsObject(_UpdaterInstallObserver) && ObjPtr(_UpdaterInstallObserver) == ObjPtr(Observer)
+			_UpdaterInstallObserver := 0
+	}
+	return Started
+}
+
+; The native window has closed: only a failure is shown, with its reason and
+; the backup the install kept.
+_Updater_ReportChosenInstall(Message) {
+	if (Message["phase"] != "failed")
+		return
+	Text := StrReplace(t(Message["reason_key"]), "{tag}", Message["tag"])
+	Text := StrReplace(Text, "{path}", Message.Has("backup_path") ? Message["backup_path"] : "")
+	if (Message.Has("backup_path") && Message["backup_path"] != "")
+		Text .= "`n`n" . StrReplace(t("changelog_window.install_backup_kept"), "{path}", Message["backup_path"])
+	MsgBox(Text, t("updater.title_changelog"), "Icon!")
+}
+
 
 ; ==================================================
 ; ===== 1.6) Release notes pane (update prompt) ====

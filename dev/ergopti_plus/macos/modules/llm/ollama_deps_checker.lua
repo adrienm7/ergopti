@@ -35,6 +35,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
+local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "ollama_deps"
 
@@ -777,6 +778,14 @@ function M.check_and_install_deps(on_complete, replay_token)
 	if not _pause_controller.is_current(token, authorization) then
 		return settle_stale_intent()
 	end
+	-- The PTY wrapper runs on an interpreter this Mac runs natively
+	-- (hardening-h-no-rosetta). Without one, the user who asked for the
+	-- install is offered one; a boot check only logs it.
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		if install_granted then require("ui.python_runtime_offer").offer(python_state) end
+		return settle_preflight_failure(i18n.get("ollama.deps_failed"))
+	end
 	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("Ollama dependency")
 	if not pty_wrapper_path then
 		Logger.error(LOG, "Failed to publish the Ollama process-group wrapper: %s.",
@@ -981,7 +990,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 	end
 
 	_observed_failure_marker = nil
-	task = TaskLifecycle.native("Ollama bootstrap", "/usr/bin/python3",
+	task = TaskLifecycle.native("Ollama bootstrap", python_bin,
 		completion_callback, streaming_callback,
 		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "" })
 

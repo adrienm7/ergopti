@@ -10,9 +10,26 @@
 --- the same transaction (ui/menu/uninstall.lua), which quits the daemon through
 --- ctx.on_quit. Configuration ends on login startup, with no dangling
 --- separator. Built through the real tray builder and renderer.
+---
+--- On a local version run from source there is nothing to remove: the row
+--- stays in place, greyed like every row greyed with a reason, « Désinstaller
+--- Ergopti… — Version locale (depuis les sources) » (the head of the
+--- manifest's disabled_reason_key), with nothing to run, and a click that
+--- still reaches the action does nothing.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+--- The head of a translated reason, cut as the renderers cut it: the text
+--- before its first colon, ASCII or full-width.
+local function reason_head(text)
+	local cut = nil
+	for _, mark in ipairs({ ":", "\239\188\154" }) do
+		local at = text:find(mark, 1, true)
+		if at and (cut == nil or at < cut) then cut = at end
+	end
+	return ((cut and text:sub(1, cut - 1) or text):gsub("^%s+", ""):gsub("%s+$", ""))
+end
 
 --- The submenu of the top-level row whose title is the translation of `key`.
 local function submenu_of(items, key)
@@ -25,21 +42,30 @@ end
 
 --- Builds the tray with the uninstall transaction replaced by a recorder.
 --- @param quits table Counts ctx.on_quit calls.
---- @return table items, table runs
-local function build(quits)
+--- @param source_run boolean|nil What the installed-build owner answers (false by default).
+--- @return table items, table runs, function restore
+local function build(quits, source_run)
 	local runs = {}
 	local previous = package.loaded["ui.menu.uninstall"]
 	package.loaded["ui.menu.uninstall"] = { run = function(opts) runs[#runs + 1] = opts end }
+	-- The suite runs from a checkout, which is a source run: each case says.
+	local Installation = require("infra.installation")
+	local real_is_source_run = Installation.is_source_run
+	Installation.is_source_run = function() return source_run == true end
+	local function restore()
+		package.loaded["ui.menu.uninstall"] = previous
+		Installation.is_source_run = real_is_source_run
+	end
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	local ok, items = pcall(mb.build, {
 		_version = "9.9.9",
 		on_quit = function() quits.count = quits.count + 1 end,
 	})
 	if not ok then
-		package.loaded["ui.menu.uninstall"] = previous
+		restore()
 		error(items, 0)
 	end
-	return items, runs, function() package.loaded["ui.menu.uninstall"] = previous end
+	return items, runs, restore
 end
 
 helpers.describe("tray (linux): Uninstall closes the Version / Updates submenu", function()
@@ -68,6 +94,43 @@ helpers.describe("tray (linux): Uninstall closes the Version / Updates submenu",
 		end)
 		restore()
 		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("is greyed on a source run, naming why, at the same place", function()
+		local items, _, restore = build({ count = 0 }, true)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local rows = submenu_of(items, "menu.about.title")
+			helpers.assert_true(type(rows) == "table" and #rows >= 3, "the tray must carry the About submenu")
+			local last = rows[#rows]
+			local head = reason_head(i18n.get("menu.about.source_run_reason"))
+			helpers.assert_true(head ~= "" and head ~= "menu.about.source_run_reason", "the reason is translated")
+			helpers.assert_eq(last.title, i18n.get("menu.global.uninstall") .. " — " .. head,
+				"the row names why in the menu itself, as every greyed row with a reason")
+			helpers.assert_eq(last.disabled, true, "a source run greys Uninstall")
+			helpers.assert_true(last.fn == nil, "with nothing to run")
+			helpers.assert_eq(rows[#rows - 1].title, "-", "at the same place, after its separator")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does nothing when a click reaches the action on a source run", function()
+		local Uninstall = helpers.load_module("ui.menu.uninstall")
+		local calls = { commands = 0, failures = 0, quits = 0 }
+		local launched = Uninstall.run({
+			root = "/checkout/static/ergopti_plus/linux",
+			version_source = "local",
+			title = "t", confirmation = "c", failure = "f",
+			run = function() calls.commands = calls.commands + 1; return true end,
+			confirm = function() return true end,
+			fail = function() calls.failures = calls.failures + 1 end,
+			quit = function() calls.quits = calls.quits + 1 end,
+		})
+		helpers.assert_eq(launched, false)
+		helpers.assert_eq(calls.commands, 0, "no removal command")
+		helpers.assert_eq(calls.failures, 0, "no failure dialog")
+		helpers.assert_eq(calls.quits, 0, "the daemon keeps running")
 	end)
 
 	helpers.it("is drawn once in the whole tray, never in Configuration", function()

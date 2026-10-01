@@ -28,14 +28,16 @@ local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local FileSystem    = require("adapters.file_system")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local PythonInterpreter = require("adapters.python_interpreter")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 
 local LOG = "shortcuts.actions.system"
 
 -- Absolute paths: the interactive layer must not inherit its binaries from PATH,
--- which differs between a login shell and the Hammerspoon process.
+-- which differs between a login shell and the Hammerspoon process. The Python
+-- is resolved per read by adapters.python_interpreter: only an interpreter this
+-- Mac runs natively, never one macOS would start under Rosetta.
 local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
-local PYTHON_BIN        = "/usr/bin/python3"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
 -- collected mid-run, which kills the subprocess so its completion callback never
@@ -446,6 +448,15 @@ end
 --- @param y number Y screen coordinate.
 --- @param on_hex function Called as on_hex(hex_or_nil) with "#a1b2c3" or nil.
 local function pixel_hex_at(operation, x, y, on_hex)
+	-- The interpreter first: without a native one nothing is captured or
+	-- started, and the user is offered the install (hardening-h-no-rosetta).
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		operation.authorized = false
+		finish_operation(operation)
+		require("ui.python_runtime_offer").offer(python_state)
+		return false
+	end
 	local allocation_ok, tmpfile, allocation_detail = xpcall(
 		FileSystem.create_secure_temp_file, debug.traceback)
 	if allocation_ok ~= true or type(tmpfile) ~= "string" or tmpfile == "" then
@@ -494,7 +505,7 @@ except Exception:
 			on_hex(nil)
 			return true
 		end
-		return start_task_phase(operation, "Pixel extractor", PYTHON_BIN,
+		return start_task_phase(operation, "Pixel extractor", python_bin,
 			{ "-c", py_src, tmpfile }, function(py_code, stdout)
 			local hex = (py_code == 0) and type(stdout) == "string"
 				and stdout:match("(#%x%x%x%x%x%x)") or nil

@@ -9,7 +9,7 @@ local function run_fixture(body, source)
 	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
 	helpers.load_with_stubs("hs")
 	local controls = { writes = 0, native = {}, keyboard_handles = {} }
-	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { cmd_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { enabled = true, return_key = "open_url", backspace = "none", escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__return_key__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
+	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { cmd_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
 	if source == false then files.config = nil end
 	local file_port = {
 		read = function(path)
@@ -34,10 +34,16 @@ local function run_fixture(body, source)
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.keycodes"] = {
-		F18_WAKE_OS = 79, F19_VOLUME_SCROLL_MODIFIER = 80,
+		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
-		RETURN = 36, BACKSPACE = 51, ESCAPE = 53,
+		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+		RETURN = 36, BACKSPACE = 51, ESCAPE = 53, FORWARD_DELETE = 117,
 		to_name = function(code) return "f" .. tostring(code) end,
+	}
+	-- A layers.toml that binds no wheel direction: the layer's wheel owner
+	-- stays unbound, as for a user who never saved one.
+	package.loaded["platform.remap.nav_layer"] = {
+		load = function() return { bindings = {}, registry = {}, wheel = { vertical = {}, horizontal = {} } } end,
 	}
 	local function handle(kind)
 		if controls.refuse_start == kind then return nil end
@@ -77,7 +83,7 @@ local function run_fixture(body, source)
 	facades.system.has_screenshot_pause_claim = function(parent) return claims[parent] == true end
 	facades.system.has_pending_screenshot_action = function() return false end
 	for _, edge in ipairs({ "pause", "stop", "resume" }) do facades.system[edge .. "_awake"] = function() return true end end
-	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_scroll", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
+	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
 		facades.system[name] = function() return handle("binding") end
 	end
 	for name, facade in pairs(facades) do
@@ -108,7 +114,8 @@ local function run_fixture(body, source)
 	local prefs = require("infra.preferences")
 	local saved = prefs.load("config")
 	local state = { shortcuts = true, script_control_enabled = true,
-		script_control_shortcuts = { return_key = "open_url", backspace = "none", escape = "none" },
+		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
+			script_altgr_delete = "open_personal_shortcuts", script_altgr_escape = "none" },
 		shortcut_keys = { ctrl_g = true }, chatgpt_url = "https://example.test" }
 	for key, value in pairs(saved.gesture_action_parameters or {}) do
 		local binding, action = gestures.split_action_parameter_key(key)

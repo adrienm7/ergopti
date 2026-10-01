@@ -52,6 +52,7 @@ package.loaded["infra.keycodes"] = {
 	F14_KARABINER_BACKSPACE = 107,
 	F15_KARABINER_ESCAPE   = 113,
 	F20_LAYER_NAV_ENTERED  = 90,
+	F19_LAYER_NAV_EXITED   = 80,
 }
 
 local Generator = helpers.load_with_stubs("platform.remap.generator")
@@ -189,8 +190,8 @@ helpers.describe("Generator.build_karabiner_json: structural skeleton", function
 			make_state(), {NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
 		)
 		local rules = result.profiles[1].complex_modifications.rules
-		-- Script-control sentinel rules are always emitted (3 slots), but
-		-- tap/hold and combo lists are empty.
+		-- The script chords' sentinel rules of an empty configuration (the
+		-- four presets), but tap/hold and combo lists are empty.
 		helpers.assert_true(type(rules) == "table", "rules must be a table")
 	end)
 
@@ -621,13 +622,21 @@ end)
 -- Hammerspoon consumes before any application sees it. The generator must keep
 -- emitting it first on every layer activation, and only inside the ACTIVE lease
 -- graph: the PAUSED graph and a revoked lease (driver not running) emit none.
+-- Its pair F19 closes every deactivation (layer-wheel-slots): Hammerspoon runs
+-- the layer's wheel bindings only between the two.
 helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", function()
 	local F20_NAME = "key_90"
+	local F19_NAME = "key_80"
 	local LAYER_ACTION = {
 		id = "layer",
 		label = "Layer",
 		karabiner_to = { { set_variable = { name = "layer_active", value = 1 } } },
 		karabiner_to_after_key_up = { { set_variable = { name = "layer_active", value = 0 } } },
+	}
+	local LAYER_OFF_ACTION = {
+		id = "layer_off",
+		label = "Layer off",
+		karabiner_to = { { set_variable = { name = "layer_active", value = 0 } } },
 	}
 	local BACKSPACE_ACTION = {
 		id = "backspace",
@@ -638,6 +647,11 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 		id = "left_command",
 		label = "Left Command",
 		from = { key_code = "left_command" },
+	}
+	local RCMD_LAYER_OFF_KEY_DEF = {
+		id = "right_command",
+		label = "Right Command",
+		from = { key_code = "right_command" },
 	}
 
 	--- Returns whether any nested event emits the given key code.
@@ -675,6 +689,24 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 			{ NONE_ACTION, BACKSPACE_ACTION, LAYER_ACTION }, { LCMD_KEY_DEF }, {}, nil, "/fake/data_dir/")
 	end
 
+	--- Collects every output list that switches the navigation layer off, with
+	--- the manipulator field holding it.
+	local function layer_deactivations(node, field, found)
+		if type(node) ~= "table" then return found end
+		for _, event in ipairs(node) do
+			local variable = type(event) == "table" and event.set_variable or nil
+			if type(variable) == "table" and variable.value == 0
+				and tostring(variable.name):find("layer_active", 1, true) then
+				found[#found + 1] = { events = node, field = field }
+				break
+			end
+		end
+		for key, child in pairs(node) do
+			layer_deactivations(child, type(key) == "string" and key or field, found)
+		end
+		return found
+	end
+
 	helpers.it("emits F20 as the first key of every navigation-layer activation", function()
 		local activations = layer_activations(build().profiles[1].complex_modifications.rules, {})
 		helpers.assert_true(#activations > 0, "the hold output must activate the navigation layer")
@@ -699,13 +731,13 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 		end
 	end)
 
-	helpers.it("confines F20 to the ACTIVE lease graph", function()
+	helpers.it("confines F20 and F19 to the ACTIVE lease graph", function()
 		local mode_name = "ergopti_mode_" .. TEST_LEASE_TOKEN
 		local revoked_name = "ergopti_revoked_" .. TEST_LEASE_TOKEN
 		local gated = 0
 		for _, rule in ipairs(build().profiles[1].complex_modifications.rules) do
 			for _, manipulator in ipairs(rule.manipulators) do
-				if emits_key(manipulator, F20_NAME) then
+				if emits_key(manipulator, F20_NAME) or emits_key(manipulator, F19_NAME) then
 					local values = {}
 					for _, condition in ipairs(manipulator.conditions or {}) do
 						if condition.type == "variable_if" then values[condition.name] = condition.value end
@@ -721,6 +753,57 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 		helpers.assert_true(gated > 0, "the configured layer hold must emit the sentinel")
 		helpers.assert_true(not emits_key(Generator.build_paused_script_control_rules(), F20_NAME),
 			"the PAUSED graph must never emit the navigation-layer sentinel")
+		helpers.assert_true(not emits_key(Generator.build_paused_script_control_rules(), F19_NAME),
+			"the PAUSED graph must never emit the navigation-layer exit sentinel")
+	end)
+
+	helpers.it("taps F19 right before every navigation-layer deactivation (layer-wheel-slots)", function()
+		local state = make_state({
+			tap_hold_config = {
+				left_command = { tap = "backspace", hold = "layer" },
+				right_command = { tap = "layer_off", hold = "none" },
+			},
+		})
+		local config = Generator.build_karabiner_json(state,
+			{ NONE_ACTION, BACKSPACE_ACTION, LAYER_ACTION, LAYER_OFF_ACTION },
+			{ LCMD_KEY_DEF, RCMD_LAYER_OFF_KEY_DEF }, {}, nil, "/fake/data_dir/")
+		local found = layer_deactivations(config.profiles[1].complex_modifications.rules, nil, {})
+		local fields = {}
+		for _, list in ipairs(found) do
+			fields[list.field] = true
+			local sentinels, deactivation, sentinel = 0, nil, nil
+			for index, event in ipairs(list.events) do
+				if event.key_code == F19_NAME then sentinels, sentinel = sentinels + 1, index end
+				local variable = event.set_variable
+				if deactivation == nil and type(variable) == "table" and variable.value == 0
+					and tostring(variable.name):find("layer_active", 1, true) then
+					deactivation = index
+				end
+			end
+			helpers.assert_eq(sentinels, 1, "one exit per deactivation in " .. tostring(list.field))
+			helpers.assert_eq(sentinel, deactivation - 1,
+				"the exit sentinel comes right before the variable in " .. tostring(list.field))
+			-- Karabiner holds the last entry of a `to` list until the key is
+			-- released: a held sentinel would take the place of the first key's
+			-- held modifiers after a chord (chord-first-key-modifiers).
+			helpers.assert_true(list.events[#list.events].key_code ~= F19_NAME,
+				"the exit sentinel is never the held last entry of " .. tostring(list.field))
+		end
+		helpers.assert_true(fields.to_after_key_up == true,
+			"the layer hold's release must announce the exit")
+		helpers.assert_true(#found >= 2, "both the hold's release and the explicit layer off are covered")
+	end)
+
+	helpers.it("keeps F19 out of the historical graph older releases deployed", function()
+		local config, err, legacy_rules = build()
+		helpers.assert_nil(err)
+		helpers.assert_true(emits_key(config.profiles[1].complex_modifications.rules, F19_NAME),
+			"the deployed graph announces the exit")
+		helpers.assert_true(type(legacy_rules) == "table" and #legacy_rules > 0)
+		helpers.assert_true(not emits_key(legacy_rules, F19_NAME),
+			"the legacy compatibility graph must be what older releases generated, without the exit sentinel")
+		helpers.assert_true(emits_key(legacy_rules, F20_NAME),
+			"the legacy graph keeps the entry sentinel older releases did emit")
 	end)
 end)
 
@@ -1044,13 +1127,14 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 	-- the paused config so the script-management shortcuts stay exempt from pause.
 		local rules = Generator.build_paused_script_control_rules(TEST_LEASE_TOKEN)
 
-	helpers.it("emits 3 rules — one per script-control slot", function()
+	helpers.it("emits 4 rules — one per shared script chord of an empty configuration", function()
 		-- While paused the remap is off, so the user reaches these with the REAL option
-		-- key (option+Enter/Backspace/Escape). One rule per slot, option-only — NOT one
-		-- per modifier, and NOT a right_command variant (the user does not press rcmd
-		-- while paused, and rcmd+Backspace/Escape would shadow native macOS chords). F-H6.
+		-- key (option+Enter/Backspace/Delete/Escape). One rule per slot, option-only —
+		-- NOT one per modifier, and NOT a right_command variant (the user does not press
+		-- rcmd while paused, and rcmd+Backspace/Escape would shadow native macOS chords).
+		-- F-H6. Every preset is a script-management action, so all four stay live.
 		helpers.assert_true(type(rules) == "table", "must return a table")
-		helpers.assert_eq(#rules, 3)
+		helpers.assert_eq(#rules, 4)
 	end)
 
 	helpers.it("each rule is option-gated with the exact generation fence variables", function()
@@ -1075,7 +1159,7 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		end
 	end)
 
-	helpers.it("gates on the real option key (NOT right_command) for all three keys", function()
+	helpers.it("gates on the real option key (NOT right_command) for all four keys", function()
 		-- While paused we do not touch the real rcmd; the shortcuts are option+key.
 		local keys = {}
 		for _, rule in ipairs(rules) do
@@ -1087,8 +1171,8 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 				"paused rules must NOT gate on right_command — rcmd is not used while paused")
 			keys[m.from.key_code] = true
 		end
-		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.escape,
-			"all three script-control keys must be present")
+		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.delete_forward
+			and keys.escape, "all four script-control keys must be present")
 	end)
 
 	helpers.it("stamps every paused sentinel with the left_control tag (consume-proof guard)", function()

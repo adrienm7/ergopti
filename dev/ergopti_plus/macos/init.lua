@@ -1791,6 +1791,12 @@ Boot.stage("UI: karabiner.init")
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
 boot_note("Remap guardian status reported by the launcher: %s.",
 	tostring(os.getenv("ERGOPTI_REMAP_GUARDIAN_STATUS") or "absent"))
+-- Only a script chord that runs an action gets its Karabiner sentinel rule:
+-- every regeneration reads the plan of the script-control owner, which asks
+-- for a new one whenever a slot or the chords' switch changes.
+if type(karabiner) ~= "table" or karabiner.set_script_chords_source(shortcuts.karabiner_script_chords) ~= true then
+	error("karabiner.set_script_chords_source did not commit")
+end
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
 end

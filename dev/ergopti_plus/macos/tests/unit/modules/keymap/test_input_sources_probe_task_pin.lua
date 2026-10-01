@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Active-layout Probe Deadline Regression
 --- DESCRIPTION:
---- A python3 layout probe that never completed kept the refresh flag set for the
+--- A layout probe that never completed kept the refresh flag set for the
 --- entire Hammerspoon session. These tests exercise the real ShellRunner and
 --- TimerScheduler adapters over faithful native doubles: the deadline must own
 --- the child before start, terminate a hung probe, fence late completion, and
@@ -118,13 +118,16 @@ helpers.describe("active-layout probe: deadline owns the async child", function(
 		f.IS.refresh_active_layouts_async(function() first_done = first_done + 1 end)
 
 		helpers.assert_eq(table.concat(f.order, ","), "spawn,deadline,start",
-			"the watchdog must commit before python3 starts")
+			"the watchdog must commit before the probe starts")
 		helpers.assert_eq(#f.tasks, 1)
 		helpers.assert_eq(#f.timers, 1)
 		helpers.assert_eq(f.timers[1].delay, 10,
 			"the probe must share the canonical input-source subprocess deadline")
-		helpers.assert_eq(tonumber(f.tasks[1].args[3]), 9,
-			"the nested defaults call must expire before its Python owner")
+		-- hardening-h-no-rosetta: the deadline owns the system's `defaults` itself;
+		-- no interpreter runs between them.
+		helpers.assert_eq(f.tasks[1].executable, "/usr/bin/defaults",
+			"the boot's layout probe must run no Python")
+		helpers.assert_eq(table.concat(f.tasks[1].args, " "), "read com.apple.HIToolbox AppleEnabledInputSources")
 		helpers.assert_eq(first_done, 0)
 
 		f.IS.refresh_active_layouts_async(function() joined_done = joined_done + 1 end)
@@ -143,7 +146,7 @@ helpers.describe("active-layout probe: deadline owns the async child", function(
 			"an accepted timeout termination must release the read-only probe slot")
 		helpers.assert_eq(successor_done, 0)
 
-		f.tasks[1]:complete(0, '[["Old", "old.id", true]]', "")
+		f.tasks[1]:complete(0, '({ "KeyboardLayout Name" = Old; })', "")
 		helpers.assert_eq(first_done, 1,
 			"a late terminal from the timed-out owner must stay cleanup-only")
 		local third_done = 0
@@ -152,7 +155,7 @@ helpers.describe("active-layout probe: deadline owns the async child", function(
 			"the old callback must not clear its live successor")
 		helpers.assert_eq(third_done, 0)
 
-		f.tasks[2]:complete(0, '[["French", "fr.id", true]]', "")
+		f.tasks[2]:complete(0, '({ "KeyboardLayout Name" = French; })', "")
 		helpers.assert_eq(successor_done, 1)
 		helpers.assert_eq(third_done, 1)
 		reset_fixture_modules()
