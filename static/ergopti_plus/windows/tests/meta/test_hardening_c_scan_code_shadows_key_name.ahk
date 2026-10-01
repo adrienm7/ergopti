@@ -101,6 +101,46 @@ _HCSC_Declarations(Code, Masked, &LabelCount, &CallCount) {
 		CallCount++
 		Found.Push(Call[2])
 	}
+	for Declaration in _HCSC_ArrayLoopDeclarations(Code) {
+		CallCount++
+		Found.Push(Declaration)
+	}
+	return Found
+}
+
+; The bounded computed-registration form: a literal key array and a loop
+; concatenating a literal modifier prefix with each key. Dynamic expressions
+; remain outside this source scan; runtime registration tests judge them.
+_HCSC_ArrayLoopDeclarations(Code) {
+	Quotes := Chr(34) . "'"
+	Arrays := Map()
+	Position := 1
+	while (At := RegExMatch(Code, "im)^global\s+(\w+)\s*:=\s*\[([^\]]*)\]", &Literal, Position)) {
+		Position := At + Literal.Len
+		Keys := []
+		Valid := true
+		for Token in StrSplit(Literal[2], ",") {
+			Token := Trim(Token, " `t`n`r")
+			if (Token == "")
+				continue
+			if !RegExMatch(Token, "^([" . Quotes . "])([A-Za-z][A-Za-z0-9_]*)\1$", &Key) {
+				Valid := false
+				break
+			}
+			Keys.Push(Key[2])
+		}
+		if Valid && Keys.Length
+			Arrays[Literal[1]] := Keys
+	}
+	Found := []
+	Position := 1
+	Pattern := "for\s+(\w+)\s+in\s+(\w+)\s*\{\s*Hotkey(?:\w*\.Call)?\(\s*([" . Quotes . "])([~*$#!^+<>]*)\3\s*\.\s*\1\s*,"
+	while (At := RegExMatch(Code, Pattern, &Registration, Position)) {
+		Position := At + Registration.Len
+		if Arrays.Has(Registration[2])
+			for Key in Arrays[Registration[2]]
+				Found.Push(Registration[4] . Key)
+	}
 	return Found
 }
 
@@ -301,6 +341,24 @@ _HCSC_ScannerFindsTheShadowedShape() {
 }
 Test("hotkeys: the scan-code precedence scanner flags exactly the shadowed shapes (hardening-c-scan-code-precedence)",
 	_HCSC_ScannerFindsTheShadowedShape)
+
+_HCSC_ComputedResetNamesAreScanned() {
+	Fixture := "SC00E:: return`nSC001:: return`n"
+		. 'global ResetKeys := ["BackSpace", "Escape"]' . "`n"
+		. 'for Key in ResetKeys {' . "`n"
+		. '    HotkeyFn.Call("~" . Key, Reset)' . "`n}" . "`n"
+		. 'global Unknown := [SomeFunction()]' . "`n"
+		. 'for Key in Unknown {' . "`n"
+		. '    Hotkey("~" . Key, Reset)' . "`n}"
+	Masked := _DriverMaskNonCode(&Fixture)
+	Found := _HCSC_Declarations(Fixture, Masked, &LabelCount, &CallCount)
+	AssertEqual(2, LabelCount)
+	AssertEqual(2, CallCount, "only the literal array's computed registrations are resolvable")
+	AssertEqual("~BackSpace, ~Escape", _HCSC_Offenders(Found, _HCSC_NameTable()),
+		"computed reset names retain the same shadowing rule as literal hotkeys")
+}
+Test("hotkeys: computed dead-key reset names are scanned (keylayout-dead-reset-identity)",
+	_HCSC_ComputedResetNamesAreScanned)
 
 _HCSC_NoNameHotkeyOnAScanCodeKey() {
 	Src := _DriverSourceConcat()

@@ -243,13 +243,14 @@ const luaTable = (source, name) =>
 		(/^global LLM_NAV_CYCLE_KEYS := Map\(([\s\S]*?)\)\s*$/m.exec(tabAccept) || [])[1] || '';
 	const arrows = new Map();
 	for (const pair of keys.matchAll(/"(\w+)", "(\w+)"/g)) {
-		arrows.set(idBy(contract.arrows.keys(), 'ahk_send', pair[1]), routes.get(pair[2]));
+		const id = idBy(contract.arrows.keys(), 'ahk_send', pair[1]);
+		arrows.set(id, routes.get(pair[2]));
 		check(
 			new RegExp(
-				`^#HotIf LLM_Menu_NavCycleChordIsOwned\\("${pair[1]}"\\)\\s*\\n\\*${pair[1]}:: LLM_Menu_NavCycleChord\\("${pair[1]}"\\)`,
+				`^#HotIf LLM_Menu_NavCycleChordIsOwned\\("${pair[1]}"\\)\\s*\\n\\*${registry[id]?.ahk}:: LLM_Menu_NavCycleChord\\("${pair[1]}"\\)`,
 				'm'
 			).test(tabAccept),
-			`Windows: ${pair[1]} must have its consuming hotkey`
+			`Windows: ${pair[1]} must consume through its shared physical scan code`
 		);
 	}
 	expectSteps('Windows LLM_NAV_CYCLE_KEYS', contract.arrows, arrows);

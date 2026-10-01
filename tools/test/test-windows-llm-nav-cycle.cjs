@@ -177,7 +177,9 @@ lines.forEach((line, index) => {
 	consumed.add(key);
 	const label = lines.slice(index + 1).find((next) => next.trim() !== '') || '';
 	check(
-		new RegExp(`^\\*${key}::\\s*LLM_Menu_NavCycleChord\\("${key}"\\)\\s*$`).test(label.trim()),
+		new RegExp(
+			`^\\*SC${arrowScanCodes.get(key)?.toString(16).toUpperCase().padStart(3, '0')}::\\s*LLM_Menu_NavCycleChord\\("${key}"\\)\\s*$`
+		).test(label.trim()),
 		`tab_accept.ahk:${index + 2} the hotkey consuming the ${key} chord must cycle through LLM_Menu_NavCycleChord("${key}"), with no pass-through prefix: ${label.trim()}`
 	);
 	const level = lines
