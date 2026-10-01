@@ -588,6 +588,46 @@ That native case passes non-release run 36935760620 at `21de5dcea`: the complete
 three-OS pipeline, including every installation variant, is green. Its temporary
 branch has been removed; the run also covers the 21-locale privacy label.
 
+- [ ] **102.** Simplify each Hotstrings category submenu to two commands,
+      "Enable all" and "Disable all", replacing the duplicate category and
+      whole-section activation controls. Declare the structure once in the
+      shared manifest and translate its labels into all 21 locales. Apply the
+      effective category/section changes through their persistence owners;
+      retain unrelated choices and fence refused writes/runtime publication.
+      Replay the same full-enable/full-disable behavior on every driver.
+- [ ] **103.** Move the common "Distance reduction" hotstrings into the
+      Ergopti+ extension: these bindings depend on the layout rather than being
+      common to every user. Extensions own their hotstrings, shortcuts and
+      layouts. Migrate existing category/section choices without duplication
+      or enabling a previously disabled group, and cover source ownership,
+      menu placement and runtime loading on all three OSes.
+- [ ] **104.** Split the common autocorrections file into meaningful, separately
+      selectable sections and replace its misleading submenu/section labels.
+      Classify the actual corrections first; preserve matching priority,
+      triggers, outputs and existing activation choices through the split.
+      Share the section catalogue and 21-locale names, with full-corpus
+      equivalence, per-section selection and cross-driver regression tests.
+
+- [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
+      macOS and Linux, separately from the ordinary hotstrings editor. Provide
+      a documented user-code entry point under "Dynamic hotstrings", examples
+      and a callback API that lets users compute any replacement/action rather
+      than limiting them to the editor's fields. Share the trigger, callback,
+      enable/disable and lifecycle contracts; isolate native implementations.
+      Preserve user source files, report load/execution errors visibly, and
+      cover real callback execution, live enable/disable, cancellation and
+      suspended/privacy-filtered input with automated cross-driver tests.
+
+- [ ] **106.** Expand the shared gesture/keyboard action catalogue for user
+      automation. Discover and offer Apple Shortcuts on macOS, and let every
+      driver assign actions that launch a user script, Python file or other
+      executable with explicit parameters. Use the same parameter model,
+      picker and persistence for gestures, keyboard shortcuts and other action
+      consumers; keep discovery and execution in platform adapters, with
+      translated reasons for unavailable OS-specific actions. Test real fixture
+      scripts, paths/arguments with spaces and Unicode, process-start refusal,
+      execution errors, lifecycle/cancellation and cross-consumer parity.
+
 The shared Shortcuts declaration separates modifier-shortcut groups from key
 combinations. Linux currently omits the combinations group, so the same boundary
 separates its modifier shortcuts from script controls. Existing renderer tests
@@ -623,7 +663,10 @@ by captured criteria. The old fixtures explicitly model held/released presses,
 retain their slot/emulation assertions and restore the query after each case.
 The script plan now also rejects assigned chords on a modeled released key;
 the actual emulation criterion rejects the released magic-key suffix.
-Repeat native CI for this correction and the maintainer's four new commits.
+Non-release run 36940286440 at `64edbf898` passed the complete shared,
+Windows/macOS/Linux unit and E2E suites, packaging and installation lanes,
+including this correction and the maintainer's four new commits. No release
+was published.
 
 The registry emulation's dead-key resets now use the scan-code identities of
 all 13 cancel/navigation keys. The shared physical-key registry independently
