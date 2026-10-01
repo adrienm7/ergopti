@@ -532,19 +532,20 @@ _KLT_MagicKeyDeclarationCase() {
 Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
 	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
-; Evaluates an AltGr row's criterion on the Kana layout family, with no AltGr
-; tap-hold. On the standard family IsRealAltGrPress also requires the physical
-; RAlt, which no test can press, so the criterion is false there whatever the
-; row decides (see test_altgr_combos_stand_down.ahk).
+; Evaluates the actual registered criterion with a modeled physical press.
+; Host input is never injected; the physical-state port is restored on refusal.
 ; @param Criterion {Func} The #HotIf criterion the row was registered under.
+; @param Pressed {Boolean} Whether the modeled AltGr key is physically held.
 ; @returns {Boolean} The criterion's answer while AltGr is held as AltGr.
-_KLT_AltGrRowOnKanaFamily(Criterion) {
-	global TapHold
-	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+_KLT_AltGrRowOnKanaFamily(Criterion, Pressed := true) {
+	global TapHold, _ALTGR_PHYSICAL_STATE_QUERY
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true), Query: _ALTGR_PHYSICAL_STATE_QUERY }
 	try {
 		TapHold := Map("keys", Map(), "layers", Map())
+		_ALTGR_PHYSICAL_STATE_QUERY := (Key) => Pressed
 		return Criterion.Call()
 	} finally {
+		_ALTGR_PHYSICAL_STATE_QUERY := Saved.Query
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
 	}
@@ -578,6 +579,8 @@ _KLT_MagicKeyYieldCase() {
 		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
 		AssertTrue(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"]),
 			"AltGr keeps the emulated layout's character")
+		AssertFalse(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"], false),
+			"released AltGr leaves the magic-key suffix to its current owner")
 		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
 		ScriptInformation["MagicKeySourceScan"] := "SC027"
 		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the chosen key, not a fixed position")

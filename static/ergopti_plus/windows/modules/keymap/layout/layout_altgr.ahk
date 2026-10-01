@@ -50,6 +50,9 @@ global ALTGR_NUMBER_ROW := ""
 global ALTGR_BASE_ROWS := ""
 global CTRL_ALT_NUMPAD := ""
 
+; The physical-state port is shared by captured criteria and direct gate calls.
+global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsDown
+
 ; ``{Plain, Shifted}`` callables of every key of two parallel spec tables.
 _AltGrTableFromSpec(Plain, Shifted, DeadTables) {
     Table := Map()
@@ -125,11 +128,11 @@ _BuildAltGrTables() {
 ; of the foreground window's layout, without a reload. Manual TOML override
 ; available via ScriptInformation["AltGrIsKanaRemap"] in case the probe ever
 ; misfires.
-; PhysicalStateFn is an optional GetKeyState-compatible query for native tests.
-IsRealAltGrPress(PhysicalStateFn := 0) {
-    global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
-    NativeQuery := (PhysicalStateFn is Integer) && PhysicalStateFn == 0
-    if !NativeQuery && !HasMethod(PhysicalStateFn, "Call")
+; PhysicalStateFn optionally replaces the KeyState port for a direct call.
+IsRealAltGrPress(PhysicalStateFn := unset) {
+    global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH, _ALTGR_PHYSICAL_STATE_QUERY
+    Query := IsSet(PhysicalStateFn) ? PhysicalStateFn : _ALTGR_PHYSICAL_STATE_QUERY
+    if !HasMethod(Query, "Call")
         throw TypeError("AltGr eligibility requires a physical-state query.")
     ; While the onboarding wizard is on screen the user has not yet committed
     ; any Ergopti feature, so every SC138-prefixed hotkey in the driver must
@@ -156,10 +159,10 @@ IsRealAltGrPress(PhysicalStateFn := 0) {
         ; AHK can retain a Kana prefix after release. Reject it before the
         ; suffix is captured; the callback's later guard cannot restore it.
         ; The unconditional prefix anchor still arms SC138 on its own press.
-        return NativeQuery ? GetKeyState("SC138", "P") : PhysicalStateFn.Call("SC138", "P")
+        return Query.Call("SC138")
     }
     ; Vanilla AltGr: real press keeps RAlt physically held; ghost releases it.
-    return NativeQuery ? GetKeyState("RAlt", "P") : PhysicalStateFn.Call("RAlt", "P")
+    return Query.Call("RAlt")
 }
 
 ; #HotIf of the script chords (AltGr+Escape quits, +Enter toggles the pause,

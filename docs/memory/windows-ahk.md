@@ -539,7 +539,11 @@ otherwise. A Kana family flag alone leaves suffixes eligible after release
 when AHK retains a prefix latch. Rejecting in the output callback is too late
 to preserve the captured native key. Keep the anchor unconditional when changing
 the suffix gate; its first-press contract and the pressed/released native-query
-cases guard these two separate hook decisions.
+cases guard these two separate hook decisions. Query through `KS_IsDown`,
+which owns physical mode, rather than adding platform calls to the module.
+Fixtures evaluating captured criteria must model the held key through
+`_ALTGR_PHYSICAL_STATE_QUERY` and restore it in `finally`; the Kana family
+alone never provides physical authority.
 
 ### project-ahk-altgr-fake-lctrl
 

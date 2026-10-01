@@ -607,7 +607,8 @@ OS input sources, so it retains that platform implementation. Both status forms
 are translated into all 21 locales. Eight registered native cases cover status
 data and the actual Win32 disabled row, with management remaining usable;
 the original Windows row was clickable and did not name its current emulation.
-The new native cases need the next non-release CI run.
+Non-release run 36937408564 at `56efa2bd8` passed these cases and the full
+Windows/macOS/Linux test, package and installation lanes.
 
 The supplied diagnostic also proves released-SC138 dispatch on Kana. Its hotkey
 criterion accepted the Kana family without querying the physical key; the later
@@ -618,7 +619,15 @@ exercise the pressed/released queries of all three families and the actual nativ
 query on a released host key. Existing hold-owner cases explicitly model a held
 key and retain their non-AltGr rejection assertions. This AHK prefix-latch repair
 does not establish the cause of item 99's exact layout-switch report; Linux and
-macOS do not use AutoHotkey's custom-combination latch. Native CI is pending.
+macOS do not use AutoHotkey's custom-combination latch. Non-release run
+36938644227 passed the seven new cases, but caught two older fixtures that
+assumed Kana alone meant a held key, and one additional direct platform call.
+The gate now uses the existing KeyState port, with an injectable query shared
+by captured criteria. The old fixtures explicitly model held/released presses,
+retain their slot/emulation assertions and restore the query after each case.
+The script plan now also rejects assigned chords on a modeled released key;
+the actual emulation criterion rejects the released magic-key suffix.
+Repeat native CI for this correction and the maintainer's four new commits.
 
 ## Time estimate
 
