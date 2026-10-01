@@ -287,8 +287,8 @@ check(
 	JSON.stringify(group.map((row) => `${row.type}:${row.id || ''}`)) ===
 		JSON.stringify([
 			'toggle:script_control_toggle',
-			'command:restore_recommended',
-			'command:clear_to_system',
+			'command:scope_restore',
+			'command:scope_clear',
 			'---:',
 			'list:script_control_shortcuts'
 		]),
@@ -320,7 +320,7 @@ for (const [driver, file, builder] of [
 ]) {
 	const source = read(...file);
 	check(builder.test(source), `${driver} must build the script_control group`);
-	for (const command of ['script_control_toggle', 'restore_recommended', 'clear_to_system']) {
+	for (const command of ['script_control_toggle', 'scope_restore', 'scope_clear']) {
 		check(
 			source.includes(`["${command}"]`),
 			`${driver} must register the ${command} command of the script chords`

@@ -718,11 +718,11 @@ function M.build(ctx)
 				ctx.updateMenu()
 				return true
 			end,
-			["restore_recommended"] = function()
+			["scope_restore"] = function()
 				return type(ctx.apply_script_chords_scope) == "function"
 					and ctx.apply_script_chords_scope("recommended") == true
 			end,
-			["clear_to_system"] = function()
+			["scope_clear"] = function()
 				return type(ctx.apply_script_chords_scope) == "function"
 					and ctx.apply_script_chords_scope("clear") == true
 			end,
