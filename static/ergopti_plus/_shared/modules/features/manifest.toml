@@ -4542,6 +4542,9 @@ platforms = ["ahk", "hs", "linux"]
 # group (Windows) into one group with a first-row switch of its own. Its rows
 # are key_combinations_group. Linux's tap-hold engine binds no combination.
 [[menu.shortcuts_menu]]
+type = "---"
+
+[[menu.shortcuts_menu]]
 type = "group"
 id = "key_combinations"
 i18n = "menu.shortcuts.key_combinations"
