@@ -453,6 +453,14 @@ is committed; one request is one commit with its regression test.
       letter struck before Space is released is shifted. A key that rolls
       over the next one is a tap: decide the hold from the order of the
       releases and the threshold, and check the other two drivers.
+- [ ] **87.** macOS: a typing key rolled over the next one is still typed
+      under its hold (item 86 covers Windows and Linux). Karabiner decides a
+      dual-role key at the next key's press (`to` + `to_if_alone`) and has
+      no rule on the order of the releases. Its `to_if_held_down` with
+      `to_delayed_action.to_if_canceled` recipe takes the hold only past the
+      threshold and types the tap when another key comes first: that fixes
+      typing but makes a quick chord type the tap, so decide which rule
+      macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
 
 ## Time estimate
 
