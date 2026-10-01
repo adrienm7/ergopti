@@ -6,10 +6,9 @@
 ; Regression guard for llm-inline-autotype-injects-superseded-prediction.
 ;
 ; LLM_Engine_OnResults ends with a staleness gate whose own comment explains why
-; it is needed: LLM_Diff_Compute runs a RegExMatch per character over each slot
-; and the display-opts resolution queries the focused window, so this thread can
-; be pre-empted between the caller's check and the paint. If the prediction has
-; been superseded in that window, the render is discarded.
+; it is needed: the display-opts resolution queries the focused window, so this
+; thread can be pre-empted between the caller's check and the paint. If the
+; prediction has been superseded in that window, the render is discarded.
 ;
 ; ROOT CAUSE ENCODED: the inline auto-type branch sits ~35 lines ABOVE that gate
 ; and RETURNS, so it never reached it. The two outcomes are not comparable. A

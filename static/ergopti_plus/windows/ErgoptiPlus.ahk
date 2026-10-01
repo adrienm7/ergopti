@@ -480,7 +480,6 @@ if UIASW_IsWorkerInvocation()
 #Include infra/wrap_symbols_config.ahk
 #Include infra/ui_style.ahk
 #Include ui/tooltip/init.ahk
-#Include infra/llm_diff.ahk
 #Include infra/hotstrings/hotstring_prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)

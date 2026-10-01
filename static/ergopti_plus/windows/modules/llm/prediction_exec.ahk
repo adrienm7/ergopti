@@ -1136,8 +1136,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	_LLM_Engine["last_result"]  := state["slots"][1]
 
 	; ``request_id`` is threaded through so the render can gate once more on its
-	; own side: LLM_Diff_Compute and the display-opts resolution run between here
-	; and the paint, and both can yield.
+	; own side: the display-opts resolution runs between here and the paint, and
+	; it can yield.
 	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true,
 		state["request_id"], state["semantic_signature"],
 		state.Get("rewrite_edits", ""))
@@ -1190,6 +1190,7 @@ _LLM_Engine_ParseSlots(raw, state) {
 	; async callback (which swallows exceptions silently).
 	dedup_ref := state.Has("dedup_stats") ? state["dedup_stats"] : LLM_ApiCommon_NewDedupStats()
 	edits     := Map()
+	displays  := Map()
 	result    := LLM_Parser_ParseResponse(
 		raw,
 		state["ctx"],
@@ -1199,9 +1200,11 @@ _LLM_Engine_ParseSlots(raw, state) {
 		is_batch,
 		state["requested"],
 		&dedup_ref,
-		&edits
+		&edits,
+		&displays
 	)
 	state["dedup_stats"] := dedup_ref
+	_LLM_Engine_RememberSlotDisplays(state["ctx"], displays)
 	; The first erasure recorded for a slot text wins, like the slot itself: a
 	; later duplicate is dropped by the dedup and must not replace its edit.
 	if !state.Has("rewrite_edits")
@@ -1311,47 +1314,24 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 		}
 	}
 
-	; On the final render, enrich each completed slot with diff chunks so the
-	; Gui-based tooltip can colourise corrections (green) vs. next-words
-	; (orange). Streaming / intermediate renders pass plain strings — diff
-	; against a partial token would be meaningless.
-	display_slots := slots
-	if HasRewrites {
-		; A rewrite slot is shown as the rewritten sentence and carries the
-		; erasure its accept performs, on every render: an intermediate slot is
-		; as acceptable as a final one.
-		display_slots := []
-		for _, s in slots {
-			if (s != "" and rewrite_edits.Has(s))
-				display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, rewrite_edits[s]))
-			else if (is_final and s != "" and IsSet(LLM_Diff_Compute))
-				display_slots.Push(LLM_Diff_Compute(
-					(StrLen(ctx) > 200) ? SubStr(ctx, -199) : ctx, s))
-			else
-				display_slots.Push(s)
-		}
-	} else if (is_final and IsSet(LLM_Diff_Compute)) {
-		; Use the context that produced THIS prediction as the diff anchor,
-		; not last_ctx — which is only updated on success and would be stale
-		; after a failed request, causing the diff to compute against the
-		; wrong baseline if the user typed more since the last accepted prediction
-		buf_tail := ctx
-		; Use only the last 200 chars of the context as the diff anchor — the
-		; full context is too long and makes prefix-matching meaningless
-		if (StrLen(buf_tail) > 200)
-			buf_tail := SubStr(buf_tail, -199)
-		display_slots := []
-		for _, s in slots {
-			if (s != "")
-				display_slots.Push(LLM_Diff_Compute(buf_tail, s))
-			else
-				display_slots.Push(s)
-		}
+	; Each slot goes to the tooltip with what its line reads. A rewrite slot is
+	; shown as the rewritten sentence and carries the erasure its accept
+	; performs, on every render: an intermediate slot is as acceptable as a
+	; final one. A parsed prediction is shown as the parser read it: the typed
+	; tail it corrects (grey), the correction (green) and the next words
+	; (orange). A slot the parser never saw whole (a partial stream, a cache
+	; hit sliced by what was typed since) stays a plain string, which the
+	; tooltip reads as words still to come.
+	display_slots := []
+	for _, s in slots {
+		if (HasRewrites and s != "" and rewrite_edits.Has(s))
+			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, rewrite_edits[s]))
+		else
+			display_slots.Push(_LLM_Engine_DisplaySlot(s, ctx))
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
-	; Last staleness gate, on the render's own side. LLM_Diff_Compute runs a
-	; RegExMatch per character over each slot and the display-opts resolution
+	; Last staleness gate, on the render's own side. The display-opts resolution
 	; queries the focused window, so this thread can be pre-empted between the
 	; caller's check and the paint. Painting after a supersede leaves a prediction
 	; for abandoned text on screen that the keystroke's deferred hide can no longer
@@ -1391,6 +1371,63 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.
 	LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
+}
+
+; What the lines of the slots parsed for one context read, by slot text. The
+; slots travel as plain strings (dedup, cache, acceptance), so what the parser
+; knows beyond the text to type is kept here until the render. One context at
+; a time: a new context replaces the previous one's entries.
+_LLM_Engine_SlotDisplayStore() {
+	static Store := { Ctx: "", ByText: Map() }
+	return Store
+}
+
+/**
+ * Records what the lines of freshly parsed slots read. The first record of a
+ * slot text wins, like the slot itself: a later duplicate is dropped by the
+ * dedup and must not replace it.
+ * @param {String} Ctx The context the slots answer.
+ * @param {Map} Displays Slot text → display (LLM_Parser_ParseResponse).
+ */
+_LLM_Engine_RememberSlotDisplays(Ctx, Displays) {
+	Store := _LLM_Engine_SlotDisplayStore()
+	if (StrCompare(Store.Ctx, Ctx, true) != 0) {
+		Store.Ctx := Ctx
+		Store.ByText := Map()
+	}
+	for Text, Display in Displays {
+		if !Store.ByText.Has(Text)
+			Store.ByText[Text] := Display
+	}
+}
+
+; Drops every recorded display with the context it belongs to. Called with the
+; prediction cache: both hold text the user typed.
+_LLM_Engine_ForgetSlotDisplays() {
+	Store := _LLM_Engine_SlotDisplayStore()
+	Store.Ctx := ""
+	Store.ByText := Map()
+}
+
+/**
+ * Builds the tooltip slot of a prediction: its text to type, with what its
+ * line reads when the parser recorded it for this context.
+ * @param {String} Text The slot text (to_type).
+ * @param {String} Ctx The context the slot answers.
+ * @returns {Object|String} { Text, Chunks, NextWords, HasCorrections }, or
+ *     Text alone when nothing was recorded.
+ */
+_LLM_Engine_DisplaySlot(Text, Ctx) {
+	Store := _LLM_Engine_SlotDisplayStore()
+	if (Text == "" or StrCompare(Store.Ctx, Ctx, true) != 0 or !Store.ByText.Has(Text))
+		return Text
+	Display := Store.ByText[Text]
+	return {
+		Text: Text,
+		Chunks: Display["chunks"],
+		NextWords: Display["nw"],
+		HasCorrections: Display["has_corrections"]
+	}
 }
 
 /**

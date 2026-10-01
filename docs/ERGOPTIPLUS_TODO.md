@@ -480,6 +480,20 @@ is committed; one request is one commit with its regression test.
       threshold and types the tap when another key comes first: that fixes
       typing but makes a quick chord type the tap, so decide which rule
       macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
+- [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
+  is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
+  ported by Windows, pinned by
+  `_shared/tests/corpus/tooltip/llm_line_vectors.json`. Seen on a real
+  Windows 11 on 2026-10-01 (grey typed, green corrected, orange next,
+  indentation 0, +2, -1 and -3). Remaining: look at the Linux GTK panel
+  and the macOS canvas on real machines (the suites cover the rows, not
+  the pixels); Windows draws the corrections of an unselected line in
+  the regular weight, where the Lua drivers use bold (its text measure
+  has one weight).
+- [ ] **89.** Windows: with the advanced prompt the AI never corrects what
+      was typed. The maintainer tried several predictions on 2026-10-01
+      and none fixed an error; read the logs in
+      `%LOCALAPPDATA%\ergopti_plus\logs` and find why.
 
 - [ ] **88.** In the shared navigation-layer editor, give the layer activation
       keys a blue background as well as their blue border, including the legend

@@ -212,6 +212,7 @@ LLM_Engine_StopGeneration() {
 			_LLM_Engine["last_result"]  := ""
 			_LLM_Engine["last_semantic_signature"]  := ""
 			_LLM_Engine["active_request_signature"] := ""
+			_LLM_Engine_ForgetSlotDisplays()
 		}
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
