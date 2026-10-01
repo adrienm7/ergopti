@@ -35,6 +35,11 @@
 			"properties": {
 				"prefixes": { "type": "array", "items": { "type": "string" } },
 				"restore_exclude": { "type": "array", "items": { "type": "string" } },
+				"clear_exclude": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Paths a clear leaves as they are, in this scope and in every scope that includes it."
+				},
 				"includes": { "type": "array", "items": { "type": "string" } },
 				"preset": { "type": "string" },
 				"action_parameters": {

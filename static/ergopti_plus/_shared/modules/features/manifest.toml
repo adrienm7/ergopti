@@ -5892,11 +5892,16 @@ type = "boolean"
 description_key = "menu.layout"
 platforms = ["hs"]
 
+# `clear_exclude` lists the paths a clear leaves as they are, as
+# `restore_exclude` does for a restore. The Tap-Holds clear empties every key's
+# tap and hold and keeps the switch: the user sets the next key from there, and
+# a switch turned off with the keys made that key do nothing.
 [scopes.tap_holds]
 action_parameters = { domains = ["tap_hold"], restore = "remove" }
 prefixes = ["tap_holds", "category_enabled.tap_holds"]
 preset = "tap_hold"
 restore_exclude = []
+clear_exclude = ["tap_holds.enabled", "category_enabled.tap_holds"]
 
 [scopes.shortcuts]
 action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }

@@ -180,24 +180,27 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 end)
 
 helpers.describe("Linux tap-hold scope: clear to system", function()
-	helpers.it("removes every owned field and the master, leaving the engine out of the hook", function()
-		local source = '[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
-			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
-			.. 'time_activation_seconds = 0.3\n[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
-			.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
-		with_scope(source, nil, function(s)
-			helpers.assert_eq(s.manager.is_active(), true)
-			helpers.assert_eq(s.owner().apply("clear"), true)
-			local stored = Codec.decode(read(s.tap_path))
-			helpers.assert_eq(stored.tap_hold, { future = "keep", keys = { left_shift = { custom = { note = "keep" } } } })
-			helpers.assert_eq(s.manager.file_enabled(), false)
-			helpers.assert_eq(s.manager.is_active(), false)
-			for key_id, key in pairs(s.manager.keys()) do
-				helpers.assert_true(key.tap_action == nil and key.hold_modifier == nil and key.hold_layer == nil,
-					"no tap or hold remains on " .. key_id)
-			end
-			helpers.assert_eq(s.installed[#s.installed], false, "the hook holds no engine")
-		end)
+	-- The clear once removed [tap_hold] enabled with the keys, so the next key
+	-- the user set did nothing until the switch was found again.
+	helpers.it("(tap-hold-clear-keeps-switch) removes every owned field and leaves the switch as it is", function()
+		for _, switch in ipairs({ true, false }) do
+			local source = '[tap_hold]\nenabled = ' .. tostring(switch) .. '\ninherit_defaults = true\nfuture = "keep"\n'
+				.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
+				.. 'time_activation_seconds = 0.3\n[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
+				.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
+			with_scope(source, nil, function(s)
+				helpers.assert_eq(s.manager.is_active(), switch)
+				helpers.assert_eq(s.owner().apply("clear"), true)
+				local stored = Codec.decode(read(s.tap_path))
+				helpers.assert_eq(stored.tap_hold, { enabled = switch, future = "keep",
+					keys = { left_shift = { custom = { note = "keep" } } } })
+				helpers.assert_eq(s.manager.file_enabled(), switch, "the clear owns the keys, not the switch")
+				for key_id, key in pairs(s.manager.keys()) do
+					helpers.assert_true(key.tap_action == nil and key.hold_modifier == nil and key.hold_layer == nil,
+						"no tap or hold remains on " .. key_id)
+				end
+			end)
+		end
 	end)
 
 	for _, mode in ipairs({ "clear", "recommended" }) do

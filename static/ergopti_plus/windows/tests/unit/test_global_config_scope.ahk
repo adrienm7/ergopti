@@ -10,7 +10,10 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	Fixture := _HotstringsScopeFixture(9)
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	TapSource := '[tap_hold]`ninherit_defaults = true`n[tap_hold.keys.space]`ntap_action = "open_url"`ntime_activation_seconds = 0.9`n[private]`nunknown = "keep"`n'
-	ConfigSource := StrReplace(Fixture.source, "[category_enabled]", "[category_enabled]``nshortcuts = true``ntap_holds = true") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__win_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
+	; Real line feeds: escaped backticks once left both switches out of the file,
+	; so the clear's assertion on the Tap-Holds switch could not fail.
+	Assert(InStr(Fixture.source, "[category_enabled]`n"), "the fixture declares the category switches")
+	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__win_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
 	if Scenario == "absent"
 		ConfigSource := StrReplace(ConfigSource, '`nenabled = true`n', '`n')
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
@@ -98,7 +101,9 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 			Assert(!Parsed["llm"].Has("ollama_port"))
 			if Mode == "clear" {
 				Assert(!Parsed["gestures"].Has("tap_4"))
-				Assert(!Parsed["category_enabled"].Has("tap_holds"))
+				AssertEqual(true, Parsed["category_enabled"]["tap_holds"],
+					"no clear rewrites the Tap-Holds switch (tap-hold-clear-keeps-switch)")
+				Assert(!Parsed["category_enabled"].Has("shortcuts"), "the other category switches are still cleared")
 			} else {
 				AssertEqual(ManifestRecommendedFor("gestures.tap_4"), Parsed["gestures"]["tap_4"])
 				AssertEqual(ManifestRecommendedFor("category_enabled.tap_holds"), Parsed["category_enabled"]["tap_holds"])

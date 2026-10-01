@@ -69,7 +69,10 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 			Assert(FSWriteDurable(RestartPath, FSReadUtf8Exact(TapPath)))
 			Reloaded := LoadTapHoldToml(RestartPath, Fixture.options["tap_hold_defaults"])
 			if Mode == "clear" {
-				Assert(!Parsed["category_enabled"].Has("tap_holds"))
+				; The clear once deleted the switch with the keys, so the next key
+				; the user set did nothing until the switch was found again.
+				AssertEqual(true, Parsed["category_enabled"]["tap_holds"],
+					"the clear owns the keys, not the Tap-Holds switch (tap-hold-clear-keeps-switch)")
 				AssertEqual(0, Reloaded["keys"].Count)
 			} else {
 				AssertEqual(ManifestRecommendedFor("category_enabled.tap_holds"), Parsed["category_enabled"]["tap_holds"])
@@ -99,7 +102,23 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	}
 }
 Test("tap-hold-scope: recommended preset and master compensate native refusal", _TapHoldScopeCase.Bind("recommended"))
-Test("tap-hold-scope: clear preset and master compensate native refusal", _TapHoldScopeCase.Bind("clear"))
+Test("tap-hold-scope: clear preset keeps the switch and compensates native refusal (tap-hold-clear-keeps-switch)", _TapHoldScopeCase.Bind("clear"))
+
+; The manifest plan itself: a clear of the Tap-Holds, alone or composed in the
+; global one, names no row for the switch, and a restore still switches it on.
+_TapHoldClearPlanKeepsSwitch() {
+	for Scope in ["tap_holds", "global"] {
+		for Row in ManifestScopeOperations(Scope, "clear")
+			Assert(!(Row.Section == "category_enabled" && Row.Key == "tap_holds"), Scope . " clear rewrites the switch")
+		Restored := false
+		for Row in ManifestScopeOperations(Scope, "recommended") {
+			if Row.Section == "category_enabled" && Row.Key == "tap_holds"
+				Restored := Row.HasOwnProp("Value") && Row.Value == true
+		}
+		Assert(Restored, Scope . " restore still switches the Tap-Holds on")
+	}
+}
+Test("tap-hold-scope: no clear plans a row for the Tap-Holds switch (tap-hold-clear-keeps-switch)", _TapHoldClearPlanKeepsSwitch)
 Test("tap-hold-scope: refused second backup leaves both original stores", _TapHoldScopeCase.Bind("recommended", true))
 Test("tap-hold-scope: external preset edit refuses both-file publication", _TapHoldScopeCase.Bind("recommended", false, true))
 

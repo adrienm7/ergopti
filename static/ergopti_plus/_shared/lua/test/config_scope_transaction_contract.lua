@@ -298,8 +298,10 @@ return function(helpers)
 				local stored = Codec.decode(files.taps)
 				helpers.assert_eq(stored.tap_hold.future, "keep")
 				helpers.assert_eq(stored.other.value, 17)
-				helpers.assert_eq(stored.tap_hold.enabled, mode == "recommended"
-					and Manifest.recommended_for("tap_holds.enabled") or nil)
+				-- A clear routes no switch row: the stored one stays (tap-hold-clear-keeps-switch).
+				local expected = false
+				if mode == "recommended" then expected = Manifest.recommended_for("tap_holds.enabled") end
+				helpers.assert_eq(stored.tap_hold.enabled, expected)
 				helpers.assert_eq(files["taps-backup"], source)
 				helpers.assert_eq(files.config, original)
 				helpers.assert_eq(files.backup, nil)

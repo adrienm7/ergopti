@@ -278,7 +278,10 @@ ManifestPathBelongs(Path, Prefix) {
 }
 
 ; Collect a scope and its named children while rejecting registry cycles.
-ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting, Definitions := unset, Presets := unset, ParameterDomains := unset) {
+; Excluded receives the paths a restore leaves alone, Kept those a clear does.
+ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting, Definitions := unset, Presets := unset, ParameterDomains := unset, Kept := unset) {
+	if !IsSet(Kept)
+		Kept := []
 	if !IsSet(Definitions)
 		Definitions := Map()
 	if !IsSet(Presets)
@@ -309,8 +312,10 @@ ManifestCollectScope(ScopeId, Prefixes, Excluded, Visiting, Definitions := unset
 		Prefixes.Push(Prefix)
 	for Path in Scope["restore_exclude"]
 		Excluded.Push(Path)
+	for Path in Scope.Get("clear_exclude", [])
+		Kept.Push(Path)
 	for Child in Scope.Get("includes", [])
-		ManifestCollectScope(Child, Prefixes, Excluded, Visiting, Definitions, Presets, ParameterDomains)
+		ManifestCollectScope(Child, Prefixes, Excluded, Visiting, Definitions, Presets, ParameterDomains, Kept)
 	Visiting.Delete(ScopeId)
 }
 
@@ -324,13 +329,20 @@ ManifestScopeOperations(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
 		throw TypeError("Owned scope paths must be an Array.")
 	if !ManifestEnsureLoaded() || !(Mode == "recommended" || Mode == "clear")
 		throw Error("Invalid configuration scope operation.")
-	Prefixes := [], Excluded := [], Rows := []
+	Prefixes := [], Excluded := [], Kept := [], Rows := []
 	Definitions := Map(), ParameterDomains := Map()
-	ManifestCollectScope(ScopeId, Prefixes, Excluded, Map(), Definitions, Map(), ParameterDomains)
+	ManifestCollectScope(ScopeId, Prefixes, Excluded, Map(), Definitions, Map(), ParameterDomains, Kept)
+	; A restore leaves `restore_exclude` alone and a clear `clear_exclude`:
+	; no row is planned, so the stored value stays whatever it is.
+	Untouched := Mode == "recommended" ? Excluded : Kept
 	for Entry in ManifestFeatures() {
 		Selected := false
 		for Prefix in Prefixes
 			Selected := Selected || ManifestPathBelongs(Entry["path"], Prefix)
+		if Mode == "clear" {
+			for Prefix in Kept
+				Selected := Selected && !ManifestPathBelongs(Entry["path"], Prefix)
+		}
 		if !Selected
 			continue
 		; An entry active by default restores its preset when its key is
@@ -347,10 +359,8 @@ ManifestScopeOperations(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
 		}
 		for Path, Value in Values {
 			Skip := false
-			if Mode == "recommended" {
-				for Prefix in Excluded
-					Skip := Skip || ManifestPathBelongs(Path, Prefix)
-			}
+			for Prefix in Untouched
+				Skip := Skip || ManifestPathBelongs(Path, Prefix)
 			if !Skip
 				Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, Value, true) : ManifestSparseOperation(Path, Value))
 		}
@@ -372,10 +382,8 @@ ManifestScopeOperations(ScopeId, Mode, OwnedPaths := unset, Owners := unset) {
 		if !Definitions.Has(Definition) || Emitted.Has(Path)
 			continue
 		Skip := false
-		if Mode == "recommended" {
-			for Prefix in Excluded
-				Skip := Skip || ManifestPathBelongs(Path, Prefix)
-		}
+		for Prefix in Untouched
+			Skip := Skip || ManifestPathBelongs(Path, Prefix)
 		if !Skip
 			Rows.Push(Mode == "clear" ? ManifestConfigRow(Path, , true)
 				: ManifestSparseOperation(Path, Definition["recommended"]))

@@ -243,6 +243,20 @@ first, and the maintainer retired the restore question, then the clear one
 refuse a `confirm` port; `test-restore-recommended-no-confirm.cjs` rejects a
 question in a function given a scope mode or naming either label.
 
+### project-a-clear-can-keep-the-switch
+
+A scope's `clear_exclude` lists the paths its clear leaves as they are, as
+`restore_exclude` does for a restore: the planners
+(`config_defaults.scope_operations`, `ManifestScopeOperations`) emit no row for
+them, in that scope and in the global one that includes it, so each owner keeps
+the stored value. The Tap-Holds scope keeps its switch
+(`category_enabled.tap_holds` on Windows, `tap_holds.enabled` on macOS and
+Linux): the maintainer's rule of 2026-10-01 is that « Tout effacer » empties
+every key's tap and hold and the user adds keys from there, and a switch
+turned off with them made the next key do nothing. Action: a menu whose clear
+must keep its switch declares it there, never in an owner; the
+`tap-hold-clear-keeps-switch` tests hold the plan and each driver's owner.
+
 ### project-a-settings-menu-opens-with-switch-restore-clear
 
 Every manifest menu that shows a scope row opens with its `toggle` (when it
