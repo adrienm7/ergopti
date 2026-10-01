@@ -338,6 +338,7 @@ return {
 	"tests.unit.ui.test_menu_extension_hotstrings",
 	"tests.unit.ui.test_menu_languages_and_global_separator",
 	"tests.unit.ui.test_menu_pause_greys_features",
+	"tests.unit.ui.test_metrics_widget_menu_parity",
 	"tests.unit.ui.test_menu_uninstall",
 	"tests.unit.ui.test_onboarding_startup",
 	"tests.unit.ui.test_restore_recommended_no_confirm",

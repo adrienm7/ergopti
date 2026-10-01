@@ -1221,6 +1221,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk
+#Include unit/test_metrics_widget_menu_parity.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk
@@ -2011,4 +2012,3 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
-

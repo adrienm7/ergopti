@@ -4782,35 +4782,31 @@ reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 # draws the same pill on the GTK surface the preview bubble already uses, and
 # reads its geometry and colours from _shared/modules/wpm_widget/constants.toml
 # rather than mirroring them the way the other two do.
-# `dynamic` ON PURPOSE, and this note exists because the obvious change is
-# wrong. These two are checkboxes, so `check` looks like the right type — the
-# menubar pair above became exactly that on 2026-08-07. It does not port here.
-#
-# The Windows handlers mutate the LIVE menu when clicked (Menu.ToggleCheck,
-# Enable/Disable on the two dependent rows) instead of rebuilding the tray, which
-# is what keeps a click on this row from costing a full tray rebuild. A `check`
-# row is drawn by the renderer, so its tick would not move until the next
-# rebuild: either the feedback regresses, or every click pays for a rebuild.
-#
-# The row stays `dynamic` on all three rather than splitting into two
-# declarations, which is the duplication this file spent the day removing.
+# Every widget control is a declared checkbox. After a committed click each
+# driver requests its normal menu rebuild; native widget effects stay in its
+# command handler. Stored checks remain visible while disabled, like the
+# menubar controls above, so disabling the widget never hides a retained choice.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "wpm_widget"
+i18n = "menu.metrics.show_wpm_widget"
+checked_when = ["wpm_widget_visible"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "widget_colors"
+i18n = "menu.metrics.colors_by_source"
+checked_when = ["metrics_widget_colors"]
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "include_realtime"
+i18n = "menu.metrics.include_realtime"
+checked_when = ["metrics_widget_graph"]
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-# `command` since 2026-08-07: a button with a label, a greying rule and a click.
-# Its two neighbours stay `dynamic` for the reason written above wpm_widget —
-# they mutate the live menu — but this one sets nothing on it.
+# A button with a label, a greying rule and a click, also drawn by the renderer.
 [[menu.metrics_menu]]
 type = "command"
 id = "reset_wpm_position"

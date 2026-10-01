@@ -30,6 +30,7 @@ global _WPMGB_HideCritical := []
 global _WPMGB_ShowCritical := []
 global _WPMGB_MoveCritical := []
 global _WPMGB_ToggleCritical := []
+global _WPMGB_RebuildCritical := []
 
 class _WPMGB_DragGui {
 	__New(X, Y) {
@@ -69,19 +70,10 @@ class _WPMGB_SurfaceGui {
 	}
 }
 
-class _WPMGB_Menu {
-	__New() {
-		this.events := []
-	}
-
-	_Record(Action, Label) {
-		this.events.Push({ action: Action, label: Label,
-			critical: A_IsCritical })
-	}
-
-	ToggleCheck(Label) => this._Record("toggle", Label)
-	Enable(Label) => this._Record("enable", Label)
-	Disable(Label) => this._Record("disable", Label)
+_WPMGB_RebuildMenu() {
+	global _WPMGB_RebuildCritical
+	_WPMGB_RebuildCritical.Push(A_IsCritical)
+	return true
 }
 
 _WPMGB_ResetFakes(WriteResult := true) {
@@ -92,7 +84,7 @@ _WPMGB_ResetFakes(WriteResult := true) {
 	global _WPMGB_WriterCritical, _WPMGB_NotifyCritical
 	global _WPMGB_RestoreCritical, _WPMGB_HideCritical
 	global _WPMGB_ShowCritical, _WPMGB_MoveCritical
-	global _WPMGB_ToggleCritical
+	global _WPMGB_ToggleCritical, _WPMGB_RebuildCritical
 	_WPMGB_WriteCalls := 0
 	_WPMGB_NotifyCalls := 0
 	_WPMGB_WriteResult := WriteResult
@@ -109,6 +101,7 @@ _WPMGB_ResetFakes(WriteResult := true) {
 	_WPMGB_ShowCritical := []
 	_WPMGB_MoveCritical := []
 	_WPMGB_ToggleCritical := []
+	_WPMGB_RebuildCritical := []
 }
 
 _WPMGB_Writer(Path, Updates) {
@@ -432,6 +425,7 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 	global ConfigurationFile, _WPMGB_WriterCritical, _WPMGB_NotifyCritical
 	global _WPMGB_RestoreCritical, _WPMGB_HideCritical
 	global _WPMGB_ShowCritical, _WPMGB_MoveCritical, _WPMGB_ToggleCritical
+	global _WPMGB_RebuildCritical
 	Saved := _WPMGB_SaveState()
 	SavedCritical := A_IsCritical
 	HadDragging := WPMWidget.HasOwnProp("_dragging")
@@ -516,34 +510,29 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		AssertEqual(0, _WPMGB_MoveCritical[1])
 
 		_WPMGB_ResetFakes()
-		MenuRef := _WPMGB_Menu()
 		WPMWidget.visible := false
 		Critical("On")
-		_ToggleWpmWidget(MenuRef, "widget", "colors", "graph",
-			_WPMGB_ToggleTrue)
+		_ToggleWpmWidget(_WPMGB_ToggleTrue, _WPMGB_RebuildMenu)
 		AssertTrue(A_IsCritical,
 			"the WPM menu toggle must restore inherited Critical")
 		Critical("Off")
 		AssertEqual(1, _WPMGB_ToggleCritical.Length)
 		AssertEqual(0, _WPMGB_ToggleCritical[1])
-		AssertEqual(3, MenuRef.events.Length)
-		for Event in MenuRef.events
-			AssertEqual(0, Event.critical,
-				"WPM menu projection must update outside Critical")
+		AssertEqual(1, _WPMGB_RebuildCritical.Length)
+		AssertEqual(0, _WPMGB_RebuildCritical[1],
+			"the shared menu projection must rebuild outside Critical")
 
 		_WPMGB_ResetFakes()
-		MenuRef := _WPMGB_Menu()
 		WPMWidget.use_colors := false
 		Critical("On")
-		_ToggleWpmWidgetColors(MenuRef, "colors", _WPMGB_Writer,
-			_WPMGB_Notify)
+		_ToggleWpmWidgetColors(_WPMGB_Writer, _WPMGB_Notify,
+			_WPMGB_RebuildMenu)
 		AssertTrue(A_IsCritical)
 		Critical("Off")
-		AssertEqual(1, MenuRef.events.Length)
-		AssertEqual(0, MenuRef.events[1].critical)
+		AssertEqual(1, _WPMGB_RebuildCritical.Length)
+		AssertEqual(0, _WPMGB_RebuildCritical[1])
 
 		_WPMGB_ResetFakes()
-		MenuRef := _WPMGB_Menu()
 		CompactGui := _WPMGB_SurfaceGui()
 		GraphGui := _WPMGB_SurfaceGui()
 		WPMWidget.visible := true
@@ -553,8 +542,8 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		WPMWidget._lbl_wpm := false
 		WPMWidget._lbl_unit := false
 		Critical("On")
-		_ToggleWpmWidgetGraph(MenuRef, "graph", _WPMGB_Writer,
-			_WPMGB_Notify, _WPMGB_RecordHide, _WPMGB_RecordShow)
+		_ToggleWpmWidgetGraph(_WPMGB_Writer, _WPMGB_Notify,
+			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu)
 		AssertTrue(A_IsCritical,
 			"the WPM graph action must restore inherited Critical")
 		Critical("Off")
@@ -562,7 +551,8 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		AssertEqual(0, _WPMGB_ShowCritical[1])
 		AssertEqual(0, CompactGui.destroy_critical)
 		AssertEqual(0, GraphGui.destroy_critical)
-		AssertEqual(0, MenuRef.events[1].critical)
+		AssertEqual(1, _WPMGB_RebuildCritical.Length)
+		AssertEqual(0, _WPMGB_RebuildCritical[1])
 	} finally {
 		Critical("Off")
 		if Barrier is Object
@@ -594,3 +584,46 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 Test("wpm-global-barrier-20260813: complete actions defuse inherited Critical "
 	. "through native and menu effects (wpm-postcommit-inherited-critical)",
 	_WPMGB_InheritedCriticalStopsAtCompleteUserActions)
+
+_WPMGB_MenuRefusalDoesNotPublish() {
+	global ConfigurationFile, _WPMGB_WriteCalls, _WPMGB_RebuildCritical
+	global _WPMGB_HideCritical, _WPMGB_ShowCritical
+	Saved := _WPMGB_SaveState()
+	try {
+		ConfigurationFile := A_Temp . "\ergopti_wpm_menu_refusal.toml"
+		WPMWidget.use_colors := false
+		WPMWidget.show_graph := false
+		WPMWidget.pos_x := 14
+		WPMWidget.pos_y := 28
+		_WPMGB_ResetFakes(false)
+		AssertFalse(_ToggleWpmWidgetColors(_WPMGB_Writer, _WPMGB_Notify,
+			_WPMGB_RebuildMenu))
+		AssertFalse(_ToggleWpmWidgetGraph(_WPMGB_Writer, _WPMGB_Notify,
+			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu))
+		AssertFalse(_ToggleWpmWidget(() => false, _WPMGB_RebuildMenu))
+		AssertEqual(2, _WPMGB_WriteCalls)
+		AssertEqual(0, _WPMGB_RebuildCritical.Length,
+			"no refused widget preference may rebuild a success projection")
+		AssertEqual(0, _WPMGB_HideCritical.Length)
+		AssertEqual(0, _WPMGB_ShowCritical.Length)
+		AssertFalse(WPMWidget.use_colors)
+		AssertFalse(WPMWidget.show_graph)
+		AssertEqual(14, WPMWidget.pos_x)
+		AssertEqual(28, WPMWidget.pos_y)
+	} finally _WPMGB_RestoreState(Saved)
+}
+Test("metrics-widget-command: refused commits retain state and skip native/menu effects",
+	_WPMGB_MenuRefusalDoesNotPublish)
+
+_WPMGB_MenuRebuildRefusalIsReported() {
+	Saved := _WPMGB_SaveState()
+	try {
+		WPMWidget.visible := false
+		AssertFalse(_ToggleWpmWidget(_WPMGB_ToggleTrue, () => false),
+			"a refused tray publication is not reported as a successful action")
+		AssertTrue(WPMWidget.visible,
+			"tray refusal must not pretend to undo an acknowledged widget commit")
+	} finally _WPMGB_RestoreState(Saved)
+}
+Test("metrics-widget-command: menu rebuild refusal does not conceal the committed state",
+	_WPMGB_MenuRebuildRefusalIsReported)

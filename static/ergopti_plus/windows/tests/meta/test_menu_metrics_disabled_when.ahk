@@ -137,7 +137,7 @@ Test("menu-metrics-disabled-when: menubar_colors depends_on is now load-bearing 
 ; ===================================================
 ; ===================================================
 
-; Every AHK dynamic handler must call the shared resolver with its own id
+; Every remaining AHK provider must call the shared resolver with its own id
 ; instead of re-deriving the dependency graph inline — the drift MG-1 closes.
 _MMDW_HandlersCallResolver() {
 	; The handlers this driver still writes. The three privacy filters left this
@@ -160,9 +160,6 @@ _MMDW_HandlersCallResolver() {
 	; 2026-10-01 (the last test of this file).
 	Handlers := Map(
 		"_MET_ExcludeAppsRows",    "exclude_apps",
-		"_MET_WpmWidget",          "wpm_widget",
-		"_MET_WpmWidgetColors",    "widget_colors",
-		"_MET_WpmWidgetGraph",     "include_realtime",
 	)
 	for FuncName, Id in Handlers {
 		Seg := _DriverFuncBody(FuncName)
@@ -289,6 +286,9 @@ _MMDW_MigratedRowsAreDeclarative() {
 	; than derived from the id, because a derivation that stops matching would
 	; assert the absence of a function that never existed under that name.
 	Migrated := Map(
+		"include_realtime", "_MET_WpmWidgetGraph",
+		"widget_colors", "_MET_WpmWidgetColors",
+		"wpm_widget", "_MET_WpmWidget",
 		"filter_private", "_MET_FilterPrivate",
 		"filter_secure",  "_MET_FilterSecure",
 		"filter_sysauth", "_MET_FilterSysauth",
@@ -315,7 +315,7 @@ _MMDW_MigratedRowsAreDeclarative() {
 			OldHandler . "() still exists — the shared renderer builds '" . Id . "' now, so this handler would draw it a second time")
 	}
 }
-Test("menu-metrics-disabled-when: the migrated privacy rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)
+Test("menu-metrics-disabled-when: the migrated check rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)
 
 ; The Metrics menu sets no shortcut of its own (the maintainer's rule of
 ; 2026-10-01, metrics-no-shortcut-rows): a shortcut that opens a metrics window

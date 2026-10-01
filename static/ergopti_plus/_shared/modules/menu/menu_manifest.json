@@ -856,23 +856,35 @@
 			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "wpm_widget",
+			"i18n": "menu.metrics.show_wpm_widget",
+			"checked_when": [
+				"wpm_widget_visible"
+			],
 			"disabled_when": [
 				"keylogger_enabled"
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "widget_colors",
+			"i18n": "menu.metrics.colors_by_source",
+			"checked_when": [
+				"metrics_widget_colors"
+			],
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "include_realtime",
+			"i18n": "menu.metrics.include_realtime",
+			"checked_when": [
+				"metrics_widget_graph"
+			],
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
