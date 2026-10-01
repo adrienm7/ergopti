@@ -3033,8 +3033,8 @@ local function _build_shortcuts(ctx)
 			if switched and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return switched
 		end
-		chords_ctx.commands["restore_recommended"] = function() return apply_chords_scope("recommended") end
-		chords_ctx.commands["clear_to_system"] = function() return apply_chords_scope("clear") end
+		chords_ctx.commands["scope_restore"] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands["scope_clear"] = function() return apply_chords_scope("clear") end
 		chords_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
 		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
