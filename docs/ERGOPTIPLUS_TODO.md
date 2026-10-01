@@ -41,6 +41,12 @@ and the Windows verdict. The full run passed, including the shared core,
 both Lua suites and all macOS/Linux installation variants.
 The next menu migrations add shared behavioral vectors to these native lanes.
 
+The configuration no-op slice passes the shared fixtures and native Windows
+tests in run 36925266946. Its three changed-file macOS fixture cases exposed
+a simulated metadata copy that depended on the runner's umask; the fixture now
+carries the real source metadata through that copy and passes under umask 022.
+The production permission checks remain strict; repeat the non-release CI.
+
 **Overnight session of 2026-09-29 (supersedes the "one item at a time"
 instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
 were implemented in parallel on `wip/*` branches, adversarially reviewed, fixed
@@ -513,7 +519,7 @@ is committed; one request is one commit with its regression test.
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
       « fais seulement pour Windows »).
 
-- [ ] **88.** In the shared navigation-layer editor, give the layer activation
+- [ ] **94.** In the shared navigation-layer editor, give the layer activation
       keys a blue background as well as their blue border, including the legend
       chip. Arrange the mouse inputs by function: left/middle/right clicks in
       three columns, back/forward below, then scroll up/down. Keep labels readable
