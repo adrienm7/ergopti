@@ -319,22 +319,22 @@ _LEH_LegendsFollowTheOsLayout() {
 	global _LayerEditorReported
 	Ctx := KeymapLayers_LoadContext(_LEH_SharedDir())
 	Corpus := _LEH_Corpus()
-	for Case in Corpus["cases"] {
-		Fake := _LEH_FakeLayout(Ctx, Case["layout"])
+	for LegendCase in Corpus["cases"] {
+		Fake := _LEH_FakeLayout(Ctx, LegendCase["layout"])
 		Legends := LayerEditor_Legends(Ctx, _LEH_NoEmulation(), Fake.Probe())
-		AssertEqual(Case["source"], Legends["source"], Case["name"] . ": source")
-		for Code, Text in Case["expected"]
-			AssertEqual(Text, Legends["keys"].Get(Code, "<none>"), Case["name"] . ": " . Code)
+		AssertEqual(LegendCase["source"], Legends["source"], LegendCase["name"] . ": source")
+		for Code, Text in LegendCase["expected"]
+			AssertEqual(Text, Legends["keys"].Get(Code, "<none>"), LegendCase["name"] . ": " . Code)
 		for Code in Legends["keys"]
-			AssertTrue(Case["expected"].Has(Code), Case["name"] . ": " . Code . " must not have a legend")
-		AssertTrue(Case["expected"].Count >= 40, "only " . Case["expected"].Count . " legends compared")
+			AssertTrue(LegendCase["expected"].Has(Code), LegendCase["name"] . ": " . Code . " must not have a legend")
+		AssertTrue(LegendCase["expected"].Count >= 40, "only " . LegendCase["expected"].Count . " legends compared")
 		Unresolved := ""
 		for Index, Code in Legends["unresolved"]
 			Unresolved .= (Index == 1 ? "" : ",") . Code
 		Expected := ""
-		for Index, Code in Case["unresolved"]
+		for Index, Code in LegendCase["unresolved"]
 			Expected .= (Index == 1 ? "" : ",") . Code
-		AssertEqual(Expected, Unresolved, Case["name"] . ": the keys left without a legend")
+		AssertEqual(Expected, Unresolved, LegendCase["name"] . ": the keys left without a legend")
 		_LayerEditorReported := Map()
 		AssertTrue(LayerEditor_ReportUnresolved(Legends), "the keys without a legend are reported")
 		AssertFalse(LayerEditor_ReportUnresolved(Legends), "the same keys are reported once")
@@ -342,7 +342,7 @@ _LEH_LegendsFollowTheOsLayout() {
 		try {
 			Js := LayerEditor_InitJs(Ctx, Dir, Legends, ["AltLeft"])
 			AssertTrue(InStr(Js, '"legends":{"source":"os","keys":{'), "init() carries the legends")
-			AssertTrue(InStr(Js, '"KeyQ":' . JsonStringLiteral(Case["expected"]["KeyQ"])), "init() carries KeyQ's legend")
+			AssertTrue(InStr(Js, '"KeyQ":' . JsonStringLiteral(LegendCase["expected"]["KeyQ"])), "init() carries KeyQ's legend")
 			AssertTrue(InStr(Js, '"layer_keys":["AltLeft"]'), "init() carries the layer key")
 		} finally _LEH_RemoveDir(Dir)
 		AssertTrue(InStr(LayerEditor_SetLegendsJs(Legends), "window.setLegends({" . '"source":"os"'),
