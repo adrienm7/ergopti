@@ -1268,6 +1268,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_llm_nav_cycle_windows.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
+#Include unit/test_llm_hotkeys_deferred_by_pause.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk
 #Include meta/test_llm_hotkey_cross_owner_policy.ahk
 #Include meta/test_config_transition_integration.ahk
