@@ -3930,8 +3930,12 @@ greyed_when_paused = true
 platforms = ["hs"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
+# The separator that closes the group of that row belongs to it: declared for
+# every driver, it stood right after the one above wherever the row is absent.
 [[menu.top_level]]
 id = "---"
+platforms = ["hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
