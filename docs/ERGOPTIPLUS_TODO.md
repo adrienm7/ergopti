@@ -457,9 +457,6 @@ is committed; one request is one commit with its regression test.
       a loaded machine). A reload asked during that write now waits for it
       (`reload-during-config-write`); find why a start that changed nothing
       writes the whole file, and make it write only what changed.
-- [ ] **79.** Metrics menu: the two dashboard rows drop their verb. They
-      read « Tableau de bord des métriques de frappe » and « Tableau de bord
-      du temps sur les applications », without « Ouvrir », in the 21 locales.
 
 ## Time estimate
 
