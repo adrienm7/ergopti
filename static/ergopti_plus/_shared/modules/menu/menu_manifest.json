@@ -99,6 +99,13 @@
 			"greyed_when_paused": true
 		},
 		{
+			"id": "metrics",
+			"greyed_when_paused": true
+		},
+		{
+			"id": "---"
+		},
+		{
 			"id": "llm",
 			"greyed_when_paused": true
 		},
@@ -108,10 +115,6 @@
 		},
 		{
 			"id": "---"
-		},
-		{
-			"id": "metrics",
-			"greyed_when_paused": true
 		},
 		{
 			"id": "apps",

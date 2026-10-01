@@ -457,10 +457,6 @@ is committed; one request is one commit with its regression test.
       a loaded machine). A reload asked during that write now waits for it
       (`reload-during-config-write`); find why a start that changed nothing
       writes the whole file, and make it write only what changed.
-- [ ] **80.** Tray root order: Metrics comes right after Hotstrings (what is
-      about typing stays together), then a separator, then the two AI rows
-      together. The macOS-only applications row goes to the most logical
-      group, or to a group of its own at the end of the AI group.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
       Windows 125, macOS 209 and Linux 127 rows are still built by the

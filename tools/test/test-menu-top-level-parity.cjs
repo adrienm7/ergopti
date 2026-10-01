@@ -376,8 +376,9 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 
 // The top-level order is a product decision, taken once for the three trays:
 // the keyboard and trackpad features first, including daemon-owned Tap-Holds
-// on Linux, then layout, hotstrings and AI, then metrics and the macOS
-// applications, then the configuration tail. The drivers build whatever the
+// on Linux, then what is about typing (layout, hotstrings, metrics), then
+// the two AI rows together, then the macOS applications in a group of their
+// own, then the configuration tail (the maintainer's order of 2026-10-01). The drivers build whatever the
 // manifest declares, so this is the one place a reordering of the manifest is
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
@@ -388,10 +389,11 @@ const APPROVED_TOP_LEVEL = [
 	SEPARATOR,
 	'keyboard_layout',
 	'hotstrings',
+	'metrics',
+	SEPARATOR,
 	'llm',
 	'agent',
 	SEPARATOR,
-	'metrics',
 	'apps',
 	SEPARATOR,
 	'configuration',
