@@ -425,6 +425,11 @@ is committed; one request is one commit with its regression test.
       hardening-c label count test walks into the local, git-ignored
       `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
       has personal shortcuts.
+- [ ] **73.** Windows: the magic key's hotstrings do nothing. « ct★ » does
+      not become « c'était » and no tooltip shows (reported on 2026-10-01,
+      on the maintainer's machine run from the repository). Find whether the
+      ★ reaches the hotstring engine (layout emulation on and off, magic key
+      source key), and whether it broke with a commit of 2026-10-01.
 
 ## Time estimate
 
