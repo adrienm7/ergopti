@@ -424,8 +424,9 @@ is committed; one request is one commit with its regression test.
       covered with the real logger's test sink. The updater-consent guard now
       audits all four explicit-consent ports, including both Versions windows;
       regression fixtures reject an extra download or a missing audited path.
-      Remaining: the AHK-15 persistence census counts 26
-      TOML writers for 25 audited; and AHK-901 no longer finds
+      The 26th TOML writer is the script-chords switch; its persistence census
+      is audited and a real refused write proves reload is suppressed and the
+      existing configuration is byte-exact. Remaining: AHK-901 no longer finds
       `DirDelete(RTrim(CaptureDir` in `ShellRunner_Exec`. Also, the
       hardening-c label count test walks into the local, git-ignored
       `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
