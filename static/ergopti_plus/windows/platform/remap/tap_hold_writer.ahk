@@ -1250,3 +1250,110 @@ TapHoldLayerImportImage(SharedDir, LayersPath) {
 	return Map("status", "ok", "kind", "rendered", "source_present", 0,
 		"source_content", "", "content", TapHoldRecommendedLayer(SharedDir)["text"])
 }
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 7/ The layer a hold brings along =======
+; ================================================
+; ================================================
+
+; The hold picker's write: the layer a key's hold enters comes with the key.
+; A layer that binds no key only lights CapsLock while it is held, so a key
+; set to hold the navigation layer in a folder with no layers.toml typed
+; capitals and read as Shift.
+; @param KeyId string The key whose hold is set.
+; @param HoldOpt Map One hold option (kind, id).
+; @param LayersConfigDir string The configuration folder whose layers.toml the
+;   layer needs; "" touches no layer file.
+; @param WriteFn Func The key writer; injectable for tests.
+; @returns {Integer} 1 when the key is written, false otherwise.
+TapHoldSetHold(KeyId, HoldOpt, LayersConfigDir, WriteFn := WriteTapHoldHold) {
+	if !(HoldOpt is Map) || !HoldOpt.Has("kind") || !HoldOpt.Has("id") || !(LayersConfigDir is String) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid tap-hold hold update.")
+		return false
+	}
+	Import := TapHoldHoldLayerImport(HoldOpt, LayersConfigDir)
+	if !(Import is Map)
+		return false
+	Written := WriteFn.Call(KeyId, HoldOpt)
+	if (Written is Integer) && Written == 1
+		return 1
+	TapHoldHoldLayerImportUndo(Import)
+	return false
+}
+
+; Creates the configuration folder's layers.toml from Ergopti's recommended
+; layer when a hold option enters that layer and the folder has none. An
+; existing file is the user's and is kept as it is; a hold that does not enter
+; that layer, or no folder, brings nothing.
+; @param HoldOpt Map One hold option (kind, id).
+; @param LayersConfigDir string The configuration folder; "" brings nothing.
+; @returns {Map|Integer} Map("path", String, "created", Boolean, "content",
+;   String), or false when the absent file could not be created.
+TapHoldHoldLayerImport(HoldOpt, LayersConfigDir) {
+	global _SharedDir
+	Import := Map("path", "", "created", false, "content", "")
+	if (LayersConfigDir == "" || !(HoldOpt["kind"] == "layer"))
+		return Import
+	try {
+		Preset := TapHoldRecommendedLayer(_SharedDir)
+		if !(HoldOpt["id"] == Preset["layer_id"])
+			return Import
+		Path := KeymapLayers_UserFilePathFromVocabulary(_SharedDir, LayersConfigDir)
+	} catch as Err {
+		try LoggerError("TapHoldWriter",
+			"The recommended navigation layer cannot be read: {1}. The hold was not changed.", Err.Message)
+		return false
+	}
+	Import["path"] := Path
+	if FileExist(Path)
+		return Import
+	Owner := _ConfigWriteLeaseTryAcquire(Path, "nav-layer-import")
+	if !(Owner is Object) {
+		try LoggerError("TapHoldWriter",
+			"Cannot create '{1}': another configuration transaction owns it. The hold was not changed.", Path)
+		return false
+	}
+	Created := false
+	try Created := FSWriteCreateDurable(Path, Preset["text"])
+	finally Released := _ConfigWriteLeaseRelease(Owner)
+	if !(Released is Integer) || Released != 1 {
+		try LoggerError("TapHoldWriter",
+			"The owner of '{1}' could not be released; later configuration changes may be refused.", Path)
+	}
+	if !(Created is Integer) || Created != 1 {
+		; CREATE_NEW refuses a file that appeared since the probe: it is the user's.
+		if FileExist(Path)
+			return Import
+		try LoggerError("TapHoldWriter",
+			"The recommended navigation layer could not be written to '{1}'. The hold was not changed.", Path)
+		return false
+	}
+	Import["created"] := true
+	Import["content"] := Preset["text"]
+	try LoggerInfo("TapHoldWriter", "Recommended navigation layer imported into '{1}'.", Path)
+	return Import
+}
+
+; Removes the layers.toml TapHoldHoldLayerImport created, while it still holds
+; the recommended layer's exact bytes. A kept file, or one edited since, stays.
+; @param Import Map What TapHoldHoldLayerImport returned.
+; @returns {Boolean} True when no file of the import's own is left.
+TapHoldHoldLayerImportUndo(Import) {
+	if !(Import is Map) || !Import["created"]
+		return true
+	Path := Import["path"]
+	if !FileExist(Path) || !FSUtf8ExactMatches(Path, Import["content"])
+		return true
+	Deleted := false
+	try Deleted := FSDeleteStrict(Path)
+	if (Deleted is Integer) && Deleted == 1
+		return true
+	try LoggerError("TapHoldWriter",
+		"The navigation layer '{1}' a refused hold change created could not be removed.", Path)
+	return false
+}

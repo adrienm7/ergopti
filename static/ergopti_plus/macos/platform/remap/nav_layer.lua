@@ -507,4 +507,49 @@ function M.undo_import(import, file_adapter)
 	return undone == true
 end
 
+--- Tells the owner of the layer's wheel bindings, which Hammerspoon runs
+--- rather than Karabiner, to read a layers.toml that was just created.
+--- @param label string For the logs.
+function M.reconcile_wheel(label)
+	local reconciled, committed = pcall(function()
+		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+	end)
+	if not reconciled or committed ~= true then
+		Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",
+			tostring(label), tostring(reconciled and "a start is in progress" or committed))
+	end
+end
+
+--- Runs a hold setter with the layer its action enters. A hold on the
+--- navigation layer creates the folder's layers.toml from Ergopti's
+--- recommended layer when there is none, before the setter saves: a key set
+--- to hold the layer in a folder without that file entered a layer that binds
+--- no key. An existing file is the user's and stays; a setter that does not
+--- save takes the created file back.
+--- @param label string For the logs.
+--- @param action_id string The hold action being set.
+--- @param commit function Saves the hold; returns true once it is committed.
+--- @return boolean committed
+function M.commit_hold(label, action_id, commit)
+	local layer = nil
+	if action_id == M.HOLD_ACTION_ID then
+		local import, layer_err = M.import_recommended()
+		if not import then
+			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
+				tostring(label), tostring(layer_err))
+			return false
+		end
+		layer = import
+	end
+	local committed = commit()
+	if committed ~= true then
+		M.undo_import(layer)
+		return committed
+	end
+	if layer and layer.status == require("keymap.layer_preset").IMPORTED then
+		M.reconcile_wheel(label)
+	end
+	return committed
+end
+
 return M

@@ -440,12 +440,6 @@ is committed; one request is one commit with its regression test.
       declared in the shared manifest, none built in a driver's folder):
       Windows 125, macOS 209 and Linux 127 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`).
-- [ ] **83.** Changing the hold of Space from Shift to the navigation layer
-      in the Tap-Hold menu leaves the hold typing capitals, as Shift did
-      (Windows, 2026-10-01). The pick writes `hold_layer = "nav"` and nothing
-      else: a folder with no layers.toml then has a layer that binds no key.
-      The pick must bring the recommended layer along, as the restore of the
-      recommended values and the first-run wizard do, on the three drivers.
 - [ ] **84.** Windows: while the navigation layer is held the driver turns
       CapsLock on as the layer's indicator (`UpdateCapsLockLED`), so every
       key the layer does not bind types in capitals. With an empty layer
