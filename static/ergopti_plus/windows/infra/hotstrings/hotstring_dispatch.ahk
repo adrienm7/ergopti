@@ -920,7 +920,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; (KLHook global removed)
 				exe := OutputHost["Exe"]
 				WindowTitle := OutputHost["Title"]
-				IsNotepadApp := (StrLower(exe) = "notepad.exe")
+				IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)
 				IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
