@@ -2,7 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-09-30, evening. Latest release: v0.0.0-dev.155 (c9e4c64ab).
+Updated: 2026-10-01. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
+ahead of it without a release (CI cancelled on purpose).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
 Item numbers are stable identifiers: a finished item is removed (its durable
@@ -225,7 +226,13 @@ These are software implementations; final hardware verification remains below.
       « Layout poll detected change » between the two names of one layout; every
       settings menu opens with its switch, « Restaurer les valeurs conseillées »
       and « Tout effacer » (no question asked), Configuration offers the global
-      clear, and the macOS Gestures menu shows its conflicts row after them.
+      clear, and the macOS Gestures menu shows its conflicts row after them; the
+      layer editor shows the input source legends and the wheel slots run volume
+      only while the layer is held; Right Option + Return, Delete, Backspace and
+      Escape run the script actions out of the box (Linux: AltGr); opening the
+      app starts no Python and shows no Rosetta notice; the MLX install works
+      behind a company proxy; a rollback from the Versions window swaps the app
+      and keeps the previous one.
 - [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
   branch on 2026-09-30; agents must not create `backup/*` branches again. The
   finished agent worktrees under `.claude/worktrees/` can be removed; the
@@ -327,7 +334,12 @@ These are software implementations; final hardware verification remains below.
       "eeee"; a Ctrl+V paste adds one row to the clipboard log with the emulation
       off and on; AltGr+Entrée, AltGr+Suppr, AltGr+Retour arrière and AltGr+Échap
       run their script action out of the box, and the « Raccourcis de gestion du
-      script » switch makes them native again.
+      script » switch makes them native again; opening the versions window
+      repeatedly logs no error; the AI menu has no clear row, its Backend row
+      reads « API 🌐 » (or Ollama, MLX), and adding an API entry asks no name
+      and lists it as `provider/model`; the layer editor shows the emulated
+      Ergopti legends and each action; « Revenir à cette version » rolls back
+      with a backup; « Désinstaller » is greyed on a source run.
 
 ## Maintainer requests on the evening of 2026-09-30
 
@@ -345,39 +357,34 @@ integrated, then publish one grouped release.
       existing rows during the migration (proposal in the menu-first-group
       report: most hide; greyed: Linux edit_shortcuts, Linux key
       combinations, Linux metrics shortcut rows, Windows preview_bubbles).
-- [ ] **55.** Script management shortcuts, the same on the three drivers: four
-      slots (Enter pause, Delete personal shortcuts, Backspace reload, Escape quit)
-      on AltGr (Windows, Linux) or Option (macOS), active by default (documented
-      exception), one submenu with its switch, restore and clear; every clear writes
-      "none" so the chords go native. Windows is integrated; macOS and Linux on
-      `feat/script-chords-three-os`.
-- [ ] **56.** Navigation layer editor: each keycap shows the current layout's
-      character (the emulated Ergopti layout, else the OS layout) and its action's
-      label; the layer gets Scroll up / Scroll down slots (volume by default,
-      editable, macOS through Hammerspoon while the layer is held) and the « Layer +
-      Scroll » shortcut goes. Branch `feat/layer-editor-legends`.
-- [ ] **57.** Versions window: « Revenir à cette version » on every other
-      release (backup of the whole configuration first, a button to restore it, the
-      update's own download, verification and install path); no driver ever installs
-      an update by itself, it only notifies; on a run from the sources, «
-      Désinstaller » and these buttons are greyed with their reason. Branch
-      `feat/release-rollback`.
 - [ ] **60.** Windows: the registry-layout emulation registers its dead-key
       resets by key name ("~" plus Enter, Escape, BackSpace, Tab), which the scan
       code declarations of the same keys shadow, so the resets never fire; the
       scan-code precedence gate misses names built by concatenation.
-- [ ] **61.** macOS on Apple silicon: opening the app posts « Fin de la prise
-      en charge des apps basées sur Intel … cette version de Python », so a Python
-      it launches runs under Rosetta (likely an Intel Homebrew `python3` found first
-      in the PATH, or a venv it created). Choose interpreters by architecture and
-      repair an Intel venv with a button. Branch `fix/macos-intel-python`.
+- [ ] **62.** Downloads on managed company networks, Windows and Linux:
+      system trust store and system proxy for every download child (the Ollama
+      installer and server for `ollama pull`, the updater and rollback, remote
+      AI APIs), and the shared failure contract (certificate, proxy, host
+      blocked, offline, disk, permission) whose dialogs name the cause in
+      French with actions that can work. macOS is integrated (uv from a
+      checksummed PyPI wheel, `UV_SYSTEM_CERTS`, the `scutil --proxy` relay,
+      the `network.failure.*` keys). The Windows and Linux work stayed
+      uncommitted in the local worktree of `fix/downloads-on-managed-networks`
+      when the session stopped; redo it if that worktree is gone.
+- [ ] **63.** Layer actions: add screen brightness up and down (asked as an
+      example for the wheel slots), with its key, action and label on the three
+      drivers and 21 locales.
+- [ ] **64.** Greyed menu rows: the rollback work added `disabled_when` +
+      `disabled_i18n` (Uninstall greyed on a source run) next to the menu
+      work's `unavailable = "grey"`; render both through one greyed-row path
+      and label format, with one schema rule for the reason key.
 
-- [ ] **62.** macOS: installing the MLX dependencies fails on a managed
-      company Mac ("operation not permitted", then uv "failed to download URL"
-      from GitHub after 3 retries). Use the system trust store and proxy for uv
-      and pip, avoid GitHub downloads when a suitable Python exists, install
-      where managed Macs allow it, and name the cause in the repair dialog.
-      Branch `fix/macos-intel-python`.
+- [ ] **65.** macOS suite, order-dependent red: "(llm-tooltip-chords-consumed)
+      types a digit beyond the predictions, or with no tooltip" fails only in
+      the full `lua tests/run.lua` run ("attempt to index a boolean value" at
+      `_shared/lua/keymap/terminators.lua:80`) and passes alone: a test that
+      runs before it leaves a `package.loaded` slot set to `true`. Find it and
+      restore the slot.
 
 ## Time estimate
 
