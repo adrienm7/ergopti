@@ -396,11 +396,15 @@ is committed; one request is one commit with its regression test.
       about Linux. The code exists on the three drivers (the shared schedule,
       `windows/modules/updater/schedule.ahk` and `self_update.ahk`, the Linux
       `modules/updater/manager.lua`, the About submenu's `about_updates` list
-      with its channel and frequency rows). The maintainer runs Windows from
-      the repository: find what a source run shows and schedules there (rows
-      hidden or greyed without a reason, timer not armed), compare the three
-      trays row by row, and make the frequency row visible and explained on
-      each.
+      with its channel and frequency rows). Found on 2026-10-01: the
+      maintainer runs Windows from the repository, and for a local build
+      `_MI_AboutUpdateRows` (`windows/ui/menu/menu_init.ahk`) returns after
+      the version and the channel picker, so the « check for updates » row
+      and the frequency submenu are not drawn at all, with no reason shown;
+      an installed build draws both. To do: on a source run draw the two
+      rows greyed with the source-run reason, as the Uninstall row is
+      (`disabled_reason_key`), check what the macOS and Linux trays do for a
+      source run, and compare the three row by row.
 - [ ] **71.** Metrics windows: retire what is left of their dedicated
       shortcuts. The two menu rows that set them are gone on the three
       drivers (2026-10-01): a shortcut that opens a metrics window is assigned
@@ -446,16 +450,11 @@ is committed; one request is one commit with its regression test.
       key switch turns it back on from the tray, and which action left the
       three French categories off on 2026-09-30 (a restore, a clear or the
       wizard) when the maintainer expected them on.
-- [ ] **74.** Windows: an error window says « Lifecycle — Reload refused
-      because another configuration transaction owns config.toml » (seen on
-      2026-10-01 at 12:20:07). From that machine's log: a tray toggle reloaded
-      the driver at 12:19:59; the new instance, about five seconds after its
-      start, rewrote config.toml with 347 updates, which took 2 360 ms that
-      time (the machine was running the test suites; it takes 15 to 30 ms
-      otherwise); a second tray toggle asked for a reload during that write
-      and was refused with an error window, the toggle lost. To do: a reload
-      asked while a configuration write is in progress waits for it (bounded)
-      instead of failing, and find why every start rewrites 347 keys.
+- [ ] **74.** Windows: every start rewrites config.toml with 347 updates
+      about three seconds after the driver is ready (15 to 30 ms, 2 360 ms on
+      a loaded machine). A reload asked during that write now waits for it
+      (`reload-during-config-write`); find why a start that changed nothing
+      writes the whole file, and make it write only what changed.
 
 ## Time estimate
 
