@@ -210,6 +210,12 @@ function catalogueRouteErrors(input) {
 			/return Packs\b/.test(prepare),
 		'catalogue preparation must publish the packs scanned from its roots'
 	);
+	check(
+		prepare.length > 0 &&
+			/_HotstringBoundSources\s*:=\s*HotstringExtensions_RouteBound\(Packs\)/.test(prepare) &&
+			!/bound files are not loaded/i.test(stripComments(input.owner, '.ahk')),
+		'committed bound-source routes must not be reported as unsupported'
+	);
 	const scan = ahkFunction(input.owner, 'HotstringExtensions_Scan');
 	check(
 		/for Root in Roots\b/.test(scan) && /FSListDirectoryStrict\(Root,\s*true\)/.test(scan),
@@ -249,6 +255,12 @@ const catalogueMutations = [
 	],
 	['owner', 'Roots := [BundledRoot]', 'Roots := []'],
 	['owner', 'HotstringExtensions_Scan(Roots)', 'HotstringExtensions_Scan([])'],
+	[
+		'owner',
+		'_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)',
+		'_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)\n' +
+			'LoggerWarn("HotstringExtensions", "bound files are not loaded")'
+	],
 	['owner', 'FSListDirectoryStrict(Root, true)', 'FSListDirectoryStrict(OtherRoot, true)'],
 	['menu', '_HS_ExtensionsCache := _HotstringExtensionPacks', '_HS_ExtensionsCache := []'],
 	[
