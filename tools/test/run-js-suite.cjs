@@ -1662,6 +1662,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs'
 	},
 	{
+		name: 'hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)',
+		cmd: 'node',
+		args: ['tools/test/test-hotstrings-config-window-fold.cjs'],
+		repro: 'npm run test:hs-config-fold'
+	},
+	{
 		name: 'hotstring colour presets identical on macOS and Linux',
 		cmd: 'node',
 		args: ['tools/test/test-color-presets-parity.cjs'],

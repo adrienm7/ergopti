@@ -411,9 +411,6 @@ is committed; one request is one commit with its regression test.
       hidden or greyed without a reason, timer not armed), compare the three
       trays row by row, and make the frequency row visible and explained on
       each.
-- [ ] **70.** Hotstrings « Délais et couleurs » window: its tables are meant
-      to fold, and a click on a table's header does nothing (seen on Windows;
-      the page is shared, so check the three drivers).
 
 ## Time estimate
 
