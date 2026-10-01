@@ -512,11 +512,6 @@ is committed; one request is one commit with its regression test.
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
       « fais seulement pour Windows »).
 
-- [ ] **95.** Clarify the keyboard-layout menu: the built-in Ergopti choice
-      does not explain the emulation's current state. Show the active emulated
-      layout (none, Ergopti, Ergol, etc.) as a disabled status row, or combine
-      that status with the layout-management action if the result remains clear.
-      Cover all three drivers and make the absence of emulation explicit.
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
@@ -575,6 +570,8 @@ retain the pre-timer immediate-hold graph (a deliberate mutation is rejected).
 The shared alias/refusal contract runs on both Lua
 runtimes for all three backend columns. Karabiner's lack of release-order rules
 means a very fast chord on these typing keys becomes a tap, as requested.
+Non-release run 36935089945 at `be5a40fee` passes the complete three-OS pipeline,
+including all installation variants. Its temporary branch has been removed.
 
 The metrics privacy filter now reads "Ignore system authentication" in
 all 21 locales. The existing setting and system-authentication exclusion
@@ -586,13 +583,26 @@ real TOML loader. Successful discovery no longer raises those warnings or the
 diagnostic warning count. The portable source guard fails on the original claim
 and rejects its reintroduction; the registered native regression captures enabled
 warning output and verifies all 83 shipped source entries remain readable.
-That new native case requires the next non-release Windows CI run.
+That native case passes non-release run 36935760620 at `21de5dcea`: the complete
+three-OS pipeline, including every installation variant, is green. Its temporary
+branch has been removed; the run also covers the 21-locale privacy label.
 
 The shared Shortcuts declaration separates modifier-shortcut groups from key
 combinations. Linux currently omits the combinations group, so the same boundary
 separates its modifier shortcuts from script controls. Existing renderer tests
 exercise all manifest menus with empty-edge and doubled-separator provider probes
 on the three drivers; the renderer retains one separator between visible rows.
+
+The Windows Layout menu now has one disabled "Emulated layout: none/name" status
+before "Manage layouts…". A disabled category cannot claim a stored choice is
+active; Ergopti, Ergopti+, registry names and an absent catalogue entry stay
+distinct. Selection is owned by the shared manager, and the obsolete second
+built-in selector is removed. macOS and Linux's existing picker selects native
+OS input sources, so it retains that platform implementation. Both status forms
+are translated into all 21 locales. Eight registered native cases cover status
+data and the actual Win32 disabled row, with management remaining usable;
+the original Windows row was clickable and did not name its current emulation.
+The new native cases need the next non-release CI run.
 
 ## Time estimate
 
