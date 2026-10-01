@@ -529,6 +529,7 @@ helpers.describe("tap-holds end to end: every option of the hold picker", functi
 						down[#down + 1] = code .. ":1"
 						table.insert(up, 1, code .. ":0")
 					end
+					helpers.assert_true(#down > 0, label .. " must name at least one modifier")
 					helpers.assert_eq(emitted, table.concat(down, " ") .. " " .. KEY_J .. ":1 " .. KEY_J .. ":0 "
 						.. table.concat(up, " "), label .. " presses its own keys and no other")
 				elseif option.kind == "layer" then
