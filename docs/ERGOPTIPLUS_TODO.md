@@ -524,6 +524,17 @@ is committed; one request is one commit with its regression test.
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
       « fais seulement pour Windows »).
 
+- [ ] **95.** Clarify the keyboard-layout menu: the built-in Ergopti choice
+      does not explain the emulation's current state. Show the active emulated
+      layout (none, Ergopti, Ergol, etc.) as a disabled status row, or combine
+      that status with the layout-management action if the result remains clear.
+      Cover all three drivers and make the absence of emulation explicit.
+- [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
+      Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
+      suffice. Verify that the layout supplies every intended change, retire
+      redundant feature gates and settings through their migration owner, and
+      add native regressions for the selected layout without an extra switch.
+
 ## Time estimate
 
 Budgetary estimate: 20–35 hours of effective work for all remaining product and
