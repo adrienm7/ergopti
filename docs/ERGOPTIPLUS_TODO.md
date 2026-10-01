@@ -411,6 +411,13 @@ is committed; one request is one commit with its regression test.
       hidden or greyed without a reason, timer not armed), compare the three
       trays row by row, and make the frequency row visible and explained on
       each.
+- [ ] **71.** Metrics menu: remove the rows that set a shortcut for the
+      typing statistics and for the applications window. Those shortcuts are
+      set in the Gestures or Shortcuts menu, by assigning the action that
+      opens each window; the two are not mixed. The separator between the two
+      rows that open the windows goes, so they form one group. On the three
+      drivers (seen on Windows); check that both opening actions exist in the
+      action catalogue of each driver.
 
 ## Time estimate
 
