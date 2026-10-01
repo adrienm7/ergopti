@@ -25,13 +25,14 @@ was deleted after its useful content was committed here. The historical
 workflow context (prompts, task status, feature map, analysis reports and
 journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 
-The user authorizes publishing `dev` and necessary CI repairs, forbids force
-pushes to `dev`/`main`, and wants a cloneable GitHub handoff. Preserve
-unrelated changes and stage exact paths. Every push to `dev` cuts a release,
-so push rarely: run the full CI on a temporary `backup/*` branch through
-`workflow_dispatch` (a non-dev ref runs the CI profile and publishes nothing),
-and push `dev` only once that run is green. Temporary `backup/*` branches are
-authorized and must be deleted after the final push.
+The current session requires one atomic commit per fix or feature, updating this
+checklist in the same commit. Push each commit immediately to `dev`, then cancel
+every CI run triggered by that exact push to avoid releases. Run the full CI
+through `workflow_dispatch` on a temporary `backup/*` branch: a non-dev ref runs
+the CI profile and publishes nothing. Use its Windows and macOS runners for
+native behavior and parity regression tests. Preserve unrelated changes, stage
+exact paths, never force-push `dev`/`main`, and delete only the temporary CI
+branches this session created after their evidence is recorded.
 
 **Overnight session of 2026-09-29 (supersedes the "one item at a time"
 instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
@@ -91,9 +92,10 @@ These are software implementations; final hardware verification remains below.
   leaves (`[hotstrings.terminator_states]`, `hotstrings.terminators`, the macOS
   paths) imported once from storage.json; a save writes only what the menu
   changed; both Linux modes return the shipped delimiters to their defaults and
-  keep the user's own (user data, as the delimiter submenu does). Still open:
-  the macOS scope leaves its delimiter states as they are (Windows resets its
-  whole delimiter string), and the Windows rows are verified statically only.
+  keep the user's own (user data, as the delimiter submenu does). macOS now
+  shares that policy, resets the file, runtime and next-save states, and keeps
+  its exact inverse on refusal. Still open: Windows resets its whole delimiter
+  string, and its recommended-delay rows need native behavioral verification.
 - [~] **6.** Complete L4 extension layout geometry and physical magic-key
   behavior. Keep independent base/Shift, AltGr/ShiftAltGr and number-row
   emulation. The physical magic-key setting is item 30.
@@ -203,11 +205,13 @@ These are software implementations; final hardware verification remains below.
       main thread). Two maintainer decisions are pending: config_migrate's
       fail-closed guard for invalid stamps (site 108) and a migrations.toml
       exception for key removals handled by the cleanup (site 112).
-- [ ] **34.** Item 5 follow-ups: the macOS Hotstrings scope leaves delimiter
-      states as they are (Windows and Linux reset the shipped ones), check that the
-      Windows « recommended » delays equal the manifest recommendation, and a
-      hand-written `[[hotstrings.terminators]]` list is applied with a warning but
-      cannot be edited from the menu.
+- [ ] **34.** Item 5 follow-ups: check that the Windows « recommended » delays
+      equal the manifest recommendation, and make a hand-written
+      `[[hotstrings.terminators]]` list editable from the menu. Both Lua drivers
+      now share the shipped-delimiter restoration policy; macOS applies it to
+      the file, runtime and next-save state, keeping personal delimiters and
+      restoring the exact snapshot after publication or runtime refusal. The
+      common behavior contract runs in both driver suites.
 - [ ] **35.** Item 13 remainder: unregister the remap guardian LaunchAgent when
       the Karabiner switch goes off or « Retirer Ergopti de Karabiner » runs
       (headless unregister role in the launcher, verified on a Mac).
