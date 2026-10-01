@@ -653,9 +653,13 @@ Ergopti_OnSuspendResume() {
 					() => LLM_Menu_OnResume())
 		; Drain the exact manual updater terminals retained across pause only after
 		; native Suspend has lifted. Background work remains intentionally silent.
+		; Its result is not checked: false is its answer when no terminal and no
+		; menu rebuild was retained, which is every ordinary resume. Requiring
+		; true logged an error and failed the transition on each of them
+		; (resume-updater-nothing-pending). A throw is still a debt.
 		if IsSet(Updater_OnSuspendResume)
 				_LifecycleRunRequiredStep(Transition, "updater",
-					Updater_OnSuspendResume, true)
+					Updater_OnSuspendResume)
 		; Suspend terminates the persistent UIA process. Warm its lightweight
 		; source entry again after the transition so the first selection-wrap after
 		; resume cannot race a cold worker; UIASW_Start remains feature/suspend safe.
