@@ -1662,6 +1662,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs'
 	},
 	{
+		name: 'metrics menu: the two rows that open a window start with the same words in the 21 locales',
+		cmd: 'node',
+		args: ['tools/test/test-metrics-open-rows-wording.cjs'],
+		repro: 'npm run test:metrics-open-rows-wording'
+	},
+	{
 		name: 'report button is white on blue with enough contrast in both appearances (diagnostics and error windows)',
 		cmd: 'node',
 		args: ['tools/test/test-report-button-contrast.cjs'],

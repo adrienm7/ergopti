@@ -145,6 +145,7 @@
 		"test:hs-config-bridge": "node ./tools/test/test-hotstrings-config-window-bridge.cjs",
 		"test:hs-config-fold": "node ./tools/test/test-hotstrings-config-window-fold.cjs",
 		"test:report-button-contrast": "node ./tools/test/test-report-button-contrast.cjs",
+		"test:metrics-open-rows-wording": "node ./tools/test/test-metrics-open-rows-wording.cjs",
 		"test:color-presets-parity": "node ./tools/test/test-color-presets-parity.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
