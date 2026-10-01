@@ -827,19 +827,6 @@ MenuRenderer_ResolveCheckedWhen(MenuKey, ItemId, Getters) {
 	return true
 }
 
-; Returns the ``i18n_dynamic`` key declared on a manifest item — the locale key
-; a dynamic handler prefixes to a runtime value (a shortcut label, a model name)
-; before rendering its own row.
-;
-; Rows whose label is computed cannot be rendered declaratively, so their
-; handler builds the string. That is not a reason for the handler to also OWN
-; the locale key: two rows declared ``i18n_dynamic`` and no code read it, while
-; the handlers carried their own copy of the same string. Editing the manifest
-; moved nothing, which is the failure this accessor removes.
-;
-; A missing declaration is an ERROR rather than a silent "": the handler is
-; about to concatenate this into a user-visible label, and an empty prefix
-; renders as a bare shortcut with no indication of what it does.
 ; Fills an EXISTING menu from one list row's provider, instead of returning a
 ; fresh Menu the way MenuRenderer_Build does.
 ;
@@ -902,17 +889,4 @@ MenuRenderer_AppendRows(TargetMenu, MenuKey, ListId, Rows) {
 		return 0
 	}
 	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
-}
-
-MenuRenderer_I18nDynamic(MenuKey, ItemId) {
-	Item := _MR_FindItemById(MenuKey, ItemId)
-	if (Item == false) {
-		try LoggerError("MenuRenderer", "No manifest item '{1}.{2}' — no i18n_dynamic key.", MenuKey, ItemId)
-		return ""
-	}
-	Key := _MR_Get(Item, "i18n_dynamic")
-	if (Key == "") {
-		try LoggerError("MenuRenderer", "Item '{1}.{2}' declares no i18n_dynamic key.", MenuKey, ItemId)
-	}
-	return Key
 }

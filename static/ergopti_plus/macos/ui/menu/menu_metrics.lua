@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
 ---    ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.  Dynamic blocks
----    (shortcut pickers, app exclusion, WPM controls, encryption) are supplied
+---    (app exclusion, WPM controls, encryption) are supplied
 ---    as handlers so state-bearing logic stays in Lua.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and
 ---    starts/stops them cleanly upon user toggling.
@@ -26,7 +26,6 @@ local text_utils = require("infra.text_utils")
 
 local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("infra.dialog_util")
-local Hotkeys       = require("adapters.hotkey_registrar")
 local kl_mod        = require("modules.keylogger")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
@@ -298,122 +297,11 @@ function M.build(ctx)
 		Keylogger.show_metrics()
 	end
 
-	-- Coerce sc.mods to a table so that a disk-persisted scalar string (e.g.
-	-- mods="ctrl") never crashes ipairs/table.concat (M-13).
-	local function coerce_mods(mods)
-		if type(mods) == "table" then return mods end
-		if type(mods) == "string" and mods ~= "" then return { mods } end
-		return {}
-	end
-
-	--- Refuses a shortcut whose key is a modifier key, telling the user why.
-	--- macOS never reports such a key as a key press, so the registrar refuses
-	--- it; without a reason the prompt closed and nothing changed.
-	--- @param key string Key the user typed.
-	--- @return boolean refused
-	local function refuse_modifier_key(key)
-		if not Hotkeys.key_is_modifier(key) then return false end
-		Logger.warn(LOG, "Refused shortcut key '%s': it is a modifier key.", key)
-		dialog.block_alert(i18n.get("metrics.shortcut_invalid_title"),
-			i18n.format("menu.metrics.shortcut_modifier_key", key), i18n.get("button.ok"))
-		return true
-	end
-
-	local function rows_shortcut_typing(_ctx)
-		local sc_label = i18n.get("menu.metrics.shortcut_none")
-		if type(state.metrics_shortcut) == "table" then
-			local mods_cap = {}
-			for _, m in ipairs(coerce_mods(state.metrics_shortcut.mods)) do
-				table.insert(mods_cap, m:sub(1, 1):upper() .. m:sub(2))
-			end
-			local mods_str = table.concat(mods_cap, "+")
-			sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.metrics_shortcut.key or "")
-		end
-		return {{
-			label    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_typing", STATE_GETTERS),
-			action   = function()
-				local current_str = ""
-				if type(state.metrics_shortcut) == "table" then
-					current_str = table.concat(coerce_mods(state.metrics_shortcut.mods), "+") .. "+" .. (state.metrics_shortcut.key or "")
-				end
-				local ok_p, btn, raw = pcall(dialog.text_prompt,
-					i18n.get("menu.metrics.shortcut_typing_title"),
-					i18n.get("menu.metrics.shortcut_prompt"),
-					current_str, "OK", i18n.get("common.cancel"))
-				if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
-				raw = raw:match("^%s*(.-)%s*$"):lower()
-				if raw == "" then
-					if type(ctx.apply_metrics_shortcut) == "function" then ctx.apply_metrics_shortcut(nil, nil) end
-					return
-				end
-				local parts = {}
-				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
-				if #parts < 1 then return end
-				local key  = parts[#parts]
-				if refuse_modifier_key(key) then return end
-				local mods = {}
-				for i = 1, #parts - 1 do
-					local m = parts[i]
-					if m == "option" then m = "alt" end
-					table.insert(mods, m)
-				end
-				if #mods == 0 then mods = { "ctrl" } end
-				if type(ctx.apply_metrics_shortcut) == "function" then ctx.apply_metrics_shortcut(mods, key) end
-			end,
-		}}
-	end
-
 	local function cmd_show_apps()
 		local ok, at = pcall(require, "ui.metrics_apps")
 		if ok and type(at.show) == "function" then
 		pcall(at.show)
 		end
-	end
-
-	local function rows_shortcut_apps(_ctx)
-		local sc_label = i18n.get("menu.metrics.shortcut_none")
-		if type(state.apps_time_shortcut) == "table" then
-			local mods_cap = {}
-			for _, m in ipairs(coerce_mods(state.apps_time_shortcut.mods)) do
-				table.insert(mods_cap, m:sub(1, 1):upper() .. m:sub(2))
-			end
-			local mods_str = table.concat(mods_cap, "+")
-			sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.apps_time_shortcut.key or "")
-		end
-		return {{
-			label    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_apps", STATE_GETTERS),
-			action   = function()
-				local current_str = ""
-				if type(state.apps_time_shortcut) == "table" then
-					current_str = table.concat(coerce_mods(state.apps_time_shortcut.mods), "+") .. "+" .. (state.apps_time_shortcut.key or "")
-				end
-				local ok_p, btn, raw = pcall(dialog.text_prompt,
-					i18n.get("menu.metrics.shortcut_apps_title"),
-					i18n.get("menu.metrics.shortcut_prompt"),
-					current_str, "OK", i18n.get("common.cancel"))
-				if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
-				raw = raw:match("^%s*(.-)%s*$"):lower()
-				if raw == "" then
-					if type(ctx.apply_apps_time_shortcut) == "function" then ctx.apply_apps_time_shortcut(nil, nil) end
-					return
-				end
-				local parts = {}
-				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
-				if #parts < 1 then return end
-				local key  = parts[#parts]
-				if refuse_modifier_key(key) then return end
-				local mods = {}
-				for i = 1, #parts - 1 do
-					local m = parts[i]
-					if m == "option" then m = "alt" end
-					table.insert(mods, m)
-				end
-				if #mods == 0 then mods = { "ctrl" } end
-				if type(ctx.apply_apps_time_shortcut) == "function" then ctx.apply_apps_time_shortcut(mods, key) end
-			end,
-		}}
 	end
 
 	--- Flips the private filter. The ROW is built by the shared renderer from
@@ -593,11 +481,14 @@ function M.build(ctx)
 	-- ===== 3.2) Manifest-Driven Menu Assembly =====
 	-- =============================================
 
-	-- The two shortcut pickers and the app-exclusion row left dyn_handlers on
-	-- 2026-08-07: their labels are computed, so no static declaration can carry
-	-- them, but a provider that returns one row is still the renderer drawing it.
-	-- The three WPM widget rows stay handlers — their callbacks repaint the OPEN
-	-- menu rather than rebuilding the tray, which a declarative row cannot do.
+	-- The app-exclusion row left dyn_handlers on 2026-08-07: its label is
+	-- computed, so no static declaration can carry it, but a provider that
+	-- returns one row is still the renderer drawing it. The three WPM widget
+	-- rows stay handlers — their callbacks repaint the OPEN menu rather than
+	-- rebuilding the tray, which a declarative row cannot do. The two rows that
+	-- set a dedicated shortcut for the metrics windows went on 2026-10-01: such
+	-- a shortcut is assigned to the opening action in the Gestures or the
+	-- Shortcuts menu.
 	local dyn_handlers = {
 		wpm_widget       = dyn_wpm_widget,
 		widget_colors    = dyn_widget_colors,
@@ -605,9 +496,7 @@ function M.build(ctx)
 	}
 
 	local list_providers = {
-		shortcut_typing = rows_shortcut_typing,
-		shortcut_apps   = rows_shortcut_apps,
-		exclude_apps    = rows_exclude_apps,
+		exclude_apps = rows_exclude_apps,
 	}
 
 	--- The category switch: the metrics submenu's first row (the manifest's

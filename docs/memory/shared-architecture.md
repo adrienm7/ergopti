@@ -192,6 +192,17 @@ the feature lacks. Both renderers draw it; the driver registers
 the feature path. The macOS menubar icon (`ui.menubar_icon`) is the first one;
 the update channel and frequency rows have the same shape.
 
+### project-a-window-has-no-shortcut-row-of-its-own
+
+Maintainer rule (2026-10-01, « on ne mélange pas les deux »): a menu never
+offers its own row to set the shortcut of a window it opens. A shortcut is
+assigned in the Gestures or the Shortcuts menu, to the catalogue action that
+opens the window (`open_metrics_typing`, `open_metrics_apps`, ...). The
+Metrics menu lost its two shortcut rows that way, and its two opening rows
+form one group. Action: give a new window a catalogue action for every driver,
+never a shortcut row or a dedicated shortcut setting;
+`metrics-no-shortcut-rows` holds the Metrics menu.
+
 ### project-script-chords-are-active-by-default
 
 An empty configuration alters no input: every input-altering manifest entry

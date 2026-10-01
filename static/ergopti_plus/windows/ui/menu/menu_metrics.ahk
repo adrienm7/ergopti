@@ -78,56 +78,19 @@ BuildMetricsMenu() {
 	)
 		Commands[Id] := Handler
 
-	; The two shortcut pickers and the app-exclusion row left DynHandlers on
-	; 2026-08-07: their labels are computed, so no static declaration can carry
-	; them, but a provider that returns one row is still the renderer drawing it.
-	; The three WPM widget rows stay handlers — their callbacks repaint the OPEN
-	; menu rather than rebuilding the tray, which a declarative row cannot do.
+	; The app-exclusion row left DynHandlers on 2026-08-07: its label is computed,
+	; so no static declaration can carry it, but a provider that returns one row
+	; is still the renderer drawing it. The three WPM widget rows stay handlers:
+	; their callbacks repaint the OPEN menu rather than rebuilding the tray,
+	; which a declarative row cannot do. The two rows that set a dedicated
+	; shortcut for the metrics windows went on 2026-10-01: such a shortcut is
+	; assigned to the opening action in the Gestures or the Shortcuts menu.
 	ListProviders := Map(
-		"shortcut_typing", (*) => _MET_ShortcutTypingRows(_MET_STATE_GETTERS),
-		"shortcut_apps",   (*) => _MET_ShortcutAppsRows(_MET_STATE_GETTERS),
-		"exclude_apps",    (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
+		"exclude_apps", (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
 	)
 
 	return MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
 }
-
-; List provider: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
-_MET_PromptShortcutAndRefresh(which, ToggleFn, PromptFn := 0, RefreshFn := 0) {
-	Before := MS_GetDisplayLabel(which)
-	Result := HasMethod(PromptFn, "Call")
-		? PromptFn.Call(which, ToggleFn)
-		: MS_PromptShortcut(which, ToggleFn)
-	After := MS_GetDisplayLabel(which)
-	CommitOk := (Result is Integer) && Result == 1
-	; A partial commit deliberately returns false, but may have published a new
-	; durable binding plus cleanup warning. Refresh that changed projection too.
-	if !CommitOk && After == Before
-		return false
-	RefreshResult := HasMethod(RefreshFn, "Call")
-		? RefreshFn.Call()
-		: RebuildTrayMenu()
-	RefreshOk := (RefreshResult is Integer) && RefreshResult == 1
-	return CommitOk && RefreshOk
-}
-
-_MET_ShortcutTypingRows(Getters) {
-	return [Map(
-		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing"),
-		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters),
-		"action",   (*) => _MET_PromptShortcutAndRefresh("typing", KLUI_ToggleTyping))]
-}
-
-; List provider: Apps shortcut picker (ZWS differentiates from typing sc label).
-_MET_ShortcutAppsRows(Getters) {
-	return [Map(
-		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B),
-		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters),
-		"action",   (*) => _MET_PromptShortcutAndRefresh("apps", KLUI_ToggleApps))]
-}
-
-
-
 
 ; List provider: App exclusion — label reflects current count.
 _MET_ExcludeAppsRows(Getters) {

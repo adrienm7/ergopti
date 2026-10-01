@@ -805,41 +805,12 @@
 			]
 		},
 		{
-			"type": "list",
-			"id": "shortcut_typing",
-			"i18n_dynamic": "menu.metrics.shortcut_prefix",
-			"disabled_when": [
-				"keylogger_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
-		},
-		{
-			"type": "---"
-		},
-		{
 			"type": "command",
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
 			"disabled_when": [
 				"keylogger_enabled"
 			]
-		},
-		{
-			"type": "list",
-			"id": "shortcut_apps",
-			"i18n_dynamic": "menu.metrics.shortcut_prefix",
-			"disabled_when": [
-				"keylogger_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
 		},
 		{
 			"type": "---"

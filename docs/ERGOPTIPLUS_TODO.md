@@ -401,13 +401,23 @@ is committed; one request is one commit with its regression test.
       hidden or greyed without a reason, timer not armed), compare the three
       trays row by row, and make the frequency row visible and explained on
       each.
-- [ ] **71.** Metrics menu: remove the rows that set a shortcut for the
-      typing statistics and for the applications window. Those shortcuts are
-      set in the Gestures or Shortcuts menu, by assigning the action that
-      opens each window; the two are not mixed. The separator between the two
-      rows that open the windows goes, so they form one group. On the three
-      drivers (seen on Windows); check that both opening actions exist in the
-      action catalogue of each driver.
+- [ ] **71.** Metrics windows: retire what is left of their dedicated
+      shortcuts. The two menu rows that set them are gone on the three
+      drivers (2026-10-01): a shortcut that opens a metrics window is assigned
+      in the Gestures or the Shortcuts menu, to `open_metrics_typing` or
+      `open_metrics_apps`, which the catalogue declares for every driver.
+      What remains is the machinery behind the removed rows, which still
+      binds a shortcut already stored: on Windows the manifest features
+      `metrics.metrics_shortcut_typing` / `metrics_shortcut_apps`, their
+      loading (`config_shortcuts.ahk`), saving (`config_io.ahk`), binding and
+      prompt (`infra/metrics/metrics_shortcuts.ahk`, `MS_ApplyAll` at boot)
+      and six test files; on macOS `metrics.shortcut` / `metrics.apps_shortcut`
+      with `apply_metrics_shortcut` / `apply_apps_time_shortcut`
+      (`ui/menu/init.lua`, `menu_state.lua`, `preferences.lua`) and their
+      tests; the locale keys `menu.metrics.shortcut_*` and
+      `metrics.shortcut_*`; and the second half of the Linux reason
+      `platform_reason.metrics_extras_are_not_on_linux`, which still speaks
+      of a shortcut.
 - [ ] **72.** The Windows suite is red on `dev` before any of today's work
       (run on a real Windows 11 on 2026-10-01, 10 of 7 567 tests, the same on
       the tree of 3e6c45827):
