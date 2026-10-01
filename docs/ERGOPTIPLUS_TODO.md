@@ -427,9 +427,36 @@ is committed; one request is one commit with its regression test.
       has personal shortcuts.
 - [ ] **73.** Windows: the magic key's hotstrings do nothing. « ct★ » does
       not become « c'était » and no tooltip shows (reported on 2026-10-01,
-      on the maintainer's machine run from the repository). Find whether the
-      ★ reaches the hotstring engine (layout emulation on and off, magic key
-      source key), and whether it broke with a commit of 2026-10-01.
+      on the maintainer's machine run from the repository). Diagnosis so far,
+      from that machine's files: « ct★ » is a French magic-key hotstring
+      (`_shared/modules/hotstrings/french/magickey.toml`), and its config.toml
+      holds `category_enabled.french_magickey = false`, already in the
+      backups of 2026-09-30 18:06, while `magic_key`, `french_autocorrection`
+      and `french_distancesreduction` are on; the boot log says « 3 forced
+      off by a disabled category ». So the engine obeys the file. Still to
+      settle with the maintainer: whether the Hotstrings › Français › magic
+      key switch turns it back on from the tray, and which action left the
+      three French categories off on 2026-09-30 (a restore, a clear or the
+      wizard) when the maintainer expected them on.
+- [ ] **74.** Windows: an error window says « Lifecycle — Reload refused
+      because another configuration transaction owns config.toml » (seen on
+      2026-10-01 at 12:20:07). From that machine's log: a tray toggle reloaded
+      the driver at 12:19:59; the new instance, about five seconds after its
+      start, rewrote config.toml with 347 updates, which took 2 360 ms that
+      time (the machine was running the test suites; it takes 15 to 30 ms
+      otherwise); a second tray toggle asked for a reload during that write
+      and was refused with an error window, the toggle lost. To do: a reload
+      asked while a configuration write is in progress waits for it (bounded)
+      instead of failing, and find why every start rewrites 347 keys.
+- [ ] **75.** System diagnostics window: make it wider by default, so the
+      paths it lists are cut in two less often (one line is too short for
+      them). The geometry is shared (`native_windows` / the webview geometry
+      single source), so the three drivers follow.
+- [ ] **76.** The « Signaler sur GitHub » button of that window is ugly:
+      white text on a blue background, with enough contrast, in the light and
+      the dark appearance. The error window draws the same button.
+- [ ] **77.** System diagnostics window: remove its « Fermer » button, the
+      window's own close button already does that.
 
 ## Time estimate
 
