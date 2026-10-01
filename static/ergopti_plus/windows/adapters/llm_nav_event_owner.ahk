@@ -648,24 +648,42 @@ _LLM_NavEventOwnerCanStop(Port := 0) {
 LLM_NavEventOwner_PrepareShutdown(ProfileSelectFn := 0, Port := 0) {
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerShutdownFenced
+	global _LLM_NavEventOwnerLifecycleQuiesced
 	if !_LLM_NavEventOwnerStarted {
 		_LLM_NavEventOwnerShutdownFenced := false
 		return !_LLM_NavEventOwnerQuarantined
 	}
 	if _LLM_NavEventOwnerQuarantined
 		return false
-	if !LLM_NavEventOwner_SetSuspended(true)
-		return false
-	_LLM_NavEventOwnerShutdownFenced := true
-	Drained := false
-	try Drained := _LLM_NavEventOwnerDrain(0, 0, ProfileSelectFn)
-	catch as Err
-		_LLM_NavEventOwnerReport(
-			"Shutdown receipt drain raised an error: " . Err.Message . ".")
-	Ready := Drained && !_LLM_NavEventOwnerHasTerminalDebt()
-		&& _LLM_NavEventOwnerCanStop(Port)
+	; A pause has already suspended the native owner, and its fence is the
+	; pause's: this preflight neither suspends it again nor, on a refusal,
+	; resumes its hook under a paused driver. The receipt drain refuses to run
+	; under a pause (its receipts wait for a resume an exit never gives), and
+	; that refusal is not a debt: taking it for one refused every reload asked
+	; while paused (reload-refused-while-paused). The native proof below still
+	; refuses an exit that would strand a suppressed key or a queued receipt.
+	Paused := A_IsSuspended || _LLM_NavEventOwnerLifecycleQuiesced
+	if !_LLM_NavEventOwnerLifecycleQuiesced {
+		if !LLM_NavEventOwner_SetSuspended(true)
+			return false
+		_LLM_NavEventOwnerShutdownFenced := true
+	}
+	Drained := Paused
+	if !Paused {
+		try Drained := _LLM_NavEventOwnerDrain(0, 0, ProfileSelectFn)
+		catch as Err
+			_LLM_NavEventOwnerReport(
+				"Shutdown receipt drain raised an error: " . Err.Message . ".")
+	}
+	TerminalDebt := _LLM_NavEventOwnerHasTerminalDebt()
+	Ready := Drained && !TerminalDebt && _LLM_NavEventOwnerCanStop(Port)
 	if Ready
 		return true
+	; The lifecycle only says that the owner refused: name what did.
+	_LLM_NavEventOwnerReport("Shutdown preflight refused (paused="
+		. (Paused ? 1 : 0) . ", receipts_drained=" . (Drained ? 1 : 0)
+		. ", terminal_debt=" . (TerminalDebt ? 1 : 0)
+		. (Drained && !TerminalDebt ? ", native_can_stop=0" : "") . ").")
 	LLM_NavEventOwner_CancelShutdown()
 	return false
 }
