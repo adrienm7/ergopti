@@ -30,6 +30,14 @@ local ManifestReader = require("infra.manifest_reader")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("compat.utf8")
 local LOG           = "menu_shortcuts"
+-- The label of each script chord slot: this driver's AltGr is the right
+-- Option key.
+local SCRIPT_CHORD_LABELS = {
+	script_altgr_enter     = "sg_labels.script_ropt_return",
+	script_altgr_backspace = "sg_labels.script_ropt_backspace",
+	script_altgr_delete    = "sg_labels.script_ropt_delete",
+	script_altgr_escape    = "sg_labels.script_ropt_escape",
+}
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}
@@ -70,11 +78,10 @@ M.DEFAULT_STATE = {
 -- ====================================
 
 --- Translates a shortcut identifier into a human-readable trigger label.
---- @param id string The shortcut identifier (e.g. "ctrl_a", "layer_scroll").
+--- @param id string The shortcut identifier (e.g. "ctrl_a", "wrap_text_if_selected").
 --- @param state table The current state table (used for trigger_char substitution).
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
-	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
 	-- Any symbol the layout types wraps the selection, AltGr or not: Ergopti puts
 	-- them on AltGr, other layouts elsewhere, so the trigger names no key.
 	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.selection_symbol") end
@@ -547,8 +554,8 @@ function M.build(ctx)
 	-- ==============================================
 
 	-- Build shortcut item buckets by iterating the shortcuts module list once.
-	local TOP_ORDER = { "layer_scroll" }
-	local top_map   = {}
+	-- The navigation layer's wheel is no shortcut: it is edited with the layer
+	-- (Tap-Holds › Edit the layer) and never listed here.
 	local wrap_item = nil
 	local ctrl_items = {}
 	local cmd_items  = {}
@@ -559,9 +566,7 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-					if s.id == "layer_scroll" then
-						top_map[s.id] = mi
-					elseif s.id == "wrap_text_if_selected" then
+					if s.id == "wrap_text_if_selected" then
 						wrap_item = mi
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
@@ -601,32 +606,40 @@ function M.build(ctx)
 
 	-- Each handler appends its items into the ``items`` list it receives.
 
-	--- The script-control shortcuts, as the one row a `list` provider returns.
-	--- @return table Provider rows (empty when the module is absent).
-	local function dyn_script_control()
+	--- « Raccourcis de gestion du script », declared by script_control_group
+	--- as on every driver: the chords' switch, the restore of their preset,
+	--- the clear to the system's behaviour, then one row per slot. The restore
+	--- and the clear apply at once, without a question, through the Shortcuts
+	--- scope owner and its backup. The title is ticked from the switch.
+	--- @return table|nil rows Rendered rows for the group, nil without the module.
+	local function script_control_group()
 		local script_control = ctx.script_control
-		if not script_control then return {} end
-		local enabled = state.script_control_enabled
+		if type(script_control) ~= "table" or type(script_control.script_chord_slots) ~= "function" then
+			Logger.warn(LOG, "Script control absent from the menu context — its submenu is skipped.")
+			return nil
+		end
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
+		local prefix = script_control.SCRIPT_BINDING_PREFIX
 
-		local function get_label(act, keyname)
+		local function get_label(act, slot_id)
 			if not act or act == "-" or act == "--" then return "-" end
 			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
-				local binding = keyname and act ~= "none" and type(ctx.gestures.get_action_parameter) == "function"
-					and script_control.BINDING_PREFIX .. keyname or nil
+				local binding = slot_id and act ~= "none" and type(prefix) == "string"
+					and type(ctx.gestures.get_action_parameter) == "function"
+					and prefix .. slot_id or nil
 				return ParameterLabel.for_binding(ctx.gestures.get_action_label(act), ctx.gestures, binding, act)
 			end
 			return act
 		end
 
-		-- Row DATA since 2026-08-07: the renderer draws all three levels, and this
-		-- only answers what the rows are.
-		local function key_submenu_rows(keyname)
-			local current = state.script_control_shortcuts[keyname] or "none"
+		-- Row DATA: the renderer draws all three levels, and this only answers
+		-- what the rows are.
+		local function slot_submenu_rows(slot_id)
+			local current = state.script_control_shortcuts[slot_id] or "none"
 			local sub = {}
 			for _, act in ipairs(actions) do
-				local label = get_label(act, keyname)
+				local label = get_label(act, slot_id)
 				if label == "-" then
 					table.insert(sub, { separator = true })
 				elseif act:match("^#") then
@@ -635,44 +648,33 @@ function M.build(ctx)
 					table.insert(sub, {
 						label    = label,
 						checked  = (current == act) or nil,
-						disabled = not enabled or paused or nil,
-						action   = (enabled and not paused) and (function(a) return function()
+						disabled = paused or nil,
+						action   = (not paused) and (function(a) return function()
 							local function assign()
-								state.script_control_shortcuts[keyname] = a
+								state.script_control_shortcuts[slot_id] = a
 								if type(script_control.set_shortcut_action) == "function" then
-									pcall(script_control.set_shortcut_action, keyname, a)
+									pcall(script_control.set_shortcut_action, slot_id, a)
 								end
 								if ctx.save_prefs() ~= true then return false end
 								ctx.updateMenu()
 							end
 
 							-- open_url / search_web do nothing without their parameter:
-							-- the handler reads get_action_parameter(binding, action) and
-							-- silently returns when it is empty. Assigning one without
-							-- prompting handed the user a key that looked configured and
-							-- did nothing when pressed. Deferred like the gestures menu so
-							-- the modal opens after the menu has closed.
+							-- prompting under the PREFIXED binding dispatch reads
+							-- (script__<slot>) keeps the configured key from staying
+							-- silently inert. Deferred so the modal opens after the
+							-- menu has closed.
 							local gestures = ctx.gestures
 							local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
 								and gestures.get_action_parameter_spec(a) or nil
 							if spec then
-								-- The parameter store is keyed by (binding, action), and the
-								-- binding script_control dispatches under is the PREFIXED key —
-								-- it passes "script__backspace", never "backspace". Prompting
-								-- under the bare key name wrote the URL to an entry nothing ever
-								-- reads, so the handler found an empty parameter and returned
-								-- silently: the very inert binding this prompt exists to
-								-- prevent, one layer deeper. The prefix is read from the module
-								-- that dispatches it rather than re-spelled here, because a
-								-- second spelling is exactly what drifted.
-								local prefix = script_control.BINDING_PREFIX
 								if type(prefix) ~= "string" then
-									Logger.error(LOG, "script_control.BINDING_PREFIX missing — refusing to "
+									Logger.error(LOG, "The script binding prefix is missing — refusing to "
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
 								DeferredWork.after(0.05, function()
-									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. keyname, a, spec) then
+									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec) then
 										assign()
 									end
 								end, "menu_shortcuts.action_parameter")
@@ -687,34 +689,48 @@ function M.build(ctx)
 			return sub
 		end
 
-		local cur_return = state.script_control_shortcuts.return_key or "none"
-		local cur_back   = state.script_control_shortcuts.backspace  or "none"
-		local cur_escape = state.script_control_shortcuts.escape     or "none"
+		local providers = {
+			["script_control_shortcuts"] = function()
+				local rows = {}
+				for _, slot in ipairs(script_control.script_chord_slots()) do
+					local current = state.script_control_shortcuts[slot.id] or "none"
+					rows[#rows + 1] = {
+						label    = string.format("%s → %s", i18n.get(SCRIPT_CHORD_LABELS[slot.id]),
+							get_label(current, slot.id)),
+						disabled = paused or nil,
+						items    = slot_submenu_rows(slot.id),
+					}
+				end
+				return rows
+			end,
+		}
 
-		-- ONE provider row, and the renderer draws it. It was a `dynamic` handler
-		-- appending one row whose label is static — which is a `list` of one, the
-		-- same shape Windows uses for the same row since 2026-08-08.
-		return { {
-			label    = i18n.get("menu.shortcuts.script_shortcuts"),
-			disabled = not enabled or paused or nil,
-			items    = ({
-				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return, "return_key")),
-					disabled = not enabled or paused or nil,
-					items    = key_submenu_rows("return_key"),
-				},
-				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back, "backspace")),
-					disabled = not enabled or paused or nil,
-					items    = key_submenu_rows("backspace"),
-				},
-				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape, "escape")),
-					disabled = not enabled or paused or nil,
-					items    = key_submenu_rows("escape"),
-				},
-			}),
-		} }
+		local chords_on = state.script_control_enabled == true
+		local render_ctx = {}
+		for key, value in pairs(ctx) do render_ctx[key] = value end
+		render_ctx.commands = {
+			["script_control_toggle"] = function()
+				state.script_control_enabled = not chords_on
+				if type(script_control.set_script_chords_enabled) == "function" then
+					pcall(script_control.set_script_chords_enabled, state.script_control_enabled)
+				end
+				if ctx.save_prefs() ~= true then return false end
+				ctx.updateMenu()
+				return true
+			end,
+			["scope_restore"] = function()
+				return type(ctx.apply_script_chords_scope) == "function"
+					and ctx.apply_script_chords_scope("recommended") == true
+			end,
+			["scope_clear"] = function()
+				return type(ctx.apply_script_chords_scope) == "function"
+					and ctx.apply_script_chords_scope("clear") == true
+			end,
+		}
+		render_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+		render_ctx.state_getters["script_control_enabled"] = function() return chords_on end
+		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, render_ctx, providers)
 	end
 
 	-- `list` since 2026-08-07: the separator, the header and one row per
@@ -782,17 +798,13 @@ function M.build(ctx)
 		end
 	end
 
-	-- The feature toggles (layer_scroll, the wrap-text toggle) open the
-	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
-	-- which the manifest places first, so the renderer draws them like every
-	-- other row: prepended after rendering, the wrap-text toggle reached the tray
-	-- with no title and hs.menubar drew nothing.
+	-- The feature toggle (the wrap-text toggle) opens the submenu. It is row
+	-- DATA handed over by the wrap-symbols list provider, which the manifest
+	-- places first, so the renderer draws it like every other row: prepended
+	-- after rendering, the wrap-text toggle reached the tray with no title and
+	-- hs.menubar drew nothing.
 	local top_items = {}
-	for _, id in ipairs(TOP_ORDER) do
-		if top_map[id] then table.insert(top_items, top_map[id]) end
-	end
 	if wrap_item then
-		if #top_items > 0 then table.insert(top_items, { separator = true }) end
 		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
 		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
 		-- have always shown it — the same feature was sitting in two different
@@ -815,6 +827,7 @@ function M.build(ctx)
 		["key_combinations"] = function()
 			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
 		end,
+		["script_control"] = script_control_group,
 	}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own
@@ -850,7 +863,6 @@ function M.build(ctx)
 		tap_keys = function(_ctx)
 			return TapKeysMenu.provide_rows(ctx, paused or nil)
 		end,
-		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
@@ -866,6 +878,8 @@ function M.build(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
+	-- Ticks « Raccourcis de gestion du script » while its switch is on.
+	sc_ctx.state_getters["script_control_enabled"] = function() return state.script_control_enabled == true end
 	-- Ticks the « Combinaisons de touches » title while its own switch is on.
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
 		local karabiner = ctx.karabiner

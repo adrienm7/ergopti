@@ -33,8 +33,13 @@ local function load_bridge(answer)
 		shown = {}, hidden = 0, pushed = {}, checks = {}, sets = {}, downloads = {}, installs = {},
 		windows = {}, completed = {}, reports = {}, channel_pushes = {}, menu_changes = 0, finished = {},
 		logs_opened = 0, channel = "dev", saved = {}, state = "idle", defer = false, pending = {},
+		source_run = false,
 	}
 	for _, name in ipairs(STUBBED) do context.saved[name] = package.loaded[name] end
+	-- The suite runs from a checkout, which is a source run: each case says.
+	local Installation = require("infra.installation")
+	context.real_is_source_run = Installation.is_source_run
+	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
 	package.loaded["ui.webview_manager"] = {
 		show = function(app) context.shown[#context.shown + 1] = app; return true end,
@@ -97,6 +102,7 @@ end
 
 local function restore(context)
 	for _, name in ipairs(STUBBED) do package.loaded[name] = context.saved[name] end
+	require("infra.installation").is_source_run = context.real_is_source_run
 	package.loaded["ui.update_check.bridge"] = nil
 end
 
@@ -157,6 +163,20 @@ helpers.describe("update-check window bridge (Linux)", function()
 			bridge.open(context.ctx)
 			bridge.on_message({ action = "update" })
 			helpers.assert_eq(#context.downloads, 0)
+			helpers.assert_eq(last(context), { type = "action", action = "update", ok = false, missing = false })
+		end)
+	end)
+
+	-- The menu greys its Update row on a source run; the window's Update button
+	-- refuses for the same reason, before any download.
+	helpers.it("refuses to install on a local version run from source", function()
+		scenario(available, function(bridge, context)
+			context.source_run = true
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			helpers.assert_eq(#context.downloads, 0, "nothing is downloaded")
+			helpers.assert_eq(#context.installs, 0, "nothing is installed")
+			helpers.assert_eq(#context.windows, 0, "no download window opens")
 			helpers.assert_eq(last(context), { type = "action", action = "update", ok = false, missing = false })
 		end)
 	end)

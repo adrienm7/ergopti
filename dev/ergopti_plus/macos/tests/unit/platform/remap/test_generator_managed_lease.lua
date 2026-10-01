@@ -312,7 +312,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 				end
 			end
 			helpers.assert_true(normal_count > 0, "full config must contain normal rules")
-			helpers.assert_eq(pause_count, 3, "full config must contain all three pause-only script controls")
+			helpers.assert_eq(pause_count, 4, "full config must contain the four pause-only script chords of an empty configuration")
 			helpers.assert_true(preserved_application_condition, "central gating must preserve existing conditions")
 		end)
 	end)
@@ -345,7 +345,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 			local Generator = fixture.Generator
 			local rules, err = Generator.build_paused_script_control_rules(TOKEN)
 			helpers.assert_not_nil(rules, err)
-			helpers.assert_eq(#rules, 3)
+			helpers.assert_eq(#rules, 4, "one per script chord of an empty configuration")
 			for _, rule in ipairs(rules) do
 				helpers.assert_true(rule.description:match(
 					"^%[ErgoptiPlus managed:" .. TOKEN .. ":pause%] "

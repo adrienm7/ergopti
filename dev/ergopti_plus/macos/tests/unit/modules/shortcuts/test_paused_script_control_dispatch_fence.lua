@@ -19,9 +19,12 @@ package.loaded["infra.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
+	F18_KARABINER_DELETE = 0x4F,
+	SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
 	BACKSPACE = 0x33,
 	RETURN = 0x24,
 	ESCAPE = 0x35,
+	FORWARD_DELETE = 0x75,
 }
 package.loaded["modules.gestures.engine"] = { init = function() end }
 package.loaded["modules.gestures.actions"] = {
@@ -104,7 +107,7 @@ end
 
 helpers.describe("audit pause fence: script control delivery", function()
 	helpers.it("audit pause fence: rejects an ordinary configured action while preserving the live tap", function()
-		ScriptControl.set_shortcut_action("backspace", "open_metrics_typing")
+		ScriptControl.set_shortcut_action("script_altgr_backspace", "open_metrics_typing")
 		ScriptControl.start(keymap, shortcuts, gestures, nil)
 		ScriptControl.pause_all()
 
@@ -120,10 +123,10 @@ helpers.describe("audit pause fence: script control delivery", function()
 			"a recognized script-control sentinel remains consumed while paused")
 		hs_stub.timer.__fire_all()
 
-		ScriptControl.set_shortcut_action("backspace", "script_reload")
+		ScriptControl.set_shortcut_action("script_altgr_backspace", "script_reload")
 		tap.fn(tagged_backspace_sentinel())
 		hs_stub.timer.__fire_all()
-		ScriptControl.set_shortcut_action("backspace", "script_quit")
+		ScriptControl.set_shortcut_action("script_altgr_backspace", "script_quit")
 		tap.fn(tagged_backspace_sentinel())
 		hs_stub.timer.__fire_all()
 		ScriptControl.stop()

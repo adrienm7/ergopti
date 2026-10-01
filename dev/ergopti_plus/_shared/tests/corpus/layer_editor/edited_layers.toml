@@ -76,6 +76,8 @@ schema_version = 1
 "KeyG" = "keystroke:F12"
 "Space" = "spotlight"
 "MetaRight" = "escape_or_option_shift"
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
 
 [layers.nav.linux]
 "KeyT" = "mute"

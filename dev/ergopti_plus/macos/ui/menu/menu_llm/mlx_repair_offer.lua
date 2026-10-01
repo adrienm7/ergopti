@@ -36,6 +36,19 @@ local LOG = "menu_llm.mlx_repair_offer"
 -- Reveals a path in the Finder without a shell.
 local OPEN_BIN = "/usr/bin/open"
 
+-- System Settings > Network, where the relay (proxy) of a managed Mac is set.
+local NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
+
+-- The actions each network class offers, in display order (the order of
+-- _shared/modules/network/managed_network.json, with the ones MLX can serve:
+-- a retry, the network settings, and Ollama in place of an API).
+local NETWORK_ACTIONS = {
+	certificate  = { "retry", "alternative" },
+	proxy        = { "open_network_settings", "retry" },
+	host_blocked = { "retry", "alternative" },
+	offline      = { "retry", "open_network_settings" },
+}
+
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
 local function checker() return require("modules.llm.mlx_deps_checker") end
 local function i18n() return require("infra.i18n") end
@@ -117,6 +130,22 @@ local function dialog_for(cause)
 		venv = ok_venv and venv or nil,
 		log_path = Logger.today_log_path(),
 	})
+	if NETWORK_ACTIONS[cause.kind] then
+		-- A network failure: its plain cause and the actions that can fix it.
+		local labels = {
+			retry = i18n().get("network.action.retry"),
+			open_network_settings = i18n().get("network.action.open_proxy_settings"),
+			alternative = type(_alternative) == "function" and i18n().get("mlx.use_ollama") or nil,
+		}
+		local choices, actions = {}, {}
+		for _, action in ipairs(NETWORK_ACTIONS[cause.kind]) do
+			if labels[action] then
+				choices[#choices + 1] = labels[action]
+				actions[#actions + 1] = action
+			end
+		end
+		return { title = i18n().get("mlx.repair_title"), body = body, choices = choices, actions = actions }
+	end
 	if cause.kind == "unsupported" then
 		if type(_alternative) == "function" then
 			return {
@@ -156,12 +185,47 @@ local function present(cause)
 		return false
 	end
 	cause = resolve_cause(cause)
+	if cause.kind == "no_native_python" then
+		-- The fix is a Python this Mac runs natively, not an MLX repair: its own
+		-- offer names what was found and carries the install.
+		return require("ui.python_runtime_offer").offer(cause.state)
+	end
 	local dialog = dialog_for(cause)
 	Logger.warn(LOG, "Offering the MLX %s action for a %s failure.",
-		tostring(dialog.action or "acknowledge"), tostring(cause.kind))
+		tostring(dialog.action or (dialog.actions and table.concat(dialog.actions, "/")) or "acknowledge"),
+		tostring(cause.kind))
 	_asking = true
 	local ok, choice
-	if dialog.secondary == nil then
+	if dialog.choices then
+		local chosen
+		ok, chosen = pcall(dialogs().choose, dialog.title, dialog.body, dialog.choices,
+			i18n().get("common.later"), i18n().get("common.ok"))
+		_asking = false
+		if not ok then
+			Logger.error(LOG, "The MLX network dialog could not be shown: %s", tostring(chosen))
+			return false
+		end
+		local action = chosen and dialog.actions[chosen] or nil
+		if action == "retry" then
+			M.repair()
+		elseif action == "open_network_settings" then
+			local opened, started = pcall(function()
+				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { NETWORK_SETTINGS_URL }, nil)
+				return handle ~= nil and handle.start() == true
+			end)
+			if not opened or started ~= true then
+				Logger.error(LOG, "The network settings could not be opened: %s.", tostring(started))
+			end
+		elseif action == "alternative" then
+			local called, selected = pcall(_alternative)
+			if not called or selected == false then
+				Logger.error(LOG, "Selecting Ollama instead of MLX failed: %s.", tostring(selected))
+			end
+		else
+			Logger.info(LOG, "MLX network fix declined (%s).", tostring(cause.kind))
+		end
+		return true
+	elseif dialog.secondary == nil then
 		-- The native alert types its optional arguments: a nil second button
 		-- followed by a style is not "no button", so a notice passes neither.
 		ok, choice = pcall(dialogs().block_alert, dialog.title, dialog.body, dialog.primary)

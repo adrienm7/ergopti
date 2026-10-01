@@ -4,11 +4,14 @@
 --- MODULE: Navigation Layer Editor (macOS host)
 --- DESCRIPTION:
 --- Shows the shared navigation layer editor (_shared/ui/layer_editor) in a
---- webview, answers its "ready" with the user's layers.toml, and saves what it
---- sends. The shared host logic (_shared/lua/keymap/layer_editor.lua) checks
+--- webview, answers its "ready" with the user's layers.toml, the legends of the
+--- current input source and the key whose hold enters the layer, and saves
+--- what it sends. The shared host logic (_shared/lua/keymap/layer_editor.lua) checks
 --- the text against every OS's loader and publishes it through the atomic
 --- FileSystem adapter; the Karabiner rules are then regenerated, and every
---- regeneration reads layers.toml again, so the edited layer applies.
+--- regeneration reads layers.toml again, so the edited layer applies. The
+--- wheel bindings, which Karabiner cannot take, are handed to their
+--- Hammerspoon owner.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One window: a second open brings the first to the front.
@@ -17,6 +20,15 @@
 --- 3. A refused save keeps the window open with the reason. A saved file whose
 ---    regeneration cannot even be requested keeps it open too, saying the file
 ---    is written but not applied yet; otherwise the window closes.
+--- 4. Legends: each key that types a character shows what the current input
+---    source puts on it (infra/keycodes over hs.keycodes.map, which follows the
+---    input source live), read in the registry's ISO form the navigation layer
+---    is generated for. macOS emulates no layout: an installed Ergopti is the
+---    input source itself. The page asks again when its window comes back to
+---    the front, so a switch made meanwhile shows.
+--- 5. The layer key is the tap-hold key whose hold is the layer action
+---    (NavLayer.HOLD_ACTION_ID) in the remap facade's configuration, found in
+---    the registry by its Karabiner key code.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +44,8 @@ local Json        = require("json")
 local TomlCodec   = require("toml_codec")
 local Layers      = require("keymap.layers")
 local LayerEditor = require("keymap.layer_editor")
+local Keycodes    = require("infra.keycodes")
+local NavLayer    = require("platform.remap.nav_layer")
 
 local LOG = "layer_editor"
 
@@ -76,6 +90,59 @@ local function load_context()
 	})
 end
 
+--- An override of a registry key for the ISO form, when it has one.
+--- @param entry table A registry key.
+--- @param field string hs | karabiner.
+--- @return any
+local function iso_field(entry, field)
+	local override = entry["macos_" .. NavLayer.KEYBOARD_FORM]
+	if type(override) == "table" and override[field] ~= nil then return override[field] end
+	return entry[field]
+end
+
+--- The legends of the current input source.
+--- @param ctx table The loader context.
+--- @return table legends The page's `legends`.
+local function current_legends(ctx)
+	local legends, unresolved = LayerEditor.legends({
+		ctx       = ctx,
+		source    = LayerEditor.LEGEND_SOURCE_OS,
+		character = function(_, entry)
+			local keycode = iso_field(entry, "hs")
+			return type(keycode) == "number" and Keycodes.character_for(keycode) or nil
+		end,
+	})
+	LayerEditor.report_unresolved(unresolved, "the current input source types nothing printable there",
+		function(message) Logger.warn(LOG, "%s", message) end)
+	return legends
+end
+
+--- The registry codes of the keys whose hold enters the layer.
+--- @param ctx table The loader context.
+--- @param karabiner table The remap facade.
+--- @return table codes
+local function layer_keys(ctx, karabiner)
+	local codes = {}
+	local karabiner_key_code = function(entry)
+		local event = iso_field(entry, "karabiner")
+		return type(event) == "table" and event.key_code or nil
+	end
+	for _, key in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+		if karabiner.get_hold_action(key.id) == NavLayer.HOLD_ACTION_ID then
+			local key_code = type(key.from) == "table" and key.from.key_code or nil
+			local code = LayerEditor.code_of(ctx, karabiner_key_code, key_code)
+			if code then
+				codes[#codes + 1] = code
+			else
+				-- Fn has no place on the registry's board: nothing to mark.
+				Logger.debug(LOG, "The layer key '%s' is not on the editor's board.", tostring(key.id))
+			end
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
 --- Calls one of the page's functions with a JSON payload.
 --- @param session table The session whose page is called.
 --- @param fn_name string init | saveResult.
@@ -108,6 +175,19 @@ local function close_session(session)
 	end
 	if session.usercontent then pcall(function() session.usercontent:setCallback(nil) end) end
 	Logger.info(LOG, "Layer editor closed.")
+end
+
+--- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
+--- Karabiner, to their owner (modules/shortcuts/bindings.lua).
+local function reconcile_wheel()
+	local ok, committed = pcall(function()
+		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+	end)
+	if not ok then
+		Logger.error(LOG, "The layer's wheel bindings could not be applied: %s.", tostring(committed))
+	elseif committed ~= true then
+		Logger.warn(LOG, "The layer's wheel bindings apply with the next Shortcuts start: a start is in progress.")
+	end
 end
 
 --- Asks the remap engine to regenerate the Karabiner rules.
@@ -150,8 +230,21 @@ local function push_init(session)
 		config_dir  = ConfigPaths.get_config_dir(),
 		read_file   = LayerEditor.read_file,
 		toml_decode = TomlCodec.decode,
+		legends     = current_legends(ctx),
+		layer_keys  = layer_keys(ctx, session.karabiner),
 	})
 	call_page(session, "init", payload)
+end
+
+--- Sends the page the legends of the input source in use now.
+--- @param session table
+local function push_legends(session)
+	local ok_ctx, ctx = pcall(load_context)
+	if not ok_ctx then
+		Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
+		return
+	end
+	call_page(session, "setLegends", current_legends(ctx))
 end
 
 --- Validates and saves the page's text, then applies it.
@@ -183,6 +276,7 @@ local function save(session, text)
 		return
 	end
 	local applied = request_regeneration(session.karabiner)
+	reconcile_wheel()
 	if applied then
 		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
 	else
@@ -205,6 +299,8 @@ function M._on_message(session, body)
 		save(session, body.text)
 	elseif body.action == "cancel" then
 		close_session(session)
+	elseif body.action == "legends" then
+		push_legends(session)
 	else
 		Logger.warn(LOG, "Ignored the unknown layer editor action '%s'.", tostring(body.action))
 	end

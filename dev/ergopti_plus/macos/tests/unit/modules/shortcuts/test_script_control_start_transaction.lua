@@ -236,11 +236,11 @@ helpers.describe("script-control terminal native readback", function()
 		function tap:stop() self.enabled = false; return self end
 		local subject = fresh_script_control(scheduler, function() return tap end)
 		helpers.assert_eq(subject.is_started(), false)
-		helpers.assert_eq(subject.set_shortcut_action("return_key", "none"), true)
+		helpers.assert_eq(subject.set_shortcut_action("script_altgr_enter", "none"), true)
 		local captured = subject.get_shortcut_actions()
-		helpers.assert_eq(captured.return_key, "none")
-		captured.return_key = "forged"
-		helpers.assert_eq(subject.get_shortcut_actions().return_key, "none")
+		helpers.assert_eq(captured.script_altgr_enter, "none")
+		captured.script_altgr_enter = "forged"
+		helpers.assert_eq(subject.get_shortcut_actions().script_altgr_enter, "none")
 		helpers.assert_eq(subject.start({}, {}, {}), true)
 		helpers.assert_eq(subject.is_started(), true)
 		tap.enabled = false

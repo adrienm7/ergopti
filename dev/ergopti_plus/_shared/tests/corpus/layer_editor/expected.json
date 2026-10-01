@@ -3,16 +3,19 @@
 	"windows": {
 		"KeyT": "keystroke:ArrowUp@repeat",
 		"KeyG": null,
-		"KeyQ": "keystroke:ctrl+shift+Home"
+		"KeyQ": "keystroke:ctrl+shift+Home",
+		"WheelUp": "keystroke:AudioVolumeUp@repeat"
 	},
 	"macos": {
 		"KeyT": "keystroke:shift+meta+KeyZ",
 		"KeyG": "keystroke:F12",
-		"KeyQ": "keystroke:shift+meta+ArrowUp"
+		"KeyQ": "keystroke:shift+meta+ArrowUp",
+		"WheelUp": "keystroke:AudioVolumeUp@repeat"
 	},
 	"linux": {
 		"KeyT": "keystroke:AudioVolumeMute",
 		"KeyG": "keystroke:F12",
-		"KeyQ": "keystroke:ctrl+shift+Home"
+		"KeyQ": "keystroke:ctrl+shift+Home",
+		"WheelUp": null
 	}
 }

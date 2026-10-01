@@ -165,6 +165,9 @@
 					"const": true,
 					"description": "Only on an input_altering entry the maintainer decided to switch on in an empty configuration (the script-management chords, 2026-09-30). Its default must equal its recommended value on every platform; every other input-altering entry defaults to off."
 				},
+				"cleared": {
+					"description": "Required with active_by_default, forbidden without it: the off value (false, \"none\" or \"\") a clear writes explicitly, because deleting the key restores the preset."
+				},
 				"type": {
 					"enum": ["boolean", "enum", "string", "number", "array", "action", "feature"]
 				},

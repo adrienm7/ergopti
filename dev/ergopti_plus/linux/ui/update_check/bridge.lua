@@ -32,6 +32,7 @@ M.bridge_name = "update_check_bridge"
 local Json         = require("json")
 local Logger       = require("logger.shim")
 local CheckSession = require("updater.check_session")
+local Installation = require("infra.installation")
 
 local LOG = "bridge.update_check"
 
@@ -84,6 +85,12 @@ local function install(updater, result)
 	local release = updater.get_cached_release()
 	if type(release) ~= "table" or release.tag ~= result.latest then
 		Logger.error(LOG, "Refused to install %s: the updater no longer offers it.", tostring(result.latest))
+		return false
+	end
+	-- A source run has no installation to replace; the menu greys its Update
+	-- row for the same reason. Nothing is downloaded.
+	if Installation.is_source_run() then
+		Logger.warn(LOG, "Refused to install %s: this is a local version run from source.", release.tag)
 		return false
 	end
 	local I18n = require("infra.i18n")

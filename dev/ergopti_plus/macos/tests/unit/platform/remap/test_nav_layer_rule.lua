@@ -17,7 +17,8 @@
 --- 2. One key: KeyT bound to F3 instead of F2 changes the t manipulators only.
 --- 3. Contracts: every manipulator is gated on layer_active; no binding is no
 ---    rule; `none` swallows the key; a mouse button is a layer key; the wheel
----    and a repeat count have no Karabiner form; every macOS call handler the
+---    and a repeat count have no Karabiner form, the wheel being the strokes
+---    Hammerspoon posts (wheel_slots); every macOS call handler the
 ---    vocabulary declares is implemented; a layers.toml rejected as a whole
 ---    closes its START with an error and no SUCCESS.
 --- 4. The generator deploys state.nav_layer in place of the static file and
@@ -210,13 +211,34 @@ helpers.describe("Karabiner navigation layer contracts", function()
 	end)
 
 	helpers.it("the wheel and a repeat count have no Karabiner form", function()
-		local result = Layers.load('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n',
-			"macos", ctx, TomlCodec.decode)
-		helpers.assert_eq(#result.errors, 1)
-		helpers.assert_eq(result.errors[1].code, "unavailable_on_os", "the loader keeps the wheel out on macOS")
+		local wheel_only = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n')
+		helpers.assert_not_nil(wheel_only.WheelUp, "the loader takes the wheel as a macOS layer key (layer-wheel-slots)")
+		helpers.assert_nil(NavLayer.build_rule(wheel_only, ctx.registry),
+			"the wheel is Hammerspoon's to run: Karabiner gets no manipulator for it")
 		helpers.assert_throws(function()
 			NavLayer.build_rule({ Digit1 = { kind = "repeat_count", count = 1 } }, ctx.registry)
 		end, "a repeat count does not exist on macOS")
+	end)
+
+	helpers.it("(layer-wheel-slots) the recommended wheel is volume up and down, posted as media keys", function()
+		local slots = NavLayer.wheel_slots(bindings_of(recommended), ctx.registry)
+		helpers.assert_eq(slots.vertical[1], { code = "WheelUp", strokes = { { system = "SOUND_UP" } } })
+		helpers.assert_eq(slots.vertical[-1], { code = "WheelDown", strokes = { { system = "SOUND_DOWN" } } })
+		helpers.assert_nil(next(slots.horizontal), "the recommended layer leaves the horizontal wheel scrolling")
+	end)
+
+	helpers.it("(layer-wheel-slots) an edited wheel slot sends its keystroke, and none swallows the turn", function()
+		local slots = NavLayer.wheel_slots(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"WheelUp" = "keystroke:primary+ArrowUp"\n"WheelDown" = "none"\n"WheelLeft" = "mute"\n'), ctx.registry)
+		helpers.assert_eq(slots.vertical[1].strokes, { { mods = { "cmd" }, keycode = ctx.registry.keys.ArrowUp.hs } })
+		helpers.assert_eq(slots.vertical[-1].strokes, {}, "a direction bound to none is consumed and sends nothing")
+		helpers.assert_eq(slots.horizontal[-1].strokes, { { system = "MUTE" } })
+	end)
+
+	helpers.it("(layer-wheel-slots) a binding a wheel turn cannot send leaves that direction scrolling", function()
+		local slots = NavLayer.wheel_slots({ WheelUp = { kind = "call", handler = "tap_escape_hold_option_shift" } },
+			ctx.registry)
+		helpers.assert_nil(slots.vertical[1], "a tap/hold handler has no stroke to send per notch")
 	end)
 
 	helpers.it("implements every macOS call handler the vocabulary declares", function()

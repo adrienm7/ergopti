@@ -17,15 +17,20 @@
 				<h1 data-i18n="layer_editor.window_title"></h1>
 				<p class="subtitle" data-i18n="layer_editor.subtitle"></p>
 				<p class="note" data-i18n="layer_editor.scope_note"></p>
+				<p class="note" id="legend-source"></p>
 			</div>
 			<div class="hdr-tools">
 				<select id="form">
 					<option value="iso" data-i18n="layer_editor.form.iso"></option>
 					<option value="ansi" data-i18n="layer_editor.form.ansi"></option>
 				</select>
-				<div class="legend">
+				<label class="toggle"
+					><input type="checkbox" id="numpad" /><span data-i18n="layer_editor.numpad"></span
+				></label>
+				<div class="chips">
 					<span class="chip recommended" data-i18n="layer_editor.legend.recommended"></span>
 					<span class="chip custom" data-i18n="layer_editor.legend.custom"></span>
+					<span class="chip layer-key" data-i18n="layer_editor.layer_key"></span>
 					<span class="chip unavailable" data-i18n="layer_editor.legend.unavailable"></span>
 				</div>
 			</div>

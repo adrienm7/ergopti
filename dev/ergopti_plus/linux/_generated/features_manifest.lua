@@ -47,7 +47,7 @@ M.sections = {
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.lalt_caps_lock"] = { description_key = "menu.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
@@ -417,6 +417,21 @@ M.features = {
 	},
 	{
 		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" }, recommended = true, input_altering = true,
+	},
+	{
+		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_backspace", id = "script_altgr_backspace", section = "shortcuts.script_control", default = "script_reload", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_backspace", platforms = { "ahk", "hs", "linux" }, recommended = "script_reload", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_delete", id = "script_altgr_delete", section = "shortcuts.script_control", default = "open_personal_shortcuts", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_delete", platforms = { "ahk", "hs", "linux" }, recommended = "open_personal_shortcuts", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_enter", id = "script_altgr_enter", section = "shortcuts.script_control", default = "script_pause_toggle", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_enter", platforms = { "ahk", "hs", "linux" }, recommended = "script_pause_toggle", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", input_altering = true, cleared = "none",
 	},
 	{
 		path = "shortcuts.keyboard.ctrl_g", id = "ctrl_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true,
@@ -794,21 +809,6 @@ M.unavailable = {
 		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.script_control.chords_enabled", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_backspace", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_delete", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_enter", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.script_control.script_altgr_escape", section = "shortcuts.script_control", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.keyboard.ctrl_b", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
 	},
 	{
@@ -1116,21 +1116,6 @@ M.unavailable = {
 	},
 	{
 		path = "ui.menubar_icon", section = "ui", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.script_control.enabled", section = "shortcuts.script_control", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.script_control.return_key", section = "shortcuts.script_control", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.script_control.backspace", section = "shortcuts.script_control", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.script_control.escape", section = "shortcuts.script_control", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.keys.layer_scroll", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },

@@ -249,7 +249,6 @@ ctrl_t = true
 ctrl_u = true
 ctrl_w = true
 ctrl_x = true
-layer_scroll = true
 
 
 

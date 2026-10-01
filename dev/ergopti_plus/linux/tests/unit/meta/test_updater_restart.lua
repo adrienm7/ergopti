@@ -110,12 +110,20 @@ end)
 helpers.describe("updater restart: the tray tells and acts", function()
 
 	--- The About submenu built on a fake updater; returns its update rows.
-	local function updates_rows(fake, ctx_extra)
+	--- @param source_run boolean|nil What the installed-build owner answers
+	---   (an installed build by default; the suite itself runs from a checkout).
+	local function updates_rows(fake, ctx_extra, source_run)
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return source_run == true end
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
 		local title = require("infra.i18n").get("menu.about.title")
-		for _, item in ipairs(mb.build(ctx)) do
+		local ok, items = pcall(mb.build, ctx)
+		Installation.is_source_run = real_is_source_run
+		if not ok then error(items, 0) end
+		for _, item in ipairs(items) do
 			if item.title == title then return item.menu end
 		end
 		error("no About section")
@@ -195,6 +203,36 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		end
 		helpers.assert_eq(requested, shown.download_url,
 			"the click must name the rendered release so the manager can refuse a changed one")
+	end)
+
+	-- A source run has no installation to replace: the row naming the release
+	-- stays, greyed, says why, and has no action a click could start.
+	helpers.it("greys the update row of a source run, naming why", function()
+		local release = { tag = "v0.0.0-dev.134" }
+		local fake = fake_updater("available", release)
+		fake.download_update = function() error("a source run must download nothing") end
+		fake.install_update = function() error("a source run must install nothing") end
+		local rows = updates_rows(fake, { on_update_finished = function() end }, true)
+		local i18n = require("infra.i18n")
+		local plain = i18n.get("menu.about.update_now"):gsub("{tag}", release.tag)
+		-- The head of the reason, cut as the renderers cut it: before its first
+		-- colon, ASCII or full-width.
+		local reason = i18n.get("menu.about.source_run_reason")
+		local cut = nil
+		for _, mark in ipairs({ ":", "\239\188\154" }) do
+			local at = reason:find(mark, 1, true)
+			if at and (cut == nil or at < cut) then cut = at end
+		end
+		local head = ((cut and reason:sub(1, cut - 1) or reason):gsub("^%s+", ""):gsub("%s+$", ""))
+		local greyed = plain .. " — " .. head
+		local found = nil
+		for _, row in ipairs(rows) do
+			helpers.assert_true(row.title ~= plain, "no live update row on a source run")
+			if row.title == greyed then found = row end
+		end
+		helpers.assert_true(found ~= nil, "the row stays and names why")
+		helpers.assert_eq(found.disabled, true, "greyed")
+		helpers.assert_true(found.fn == nil, "with no action to start")
 	end)
 
 	helpers.it("hands a failed download on, which is not installed", function()

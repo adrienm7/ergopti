@@ -55,6 +55,7 @@ local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "mlx_deps"
 
@@ -235,6 +236,24 @@ function M.runtime_installed()
 		return ok and mode == "file"
 	end
 	return is_file(python_path) and is_file(venv .. "/.last_sync_hash"), python_path
+end
+
+--- Names why the installed runtime's interpreter must never be started: its
+--- Mach-O lacks a slice for this Mac's processor (a venv built on an Intel
+--- Python on Apple silicon), so macOS would run it under Rosetta. Read from the
+--- header, without starting it.
+--- @return table|nil cause { kind = "venv_not_native", path, archs, line, repairable }, nil when native or absent.
+function M.foreign_interpreter_cause()
+	local venv = M.venv_dir()
+	if not venv then return nil end
+	local python = venv .. "/bin/python"
+	local native_ok, detail = PythonInterpreter.inspect(python)
+	if native_ok or detail.archs == nil or detail.reason == "unknown_native_arch" then return nil end
+	local archs = PythonInterpreter.describe_archs(detail.archs)
+	return {
+		kind = "venv_not_native", path = python, archs = archs, repairable = true,
+		line = python .. " [" .. archs .. "]",
+	}
 end
 
 --- Names the venv only when it is exactly the folder Ergopti owns and may
@@ -1022,6 +1041,17 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- provisioned only under the grant of an MLX backend selection, or when a
 	-- pause replays a script that selection already started.
 	local installed, venv_python = M.runtime_installed()
+	-- A venv on an interpreter for another processor is never reused: it is
+	-- flagged broken, and the selection's repair rebuilds it natively.
+	if installed then
+		local foreign = M.foreign_interpreter_cause()
+		if foreign then
+			Logger.warn(LOG, "The MLX venv's Python %s is built for %s, not this Mac; it is never started.",
+				foreign.path, foreign.archs)
+			M.invalidate_runtime(foreign)
+			installed = false
+		end
+	end
 	local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
 		and _resume_intent.kind == "task"
 	local install_allowed = install_granted or replaying_install
@@ -1134,6 +1164,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- Forward the project root so the script knows where to find .venv even
 	-- when launched outside the project directory (e.g. from launchd).
 	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
+	-- The script refuses every uv and venv interpreter without this slice, and
+	-- builds the venv on a native system Python rather than download one.
+	env_prefix = env_prefix .. "ERGOPTI_NATIVE_ARCH=" .. shell_quote(PythonInterpreter.native_arch() or "") .. " "
+		.. "ERGOPTI_NATIVE_PYTHONS=" .. shell_quote(table.concat(PythonInterpreter.native_candidates(), ":")) .. " "
 	if repair then env_prefix = env_prefix .. "ERGOPTI_MLX_REPAIR=1 " end
 	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
 
@@ -1161,6 +1195,14 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_stale_intent()
 	end
 
+	-- The PTY wrapper runs on an interpreter this Mac runs natively; without
+	-- one the failure is named and its offer carries the install
+	-- (hardening-h-no-rosetta).
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		return settle_preflight_failure(nil,
+			{ kind = "no_native_python", state = python_state, repairable = false })
+	end
 	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency")
 	if not pty_wrapper_path then
 		Logger.error(LOG, "Failed to publish the MLX process-group wrapper: %s.",
@@ -1178,8 +1220,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- stdio. Without a pty, uv (Rust) and any libc-using subprocess switch
 	-- to fully buffered stdio when piped, meaning their output only reaches
 	-- our streaming callback when a 4 KB buffer fills — i.e., not for
-	-- minutes. We use Python (built-in to macOS at /usr/bin/python3 since
-	-- Catalina) rather than BSD `script` because macOS `script -F` does not
+	-- minutes. We use Python (the native one adapters.python_interpreter
+	-- names) rather than BSD `script` because macOS `script -F` does not
 	-- mean "flush" (it means "write to named pipe") — `script` ends up
 	-- buffering its own stdout output and we get nothing in real time.
 	-- python -u + pty.spawn gives us unbuffered, line-by-line forwarding.
@@ -1380,7 +1422,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 
 	-- Construct the full Python invocation: python3 executes the PTY wrapper,
 	-- passing bash_cmd so the child process receives the exact shell command.
-	task = TaskLifecycle.native("MLX dependency bootstrap", "/usr/bin/python3",
+	task = TaskLifecycle.native("MLX dependency bootstrap", python_bin,
 		completion_callback, streaming_callback,
 		{ "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
 

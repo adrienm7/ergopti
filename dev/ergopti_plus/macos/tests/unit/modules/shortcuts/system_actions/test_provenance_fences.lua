@@ -20,6 +20,31 @@ local physical_scroll = fixture.physical_scroll
 local owned_scroll = fixture.owned_scroll
 local capture_on_keycode_10 = fixture.capture_on_keycode_10
 
+--- The navigation layer's wheel binding these cases run: volume up on a turn
+--- up, nothing elsewhere (the shape of NavLayer.wheel_slots).
+--- @param axis string "vertical" or "horizontal".
+--- @param direction number 1 or -1.
+--- @return table|nil slot
+local function volume_up_slot(axis, direction)
+	if axis == "vertical" and direction == 1 then
+		return { code = "WheelUp", strokes = { { system = "SOUND_UP" } } }
+	end
+	return nil
+end
+
+--- Publishes the sentinel Karabiner taps on entering the navigation layer, as
+--- the keymap tap that claims it does.
+local function enter_layer()
+	require("modules.keymap.control_sentinels").claim_key(
+		require("infra.keycodes").F20_LAYER_NAV_ENTERED, true, {})
+end
+
+--- Publishes the sentinel Karabiner taps on leaving the navigation layer.
+local function exit_layer()
+	require("modules.keymap.control_sentinels").claim_key(
+		require("infra.keycodes").F19_LAYER_NAV_EXITED, true, {})
+end
+
 helpers.describe("shortcuts.actions.system: exact provenance and ordered fences (HS-H-01)", function()
 	helpers.it("an owned @ event cannot trigger the screenshot tap (HS-H-01)", function()
 		with_fixture(function()
@@ -212,7 +237,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		end)
 	end)
 
-	helpers.it("F19 state is immediate, while owned F19/scroll events never control volume (HS-H-01)", function()
+	helpers.it("the layer state is immediate, while owned scroll never runs a wheel binding (HS-H-01)", function()
 		with_fixture(function()
 			local cleanup_count = 0
 			local click_held = true
@@ -234,34 +259,33 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 					end,
 				}
 			end
-			fixture.system.bind_layer_scroll()
+			fixture.system.bind_layer_wheel(nil, volume_up_slot)
 			local taps = fixture.hs.eventtap.__taps
-			local key_tap = taps[#taps - 1]
 			local scroll_tap = taps[#taps]
-			local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
 
-			key_tap.fn(owned_key_down(fixture, "f19", f19, "", {}))
+			enter_layer()
 			local owned_consume = scroll_tap.fn(owned_scroll(fixture, 1))
-			helpers.assert_true(not owned_consume,
-				"an owned F19 must not arm the physical layer, and owned scroll is never a command")
+			helpers.assert_true(not owned_consume, "owned scroll is never a command, even inside the layer")
 
-			local down = physical_key_down(fixture, f19, "", {})
-			local down_consume = key_tap.fn(down)
-			helpers.assert_true(not down_consume, "the physical F19 itself remains visible to the OS")
-			-- Do not fire the deferred gesture-cleanup timer. The very first following
-			-- scroll must already observe layer_held=true.
+			exit_layer()
+			helpers.assert_true(not scroll_tap.fn(physical_scroll(fixture, 1)),
+				"outside the layer the wheel scrolls")
+			-- Do not fire the deferred dispatcher. The very first scroll after the
+			-- sentinel must already observe the layer as held.
+			enter_layer()
 			local scroll_consume = scroll_tap.fn(physical_scroll(fixture, 1))
 			helpers.assert_true(scroll_consume,
-				"F19 layer state must be O(1) synchronous or the first scroll notch leaks")
+				"the layer state must be O(1) synchronous or the first scroll notch leaks")
 			helpers.assert_eq(#media_events, 0,
 				"media emission and gesture cleanup must still run after the tap returns")
 			fire_post_callback_actions(fixture.hs)
 			helpers.assert_eq(#media_events, 2, "one notch must emit one media down/up pair")
 			helpers.assert_eq(cleanup_count, 1)
+			exit_layer()
 		end)
 	end)
 
-	helpers.it("reports every refused F19 media-key phase", function()
+	helpers.it("reports every refused media-key phase of a wheel binding", function()
 		with_fixture(function()
 			for _, mode in ipairs({ "false", "nil", "throw" }) do
 				local errors = {}
@@ -282,15 +306,14 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 					}
 				end
 
-				fixture.system.bind_layer_scroll()
+				fixture.system.bind_layer_wheel(nil, volume_up_slot)
 				local taps = fixture.hs.eventtap.__taps
-				local key_tap = taps[#taps - 1]
 				local scroll_tap = taps[#taps]
-				local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
-				key_tap.fn(physical_key_down(fixture, f19, "", {}))
+				enter_layer()
 				helpers.assert_true(scroll_tap.fn(physical_scroll(fixture, 1)),
 					mode .. " refusal must still consume the admitted physical scroll")
 				fire_post_callback_actions(fixture.hs)
+				exit_layer()
 
 				helpers.assert_eq(#post_attempts, 2,
 					mode .. " refusal must still attempt the down and up phases")
@@ -520,7 +543,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		end)
 	end)
 
-	helpers.it("unreadable F19 and scroll provenance cannot mutate layer state or emit media (HS-H-01)", function()
+	helpers.it("unreadable scroll provenance cannot run a wheel binding (HS-H-01)", function()
 		with_fixture(function()
 			local fixture = load_h01_system({ gestures = {} })
 			local media_count = 0
@@ -532,25 +555,11 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 					end,
 				}
 			end
-			fixture.system.bind_layer_scroll()
+			fixture.system.bind_layer_wheel(nil, volume_up_slot)
 			local taps = fixture.hs.eventtap.__taps
-			local key_tap = taps[#taps - 1]
 			local scroll_tap = taps[#taps]
-			local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
 
-			fixture.synthetic.emit_key_stroke({}, "a", 0)
-			local unreadable_key = {
-				getType = function() return fixture.hs.eventtap.event.types.keyDown end,
-				getProperty = function() error("unreadable") end,
-				getKeyCode = function() return f19 end,
-			}
-			local key_consume, key_fence = key_tap.fn(unreadable_key)
-			helpers.assert_true(not key_consume)
-			helpers.assert_true(type(key_fence) == "table" and #key_fence == 2)
-			helpers.assert_true(not scroll_tap.fn(physical_scroll(fixture, 1)),
-				"unreadable F19 must not arm the volume layer")
-
-			key_tap.fn(physical_key_down(fixture, f19, "", {}))
+			enter_layer()
 			fixture.synthetic.emit_key_stroke({}, "b", 0)
 			local unreadable_scroll = {
 				getType = function() return fixture.hs.eventtap.event.types.scrollWheel end,
@@ -560,7 +569,8 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 			helpers.assert_true(not scroll_consume)
 			helpers.assert_true(type(scroll_fence) == "table" and #scroll_fence == 2)
 			helpers.assert_eq(media_count, 0,
-				"unreadable scroll provenance must fail closed even while physical F19 is held")
+				"unreadable scroll provenance must fail closed even while the layer is held")
+			exit_layer()
 		end)
 	end)
 end)

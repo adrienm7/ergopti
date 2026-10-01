@@ -21,9 +21,12 @@ package.loaded["infra.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
+	F18_KARABINER_DELETE = 0x4F,
+	SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
 	BACKSPACE = 0x33,
 	RETURN = 0x24,
 	ESCAPE = 0x35,
+	FORWARD_DELETE = 0x75,
 }
 package.loaded["infra.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
 package.loaded["modules.gestures.engine"] = {
@@ -162,16 +165,33 @@ end)
 -- =====================================
 
 helpers.describe("ScriptControl.set_shortcut_action", function()
-	helpers.it("accepts string keyname + action", function()
-		SC.set_shortcut_action("backspace", "script_reload")
-		SC.set_shortcut_action("return_key", "script_pause_toggle")
-		SC.set_shortcut_action("escape", "script_quit")
+	-- script-chords-three-os-2026-09-30: the four slots every driver shares,
+	-- each starting with its preset, the switch on.
+	helpers.it("script-chord: an empty configuration holds the four presets and the switch on", function()
+		local actions = SC.get_shortcut_actions()
+		helpers.assert_eq(actions.script_altgr_enter, "script_pause_toggle")
+		helpers.assert_eq(actions.script_altgr_backspace, "script_reload")
+		helpers.assert_eq(actions.script_altgr_delete, "open_personal_shortcuts")
+		helpers.assert_eq(actions.script_altgr_escape, "script_quit")
+		helpers.assert_eq(SC.chords_enabled(), true)
+		local ids = {}
+		for _, slot in ipairs(SC.slots()) do ids[#ids + 1] = slot.id end
+		helpers.assert_eq(table.concat(ids, ","),
+			"script_altgr_enter,script_altgr_backspace,script_altgr_delete,script_altgr_escape")
 	end)
 
-	helpers.it("rejects non-string arguments without crashing", function()
-		SC.set_shortcut_action(nil, "script_reload")
-		SC.set_shortcut_action("backspace", nil)
-		SC.set_shortcut_action(42, true)
+	helpers.it("accepts a shared slot and an action", function()
+		helpers.assert_eq(SC.set_shortcut_action("script_altgr_backspace", "script_reload"), true)
+		helpers.assert_eq(SC.set_shortcut_action("script_altgr_enter", "script_pause_toggle"), true)
+		helpers.assert_eq(SC.set_shortcut_action("script_altgr_escape", "script_quit"), true)
+	end)
+
+	helpers.it("rejects non-string arguments and unknown slots without crashing", function()
+		helpers.assert_eq(SC.set_shortcut_action(nil, "script_reload"), false)
+		helpers.assert_eq(SC.set_shortcut_action("script_altgr_backspace", nil), false)
+		helpers.assert_eq(SC.set_shortcut_action(42, true), false)
+		helpers.assert_eq(SC.set_shortcut_action("return_key", "script_reload"), false,
+			"the retired macOS slot names are no slot any more")
 	end)
 end)
 
@@ -832,6 +852,123 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		SC.stop()
 		package.loaded["ui.tooltip"] = nil
 	end)
+end)
+
+
+
+
+--- Runs before the extras describe below on purpose: its load_with_stubs
+--- installs a fresh global hs stub, which this file's ScriptControl, holding
+--- the stub it was loaded with, would never read an eventtap from.
+helpers.describe("ScriptControl — the shared script chords (script-chords-three-os-2026-09-30)", function()
+	local handler
+	local regenerations = 0
+	local karabiner = { regenerate = function(done)
+		regenerations = regenerations + 1
+		if type(done) == "function" then done(true) end
+		return true
+	end }
+	local orig_new = _G.hs.eventtap.new
+	_G.hs.eventtap.new = function(_, fn)
+		handler = fn
+		local enabled = false
+		return {
+			start = function() enabled = true end,
+			stop = function() enabled = false end,
+			isEnabled = function() return enabled end,
+		}
+	end
+	_G.hs.eventtap.event.rawFlagMasks = {
+		deviceRightCommand = 0x10, deviceRightAlternate = 0x40,
+		deviceLeftCommand = 0x08, deviceLeftAlternate = 0x20,
+	}
+	SC.stop()
+	SC.start({}, {}, {}, karabiner)
+	_G.hs.eventtap.new = orig_new
+	helpers.assert_true(type(handler) == "function", "script-control tap handler must be captured")
+
+	--- A physical right Command + key, the path Karabiner paused leaves. The
+	--- fallback reads only a real event, which is userdata: a file handle wears
+	--- the event's methods for this block and gets its own metatable back at the end.
+	local pressed = { code = 0 }
+	local event_backing = {
+		getProperty = function() return 0 end,
+		getKeyCode = function() return pressed.code end,
+		getFlags = function() return { cmd = true } end,
+		rawFlags = function() return 0x10 end,
+	}
+	local event_userdata = assert(io.tmpfile())
+	local event_userdata_metatable = debug.getmetatable(event_userdata)
+	debug.setmetatable(event_userdata, { __index = event_backing })
+	local function right_command(code)
+		pressed.code = code
+		return event_userdata
+	end
+	local ESCAPE, RETURN, FORWARD_DELETE = 0x35, 0x24, 0x75
+
+	helpers.it("script-chord: an unassigned slot leaves its chord to the system", function()
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_escape", "none"))
+		helpers.assert_eq(SC.slot_runs("script_altgr_escape"), false)
+		helpers.assert_eq((handler(right_command(ESCAPE))), false, "right Command + Escape reaches the application")
+		helpers.assert_eq(SC.karabiner_chords().normal.script_altgr_escape, nil,
+			"Karabiner keeps no sentinel rule for an unassigned slot")
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_escape", "script_quit"))
+		helpers.assert_eq((handler(right_command(ESCAPE))), true)
+		helpers.assert_eq((handler(right_command(FORWARD_DELETE))), true, "the Delete slot is a chord too")
+		_G.hs.timer.__fire_all()
+	end)
+
+	helpers.it("script-chord: the switch off leaves every chord to the system and keeps the actions", function()
+		helpers.assert_true(SC.set_chords_enabled(false))
+		for _, code in ipairs({ ESCAPE, RETURN, FORWARD_DELETE }) do
+			helpers.assert_eq((handler(right_command(code))), false)
+		end
+		local plan = SC.karabiner_chords()
+		helpers.assert_eq(next(plan.normal), nil)
+		helpers.assert_eq(next(plan.paused), nil)
+		helpers.assert_eq(SC.get_shortcut_actions().script_altgr_escape, "script_quit")
+		helpers.assert_true(SC.set_chords_enabled(true))
+		-- Escape, not Enter: the pause toggle would pause the rest of this file.
+		helpers.assert_eq((handler(right_command(ESCAPE))), true)
+		_G.hs.timer.__fire_all()
+	end)
+
+	helpers.it("script-chord: paused, only a script-management action keeps its chord", function()
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_delete", "other_action"))
+		helpers.assert_eq(SC.slot_runs("script_altgr_delete", true), false)
+		helpers.assert_eq(SC.slot_runs("script_altgr_enter", true), true)
+		helpers.assert_eq(SC.slot_runs("script_altgr_delete", false), true)
+		local plan = SC.karabiner_chords()
+		helpers.assert_eq(plan.normal.script_altgr_delete, true)
+		helpers.assert_eq(plan.paused.script_altgr_delete, nil, "no paused sentinel for another action")
+		helpers.assert_eq(plan.paused.script_altgr_enter, true)
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_delete", "open_personal_shortcuts"))
+		helpers.assert_eq(SC.karabiner_chords().paused.script_altgr_delete, true,
+			"opening the personal shortcuts is a script-management action")
+	end)
+
+	helpers.it("script-chord: a new plan asks Karabiner once for its rules", function()
+		SC.karabiner_chords()
+		_G.hs.timer.__fire_all()
+		regenerations = 0
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_enter", "none"))
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_backspace", "none"))
+		_G.hs.timer.__fire_all()
+		helpers.assert_eq(regenerations, 1, "one regeneration for the two changes of one turn")
+		SC.karabiner_chords()
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_enter", "none"))
+		_G.hs.timer.__fire_all()
+		helpers.assert_eq(regenerations, 1, "a plan Karabiner already read asks for nothing")
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_enter", "script_pause_toggle"))
+		helpers.assert_true(SC.set_shortcut_action("script_altgr_backspace", "script_reload"))
+		_G.hs.timer.__fire_all()
+		helpers.assert_eq(regenerations, 2)
+		SC.karabiner_chords()
+	end)
+
+	SC.stop()
+	debug.setmetatable(event_userdata, event_userdata_metatable)
+	io.close(event_userdata)
 end)
 
 

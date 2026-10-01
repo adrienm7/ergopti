@@ -13,10 +13,11 @@ local function fixture(options)
 	options = options or {}
 	package.loaded["ui.menu.uninstall"] = nil
 	local module = require("ui.menu.uninstall")
-	local calls = { exits = 0, failures = 0, starts = 0, stops = 0, writes = {} }
+	local calls = { exits = 0, failures = 0, starts = 0, stops = 0, writes = {}, resolves = 0, dialogs = 0 }
 	local deps = {
 		i18n = { get = function(key) return key end },
 		logger = { error = function() end, info = function() end },
+		updater = { is_local_source = function() return options.source_run == true end },
 		lifecycle = {
 			is_pending = function() return options.pending == true end,
 			request_user_exit = function(reason)
@@ -26,10 +27,12 @@ local function fixture(options)
 			end,
 		},
 		resolver = { resolve = function()
+			calls.resolves = calls.resolves + 1
 			if options.source then return nil, "source tree" end
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus", nil, { identity = "exact" }
 		end },
 		dialog = { block_alert = function(_, _, _, _, style)
+			calls.dialogs = calls.dialogs + 1
 			if style == "critical" then calls.failures = calls.failures + 1; return end
 			return options.cancel and "button.cancel" or "button.remove"
 		end },
@@ -70,6 +73,18 @@ helpers.describe("macOS uninstall", function()
 			helpers.assert_eq(calls.starts, 0)
 			helpers.assert_eq(calls.exits, 0)
 		end
+	end)
+	-- The About row is greyed on a source run; a click that still reaches the
+	-- action must do nothing, not end in « could not be uninstalled ».
+	helpers.it("does nothing on a local version run from source", function()
+		local module, deps, calls = fixture({ source_run = true })
+		helpers.assert_eq(module.run(deps), false)
+		helpers.assert_eq(calls.resolves, 0, "no helper is looked for")
+		helpers.assert_eq(calls.dialogs, 0, "no dialog is shown")
+		helpers.assert_eq(calls.starts, 0)
+		helpers.assert_eq(calls.exits, 0)
+		deps.updater = { is_local_source = function() return false end }
+		helpers.assert_true(module.run(deps), "the refusal leaves no owner behind")
 	end)
 	helpers.it("retains the application on failed start or authorization write", function()
 		for _, option in ipairs({ "start", "write" }) do

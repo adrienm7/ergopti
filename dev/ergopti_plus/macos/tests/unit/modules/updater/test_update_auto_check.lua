@@ -385,6 +385,8 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 			helpers.assert_eq(#sent, 1, "one notification")
 			helpers.assert_true(sent[1].body:find("v0.0.0-dev.150%", 1, true) ~= nil,
 				"the body names the release, a % included")
+			-- Notify only: Sparkle hears of the release on the click, never before.
+			helpers.assert_eq(#checks, 0, "nothing asks Sparkle for the release before the click")
 			sent[1].on_click()
 			helpers.assert_eq(checks, { "dev" }, "the click asks Sparkle for the release's channel")
 		end)

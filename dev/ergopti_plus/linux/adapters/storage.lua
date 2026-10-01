@@ -281,6 +281,13 @@ function M.has(key)
 	return result == true
 end
 
+--- The file the store persists to, for the configuration backup that copies
+--- it with the configuration folder (modules/updater/config_backup.lua).
+--- @return string Absolute path.
+function M.path()
+	return _STORE_PATH
+end
+
 --- Returns all keys currently present in the persistent store.
 --- @return table Array of key strings.
 function M.keys()

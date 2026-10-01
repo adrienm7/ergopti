@@ -328,6 +328,13 @@ apps_shortcut = false
 enabled = false
 chatgpt_url = "https://chat.openai.com"
 
+[shortcuts.script_control]
+chords_enabled = true
+script_altgr_backspace = "script_reload"
+script_altgr_delete = "open_personal_shortcuts"
+script_altgr_enter = "script_pause_toggle"
+script_altgr_escape = "script_quit"
+
 [shortcuts.keyboard]
 hs_ctrl_space = "none"
 
@@ -462,14 +469,7 @@ menubar_icon = "v1"
 [tap_holds]
 enabled = false
 
-[shortcuts.script_control]
-enabled = false
-return_key = "none"
-backspace = "none"
-escape = "none"
-
 [shortcuts.keys]
-layer_scroll = false
 wrap_text_if_selected = false
 ctrl_a = false
 ctrl_d = false

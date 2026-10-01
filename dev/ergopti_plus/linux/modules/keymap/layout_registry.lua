@@ -228,7 +228,6 @@ end
 --- @param settings table Result of M.settings().
 --- @return table
 local function default_deps(settings)
-	local Version = require("infra.version")
 	local local_dir = ConfigPaths.config(settings.local_folder) .. "/"
 	local driver_root = Paths.driver_root()
 	-- curl records the response ETag in this file (--etag-save); the transport
@@ -236,7 +235,7 @@ local function default_deps(settings)
 	local etag_capture = local_dir .. ".index.etag.download"
 	return {
 		settings = settings,
-		local_source = Version.SOURCE == Version.SOURCE_LOCAL,
+		local_source = require("infra.installation").is_source_run(),
 		transport = {
 			get = function(url, headers, timeout_ms, callback)
 				local is_index = url:sub(-#settings.index_file) == settings.index_file

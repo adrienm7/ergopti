@@ -443,7 +443,10 @@ _MI_BuildAboutMenu() {
 		"about_releases_page", Updater_OpenReleasesPage,
 		"uninstall",           ShowUninstallErgopti
 	)
-	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
+	; A local version run from source has nothing to uninstall: the row stays,
+	; greyed, and says why (the manifest's disabled_reason_key).
+	StateGetters := Map("installed_build", () => !Updater_IsLocalSource())
+	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands, StateGetters)
 }
 
 ; List provider: the version row (the build and its commit), the channel picker

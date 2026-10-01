@@ -44,6 +44,7 @@ local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local ControlSignals = require("platform.remap.control_signals")
 local NavLayer = require("platform.remap.nav_layer")
+local ScriptChordRules = require("platform.remap.script_chord_rules")
 
 local LOG = "karabiner"
 
@@ -111,10 +112,11 @@ local HAND_MODIFIER_FLAGS = {
 local NEVER_POSTED_KEY_CODE   = "vk_none"
 local NEVER_POSTED_EXPRESSION = "0"
 
--- Physical key and sentinel outputs for the script-control rules.
--- These values must match the F13/F14/F15 sentinel constants consumed by
--- modules/shortcuts/script_control.lua.
-local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
+-- Physical key and sentinel outputs of the three historical script-control
+-- rules (Return, Backspace, Escape), which the legacy graph proof below
+-- reconstructs. The rules deployed now are the shared script chords of
+-- platform/remap/script_chord_rules.lua, the Delete slot included.
+local SCRIPT_CONTROL_HOLDER_KEY     = ScriptChordRules.HOLDER_KEY
 -- Synthetic modifier KE stamps onto every emitted F13/F14/F15 sentinel. HS reads
 -- it off the EVENT itself (modules/shortcuts/script_control.lua) to confirm a
 -- genuine sentinel without depending on the live keyboard modifier state — which
@@ -140,7 +142,12 @@ local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 -- layer" from "user pressed a real key that should dismiss the tooltip".
 local LAYER_ACTIVE_VAR_NAME    = "layer_active"
 local LAYER_ACTIVE_ON_VALUE    = 1
+local LAYER_ACTIVE_OFF_VALUE   = 0
 local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
+-- Its pair, emitted by every event list that turns the layer off, so
+-- Hammerspoon knows when the layer is no longer held: it runs the layer's
+-- wheel bindings, which Karabiner cannot take, only in between.
+local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
 
 -- The tap-hold keys the navigation layer swallows while another key holds it,
 -- by key id, with the tap that makes them so (their hold being the layer):
@@ -516,6 +523,15 @@ local function is_layer_activation_event(ev)
 	   and ev.set_variable.value == LAYER_ACTIVE_ON_VALUE
 end
 
+--- Returns true when an event sets layer_active to its "off" value.
+--- @param ev table A karabiner event entry.
+--- @return boolean
+local function is_layer_deactivation_event(ev)
+	if type(ev) ~= "table" or type(ev.set_variable) ~= "table" then return false end
+	return ev.set_variable.name  == LAYER_ACTIVE_VAR_NAME
+	   and ev.set_variable.value == LAYER_ACTIVE_OFF_VALUE
+end
+
 --- Returns true when a karabiner_to array activates the navigation layer.
 --- @param to_events table List of karabiner_to events.
 --- @return boolean
@@ -558,6 +574,39 @@ local function prepend_nav_layer_sentinel(available_actions)
 	end
 end
 
+--- Mutates the available_actions list so every event list that turns the
+--- navigation layer off (a hold's karabiner_to_after_key_up, an explicit layer
+--- off's karabiner_to) emits the F19 exit sentinel right before the variable,
+--- as F20 precedes the one that turns it on. Karabiner holds only the last
+--- entry of a `to` list until the key is released: the sentinel is never that
+--- entry, so it is tapped, and an action that kept nothing down still keeps
+--- nothing down.
+---
+--- Idempotent: a deactivation already preceded by the sentinel is left alone.
+--- @param available_actions table List of action definitions (mutated in place).
+local function insert_nav_layer_exit_sentinel(available_actions)
+	local patched = 0
+	for _, action in ipairs(available_actions) do
+		for _, field in ipairs({ "karabiner_to", "karabiner_to_after_key_up" }) do
+			local events = action[field]
+			local index = nil
+			if type(events) == "table" then
+				for i, ev in ipairs(events) do
+					if index == nil and is_layer_deactivation_event(ev) then index = i end
+				end
+			end
+			local previous = index and events[index - 1] or nil
+			if index and not (type(previous) == "table" and previous.key_code == LAYER_EXIT_SENTINEL_NAME) then
+				table.insert(events, index, { key_code = LAYER_EXIT_SENTINEL_NAME })
+				patched = patched + 1
+			end
+		end
+	end
+	if patched > 0 then
+		Logger.info(LOG, "Inserted the F19 exit sentinel into %d nav-layer-deactivating event list(s).", patched)
+	end
+end
+
 --- Recursively copies a JSON-compatible value without retaining table aliases.
 --- Legacy graph hints must remain in their historical pre-lease form while
 --- timing and generation gates mutate the deployed rule graph in place.
@@ -592,6 +641,27 @@ local function detach_runtime_variable_actions(available_actions)
 		prepared[index] = requires_copy and deep_copy(action) or action
 	end
 	return prepared
+end
+
+--- Removes, in place, every F19 exit sentinel event from a rule graph copy:
+--- releases before the sentinel deployed the same graph without it, and the
+--- legacy compatibility graph must be theirs exactly.
+--- @param value table A deep copy of generated rules.
+local function strip_exit_sentinels(value)
+	if type(value) ~= "table" then return end
+	local count = #value
+	if count > 0 then
+		local kept = {}
+		for index = 1, count do
+			local item = value[index]
+			if not (type(item) == "table" and item.key_code == LAYER_EXIT_SENTINEL_NAME) then
+				kept[#kept + 1] = item
+			end
+			value[index] = nil
+		end
+		for index, item in ipairs(kept) do value[index] = item end
+	end
+	for _, nested in pairs(value) do strip_exit_sentinels(nested) end
 end
 
 --- Recursively compares two values for structural equality.
@@ -1432,9 +1502,10 @@ end
 --- The normal sentinel rules condition on ke_held_right_command, but every normal
 --- rule requires the generation-scoped mode to be ACTIVE. These
 --- pause-only rules gate DIRECTLY on the physical modifier, so
---- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
---- modules/shortcuts/script_control.lua) while every other remap is off, so
---- the script-control shortcuts stay identical and working while paused.
+--- AltGr+Enter / Backspace / Delete / Escape keep emitting their sentinels
+--- (consumed by modules/shortcuts/script_control.lua) while every other remap
+--- is off, for the slots whose action is a script-management one: any other
+--- slot, like an unassigned one, leaves the chord to the system while paused.
 --- While paused the remap layer is OFF, so the user reaches these shortcuts with the
 --- REAL option key — option+Enter / option+Backspace / option+Escape. The rules gate
 --- ONLY on the side-agnostic real "option" key and deliberately do NOT include a
@@ -1442,15 +1513,22 @@ end
 --- right_command+Backspace/Escape rule would shadow native macOS chords (e.g.
 --- Cmd+Delete = delete-to-line-start). One rule per slot (F-H6).
 --- @param lease_token string Canonical generation token shared with the watchdog.
---- @return table|nil rules List of managed Karabiner rules (one per slot).
+--- @param script_chords table|nil The script chords' plan (script_chord_rules.lua);
+---   nil deploys those of an empty configuration.
+--- @return table|nil rules List of managed Karabiner rules (one per paused slot).
 --- @return string|nil error_message Validation failure.
-function M.build_paused_script_control_rules(lease_token)
+function M.build_paused_script_control_rules(lease_token, script_chords)
 	if not LeaseContract.is_valid_token(lease_token) then
 		local err = LeaseContract.invalid_token_error(lease_token)
 		Logger.error(LOG, "Cannot build paused script-control rules: %s.", err)
 		return nil, err
 	end
-	local rules = build_raw_paused_script_control_rules()
+	local built, rules = pcall(ScriptChordRules.paused, script_chords)
+	if not built then
+		local err = "script chords: " .. tostring(rules)
+		Logger.error(LOG, "Cannot build paused script-control rules: %s.", err)
+		return nil, err
+	end
 	local managed, err = gate_managed_rules(rules, lease_token, MANAGED_MODE_PAUSE)
 	if not managed then Logger.error(LOG, "Cannot gate paused script-control rules: %s.", err) end
 	return managed, err
@@ -1594,9 +1672,11 @@ function M.build_karabiner_json(
 	end
 	available_actions = detach_runtime_variable_actions(available_actions)
 
-	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
-	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
+	-- Inject the F20 and F19 sentinels into every action that turns the nav
+	-- layer on or off BEFORE indexing, so all downstream rule builders
+	-- (tap/hold, combo, etc.) inherit them.
 	prepend_nav_layer_sentinel(available_actions)
+	insert_nav_layer_exit_sentinel(available_actions)
 
 	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)
 	if prepared_catalogue_err then
@@ -1708,8 +1788,12 @@ function M.build_karabiner_json(
 	-- Script-control sentinel rules (placed after combos so a user-configured
 	-- rcmd+bsp/ret/esc combo takes precedence over the sentinel when both exist).
 	-- These rely on ke_held_right_command being set by the rcmd tap/hold rule.
+	-- The three historical rules stand here while the legacy graph below is
+	-- captured; the script chords that run now then take their place.
+	local historical_script_rules = {}
 	for _, rule in ipairs(build_script_control_sentinel_rules()) do
 		all_rules[#all_rules + 1] = rule
+		historical_script_rules[rule] = true
 	end
 
 
@@ -1800,7 +1884,11 @@ function M.build_karabiner_json(
 	local legacy_available_actions = detach_runtime_variable_actions(available_actions)
 	local legacy_rules = {}
 	for index, rule in ipairs(all_rules) do
-		if rule ~= nav_rule then legacy_rules[#legacy_rules + 1] = deep_copy(rule) end
+		if rule ~= nav_rule then
+			local legacy_rule = deep_copy(rule)
+			strip_exit_sentinels(legacy_rule)
+			legacy_rules[#legacy_rules + 1] = legacy_rule
+		end
 		if index == nav_layer_position and legacy_layer_keys then
 			legacy_rules[#legacy_rules + 1] = deep_copy(legacy_layer_keys)
 		end
@@ -1811,6 +1899,27 @@ function M.build_karabiner_json(
 	for _, paused_rule in ipairs(build_raw_paused_script_control_rules()) do
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end
+
+	-- Only a script chord that runs an action keeps its sentinel rule: an
+	-- unassigned slot, or every slot while the chords' switch is off, leaves
+	-- the key combination to the system (script-chords-three-os-2026-09-30).
+	local chords_ok, chord_rules = pcall(ScriptChordRules.running, state.script_chords,
+		held_var_name(SCRIPT_CONTROL_HOLDER_KEY))
+	if not chords_ok then
+		local err = "script chords: " .. tostring(chord_rules)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
+	local with_chords = {}
+	for _, rule in ipairs(all_rules) do
+		if not historical_script_rules[rule] then
+			with_chords[#with_chords + 1] = rule
+		elseif chord_rules then
+			for _, chord_rule in ipairs(chord_rules) do with_chords[#with_chords + 1] = chord_rule end
+			chord_rules = nil
+		end
+	end
+	all_rules = with_chords
 
 	-- Tap-Holds or key combinations switched off: drop that feature's rules
 	-- after the legacy capture above, which must keep describing the complete
@@ -1877,7 +1986,7 @@ function M.build_karabiner_json(
 	end
 	all_rules = managed_normal
 
-	local paused_rules, pause_err = M.build_paused_script_control_rules(lease_token)
+	local paused_rules, pause_err = M.build_paused_script_control_rules(lease_token, state.script_chords)
 	if not paused_rules then return nil, pause_err end
 	for _, rule in ipairs(paused_rules) do all_rules[#all_rules + 1] = rule end
 

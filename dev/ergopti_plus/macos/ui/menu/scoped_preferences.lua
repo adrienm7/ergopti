@@ -77,14 +77,17 @@ function M.new(options)
 	--- inverse already make a restore or a clear recoverable (the maintainer
 	--- retired the clear's question on 2026-09-30).
 	--- @param mode string "recommended" or "clear".
+	--- @param select function|nil Narrows the scope to the rows whose path it
+	---   returns true for (config_scope_transaction `select`).
 	--- @return boolean committed
-	function owner.apply(mode)
+	function owner.apply(mode, select)
 		if mode ~= "clear" and mode ~= "recommended" then return false end
+		if select ~= nil and type(select) ~= "function" then return false end
 		return options.admission("Preference scope: " .. options.scope, function()
 			if options.paused() ~= false then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
 			transaction = (options.transaction_factory or Scope.new)({
-				manifest = Manifest,
+				manifest = Manifest, select = select,
 				path = options.path, backup_path = options.backup_path(), files = options.files,
 				capture = function(source, candidate, updates)
 					local baseline = preferences.source_snapshot(options.path)

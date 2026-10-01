@@ -8,6 +8,21 @@ local Scope = require("infra.preferences_scope")
 
 local STATE_FIELDS = { "shortcuts", "chatgpt_url", "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
 
+-- The rows of the script chords' submenu: their section, and the parameters
+-- of the bindings they dispatch under (modules/shortcuts/script_control.lua
+-- BINDING_PREFIX).
+local SCRIPT_CHORD_SECTION = "shortcuts.script_control"
+local SCRIPT_CHORD_PARAMETERS = "gestures.action_parameters." .. require("modules.shortcuts.script_control").BINDING_PREFIX
+
+--- Whether a Shortcuts scope row belongs to the script chords' submenu, whose
+--- restore and clear narrow the scope to it (config_scope_transaction `select`).
+--- @param path string Configuration path of a scope row.
+--- @return boolean
+function M.script_chord_rows(path)
+	return path == SCRIPT_CHORD_SECTION or path:sub(1, #SCRIPT_CHORD_SECTION + 1) == SCRIPT_CHORD_SECTION .. "."
+		or path:sub(1, #SCRIPT_CHORD_PARAMETERS) == SCRIPT_CHORD_PARAMETERS
+end
+
 local function clone(value)
 	if type(value) ~= "table" then return value end
 	local result = {}
@@ -48,6 +63,8 @@ function M.new(options)
 			if script.set_shortcut_action(key, action) ~= true
 				or script.get_shortcut_actions()[key] ~= action then return false end
 		end
+		if script.set_chords_enabled(target.script_chords_on) ~= true
+			or script.chords_enabled() ~= target.script_chords_on then return false end
 		for id, action in pairs(target.keyboard) do if keyboard.get_action(id) ~= action then return false end end
 		for id, action in pairs(target.tap_keys) do if taps.get_action(id) ~= action then return false end end
 		if target.master and shortcuts.resume_bindings("feature_toggle", configuration) ~= true then return false end
@@ -66,9 +83,11 @@ function M.new(options)
 		config.gestures = gestures
 		config.owned_paths = keyboard.get_owned_config_paths
 		-- The scope's reset owns both assignment containers, an older build's
-		-- plain value included.
+		-- plain value included; the script chords' submenu (a `select`) owns
+		-- neither, but writes its inline leaves the same way.
+		local containers = config.select == nil and Preferences.SHORTCUT_CONTAINERS or nil
 		config.prepare_rows = function(source, rows)
-			return Preferences.prepare_shortcut_updates(source, rows, Preferences.SHORTCUT_CONTAINERS)
+			return Preferences.prepare_shortcut_updates(source, rows, containers)
 		end
 		return Scope.new(config)
 	end
@@ -78,7 +97,8 @@ function M.new(options)
 				and shortcuts.has_bindings_pause_debt() == false, "shortcut scope has unsettled ownership")
 			local native = { master = read_started(bindings), script_started = read_started(script),
 				keyboard = clone(keyboard.get_assignments()), tap_keys = {}, keys = {},
-				script_actions = script.get_shortcut_actions(), url = bindings.get_chatgpt_url() }
+				script_actions = script.get_shortcut_actions(), script_chords_on = script.chords_enabled(),
+				url = bindings.get_chatgpt_url() }
 			assert(read_started(keyboard) == native.master, "shortcut children have inconsistent native posture")
 			taps.ensure_loaded(gestures.is_assignable)
 			for _, key in ipairs(taps.keys()) do native.tap_keys[key.id] = taps.get_action(key.id) end
@@ -108,20 +128,25 @@ function M.new(options)
 						assert(native.keys[row.key] ~= nil, "scope key has no native binding owner: " .. row.key)
 						native.keys[row.key], desired.shortcut_keys[row.key] = value, value
 					elseif row.section == "shortcuts.script_control" then
-						if row.key == "enabled" then desired.script_control_enabled = value
+						if row.key == "chords_enabled" then desired.script_control_enabled = value
 						else desired.script_control_shortcuts[row.key] = value end
 					elseif row.section == "shortcuts" and row.key == "enabled" then native.master, desired.shortcuts = value, value
 					elseif row.section == "shortcuts" and row.key == "chatgpt_url" then native.url, desired.chatgpt_url = value, value
 					else error("shortcut scope has no runtime owner: " .. row.section .. "." .. row.key) end
 				end
 			end
+			-- The switch off keeps every slot's action (a clear writes "none" in
+			-- each slot, since an absent slot starts with its preset).
 			for key in pairs(native.script_actions) do
 				local value = desired.script_control_shortcuts[key]
 				if Manifest.has_default("shortcuts.script_control." .. key) then
-					assert(type(value) == "string" and gestures.is_assignable(value), "invalid script action in scope candidate")
-					native.script_actions[key] = desired.script_control_enabled and value or "none"
+					assert(type(value) == "string" and (value == "none" or gestures.is_assignable(value)),
+						"invalid script action in scope candidate")
+					native.script_actions[key] = value
 				end
 			end
+			assert(type(desired.script_control_enabled) == "boolean", "invalid script chords switch in scope candidate")
+			native.script_chords_on = desired.script_control_enabled
 			if apply_native(native) ~= true then return false end
 			set_state(desired)
 			return true

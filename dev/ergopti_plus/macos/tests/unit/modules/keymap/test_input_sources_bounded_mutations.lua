@@ -228,7 +228,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "enable",
-				executable = "/usr/bin/python3",
+				executable = helpers.HEALTHY_PYTHON,
 				invoke = function(IS, done)
 					return IS.enable_keylayout_source_async(KEYLAYOUT_PATH, "Ergopti+", done)
 				end,
@@ -242,7 +242,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "disable",
-				executable = "/usr/bin/python3",
+				executable = helpers.HEALTHY_PYTHON,
 				invoke = function(IS, done)
 					return IS.disable_keylayout_source_async(KL_NAME, "Ergopti+", done)
 				end,
@@ -454,6 +454,40 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(terminals[1].ok, false)
 		helpers.assert_eq(terminals[1].reason, "timeout")
 		helpers.assert_eq(f.tasks[1].terminate_calls, 1)
+		reset_fixture_modules()
+	end)
+
+	-- hardening-h-no-rosetta: the editor runs Python; an Apple silicon Mac with
+	-- only Intel ones starts nothing and is offered a native one.
+	helpers.it("starts no Intel Python to edit the enabled sources and offers a native one", function()
+		local f = load_fixture()
+		local offers = {}
+		package.loaded["ui.python_runtime_offer"] = {
+			offer = function(state) offers[#offers + 1] = state; return true end,
+		}
+		local intel = "\207\250\237\254" .. "\7\0\0\1" .. string.rep("\0", 24)
+		package.loaded["adapters.python_interpreter"]._set_deps({
+			read_head = function(path)
+				if path == helpers.HEALTHY_PYTHON or path == "/usr/local/bin/python3" then return intel end
+				return nil
+			end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		local terminals = {}
+		local accepted = f.IS.enable_keylayout_source_async(KEYLAYOUT_PATH, "Ergopti+", function(ok, _out, reason)
+			terminals[#terminals + 1] = { ok = ok, reason = reason }
+		end)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(#f.tasks, 0, "no interpreter may start under Rosetta")
+		helpers.assert_eq(#terminals, 1)
+		helpers.assert_eq(terminals[1].ok, false)
+		helpers.assert_eq(terminals[1].reason, "python_unavailable")
+		helpers.assert_eq(#offers, 1)
+		helpers.assert_eq(offers[1].kind, "python_not_native")
+		package.loaded["ui.python_runtime_offer"] = nil
 		reset_fixture_modules()
 	end)
 end)

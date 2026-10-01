@@ -442,6 +442,33 @@ local function perform_reload(trigger)
 	end
 end
 
+--- Starts the release the updater just installed in place of this daemon: an
+--- update from the menu or the update-check window, or a release chosen in the
+--- Versions window.
+--- @return boolean started Whether systemd or the relay took the restart over.
+local function restart_on_installed_release()
+	local launch_args = {}
+	for index = 1, #arg do launch_args[index] = arg[index] end
+	local how = require("modules.updater.restarter").restart({
+		wrapper = updater.installed_launcher(),
+		args = launch_args,
+	})
+	if how == "relay" then shutdown.request("update installed") end
+	return how ~= nil
+end
+
+--- Restarts the daemon on the same installation, for a configuration every
+--- module reads at start (the setup wizard's, a restored backup).
+--- @param reason string
+--- @return boolean started
+local function restart_daemon(reason)
+	local launch_args = {}
+	for index = 1, #arg do launch_args[index] = arg[index] end
+	local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args })
+	if how == "relay" then shutdown.request(reason) end
+	return how ~= nil
+end
+
 
 --- Logs the cross-driver diagnostic snapshot once the daemon is ready.
 ---
@@ -1303,6 +1330,18 @@ local function main()
 		end,
 	})
 
+	-- The script-management chords (AltGr + Enter, Backspace, Delete, Escape),
+	-- shared by the three drivers: a chord whose slot runs an action runs it on
+	-- the next loop tick and never reaches the application; an unassigned slot,
+	-- the switch off or, while paused, any action outside script management
+	-- leave the chord to it. They follow no feature switch but their own, so a
+	-- paused daemon can always be resumed from the keyboard.
+	local script_chords = require("modules.shortcuts.script_chords")
+	script_chords.init({
+		is_paused = function() return script_actions.is_paused() end,
+		defer = function(fn) return event_loop.defer(fn) end,
+	})
+
 	-- The number-row tap keys: a plain press of one the user assigned runs its
 	-- action on the next loop tick and never reaches the application. Decided in
 	-- the consumption callback below, before wrap-on-type sees the key.
@@ -1437,6 +1476,7 @@ local function main()
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
 		if MagicKeySource.on_key(detail) then return true end
+		if script_chords.on_key(detail) then return true end
 		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine
@@ -1596,6 +1636,8 @@ local function main()
 							on_config_changed = function()
 								if rebuild_tray_menu then rebuild_tray_menu() end
 							end,
+							restart_after_update = function() return restart_on_installed_release() end,
+							restart = restart_daemon,
 						})
 					end
 					-- So the tick moves to the row the user just chose. Without it the
@@ -1662,13 +1704,7 @@ local function main()
 					notifier.send(i18n_mod.get("updater.installed_restarting")
 						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = "info" })
 				end
-				local launch_args = {}
-				for index = 1, #arg do launch_args[index] = arg[index] end
-				local how = require("modules.updater.restarter").restart({
-					wrapper = updater.installed_launcher(),
-					args = launch_args,
-				})
-				if how == "relay" then shutdown.request("update installed") end
+				restart_on_installed_release()
 			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
 			-- field is the settings window. Opening it is honest; a native prompt
@@ -1912,15 +1948,12 @@ local function main()
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			-- A release chosen in the Versions window is installed: the daemon
+			-- restarts on it like after an update.
+			restart_after_update = function() return restart_on_installed_release() end,
 			-- The setup wizard writes config.toml, which every module reads when
 			-- it starts: the daemon restarts on it, as the other drivers reload.
-			restart = function(reason)
-				local launch_args = {}
-				for index = 1, #arg do launch_args[index] = arg[index] end
-				local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args })
-				if how == "relay" then shutdown.request(reason) end
-				return how ~= nil
-			end,
+			restart = restart_daemon,
 			notify_restart_required = function()
 				if notifier and ok_i18n and i18n_mod then
 					notifier.send(i18n_mod.get("onboarding.done.restart_required"), {

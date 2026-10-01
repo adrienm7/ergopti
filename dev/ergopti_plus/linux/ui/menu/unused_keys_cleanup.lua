@@ -45,6 +45,7 @@ function M.collect(decoded, mark)
 	require("infra.hotstring_preferences").mark_config_reads(decoded, mark)
 	require("modules.hotstrings.terminator_settings").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
+	require("modules.shortcuts.script_chords").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("infra.metrics_preferences").resolve(decoded, mark)
 	for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings", "profile_settings" }) do

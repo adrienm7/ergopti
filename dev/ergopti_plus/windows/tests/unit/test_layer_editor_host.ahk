@@ -18,7 +18,14 @@
 ;    debris, the reload is requested, and the hotkey table then built from the
 ;    folder carries every Windows edit.
 ; 4. Messages: save answers saveResult(), cancel closes the window, an unknown
-;    action does nothing.
+;    action does nothing, "legends" answers setLegends().
+; 5. Legends (layer-editor-current-layout-legends): init() carries what the
+;    layout the user types with puts on every character key: the shared
+;    corpus (_shared/tests/corpus/layer_editor/legends.json) through a fake
+;    ToUnicodeEx by scan code; with the Ergopti emulation on, the characters
+;    of its .keylayout (ErgoptiLayout_Spec, never a copied table); the keys
+;    left without one are reported once; the layer key comes from the
+;    tap-hold configuration.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -104,6 +111,7 @@ class _LEH_FakeApply {
 ; =========================
 
 _LEH_InitSendsTheFileAndItsProblems() {
+	_TestEnsureErgoptiLayout()
 	Ctx := KeymapLayers_LoadContext(_LEH_SharedDir())
 	Dir := _LEH_MakeDir()
 	try {
@@ -235,6 +243,10 @@ _LEH_MessagesRouteToTheirAction() {
 		AssertTrue(InStr(Host.Scripts[1], "window.saveResult({" . '"saved":true,"applied":true'), "the answer is saveResult()")
 		_LayerEditor_OnMessage(Host, Map("action", "save"), Apply)
 		AssertTrue(InStr(Host.Scripts[2], '"saved":false'), "a save without text is refused")
+		_TestEnsureErgoptiLayout()
+		_LayerEditor_OnMessage(Host, Map("action", "legends"), Apply)
+		AssertEqual(3, Host.Scripts.Length, '"legends" answers once')
+		AssertTrue(InStr(Host.Scripts[3], "window.setLegends({" . '"source":'), "the answer is setLegends()")
 		_LayerEditor_OnMessage(Host, Map("action", "cancel"), Apply)
 		AssertEqual(1, Host.Closed, "cancel closes the window")
 		AssertEqual(1, Apply.Calls, "only the valid save reloads")
@@ -258,5 +270,155 @@ _LEH_ContractMatchesTheLuaHosts() {
 		AssertTrue(RegExMatch(Source, "m)^M\." . Name . ' = "([a-z_]+)"\r?$', &Declared), "the Lua hosts declare " . Name)
 		AssertEqual(Declared[1], Code, Name . " is one error code on every OS")
 	}
+	Sources := Map("LEGEND_SOURCE_EMULATION", LAYER_EDITOR_LEGEND_SOURCE_EMULATION,
+		"LEGEND_SOURCE_OS", LAYER_EDITOR_LEGEND_SOURCE_OS)
+	for Name, Value in Sources {
+		AssertTrue(RegExMatch(Source, "m)^M\." . Name . ' = "([a-z_]+)"\r?$', &Declared), "the Lua hosts declare " . Name)
+		AssertEqual(Declared[1], Value, Name . " is one legend source on every OS")
+	}
 }
 Test("layer editor host: the size limit and error codes are the Lua hosts' ones", _LEH_ContractMatchesTheLuaHosts)
+
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 6/ Legends (layer-editor-current-layout-legends) =======
+; ================================================================
+; ================================================================
+
+_LEH_Corpus() => JsonParse(FileRead(_LEH_SharedDir() . "\tests\corpus\layer_editor\legends.json", "UTF-8"))
+
+; A layout as ToUnicodeEx reads it: registry code -> text, looked up by the
+; scan code the host probes.
+class _LEH_FakeLayout {
+	__New(Ctx, Layout) {
+		this.BySc := Map()
+		for Code, Text in Layout
+			this.BySc[Integer("0x" . SubStr(Ctx["keys"][Code]["ahk"], 3))] := Text
+	}
+	Probe() {
+		return {
+			Hkl: () => 0x040C040C,
+			ScToVk: (Sc, Hkl) => (Hkl == 0x040C040C) ? 0x100 + Sc : 0,
+			ToUnicode: this._Text.Bind(this),
+		}
+	}
+	_Text(Vk, Sc, Hkl) {
+		Text := this.BySc.Get(Sc, "")
+		return { Count: StrLen(Text), Text: Text }
+	}
+}
+
+_LEH_NoEmulation() => Map("active", false, "character", (Sc) => "")
+
+_LEH_LegendsFollowTheOsLayout() {
+	global _LayerEditorReported
+	Ctx := KeymapLayers_LoadContext(_LEH_SharedDir())
+	Corpus := _LEH_Corpus()
+	for LegendCase in Corpus["cases"] {
+		Fake := _LEH_FakeLayout(Ctx, LegendCase["layout"])
+		Legends := LayerEditor_Legends(Ctx, _LEH_NoEmulation(), Fake.Probe())
+		AssertEqual(LegendCase["source"], Legends["source"], LegendCase["name"] . ": source")
+		for Code, Text in LegendCase["expected"]
+			AssertEqual(Text, Legends["keys"].Get(Code, "<none>"), LegendCase["name"] . ": " . Code)
+		for Code in Legends["keys"]
+			AssertTrue(LegendCase["expected"].Has(Code), LegendCase["name"] . ": " . Code . " must not have a legend")
+		AssertTrue(LegendCase["expected"].Count >= 40, "only " . LegendCase["expected"].Count . " legends compared")
+		Unresolved := ""
+		for Index, Code in Legends["unresolved"]
+			Unresolved .= (Index == 1 ? "" : ",") . Code
+		Expected := ""
+		for Index, Code in LegendCase["unresolved"]
+			Expected .= (Index == 1 ? "" : ",") . Code
+		AssertEqual(Expected, Unresolved, LegendCase["name"] . ": the keys left without a legend")
+		_LayerEditorReported := Map()
+		AssertTrue(LayerEditor_ReportUnresolved(Legends), "the keys without a legend are reported")
+		AssertFalse(LayerEditor_ReportUnresolved(Legends), "the same keys are reported once")
+		Dir := _LEH_MakeDir()
+		try {
+			Js := LayerEditor_InitJs(Ctx, Dir, Legends, ["AltLeft"])
+			AssertTrue(InStr(Js, '"legends":{"source":"os","keys":{'), "init() carries the legends")
+			AssertTrue(InStr(Js, '"KeyQ":' . JsonStringLiteral(LegendCase["expected"]["KeyQ"])), "init() carries KeyQ's legend")
+			AssertTrue(InStr(Js, '"layer_keys":["AltLeft"]'), "init() carries the layer key")
+		} finally _LEH_RemoveDir(Dir)
+		AssertTrue(InStr(LayerEditor_SetLegendsJs(Legends), "window.setLegends({" . '"source":"os"'),
+			"setLegends() takes the same legends")
+	}
+	; No layout could be read: every character key is unresolved, and says why.
+	None := LayerEditor_Legends(Ctx, _LEH_NoEmulation(), { Hkl: () => 0, ScToVk: (Sc, Hkl) => 0,
+		ToUnicode: (Vk, Sc, Hkl) => ({ Count: 0, Text: "" }) })
+	AssertEqual(0, None["keys"].Count, "no layout, no legend")
+	AssertTrue(None["unresolved"].Length >= 45, "every character key is unresolved")
+	AssertContains(None["reason"], "no keyboard layout", "the reason is logged")
+}
+Test("layer editor host: legends follow the OS layout (layer-editor-current-layout-legends)", _LEH_LegendsFollowTheOsLayout)
+
+_LEH_EmulatedLegendsComeFromTheKeylayout() {
+	_TestEnsureErgoptiLayout()
+	Ctx := KeymapLayers_LoadContext(_LEH_SharedDir())
+	Spec := ErgoptiLayout_Spec()
+	; A QWERTY-like OS layout under the emulation: every key types "x".
+	Qwerty := Map()
+	for Code, Entry in Ctx["keys"]
+		if (Entry["kind"] == "key") && !(Entry["ahk_send"] is String)
+			Qwerty[Code] := "x"
+	Fake := _LEH_FakeLayout(Ctx, Qwerty)
+	Emulation := Map("active", true, "character", _LayerEditor_EmulatedCharacter.Bind(false, true, true))
+	Legends := LayerEditor_Legends(Ctx, Emulation, Fake.Probe())
+	AssertEqual("emulation", Legends["source"], "the emulated layout is the source")
+	Compared := 0
+	for Code, Entry in Ctx["keys"] {
+		Sc := Entry["ahk"]
+		if !Spec["levels"]["base"].Has(Sc) || (Entry["ahk_send"] is String)
+			continue
+		Descriptor := Spec["levels"]["base"][Sc]
+		if !Descriptor.Has("text") && !Descriptor.Has("dead")
+			continue
+		Want := Descriptor.Has("text") ? Descriptor["text"] : Spec["terminators"][Descriptor["dead"]]
+		AssertEqual(Want, Legends["keys"].Get(Code, "<none>"), Code . " (" . Sc . ") shows the .keylayout's character")
+		Compared += 1
+	}
+	AssertTrue(Compared >= 30, "only " . Compared . " emulated keys compared")
+	AssertTrue(Legends["keys"]["KeyQ"] != "x", "KeyQ is not read from the OS layout under the emulation")
+	AssertEqual("1", Legends["keys"]["Digit1"], "the digit row types its digits")
+	AssertEqual(ErgoptiNumberRowEdgeMapping()[0x29], Legends["keys"]["Backquote"], "the digit row's left edge")
+	; Without the digit row, the number row is the OS layout's.
+	NoDigits := LayerEditor_Legends(Ctx, Map("active", true,
+		"character", _LayerEditor_EmulatedCharacter.Bind(false, true, false)), Fake.Probe())
+	AssertEqual("x", NoDigits["keys"]["Digit1"], "a key the emulation leaves is the OS layout's")
+	; The live emulation: the suite's features turn the Ergopti base layer on.
+	AssertTrue(LayerEditor_CurrentEmulation()["active"], "the Ergopti base layer is an emulation")
+	AssertEqual(Legends["keys"]["KeyQ"], LayerEditor_CurrentEmulation()["character"].Call("SC010"),
+		"the live emulation reads the same .keylayout")
+}
+Test("layer editor host: emulated legends come from the .keylayout (layer-editor-current-layout-legends)",
+	_LEH_EmulatedLegendsComeFromTheKeylayout)
+
+_LEH_LegendTextRefusesTheUnprintable() {
+	AssertEqual("a", LayerEditor_LegendText("a"))
+	AssertEqual("^", LayerEditor_LegendText("^"), "a dead key's accent is a legend")
+	for Bad in ["", " ", "`t", Chr(0x1B), Chr(0x1C), Chr(0x85), Chr(0xA0), 42]
+		AssertEqual("", LayerEditor_LegendText(Bad), "case " . A_Index . " is no legend")
+}
+Test("layer editor host: a legend is printable text", _LEH_LegendTextRefusesTheUnprintable)
+
+_LEH_LayerKeysFollowTheTapHolds() {
+	Corpus := _LEH_Corpus()
+	Shipped := LayerEditor_LayerKeys(LoadTapHoldToml(_LEH_SharedDir() . "\tap_hold\defaults.toml"))
+	Want := ""
+	for Index, Code in Corpus["recommended_layer_keys"]["windows"]
+		Want .= (Index == 1 ? "" : ",") . Code
+	Got := ""
+	for Index, Code in Shipped
+		Got .= (Index == 1 ? "" : ",") . Code
+	AssertEqual(Want, Got, "the shipped tap-holds' layer key")
+	Moved := LayerEditor_LayerKeys(Map("keys", Map("space", Map("hold_layer", "nav"))))
+	AssertEqual(1, Moved.Length, "one layer key")
+	AssertEqual("Space", Moved[1], "the layer key follows the configuration")
+	AssertEqual(0, LayerEditor_LayerKeys(Map("keys", Map())).Length, "no tap-hold, no layer key")
+}
+Test("layer editor host: the layer key comes from the tap-hold configuration", _LEH_LayerKeysFollowTheTapHolds)

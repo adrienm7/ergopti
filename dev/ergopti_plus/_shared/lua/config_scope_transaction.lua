@@ -44,6 +44,9 @@ end
 --- Optional presets[id] = { path, backup_path, prefixes, render } owns the file
 --- of a manifest preset: rows under `prefixes` are routed to it, and
 --- render(mode, source_document, rows) returns its complete candidate bytes.
+--- Optional select(path) narrows a scope to the rows it returns true for: a
+--- submenu that restores or clears one part of its scope (the script chords of
+--- the Shortcuts scope) keeps the scope's owner, backup and compensation.
 --- @param options table Path, unique backup path, manifest, files and runtime ports.
 --- @return table owner Transaction owner retaining failed compensation debt.
 function M.new(options)
@@ -57,6 +60,7 @@ function M.new(options)
 		and type(options.files.write) == "function" and type(options.files.write_if_unchanged) == "function",
 		"scope transactions require serialized conditional publication")
 	assert(options.prepare_batch == nil or type(options.prepare_batch) == "function", "invalid scope preparation owner")
+	assert(options.select == nil or type(options.select) == "function", "invalid scope row selection")
 	assert(options.presets == nil or type(options.presets) == "table", "invalid scope preset owners")
 	for id, port in pairs(options.presets or {}) do check_preset(id, port, options) end
 	local prepare_batch = options.prepare_batch or Writer.prepare_batch
@@ -149,13 +153,15 @@ function M.new(options)
 			local updates = {}
 			for _, row in ipairs(plan.operations) do
 				local path, target = row.section .. "." .. row.key, nil
-				for _, preset in ipairs(presets) do
-					for _, prefix in ipairs(preset.port.prefixes or {}) do
-						if belongs(path, prefix) then target = preset end
+				if options.select == nil or options.select(path) == true then
+					for _, preset in ipairs(presets) do
+						for _, prefix in ipairs(preset.port.prefixes or {}) do
+							if belongs(path, prefix) then target = preset end
+						end
 					end
+					local rows = target and target.rows or updates
+					rows[#rows + 1] = row
 				end
-				local rows = target and target.rows or updates
-				rows[#rows + 1] = row
 			end
 			-- A preset scope with no configuration rows leaves config.toml alone:
 			-- creating it would also end the first-run state of an absent file.
