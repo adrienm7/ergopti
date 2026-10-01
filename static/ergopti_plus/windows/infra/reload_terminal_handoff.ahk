@@ -354,6 +354,19 @@ ReloadTerminalHandoffPending() {
 	finally Critical(PreviousCritical)
 }
 
+; Whether a reload hand-off exists, from its authorization to its terminal. A
+; successor may then be loading: no detached worker starts meanwhile, because
+; one would share the driver's window title with it (LifecycleRetireWorkers).
+; A record whose claim could not be rearmed stays published for good and has
+; no successor, so it does not count.
+ReloadTerminalHandoffActive() {
+	global _ReloadTerminalHandoff
+	PreviousCritical := Critical("On")
+	try return (_ReloadTerminalHandoff is Map)
+		&& _ReloadTerminalHandoff["state"] != "cancel_failed"
+	finally Critical(PreviousCritical)
+}
+
 _ReloadTerminalHandoffArmWatch(Record) {
 	global RELOAD_SUCCESSOR_POLL_MS
 	try Record["port"]["arm"].Call(_ReloadTerminalHandoffWatch.Bind(Record),

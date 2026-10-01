@@ -163,6 +163,25 @@ asked for (the layout poll) retries a refusal a few times with a doubling wait,
 starts only while `LifecycleShutdownVetoHonored()`, and reports a refused stage
 without the "save failed" notice.
 
+### project-ahk-restart-closes-the-newest-window-with-the-title
+
+`/restart` and `#SingleInstance Force` ask ONE window to close: the newest one
+whose class and title match the script's main window (`FindWindow`, top of the
+Z-order). A detached worker that re-runs the driver entry owns that exact title
+from the creation of its window to its first statement, where it retitles
+itself: 22 to 34 ms measured on v2.0.26, because the hooks and hotkeys are
+installed in between. A successor that finished loading inside that span
+closed the worker (exit 0, « no output captured »), then waited
+`DRIVER_MUTEX_WAIT_MS` on the mutex the live driver still held and left; the
+driver reported « the successor exited without asking this instance to close ».
+The two started in the same millisecond because the metrics warm-up chains its
+next worker from a completion callback that runs while the reload launches.
+Action: no worker starts while `ReloadTerminalHandoffActive()`, and
+`LifecycleRetireWorkers` stops the live ones before the successor launches; a
+new kind of worker that reuses the entry or the executable joins both. When
+that refusal comes back, read `bootstrap.log` for the mutex line and look for
+a worker that ended at the same second.
+
 ### project-ahk-getmenustate-counts-rows-in-the-high-byte
 
 For a row that opens a submenu, `GetMenuState` returns the row's flags in the

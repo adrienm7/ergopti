@@ -1676,6 +1676,12 @@ KLWV_WarmRun(Index := 1, *) {
 		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while suspended.")
 		return false
 	}
+	; KLPF_RequestBuild refuses during a reload; standing down here keeps that
+	; expected refusal out of the warnings.
+	if KLPF_ReloadKeepsWorkersOut() {
+		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while a reload is under way.")
+		return false
+	}
 	MetricsDir := KLWV.warm_metrics_dir
 	if (MetricsDir = "")
 		return false

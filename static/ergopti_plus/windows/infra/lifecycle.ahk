@@ -272,10 +272,38 @@ _ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
 ; successor that died while loading and stop one whose request was refused.
 ; @returns {Map} The successor's "pid" and owned process "handle".
 LifecycleLaunchSuccessor() {
+	LifecycleRetireWorkers()
 	Target := A_IsCompiled
 		? '"' . A_ScriptFullPath . '" /restart'
 		: '"' . A_AhkPath . '" /restart "' . A_ScriptFullPath . '"'
 	return ReloadSuccessorLaunch(Target, A_InitialWorkingDir)
+}
+
+; Stops the detached workers before a successor launches. A worker that re-runs
+; the driver entry (the metrics projection always, the UIA probe when compiled)
+; holds the driver's window title while it starts, and /restart closes the
+; newest window with that title (reload-worker-identity, see
+; KLPF_ReloadKeepsWorkersOut). Workers are disposable and end with this instance
+; anyway, and none starts again while the hand-off exists. A worker that could
+; not be confirmed stopped is reported and the reload goes on: past its first
+; statement it no longer shares the title, and a successor that still closes it
+; is caught by the hand-off's liveness probe.
+; @returns {Boolean} False when a worker could not be confirmed stopped.
+LifecycleRetireWorkers() {
+	PrefetchStopped := false
+	try PrefetchStopped := KLPF_CancelAll()
+	catch as Err
+		try LoggerError("Lifecycle", "Metrics projection workers could not be stopped before the reload: {1}.", Err.Message)
+	; UIASW_Stop reports false when it owned nothing, which is a stopped worker.
+	UiaLive := IsObject(UIASWState.handle)
+	UiaStopped := !UiaLive
+	try UiaStopped := UIASW_Stop("canceled") || !UiaLive
+	catch as Err
+		try LoggerError("Lifecycle", "The UIA probe worker could not be stopped before the reload: {1}.", Err.Message)
+	if !(PrefetchStopped && UiaStopped)
+		try LoggerWarn("Lifecycle", "A detached worker was not confirmed stopped before the reload successor launched (metrics projection stopped={1}, UIA probe stopped={2}).",
+			PrefetchStopped ? "true" : "false", UiaStopped ? "true" : "false")
+	return PrefetchStopped && UiaStopped
 }
 
 ; Logs successful publication immediately before Reload. Destructive UI cleanup
