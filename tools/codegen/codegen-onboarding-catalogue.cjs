@@ -473,7 +473,31 @@ const TRIGGER_CHARACTER_PATH = 'hotstrings.trigger_char';
 // value is the action they run, and the macOS built-in shortcuts, whose label
 // is the action their chord runs.
 const SLOT_SECTION = 'shortcuts.keyboard';
+// A key-combination slot is named by its two keys, the one held first then the
+// one struck under it, as the Shortcuts menu lists the pair.
+const COMBINATION_SECTION = 'shortcuts.key_combination_taps';
+const COMBINATION_SEPARATOR = '_then_';
 const BUILT_IN_SHORTCUT_SECTION = 'shortcuts.keys';
+
+/**
+ * Label segments of a key-combination slot: its two tap-hold keys, each under
+ * the name the Tap-Hold menu gives it.
+ * @param {string} slot Id such as alt_gr_then_left_alt.
+ * @param {object} labels Label helpers.
+ * @param {string} context Error context.
+ * @returns {object[]} Segments.
+ */
+function combinationSegments(slot, labels, context) {
+	const keys = slot.split(COMBINATION_SEPARATOR);
+	if (keys.length !== 2 || keys.some((key) => key === '')) {
+		throw new Error(`${context}: ${slot} names no pair of tap-hold keys`);
+	}
+	return [
+		{ key: labels.requireKey(`tap_hold.group.${keys[0]}`, context) },
+		{ text: ' + ' },
+		{ key: labels.requireKey(`tap_hold.group.${keys[1]}`, context) }
+	];
+}
 
 /**
  * Label segments of a keyboard slot or built-in shortcut id on one platform,
@@ -715,9 +739,11 @@ function subSwitchFor(id, page, platform, master, groups, manifest, projection) 
 	if (
 		!isPlainObject(declared) ||
 		typeof declared.path !== 'string' ||
-		typeof declared.menu_group !== 'string'
+		!Array.isArray(declared.sections) ||
+		declared.sections.length === 0 ||
+		declared.sections.some((section) => typeof section !== 'string' || section === '')
 	) {
-		throw new Error(`[onboarding.pages.${id}] sub_switch needs a path and a menu_group`);
+		throw new Error(`[onboarding.pages.${id}] sub_switch needs a path and its sections`);
 	}
 	if (!master) {
 		throw new Error(`onboarding page ${id}: a sub-switch needs the category switch on ${platform}`);
@@ -729,16 +755,14 @@ function subSwitchFor(id, page, platform, master, groups, manifest, projection) 
 	if (projection.scopeOf(declared.path) !== id) {
 		throw new Error(`onboarding page ${id}: ${declared.path} belongs to another scope`);
 	}
-	const rows = (manifest.menu && manifest.menu[declared.menu_group]) || [];
-	const sections = rows
-		.filter(
-			(row) => row.type === 'feature' && (row.platforms || MANIFEST_PLATFORMS).includes(platform)
-		)
-		.map((row) => row.path);
-	if (sections.length === 0) {
-		throw new Error(
-			`onboarding page ${id}: menu group ${declared.menu_group} has no feature row on ${platform}`
-		);
+	const sections = declared.sections;
+	for (const section of sections) {
+		const known =
+			manifest.sections &&
+			section.split('.').reduce((node, part) => node && node[part], manifest.sections);
+		if (!isPlainObject(known)) {
+			throw new Error(`onboarding page ${id}: sub_switch names no feature section ${section}`);
+		}
 	}
 	const itemPaths = [];
 	(function walk(list) {
@@ -831,6 +855,8 @@ function recommendedItems(id, page, platform, master, features, projection, labe
 		} else if (feature.type === 'action' && feature.section === SLOT_SECTION) {
 			label = chordSegments(feature.id, platform, labels, triggerCharacter);
 			if (!label) label = [{ key: labels.featureLabelKey(feature, context) }];
+		} else if (feature.type === 'action' && feature.section === COMBINATION_SECTION) {
+			label = combinationSegments(feature.id, labels, context);
 		} else if (feature.section === BUILT_IN_SHORTCUT_SECTION) {
 			// The label names what the shortcut does, so its trigger comes first.
 			if (Object.hasOwn(triggers, itemPath)) {

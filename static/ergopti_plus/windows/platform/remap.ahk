@@ -32,6 +32,9 @@
 
 #Include remap/constants.ahk
 #Include remap/tap_hold_roll.ahk
+; The second key of a key combination, before every other hotkey of a
+; tap-hold key: the earliest-created eligible variant fires.
+#Include remap/key_combination_keys.ahk
 #Include remap/tap_hold_roll_keys.ahk
 #Include remap/one_shot_shift.ahk
 #Include remap/capslock.ahk

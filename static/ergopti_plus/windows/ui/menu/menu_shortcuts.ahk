@@ -14,15 +14,10 @@
 
 
 
-; The three Shortcuts sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock) now
-; live in the manifest's ``key_combinations_group`` section, one entry per
-; sub-submenu carrying its section path and its ``group_label``, after the
-; group's own first-row switch. They used to be a Map here as well, which made
-; the manifest section decorative: nothing read it, so adding a fourth combo
-; there changed nothing until someone also edited this file. The sub-submenu
-; label is still the raw v1 key, as the legacy render had it — those are key
-; names (AltGr, LAlt, CapsLock), identical in every locale, so they carry no
-; i18n key.
+; The key combinations are the manifest's ``key_combinations_group``: its own
+; first-row switch, then one row per ordered pair of tap-hold keys, in two
+; lists (the hand of the key held first) supplied as data by
+; KeyCombinationRows (infra/key_combinations.ahk).
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
@@ -70,12 +65,15 @@ _SC_Getters() {
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
-; KeyCombinations gate, independent of Shortcuts), then one submenu per AltGr / LAlt /
-; CapsLock combination family, all declared by key_combinations_group.
+; KeyCombinations gate, independent of Shortcuts), then one submenu per first
+; key listing the pairs it begins, all declared by key_combinations_group.
 _SC_KeyCombinationsSubmenu() {
 	Commands := Map("key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"))
 	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
-	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", "", Commands, Getters)
+	ListProviders := Map(
+		"key_combination_rows_left", () => KeyCombinationRows("left"),
+		"key_combination_rows_right", () => KeyCombinationRows("right"))
+	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).

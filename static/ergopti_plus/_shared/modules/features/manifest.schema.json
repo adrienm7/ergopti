@@ -51,7 +51,9 @@
 							"type": "array",
 							"minItems": 1,
 							"uniqueItems": true,
-							"items": { "enum": ["gesture", "keyboard", "script", "tap_key", "tap_hold"] }
+							"items": {
+								"enum": ["combination", "gesture", "keyboard", "script", "tap_key", "tap_hold"]
+							}
 						},
 						"restore": { "const": "remove" }
 					}

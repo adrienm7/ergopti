@@ -17,8 +17,8 @@
 ; initializer instead of a top-level `global := .Bind()`. A module-scope
 ; assignment executes only when auto-exec reaches this file's #Include position
 ; (~700 ms into boot), but ToggleCapsWord/DisableCapsWord are reachable far
-; earlier — the default-enabled lalt_caps_lock.caps_word action fires from a
-; parse-time-armed hotkey once Features exists (~420 ms) — so the old global was
+; earlier — a key combination bound to caps_word fires from a parse-time-armed
+; hotkey once its slots are read — so the old global was
 ; unset in that window and dereferencing it threw UnsetError -> ExitApp(1) via the
 ; pre-ready error net. The static initializer runs on first call (any time after
 ; parse) and returns the SAME object every call, so HookDispatcher's identity

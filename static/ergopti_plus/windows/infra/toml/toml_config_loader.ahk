@@ -147,11 +147,21 @@ TomlConfigForeignOwnershipRegistry() {
 	return Registry
 }
 
+; The keys of a key combination, as a regex alternation: the Windows column of
+; [tap_hold.catalog] in _shared/tap_hold/defaults.toml. Spelled here because
+; this loader runs before that catalogue is read, and in a function because a
+; key can be asked about before this file's include position has run;
+; tests/unit/test_key_combinations.ahk holds the two together.
+TomlConfigKeyCombinationKeys() {
+	static Keys := "escape|tab|caps_lock|left_shift|left_ctrl|win|left_alt|space|alt_gr|right_ctrl|right_shift|enter|backspace|delete"
+	return Keys
+}
+
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 TomlConfigActionParameterIsOwned(Key) {
 	static Actions := GestureActionCatalogueData().Actions
-	if !RegExMatch(Key, "^(?:gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
 	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
 }
@@ -173,6 +183,13 @@ TomlConfigForeignOwner(SectionPath, Key) {
 			&& RegExMatch(Key,
 				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
 		return "ConfigIO"
+	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
+	; « first_then_second » (infra/key_combinations.ahk); the manifest declares
+	; only the pairs that ship a recommendation. The reader refuses a pair of
+	; one key twice.
+	if ((SectionPath == "shortcuts.key_combination_taps" || SectionPath == "shortcuts.key_combination_holds")
+			&& RegExMatch(Key, "^(?:" . TomlConfigKeyCombinationKeys() . ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
+		return "KeyCombinations"
 	return ""
 }
 

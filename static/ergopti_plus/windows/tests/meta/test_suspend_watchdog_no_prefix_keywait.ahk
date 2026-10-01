@@ -117,13 +117,13 @@ _SWNPK_ToggleDrainsBeforeSuspend() {
 Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-no-prefix-keywait)", _SWNPK_ToggleDrainsBeforeSuspend)
 
 ; Invariant 3: every registered custom-combination prefix key is drained.
-; SC138 (AltGr/Kana) and SC038 (LAlt, "SC038 & SC03A::" in base_modifier.ahk)
-; both latch AHK's internal prefix-down flag across Suspend() the same way
-; (F42 -- same_class_found_elsewhere regression of
-; feedback_ahk_suspend_prefix_latch). _SuspendDrainPrefix drains the whole
-; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS list generically so a future THIRD prefix
-; key only needs a one-line addition to the list, not a new hand-rolled
-; drain call site.
+; SC138 (AltGr/Kana) and every other prefix of an "X & Y" hotkey latch AHK's
+; internal prefix-down flag across Suspend() the same way (F42 --
+; same_class_found_elsewhere regression of feedback_ahk_suspend_prefix_latch).
+; _SuspendDrainPrefix drains the whole SUSPEND_CUSTOM_COMBO_PREFIX_KEYS list
+; generically so a new prefix key only needs a one-line addition to the list,
+; not a new hand-rolled drain call site;
+; test_suspend_prefix_drain_covers_all_combos.ahk derives the list from source.
 _SWNPK_DrainHelperWaitsEveryPrefix() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("_SuspendPrefixesAreClear")
@@ -136,14 +136,14 @@ _SWNPK_DrainHelperWaitsEveryPrefix() {
 	ListDecl := SubStr(Src, ListPos, 200)
 	Assert(InStr(ListDecl, Q . "SC138" . Q) > 0,
 		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC138 (AltGr/Kana) — the original documented drain target")
-	Assert(InStr(ListDecl, Q . "SC038" . Q) > 0,
-		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC038 (LAlt, 'SC038 & SC03A::' in base_modifier.ahk) — it has the identical unprotected prefix-latch exposure as SC138 (F42)")
+	Assert(InStr(ListDecl, Q . "SC01D" . Q) > 0,
+		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC01D (LCtrl, '~SC01D & SC138::') — it has the identical unprotected prefix-latch exposure as SC138 (F42)")
 	Assert(InStr(Seg, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS") > 0,
 		"_SuspendDrainPrefix must iterate SUSPEND_CUSTOM_COMBO_PREFIX_KEYS, not hardcode a single key, so every listed prefix is drained")
 	Assert(InStr(Seg, "GetKeyState(PrefixKey, " . Q . "P" . Q . ")") > 0 and InStr(Seg, "KeyWait(") = 0,
 		"_SuspendPrefixesAreClear must test the physical prefix state without blocking the tray thread")
 }
-Test("lifecycle: _SuspendDrainPrefix drains every registered custom-combination prefix key, including SC038 (suspend-watchdog-no-prefix-keywait, F42)", _SWNPK_DrainHelperWaitsEveryPrefix)
+Test("lifecycle: _SuspendDrainPrefix drains every registered custom-combination prefix key, including SC01D (suspend-watchdog-no-prefix-keywait, F42)", _SWNPK_DrainHelperWaitsEveryPrefix)
 
 
 

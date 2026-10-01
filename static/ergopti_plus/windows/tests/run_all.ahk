@@ -149,6 +149,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/wrap_pair.ahk
 #Include ../infra/send_input_parameter.ahk
 #Include ../infra/tap_keys.ahk
+#Include ../infra/key_combinations.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/altgr_family.ahk
@@ -723,6 +724,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_live_mode.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk
+#Include unit/test_key_combinations.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
@@ -1307,7 +1309,6 @@ _LogBootProgress("keylogger modules + tests included")
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
-#Include meta/test_altgr_reregister_guard.ahk
 #Include meta/test_app_picker_t_variable_shadows_i18n.ahk
 #Include meta/test_appstate_orphaned_parallel_state.ahk
 #Include meta/test_av_focus_mode_dead_code.ahk
@@ -1474,7 +1475,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tickcount_lib_wrap.ahk
 #Include meta/test_llm_token_budget_min5.ahk
 #Include meta/test_llm_parser_nul_strip.ahk
-#Include meta/test_altgr_hotif_dynamic.ahk
 #Include meta/test_ergo_pinky_modifier_skip.ahk
 #Include meta/test_watchers_idle_end_ordering.ahk
 #Include meta/test_timer_scheduler_ms_guard.ahk
@@ -1517,7 +1517,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_capsword_reset_on_suspend.ahk
 #Include meta/test_capsword_space_release_timeout.ahk
 #Include meta/test_gesture_toggle_ui_errors_logged.ahk
-#Include meta/test_lalt_capslock_enabled_gate.ahk
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
@@ -1867,7 +1866,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_manifest_single_decode.ahk
 #Include meta/test_menu_prune_keeps_detached_registrations.ahk
 #Include meta/test_metrics_filter_secure_field_fails_closed.ahk
-#Include meta/test_nav_layer_lalt_capslock_group_gate.ahk
 #Include meta/test_network_info_single_wlan_roundtrip.ahk
 #Include meta/test_onboarding_unbraced_if_scope.ahk
 #Include meta/test_personal_info_save_surfaces_failure.ahk

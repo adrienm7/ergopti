@@ -1271,6 +1271,10 @@ KeylayoutEmulation_Boot(_ConfigDir)
 #Include infra/tap_keys.ahk
 #Include modules/shortcuts/tap_keys.ahk
 TapKeysReadConfig(_IniCache)
+; The key combinations: their slots are read before the pair hotkeys of
+; platform/remap.ahk can answer a press.
+#Include infra/key_combinations.ahk
+KeyCombinationsReadConfig(_IniCache)
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
 #Include platform/remap.ahk

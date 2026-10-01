@@ -365,41 +365,10 @@ letter = "x"
 enabled = false
 letter = "z"
 
-[shortcuts.alt_gr_caps_lock]
-backspace = false
-caps_lock = false
-caps_word = false
-ctrl_backspace = false
-ctrl_delete = false
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
-
-[shortcuts.alt_gr_lalt]
-backspace = false
-caps_lock = false
-caps_word = false
-ctrl_backspace = false
-ctrl_delete = false
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
-
-[shortcuts.lalt_caps_lock]
-backspace = false
-caps_lock = false
-caps_word = false
-ctrl_backspace = false
-ctrl_delete = false
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
+[shortcuts.key_combination_taps]
+alt_gr_then_left_alt = "none"
+alt_gr_then_caps_lock = "none"
+left_alt_then_caps_lock = "none"
 
 [shortcuts.personal]
 laptop_broken_key = false

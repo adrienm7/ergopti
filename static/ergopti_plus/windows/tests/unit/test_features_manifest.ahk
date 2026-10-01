@@ -334,11 +334,11 @@ Test("ManifestBuildFeaturesMap: take_note shortcut carries dated_notes + destina
 
 TestFMv2_AhkShortcutsSubsections() {
 	Built := ManifestBuildFeaturesMap()
-	AssertTrue(Built["shortcuts"].Has("alt_gr_caps_lock"))
-	AssertTrue(Built["shortcuts"]["alt_gr_caps_lock"].Has("ctrl_delete"))
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["backspace"])
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["caps_lock"])
+	AssertTrue(Built["shortcuts"].Has("key_combination_taps"))
+	Taps := Built["shortcuts"]["key_combination_taps"]
+	AssertEqual(3, Taps.Count, "the three declared pairs")
+	for PairId in ["alt_gr_then_left_alt", "alt_gr_then_caps_lock", "left_alt_then_caps_lock"]
+		AssertEqual("none", Taps[PairId], PairId . " binds nothing in an empty configuration")
 }
 Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their defaults",
 	TestFMv2_AhkShortcutsSubsections)
@@ -1110,64 +1110,6 @@ Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 
 
 
-; ==================================================================
-; ===== 7.1) #HotIf-reachable HELPERS must self-guard Features =====
-; ==================================================================
-
-; F01 (audit 2026-07-20): base_modifier.ahk's parse-time `SC038 & SC03A` #HotIf is
-; `_LAltKeepsBareModifierForCapsLockCombo() and _AnyShortcutEnabled("lalt_caps_lock")`.
-; The helper _AnyShortcutEnabled dereferenced the global Features with a bare .Has().
-; The #HotIf arms at parse time, but Features is assigned only later in auto-execute
-; (ErgoptiPlus.ahk pre-pump seeds TapHold/LayerEnabled/CapsWordEnabled but NOT
-; Features) -- and never at all on an aborted boot -- so a keypress in that window threw
-; UnsetError INSIDE the #HotIf evaluator and the fatal-before-ready error net escalated
-; it to ExitApp(1) (field crash_reports/2026-07-19T08-03-45Z.json + 3 signatures on
-; 07-16). The section-7 scan above only sees literal `#HotIf ...Features[...` lines, so
-; the helper indirection was invisible to it. Root-cause guard: every function reachable
-; from a #HotIf (via helper) OR from a direct tap-hold call that bypasses the #HotIf must
-; guard IsSet(Features) BEFORE its first Features dereference.
-
-; Returns { ok, reason }: whether FuncName guards IsSet(Features) before its first
-; `Features.`/`Features[` dereference (full-line comments already stripped by
-; _DriverFuncBody, so only real code positions are compared).
-_FMv2_FeaturesGuardedBeforeDeref(FuncName) {
-	Body := _DriverFuncBody(FuncName)
-	if (Body == "")
-		return { ok: false, reason: FuncName . ": function body not found in driver source" }
-	GuardPos := InStr(Body, "IsSet(Features)")
-	DerefPos := 0
-	for Needle in ["Features.", "Features["] {
-		p := InStr(Body, Needle)
-		if (p and (DerefPos == 0 or p < DerefPos))
-			DerefPos := p
-	}
-	if (DerefPos == 0)
-		return { ok: true, reason: "" }  ; no dereference -> nothing to guard
-	if (GuardPos == 0)
-		return { ok: false, reason: FuncName . ": dereferences Features with no IsSet(Features) guard" }
-	if (GuardPos > DerefPos)
-		return { ok: false, reason: FuncName . ": IsSet(Features) guard comes AFTER first Features dereference" }
-	return { ok: true, reason: "" }
-}
-
-TestFMv2_HotIfReachableFeaturesGuarded() {
-	; _AnyShortcutEnabled is the #HotIf criterion helper; the three *Shortcut
-	; dispatchers are also reachable by direct tap-hold calls that bypass the #HotIf
-	; (capslock.ahk / nav_layer.ahk), so all four can run before Features is assigned.
-	Funcs := ["_AnyShortcutEnabled", "AltGrLAltShortcut", "AltGrCapsLockShortcut", "LAltCapsLockShortcut"]
-	Violations := []
-	for FuncName in Funcs {
-		Res := _FMv2_FeaturesGuardedBeforeDeref(FuncName)
-		if !Res.ok
-			Violations.Push(Res.reason)
-	}
-	AssertEqual(0, Violations.Length,
-		"#HotIf-reachable Features deref without preceding IsSet guard: "
-		. (Violations.Length > 0 ? Violations[1] : ""))
-}
-Test("#HotIf-reachable helpers: Features guarded by IsSet before first deref",
-	TestFMv2_HotIfReachableFeaturesGuarded)
-
 ; F42 (audit 2026-07-20): the Win+<magic-key-source> hotkey that opens the personal
 ; editor was registered with no #HotIf and outside the magic-key feature block, so it
 ; stole an OS Win+<key> combo even with every Ergopti feature disabled — "all features
@@ -1189,21 +1131,3 @@ TestFMv2_PersonalEditorHotkeyIsFeatureGated() {
 }
 Test("layout: personal-editor Win hotkey is feature-gated, not unconditional",
 	TestFMv2_PersonalEditorHotkeyIsFeatureGated)
-
-; F43 (audit 2026-07-20): the three chord dispatchers guarded only the GROUP
-; (Features["shortcuts"].Has(group)) but then raw-indexed all ten action leaves. A
-; config missing a single action key therefore turned every chord press into an
-; UnsetItemError — post-ready that means an error-net toast and a crash report on each
-; press. Every leaf read must degrade per-key via .Get(id, false).
-TestFMv2_ShortcutDispatchersUseGuardedLeafReads() {
-	for FuncName in ["LAltCapsLockShortcut", "AltGrLAltShortcut", "AltGrCapsLockShortcut"] {
-		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in modules/shortcuts/")
-		Assert(RegExMatch(Body, 'Features\["shortcuts"\]\["\w+"\]\["') = 0,
-			FuncName . " must read action flags with .Get(id, false), never a raw leaf index — one missing action key otherwise throws on every chord press")
-		Assert(InStr(Body, '.Get("backspace", false)') > 0,
-			FuncName . " must still dispatch its action cascade through guarded reads")
-	}
-}
-Test("shortcuts: chord dispatchers read action flags with guarded .Get, not raw indexes",
-	TestFMv2_ShortcutDispatchersUseGuardedLeafReads)

@@ -1885,7 +1885,10 @@ KeyboardSlotRows() {
 		return Rows
 }
 
-/** Removes custom keyboard slots accepted by this persistence owner's grammar. */
+/**
+ * Removes the custom keyboard slots accepted by this persistence owner's
+ * grammar, and the key-combination slots the manifest does not declare.
+ */
 ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 	global KeyboardShortcutAssignments
 	if ScopeId != "shortcuts" || !(Mode == "recommended" || Mode == "clear")
@@ -1900,5 +1903,7 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 			continue
 		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
 	}
+	for Row in KeyCombinationScopeRows()
+		Rows.Push(Row)
 	return Rows
 }

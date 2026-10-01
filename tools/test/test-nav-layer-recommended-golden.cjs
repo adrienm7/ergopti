@@ -202,12 +202,11 @@ function parenDelta(text) {
 	return (text.match(/\(/g) || []).length - (text.match(/\)/g) || []).length;
 }
 
-// The activation special cases: each fixes how a particular hold key enters the
-// layer; none is a binding of the layer itself.
-const SPECIAL_CASES = [
-	{ token: '_AnyShortcutEnabled("lalt_caps_lock")', label: '*SC03A' },
-	{ token: '_LAltIsBackspaceLayer()', label: '*SC038' }
-];
+// The activation special case: it fixes how a particular hold key enters the
+// layer; it is no binding of the layer itself. LAlt then CapsLock had one too,
+// until it became a key combination, whose hotkeys are created before the
+// layer's (platform/remap/key_combination_keys.ahk).
+const SPECIAL_CASES = [{ token: '_LAltIsBackspaceLayer()', label: '*SC038' }];
 
 // AutoHotkey sources carry a UTF-8 BOM; drop it before the first label is read.
 const BOM = String.fromCharCode(0xfeff);
@@ -251,7 +250,7 @@ for (const s of SPECIAL_CASES)
 		);
 if (hotkeys !== SPECIAL_CASES.length)
 	fail(
-		`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fixes belong there`
+		`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fix(es) belong there`
 	);
 
 // The table is registered at boot from the root of the configuration folder,

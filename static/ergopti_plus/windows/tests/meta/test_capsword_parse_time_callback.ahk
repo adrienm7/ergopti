@@ -7,7 +7,7 @@
 ; identity-compares on Unregister) AND resolvable before capsword.ahk's #Include
 ; position. A top-level `_CapsWord_OnMouseDown := ....Bind()` only runs when
 ; auto-exec reaches this file (~700 ms into boot), but ToggleCapsWord is reachable
-; far earlier: the default-enabled lalt_caps_lock.caps_word action fires from a
+; far earlier: a key combination bound to caps_word fires from a
 ; parse-time-armed hotkey once Features exists (~420 ms). Dereferencing the still-
 ; unset global there threw UnsetError, which the pre-ready error net escalates to
 ; ExitApp(1). The fix is a static-initializer accessor (_CapsWord_Callback) that
