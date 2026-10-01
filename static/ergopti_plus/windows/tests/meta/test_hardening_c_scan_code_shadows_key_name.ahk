@@ -225,12 +225,16 @@ _HCSC_ApplyDirective(Line, State, Cursor) {
 
 ; Visits one file in parse order, following its #Include directives in place,
 ; and records every static label with its file and the directive context at
-; its line.
-_HCSC_WalkIncludes(File, State, Seen, Labels) {
+; its line. A label is "owned" when its file is production source and so is
+; every file that led to it: the generated personal-shortcuts stub includes
+; the user's own file, which lives outside the driver and whose hotkeys are
+; theirs (15 of them failed this census on the maintainer's machine).
+_HCSC_WalkIncludes(File, State, Seen, Labels, Owned := true) {
 	global _HCSC_LABEL_LINE
 	if Seen.Has(StrLower(File))
 		return
 	Seen[StrLower(File)] := true
+	Owned := Owned && _DriverIsProductionSource(File)
 	Src := FileRead(File, "UTF-8")
 	Masked := _DriverMaskNonCode(&Src)
 	SplitPath(File, , &Dir)
@@ -238,9 +242,9 @@ _HCSC_WalkIncludes(File, State, Seen, Labels) {
 	for Line in StrSplit(Masked, "`n", "`r") {
 		Target := _HCSC_ApplyDirective(Line, State, Cursor)
 		if (Target != "")
-			_HCSC_WalkIncludes(Target, State, Seen, Labels)
+			_HCSC_WalkIncludes(Target, State, Seen, Labels, Owned)
 		else if RegExMatch(Line, _HCSC_LABEL_LINE, &Label)
-			Labels.Push(Map("text", Label[1], "file", File, "context", State.Clone()))
+			Labels.Push(Map("text", Label[1], "file", File, "owned", Owned, "context", State.Clone()))
 	}
 }
 
@@ -395,7 +399,7 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 	}
 	Labels := []
 	for Entry in Walked {
-		if _DriverIsProductionSource(Entry["file"])
+		if Entry["owned"]
 			Labels.Push(Entry)
 	}
 	Assert(Seen.Count > 100, "the #Include walk from the driver root scripts must reach the driver, reached " . Seen.Count)
@@ -443,24 +447,29 @@ _HCSC_PersonalIncludePreservesContext() {
 	Root := A_Temp . "\ergopti-hcsc-" . A_TickCount . "-" . Random(10000, 99999)
 	Driver := Root . "\driver.ahk"
 	Personal := Root . "\_generated\personal_shortcuts.ahk"
+	; The user's own file, outside the driver, which the generated stub includes.
+	UserFile := Root . "\elsewhere\personal_shortcuts.ahk"
 	Owned := Root . "\ui\hotkeys.ahk"
 	DirCreate(Root . "\_generated")
+	DirCreate(Root . "\elsewhere")
 	DirCreate(Root . "\ui")
 	try {
 		FileAppend("#InputLevel 0`n#Include _generated/personal_shortcuts.ahk`n#Include ui/hotkeys.ahk`n",
 			Driver, "UTF-8")
-		FileAppend('#InputLevel 2`n#HotIf WinActive("fixture")`n^v::return`n#UseHook true`n',
-			Personal, "UTF-8")
+		FileAppend('#InputLevel 2`n#HotIf WinActive("fixture")`n^v::return`n#Include *i ' . UserFile
+			. '`n#UseHook true`n', Personal, "UTF-8")
+		FileAppend("^k::return`n+SC02E::return`n", UserFile, "UTF-8")
 		FileAppend("SC02F::return`n", Owned, "UTF-8")
 		State := Map("level", 0, "hotif", false, "usehook", false)
 		Seen := Map(), Walked := [], Labels := []
 		_HCSC_WalkIncludes(Driver, State, Seen, Walked)
-		AssertEqual(3, Seen.Count, "the generated include is traversed too")
+		AssertEqual(4, Seen.Count, "the generated include is traversed too, and the user's file it includes")
 		for Entry in Walked {
-			if _DriverIsProductionSource(Entry["file"])
+			if Entry["owned"]
 				Labels.Push(Entry)
 		}
-		AssertEqual(1, Labels.Length, "personal hotkeys never enter the driver census")
+		AssertEqual(1, Labels.Length,
+			"personal hotkeys never enter the driver census, wherever the user's own file lives")
 		AssertEqual("SC02F", Labels[1]["text"], "the owned label remains visible")
 		AssertEqual(2, Labels[1]["context"]["level"], "generated directives still affect later code")
 		AssertTrue(Labels[1]["context"]["hotif"], "the generated criterion remains in force")
