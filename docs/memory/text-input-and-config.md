@@ -246,6 +246,25 @@ keep the load-outdated entries below it (`reset_keeping_outdated`). The Lua
 codec reads a dotted key (`a.b = 1`) as one literal key, so such a hand edit
 is ignored, not refused.
 
+### project-configuration-noop-preserves-the-live-inode
+
+Windows queues a boot full save to settle normalization and schema obligations;
+that is not evidence that 347 collected operations changed 347 settings. Its
+batch writer must not materialize a missing section for a neutral-value deletion.
+After rendering, a byte-identical canonical UTF-8 image is acknowledged without
+staging or replacing the live file, and the read cache is invalidated normally.
+The existing full-save generation owner still records that acknowledgement.
+
+Both Lua drivers share the fallback no-op check in `toml_codec/writer`: re-read
+the exact source before acknowledging identical bytes. macOS performs the same
+check inside its native cooperative writer lock and revalidates the symlink
+route; lock acquisition and release remain mandatory even without staging.
+Explicit writes without a source precondition still publish normally. Source
+changes and session fences remain failures. The common typed operations live in
+`_shared/tests/corpus/config_noop/vectors.json` and run in all three suites;
+Windows also checks retained modification time, and macOS checks the native
+lock and absence of staging/publication.
+
 ### project-toml-cache-returns-real-booleans
 
 TOML caches return native booleans. Do not compare their values to string
