@@ -493,10 +493,14 @@ helpers.describe("FileSystem native no-op publication parity", function()
 				local seed = assert(io.open(path, "w"))
 				assert(seed:write(vector.input))
 				assert(seed:close())
+				-- The fixture simulates cp -p rather than spawning macOS cp. Carry
+				-- the real source metadata into that simulation: tmpname is 0600,
+				-- while a newly opened staging file follows the runner's umask.
+				local metadata = { records = { [path] = fixture.HOST_ATTRIBUTES(path) } }
 				local held, locks, unlocks, stages, publications = false, 0, 0, 0, 0
 				local adapter = fixture.make_adapter(nil, nil, nil, nil,
 					function() locks, held = locks + 1, true; return true end,
-					function() unlocks, held = unlocks + 1, false; return true end)
+					function() unlocks, held = unlocks + 1, false; return true end, nil, metadata)
 				local original_read = adapter.read_with_status
 				local original_open, original_rename = io.open, os.rename
 				local prepared, detail, candidate, source = require("toml_codec.writer").prepare_batch(path, {
