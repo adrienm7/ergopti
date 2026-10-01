@@ -143,8 +143,34 @@ _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 	return (NavReady is Integer) && NavReady == 1
 }
 
+; Whether the first activation of the AI hotkeys waits for the resume, and how
+; many times that resume may try it, how far apart.
+global _LLM_Menu_FirstRestoreHotkeysDeferred := false
+global LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS := 3
+global LLM_MENU_DEFERRED_HOTKEY_RETRY_MS := 500
+
+/**
+ * Activates the profile and navigation hotkeys of the first menu build, or
+ * defers them to the resume when the driver is paused. A pause suspends the
+ * native navigation owner, which then refuses every plan: a driver reloaded
+ * under a pause builds its first tray root paused, failed here three times and
+ * retired that root, leaving no menu (llm-hotkeys-deferred-by-pause). The
+ * hotkeys cannot fire under a pause, so nothing is lost by waiting.
+ * @param {Boolean} FirstRestore - True on the build that restored the options.
+ * @param {Func} ProfileFn - Test seam of the profile hotkeys.
+ * @param {Func} NavFn - Test seam of the navigation hotkeys.
+ * @param {Boolean} IsPaused - Test seam; A_IsSuspended when omitted.
+ * @returns {Boolean} True when the hotkeys are active or deferred.
+ * @throws {Error} When an active driver could not activate them.
+ */
 _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
-		NavFn := 0) {
+		NavFn := 0, IsPaused := unset) {
+	global _LLM_Menu_FirstRestoreHotkeysDeferred
+	if FirstRestore && (IsSet(IsPaused) ? IsPaused : A_IsSuspended) {
+		_LLM_Menu_FirstRestoreHotkeysDeferred := true
+		try LoggerInfo("LLM", "AI hotkeys deferred to the resume: the driver is paused.")
+		return true
+	}
 	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
 		return true
 	if _LLM_Menu_ProfileHotkeyRetryPending()
@@ -153,6 +179,47 @@ _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 	LoggerError("LLM",
 		"Initial LLM hotkey activation remained incomplete; retaining the tray build for retry.")
 	throw Error("initial LLM hotkey surface is incomplete")
+}
+
+/**
+ * Activates, once the driver is active again, the AI hotkeys a paused first
+ * build deferred. A refusal is retried a bounded number of times, since the
+ * native owner may still be finishing its own resume, then reported.
+ * @param {Func} ActivateFn - Test seam returning true once the hotkeys are active.
+ * @param {Integer} Attempt - One-based attempt number.
+ * @param {Func} ScheduleFn - Test seam taking the retry callback and its delay.
+ * @param {Boolean} IsPaused - Test seam; A_IsSuspended when omitted.
+ * @returns {Boolean} True when nothing was deferred or the hotkeys are active.
+ */
+LLM_Menu_ActivateDeferredHotkeys(ActivateFn := 0, Attempt := 1, ScheduleFn := 0,
+		IsPaused := unset) {
+	global _LLM_Menu_FirstRestoreHotkeysDeferred
+	global LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS, LLM_MENU_DEFERRED_HOTKEY_RETRY_MS
+	if !_LLM_Menu_FirstRestoreHotkeysDeferred
+		return true
+	; Paused again before this ran: the next resume takes it.
+	if (IsSet(IsPaused) ? IsPaused : A_IsSuspended)
+		return false
+	Activated := HasMethod(ActivateFn, "Call")
+		? ActivateFn.Call() : _LLM_Menu_ActivateFirstRestoreHotkeys(true)
+	if (Activated is Integer) && Activated == 1 {
+		_LLM_Menu_FirstRestoreHotkeysDeferred := false
+		try LoggerInfo("LLM", "AI hotkeys deferred by the pause are active.")
+		return true
+	}
+	if Attempt >= LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS {
+		_LLM_Menu_FirstRestoreHotkeysDeferred := false
+		LoggerError("LLM",
+			"AI hotkeys deferred by the pause could not be activated after {1} attempts.",
+			Attempt)
+		return false
+	}
+	Retry := LLM_Menu_ActivateDeferredHotkeys.Bind(ActivateFn, Attempt + 1, ScheduleFn)
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(Retry, LLM_MENU_DEFERRED_HOTKEY_RETRY_MS)
+	else
+		SetTimer(Retry, -LLM_MENU_DEFERRED_HOTKEY_RETRY_MS)
+	return false
 }
 
 _LLM_Menu_ApplyOllamaPortAtBoot(MenuState, SetPortFn := 0) {

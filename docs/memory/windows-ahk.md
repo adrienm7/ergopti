@@ -230,7 +230,18 @@ deferred boot build of the tray root; « no rebuild under a pause » then
 refused the first root and left the paused driver without its pause row. The
 first root publishes under a pause and the watchdog serves it there
 (`_TrayRootFirstPublicationPending`); every later rebuild still waits for the
-resume. Test a paused reload end to end: each gate fixed uncovers the next.
+resume. That build then asks owners the pause has suspended: the AI hotkeys
+need the native navigation owner, which refuses every plan while paused, so
+the first build defers them and `LLM_Menu_OnResume` activates them.
+
+Each gate fixed on this path uncovered the next (shutdown preflight, first
+root, AI hotkeys, then the updater's resume step, which required `true` from a
+function whose `false` means « nothing retained » and so failed every resume).
+The startup smoke's `suspend-marker` fixture is the end-to-end check: it boots
+paused, builds the tray root under the pause, lifts the pause and waits for
+the deferred hotkeys, and any ERROR line fails it. Before 2026-10-01 it
+skipped the build for that fixture, which hid all of the above; extend it
+rather than a unit test when a new owner joins the paused boot or the resume.
 
 ### project-updater-nonblocking-http
 

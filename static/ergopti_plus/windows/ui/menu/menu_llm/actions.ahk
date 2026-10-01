@@ -560,6 +560,9 @@ LLM_Menu_OnResume() {
 	global _LLM_Menu
 	if A_IsSuspended
 		return
+	; The AI hotkeys of a first menu build made under a pause (a driver
+	; reloaded while paused) were deferred to this resume.
+	LLM_Menu_ActivateDeferredHotkeys()
 	_LLM_Menu_ServiceDeleteReconcile()
 	LLM_Menu_ServiceBuilds()
 	if _LLM_Menu["bootstrap_pending"] {
