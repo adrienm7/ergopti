@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "キーロガーからアプリを除外…",
 	"menu.metrics.filter_private": "プライベートブラウジングを無視",
 	"menu.metrics.filter_secure": "パスワードフィールドを無視",
-	"menu.metrics.filter_sysauth": "システム認証ダイアログを無視",
+	"menu.metrics.filter_sysauth": "システム認証を無視",
 	"menu.metrics.include_realtime": "    ↳ リアルタイムグラフを含める",
 	"menu.metrics.enable": "指標を有効にする",
 	"menu.metrics.open_encryptor": "  ↳ スタンドアロン暗号化ツールを開く…",

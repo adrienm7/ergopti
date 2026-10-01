@@ -1514,7 +1514,7 @@
 	"menu.metrics.exclude_apps": "Exclure des applications du keylogger…",
 	"menu.metrics.filter_private": "Ignorer la navigation privée",
 	"menu.metrics.filter_secure": "Ignorer les champs mot de passe",
-	"menu.metrics.filter_sysauth": "Ignorer les boîtes de dialogue d'authentification système",
+	"menu.metrics.filter_sysauth": "Ignorer les authentifications système",
 	"menu.metrics.include_realtime": "    ↳ Inclure le graphe temps réel",
 	"menu.metrics.enable": "Activer les métriques",
 	"menu.metrics.open_encryptor": "  ↳ Ouvrir l'Encryptor autonome…",

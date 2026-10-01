@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Udeluk applikationer fra keylogger…",
 	"menu.metrics.filter_private": "Ignorer privat browsing",
 	"menu.metrics.filter_secure": "Ignorer adgangskodefelter",
-	"menu.metrics.filter_sysauth": "Ignorer systemgodkendelsesdialogs",
+	"menu.metrics.filter_sysauth": "Ignorer systemgodkendelse",
 	"menu.metrics.include_realtime": "    ↳ Inkludér realtidsgraf",
 	"menu.metrics.enable": "Aktivér metrics",
 	"menu.metrics.open_encryptor": "  ↳ Åbn standalone Encryptor…",
