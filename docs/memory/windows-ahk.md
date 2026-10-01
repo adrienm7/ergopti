@@ -533,6 +533,14 @@ The anchor arms SC138 on QWERTY too, where it is a plain right Alt, so every
 fire as an Alt chord (the script quit, reload and pause) also requires
 `KS_LayoutHasAltGr()` (`ScriptAltGrChordIsLive`).
 
+The anchor's arming authority is independent of a suffix's eligibility:
+`IsRealAltGrPress` must query physical `SC138` on Kana, and physical `RAlt`
+otherwise. A Kana family flag alone leaves suffixes eligible after release
+when AHK retains a prefix latch. Rejecting in the output callback is too late
+to preserve the captured native key. Keep the anchor unconditional when changing
+the suffix gate; its first-press contract and the pressed/released native-query
+cases guard these two separate hook decisions.
+
 ### project-ahk-altgr-fake-lctrl
 
 On an AltGr layout every AltGr press is a fake LCtrl (scan code 0x21D, read as

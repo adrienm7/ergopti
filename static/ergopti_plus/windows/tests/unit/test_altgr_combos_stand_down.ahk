@@ -21,7 +21,8 @@ _ACSD_Gate(Entry) {
 	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
 	try {
 		TapHold := Map("keys", IsObject(Entry) ? Map("alt_gr", Entry) : Map(), "layers", Map())
-		return IsRealAltGrPress()
+		; The owner cases model a held key; host input is never injected here.
+		return IsRealAltGrPress((Key, Mode) => true)
 	} finally {
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
@@ -106,3 +107,45 @@ _ACSD_EveryAltGrGateAppliesIt() {
 }
 Test("altgr combos: every AltGr gate applies the rule (kana-altgr-hold-other-2026-09-26)",
 	_ACSD_EveryAltGrGateAppliesIt)
+
+_ACSD_PhysicalEligibility(Family, Pressed) {
+	global TapHold
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(Family == "kana", Family == "standard") }
+	try {
+		TapHold := Map("keys", Map(), "layers", Map())
+		Queries := []
+		ReadPhysical(Key, Mode) {
+			Queries.Push(Map("key", Key, "mode", Mode))
+			return Pressed
+		}
+		AssertEqual(Pressed, IsRealAltGrPress(ReadPhysical),
+			Family . ": a latched prefix without a physical press must never admit a suffix")
+		AssertEqual(1, Queries.Length, "eligibility must read one physical key")
+		AssertEqual(Family == "kana" ? "SC138" : "RAlt", Queries[1]["key"])
+		AssertEqual("P", Queries[1]["mode"], "logical prefix state is not physical authority")
+	} finally {
+		TapHold := Saved.TapHold
+		_TestRestoreAltGrFamily(Saved.Family)
+	}
+}
+for Family in ["standard", "qwerty", "kana"]
+	for Pressed in [false, true]
+		Test("altgr combos: physical eligibility on " . Family . " held=" . Pressed . " (altgr-physical-eligibility)",
+			_ACSD_PhysicalEligibility.Bind(Family, Pressed))
+
+; Exercises the production query with a released host key. This covers the
+; diagnostic's Kana ghost criterion: it used to return true without reading SC138.
+_ACSD_ReleasedKanaNeverAdmitsSuffixes() {
+	global TapHold
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+	try {
+		TapHold := Map("keys", Map(), "layers", Map())
+		AssertFalse(GetKeyState("SC138", "P"), "this non-injecting case requires a released host key")
+		AssertFalse(IsRealAltGrPress(), "a Kana layout alone must never authorize an AltGr suffix")
+	} finally {
+		TapHold := Saved.TapHold
+		_TestRestoreAltGrFamily(Saved.Family)
+	}
+}
+Test("altgr combos: a released Kana key never admits suffixes (altgr-physical-eligibility)",
+	_ACSD_ReleasedKanaNeverAdmitsSuffixes)

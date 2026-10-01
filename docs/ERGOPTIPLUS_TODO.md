@@ -542,8 +542,7 @@ is committed; one request is one commit with its regression test.
       snapshot's unpublished local revision; retain the report for a concrete
       reproduction rather than adding an unproven runtime workaround.
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
-      shutdown debt (watchers=0), spurious AltGr dispatches while SC138 is not
-      physically held. Keep privacy filtering fail-closed;
+      shutdown debt (watchers=0). Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
 
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
@@ -603,6 +602,17 @@ are translated into all 21 locales. Eight registered native cases cover status
 data and the actual Win32 disabled row, with management remaining usable;
 the original Windows row was clickable and did not name its current emulation.
 The new native cases need the next non-release CI run.
+
+The supplied diagnostic also proves released-SC138 dispatch on Kana. Its hotkey
+criterion accepted the Kana family without querying the physical key; the later
+callback rejected the output after the suffix had been captured. Eligibility now
+requires physical SC138 on Kana, preserving the unconditional first-press anchor,
+and still requires physical RAlt on other families. Seven new registered cases
+exercise the pressed/released queries of all three families and the actual native
+query on a released host key. Existing hold-owner cases explicitly model a held
+key and retain their non-AltGr rejection assertions. This AHK prefix-latch repair
+does not establish the cause of item 99's exact layout-switch report; Linux and
+macOS do not use AutoHotkey's custom-combination latch. Native CI is pending.
 
 ## Time estimate
 
