@@ -457,7 +457,12 @@ is committed; one request is one commit with its regression test.
       Windows commands rebuild through the normal tray owner after durable
       acknowledgement. One golden fixture covers all 16 state combinations
       in each native menu suite; command regressions fence refused writes and
-      ensure a refused Linux stop never starts the widget instead.
+      ensure a refused Linux stop never starts the widget instead. Native CI
+      run 36920222032 passed the new widget behaviors but exposed an API-family
+      census that counted Menu( inside domain-helper names. The counter now
+      recognizes complete native tokens (including whitespace calls); a source
+      fixture covers every family, helper suffixes and comments without raising
+      any baseline. Its repaired native lane is being revalidated.
       Order: finish other computed Metrics rows, then the template of (b)
       on Tap-Holds (the smallest menu that has one), then Gestures and
       Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
