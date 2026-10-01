@@ -3870,9 +3870,11 @@ french_autocorrection = "FrenchAutocorrection"
 french_magickey = "FrenchMagicKey"
 
 # The order is the approved one and every driver builds it from here: the
-# keyboard and trackpad features, then layout, text and AI, then metrics and
-# the applications, then the configuration tail. A separator is drawn only
-# between two rows a platform shows.
+# keyboard and trackpad features, then what is about typing (layout,
+# hotstrings, metrics), then the two AI rows together, then the macOS
+# applications in a group of their own, then the configuration tail (the
+# maintainer's order of 2026-10-01). A separator is drawn only between two
+# rows a platform shows.
 #
 # `greyed_when_paused` marks feature rows; every driver greys and disables those
 # rows while keeping the configuration and lifecycle tail available.
@@ -3902,6 +3904,13 @@ id = "hotstrings"
 greyed_when_paused = true
 
 [[menu.top_level]]
+id = "metrics"
+greyed_when_paused = true
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
 id = "llm"
 greyed_when_paused = true
 
@@ -3911,10 +3920,6 @@ greyed_when_paused = true
 
 [[menu.top_level]]
 id = "---"
-
-[[menu.top_level]]
-id = "metrics"
-greyed_when_paused = true
 
 # macOS only: it lists the applications bundled with the macOS app. Linux had
 # one too, holding a single config-folder row, and that row now lives under
