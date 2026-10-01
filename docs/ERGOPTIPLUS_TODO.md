@@ -421,9 +421,10 @@ is committed; one request is one commit with its regression test.
       CI must confirm the five AI failures and restore failure are gone.
       Release-install logging now closes at the acknowledged swap/restart
       handoff and reports download/observer refusals as failure terminals,
-      covered with the real logger's test sink. Remaining:
-      updater-consent-2026-09-25 counts four
-      download starts for two allowed; the AHK-15 persistence census counts 26
+      covered with the real logger's test sink. The updater-consent guard now
+      audits all four explicit-consent ports, including both Versions windows;
+      regression fixtures reject an extra download or a missing audited path.
+      Remaining: the AHK-15 persistence census counts 26
       TOML writers for 25 audited; and AHK-901 no longer finds
       `DirDelete(RTrim(CaptureDir` in `ShellRunner_Exec`. Also, the
       hardening-c label count test walks into the local, git-ignored
