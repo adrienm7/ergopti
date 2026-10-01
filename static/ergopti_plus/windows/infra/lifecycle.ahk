@@ -714,6 +714,14 @@ _SuspendStateWatchdog() {
 						if IsSet(_TrayRootServiceRetained)
 								RootService := _TrayRootServiceRetained
 						_TrayRootServiceRetainedWork(RootService)
+				} else if IsSet(_TrayRootFirstPublicationPending)
+						&& _TrayRootFirstPublicationPending() {
+						; A pause restored after a reload can land while the boot
+						; build of the tray root is staging, which makes that root
+						; stale. It is the one retained root served under a pause:
+						; without it the paused driver keeps the boot menu, without
+						; the row that lifts the pause (first-root-under-pause).
+						_TrayRootServiceRetainedWork(_TrayRootServiceRetained)
 				}
 				return
 		}
@@ -1182,7 +1190,13 @@ BuildTrayMenuDeferred() {
 	try {
 		BuildAccepted := RebuildTrayMenu(0, _TrayRootBuildBoot, false)
 		if !((BuildAccepted is Integer) and BuildAccepted == 1) {
-			try LoggerError("TrayMenu", "Deferred tray-menu build was retained for retry.")
+			; A pause restored while the root was staging is an expected refusal,
+			; not a failure: the watchdog publishes the first root under the pause.
+			if A_IsSuspended {
+				try LoggerInfo("TrayMenu", "Deferred tray-menu build interrupted by the restored pause; the watchdog rebuilds it under the pause.")
+			} else {
+				try LoggerError("TrayMenu", "Deferred tray-menu build was retained for retry.")
+			}
 			return false
 		}
 		return true

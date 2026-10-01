@@ -223,6 +223,15 @@ skips the paused step, keeps the proof that reads state (`CanStop`), and
 compensates only the fence it took itself. Every refusal names the condition
 that refused: the lifecycle line alone says only which owner did.
 
+The same holds for work a pause defers to the resume: check that something
+exists for the paused driver to keep. A reload asked while paused restores the
+pause from the successor's first watchdog tick, which lands during the
+deferred boot build of the tray root; « no rebuild under a pause » then
+refused the first root and left the paused driver without its pause row. The
+first root publishes under a pause and the watchdog serves it there
+(`_TrayRootFirstPublicationPending`); every later rebuild still waits for the
+resume. Test a paused reload end to end: each gate fixed uncovers the next.
+
 ### project-updater-nonblocking-http
 
 Background HTTP must be asynchronous because a synchronous native call can
