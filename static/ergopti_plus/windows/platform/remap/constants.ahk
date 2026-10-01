@@ -209,6 +209,11 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	}
 }
 
+; The reason the tracker records when another key was struck during a press.
+; Named because one reader tells it from the pointer reasons: the keys struck
+; around the tap of a typing key are text, not a chord (TapHoldDispatchTap).
+global TAPHOLD_CANCEL_BY_OTHER_KEY := "another key during hold"
+
 ; Mark every currently held tap-hold key except the key that caused the event.
 ; This is the generic activity boundary for tap-hold disambiguation: Ctrl+C,
 ; Ctrl+V, Ctrl+wheel, and mouse activity must all prevent Ctrl's tap action
@@ -226,8 +231,9 @@ TapHoldTrackActivityCancel(ExceptKeyId := "", Reason := "other input") {
 ; A keyboard activity event cancels other held tap-holds, but never cancels the
 ; tap-hold key's own initial/repeated key-down event.
 TapHoldTrackOtherKeyActivityByScancode(vk, sc) {
+	global TAPHOLD_CANCEL_BY_OTHER_KEY
 	keyId := TapHoldResolveKeyIdFromVkSc(vk, sc)
-	TapHoldTrackActivityCancel(keyId, "another key during hold")
+	TapHoldTrackActivityCancel(keyId, TAPHOLD_CANCEL_BY_OTHER_KEY)
 }
 
 ; Clear the track flag on key release. State is kept until dispatch so
@@ -1141,6 +1147,10 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		if (LimitMs < 250)
 			LimitMs := 250
 		CancelReason := TapHoldShouldCancelTap(KeyId, LimitMs)
+		; The keys struck around the tap of a typing key are text, not a chord:
+		; only a click or the wheel makes its press something else than a tap.
+		if (CancelReason == TAPHOLD_CANCEL_BY_OTHER_KEY && TapHoldRollTapIsRunning(KeyId))
+			CancelReason := ""
 		if (CancelReason != "") {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, LimitMs)
 			return false

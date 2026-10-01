@@ -75,6 +75,7 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../../adapters/text_sender.ahk
 #Include ../../adapters/key_state.ahk
 #Include ../../platform/remap/constants.ahk
+#Include ../../platform/remap/tap_hold_roll.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()

@@ -43,8 +43,8 @@ _EscapeHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: {
-	Result := TapHoldOwnImmediateModifier("escape", "Escape",
-		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
+	Result := TapHoldOwnHoldModifier("escape", "Escape",
+		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"), _EscapeDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
@@ -64,7 +64,7 @@ $SC001:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: {
-	Result := TapHoldOwnImmediateLayer("escape", "Escape", TapHoldDuration(TapHold, "escape"))
+	Result := TapHoldOwnHoldLayer("escape", "Escape", TapHoldDuration(TapHold, "escape"), _EscapeDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }

@@ -729,6 +729,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_tray_menu_separator_popup.ahk
 #Include unit/test_tap_hold_hold_picker_options.ahk
 #Include unit/test_menu_command_deferral.ahk
+#Include unit/test_tap_hold_roll.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
@@ -994,6 +995,7 @@ global _AhkSubDir := ""
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
+#Include ../platform/remap/tap_hold_roll.ahk
 #Include ../platform/remap/altgr_criteria.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_tap_hold_owned_press.ahk

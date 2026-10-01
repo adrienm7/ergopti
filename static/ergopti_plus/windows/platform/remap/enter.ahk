@@ -44,8 +44,8 @@ _EnterHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
-	Result := TapHoldOwnImmediateModifier("enter", "Enter",
-		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
+	Result := TapHoldOwnHoldModifier("enter", "Enter",
+		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"), _EnterDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
@@ -65,7 +65,7 @@ $SC01C:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
-	Result := TapHoldOwnImmediateLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"))
+	Result := TapHoldOwnHoldLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"), _EnterDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }

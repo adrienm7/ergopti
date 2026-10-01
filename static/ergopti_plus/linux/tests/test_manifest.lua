@@ -114,6 +114,7 @@ return {
 	"tests.unit.meta.test_nav_layer_reload",
 	"tests.unit.meta.test_tap_hold_menu",
 	"tests.unit.meta.test_tap_hold_integration",
+	"tests.unit.meta.test_tap_hold_roll",
 	"tests.unit.meta.test_keyboard_hook_adapter",
 	"tests.unit.meta.test_keyboard_hook_intercept_passthrough",
 	"tests.unit.meta.test_keyboard_hook_modal_release",

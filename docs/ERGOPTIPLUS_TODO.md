@@ -446,13 +446,6 @@ is committed; one request is one commit with its regression test.
       the hold read as Shift (item 83). Keep an indicator that does not
       change what an unbound key types, and check what macOS and Linux type
       for a key their layer does not bind.
-- [ ] **86.** With Shift as the hold of Space, fast typing turns « word,
-      Space, letter » into the letter in capitals followed by the space
-      (« fonctionnerA ussi » for « fonctionner aussi », Windows,
-      2026-10-01): the hold is pressed as soon as Space goes down, so a
-      letter struck before Space is released is shifted. A key that rolls
-      over the next one is a tap: decide the hold from the order of the
-      releases and the threshold, and check the other two drivers.
 - [ ] **87.** macOS: a typing key rolled over the next one is still typed
       under its hold (item 86 covers Windows and Linux). Karabiner decides a
       dual-role key at the next key's press (`to` + `to_if_alone`) and has

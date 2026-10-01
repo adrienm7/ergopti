@@ -234,6 +234,13 @@ function M.load_document(defaults_path, user, user_err, user_path)
 	-- The hold picker's catalogue is the shipped one: a user file changes what a
 	-- key does, not what the tray offers or what a hold may be.
 	local hold_picker = type(defaults.tap_hold) == "table" and defaults.tap_hold.hold_picker or nil
+	-- The typing keys decided by the order of the releases are the shipped list
+	-- too: every driver reads the same one.
+	local rollover = type(defaults.tap_hold) == "table" and defaults.tap_hold.rollover or nil
+	local roll_keys = type(rollover) == "table" and rollover.keys or nil
+	if type(roll_keys) ~= "table" then
+		error(tostring(defaults_path) .. ": [tap_hold.rollover] declares no keys", 0)
+	end
 	for key_id, fields in pairs(keys) do
 		local set_by_user = user_fields[key_id] or {}
 		keys[key_id] = validated(key_id, fields, hold_picker, function(field)
@@ -249,6 +256,7 @@ function M.load_document(defaults_path, user, user_err, user_path)
 		user_path = user_file,
 		user_fields = user_fields,
 		hold_picker = hold_picker,
+		roll_keys = roll_keys,
 		catalog = catalog,
 	}
 end
