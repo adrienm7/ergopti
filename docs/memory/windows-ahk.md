@@ -498,6 +498,20 @@ read still fixed at load is the magic key's source key without the Ergopti
 emulation; the layout poll reloads only when it differs
 (`LayoutRemapSignature`).
 
+### project-ahk-altgr-family-setting-defaults-to-the-probe
+
+`script.alt_gr_is_kana_remap` is a parameter (`input_altering = false`,
+default `"auto"`), not an activation. The neutral-configuration pass gave it
+the neutral `false`, which is a forced override: every configuration that did
+not name it took the standard family, the probe never decided, and on a
+Kana-style layout `KS_LayoutHasAltGr()` was false, so the script chords were
+dead while their menu showed them on (2026-09-30 to 2026-10-01). The tests
+missed it because `_AGD_Init` substituted `"auto"` for « no override ».
+Action: a setting that selects a detection mode keeps its detecting value in
+an empty configuration; test the absent case with `ManifestDefaultFor`, never
+a literal. When an AltGr feature is dead, read the boot `AltGrDetect` line
+first: `source=override` against the layout's own verdict is now a WARNING.
+
 ### project-ahk-prefix-arms-before-physical-state
 
 AutoHotkey decides whether a custom-combination prefix is armed while it

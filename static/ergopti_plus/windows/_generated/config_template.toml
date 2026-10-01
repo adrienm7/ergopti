@@ -8,7 +8,7 @@
 locale = "fr"
 log_level = "INFO"
 show_error_dialog = true
-alt_gr_is_kana_remap = false
+alt_gr_is_kana_remap = "auto"
 
 [hotstrings]
 trigger_char = "★"

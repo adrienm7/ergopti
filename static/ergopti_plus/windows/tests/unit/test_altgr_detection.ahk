@@ -38,7 +38,7 @@ _AGD_Init(Hkl, ProbeFn, Override := "") {
 		else
 			ScriptInformation["AltGrIsKanaRemap"] := Override
 		HotstringEngineInit(() => Hkl, ProbeFn)
-		return { Kana: _ALTGR_KANA_FIXUP, Probe: _ALTGR_LAYOUT_PROBE }
+		return { Kana: _ALTGR_KANA_FIXUP, Probe: _ALTGR_LAYOUT_PROBE, HasAltGr: KS_LayoutHasAltGr() }
 	} finally {
 		_ALTGR_KANA_FIXUP := Saved.Kana
 		_ALTGR_LAYOUT_PROBE := Saved.Probe
@@ -78,6 +78,43 @@ _AGD_OverrideWinsAndKeepsTheLayout() {
 }
 Test("altgr detection: the TOML override wins, the layout is still recorded (altgr-single-probe-2026-09-26)",
 	_AGD_OverrideWinsAndKeepsTheLayout)
+
+; A configuration that does not name the setting starts with its manifest
+; default. That default was false for three days: every such configuration
+; forced the standard family, so a Kana-style layout was never detected and
+; the script chords, which need a layout whose AltGr key is an AltGr, were
+; dead there while their menu showed them on.
+_AGD_AbsentSettingLetsTheProbeDecide() {
+	Default := ManifestDefaultFor("script.alt_gr_is_kana_remap")
+	AssertEqual("auto", Default, "the setting's default defers to the probe")
+	Kana := _AGD_Init(0xFC06040C, _AGD_Probe(0, 0xDF), Default)
+	AssertTrue(Kana.Kana, "without the setting, a Kana-style layout is detected")
+	AssertEqual("probe", Kana.Probe["source"], "without the setting, the probe decides")
+	AssertTrue(Kana.HasAltGr, "its AltGr key is an AltGr, which the script chords require")
+	Standard := _AGD_Init(0x040C040C, _AGD_Probe(0xE038, 0xA5, true), Default)
+	AssertFalse(Standard.Kana, "without the setting, a standard AltGr layout stays standard")
+	AssertEqual("probe", Standard.Probe["source"], "and the probe decided there too")
+}
+Test("altgr detection: an absent setting lets the probe decide (kana-default-2026-10-01)",
+	_AGD_AbsentSettingLetsTheProbeDecide)
+
+_AGD_OverrideAgainstTheProbeIsNamed() {
+	Against := _AGD_Init(0xFC06040C, _AGD_Probe(0, 0xDF), false)
+	AssertTrue(AltGrFamilyOverrideContradictsProbe(Against.Probe),
+		"false on a layout that probes as Kana contradicts the probe")
+	Forced := _AGD_Init(0x040C040C, _AGD_Probe(0xE038, 0xA5), true)
+	AssertTrue(AltGrFamilyOverrideContradictsProbe(Forced.Probe),
+		"true on a layout that probes as standard contradicts the probe")
+	Agreeing := _AGD_Init(0xFC06040C, _AGD_Probe(0, 0xDF), true)
+	AssertFalse(AltGrFamilyOverrideContradictsProbe(Agreeing.Probe), "an override the probe agrees with")
+	Auto := _AGD_Init(0xFC06040C, _AGD_Probe(0, 0xDF), "auto")
+	AssertFalse(AltGrFamilyOverrideContradictsProbe(Auto.Probe), "no override")
+	Blank := _AGD_Init(0xDEADBEEF, _AGD_Probe(0, 0), true)
+	AssertFalse(AltGrFamilyOverrideContradictsProbe(Blank.Probe),
+		"a probe that read nothing has no verdict to contradict")
+}
+Test("altgr detection: an override against the probe's verdict is named (kana-default-2026-10-01)",
+	_AGD_OverrideAgainstTheProbeIsNamed)
 
 _AGD_UnreadableLayoutIsNotKana() {
 	Probed := false
