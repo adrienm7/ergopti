@@ -477,6 +477,15 @@ is committed; one request is one commit with its regression test.
       threshold and types the tap when another key comes first: that fixes
       typing but makes a quick chord type the tap, so decide which rule
       macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
+- [ ] **88.** Windows: a reload asked while paused now restarts the driver
+      (`reload-refused-while-paused`), but the restarted driver opens the
+      error window with « Deferred tray-menu build was retained for retry »
+      (2026-10-01 16:44:53). The pause handed over by the reload is restored
+      by the watchdog's first tick, which lands during the deferred build of
+      the tray root; the publication is refused because rebuilds are refused
+      while paused, and the retained root is replayed only once the driver
+      is active again. The paused driver is left with the boot menu, without
+      its « Suspendre » row.
 
 ## Time estimate
 
