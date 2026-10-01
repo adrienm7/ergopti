@@ -45,6 +45,12 @@ body {
 	overflow: hidden;
 }
 
+/* A rule that sets `display` beats the browser's own rule for the `hidden`
+   attribute: the folded sections (`display: flex`) stayed on screen. */
+[hidden] {
+	display: none !important;
+}
+
 body {
 	background: var(--bg);
 	color: var(--text);
@@ -156,6 +162,7 @@ main {
 }
 
 .cat-title {
+	cursor: pointer;
 	font-size: 13px;
 	font-weight: 600;
 }
