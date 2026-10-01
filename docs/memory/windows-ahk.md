@@ -369,6 +369,15 @@ release a swallowed repeat would suppress), and every tap-hold key has a `*`
 swallower gated on that claim. AHK falls back to it even when the exact hotkey
 has no eligible variant, and it beats the layer's mapping of the same key only
 because `nav_layer.ahk` is included last (first eligible variant wins).
+A hotkey whose modifiers match exactly beats the wildcard, though: Space held
+as Shift repeated the layout emulation's `+SC039` and typed « ------ », and
+under a layer hold the bare repeat fell to the emulation's bare `SC039`. The
+six keys therefore declare, under the same claim, the bare key and all fifteen
+chords of `^ ! + #` as static labels: a static variant is created before every
+`Hotkey()` one and fires first while its criterion holds (measured with F20).
+Action: a module that registers an exact hotkey on a tap-hold key's scan code
+needs no gate of its own, but a new native tap-hold key needs the sixteen
+labels; `test_tap_hold_owned_repeat_identities.ahk` holds both.
 
 ### project-ahk-synthetic-hold-leaves-the-users-key
 
