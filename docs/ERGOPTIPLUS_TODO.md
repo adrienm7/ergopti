@@ -391,10 +391,6 @@ integrated, then publish one grouped release.
 Every request the maintainer makes is written here first and removed once it
 is committed; one request is one commit with its regression test.
 
-- [ ] **66.** Tap-Holds menu, « Tout effacer »: it switched the Tap-Holds
-      off (seen on Windows). It must only empty every key's tap and hold, so
-      the keys behave as the system's and new ones can be added from there;
-      the switch stays as it is. Same rule on the three drivers.
 - [ ] **67.** Windows: Space with Shift as its hold, held down, types
       « ------ » (Shift+Space repeated, which is « - » on the maintainer's
       layout). A held tap-hold key must send nothing while it is held.

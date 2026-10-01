@@ -96,17 +96,24 @@ helpers.describe("remap scope transaction", function()
 		end)
 	end)
 
-	helpers.it("clears the keys and the master to the neutral state", function()
-		with_fixture(function(fixture)
-			local remap, calls, disk = scoped_remap(fixture)
-			helpers.assert_true(request(remap, "tap_holds", "clear", "/remap/backup-2"))
-			disk.terminal(true, "ready")
-			local saved = calls.saved_payloads[1]
-			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").default_for("tap_holds.enabled"))
-			helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "none", hold = "none" })
-			helpers.assert_eq(remap.get_tap_action(KEY), "none")
-			helpers.assert_eq(remap.get_combo_tap_action(COMBO), "escape")
-		end)
+	-- The clear once put the switch back to its neutral off with the keys, so the
+	-- next key the user set did nothing until the switch was found again.
+	helpers.it("(tap-hold-clear-keeps-switch) clears the keys and leaves the switch as it is", function()
+		for _, switch in ipairs({ true, false }) do
+			with_fixture(function(fixture)
+				local remap, calls, disk = scoped_remap(fixture)
+				helpers.assert_true(remap.set_tap_holds_enabled(switch))
+				calls.save, calls.saved_payloads = 0, {}
+				helpers.assert_true(request(remap, "tap_holds", "clear", "/remap/backup-2"))
+				disk.terminal(true, "ready")
+				local saved = calls.saved_payloads[1]
+				helpers.assert_eq(saved.tap_holds_enabled, switch, "the clear owns the keys, not the switch")
+				helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "none", hold = "none" })
+				helpers.assert_eq(remap.get_tap_action(KEY), "none")
+				helpers.assert_eq(remap.get_tap_holds_enabled(), switch)
+				helpers.assert_eq(remap.get_combo_tap_action(COMBO), "escape")
+			end)
+		end
 	end)
 
 	helpers.it("lets the shortcuts scope own only the chords", function()

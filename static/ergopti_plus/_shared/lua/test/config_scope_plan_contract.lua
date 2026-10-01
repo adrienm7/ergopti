@@ -110,6 +110,24 @@ return function(helpers)
 			}), false)
 			helpers.assert_eq(pcall(Manifest.scope_inventory, "hotstrings", { invalid = false }), false)
 		end)
+		-- « Tout effacer » of the Tap-Holds menu switched the Tap-Holds off, and
+		-- the next key the user set did nothing until the switch was found again.
+		helpers.it("(tap-hold-clear-keeps-switch) a clear leaves the Tap-Holds switch as it is", function()
+			local switches = { ["tap_holds.enabled"] = true, ["category_enabled.tap_holds"] = true }
+			local declared = false
+			for path in pairs(switches) do declared = declared or Manifest.find_entry_by_path(path) ~= nil end
+			helpers.assert_true(declared, "this driver's Tap-Holds switch is a manifest entry")
+			for _, scope in ipairs({ "tap_holds", "global" }) do
+				local restored = false
+				for _, row in ipairs(Manifest.scope_plan(scope, "clear", {}).operations) do
+					helpers.assert_nil(switches[row.section .. "." .. row.key], scope .. " clear rewrites the switch")
+				end
+				for _, row in ipairs(Manifest.scope_plan(scope, "recommended", {}).operations) do
+					restored = restored or switches[row.section .. "." .. row.key] == true
+				end
+				helpers.assert_true(restored, scope .. " restore still switches the Tap-Holds on")
+			end
+		end)
 		helpers.it("routes separate-file presets for restore and clear without inventing config rows", function()
 			for _, mode in ipairs({ "recommended", "clear" }) do
 				local plan = Manifest.scope_plan("global", mode, {})
