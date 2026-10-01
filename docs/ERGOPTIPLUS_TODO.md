@@ -386,6 +386,35 @@ integrated, then publish one grouped release.
       runs before it leaves a `package.loaded` slot set to `true`. Find it and
       restore the slot.
 
+## Maintainer requests on 2026-10-01
+
+Every request the maintainer makes is written here first and removed once it
+is committed; one request is one commit with its regression test.
+
+- [ ] **66.** Tap-Holds menu, « Tout effacer »: it switched the Tap-Holds
+      off (seen on Windows). It must only empty every key's tap and hold, so
+      the keys behave as the system's and new ones can be added from there;
+      the switch stays as it is. Same rule on the three drivers.
+- [ ] **67.** Windows: Space with Shift as its hold, held down, types
+      « ------ » (Shift+Space repeated, which is « - » on the maintainer's
+      layout). A held tap-hold key must send nothing while it is held.
+      Check the other tap-hold keys and the other two drivers.
+- [ ] **68.** Gestures menu, « Tout effacer »: it switches the Gestures off,
+      like item 66. It must only remove the assignments.
+- [ ] **69.** Windows: no automatic search for updates every N hours is
+      visible to the maintainer, who remembers it on macOS and does not know
+      about Linux. The code exists on the three drivers (the shared schedule,
+      `windows/modules/updater/schedule.ahk` and `self_update.ahk`, the Linux
+      `modules/updater/manager.lua`, the About submenu's `about_updates` list
+      with its channel and frequency rows). The maintainer runs Windows from
+      the repository: find what a source run shows and schedules there (rows
+      hidden or greyed without a reason, timer not armed), compare the three
+      trays row by row, and make the frequency row visible and explained on
+      each.
+- [ ] **70.** Hotstrings « Délais et couleurs » window: its tables are meant
+      to fold, and a click on a table's header does nothing (seen on Windows;
+      the page is shared, so check the three drivers).
+
 ## Time estimate
 
 Budgetary estimate: 20–35 hours of effective work for all remaining product and
