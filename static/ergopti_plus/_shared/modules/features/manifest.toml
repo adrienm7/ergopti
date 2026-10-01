@@ -5909,10 +5909,13 @@ prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_e
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
 
+# The Gestures clear removes the assignments and keeps the switch, like the
+# Tap-Holds one: the user assigns the next gesture from there.
 [scopes.gestures]
 action_parameters = { domains = ["gesture"], restore = "remove" }
 prefixes = ["gestures"]
 restore_exclude = []
+clear_exclude = ["gestures.enabled"]
 
 [scopes.keyboard_layout]
 prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]

@@ -110,24 +110,30 @@ return function(helpers)
 			}), false)
 			helpers.assert_eq(pcall(Manifest.scope_inventory, "hotstrings", { invalid = false }), false)
 		end)
-		-- « Tout effacer » of the Tap-Holds menu switched the Tap-Holds off, and
-		-- the next key the user set did nothing until the switch was found again.
-		helpers.it("(tap-hold-clear-keeps-switch) a clear leaves the Tap-Holds switch as it is", function()
-			local switches = { ["tap_holds.enabled"] = true, ["category_enabled.tap_holds"] = true }
-			local declared = false
-			for path in pairs(switches) do declared = declared or Manifest.find_entry_by_path(path) ~= nil end
-			helpers.assert_true(declared, "this driver's Tap-Holds switch is a manifest entry")
-			for _, scope in ipairs({ "tap_holds", "global" }) do
-				local restored = false
-				for _, row in ipairs(Manifest.scope_plan(scope, "clear", {}).operations) do
-					helpers.assert_nil(switches[row.section .. "." .. row.key], scope .. " clear rewrites the switch")
+		-- « Tout effacer » of the Tap-Holds menu, then of the Gestures menu,
+		-- switched the feature off, and the next key or gesture the user set did
+		-- nothing until the switch was found again.
+		for _, case in ipairs({
+			{ slug = "tap-hold-clear-keeps-switch", scope = "tap_holds",
+				switches = { ["tap_holds.enabled"] = true, ["category_enabled.tap_holds"] = true } },
+			{ slug = "gestures-clear-keeps-switch", scope = "gestures", switches = { ["gestures.enabled"] = true } },
+		}) do
+			helpers.it("(" .. case.slug .. ") a clear leaves the " .. case.scope .. " switch as it is", function()
+				local declared = false
+				for path in pairs(case.switches) do declared = declared or Manifest.find_entry_by_path(path) ~= nil end
+				helpers.assert_true(declared, "this driver's switch is a manifest entry")
+				for _, scope in ipairs({ case.scope, "global" }) do
+					local restored = false
+					for _, row in ipairs(Manifest.scope_plan(scope, "clear", {}).operations) do
+						helpers.assert_nil(case.switches[row.section .. "." .. row.key], scope .. " clear rewrites the switch")
+					end
+					for _, row in ipairs(Manifest.scope_plan(scope, "recommended", {}).operations) do
+						restored = restored or case.switches[row.section .. "." .. row.key] == true
+					end
+					helpers.assert_true(restored, scope .. " restore still switches the feature on")
 				end
-				for _, row in ipairs(Manifest.scope_plan(scope, "recommended", {}).operations) do
-					restored = restored or switches[row.section .. "." .. row.key] == true
-				end
-				helpers.assert_true(restored, scope .. " restore still switches the Tap-Holds on")
-			end
-		end)
+			end)
+		end
 		helpers.it("routes separate-file presets for restore and clear without inventing config rows", function()
 			for _, mode in ipairs({ "recommended", "clear" }) do
 				local plan = Manifest.scope_plan("global", mode, {})

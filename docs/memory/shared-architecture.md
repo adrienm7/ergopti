@@ -253,9 +253,14 @@ the stored value. The Tap-Holds scope keeps its switch
 (`category_enabled.tap_holds` on Windows, `tap_holds.enabled` on macOS and
 Linux): the maintainer's rule of 2026-10-01 is that « Tout effacer » empties
 every key's tap and hold and the user adds keys from there, and a switch
-turned off with them made the next key do nothing. Action: a menu whose clear
-must keep its switch declares it there, never in an owner; the
-`tap-hold-clear-keeps-switch` tests hold the plan and each driver's owner.
+turned off with them made the next key do nothing. The Gestures scope keeps
+`gestures.enabled` for the same reason; its macOS owner then reads the live
+switch (no row names it) and leaves the session demotion of that switch, which
+only a scope publishing the switch ends. Action: a menu whose clear must keep
+its switch declares it there, never in an owner; the
+`tap-hold-clear-keeps-switch` and `gestures-clear-keeps-switch` tests hold the
+plan and each driver's owner. The Shortcuts, Hotstrings and layout clears
+still turn their switches off: ask the maintainer before changing them.
 
 ### project-a-settings-menu-opens-with-switch-restore-clear
 

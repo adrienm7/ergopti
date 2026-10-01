@@ -31,7 +31,12 @@ local function with_scope(body)
 				write = function() error("unconditional writes are forbidden") end,
 				write_if_unchanged = function(target, content, expected)
 					if controls.refuse == target then return false, "injected publication refusal" end
-					if controls.external_edit and target == path then Sandbox.write_bytes(path, controls.external_edit) end
+					if controls.external_edit and target == path then
+						Sandbox.write_bytes(path, controls.external_edit)
+						-- The reader refuses from the publication on: the apply
+						-- that came before it started the reader.
+						if controls.refuse_reader_after_edit then controls.refuse_reader = true end
+					end
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
@@ -126,8 +131,10 @@ helpers.describe("Linux gesture scope transaction", function()
 			if backup then controls.backups[#controls.backups + 1] = backup end
 			helpers.assert_true(committed, tostring(detail))
 			helpers.assert_eq(Sandbox.read_bytes(backup), SOURCE)
-			helpers.assert_eq(gestures.is_enabled(), false)
-			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, nil)
+			-- The clear once switched the Gestures off with the assignments
+			-- (gestures-clear-keeps-switch).
+			helpers.assert_eq(gestures.is_enabled(), true, "the clear owns the assignments, not the switch")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, true)
 		end)
 	end)
 
@@ -184,9 +191,9 @@ helpers.describe("Linux gesture scope transaction", function()
 				clear.fn()
 				helpers.assert_eq(table.concat(calls, ","), "clear,clear")
 				helpers.assert_true(refreshes > 0)
-				helpers.assert_eq(gestures.is_enabled(), false)
+				helpers.assert_eq(gestures.is_enabled(), true, "the menu clear keeps the switch (gestures-clear-keeps-switch)")
 				local saved = Codec.decode(Sandbox.read_bytes(path))
-				helpers.assert_eq(saved.gestures and saved.gestures.enabled, nil)
+				helpers.assert_eq(saved.gestures and saved.gestures.enabled, true)
 				helpers.assert_eq(saved.other.value, 42)
 				helpers.assert_eq(Sandbox.read_bytes(controls.backups[#controls.backups]), SOURCE,
 					"the clear backs the file up before it rewrites it")
@@ -208,7 +215,7 @@ helpers.describe("Linux gesture scope transaction", function()
 			helpers.assert_true(committed, tostring(detail))
 			helpers.assert_eq(Sandbox.read_bytes(backup), SOURCE)
 			local saved = Codec.decode(Sandbox.read_bytes(path))
-			helpers.assert_eq(saved.gestures and saved.gestures.enabled, nil)
+			helpers.assert_eq(saved.gestures and saved.gestures.enabled, true, "gestures-clear-keeps-switch")
 			helpers.assert_eq(saved.linux.gestures.tap_4, nil)
 			helpers.assert_eq(saved.linux.gestures.unknown, "keep")
 			helpers.assert_eq(saved.linux.action_parameters.tap_4__open_url, nil)
@@ -217,8 +224,11 @@ helpers.describe("Linux gesture scope transaction", function()
 			helpers.assert_eq(saved.gesture_parameters.keyboard__ctrl_j__open_url, "https://keyboard.example")
 			helpers.assert_eq(saved.gesture_parameters.unknown, "keep")
 			helpers.assert_eq(saved.other.value, 42)
-			helpers.assert_eq(gestures.is_enabled(), false)
-			helpers.assert_eq(gestures.is_reading(), false)
+			helpers.assert_eq(gestures.is_enabled(), true, "the switch stays on")
+			helpers.assert_eq(gestures.is_reading(), true)
+			for slot in pairs(gestures.DEFAULT_GESTURES) do
+				helpers.assert_eq(gestures.get_action(slot), "none", slot .. " is cleared")
+			end
 			helpers.assert_eq(gestures.get_all_action_parameters().tap_3__open_url, nil)
 			helpers.assert_eq(gestures.get_all_action_parameters().tap_4__open_url, nil)
 			package.loaded["modules.gestures.manager"] = nil
@@ -266,8 +276,10 @@ helpers.describe("Linux gesture scope transaction", function()
 
 	helpers.it("gesture-scope: external edits win while refused reader restoration retains debt", function()
 		with_scope(function(owner, gestures, controls, path)
+			-- A clear keeps the switch, so its apply restarts the reader like its
+			-- inverse does: the reader refuses only once the publication lost.
 			controls.external_edit = SOURCE .. "# another writer\n"
-			controls.refuse_reader = true
+			controls.refuse_reader_after_edit = true
 			helpers.assert_eq(owner.apply("clear"), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), controls.external_edit)
 			helpers.assert_eq(owner.pending(), true)
@@ -285,7 +297,8 @@ helpers.describe("Linux gesture scope revert", function()
 		with_scope(function(owner, gestures, _, path)
 			local actions = gestures.get_all_actions()
 			helpers.assert_eq(owner.apply("clear"), true)
-			helpers.assert_eq(gestures.is_enabled(), false)
+			helpers.assert_eq(gestures.is_enabled(), true, "the clear keeps the switch")
+			helpers.assert_eq(gestures.get_action("tap_3"), "none", "and removes the assignment")
 			local reverted, detail = owner.revert()
 			helpers.assert_eq(reverted, true, detail)
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
