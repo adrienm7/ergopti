@@ -134,10 +134,16 @@ _ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey := "") {
 				Known := true
 		}
 		_ReleaseInstallTag := ""
+		try LoggerError("ReleaseInstall", "Install of {1} stopped: {2}.", Tag,
+			Known ? ReasonKey : RELEASE_INSTALL_REASONS["unexpected"])
 		_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "failed", "backup_path", BackupPath,
 			"reason_key", Known ? ReasonKey : RELEASE_INSTALL_REASONS["unexpected"]))
 		return
 	}
+	; The swap worker has been acknowledged, not completed: the resident process
+	; cannot observe installation after it exits. Close only this owner's handoff.
+	if (Phase == "restarting")
+		try LoggerSuccess("ReleaseInstall", "Verified release {1} handed to the swap and restart worker.", Tag)
 	if (Phase == "installing" || Phase == "restarting")
 		_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", Phase, "backup_path", BackupPath))
 }
@@ -145,6 +151,7 @@ _ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey := "") {
 _ReleaseInstall_Fail(Deps, Tag, Reason, BackupPath) {
 	global _ReleaseInstallTag, RELEASE_INSTALL_REASONS
 	_ReleaseInstallTag := ""
+	try LoggerError("ReleaseInstall", "Install of {1} stopped: {2}.", Tag, RELEASE_INSTALL_REASONS[Reason])
 	Message := Map("tag", Tag, "phase", "failed", "reason_key", RELEASE_INSTALL_REASONS[Reason])
 	if (BackupPath != "")
 		Message["backup_path"] := BackupPath

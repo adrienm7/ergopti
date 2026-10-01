@@ -419,8 +419,10 @@ is committed; one request is one commit with its regression test.
       include graph and the resident driver initialize the same options; the
       regression also renders the native menu with reordered options. Native
       CI must confirm the five AI failures and restore failure are gone.
-      Remaining: `modules/updater/release_install.ahk` opens a LoggerStart it
-      never closes (logger pairing); updater-consent-2026-09-25 counts four
+      Release-install logging now closes at the acknowledged swap/restart
+      handoff and reports download/observer refusals as failure terminals,
+      covered with the real logger's test sink. Remaining:
+      updater-consent-2026-09-25 counts four
       download starts for two allowed; the AHK-15 persistence census counts 26
       TOML writers for 25 audited; and AHK-901 no longer finds
       `DirDelete(RTrim(CaptureDir` in `ShellRunner_Exec`. Also, the
