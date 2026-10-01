@@ -624,6 +624,9 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "group",
 			"id": "key_combinations",
 			"i18n": "menu.shortcuts.key_combinations",

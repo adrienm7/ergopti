@@ -502,9 +502,6 @@ is committed; one request is one commit with its regression test.
       chord ». Windows gets the same model over the keys of
       `[tap_hold.catalog]`, the three families becoming the recommended
       values of their pairs.
-- [ ] **92.** Shortcuts menu: a separator before « Combinaisons de touches »,
-      which today follows the modifier-shortcut submenus (Ctrl, Win, Alt…)
-      without a break.
 - [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
       binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
       taps when a second tap-hold key goes down) and the Shortcuts menu draws
@@ -590,6 +587,12 @@ diagnostic warning count. The portable source guard fails on the original claim
 and rejects its reintroduction; the registered native regression captures enabled
 warning output and verifies all 83 shipped source entries remain readable.
 That new native case requires the next non-release Windows CI run.
+
+The shared Shortcuts declaration separates modifier-shortcut groups from key
+combinations. Linux currently omits the combinations group, so the same boundary
+separates its modifier shortcuts from script controls. Existing renderer tests
+exercise all manifest menus with empty-edge and doubled-separator provider probes
+on the three drivers; the renderer retains one separator between visible rows.
 
 ## Time estimate
 
