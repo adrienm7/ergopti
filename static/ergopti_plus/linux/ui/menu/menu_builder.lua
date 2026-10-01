@@ -2409,6 +2409,16 @@ local function _manifest_metrics_rows(ctx, k)
 		end
 	end
 
+	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
+	--- missing still builds its menu — the row then reports the widget as off,
+	--- which is what it is.
+	--- @return table|nil
+	local function wpm_widget()
+		local ok, widget = pcall(require, "ui.wpm.widget")
+		return ok and widget or nil
+	end
+
+
 	-- The canonical state keys the manifest's disabled_when / checked_when arrays
 	-- name. A key declared there with no getter here is an ERROR in the renderer,
 	-- not a silent always-enabled row — which is the whole point of resolving them
@@ -2427,8 +2437,16 @@ local function _manifest_metrics_rows(ctx, k)
 			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
 		end,
 		wpm_widget_visible     = function()
-			local ok, widget = pcall(require, "ui.wpm.widget")
-			return ok and widget.is_running() or false
+			local widget = wpm_widget()
+			return widget ~= nil and widget.is_running()
+		end,
+		metrics_widget_colors  = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_source_colors()
+		end,
+		metrics_widget_graph   = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_graph()
 		end,
 		-- The tray readout: the Linux counterpart of the macOS menu bar one.
 		metrics_menubar_wpm    = function()
@@ -2444,20 +2462,6 @@ local function _manifest_metrics_rows(ctx, k)
 			return ok and readout.is_running() or false
 		end,
 	}
-
-	--- One manifest row, with its disabled state resolved from the manifest.
-	--- @param id string Manifest item id.
-	--- @param label string Translated label.
-	--- @param checked boolean Whether to draw the checkmark.
-	--- @param on_click function
-	--- @return table
-	local function row(id, label, checked, on_click)
-		return {
-			title    = label .. (checked and " ✓" or ""),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", id, getters) or nil,
-			fn       = on_click,
-		}
-	end
 
 	--- Opens one of the two metrics windows through the webview manager.
 	--- @param app string Window id, e.g. "metrics_typing".
@@ -2486,56 +2490,46 @@ local function _manifest_metrics_rows(ctx, k)
 		end
 	end
 
-	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
-	--- missing still builds its menu — the row then reports the widget as off,
-	--- which is what it is.
-	--- @return table|nil
-	local function wpm_widget()
-		local ok, widget = pcall(require, "ui.wpm.widget")
-		return ok and widget or nil
+
+	local function cmd_wpm_widget()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
+			return false
+		end
+		local changed
+		if widget.is_running() then
+			changed = widget.stop()
+		else
+			changed = widget.start()
+		end
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
 	end
 
-	local handlers = {
-		wpm_widget = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("wpm_widget", i18n_safe("menu.metrics.show_wpm_widget"),
-				widget ~= nil and widget.is_running(),
-				function()
-					if not widget then
-						Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
-						return
-					end
-					local changed = widget.is_running() and widget.stop() or widget.start()
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		widget_colors = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("widget_colors", i18n_safe("menu.metrics.colors_by_source"),
-				widget ~= nil and widget.uses_source_colors(),
-				function()
-					if not widget then return end
-					local changed = widget.set_use_source_colors(not widget.uses_source_colors())
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		-- The real-time graph in place of the pill, as on macOS.
-		include_realtime = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("include_realtime", i18n_safe("menu.metrics.include_realtime"),
-				widget ~= nil and widget.uses_graph(),
-				function()
-					if not widget then return end
-					local changed = widget.set_graph(not widget.uses_graph())
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		-- The three privacy filters are gone from this table on purpose: their
-		-- manifest rows are `type = "check"` now, so the SHARED renderer builds
-		-- them from the declaration and this driver supplies only the behaviour,
-		-- through `ctx.commands` below. Three fewer rows built here, and the tick
-		-- is the tray's own check item instead of a " ✓" glued to the title.
-	}
+	local function cmd_widget_colors()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — colors cannot change.")
+			return false
+		end
+		local changed = widget.set_use_source_colors(not widget.uses_source_colors())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local function cmd_include_realtime()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — graph cannot change.")
+			return false
+		end
+		local changed = widget.set_graph(not widget.uses_graph())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local handlers = {}
 
 	-- The declarative rows read their state and their behaviour off the context:
 	-- `state_getters` answers the manifest's checked_when / disabled_when keys,
@@ -2558,6 +2552,9 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
+		["wpm_widget"] = cmd_wpm_widget,
+		["widget_colors"] = cmd_widget_colors,
+		["include_realtime"] = cmd_include_realtime,
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
 		["scope_restore"] = restore_metrics_scope,

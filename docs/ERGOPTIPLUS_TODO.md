@@ -34,6 +34,13 @@ native behavior and parity regression tests. Preserve unrelated changes, stage
 exact paths, never force-push `dev`/`main`, and delete only the temporary CI
 branches this session created after their evidence is recorded.
 
+The Windows regression backlog (former item 72) is closed: non-release CI
+run [36916568697](https://github.com/adrienm7/ergopti/actions/runs/36916568697)
+at `e5da10fbc` passed native unit tests, engine E2E, packaging, install/launch
+and the Windows verdict. The full run passed, including the shared core,
+both Lua suites and all macOS/Linux installation variants.
+The next menu migrations add shared behavioral vectors to these native lanes.
+
 **Overnight session of 2026-09-29 (supersedes the "one item at a time"
 instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
 were implemented in parallel on `wip/*` branches, adversarially reviewed, fixed
@@ -354,7 +361,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (baseline: Windows 125, macOS 209, Linux 127, each
+      drivers still build (baseline: Windows 122, macOS 204, Linux 127, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -412,31 +419,6 @@ is committed; one request is one commit with its regression test.
       `metrics.shortcut_*`; and the second half of the Linux reason
       `platform_reason.metrics_extras_are_not_on_linux`, which still speaks
       of a shortcut.
-- [ ] **72.** The Windows suite is red on `dev` before any of today's work
-      (run on a real Windows 11 on 2026-10-01, 10 of 7 567 tests, the same on
-      the tree of 3e6c45827):
-      The backend catalogue now lives beside its only reader, so the unit
-      include graph and the resident driver initialize the same options; the
-      regression also renders the native menu with reordered options. Native
-      CI must confirm the five AI failures and restore failure are gone.
-      Release-install logging now closes at the acknowledged swap/restart
-      handoff and reports download/observer refusals as failure terminals,
-      covered with the real logger's test sink. The updater-consent guard now
-      audits all four explicit-consent ports, including both Versions windows;
-      regression fixtures reject an extra download or a missing audited path.
-      The 26th TOML writer is the script-chords switch; its persistence census
-      is audited and a real refused write proves reload is suppressed and the
-      existing configuration is byte-exact. AHK-901 now follows the checked
-      native remover; real Windows regressions keep adjacent owners' output
-      and refuse recursive deletion of an unclaimed file. Source and include
-      censuses now share one production-ownership predicate; a generated
-      personal-shortcuts fixture verifies matching counts while preserving
-      inherited directives. Remaining: confirm the repaired suite and these
-      native regressions through the non-release CI lane before retiring item 72.
-      CI run 36914974910 at bbdb51f42 reduced the original ten failures to one
-      (7,606 passed): the no-dialog AI case still invoked its deliberately
-      retired clear command. It now exercises restore alone, including the
-      assertion that the command factory exposes no clear; final CI is pending.
 - [ ] **73.** Follow-ups of the tray rows the Windows separator bug hid
       (`submenu-read-as-separator-2026-10-01`, fixed): the three families of «
       Combinaisons de touches » are back and read their raw `group_label`
@@ -452,7 +434,7 @@ is committed; one request is one commit with its regression test.
       writes the whole file, and make it write only what changed.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 125, macOS 207 and Linux 127 rows are still built by the
+      Windows 122, macOS 204 and Linux 127 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:
@@ -470,7 +452,13 @@ is committed; one request is one commit with its regression test.
       sites): they follow (b), as part of the template;
       (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
       `menu_init.ahk`).
-      Order: (a) for Metrics on the three drivers, then the template of (b)
+      Metrics widget rows are now shared `check` declarations on all three
+      drivers. Native getters retain stored colors/graph checks while disabled;
+      Windows commands rebuild through the normal tray owner after durable
+      acknowledgement. One golden fixture covers all 16 state combinations
+      in each native menu suite; command regressions fence refused writes and
+      ensure a refused Linux stop never starts the widget instead.
+      Order: finish other computed Metrics rows, then the template of (b)
       on Tap-Holds (the smallest menu that has one), then Gestures and
       Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
       (Windows 41, macOS about 70), and Linux `menu_builder.lua` (123) along

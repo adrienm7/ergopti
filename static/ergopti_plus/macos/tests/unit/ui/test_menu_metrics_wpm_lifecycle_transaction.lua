@@ -49,8 +49,7 @@ local function load_menu(options)
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.manifest_menu"] = {
-		build = function(_id, _label, dynamic_handlers, _unused, render_context)
-			context.dynamic_handlers = dynamic_handlers
+		build = function(_id, _label, _dynamic_handlers, _unused, render_context)
 			context.commands = render_context.commands
 			return {}
 		end,
@@ -122,9 +121,7 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 
 	helpers.it("compensates a rejected floating-widget activation", function()
 		local context = load_menu({ widget_start = function() return false end })
-		local items = {}
-		context.dynamic_handlers.wpm_widget(items, {})
-		local committed = items[1].fn()
+		local committed = context.commands.wpm_widget()
 
 		helpers.assert_eq(committed, false)
 		helpers.assert_eq(context.state.keylogger_float_wpm, false)

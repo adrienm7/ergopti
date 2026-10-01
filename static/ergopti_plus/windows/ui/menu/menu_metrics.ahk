@@ -22,6 +22,8 @@
 global _MET_STATE_GETTERS := Map(
 	"keylogger_enabled",       () => MetricsShortcuts.enabled,
 	"wpm_widget_visible",      () => WPMWidget.visible,
+	"metrics_widget_colors",   () => WPMWidget.use_colors,
+	"metrics_widget_graph",    () => WPMWidget.show_graph,
 	; Read by the manifest's checked_when predicates, so the checkmark state is
 	; declared beside the row rather than restated in each handler.
 	"metrics_filter_private",  () => MetricsFilters.private_browsing,
@@ -46,28 +48,15 @@ global _MET_STATE_GETTERS := Map(
 BuildMetricsMenu() {
 	global A_TrayMenu, _MET_STATE_GETTERS
 
-	; Dynamic handlers — each populates the MetricsMenu in place, resolving
-	; its own grey-out state from the manifest's disabled_when predicate.
-
-	DynHandlers := Map(
-		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
-		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
-		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
-	)
-
-	; The three privacy filters left DynHandlers on 2026-08-06: their manifest
-	; rows are `type = "check"`, so the renderer builds them from the
-	; declaration and this file supplies only the behaviour. One row shape for
-	; three drivers, which is what the manifest was for.
-	; show_typing and show_apps left DynHandlers on 2026-08-07: their manifest
-	; rows are `command` now, so the renderer builds the label and applies the
-	; greying from the declaration and this driver supplies only the click.
-	; The category switch is the manifest's `metrics_toggle` row. Its command is
-	; the dedicated writer (security warning + MetricsShortcuts.enabled + save)
-	; rather than the generic CategoryEnabled flip.
+	; The shared declaration owns labels, checks and disabled predicates.
+	; This driver supplies native state reads and committed click effects.
+	DynHandlers := Map()
 	Commands := _MET_ScopeCommands()
 	for Id, Handler in Map(
 		"metrics_toggle",  (*) => ToggleMetricsEnabled(),
+		"wpm_widget",      (*) => _ToggleWpmWidget(),
+		"widget_colors",   (*) => _ToggleWpmWidgetColors(),
+		"include_realtime", (*) => _ToggleWpmWidgetGraph(),
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
 		"filter_sysauth",  ToggleFilterSystemAuth,
@@ -78,13 +67,7 @@ BuildMetricsMenu() {
 	)
 		Commands[Id] := Handler
 
-	; The app-exclusion row left DynHandlers on 2026-08-07: its label is computed,
-	; so no static declaration can carry it, but a provider that returns one row
-	; is still the renderer drawing it. The three WPM widget rows stay handlers:
-	; their callbacks repaint the OPEN menu rather than rebuilding the tray,
-	; which a declarative row cannot do. The two rows that set a dedicated
-	; shortcut for the metrics windows went on 2026-10-01: such a shortcut is
-	; assigned to the opening action in the Gestures or the Shortcuts menu.
+	; Only the app-exclusion count requires a computed label.
 	ListProviders := Map(
 		"exclude_apps", (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
 	)
@@ -102,40 +85,6 @@ _MET_ExcludeAppsRows(Getters) {
 		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "exclude_apps", Getters),
 		"action",   OpenMetricsAppPicker)]
 }
-
-; Dynamic handler: WPM floating widget toggle.
-_MET_WpmWidget(M, _Cat, Getters) {
-	Label := t("menu.metrics.show_wpm_widget")
-	ColorsLabel := t("menu.metrics.colors_by_source")
-	GraphLabel  := t("menu.metrics.include_realtime")
-	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidget(M, Label, ColorsLabel, GraphLabel))
-	if WPMWidget.visible
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "wpm_widget", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: Widget colors-by-source sub-option.
-_MET_WpmWidgetColors(M, _Cat, Getters) {
-	Label := t("menu.metrics.colors_by_source")
-	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidgetColors(M, Label))
-	if WPMWidget.visible && WPMWidget.use_colors
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "widget_colors", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: Include realtime graph sub-option.
-_MET_WpmWidgetGraph(M, _Cat, Getters) {
-	Label := t("menu.metrics.include_realtime")
-	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidgetGraph(M, Label))
-	if WPMWidget.visible && WPMWidget.show_graph
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "include_realtime", Getters)
-		M.Disable(Label)
-}
-
-; ── Layout dynamic handlers ────────────────────────────────────────────────────
 
 ; Consent is excluded from recommendations by the shared scope declaration.
 ; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.

@@ -9,9 +9,9 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
----    ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.  Dynamic blocks
----    (app exclusion, WPM controls, encryption) are supplied
----    as handlers so state-bearing logic stays in Lua.
+---    ``_shared/modules/menu/menu_manifest.json`` via ``infra/manifest_menu``.
+---    Native getters and commands supply state and effects; only the app
+---    exclusion count needs a computed provider label.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and
 ---    starts/stops them cleanly upon user toggling.
 --- 3. Standalone App Link: Provides a direct link to open the GUI of the Encryptor.
@@ -263,7 +263,7 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 3.1) Dynamic Handlers for Manifest Items =====
+	-- ===== 3.1) Native Commands for Manifest Items =====
 	-- =====================================================
 
 	-- Canonical state-key getters for the disabled_when AND checked_when resolvers
@@ -279,6 +279,8 @@ function M.build(ctx)
 	local STATE_GETTERS = {
 		keylogger_enabled      = function() return state.keylogger_enabled end,
 		wpm_widget_visible     = function() return state.keylogger_float_wpm end,
+		metrics_widget_colors  = function() return state.keylogger_float_colors end,
+		metrics_widget_graph   = function() return state.keylogger_float_graph end,
 		wpm_menubar_visible    = function() return state.keylogger_menubar_wpm end,
 		metrics_filter_private = function() return state.keylogger_private_filter_enabled end,
 		metrics_filter_secure  = function() return state.keylogger_secure_filter_enabled end,
@@ -377,64 +379,43 @@ function M.build(ctx)
 		updateMenu()
 	end
 
-	local function dyn_wpm_widget(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.show_wpm_widget"),
-			checked  = state.keylogger_float_wpm,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_widget", STATE_GETTERS),
-			fn       = function()
-				local WpmWidget = require("ui.wpm.wpm_widget")
-				if type(WpmWidget.set_use_source_colors) == "function" then
-					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
-				end
-				return toggle_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
-					state.keylogger_float_graph)
-			end,
-		})
+	local function cmd_wpm_widget()
+		local WpmWidget = require("ui.wpm.wpm_widget")
+		if type(WpmWidget.set_use_source_colors) == "function" then
+			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+		end
+		return toggle_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
+			state.keylogger_float_graph)
 	end
 
-	local function dyn_widget_colors(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.colors_by_source"),
-			checked  = state.keylogger_float_colors,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "widget_colors", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_float_colors = not state.keylogger_float_colors
-				if save_prefs() ~= true then return false end
-				local WpmWidget = require("ui.wpm.wpm_widget")
-				if type(WpmWidget.set_use_source_colors) == "function" then
-					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
-				end
-				if state.keylogger_float_wpm and not paused_now()
-					and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-						state.keylogger_float_graph) then
-					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
-				end
-				updateMenu()
-			end,
-		})
+	local function cmd_widget_colors()
+		state.keylogger_float_colors = not state.keylogger_float_colors
+		if save_prefs() ~= true then return false end
+		local WpmWidget = require("ui.wpm.wpm_widget")
+		if type(WpmWidget.set_use_source_colors) == "function" then
+			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+		end
+		if state.keylogger_float_wpm and not paused_now()
+			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+				state.keylogger_float_graph) then
+			compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+		end
+		updateMenu()
 	end
 
-	local function dyn_include_realtime(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.metrics.include_realtime"),
-			checked  = state.keylogger_float_graph,
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "include_realtime", STATE_GETTERS),
-			fn       = function()
-				state.keylogger_float_graph = not state.keylogger_float_graph
-				if save_prefs() ~= true then return false end
-				local WpmWidget = require("ui.wpm.wpm_widget")
-				if type(WpmWidget.set_use_source_colors) == "function" then
-					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
-				end
-				if state.keylogger_float_wpm and not paused_now()
-					and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-						state.keylogger_float_graph) then
-					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
-				end
-				updateMenu()
-			end,
-		})
+	local function cmd_include_realtime()
+		state.keylogger_float_graph = not state.keylogger_float_graph
+		if save_prefs() ~= true then return false end
+		local WpmWidget = require("ui.wpm.wpm_widget")
+		if type(WpmWidget.set_use_source_colors) == "function" then
+			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+		end
+		if state.keylogger_float_wpm and not paused_now()
+			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+				state.keylogger_float_graph) then
+			compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+		end
+		updateMenu()
 	end
 
 	local function cmd_reset_wpm_position()
@@ -481,19 +462,8 @@ function M.build(ctx)
 	-- ===== 3.2) Manifest-Driven Menu Assembly =====
 	-- =============================================
 
-	-- The app-exclusion row left dyn_handlers on 2026-08-07: its label is
-	-- computed, so no static declaration can carry it, but a provider that
-	-- returns one row is still the renderer drawing it. The three WPM widget
-	-- rows stay handlers — their callbacks repaint the OPEN menu rather than
-	-- rebuilding the tray, which a declarative row cannot do. The two rows that
-	-- set a dedicated shortcut for the metrics windows went on 2026-10-01: such
-	-- a shortcut is assigned to the opening action in the Gestures or the
-	-- Shortcuts menu.
-	local dyn_handlers = {
-		wpm_widget       = dyn_wpm_widget,
-		widget_colors    = dyn_widget_colors,
-		include_realtime = dyn_include_realtime,
-	}
+	-- Static rows are declared; only the exclusion count needs a provider.
+	local dyn_handlers = {}
 
 	local list_providers = {
 		exclude_apps = rows_exclude_apps,
@@ -620,6 +590,9 @@ function M.build(ctx)
 	render_ctx.state_getters = STATE_GETTERS
 	render_ctx.commands = {
 		["metrics_toggle"] = toggle_metrics,
+		["wpm_widget"] = cmd_wpm_widget,
+		["widget_colors"] = cmd_widget_colors,
+		["include_realtime"] = cmd_include_realtime,
 		["filter_private"] = cmd_filter_private,
 		["filter_secure"]  = cmd_filter_secure,
 		["filter_sysauth"] = cmd_filter_sysauth,
