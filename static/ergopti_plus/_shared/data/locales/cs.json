@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Vyloučit aplikace z klávesového záznamu…",
 	"menu.metrics.filter_private": "Ignorovat soukromé prohlížení",
 	"menu.metrics.filter_secure": "Ignorovat pole pro hesla",
-	"menu.metrics.filter_sysauth": "Ignorovat systémová ověřovací dialogová okna",
+	"menu.metrics.filter_sysauth": "Ignorovat systémové ověřování",
 	"menu.metrics.include_realtime": "    ↳ Zahrnout graf v reálném čase",
 	"menu.metrics.enable": "Povolit metriky",
 	"menu.metrics.open_encryptor": "  ↳ Otevřít samostatný šifrátor…",

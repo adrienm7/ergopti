@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Toepassingen uitsluiten van keylogger…",
 	"menu.metrics.filter_private": "Privébrowsen negeren",
 	"menu.metrics.filter_secure": "Wachtwoordvelden negeren",
-	"menu.metrics.filter_sysauth": "Systeemverificatievensters negeren",
+	"menu.metrics.filter_sysauth": "Systeemauthenticatie negeren",
 	"menu.metrics.include_realtime": "    ↳ Realtime grafiek opnemen",
 	"menu.metrics.enable": "Statistieken inschakelen",
 	"menu.metrics.open_encryptor": "  ↳ Zelfstandige versleuteling openen…",

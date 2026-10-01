@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Wyklucz aplikacje z keyloggera…",
 	"menu.metrics.filter_private": "Ignoruj przeglądanie prywatne",
 	"menu.metrics.filter_secure": "Ignoruj pola hasła",
-	"menu.metrics.filter_sysauth": "Ignoruj okna uwierzytelniania systemowego",
+	"menu.metrics.filter_sysauth": "Ignoruj uwierzytelnianie systemowe",
 	"menu.metrics.include_realtime": "    ↳ Dołącz wykres w czasie rzeczywistym",
 	"menu.metrics.enable": "Włącz statystyki",
 	"menu.metrics.open_encryptor": "  ↳ Otwórz samodzielny szyfrarz…",

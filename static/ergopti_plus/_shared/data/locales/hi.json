@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "कीलॉगर से अनुप्रयोगों को बाहर रखें…",
 	"menu.metrics.filter_private": "निजी ब्राउज़िंग को अनदेखा करें",
 	"menu.metrics.filter_secure": "पासवर्ड फील्ड को अनदेखा करें",
-	"menu.metrics.filter_sysauth": "सिस्टम प्रमाणीकरण संवादों को अनदेखा करें",
+	"menu.metrics.filter_sysauth": "सिस्टम प्रमाणीकरण को अनदेखा करें",
 	"menu.metrics.include_realtime": "    ↳ रीयल-टाइम ग्राफ शामिल करें",
 	"menu.metrics.enable": "मेट्रिक्स सक्षम करें",
 	"menu.metrics.open_encryptor": "  ↳ स्टैंडअलोन एन्क्रिप्टर खोलें…",

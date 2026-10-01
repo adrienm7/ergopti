@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "החרג יישומים מ-keylogger…",
 	"menu.metrics.filter_private": "התעלם מגלישה פרטית",
 	"menu.metrics.filter_secure": "התעלם משדות סיסמה",
-	"menu.metrics.filter_sysauth": "התעלם מדיאלוגי אימות מערכת",
+	"menu.metrics.filter_sysauth": "התעלמות מאימות מערכת",
 	"menu.metrics.include_realtime": "    ↳ כלול גרף בזמן אמת",
 	"menu.metrics.enable": "הפעל מטריקות",
 	"menu.metrics.open_encryptor": "  ↳ פתח Encryptor עצמאי…",

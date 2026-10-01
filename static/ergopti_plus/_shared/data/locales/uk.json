@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Виключити програми з кейлоггера…",
 	"menu.metrics.filter_private": "Ігнорувати приватний перегляд",
 	"menu.metrics.filter_secure": "Ігнорувати поля паролів",
-	"menu.metrics.filter_sysauth": "Ігнорувати діалоги аутентифікації системи",
+	"menu.metrics.filter_sysauth": "Ігнорувати системну автентифікацію",
 	"menu.metrics.include_realtime": "    ↳ Включити графік у реальному часі",
 	"menu.metrics.enable": "Увімкнути метрики",
 	"menu.metrics.open_encryptor": "  ↳ Відкрити автономний шифрувальник…",

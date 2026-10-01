@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Exkludera program från tangenttryckloggning…",
 	"menu.metrics.filter_private": "Ignorera privat surfning",
 	"menu.metrics.filter_secure": "Ignorera lösenordsfält",
-	"menu.metrics.filter_sysauth": "Ignorera systemautentiseringsdialogrutorna",
+	"menu.metrics.filter_sysauth": "Ignorera systemautentisering",
 	"menu.metrics.include_realtime": "    ↳ Inkludera realtidsgraf",
 	"menu.metrics.enable": "Aktivera mätvärden",
 	"menu.metrics.open_encryptor": "  ↳ Öppna fristående krypterare…",

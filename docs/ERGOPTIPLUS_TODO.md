@@ -576,6 +576,10 @@ The shared alias/refusal contract runs on both Lua
 runtimes for all three backend columns. Karabiner's lack of release-order rules
 means a very fast chord on these typing keys becomes a tap, as requested.
 
+The metrics privacy filter now reads "Ignore system authentication" in
+all 21 locales. The existing setting and system-authentication exclusion
+behavior stay with their current owners; only the label is shortened.
+
 ## Time estimate
 
 Budgetary estimate: 20–35 hours of effective work for all remaining product and

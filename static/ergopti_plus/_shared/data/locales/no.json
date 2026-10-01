@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Ekskluder programmer fra tastetillogging…",
 	"menu.metrics.filter_private": "Ignorer privat surfing",
 	"menu.metrics.filter_secure": "Ignorer passordfelter",
-	"menu.metrics.filter_sysauth": "Ignorer systemautentiseringsdialager",
+	"menu.metrics.filter_sysauth": "Ignorer systemautentisering",
 	"menu.metrics.include_realtime": "    ↳ Inkluder sanntidsgraf",
 	"menu.metrics.enable": "Aktiver metrikker",
 	"menu.metrics.open_encryptor": "  ↳ Åpne frittstående kryptering…",

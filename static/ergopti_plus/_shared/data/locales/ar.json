@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "استثناء تطبيقات من مسجّل لوحة المفاتيح…",
 	"menu.metrics.filter_private": "تجاهل التصفح الخاص",
 	"menu.metrics.filter_secure": "تجاهل حقول كلمة المرور",
-	"menu.metrics.filter_sysauth": "تجاهل مربعات حوار مصادقة النظام",
+	"menu.metrics.filter_sysauth": "تجاهل مصادقة النظام",
 	"menu.metrics.include_realtime": "    ↳ تضمين الرسم البياني الآني",
 	"menu.metrics.enable": "تفعيل المقاييس",
 	"menu.metrics.open_encryptor": "  ↳ فتح أداة التشفير المستقلة…",

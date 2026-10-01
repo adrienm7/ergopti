@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "Uygulamaları keylogger'dan dışla…",
 	"menu.metrics.filter_private": "Gizli taramayı yoksay",
 	"menu.metrics.filter_secure": "Şifre alanlarını yoksay",
-	"menu.metrics.filter_sysauth": "Sistem kimlik doğrulama iletişim kutularını yoksay",
+	"menu.metrics.filter_sysauth": "Sistem kimlik doğrulamasını yok say",
 	"menu.metrics.include_realtime": "    ↳ Gerçek zamanlı grafik dahil et",
 	"menu.metrics.enable": "İstatistikleri etkinleştir",
 	"menu.metrics.open_encryptor": "  ↳ Bağımsız şifreleyiciyi aç…",

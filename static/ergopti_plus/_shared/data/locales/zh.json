@@ -1502,7 +1502,7 @@
 	"menu.metrics.exclude_apps": "将应用排除在键盘记录之外…",
 	"menu.metrics.filter_private": "忽略私人浏览",
 	"menu.metrics.filter_secure": "忽略密码字段",
-	"menu.metrics.filter_sysauth": "忽略系统身份验证对话框",
+	"menu.metrics.filter_sysauth": "忽略系统身份验证",
 	"menu.metrics.include_realtime": "    ↳ 包含实时图表",
 	"menu.metrics.enable": "启用统计数据",
 	"menu.metrics.open_encryptor": "  ↳ 打开独立加密器…",
