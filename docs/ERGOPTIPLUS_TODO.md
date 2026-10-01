@@ -477,6 +477,15 @@ is committed; one request is one commit with its regression test.
       threshold and types the tap when another key comes first: that fixes
       typing but makes a quick chord type the tap, so decide which rule
       macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
+- [ ] **88.** Windows: an AI prediction accepted in Notepad is typed as its
+      last character repeated (« général de l’histoire militaire », 32
+      characters, came out as 32 « e », 2026-10-01, Tab tapped on the AltGr
+      tap-hold). Windows 11's Notepad loses and replaces characters sent as
+      text in a burst (reproduced outside the driver with one `SendInput` of
+      Unicode characters: « général eeee »; a classic Edit control receives
+      them all). The hotstring engine already pastes its replacement there;
+      the accepted prediction, the inline autotype and the tone rewrite do
+      not.
 
 ## Time estimate
 
