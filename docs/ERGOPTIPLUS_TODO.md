@@ -490,6 +490,15 @@ is committed; one request is one commit with its regression test.
   the pixels); Windows draws the corrections of an unselected line in
   the regular weight, where the Lua drivers use bold (its text measure
   has one weight).
+- [ ] **90.** Windows: the script-management chords (AltGr+Enter, BackSpace,
+      Delete, Escape) are on in the maintainer's configuration and do
+      nothing. Their log has decided the AltGr family by
+      `_ALTGR_KANA_FIXUP=false (source=override)` since 2026-09-30 18:01 on
+      their Kana-style layout (VK_RMENU unmapped, AltGr on VK_OEM_8), where
+      it was `true (source=probe)` before: `script.alt_gr_is_kana_remap`
+      defaults to `false` since the neutral-configuration commit, so a
+      configuration that does not name it forces the standard family and no
+      layout is ever detected.
 
 - [ ] **88.** In the shared navigation-layer editor, give the layer activation
       keys a blue background as well as their blue border, including the legend
