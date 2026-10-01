@@ -49,6 +49,41 @@ _LBMD_BackendRowLabel() {
 Test("backend-row-selected-option: the Backend row names the selected option",
 	_LBMD_BackendRowLabel)
 
+; A definitions-only include must own its catalogue too. Reordering it must
+; change the rendered options without changing the stored backend or port.
+_LBMD_BackendCatalogueRows() {
+	global _LLM_Menu, LLM_MENU_BACKEND_OPTIONS
+	SavedMenu := _LLM_Menu
+	SavedOptions := LLM_MENU_BACKEND_OPTIONS
+	try {
+		LLM_MENU_BACKEND_OPTIONS := ["api", "ollama"]
+		for Backend in LLM_MENU_BACKEND_OPTIONS {
+			_LLM_Menu := Map("backend", Backend, "ollama_port", 11434)
+			Rows := _LLM_Menu_BackendRows()
+			Checked := 0
+			for Index, Id in LLM_MENU_BACKEND_OPTIONS {
+				AssertEqual(_LLM_Menu_BackendOptionLabel(Id), Rows[Index]["label"],
+					"backend rows preserve the declared catalogue order")
+				AssertEqual(Id == Backend, Rows[Index]["checked"],
+					"only the selected backend is checked")
+				Assert(HasMethod(Rows[Index]["action"], "Call"),
+					"each backend remains actionable")
+				Checked += Rows[Index]["checked"] ? 1 : 0
+			}
+			AssertEqual(1, Checked, "exactly one supported backend is checked")
+			AssertEqual(Backend, _LLM_Menu["backend"], "building does not change the selection")
+			AssertEqual(11434, _LLM_Menu["ollama_port"], "building does not change the server port")
+			Assert(LLM_Menu_BuildBackendMenu() is Menu,
+				"the native renderer builds from the definitions-only catalogue")
+		}
+	} finally {
+		_LLM_Menu := SavedMenu
+		LLM_MENU_BACKEND_OPTIONS := SavedOptions
+	}
+}
+Test("llm menu: definitions-only backend catalogue renders in declared order",
+	_LBMD_BackendCatalogueRows)
+
 _LBMD_ModelDisplayText() {
 	global _LLM_Menu, LLM_API_PROVIDERS
 	Assert(_DriverFuncBody("_LLM_Menu_ModelDisplayText") != "",

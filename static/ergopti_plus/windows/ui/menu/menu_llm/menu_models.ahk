@@ -23,6 +23,11 @@
 
 #Requires AutoHotkey v2.0
 
+; The backend catalogue belongs beside its only reader, so definitions-only
+; includes build the same menu as the resident driver without the tray bootstrap.
+; API uses the shared remote-provider catalogue; MLX remains macOS-only.
+global LLM_MENU_BACKEND_OPTIONS := ["ollama", "api"]
+
 ; Delay before the menu is rebuilt after launching an `ollama pull` in its own
 ; terminal. Long enough that a small model has usually finished and the green
 ; "installed" dot appears on the first glance back at the tray; short enough that
