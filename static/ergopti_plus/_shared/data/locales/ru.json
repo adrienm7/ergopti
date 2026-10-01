@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Сообщить на GitHub",
 	"healthcheck.toolbar.open_logs": "Открыть журналы",
 	"healthcheck.toolbar.refresh": "Обновить",
-	"healthcheck.toolbar.close": "Закрыть",
 	"healthcheck.details_checkbox": "Включить подробности (открытые приложения, устройства)",
 	"healthcheck.preview.title": "Предпросмотр передаваемых данных",
 	"healthcheck.preview.hint": "Именно этот текст копируется, сохраняется и отправляется. Домашняя папка, имя учётной записи и секреты удаляются; больше ничего не собирается.",

@@ -453,9 +453,6 @@ is committed; one request is one commit with its regression test.
 - [ ] **76.** The « Signaler sur GitHub » button of that window is ugly:
       white text on a blue background, with enough contrast, in the light and
       the dark appearance. The error window draws the same button.
-- [ ] **77.** System diagnostics window: remove its « Fermer » button, the
-      window's own close button already does that. In its place, the «
-      Actualiser » button is the one aligned to the right.
 - [ ] **78.** Metrics menu: rename, in the 21 locales, the two rows that
       open the metrics windows. Both start the same way and only the end
       names the window, in French something like « Ouvrir le tableau de bord

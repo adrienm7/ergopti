@@ -724,7 +724,6 @@
 	"healthcheck.toolbar.report": "Report on GitHub",
 	"healthcheck.toolbar.open_logs": "Open logs",
 	"healthcheck.toolbar.refresh": "Refresh",
-	"healthcheck.toolbar.close": "Close",
 	"healthcheck.details_checkbox": "Include details (open applications, devices)",
 	"healthcheck.preview.title": "Preview of what is shared",
 	"healthcheck.preview.hint": "This exact text is copied, saved and sent. Your home folder, your account name and secrets are removed; nothing else is collected.",

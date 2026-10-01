@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "GitHub에 보고",
 	"healthcheck.toolbar.open_logs": "로그 열기",
 	"healthcheck.toolbar.refresh": "새로 고침",
-	"healthcheck.toolbar.close": "닫기",
 	"healthcheck.details_checkbox": "세부 정보 포함(열려 있는 응용 프로그램, 장치)",
 	"healthcheck.preview.title": "공유되는 내용 미리 보기",
 	"healthcheck.preview.hint": "복사, 저장, 전송되는 것은 바로 이 텍스트입니다. 홈 폴더, 계정 이름, 비밀 정보는 제거되며 그 밖의 정보는 수집되지 않습니다.",

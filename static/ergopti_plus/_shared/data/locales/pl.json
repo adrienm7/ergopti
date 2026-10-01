@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Zgłoś w serwisie GitHub",
 	"healthcheck.toolbar.open_logs": "Otwórz dzienniki",
 	"healthcheck.toolbar.refresh": "Odśwież",
-	"healthcheck.toolbar.close": "Zamknij",
 	"healthcheck.details_checkbox": "Dołącz szczegóły (otwarte aplikacje, urządzenia)",
 	"healthcheck.preview.title": "Podgląd udostępnianych danych",
 	"healthcheck.preview.hint": "Dokładnie ten tekst jest kopiowany, zapisywany i wysyłany. Folder domowy, nazwa konta i sekrety są usuwane; nic więcej nie jest zbierane.",

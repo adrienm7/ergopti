@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "GitHub で報告",
 	"healthcheck.toolbar.open_logs": "ログを開く",
 	"healthcheck.toolbar.refresh": "更新",
-	"healthcheck.toolbar.close": "閉じる",
 	"healthcheck.details_checkbox": "詳細を含める（開いているアプリケーション、デバイス）",
 	"healthcheck.preview.title": "共有される内容のプレビュー",
 	"healthcheck.preview.hint": "コピー、保存、送信されるのはこのテキストそのものです。ホームフォルダー、アカウント名、秘密情報は取り除かれ、それ以外は収集されません。",

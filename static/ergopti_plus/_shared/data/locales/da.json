@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Rapportér på GitHub",
 	"healthcheck.toolbar.open_logs": "Åbn logge",
 	"healthcheck.toolbar.refresh": "Opdater",
-	"healthcheck.toolbar.close": "Luk",
 	"healthcheck.details_checkbox": "Medtag detaljer (åbne programmer, enheder)",
 	"healthcheck.preview.title": "Forhåndsvisning af det, der deles",
 	"healthcheck.preview.hint": "Det er præcis denne tekst, der kopieres, gemmes og sendes. Din hjemmemappe, dit kontonavn og hemmeligheder fjernes; intet andet indsamles.",

@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Auf GitHub melden",
 	"healthcheck.toolbar.open_logs": "Protokolle öffnen",
 	"healthcheck.toolbar.refresh": "Aktualisieren",
-	"healthcheck.toolbar.close": "Schließen",
 	"healthcheck.details_checkbox": "Details einschließen (geöffnete Anwendungen, Geräte)",
 	"healthcheck.preview.title": "Vorschau der geteilten Daten",
 	"healthcheck.preview.hint": "Genau dieser Text wird kopiert, gespeichert und gesendet. Ihr Benutzerordner, Ihr Kontoname und Geheimnisse werden entfernt; sonst wird nichts erfasst.",

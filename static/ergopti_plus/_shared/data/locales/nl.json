@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Melden op GitHub",
 	"healthcheck.toolbar.open_logs": "Logs openen",
 	"healthcheck.toolbar.refresh": "Vernieuwen",
-	"healthcheck.toolbar.close": "Sluiten",
 	"healthcheck.details_checkbox": "Details opnemen (geopende toepassingen, apparaten)",
 	"healthcheck.preview.title": "Voorbeeld van wat er wordt gedeeld",
 	"healthcheck.preview.hint": "Precies deze tekst wordt gekopieerd, opgeslagen en verzonden. Je thuismap, je accountnaam en geheimen worden verwijderd; verder wordt niets verzameld.",

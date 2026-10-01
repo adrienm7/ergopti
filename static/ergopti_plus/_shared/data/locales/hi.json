@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "GitHub पर रिपोर्ट करें",
 	"healthcheck.toolbar.open_logs": "लॉग खोलें",
 	"healthcheck.toolbar.refresh": "रीफ़्रेश करें",
-	"healthcheck.toolbar.close": "बंद करें",
 	"healthcheck.details_checkbox": "विवरण शामिल करें (खुले ऐप्लिकेशन, डिवाइस)",
 	"healthcheck.preview.title": "साझा की जाने वाली जानकारी का पूर्वावलोकन",
 	"healthcheck.preview.hint": "ठीक यही पाठ कॉपी, सहेजा और भेजा जाता है। आपका होम फ़ोल्डर, खाते का नाम और गुप्त जानकारी हटा दी जाती है; और कुछ एकत्र नहीं किया जाता।",

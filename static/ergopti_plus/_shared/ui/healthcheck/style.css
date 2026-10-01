@@ -97,7 +97,9 @@ button.primary {
 	color: var(--accent-text);
 }
 
-#btn-close {
+/* Collecting again stands apart on the right. The window's own close button
+   closes it, so the toolbar repeats none. */
+#btn-refresh {
 	margin-left: auto;
 }
 
