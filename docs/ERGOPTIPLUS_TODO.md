@@ -490,6 +490,28 @@ is committed; one request is one commit with its regression test.
   the pixels); Windows draws the corrections of an unselected line in
   the regular weight, where the Lua drivers use bold (its text measure
   has one weight).
+- [ ] **91.** Windows: « Combinaisons de touches » works as on macOS. Today
+      it is three fixed families (AltGr+LAlt, AltGr+CapsLock, LAlt+CapsLock),
+      each one boolean per action, one direction, fired when the second key
+      goes down. macOS lists every ordered pair of its tap-hold keys (key 1
+      then key 2 is not key 2 then key 1), each with three slots: the chord
+      (both within the simultaneity delay), hold 1 + tap 2 and hold 1 +
+      hold 2, plus the chord symmetry, the chord delay and « copy tap to
+      chord ». Windows gets the same model over the keys of
+      `[tap_hold.catalog]`, the three families becoming the recommended
+      values of their pairs.
+- [ ] **92.** Shortcuts menu: a separator before « Combinaisons de touches »,
+      which today follows the modifier-shortcut submenus (Ctrl, Win, Alt…)
+      without a break.
+- [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
+      binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
+      taps when a second tap-hold key goes down) and the Shortcuts menu draws
+      no `key_combinations` group. Port the pair model of item 91 (same pair
+      ids, slots and file section as Windows), decide the chord inside
+      `M:process` / `M:tick`, and widen the manifest group to `linux`.
+      `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
+      today. Left out of the 2026-10-01 session on purpose (the maintainer:
+      « fais seulement pour Windows »).
 
 - [ ] **88.** In the shared navigation-layer editor, give the layer activation
       keys a blue background as well as their blue border, including the legend
