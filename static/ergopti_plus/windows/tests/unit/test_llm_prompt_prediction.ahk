@@ -502,27 +502,100 @@ Test("LLM prompt prediction: the override count is part of the request identity"
 
 
 
-; ================================================
-; ================================================
-; ======= 4/ Erasing stays a rewrite's own =======
-; ================================================
-; ================================================
+; ====================================================
+; ====================================================
+; ======= 4/ A correction erases what it names =======
+; ====================================================
+; ====================================================
 
-; An ordinary advanced correction that needs an erasure is still refused: only
-; a rewrite records the exact text it erases.
-_LPP_OrdinaryCorrectionStillRefused() {
-	State := Map("ctx", "Je vous envoit", "ctx_tail", "Je vous envoit", "min_words", 1,
-		"max_words", 5, "is_batch", false, "requested", 1,
-		"dedup_stats", LLM_ApiCommon_NewDedupStats(), "rewrite_edits", Map())
-	Slots := _LLM_Engine_ParseSlots("TAIL_CORRECTED: Je vous envoie`nNEXT_WORDS: ce mail", State)
-	AssertEqual(0, Slots.Length, "a correction needing an erasure never becomes a slot")
-	AssertEqual(0, State["rewrite_edits"].Count, "and records no erasure")
-	Rewrite := _LLM_Engine_ParseSlots("REWRITE: Je vous envoie ce mail.", State)
-	AssertEqual(1, Rewrite.Length, "the same text as a rewrite is offered")
-	AssertTrue(State["rewrite_edits"].Has(Rewrite[1]), "with the erasure it needs")
+; With the advanced prompt the model corrects the last words. The parser used
+; to refuse every such correction on Windows (« Dropping a correction that
+; needs N character(s) erased »), because only a rewrite recorded the text it
+; erases: the maintainer's logs of 2026-10-01 show three in a row dropped, and
+; no typo was ever fixed. A correction now names its erasure like a rewrite and
+; goes through the same accept step (llm-correction-erases).
+_LPP_CorrectionEndToEnd() {
+	_LPP_Run(_LPP_Menu(), "Je vous envoit", _Body)
+	_Body(Calls, Lines) {
+		global _LLM_Engine
+		LLM_Engine_FirePrediction("Je vous envoit", ,
+			Map("profile_id", "advanced", "num_predictions", 1))
+		AssertEqual(1, Calls.Length, "the request is dispatched")
+		_LPP_Answer(Calls[1], "TAIL_CORRECTED: Je vous envoie`nNEXT_WORDS: ce mail")
+		Final := _LPP_LastFinalRender()
+		AssertTrue(IsObject(Final), "the correction must reach the tooltip")
+		AssertEqual(1, Final.slots.Length, "as one slot")
+		Slot := Final.slots[1]
+		AssertTrue(IsObject(Slot) && Slot.HasOwnProp("Deletes"), "the slot carries its erasure")
+		AssertEqual("e ce mail", Slot.Text, "it types what follows the erasure")
+		AssertEqual(1, Slot.Deletes, "it erases the wrong letter")
+		AssertEqual("t", Slot.DeletedText, "and names it")
+		AssertEqual("Je vous envoit", Slot.RewriteSpan, "within the text it was asked about")
+		Roles := ""
+		for , Segment in _LLM_SlotSegments(Slot)
+			Roles .= (Roles == "" ? "" : "|") . Segment.Role . ":" . Segment.Text
+		AssertEqual("typed:envoi|corrected:e|next: ce mail", Roles,
+			"the line reads the typed word, its correction, then the next words")
+		AssertEqual("", _LLM_Engine["last_ctx"],
+			"an erasing slot is never cached: the cache would replay its text without the erasure")
+		AssertEqual(0, _LPP_LinesWith(Lines, "WARNING", "Dropping a correction"),
+			"nothing is dropped")
+
+		_LPP_WithKeyboard(_Accept)
+		_Accept(Sent) {
+			global _LLM_Bridge_Buffer
+			Presented := LLM_Tooltip_GetAcceptSnapshot()
+			AssertTrue(IsObject(Presented), "the final render must be acceptable")
+			Transaction := _LPP_AcceptTransaction(Presented)
+			AssertTrue(_LLM_Bridge_RewriteStillApplies(Transaction), "nothing was typed meanwhile")
+			Results := []
+			TextSend(Transaction.Text, _LLM_Bridge_InjectionOptions(Transaction),
+				(Ok, ErrorMessage := "") => Results.Push(Ok))
+			AssertEqual(1, Sent.Length, "the erasure and the text are one SendInput batch")
+			AssertEqual("{Backspace 1}{Text}e ce mail", Sent[1],
+				"the wrong letter is erased, then the correction and the next words typed")
+			AssertEqual("Je vous envoie ce mail", _LLM_Bridge_Buffer,
+				"the sentence comes out corrected, not appended to its typo")
+		}
+	}
 }
-Test("LLM prompt prediction: an ordinary correction needing an erasure is still refused",
-	_LPP_OrdinaryCorrectionStillRefused)
+Test("LLM prompt prediction: an advanced correction erases its typo and types the fix (llm-correction-erases)",
+	_LPP_CorrectionEndToEnd)
+
+; A correction whose typed text changed since it was generated erases nothing.
+_LPP_StaleCorrectionIsNotApplied() {
+	_LPP_Run(_LPP_Menu(), "Je vous envoit", _Body)
+	_Body(Calls, Lines) {
+		global _LLM_Bridge_Buffer
+		LLM_Engine_FirePrediction("Je vous envoit", ,
+			Map("profile_id", "advanced", "num_predictions", 1))
+		_LPP_Answer(Calls[1], "TAIL_CORRECTED: Je vous envoie`nNEXT_WORDS: ce mail")
+		Slot := _LPP_LastFinalRender().slots[1]
+		_LLM_Bridge_Buffer := "Je vous envoit" . "x"
+		_LPP_WithKeyboard(_Accept)
+		_Accept(Sent) {
+			Seed := Map("hwnd", 1, "control", 1, "physical_generation", 0,
+				"content_generation", 0, "context_generation", 0)
+			LLM_Bridge_OnAccept(Slot.Text, Seed, [Slot], 1)
+			AssertEqual(0, Sent.Length, "nothing is erased or typed")
+		}
+	}
+}
+Test("LLM prompt prediction: a correction whose text changed is not applied (llm-correction-erases)",
+	_LPP_StaleCorrectionIsNotApplied)
+
+; A record that counts an erasure without naming it is still refused: typing it
+; would append the fix to the typo.
+_LPP_UnnamedErasureIsRefused() {
+	AssertFalse(_LLM_Parser_IsPhysicallyInjectable(Map("deletes", 1, "to_type", "e ce mail")),
+		"an erasure with no deleted_text and no span cannot be applied")
+	AssertTrue(_LLM_Parser_IsPhysicallyInjectable(Map("deletes", 1, "to_type", "e ce mail",
+		"deleted_text", "t", "span", "Je vous envoit")), "a named erasure can")
+	AssertTrue(_LLM_Parser_IsPhysicallyInjectable(Map("deletes", 0, "to_type", "ce mail")),
+		"a continuation erases nothing")
+}
+Test("LLM prompt prediction: an erasure that names nothing is refused (llm-correction-erases)",
+	_LPP_UnnamedErasureIsRefused)
 
 ; A keystroke admitted after the rewrite was generated (the tooltip's minimum
 ; display window) moves the end of the buffer: the recorded count would erase

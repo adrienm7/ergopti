@@ -1128,12 +1128,24 @@ _LLM_Engine_FinalizeRequest(state) {
 		try LoggerInfo("LLM", "Prediction superseded before render — discarding request #{1}.", state["request_id"])
 		return
 	}
-	_LLM_Engine["last_ctx"]     := state["ctx"]
-	_LLM_Engine["last_results"] := state["slots"]
-	_LLM_Engine["last_semantic_signature"] := state["semantic_signature"]
-	; Keep ``last_result`` (singular) for the legacy cache hit path so any
-	; external code still reading that field keeps working.
-	_LLM_Engine["last_result"]  := state["slots"][1]
+	Edits := state.Get("rewrite_edits", "")
+	if (Edits is Map and Edits.Count > 0) {
+		; A slot that erases typed text is never replayed from the cache: the
+		; cache holds slot text without the erasure it needs, and replaying it
+		; would append the fix to the typo. The next fire on this context asks
+		; the model again.
+		_LLM_Engine["last_ctx"]     := ""
+		_LLM_Engine["last_results"] := []
+		_LLM_Engine["last_semantic_signature"] := ""
+		_LLM_Engine["last_result"]  := ""
+	} else {
+		_LLM_Engine["last_ctx"]     := state["ctx"]
+		_LLM_Engine["last_results"] := state["slots"]
+		_LLM_Engine["last_semantic_signature"] := state["semantic_signature"]
+		; Keep ``last_result`` (singular) for the legacy cache hit path so any
+		; external code still reading that field keeps working.
+		_LLM_Engine["last_result"]  := state["slots"][1]
+	}
 
 	; ``request_id`` is threaded through so the render can gate once more on its
 	; own side: the display-opts resolution runs between here and the paint, and
@@ -1322,12 +1334,17 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; (orange). A slot the parser never saw whole (a partial stream, a cache
 	; hit sliced by what was typed since) stays a plain string, which the
 	; tooltip reads as words still to come.
+	; A correction that erases typed text is shown as the parser read it too,
+	; and carries its erasure like a rewrite.
 	display_slots := []
 	for _, s in slots {
-		if (HasRewrites and s != "" and rewrite_edits.Has(s))
-			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, rewrite_edits[s]))
-		else
+		Edit := (HasRewrites and s != "" and rewrite_edits.Has(s)) ? rewrite_edits[s] : 0
+		if !(Edit is Map)
 			display_slots.Push(_LLM_Engine_DisplaySlot(s, ctx))
+		else if Edit.Get("rewrite", true)
+			display_slots.Push(_LLM_Engine_RewriteDisplaySlot(s, Edit))
+		else
+			display_slots.Push(_LLM_Engine_CorrectionDisplaySlot(s, ctx, Edit))
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
@@ -1428,6 +1445,27 @@ _LLM_Engine_DisplaySlot(Text, Ctx) {
 		NextWords: Display["nw"],
 		HasCorrections: Display["has_corrections"]
 	}
+}
+
+/**
+ * Builds the tooltip slot of a correction that erases typed text: the line the
+ * parser read (the typed tail, the correction, the next words) with the
+ * erasure its accept performs. Without a recorded reading it is shown like a
+ * rewrite, as the text it keeps then the text it types.
+ * @param {String} Text The slot text (to_type).
+ * @param {String} Ctx The context the slot answers.
+ * @param {Map} Edit Map("deletes", Codepoints, "deleted_text", Text, "span", Span).
+ * @returns {Object} { Text, Chunks, NextWords, HasCorrections, Deletes,
+ *     DeletedText, RewriteSpan }.
+ */
+_LLM_Engine_CorrectionDisplaySlot(Text, Ctx, Edit) {
+	Slot := _LLM_Engine_DisplaySlot(Text, Ctx)
+	if !IsObject(Slot)
+		return _LLM_Engine_RewriteDisplaySlot(Text, Edit)
+	Slot.Deletes := Edit["deletes"]
+	Slot.DeletedText := Edit["deleted_text"]
+	Slot.RewriteSpan := Edit["span"]
+	return Slot
 }
 
 /**

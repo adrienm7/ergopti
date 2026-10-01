@@ -490,10 +490,6 @@ is committed; one request is one commit with its regression test.
   the pixels); Windows draws the corrections of an unselected line in
   the regular weight, where the Lua drivers use bold (its text measure
   has one weight).
-- [ ] **89.** Windows: with the advanced prompt the AI never corrects what
-      was typed. The maintainer tried several predictions on 2026-10-01
-      and none fixed an error; read the logs in
-      `%LOCALAPPDATA%\ergopti_plus\logs` and find why.
 
 - [ ] **88.** In the shared navigation-layer editor, give the layer activation
       keys a blue background as well as their blue border, including the legend
