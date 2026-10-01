@@ -63,7 +63,13 @@ _BDA_ThreeArgCallPresent() {
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; The correct form satisfies the (ItemName, ItemPos, MenuObj) arity that
 	; every AHK menu callback expects, preventing a "too few arguments" throw.
-	Assert(InStr(Seg, 'Callback.Call("", 0, 0)') > 0,
-		"_DispatchIfMissed must call Callback.Call with 3 args matching the menu callback contract")
+	; The command runs through MenuCommandRun since a click made during a
+	; configuration write waits for it: the three arguments are handed there,
+	; and it calls the command with exactly what it was given.
+	Assert(InStr(Seg, 'MenuCommandRun(Callback, ["", 0, 0])') > 0,
+		"_DispatchIfMissed must run the callback with 3 args matching the menu callback contract")
+	Run := _DriverFuncBody("MenuCommandRun")
+	Assert(InStr(Run, "return Callback.Call(Args*)") > 0,
+		"MenuCommandRun must call the command with the arguments it was given, all of them")
 }
 Test("menu_dispatcher: _DispatchIfMissed calls Callback with 3 args not 1", _BDA_ThreeArgCallPresent)

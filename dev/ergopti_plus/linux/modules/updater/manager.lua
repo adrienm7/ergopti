@@ -1445,6 +1445,13 @@ function M.init(opts)
 	Logger.info(LOG, "Updater initialised (channel=%s, interval=%ds, version=%s).",
 		_channel, _check_interval, M.current_version())
 
+	-- A local version run from source has no installation to update: it
+	-- checks for nothing on its own, as on the other two drivers, and the
+	-- tray greys its check and frequency rows.
+	if require("infra.installation").is_source_run() then
+		Logger.info(LOG, "Local version run from source: no automatic update check.")
+		return
+	end
 	M.start_background_checks()
 end
 

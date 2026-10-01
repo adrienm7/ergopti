@@ -65,7 +65,8 @@ _HMRB_AssertBounded(RelPath, Anchor, Where) {
 	Src := _HMRB_ReadSource(RelPath)
 	Body := _HMRB_Block(Src, Anchor)
 	Assert(Body != "", Where . " generic hold-modifier #HotIf block must exist")
-	if InStr(Body, "TapHoldOwnImmediateModifier(") {
+	; TapHoldOwnHoldModifier is the typing keys' entry to the same shared owner.
+	if (InStr(Body, "TapHoldOwnImmediateModifier(") or InStr(Body, "TapHoldOwnHoldModifier(")) {
 		Assert(!InStr(Body, "KeyWait("),
 			Where . " must delegate release ownership to the shared bounded owner instead of waiting privately")
 		return

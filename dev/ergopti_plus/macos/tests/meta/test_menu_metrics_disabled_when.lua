@@ -19,9 +19,7 @@ local helpers = require("tests.helpers")
 -- id -> canonical disabled_when key array (order matches the manifest).
 local CANON = {
 	{ id = "show_typing",        keys = { "keylogger_enabled" } },
-	{ id = "shortcut_typing",    keys = { "keylogger_enabled" } },
 	{ id = "show_apps",          keys = { "keylogger_enabled" } },
-	{ id = "shortcut_apps",      keys = { "keylogger_enabled" } },
 	{ id = "wpm_menubar",        keys = { "keylogger_enabled" } },
 	{ id = "menubar_colors",     keys = { "keylogger_enabled", "wpm_menubar_visible" } },
 	{ id = "wpm_widget",         keys = { "keylogger_enabled" } },
@@ -102,6 +100,40 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 					"metrics_menu item '" .. c.id .. "' disabled_when[" .. i .. "] must be '" .. key .. "'")
 			end
 		end
+	end)
+
+	-- The Metrics menu sets no shortcut of its own (the maintainer's rule of
+	-- 2026-10-01): a shortcut that opens a metrics window is assigned to its
+	-- opening action in the Gestures or the Shortcuts menu. The two rows and
+	-- their providers are gone, and the two rows that open a window follow
+	-- each other with no separator between them.
+	helpers.it("(metrics-no-shortcut-rows) the menu sets no shortcut and its two opening rows form one group", function()
+		local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+		helpers.assert_true(fh ~= nil, "menu_manifest.json must be readable")
+		local data = hs.json.decode(fh:read("*a"))
+		fh:close()
+		local ids = {}
+		for _, entry in ipairs(data.metrics_menu) do
+			helpers.assert_true(entry.id ~= "shortcut_typing" and entry.id ~= "shortcut_apps",
+				"the Metrics menu must declare no shortcut row, found " .. tostring(entry.id))
+			helpers.assert_nil(entry.i18n_dynamic, "no Metrics row carries a shortcut label prefix any more")
+			local hidden = false
+			if type(entry.platforms) == "table" then
+				hidden = true
+				for _, platform in ipairs(entry.platforms) do hidden = hidden and platform ~= "hs" end
+			end
+			if not hidden then ids[#ids + 1] = entry.type == "---" and "---" or tostring(entry.id) end
+		end
+		local at
+		for index, id in ipairs(ids) do
+			if id == "show_typing" then at = index end
+		end
+		helpers.assert_true(at ~= nil, "the Metrics menu must still declare the row that opens the typing metrics")
+		helpers.assert_eq(ids[at + 1], "show_apps", "the two rows that open a window form one group")
+		helpers.assert_eq(ids[at + 2], "---", "a separator closes that group")
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		helpers.assert_nil(src:find("rows_shortcut_", 1, true), "the menu builds no shortcut row")
+		helpers.assert_nil(src:find("shortcut_prompt", 1, true), "the menu opens no shortcut prompt")
 	end)
 
 	helpers.it("menubar_colors depends_on is now load-bearing disabled_when (MG-2)", function()

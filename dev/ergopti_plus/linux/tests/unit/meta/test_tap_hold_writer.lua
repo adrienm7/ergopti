@@ -45,6 +45,42 @@ local function read_file(path)
 	return content
 end
 
+--- A file's content, nil when it is absent (read_file() answers "" for both).
+local function read_or_nil(path)
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
+--- Runs body(writer, dir, state) with a writer bound to the tap_hold.toml of a
+--- private configuration folder, as the daemon binds it.
+--- @param opts table|nil { reload_ok = boolean, layers = false to bind no layer folder }
+local function with_folder_writer(opts, body)
+	opts = opts or {}
+	local dir = os.tmpname()
+	os.remove(dir)
+	local made = os.execute('mkdir "' .. dir .. '"')
+	assert(made == true or made == 0, "the isolated configuration folder must exist")
+	local state = { reloads = 0 }
+	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	writer.init({
+		path = dir .. "/tap_hold.toml",
+		reload = function() state.reloads = state.reloads + 1; return opts.reload_ok ~= false end,
+		is_tap_action = function(id) return id == "copy" end,
+		canonical_hold = function(kind, id)
+			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+		end,
+		layers = opts.layers ~= false
+			and { shared_root = require("infra.paths").shared_root(), config_dir = dir } or nil,
+	})
+	local ok, err = pcall(body, writer, dir, state)
+	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp", "layers.toml" }) do os.remove(dir .. "/" .. name) end
+	os.execute('rmdir "' .. dir .. '"')
+	if not ok then error(err, 0) end
+end
+
 local function write_file(path, text)
 	local fh = assert(io.open(path, "w"))
 	fh:write(text)
@@ -90,6 +126,70 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_eq(keys.caps_lock.hold_modifier, "ctrl+shift")
 		helpers.assert_nil(keys.caps_lock.hold_layer)
 		os.remove(path)
+	end)
+
+	-- Picking the navigation layer as a key's hold wrote hold_layer and nothing
+	-- else: in a folder with no layers.toml the key entered a layer that binds
+	-- no key. The pick brings the recommended layer along, as the restore does.
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer", function()
+		local preset = read_or_nil(require("infra.paths").shared("keymap/layers.recommended.toml"))
+		helpers.assert_type(preset, "string", "the shipped layer must be readable")
+		with_folder_writer(nil, function(writer, dir, state)
+			helpers.assert_true(writer.set_hold("caps_lock", "modifier", "ctrl"))
+			helpers.assert_nil(read_or_nil(dir .. "/layers.toml"), "a modifier hold brings no layer file")
+			helpers.assert_true(writer.set_hold("caps_lock", "layer", "nav"))
+			helpers.assert_eq(read_or_nil(dir .. "/layers.toml"), preset, "the recommended layer's exact bytes")
+			helpers.assert_eq(effective(dir .. "/tap_hold.toml").keys.caps_lock.hold_layer, "nav")
+			helpers.assert_eq(state.reloads, 2, "the engine reloads once the layer is there")
+		end)
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) an existing layers.toml is the user's and stays byte for byte", function()
+		with_folder_writer(nil, function(writer, dir)
+			write_file(dir .. "/layers.toml", "# my own layer\n")
+			local own = read_or_nil(dir .. "/layers.toml")
+			helpers.assert_true(writer.set_hold("caps_lock", "layer", "nav"))
+			helpers.assert_eq(read_or_nil(dir .. "/layers.toml"), own)
+			write_file(dir .. "/tap_hold.toml", "[tap_hold.keys.left_shift\n")
+			helpers.assert_true(not writer.set_hold("caps_lock", "layer", "nav"), "a file that does not parse refuses the change")
+			helpers.assert_eq(read_or_nil(dir .. "/layers.toml"), own, "a refused change removes only a file the pick created")
+		end)
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) a refused key write takes the layer it created back", function()
+		with_folder_writer(nil, function(writer, dir)
+			local broken = "[tap_hold.keys.left_shift\n"
+			write_file(dir .. "/tap_hold.toml", broken)
+			helpers.assert_true(not writer.set_hold("caps_lock", "layer", "nav"))
+			helpers.assert_eq(read_file(dir .. "/tap_hold.toml"), broken, "the user's text is left as it was")
+			helpers.assert_nil(read_or_nil(dir .. "/layers.toml"), "no layer file outlives a refused change")
+		end)
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) a saved key keeps its layer when the engine does not reload", function()
+		with_folder_writer({ reload_ok = false }, function(writer, dir)
+			helpers.assert_true(not writer.set_hold("caps_lock", "layer", "nav"), "the failed reload is reported")
+			helpers.assert_eq(effective(dir .. "/tap_hold.toml").keys.caps_lock.hold_layer, "nav", "the key is saved")
+			helpers.assert_type(read_or_nil(dir .. "/layers.toml"), "string", "the layer the saved key enters stays")
+		end)
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) a writer bound to no layer folder writes no layer file", function()
+		with_folder_writer({ layers = false }, function(writer, dir)
+			helpers.assert_true(writer.set_hold("caps_lock", "layer", "nav"))
+			helpers.assert_nil(read_or_nil(dir .. "/layers.toml"))
+		end)
+	end)
+
+	-- The daemon is the caller that names the folder.
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) the daemon binds the writer to the configuration folder's layer file", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = fh:read("*a")
+		fh:close()
+		local call = source:match('require%("platform%.remap%.tap_hold_writer"%)%.init%(%b{}%)')
+		helpers.assert_type(call, "string", "the daemon must initialise the tap-hold writer")
+		helpers.assert_true(call:find("layers%s*=%s*{") ~= nil and call:find("config_dir", 1, true) ~= nil
+			and call:find("shared_root", 1, true) ~= nil, "the writer must be given the folder a layer hold needs")
 	end)
 
 	helpers.it("stores a hold in the canonical spelling the loader reads back", function()

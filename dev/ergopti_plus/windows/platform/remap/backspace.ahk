@@ -47,8 +47,8 @@ _BackspaceHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
-	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
-		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
+	Result := TapHoldOwnHoldModifier("backspace", "BackSpace",
+		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"), _BackspaceDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
@@ -68,7 +68,7 @@ $SC00E:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
-	Result := TapHoldOwnImmediateLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"))
+	Result := TapHoldOwnHoldLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"), _BackspaceDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
@@ -90,8 +90,31 @@ $SC00E:: {
 ; under a held modifier, as on every driver. Its own auto-repeat arrives under
 ; the modifier or layer the hold owns and matches none of them: swallow it for
 ; as long as the owner resolves the press (see TapHoldPressIsOwned).
+; An exact chord beats the wildcard: Space held as Shift repeated the layout
+; emulation's Shift+Space hotkey. The bare key and every chord of Ctrl, Alt,
+; Shift and Win are therefore declared too; a static variant is created before
+; every Hotkey() one, and the first eligible variant of an identity fires.
 #HotIf TapHoldPressIsOwned("backspace")
-*SC00E:: return
+*SC00E::
+SC00E::
+^SC00E::
+!SC00E::
+^!SC00E::
++SC00E::
+^+SC00E::
+!+SC00E::
+^!+SC00E::
+#SC00E::
+^#SC00E::
+!#SC00E::
+^!#SC00E::
++#SC00E::
+^+#SC00E::
+!+#SC00E::
+^!+#SC00E::
+{
+	return
+}
 #HotIf
 
 

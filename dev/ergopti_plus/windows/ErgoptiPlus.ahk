@@ -1331,10 +1331,26 @@ if (_DriverStartupSmokeDir != "") {
 		; this point used to miss deterministic post-ready boot failures. Exercise
 		; that first deferred owner synchronously and consume its status before the
 		; isolated smoke exits; this caught Func("...") -> Invalid base in LLM replay.
-		; A suspended driver deliberately retains tray-root work for resume; only
-		; active fixtures can require this deferred owner to publish immediately.
-		if !_StartupSmokeExpectedSuspend and !BuildTrayMenuDeferred()
+		; A driver restored paused is held to the same build: its first tray root
+		; publishes under the pause (first-root-under-pause). Skipping this fixture
+		; hid every owner that refuses to work under a pause during that build, the
+		; AI hotkeys first (llm-hotkeys-deferred-by-pause).
+		if !BuildTrayMenuDeferred()
 				throw Error("deferred tray-menu construction failed after ready")
+		; The same driver must come back from that pause: lift it and wait for the
+		; AI hotkeys its paused build deferred. Any error the resume logs fails
+		; the fixture like any other.
+		if _StartupSmokeExpectedSuspend {
+				ToggleSuspend()
+				_StartupSmokeResumeStarted := A_TickCount
+				while ((A_IsSuspended or _LLM_Menu_FirstRestoreHotkeysDeferred)
+						and !TickExpired(_StartupSmokeResumeStarted, 3000))
+						Sleep(20)
+				if A_IsSuspended
+						throw Error("the restored pause could not be lifted")
+				if _LLM_Menu_FirstRestoreHotkeysDeferred
+						throw Error("the AI hotkeys deferred by the pause were not activated on resume")
+		}
 		; #NoTrayIcon hides every process's icon at load; the driver path alone
 		; reveals it. A driver that reaches ready without it has no tray at all.
 		if A_IconHidden

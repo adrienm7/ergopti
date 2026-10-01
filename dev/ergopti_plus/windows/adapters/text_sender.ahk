@@ -18,7 +18,9 @@
 ; CLIPBOARD THRESHOLD:
 ; Payloads longer than TEXT_CLIPBOARD_THRESHOLD characters (1000, matching
 ; TextSender.spec.js) are injected via the clipboard to avoid the overhead
-; of simulating keystrokes for large expansions.
+; of simulating keystrokes for large expansions. In "auto" mode a payload of
+; any length is pasted into an application that garbles typed text (Windows
+; 11's Notepad, see _TextSenderHostTakesTextByPaste).
 ;
 ; CLIPBOARD DEPENDENCY:
 ; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
@@ -710,6 +712,20 @@ _TextSenderErasePrefix(Opts) {
 	return (Count > 0) ? "{Backspace " . Count . "}" : ""
 }
 
+; Whether the foreground application must receive a text by paste rather than
+; typed: Windows 11's Notepad types the last character of a typed burst in
+; place of the others (OutputHostTakesTextByPaste, the rule the hotstring
+; engine follows too). An accepted AI prediction typed there as text came out
+; as one repeated letter (llm-accept-notepad-paste). IsSet-guarded because
+; headless adapter runners may omit the hotstring layer, which owns the
+; foreground receipt.
+; @return {Boolean} True when "auto" must paste whatever the payload length.
+_TextSenderHostTakesTextByPaste() {
+	if !IsSet(OutputHostResolve) or !IsSet(OutputHostTakesTextByPaste)
+		return false
+	return OutputHostTakesTextByPaste(OutputHostResolve())
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
@@ -738,9 +754,11 @@ TextSend(Text, Opts, Callback) {
 		return
 	}
 
-	; Resolve "auto" to a concrete strategy based on payload length.
+	; Resolve "auto" to a concrete strategy: a long payload is pasted, and so is
+	; any payload for an application that garbles typed text.
 	if Mode = "auto"
-		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
+		Mode := (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD or _TextSenderHostTakesTextByPaste())
+			? "clipboard" : "direct"
 
 	if Mode = "clipboard" {
 		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred

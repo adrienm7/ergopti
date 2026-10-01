@@ -122,6 +122,34 @@ end
 -- ============================
 -- ============================
 
+--- The interval a menu state stores, snapped to a preset; the default one
+--- when it stores none or an invalid one.
+--- @param state table Menu state (holds update_check_interval_seconds).
+--- @param timing table The shared timing.
+--- @return number seconds
+local function stored_interval(state, timing)
+	local raw = state[M.STATE_KEY]
+	if raw == nil then return timing.default_check_interval_sec end
+	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
+		return timing.default_check_interval_sec
+	end
+	local seconds = Schedule.snap_interval(raw, timing)
+	return seconds
+end
+
+--- The preset code of the interval a menu state stores, for a driver that
+--- starts no owner: a local version names the preset on its greyed row.
+--- @param state table Menu state (holds update_check_interval_seconds).
+--- @param config table|nil load_config() result (tests pass one).
+--- @return string code The preset's menu label key suffix.
+function M.stored_interval_code(state, config)
+	if type(state) ~= "table" then error("the stored check interval needs the menu state", 2) end
+	local timing = (config or M.load_config()).timing
+	local _, code = Schedule.snap_interval(stored_interval(state, timing), timing)
+	return code
+end
+
 --- Creates the automatic-check owner of one menu session.
 --- @param opts table
 ---   state table Menu state (holds update_check_interval_seconds).
@@ -187,14 +215,7 @@ function M.new(opts)
 
 	--- The interval in force: the persisted preference snapped to a preset.
 	function owner.interval()
-		local raw = opts.state[M.STATE_KEY]
-		if raw == nil then return timing.default_check_interval_sec end
-		if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
-			Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
-			return timing.default_check_interval_sec
-		end
-		local seconds = Schedule.snap_interval(raw, timing)
-		return seconds
+		return stored_interval(opts.state, timing)
 	end
 
 	--- The preset code of the interval in force (its menu label key suffix).

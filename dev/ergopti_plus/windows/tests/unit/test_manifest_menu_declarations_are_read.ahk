@@ -3,15 +3,11 @@
 ; ==============================================================================
 ; MODULE: Regression — manifest declarations that nothing read
 ; DESCRIPTION:
-; Three keys in menu_manifest.json were declared and then ignored, each with a
+; Two keys in menu_manifest.json were declared and then ignored, each with a
 ; copy of the same data living in AutoHotkey source. The manifest is meant to be
 ; the description of what the user sees, so a key nobody reads is a config that
 ; lies: editing it moves nothing, and the code copy is the real source.
 ;
-;   * ``i18n_dynamic`` on metrics_menu's shortcut_typing and shortcut_apps rows
-;     named the locale key for the label prefix. Zero readers existed anywhere in
-;     the repo; _MET_ShortcutTyping and _MET_ShortcutApps each carried their own
-;     literal t("menu.metrics.shortcut_prefix").
 ;   * ``accented_letters_group`` listed four letter_picker ids, while
 ;     _MR_BuildBuiltinGroup built the submenu from a hardcoded array of the same
 ;     four paths.
@@ -31,56 +27,9 @@
 
 
 
-; =====================================================
-; =====================================================
-; ======= 1/ i18n_dynamic reaches the handler =========
-; =====================================================
-; =====================================================
-
-Test("manifest_menu: i18n_dynamic is read from the manifest, not the handler", () => (
-	; The exact key the two metrics handlers now prefix their runtime label with.
-	; A handler holding its own literal would leave this accessor unused and the
-	; manifest declaration inert — which is the state this replaced.
-	AssertEqual(
-		"menu.metrics.shortcut_prefix",
-		MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing"),
-		"shortcut_typing must take its label prefix key from the manifest"
-	)
-))
-
-Test("manifest_menu: the second i18n_dynamic row resolves too", () => (
-	AssertEqual(
-		"menu.metrics.shortcut_prefix",
-		MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps"),
-		"shortcut_apps must take its label prefix key from the manifest"
-	)
-))
-
-Test("manifest_menu: an unknown item yields no i18n_dynamic key", () => (
-	; Fails visibly rather than inventing a key: the caller is about to build a
-	; user-visible label out of it.
-	AssertEqual(
-		"",
-		MenuRenderer_I18nDynamic("metrics_menu", "_no_such_item_xyz_"),
-		"an unknown item id must not resolve an i18n_dynamic key"
-	)
-))
-
-Test("manifest_menu: a row with no i18n_dynamic declaration yields empty", () => (
-	; show_apps is a static-label row: it declares i18n, not i18n_dynamic.
-	AssertEqual(
-		"",
-		MenuRenderer_I18nDynamic("metrics_menu", "show_apps"),
-		"a statically-labelled row declares no i18n_dynamic key"
-	)
-))
-
-
-
-
 ; ==========================================================
 ; ==========================================================
-; ======= 2/ The built-in groups read their section ========
+; ======= 1/ The built-in groups read their section ========
 ; ==========================================================
 ; ==========================================================
 
@@ -155,7 +104,7 @@ _MM_AhkFeatureRowValues(SectionKey, Key) {
 
 ; ===============================================
 ; ===============================================
-; ======= 3/ Shared row-inspection helper =======
+; ======= 2/ Shared row-inspection helper =======
 ; ===============================================
 ; ===============================================
 

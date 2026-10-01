@@ -15,6 +15,8 @@
 ---    later change to the shipped defaults never silently reaches the user.
 --- 2. Exact Ownership: only the tray's per-key fields, the master flag and the
 ---    tap_hold parameter domain change; unknown sections and fields survive.
+---    A clear leaves the master flag as it is (the manifest's `clear_exclude`):
+---    it empties the keys, and the user sets the next one from there.
 --- 3. Revertible: a committed owner keeps its exact inverse, so a composed
 ---    scope can undo it when a later category refuses.
 --- 4. The layer comes with its key: a restore also creates the folder's

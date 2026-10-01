@@ -16,9 +16,9 @@ _OIH_SpaceAndOneShotHooksStopOnSuspend() {
 	_OIH_AssertSuspendOwnedHook("OneShotShift", "one-shot-shift")
 	_OIH_AssertSuspendOwnedHook("DeadKey", "dead-key")
 	Space := _DriverFuncBody("SpaceTapHold")
-	Assert(InStr(Space, 'TapHoldOwnImmediateModifier("space",') > 0
+	Assert(InStr(Space, 'TapHoldOwnHoldModifier("space",') > 0
 		and !InStr(Space, "InputHook("),
-		"Space no longer owns an InputHook: its configured modifier must be active before the first chord")
+		"Space owns no InputHook: its hold goes through the shared owner, at key-down or once the keys decided it")
 }
 Test("lifecycle: owned InputHooks stop on suspend and Space uses no capture hook (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
 

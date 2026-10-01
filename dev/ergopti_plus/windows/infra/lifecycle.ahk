@@ -14,6 +14,7 @@
 #Include suspend_handoff.ahk
 #Include reload_terminal_handoff.ahk
 #Include reload_successor.ahk
+#Include reload_deferral.ahk
 #Include lifecycle_transition.ahk
 
 ActivateEdit(*) {
@@ -195,10 +196,16 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		}
 	}
 	if !(OwnerBundle is Object) {
+		; A configuration write is in progress, and this thread interrupted it:
+		; a plain request waits for the write to end (infra/reload_deferral.ahk).
+		if _ReloadRequestIsPlain(SuccessFn, ExistingBundle, RefusedFn, StageFailureFn)
+				&& ReloadDeferralQueue(_ReloadAfterConfigWrite)
+			return true
 		try LoggerError("Lifecycle", "Reload refused because another configuration transaction owns config.toml.")
 		ReportStage.Call("config-lease", ConfigurationFile)
 		return false
 	}
+	ReloadDeferralSettle()
 	if !(_ConfigWriteLeaseSelectOwner(OwnerBundle,
 			ConfigurationFile) is Object) {
 		try LoggerError("Lifecycle", "Reload refused because its borrowed configuration bundle is stale or does not own the active path.")
@@ -231,6 +238,22 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		if OwnBundle && !Launched
 			_ConfigWriteTerminalRelease(OwnerBundle)
 	}
+}
+
+; Whether a reload request carries nothing a later retry could not carry: no
+; completion or refusal callback, no borrowed configuration bundle and the
+; default stage report. Only such a request is queued behind a write.
+_ReloadRequestIsPlain(SuccessFn, ExistingBundle, RefusedFn, StageFailureFn) {
+	return !HasMethod(SuccessFn, "Call") && !(ExistingBundle is Object)
+		&& !HasMethod(RefusedFn, "Call") && !HasMethod(StageFailureFn, "Call")
+}
+
+; The deferred reload's retry, run by its one-shot timer once the interrupted
+; writer could resume.
+_ReloadAfterConfigWrite(*) {
+	PreviousCritical := Critical("Off")
+	try _ReloadPreservingSuspendNonCritical(0, 0, 0, 0)
+	finally Critical(PreviousCritical)
 }
 
 ; A launched reload refused later leaves this instance running on its previous
@@ -630,9 +653,13 @@ Ergopti_OnSuspendResume() {
 					() => LLM_Menu_OnResume())
 		; Drain the exact manual updater terminals retained across pause only after
 		; native Suspend has lifted. Background work remains intentionally silent.
+		; Its result is not checked: false is its answer when no terminal and no
+		; menu rebuild was retained, which is every ordinary resume. Requiring
+		; true logged an error and failed the transition on each of them
+		; (resume-updater-nothing-pending). A throw is still a debt.
 		if IsSet(Updater_OnSuspendResume)
 				_LifecycleRunRequiredStep(Transition, "updater",
-					Updater_OnSuspendResume, true)
+					Updater_OnSuspendResume)
 		; Suspend terminates the persistent UIA process. Warm its lightweight
 		; source entry again after the transition so the first selection-wrap after
 		; resume cannot race a cold worker; UIASW_Start remains feature/suspend safe.
@@ -691,6 +718,14 @@ _SuspendStateWatchdog() {
 						if IsSet(_TrayRootServiceRetained)
 								RootService := _TrayRootServiceRetained
 						_TrayRootServiceRetainedWork(RootService)
+				} else if IsSet(_TrayRootFirstPublicationPending)
+						&& _TrayRootFirstPublicationPending() {
+						; A pause restored after a reload can land while the boot
+						; build of the tray root is staging, which makes that root
+						; stale. It is the one retained root served under a pause:
+						; without it the paused driver keeps the boot menu, without
+						; the row that lifts the pause (first-root-under-pause).
+						_TrayRootServiceRetainedWork(_TrayRootServiceRetained)
 				}
 				return
 		}
@@ -1159,7 +1194,13 @@ BuildTrayMenuDeferred() {
 	try {
 		BuildAccepted := RebuildTrayMenu(0, _TrayRootBuildBoot, false)
 		if !((BuildAccepted is Integer) and BuildAccepted == 1) {
-			try LoggerError("TrayMenu", "Deferred tray-menu build was retained for retry.")
+			; A pause restored while the root was staging is an expected refusal,
+			; not a failure: the watchdog publishes the first root under the pause.
+			if A_IsSuspended {
+				try LoggerInfo("TrayMenu", "Deferred tray-menu build interrupted by the restored pause; the watchdog rebuilds it under the pause.")
+			} else {
+				try LoggerError("TrayMenu", "Deferred tray-menu build was retained for retry.")
+			}
 			return false
 		}
 		return true

@@ -24,7 +24,9 @@
 _SHSG_AssertSpaceHoldSuspendGuard() {
 	Body := _DriverFuncBody("SpaceTapHold")
 	Assert(Body != "", "SpaceTapHold(HoldFn) must exist")
-	Assert(InStr(Body, 'TapHoldOwnImmediateModifier("space",') > 0,
+	; TapHoldOwnHoldModifier hands the hold to the shared immediate owner, at
+	; key-down or once a typing key is decided (tap_hold_roll.ahk).
+	Assert(InStr(Body, 'TapHoldOwnHoldModifier("space",') > 0,
 		"Space must delegate to the shared owner which guards suspension and balances the modifier")
 	Assert(!InStr(Body, "InputHook(") and !InStr(Body, "ih.Wait()"),
 		"Space must not suppress/capture the first chord before arming its configured modifier")

@@ -32,9 +32,7 @@
 _MMDW_Canonical() {
 	return Map(
 		"show_typing",        ["keylogger_enabled"],
-		"shortcut_typing",    ["keylogger_enabled"],
 		"show_apps",          ["keylogger_enabled"],
-		"shortcut_apps",      ["keylogger_enabled"],
 		"wpm_widget",         ["keylogger_enabled"],
 		"widget_colors",      ["keylogger_enabled", "wpm_widget_visible"],
 		"include_realtime",   ["keylogger_enabled", "wpm_widget_visible"],
@@ -154,14 +152,13 @@ _MMDW_HandlersCallResolver() {
 	; are `command`, so the RENDERER applies the greying from the declaration and
 	; there is no handler left to delegate. That is the case the paragraph above
 	; describes — a row built by more shared code, not less.
-	; The two shortcut pickers and the app-exclusion row became `list` providers on
-	; 2026-08-07 — the renderer draws the row, the provider only says what it says.
-	; They stay in this list under their new names: a provider resolves its own
-	; greying exactly as the handler did, because the label is computed and the
-	; renderer has nothing else to apply the declaration to.
+	; The app-exclusion row became a `list` provider on 2026-08-07 — the renderer
+	; draws the row, the provider only says what it says. It stays in this list
+	; under its new name: a provider resolves its own greying exactly as the
+	; handler did, because the label is computed and the renderer has nothing
+	; else to apply the declaration to. The two shortcut pickers left the menu on
+	; 2026-10-01 (the last test of this file).
 	Handlers := Map(
-		"_MET_ShortcutTypingRows", "shortcut_typing",
-		"_MET_ShortcutAppsRows",   "shortcut_apps",
 		"_MET_ExcludeAppsRows",    "exclude_apps",
 		"_MET_WpmWidget",          "wpm_widget",
 		"_MET_WpmWidgetColors",    "widget_colors",
@@ -320,22 +317,33 @@ _MMDW_MigratedRowsAreDeclarative() {
 }
 Test("menu-metrics-disabled-when: the migrated privacy rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)
 
-_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels() {
-	for Name in ["_MET_ShortcutTypingRows", "_MET_ShortcutAppsRows"] {
-		Body := _DriverFuncBody(Name)
-		Assert(InStr(Body, "_MET_PromptShortcutAndRefresh(") > 0,
-			Name . " must route its click through the tray-refresh owner")
-		Assert(InStr(Body, "MS_PromptShortcut(") = 0,
-			Name . " must not leave a direct click path with a stale label snapshot")
+; The Metrics menu sets no shortcut of its own (the maintainer's rule of
+; 2026-10-01, metrics-no-shortcut-rows): a shortcut that opens a metrics window
+; is assigned to its opening action in the Gestures or the Shortcuts menu. The
+; two rows, their providers and their refresh wrapper are gone, and the two
+; rows that open a window follow each other with no separator between them.
+_MMDW_NoShortcutRows() {
+	Rows := _MMDW_LoadMetricsMenu()
+	Ids := []
+	for Entry in Rows {
+		if !(Entry is Map)
+			continue
+		Id := Entry.Has("id") ? Entry["id"] : ""
+		Assert(Id != "shortcut_typing" and Id != "shortcut_apps",
+			"the Metrics menu must declare no shortcut row, found '" . Id . "'")
+		Assert(!Entry.Has("i18n_dynamic"), "no Metrics row carries a shortcut label prefix any more")
+		Ids.Push(Entry.Has("type") and Entry["type"] == "---" ? "---" : Id)
 	}
-	Wrapper := _DriverFuncBody("_MET_PromptShortcutAndRefresh")
-	Assert(InStr(Wrapper, "RebuildTrayMenu()") > 0,
-		"the shortcut action must request the canonical tray generation owner")
-	Assert(InStr(Wrapper, "(Result is Integer) && Result == 1") > 0
-		and InStr(Wrapper, "(RefreshResult is Integer) && RefreshResult == 1") > 0,
-		"prompt and tray outcomes must both reject truthy String statuses")
-	Assert(InStr(Wrapper, "After == Before") > 0,
-		"a surfaced cleanup failure must still refresh when its warning label changed")
+	At := 0
+	for Index, Id in Ids {
+		if (Id == "show_typing")
+			At := Index
+	}
+	Assert(At > 0 and At + 2 <= Ids.Length, "the Metrics menu must still declare the row that opens the typing metrics")
+	AssertEqual("show_apps", Ids[At + 1], "the two rows that open a window form one group, with nothing between them")
+	AssertEqual("---", Ids[At + 2], "a separator closes that group")
+	for Name in ["_MET_ShortcutTypingRows", "_MET_ShortcutAppsRows", "_MET_PromptShortcutAndRefresh"]
+		Assert(_DriverFuncBodyOrEmpty(Name) == "", Name . "() still exists: the Metrics menu sets no shortcut")
 }
-Test("menu-metrics-disabled-when: shortcut clicks strictly refresh committed projections",
-	_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels)
+Test("menu-metrics-disabled-when: the menu sets no shortcut and its two opening rows form one group (metrics-no-shortcut-rows)",
+	_MMDW_NoShortcutRows)

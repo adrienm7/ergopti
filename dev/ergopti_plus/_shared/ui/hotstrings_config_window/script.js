@@ -20,6 +20,22 @@ let state = { categories: [], groups: [], presets: [], global_default_delay_ms: 
 // so the user's position is not lost after every mutation round-trip.
 let activeGroup = null;
 
+// The categories the user folded, by identity. Every mutation makes the host
+// push a fresh state and the page draws again: the fold must outlive that.
+const foldedCategories = new Set();
+
+// One category's identity across state pushes.
+function categoryKey(cat) {
+	return [cat.group, cat.name, cat.ext_id || '', cat.personal_path || ''].join('\u0000');
+}
+
+// Show or hide a category's sections and turn its caret accordingly.
+function applyFold(toggle, sectionsBox, folded) {
+	sectionsBox.hidden = folded;
+	toggle.classList.toggle('open', !folded);
+	toggle.setAttribute('aria-expanded', folded ? 'false' : 'true');
+}
+
 // Resolve a translation key via the loaded locale strings (set by i18n.js).
 function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
@@ -118,18 +134,19 @@ function render() {
 
 		card.querySelector('.cat-title').textContent = cat.title;
 
+		// The caret and the title both fold the category's sections.
 		const toggle = card.querySelector('[data-role=toggle]');
+		const title = card.querySelector('.cat-title');
 		const sectionsBox = card.querySelector('.sections');
-		toggle.addEventListener('click', () => {
-			const open = sectionsBox.hasAttribute('hidden');
-			if (open) {
-				sectionsBox.removeAttribute('hidden');
-				toggle.classList.add('open');
-			} else {
-				sectionsBox.setAttribute('hidden', '');
-				toggle.classList.remove('open');
-			}
-		});
+		const key = categoryKey(cat);
+		const fold = () => {
+			if (foldedCategories.has(key)) foldedCategories.delete(key);
+			else foldedCategories.add(key);
+			applyFold(toggle, sectionsBox, foldedCategories.has(key));
+		};
+		applyFold(toggle, sectionsBox, foldedCategories.has(key));
+		toggle.addEventListener('click', fold);
+		title.addEventListener('click', fold);
 
 		// File-level (category) controls
 		bindDelay(card.querySelector('.field-delay'), cat, null);

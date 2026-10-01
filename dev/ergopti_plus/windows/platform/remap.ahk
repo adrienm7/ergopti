@@ -31,6 +31,8 @@
 #Include ../platform/remap/tap_hold_loader.ahk
 
 #Include remap/constants.ahk
+#Include remap/tap_hold_roll.ahk
+#Include remap/tap_hold_roll_keys.ahk
 #Include remap/one_shot_shift.ahk
 #Include remap/capslock.ahk
 #Include remap/lshift_lctrl.ahk

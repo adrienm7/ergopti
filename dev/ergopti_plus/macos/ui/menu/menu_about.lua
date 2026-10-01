@@ -230,6 +230,19 @@ function M.build(ctx, actions)
 		else
 			Logger.error(LOG, "No automatic update-check owner in the menu context — the frequency rows are left out.")
 		end
+	else
+		-- A local version has no installation to update, so it checks for
+		-- nothing. The two rows are still drawn, greyed with the reason: left
+		-- out, nobody could tell whether the automatic update exists.
+		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
+		local code = require("modules.updater.auto_check").stored_interval_code(state)
+		for _, label in ipairs({
+			i18n.get("menu.about.check_for_updates"),
+			i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. code),
+		}) do
+			table.insert(menu_items, { label = label, disabled = true,
+				disabled_reason_key = "menu.about.source_run_reason" })
+		end
 	end
 
 	-- The updater block above is the manifest's `about_updates` list; the rows

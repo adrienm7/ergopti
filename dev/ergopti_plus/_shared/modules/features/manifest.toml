@@ -3870,9 +3870,11 @@ french_autocorrection = "FrenchAutocorrection"
 french_magickey = "FrenchMagicKey"
 
 # The order is the approved one and every driver builds it from here: the
-# keyboard and trackpad features, then layout, text and AI, then metrics and
-# the applications, then the configuration tail. A separator is drawn only
-# between two rows a platform shows.
+# keyboard and trackpad features, then what is about typing (layout,
+# hotstrings, metrics), then the two AI rows together, then the macOS
+# applications in a group of their own, then the configuration tail (the
+# maintainer's order of 2026-10-01). A separator is drawn only between two
+# rows a platform shows.
 #
 # `greyed_when_paused` marks feature rows; every driver greys and disables those
 # rows while keeping the configuration and lifecycle tail available.
@@ -3902,6 +3904,13 @@ id = "hotstrings"
 greyed_when_paused = true
 
 [[menu.top_level]]
+id = "metrics"
+greyed_when_paused = true
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
 id = "llm"
 greyed_when_paused = true
 
@@ -3912,10 +3921,6 @@ greyed_when_paused = true
 [[menu.top_level]]
 id = "---"
 
-[[menu.top_level]]
-id = "metrics"
-greyed_when_paused = true
-
 # macOS only: it lists the applications bundled with the macOS app. Linux had
 # one too, holding a single config-folder row, and that row now lives under
 # Configuration with the other two drivers' copy of it.
@@ -3925,8 +3930,12 @@ greyed_when_paused = true
 platforms = ["hs"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
+# The separator that closes the group of that row belongs to it: declared for
+# every driver, it stood right after the one above wherever the row is absent.
 [[menu.top_level]]
 id = "---"
+platforms = ["hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
@@ -4732,35 +4741,18 @@ id = "show_typing"
 i18n = "menu.metrics.show_typing"
 disabled_when = ["keylogger_enabled"]
 
-# `list` since 2026-08-07, not `action`/`dynamic`: each of these three rows
-# carries a label built from runtime state — the shortcut currently assigned, the
-# number of excluded apps — so no static i18n key can express it. A provider that
-# returns ONE row is still the renderer drawing it, which is the difference that
-# matters: the driver answers what the row says and the renderer decides what a
-# row looks like.
-[[menu.metrics_menu]]
-type = "list"
-id = "shortcut_typing"
-i18n_dynamic = "menu.metrics.shortcut_prefix"
-disabled_when = ["keylogger_enabled"]
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.metrics_extras_are_not_on_linux"
-[[menu.metrics_menu]]
-type = "---"
-
+# The two rows that open a window form one group. Each was followed, until
+# 2026-10-01, by a row that set a dedicated shortcut for it (`shortcut_typing`,
+# `shortcut_apps`), with a separator between the pairs. The maintainer retired
+# them: a shortcut that opens one of these windows is assigned in the Gestures
+# or the Shortcuts menu, to the `open_metrics_typing` or `open_metrics_apps`
+# action, like any other, and the two ways are not mixed.
 [[menu.metrics_menu]]
 type = "command"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
 disabled_when = ["keylogger_enabled"]
 
-[[menu.metrics_menu]]
-type = "list"
-id = "shortcut_apps"
-i18n_dynamic = "menu.metrics.shortcut_prefix"
-disabled_when = ["keylogger_enabled"]
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
@@ -4852,6 +4844,11 @@ i18n = "menu.metrics.filter_sysauth"
 checked_when = ["metrics_filter_sysauth"]
 disabled_when = ["keylogger_enabled"]
 
+# `list` since 2026-08-07, not `action`/`dynamic`: the row's label is built
+# from runtime state — the number of excluded apps — so no static i18n key can
+# express it. A provider that returns ONE row is still the renderer drawing it:
+# the driver answers what the row says and the renderer decides what a row
+# looks like.
 [[menu.metrics_menu]]
 type = "list"
 id = "exclude_apps"
@@ -4890,8 +4887,8 @@ platforms = ["linux"]
 # Three rows stood here until 2026-08-07 — "Session statistics", "Current WPM"
 # and "Per-application statistics" — and each one's entire effect was a line in
 # the driver's log. Their labels promised figures the user never saw. The same
-# menu already opens the windows that hold them: "Show typing metrics" and "Show
-# time per application" are declared above for all three drivers, and the WPM
+# menu already opens the windows that hold them: `show_typing` and `show_apps`
+# are declared above for all three drivers, and the WPM
 # widget toggle shows the live rate. They were removed rather than pointed at
 # those windows, which would have given this menu two rows opening one window.
 
@@ -5892,11 +5889,16 @@ type = "boolean"
 description_key = "menu.layout"
 platforms = ["hs"]
 
+# `clear_exclude` lists the paths a clear leaves as they are, as
+# `restore_exclude` does for a restore. The Tap-Holds clear empties every key's
+# tap and hold and keeps the switch: the user sets the next key from there, and
+# a switch turned off with the keys made that key do nothing.
 [scopes.tap_holds]
 action_parameters = { domains = ["tap_hold"], restore = "remove" }
 prefixes = ["tap_holds", "category_enabled.tap_holds"]
 preset = "tap_hold"
 restore_exclude = []
+clear_exclude = ["tap_holds.enabled", "category_enabled.tap_holds"]
 
 [scopes.shortcuts]
 action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
@@ -5904,10 +5906,13 @@ prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_e
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
 
+# The Gestures clear removes the assignments and keeps the switch, like the
+# Tap-Holds one: the user assigns the next gesture from there.
 [scopes.gestures]
 action_parameters = { domains = ["gesture"], restore = "remove" }
 prefixes = ["gestures"]
 restore_exclude = []
+clear_exclude = ["gestures.enabled"]
 
 [scopes.keyboard_layout]
 prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]

@@ -76,14 +76,15 @@ return function(helpers)
 			local committed, detail = owner.apply("gestures", "clear")
 			helpers.assert_eq(committed, true, detail)
 			local decoded = Codec.decode(files.config)
-			helpers.assert_eq(decoded.gestures.enabled, nil)
+			-- A clear routes no row for the switch (gestures-clear-keeps-switch).
+			helpers.assert_eq(decoded.gestures.enabled, true)
 			helpers.assert_eq(decoded.gestures.swipe_3_down, nil)
 			helpers.assert_eq(decoded.gestures.future, 42)
 			helpers.assert_eq(decoded.gestures.expert.value, "preserve")
 			helpers.assert_eq(decoded.llm.enabled, true)
 			helpers.assert_eq(files.backup, original)
 			helpers.assert_eq(#writes, 2)
-			helpers.assert_eq(runtime.marker, nil)
+			helpers.assert_eq(runtime.marker, true)
 		end)
 
 		helpers.it("restores recommendations without acquiring absent AI or metrics consent", function()
@@ -298,8 +299,10 @@ return function(helpers)
 				local stored = Codec.decode(files.taps)
 				helpers.assert_eq(stored.tap_hold.future, "keep")
 				helpers.assert_eq(stored.other.value, 17)
-				helpers.assert_eq(stored.tap_hold.enabled, mode == "recommended"
-					and Manifest.recommended_for("tap_holds.enabled") or nil)
+				-- A clear routes no switch row: the stored one stays (tap-hold-clear-keeps-switch).
+				local expected = false
+				if mode == "recommended" then expected = Manifest.recommended_for("tap_holds.enabled") end
+				helpers.assert_eq(stored.tap_hold.enabled, expected)
 				helpers.assert_eq(files["taps-backup"], source)
 				helpers.assert_eq(files.config, original)
 				helpers.assert_eq(files.backup, nil)

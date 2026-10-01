@@ -44,8 +44,8 @@ _EnterHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
-	Result := TapHoldOwnImmediateModifier("enter", "Enter",
-		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
+	Result := TapHoldOwnHoldModifier("enter", "Enter",
+		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"), _EnterDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
@@ -65,7 +65,7 @@ $SC01C:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
-	Result := TapHoldOwnImmediateLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"))
+	Result := TapHoldOwnHoldLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"), _EnterDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
@@ -87,8 +87,31 @@ $SC01C:: {
 ; under a held modifier, as on every driver. Its own auto-repeat arrives under
 ; the modifier or layer the hold owns and matches none of them: swallow it for
 ; as long as the owner resolves the press (see TapHoldPressIsOwned).
+; An exact chord beats the wildcard: Space held as Shift repeated the layout
+; emulation's Shift+Space hotkey. The bare key and every chord of Ctrl, Alt,
+; Shift and Win are therefore declared too; a static variant is created before
+; every Hotkey() one, and the first eligible variant of an identity fires.
 #HotIf TapHoldPressIsOwned("enter")
-*SC01C:: return
+*SC01C::
+SC01C::
+^SC01C::
+!SC01C::
+^!SC01C::
++SC01C::
+^+SC01C::
+!+SC01C::
+^!+SC01C::
+#SC01C::
+^#SC01C::
+!#SC01C::
+^!#SC01C::
++#SC01C::
+^+#SC01C::
+!+#SC01C::
+^!+#SC01C::
+{
+	return
+}
 #HotIf
 
 

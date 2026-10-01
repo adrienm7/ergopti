@@ -137,6 +137,67 @@ _TRLR_PausePulseRetainsAndReplaysLatestRoot() {
 Test("tray root: pause pulse retains and replays latest generation exactly once (tray-root-lifecycle-retained)",
 	_TRLR_PausePulseRetainsAndReplaysLatestRoot)
 
+; Regression for first-root-under-pause (2026-10-01). A reload asked while
+; paused hands the pause to its successor, whose watchdog restores it while the
+; deferred boot build of the tray root is staging. The publication was refused
+; like any rebuild under a pause and replayed only once the driver was active
+; again: the paused driver kept the boot menu, without its pause row, and
+; opened the error window. A paused driver that has no root yet has nothing
+; live to keep: its first root publishes under the pause, and only that one.
+_TRLR_PauseDuringFirstBuild(State, PublishAuthorizeFn) {
+	State.BuildCalls += 1
+	if State.BuildCalls == 1 {
+		_TrayRootOnSuspendEnter()
+		Suspend(true)
+	}
+	Authorized := PublishAuthorizeFn.Call()
+	if !((Authorized is Integer) and Authorized == 1)
+		return false
+	State.PublishCalls += 1
+	return true
+}
+
+_TRLR_FirstRootPublishesUnderAPause() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive
+	Saved := _TRLR_SaveRootState()
+	WasSuspended := A_IsSuspended
+	try {
+		_TRLR_ResetRootState()
+		AssertFalse(A_IsSuspended, "the repro must begin on an active driver")
+		AssertFalse(_TrayRootFirstPublicationPending(),
+			"no root is pending before any was requested")
+		State := { BuildCalls: 0, PublishCalls: 0 }
+		Worker := _TRLR_PauseDuringFirstBuild.Bind(State)
+
+		AssertFalse(RebuildTrayMenu(0, Worker, false),
+			"a root staged across the restored pause is stale and must not publish")
+		AssertTrue(A_IsSuspended, "the repro must leave the driver paused")
+		AssertEqual(0, State.PublishCalls)
+		AssertTrue(_TrayRootFirstPublicationPending(),
+			"the paused driver still owes its first root")
+
+		AssertTrue(_TrayRootServiceRetained(),
+			"a paused driver must still publish its first root (first-root-under-pause)")
+		AssertEqual(2, State.BuildCalls, "the first root is rebuilt once under the pause")
+		AssertEqual(1, State.PublishCalls, "the first root publishes under the pause")
+		AssertEqual(1, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive, "the owner must release after publishing")
+		AssertFalse(_TrayRootFirstPublicationPending(),
+			"a published root ends the exception")
+
+		AssertFalse(RebuildTrayMenu(0, Worker, false),
+			"once a root is live, a rebuild under the pause stays refused")
+		AssertEqual(1, State.PublishCalls,
+			"the live root must not be replaced under the pause")
+	} finally {
+		Suspend(WasSuspended)
+		_TRLR_RestoreRootState(Saved)
+	}
+}
+Test("tray root: a paused driver publishes its first root, and only that one (first-root-under-pause)",
+	_TRLR_FirstRootPublishesUnderAPause)
+
 _TRLR_PreTrayServiceIsSafeBeforeInitializer() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch

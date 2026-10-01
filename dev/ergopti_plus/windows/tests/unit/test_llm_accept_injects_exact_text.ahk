@@ -198,3 +198,95 @@ Test("LLM accept: every TextSender path leaves at SendLevel 0 and restores the c
 _LAIET_ThrowSendFailure() {
 	throw Error("simulated SendInput failure")
 }
+
+; Regression for llm-accept-notepad-paste. Windows 11's Notepad loses the
+; characters of a text typed in one burst and types the last one in their
+; place: « général de l’histoire militaire » accepted there came out as its
+; final « e » 32 times (2026-10-01). The hotstring engine already pastes its
+; replacement in that application; the accepted prediction typed it as text.
+; The clipboard worker is stopped before it runs, so the test never touches
+; the real clipboard: it takes the queued request and sends the paste the
+; worker sends once the clipboard holds the text.
+_LAIET_NotepadReceivesThePredictionByPaste() {
+	global _TEXT_CLIPBOARD_QUEUE
+	SavedQueue := _TEXT_CLIPBOARD_QUEUE
+	SimulateNotepadActive()
+	try {
+		_TEXT_CLIPBOARD_QUEUE := []
+		_LAIET_Run(_Body)
+	} finally {
+		SetTimer(_TextSenderStartClipboard, 0)
+		_TEXT_CLIPBOARD_QUEUE := SavedQueue
+		SimulateRegularApp()
+	}
+	_Body(Sent, Record) {
+		global LAIET_TYPED, LAIET_PREDICTION, _LLM_Bridge_Buffer
+		global _TEXT_CLIPBOARD_QUEUE, _AHK_SendInput, TEXT_SENDER_SEND_LEVEL
+		SendLevel(2)
+		AssertTrue(_LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot()),
+			"the shown prediction must be claimed and dispatched")
+		SetTimer(_TextSenderStartClipboard, 0)
+		AssertEqual(0, Sent.Length,
+			"in Notepad the prediction must not be typed as text, which Notepad garbles (llm-accept-notepad-paste)")
+		AssertEqual(1, _TEXT_CLIPBOARD_QUEUE.Length,
+			"in Notepad the prediction must be queued for exactly one paste")
+		Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
+		AssertEqual(LAIET_PREDICTION, Request.Text,
+			"the pasted text must be the exact accented prediction")
+		Result := _TextSenderRunAtomicOutput(
+			_AHK_SendInput.Bind(_TextSenderErasePrefix(Request.Opts) . "^v"),
+			Request.Opts, "clipboard paste")
+		Request.Callback.Call(Result.Ok, Result.ErrorMessage)
+		AssertEqual(1, Sent.Length, "the paste is one keystroke batch")
+		AssertEqual("^v", Sent[1].Keys, "an insertion erases nothing before its paste")
+		AssertEqual(TEXT_SENDER_SEND_LEVEL, Sent[1].Level,
+			"the paste must leave at TextSender's SendLevel")
+		AssertEqual(LAIET_TYPED . LAIET_PREDICTION, _LLM_Bridge_Buffer,
+			"the bridge buffer mirrors the pasted prediction exactly once")
+		AssertEqual("accepted", Record.Lifecycle.Outcome,
+			"the presented offer is retired as accepted")
+	}
+}
+Test("LLM accept: Notepad receives the prediction by paste, never as typed text (llm-accept-notepad-paste)",
+	_LAIET_NotepadReceivesThePredictionByPaste)
+
+; The choice belongs to TextSend's "auto" mode, so every caller that leaves the
+; strategy to the adapter gets it: a short text is typed everywhere but in
+; Notepad, where it is queued for a paste.
+_LAIET_AutoModePastesInNotepadOnly() {
+	global _TEXT_CLIPBOARD_QUEUE, _AHK_SendText
+	SavedQueue := _TEXT_CLIPBOARD_QUEUE
+	SavedSendText := _AHK_SendText
+	Typed := []
+	try {
+		_TEXT_CLIPBOARD_QUEUE := []
+		_AHK_SendText := (Text) => Typed.Push(Text)
+		SimulateRegularApp()
+		TextSend("court", Map("mode", "auto"), 0)
+		SetTimer(_TextSenderStartClipboard, 0)
+		AssertEqual(1, Typed.Length, "a short text is typed in an ordinary application")
+		AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length,
+			"a short text is not pasted in an ordinary application")
+		SimulateNotepadActive()
+		TextSend("court", Map("mode", "auto"), 0)
+		SetTimer(_TextSenderStartClipboard, 0)
+		AssertEqual(1, Typed.Length,
+			"in Notepad a text left to the adapter must not be typed (llm-accept-notepad-paste)")
+		AssertEqual(1, _TEXT_CLIPBOARD_QUEUE.Length,
+			"in Notepad a text left to the adapter is queued for a paste")
+		AssertTrue(OutputHostTakesTextByPaste(OutputHostResolve()),
+			"Notepad is the host that takes text by paste")
+		SimulateRegularApp()
+		AssertFalse(OutputHostTakesTextByPaste(OutputHostResolve()),
+			"an ordinary application takes typed text")
+		AssertFalse(OutputHostTakesTextByPaste(_OutputHostInvalidReceipt("identity_unavailable")),
+			"an unknown host keeps the typed text")
+	} finally {
+		SetTimer(_TextSenderStartClipboard, 0)
+		_TEXT_CLIPBOARD_QUEUE := SavedQueue
+		_AHK_SendText := SavedSendText
+		SimulateRegularApp()
+	}
+}
+Test("TextSender: auto mode pastes in Notepad and types elsewhere (llm-accept-notepad-paste)",
+	_LAIET_AutoModePastesInNotepadOnly)

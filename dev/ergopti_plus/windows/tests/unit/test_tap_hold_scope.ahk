@@ -69,7 +69,10 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 			Assert(FSWriteDurable(RestartPath, FSReadUtf8Exact(TapPath)))
 			Reloaded := LoadTapHoldToml(RestartPath, Fixture.options["tap_hold_defaults"])
 			if Mode == "clear" {
-				Assert(!Parsed["category_enabled"].Has("tap_holds"))
+				; The clear once deleted the switch with the keys, so the next key
+				; the user set did nothing until the switch was found again.
+				AssertEqual(true, Parsed["category_enabled"]["tap_holds"],
+					"the clear owns the keys, not the Tap-Holds switch (tap-hold-clear-keeps-switch)")
 				AssertEqual(0, Reloaded["keys"].Count)
 			} else {
 				AssertEqual(ManifestRecommendedFor("category_enabled.tap_holds"), Parsed["category_enabled"]["tap_holds"])
@@ -99,7 +102,23 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	}
 }
 Test("tap-hold-scope: recommended preset and master compensate native refusal", _TapHoldScopeCase.Bind("recommended"))
-Test("tap-hold-scope: clear preset and master compensate native refusal", _TapHoldScopeCase.Bind("clear"))
+Test("tap-hold-scope: clear preset keeps the switch and compensates native refusal (tap-hold-clear-keeps-switch)", _TapHoldScopeCase.Bind("clear"))
+
+; The manifest plan itself: a clear of the Tap-Holds, alone or composed in the
+; global one, names no row for the switch, and a restore still switches it on.
+_TapHoldClearPlanKeepsSwitch() {
+	for Scope in ["tap_holds", "global"] {
+		for Row in ManifestScopeOperations(Scope, "clear")
+			Assert(!(Row.Section == "category_enabled" && Row.Key == "tap_holds"), Scope . " clear rewrites the switch")
+		Restored := false
+		for Row in ManifestScopeOperations(Scope, "recommended") {
+			if Row.Section == "category_enabled" && Row.Key == "tap_holds"
+				Restored := Row.HasOwnProp("Value") && Row.Value == true
+		}
+		Assert(Restored, Scope . " restore still switches the Tap-Holds on")
+	}
+}
+Test("tap-hold-scope: no clear plans a row for the Tap-Holds switch (tap-hold-clear-keeps-switch)", _TapHoldClearPlanKeepsSwitch)
 Test("tap-hold-scope: refused second backup leaves both original stores", _TapHoldScopeCase.Bind("recommended", true))
 Test("tap-hold-scope: external preset edit refuses both-file publication", _TapHoldScopeCase.Bind("recommended", false, true))
 
@@ -200,3 +219,69 @@ _TapHoldScopeRestoreCreatesLayer() {
 }
 Test("tap-hold-scope: the restore publishes the layer with the preset and a refusal takes it back (nav-layer-fresh-install-default)",
 	_TapHoldScopeRestoreCreatesLayer)
+
+; Picking the navigation layer as a key's hold wrote hold_layer and nothing
+; else. In a folder with no layers.toml the key then entered a layer that binds
+; no key, which only lights CapsLock while held: every letter came out in
+; capitals and the hold read as Shift. The picker's write brings the
+; recommended layer along, as the restore does.
+_TapHoldPickerBringsLayer() {
+	global _SharedDir
+	Fixture := _ScopeOwnerFixture()
+	LayersPath := Fixture.directory . "\layers.toml"
+	Preset := TapHoldRecommendedLayer(_SharedDir)
+	LayerOpt := Map("kind", "layer", "id", Preset["layer_id"])
+	Writes := []
+	Accept(KeyId, HoldOpt) {
+		Writes.Push(KeyId . ":" . HoldOpt["kind"] . ":" . HoldOpt["id"] . ":" . (FileExist(LayersPath) ? "layer" : "none"))
+		return 1
+	}
+	Refuse(KeyId, HoldOpt) => false
+	try {
+		AssertEqual(1, TapHoldSetHold("space", Map("kind", "modifier", "id", "shift"), Fixture.directory, Accept))
+		Assert(!FileExist(LayersPath), "a modifier hold brings no layer file")
+		AssertEqual(1, TapHoldSetHold("space", Map("kind", "layer", "id", "not_the_recommended_layer"), Fixture.directory, Accept))
+		Assert(!FileExist(LayersPath), "a layer the recommended file does not bind brings nothing")
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, "", Accept))
+		Assert(!FileExist(LayersPath), "without a configuration folder no layer file is written")
+
+		Assert(!TapHoldSetHold("space", LayerOpt, Fixture.directory, Refuse), "a refused key write is reported")
+		Assert(!FileExist(LayersPath), "a refused key write takes the layer it created back")
+
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, Fixture.directory, Accept))
+		AssertEqual(Preset["text"], FSReadUtf8Exact(LayersPath),
+			"picking the layer creates layers.toml with the recommended layer's exact bytes")
+		AssertEqual("space:layer:" . Preset["layer_id"] . ":layer", Writes[Writes.Length],
+			"the layer file is there before the key that enters it is written")
+		Assert(_ConfigWriteLeaseTryAcquire(LayersPath, "probe") is Object, "the import releases the layer file")
+
+		Own := "# the user's own layer`n"
+		Assert(FSDeleteStrict(LayersPath))
+		Assert(FSWriteDurable(LayersPath, Own))
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, Fixture.directory, Accept))
+		AssertEqual(Own, FSReadUtf8Exact(LayersPath), "an existing layers.toml is the user's and is never replaced")
+		Assert(!TapHoldSetHold("space", LayerOpt, Fixture.directory, Refuse))
+		AssertEqual(Own, FSReadUtf8Exact(LayersPath), "a refused key write removes only a file the picker created")
+	} finally {
+		Current := _ConfigWriteLeaseCurrent(LayersPath)
+		if Current is Object
+			_ConfigWriteLeaseRelease(Current)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("tap-hold-scope: picking the layer as a hold brings the recommended layer along (hold-picker-brings-the-layer-2026-10-01)",
+	_TapHoldPickerBringsLayer)
+
+; The tray's hold picker is the caller: it hands the configuration folder to
+; the owner above, never to the bare key writer.
+_TapHoldPickerCallsLayerOwner() {
+	Body := _DriverFuncBody("_TH_ApplyHold")
+	Assert(RegExMatch(Body, "TapHoldSetHold\(KeyId,\s*HoldOpt,\s*_ConfigDir\)"),
+		"the hold picker must write through TapHoldSetHold with the configuration folder")
+	Assert(!RegExMatch(Body, "[^A-Za-z_]WriteTapHoldHold\("),
+		"the hold picker must not call the bare key writer, which brings no layer")
+	Assert(InStr(_DriverSourceNoComments(), "return _TH_ApplyHold(this.KeyId, this.HoldOpt)"),
+		"the picker row's callback must reach _TH_ApplyHold")
+}
+Test("tap-hold-scope: the hold picker writes through the layer owner (hold-picker-brings-the-layer-2026-10-01)",
+	_TapHoldPickerCallsLayerOwner)

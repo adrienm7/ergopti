@@ -428,7 +428,7 @@ helpers.describe("ui.webkit_host", function()
       local count = 0
       for _ in pairs(seeded) do count = count + 1 end
       helpers.assert_eq(count, expected, "the page must carry every string of the catalogue")
-      helpers.assert_eq(seeded["healthcheck.toolbar.close"], catalogue["healthcheck.toolbar.close"],
+      helpers.assert_eq(seeded["healthcheck.toolbar.refresh"], catalogue["healthcheck.toolbar.refresh"],
         "the page's labels must read as text, not as keys")
     end)
 

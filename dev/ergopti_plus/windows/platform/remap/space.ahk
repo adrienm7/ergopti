@@ -36,10 +36,11 @@ global _SpaceHoldInputHook := ""
 ; ========================
 ; ========================
 
-; Design: both modifier and layer ownership begin synchronously on physical
-; Space down. The first following key therefore observes the configured hold,
-; even when it arrives before the tap threshold. On release the owner is
-; balanced first; only a quick, otherwise isolated press emits the tap action.
+; Design: Space that keeps its own key on a tap is decided by the order of
+; the releases (tap_hold_roll.ahk): a letter struck before Space comes up is
+; typed after the space, not under the hold. With a tap that is an action,
+; both modifier and layer ownership begin synchronously on physical Space
+; down, and only a quick, otherwise isolated press emits the tap action.
 ; The owned-press swallower at the end of this file silences Space's own
 ; auto-repeat while either hold is active.
 ;
@@ -47,18 +48,21 @@ global _SpaceHoldInputHook := ""
 ; SendInput bypasses the prefix-watcher InputHook.
 
 SpaceTapHold() {
-	Result := TapHoldOwnImmediateModifier("space", "SC039",
-		_SpaceHoldModKey(), TapHoldDuration(TapHold, "space"))
+	Result := TapHoldOwnHoldModifier("space", "SC039",
+		_SpaceHoldModKey(), TapHoldDuration(TapHold, "space"), _SpaceTapOrDispatch)
 	if Result["tap"]
 		_SpaceTapOrDispatch()
 }
 
 SpaceTapHoldLayer() {
-	Result := TapHoldOwnImmediateLayer("space", "SC039", TapHoldDuration(TapHold, "space"))
+	Result := TapHoldOwnHoldLayer("space", "SC039", TapHoldDuration(TapHold, "space"), _SpaceTapOrDispatch)
 	if Result["tap"] {
 		_SpaceTapOrDispatch()
 		return
 	}
+	; A press the roll owner already typed as a tap recorded its own space.
+	if (Result.Get("decision", "") == "tap")
+		return
 	UpdateLastSentCharacter("Space")
 }
 
@@ -154,6 +158,29 @@ SC039:: SpaceTapHold()
 ; under a held modifier, as on every driver. Its own auto-repeat arrives under
 ; the modifier or layer the hold owns and matches none of them: swallow it for
 ; as long as the owner resolves the press (see TapHoldPressIsOwned).
+; An exact chord beats the wildcard: Space held as Shift repeated the layout
+; emulation's Shift+Space hotkey. The bare key and every chord of Ctrl, Alt,
+; Shift and Win are therefore declared too; a static variant is created before
+; every Hotkey() one, and the first eligible variant of an identity fires.
 #HotIf TapHoldPressIsOwned("space")
-*SC039:: return
+*SC039::
+SC039::
+^SC039::
+!SC039::
+^!SC039::
++SC039::
+^+SC039::
+!+SC039::
+^!+SC039::
+#SC039::
+^#SC039::
+!#SC039::
+^!#SC039::
++#SC039::
+^+#SC039::
+!+#SC039::
+^!+#SC039::
+{
+	return
+}
 #HotIf

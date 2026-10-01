@@ -222,11 +222,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; lifts a Kana-style layout's AltGr for it; returns the send verdict.
 				SendOutput() {
 						isNotepad := false
-						try {
-								Host := OutputHostResolve()
-								isNotepad := Host["Valid"]
-										&& (StrLower(Host["Exe"]) = "notepad.exe")
-						}
+						try isNotepad := OutputHostTakesTextByPaste(OutputHostResolve())
 						if isNotepad {
 								; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
 								; so we route replacement through the clipboard. Keep the erase and

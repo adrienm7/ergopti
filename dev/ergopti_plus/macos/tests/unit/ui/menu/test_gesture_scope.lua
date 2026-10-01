@@ -99,7 +99,9 @@ helpers.describe("macOS complete gesture scope", function()
 		local committed, detail = menu_commands(owner, gestures, state).scope_clear()
 		helpers.assert_eq(committed, true, detail)
 		local decoded = Codec.decode(files.config)
-		helpers.assert_eq(decoded.gestures.enabled, nil)
+		-- The clear once switched the Gestures off with the assignments
+		-- (gestures-clear-keeps-switch).
+		helpers.assert_eq(decoded.gestures.enabled, true, "the clear owns the assignments, not the switch")
 		helpers.assert_eq(decoded.gestures.tap_4, nil)
 		helpers.assert_eq(decoded.gestures.modes.swipe_3_horiz, nil)
 		helpers.assert_eq(decoded.gestures.modes.future, "keep")
@@ -110,8 +112,8 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_k__open_url, "https://example.com")
 		helpers.assert_eq(files.backup, original)
 		helpers.assert_eq(writes(), 2)
-		helpers.assert_eq(state.gestures, false)
-		helpers.assert_eq(gestures.is_enabled(), false)
+		helpers.assert_eq(state.gestures, true)
+		helpers.assert_eq(gestures.is_enabled(), true)
 		for slot in pairs(gestures.DEFAULT_GESTURES) do helpers.assert_eq(gestures.get_action(slot), "none") end
 		helpers.assert_eq(gestures.get_mode("swipe_3_horiz"), Manifest.default_for("gestures.modes.swipe_3_horiz"))
 		helpers.assert_eq(gestures.get_sensitivity("swipe_3_horiz"), Manifest.default_for("gestures.sensitivities.swipe_3_horiz"))
@@ -178,20 +180,29 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(save(), true)
 		helpers.assert_eq(Codec.decode(files.config).gestures.action_parameters.future.preserve, 7)
 	end)
-	helpers.it("clear explicitly ends only gesture demotions, with an inverse when publication fails", function()
-		for _, refuse in ipairs({ false, true }) do
-			local owner, gestures, files, state, controls, _, save = fixture()
-			controls.demotions.record({ feature = "gestures", key = "gestures", persisted = true, demoted = false })
-			controls.demotions.record({ feature = "llm", key = "llm_enabled", persisted = true, demoted = false })
-			state.gestures = false
-			gestures.disable_all()
-			controls.refuse_write = refuse
-			helpers.assert_eq(owner.apply("clear"), not refuse)
-			helpers.assert_eq(#controls.demotions.list(), refuse and 2 or 1)
-			if not refuse then
-				helpers.assert_eq(controls.demotions.list()[1].feature, "llm")
-				helpers.assert_eq(save(), true)
-				helpers.assert_eq(Codec.decode(files.config).gestures.enabled, nil)
+	-- A demotion is the switch saved on and off for this session. A clear leaves
+	-- the switch alone, so it leaves the demotion too; a restore publishes the
+	-- switch and ends it (gestures-clear-keeps-switch).
+	helpers.it("a clear keeps the gesture demotion and a restore ends only that one, with an inverse when publication fails", function()
+		for _, mode in ipairs({ "clear", "recommended" }) do
+			for _, refuse in ipairs({ false, true }) do
+				local owner, gestures, files, state, controls, _, save = fixture()
+				controls.demotions.record({ feature = "gestures", key = "gestures", persisted = true, demoted = false })
+				controls.demotions.record({ feature = "llm", key = "llm_enabled", persisted = true, demoted = false })
+				state.gestures = false
+				gestures.disable_all()
+				controls.refuse_write = refuse
+				helpers.assert_eq(owner.apply(mode), not refuse)
+				local ended = mode == "recommended" and not refuse
+				helpers.assert_eq(#controls.demotions.list(), ended and 1 or 2, mode)
+				if not refuse then
+					if ended then helpers.assert_eq(controls.demotions.list()[1].feature, "llm") end
+					if mode == "clear" then
+						helpers.assert_eq(gestures.is_enabled(), false, "the session demotion still holds")
+					end
+					helpers.assert_eq(save(), true)
+					helpers.assert_eq(Codec.decode(files.config).gestures.enabled, true, mode)
+				end
 			end
 		end
 	end)
