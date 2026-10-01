@@ -535,6 +535,49 @@ is committed; one request is one commit with its regression test.
       redundant feature gates and settings through their migration owner, and
       add native regressions for the selected layout without an extra switch.
 
+- [ ] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
+      user-owned entries, empty by default and offering "+ Add". Let a user on
+      any keyboard layout choose an action from the shared catalogue or enter
+      a character, then assign a physical key or modifier chord. Include é, à,
+      è, ç, ù, circumflex/diaeresis dead keys and arbitrary punctuation (comma,
+      period, colon, etc.). Ergopti emulation/keylayouts already supply their
+      symbol mappings, so do not duplicate them as default shortcuts. Share the
+      entry model, picker and persistence contract across drivers; test capture,
+      custom Unicode output, dead-key composition, neutral defaults and refusal
+      behavior through automated native and parity suites.
+
+- [ ] **98.** Replace the fixed "make J the star key" setting with a physical
+      key and output chosen by the user: any keyboard position and arbitrary
+      character, including choosing no star at all. Integrate with item 97's
+      shared user-owned shortcut model rather than another fixed-layout switch.
+- [ ] **99.** Windows: switching from AZERTY with AHK Ergopti+ emulation to the
+      native Ergopti Windows layout leaves AltGr unusable until reload. Follow
+      the foreground HKL and re-decide Kana/AltGr without restarting; cover both
+      directions, same-window changes and active/deferred owners in native CI.
+- [~] **100.** Windows diagnostics must retain a structured UI under memory
+  pressure. The supplied 2026-10-01 snapshot reports 1,512,222,720 free bytes
+  and installed WebView2, below the current 1,536 MiB native-fallback gate.
+  Attempt the shared page and reuse a warm environment; a real browser
+  failure must still leave a structured readable native view. Add automatic
+  low-memory, warm/cold boot and native-fallback regressions.
+  The shared page is now attempted regardless of free RAM, and the other
+  hosts reuse an already-running browser without a cold-start RAM query.
+  Real browser failures render the shared schema as translated expandable
+  native sections and separate log entries. Native controls, resize, RAM
+  boundary decisions and warm reuse have Windows regressions; three JS
+  guards reproduced the original behavior before the fix. Native CI pending.
+- [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
+      shutdown debt (watchers=0), spurious AltGr dispatches while SC138 is not
+      physically held, and bound hotstring extension files ignored on Windows
+      (repeatcorrections, rolls, sfbsreduction). Keep privacy filtering fail-closed;
+      distinguish measured stalls from causes before changing tooltip/hook code.
+
+The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
+rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
+installation variants. Linux unit passes, but its real accessibility-bus probe
+exceeded the five-minute step timeout; Linux packaging/installation did not run.
+Keep that failure separate from the passing browser and native results.
+
 ## Time estimate
 
 Budgetary estimate: 20–35 hours of effective work for all remaining product and

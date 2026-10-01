@@ -141,9 +141,13 @@ WebView_AvailRamMb() {
 ; True when free RAM is too low to comfortably boot Chromium, so a WebView window
 ; should use its native fallback. An unknown reading never gates (returns false),
 ; leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback() {
-	global WEBVIEW_MIN_AVAIL_RAM_MB
-	Avail := WebView_AvailRamMb()
+WebView_ShouldUseNativeFallback(AvailRamFn := 0) {
+	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
+	; A warm environment already owns the browser process; this open needs only
+	; a controller, so the cold-start RAM heuristic must not suppress it.
+	if _WebView_SharedEnv
+		return false
+	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
 	if Avail < 0
 		return false
 	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB

@@ -18,8 +18,9 @@
 ;    schema's allowlist: the host opens only the paths it collected, by id.
 ; 3. The page asks for the first snapshot with "ready"; the probes start then
 ;    and push their answers into the same window only.
-; 4. Without WebView2 the window shows the snapshot as plain text in a
-;    read-only field: the report stays readable and copyable by hand.
+; 4. Diagnostics attempt the shared page even under memory pressure. When
+;    WebView2 is unavailable, a native tree preserves translated sections and
+;    separate values instead of dumping the plain-text export into an Edit.
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
@@ -492,7 +493,7 @@ HealthCheck_ShowWindow(Mode := "") {
 	; Publish the host window so the next open can actually destroy this one.
 	_HC_Gui := G
 
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
+	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		WVC := 0
@@ -500,7 +501,7 @@ HealthCheck_ShowWindow(Mode := "") {
 			WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
-			LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing the plain-text report.", Err.Message)
+			LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing structured native diagnostics.", Err.Message)
 		}
 
 		if WVC {
@@ -539,12 +540,54 @@ HealthCheck_ShowWindow(Mode := "") {
 		}
 	}
 
-	; Without WebView2: the snapshot as plain text in a read-only field
-	ContentCtl.GetPos(&X, &Y, &W, &H)
-	EditCtl := G.Add("Edit", "x" . X . " y" . Y . " w" . W . " h" . H . " ReadOnly Multi -Wrap +VScroll",
-		HealthCheck_FormatPlain(Snapshot))
-	EditCtl.SetFont("s9", "Consolas")
-	LoggerSuccess("Healthcheck", "Diagnostics window opened as plain text (no WebView2).")
+	ContentCtl.Visible := false
+	_HC_ShowNativeSnapshot(G, Snapshot)
+	LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
+}
+
+; Builds a readable native view when the installed browser really cannot open.
+; @param G {Gui} The diagnostics host window.
+; @param Snapshot {Map} The same snapshot supplied to the shared page.
+_HC_ShowNativeSnapshot(G, Snapshot) {
+	global HC_WIDTH, HC_HEIGHT
+	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT . " +HScroll")
+	G.NativeDiagnostics := Tree
+	Summary := Tree.Add(t("healthcheck.section.summary"), 0, "Bold Expand")
+	_HC_NativeAddValue(Tree, t("healthcheck.export.driver"), Snapshot["driver"], Summary)
+	_HC_NativeAddValue(Tree, t("healthcheck.export.generated"), Snapshot["generated_at"], Summary)
+	for Definition in HealthCheck_Config()["schema"]["sections"] {
+		Id := Definition["id"]
+		if !Snapshot["sections"].Has(Id) || !_HealthCheck_Applies(Definition)
+			continue
+		Section := Snapshot["sections"][Id]
+		Parent := Tree.Add(t("healthcheck.section." . Id), 0, "Bold Expand")
+		if Definition.Has("fields") {
+			for Field in Definition["fields"] {
+				Key := Field["id"]
+				if Section.Has(Key) && _HealthCheck_Applies(Field)
+					_HC_NativeAddValue(Tree, t("healthcheck.field." . Key), Section[Key], Parent)
+			}
+		} else {
+			for Key, Value in Section
+				_HC_NativeAddValue(Tree, Key, Value, Parent)
+		}
+	}
+	return Tree
+}
+
+; Keeps arrays and records expandable, including each recent log entry.
+; @param Tree {Gui.TreeView} The native diagnostics view.
+; @param Label {String} The translated field name or record key.
+; @param Value {Any} The snapshot value.
+; @param Parent {Integer} The enclosing section or record.
+_HC_NativeAddValue(Tree, Label, Value, Parent) {
+	if Value is Array || Value is Map {
+		Node := Tree.Add(Label, Parent, "Expand")
+		for Key, Item in Value
+			_HC_NativeAddValue(Tree, String(Key), Item, Node)
+		return Node
+	}
+	return Tree.Add(Label . ": " . _HealthCheck_PlainValue(Value), Parent)
 }
 
 ; Keeps the page filling the window when it is resized.
@@ -554,6 +597,8 @@ _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	ContentCtl.Move(0, 0, Width, Height)
+	if GuiObj.HasProp("NativeDiagnostics")
+		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height)
 	if !_HC_ResetDone && IsSet(_HC_Controller)
 		try _HC_Controller.Fill()
 }

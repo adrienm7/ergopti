@@ -318,9 +318,12 @@ report(
 	'a WMI query or a RunWait runs on the AHK thread'
 );
 report(
-	'Windows: the plain-text report stays for a machine without WebView2',
-	/"Edit"[^\n]*ReadOnly[\s\S]{0,120}HealthCheck_FormatPlain\(Snapshot\)/.test(winCore),
-	'no read-only fallback field'
+	'Windows: browser failure retains structured native diagnostics',
+	/_HC_ShowNativeSnapshot\(G, Snapshot\)/.test(winCore) &&
+		/G\.Add\("TreeView"/.test(winCore) &&
+		/HealthCheck_Config\(\)\["schema"\]\["sections"\]/.test(winCore) &&
+		!/_HealthCheck_LoadDocs/.test(winCore),
+	'no schema-driven native view'
 );
 
 const linuxBridge = withoutComments(read('linux/ui/healthcheck/bridge.lua'));

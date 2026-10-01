@@ -9,7 +9,8 @@
 ; WebView windows that have a native equivalent skip WebView2 and use that native
 ; view when free RAM is below WEBVIEW_MIN_AVAIL_RAM_MB. This test pins:
 ;   1. the shared gate helper exists in infra/webview_utils.ahk,
-;   2. each gated host actually consults WebView_ShouldUseNativeFallback,
+;   2. cold-start gating never suppresses an already-running browser,
+;      and diagnostics always attempt their structured shared page,
 ;   3. updater/changelog has a real native notes fallback (an Edit), so gating
 ;      it cannot leave the notes pane blank.
 ; ==============================================================================
@@ -34,13 +35,16 @@ _TWLR_GateHelperExists() {
 }
 Test("webview-lowram: gate helper + threshold defined in webview_utils", _TWLR_GateHelperExists)
 
-; Healthcheck must gate its WebView2 use so low RAM falls back to the native Edit.
-_TWLR_HealthcheckGated() {
+; Diagnostics must attempt the shared page; RAM alone is no browser failure.
+_TWLR_HealthcheckAttempted() {
 	Src := _DriverDirConcat("ui/healthcheck")
-	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
-		"healthcheck must gate WebView2 on WebView_ShouldUseNativeFallback (low RAM -> native Edit)")
+	Assert(Src != "", "healthcheck source must exist")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") = 0,
+		"diagnostics must attempt the installed browser even under memory pressure")
+	Assert(InStr(Src, "_HC_ShowNativeSnapshot(G, Snapshot)") > 0,
+		"a real browser failure must retain structured native diagnostics")
 }
-Test("webview-lowram: healthcheck gates WebView2 on free RAM", _TWLR_HealthcheckGated)
+Test("webview-lowram: diagnostics attempt WebView2 regardless of free RAM", _TWLR_HealthcheckAttempted)
 
 ; The updater module (changelog pane + update prompt) must gate the same way.
 _TWLR_UpdaterModuleGated() {
@@ -92,3 +96,32 @@ _TWLR_MarkdownToPlainStripsMarkup() {
 	Assert(InStr(out, "https://x.io") > 0, "link URL must survive as plain text")
 }
 Test("webview-lowram: _Updater_MarkdownToPlain strips markup for the native notes view", _TWLR_MarkdownToPlainStripsMarkup)
+
+_TWLR_ColdAndWarmDecisions() {
+	global _WebView_SharedEnv, WEBVIEW_MIN_AVAIL_RAM_MB
+	SavedEnvironment := _WebView_SharedEnv
+	try {
+		_WebView_SharedEnv := 0
+		for Available in [0, 1512222720 / 1048576, WEBVIEW_MIN_AVAIL_RAM_MB - 1]
+			AssertTrue(WebView_ShouldUseNativeFallback(_TWLR_MemoryReading.Bind(Available)),
+				"an optional cold-start native equivalent still respects low memory")
+		for Available in [-1, WEBVIEW_MIN_AVAIL_RAM_MB, WEBVIEW_MIN_AVAIL_RAM_MB + 1]
+			AssertFalse(WebView_ShouldUseNativeFallback(_TWLR_MemoryReading.Bind(Available)),
+				"unknown readings and sufficient memory must attempt the browser")
+		_WebView_SharedEnv := {name: "warm-browser"}
+		AssertFalse(WebView_ShouldUseNativeFallback(_TWLR_UnexpectedMemoryQuery),
+			"a warm browser must be reused without querying cold-start headroom")
+	} finally {
+		_WebView_SharedEnv := SavedEnvironment
+	}
+}
+
+_TWLR_MemoryReading(Available) {
+	return Available
+}
+
+_TWLR_UnexpectedMemoryQuery() {
+	throw Error("a warm environment must not query free memory")
+}
+Test("webview-lowram: cold-start boundaries and warm browser reuse",
+	_TWLR_ColdAndWarmDecisions)

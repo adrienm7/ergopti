@@ -384,6 +384,19 @@ function init(page, detailed, mode) {
 	}
 }
 
+{
+	const host = fs.readFileSync(
+		path.join(SHARED, '..', 'windows', 'ui', 'healthcheck', 'core.ahk'),
+		'utf8'
+	);
+	if (/\bWebView_ShouldUseNativeFallback\s*\(/.test(host))
+		fail('installed WebView2 diagnostics must be attempted under memory pressure');
+	if (!host.includes('_HC_ShowNativeSnapshot(G, Snapshot)') || !host.includes('G.Add("TreeView"'))
+		fail('a real WebView2 failure must leave structured native diagnostics');
+	if (/EditCtl[\s\S]*?HealthCheck_FormatPlain\(Snapshot\)/.test(host))
+		fail('the diagnostics window must not fall back to a raw-text report');
+}
+
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);
