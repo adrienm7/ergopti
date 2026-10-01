@@ -1662,7 +1662,7 @@ const CHECKS = [
 		repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs'
 	},
 	{
-		name: 'metrics menu: the two rows that open a window start with the same words in the 21 locales',
+		name: 'metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales',
 		cmd: 'node',
 		args: ['tools/test/test-metrics-open-rows-wording.cjs'],
 		repro: 'npm run test:metrics-open-rows-wording'
