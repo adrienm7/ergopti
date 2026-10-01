@@ -488,8 +488,9 @@ is committed; one request is one commit with its regression test.
       no rule on the order of the releases. Its `to_if_held_down` with
       `to_delayed_action.to_if_canceled` recipe takes the hold only past the
       threshold and types the tap when another key comes first: that fixes
-      typing but makes a quick chord type the tap, so decide which rule
-      macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
+      typing but makes a quick chord type the tap. The maintainer chose typing
+      priority on 2026-10-01, like Windows/Linux: implement that recipe for the
+      keys of `[tap_hold.rollover]` and cover its generated event rules in CI.
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
   ported by Windows, pinned by
@@ -522,13 +523,6 @@ is committed; one request is one commit with its regression test.
       `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
       « fais seulement pour Windows »).
-
-- [ ] **94.** In the shared navigation-layer editor, give the layer activation
-      keys a blue background as well as their blue border, including the legend
-      chip. Arrange the mouse inputs by function: left/middle/right clicks in
-      three columns, back/forward below, then scroll up/down. Keep labels readable
-      in light and dark themes, and cover the shared layout and colors with
-      automated regressions used by all three drivers.
 
 ## Time estimate
 

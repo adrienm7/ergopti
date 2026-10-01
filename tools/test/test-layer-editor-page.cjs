@@ -969,6 +969,30 @@ section('keycaps', () => {
 	);
 });
 
+section('layer colors and mouse groups', () => {
+	for (const os of ['windows', 'macos', 'linux']) {
+		const page = loadPage();
+		page.call(
+			`init(${JSON.stringify({ os, text: RECOMMENDED_TEXT, errors: [], layer_keys: ['AltLeft'] })})`
+		);
+		check(
+			page
+				.keys('mouse')
+				.map((key) => key.dataset.code)
+				.join(',') ===
+				'MouseLeft,MouseMiddle,MouseRight,MouseBack,MouseForward,WheelUp,WheelDown,WheelLeft,WheelRight',
+			`(${os}) mouse inputs must read in click, history and scrolling order`
+		);
+		check(page.key('AltLeft').classList.contains('layer-key'), `(${os}) layer key remains marked`);
+	}
+	for (const selector of ['.key.layer-key .cap', '.chip.layer-key']) {
+		check(
+			cssRule(selector)?.background === 'var(--accent-soft)',
+			`${selector} must have a blue fill`
+		);
+	}
+});
+
 if (checks < 400) fail(`only ${checks} checks ran (floor 400)`);
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer editor page breaks the host protocol:\x1b[0m');

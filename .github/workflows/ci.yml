@@ -310,6 +310,16 @@ jobs:
       - name: Run shared validation suite
         run: npm run test:${{ matrix.suite }}
 
+      # Actual WebView rendering belongs to the shared JS lane. Native bridges
+      # are recorded; Chromium and WebKit cover both renderer families.
+      - name: Install shared UI browsers
+        if: matrix.suite == 'js'
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Test shared layer editor rendering
+        if: matrix.suite == 'js'
+        run: npm run test:browser:layer-editor
+
   macos:
     name: 'macOS'
     needs: [validate]

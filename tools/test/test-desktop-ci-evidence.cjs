@@ -116,6 +116,15 @@ function checkCore(body) {
 	);
 	assert.ok(steps.some((step) => pipeline.stepField(step.body, 'run') === 'npm ci'));
 	assert.match(body, /sudo apt-get install -y lua5\.4 libxml2-utils/);
+	for (const [name, command] of [
+		['Install shared UI browsers', 'npx playwright install --with-deps chromium webkit'],
+		['Test shared layer editor rendering', 'npm run test:browser:layer-editor']
+	]) {
+		const step = pipeline.step(body, name);
+		assert.equal(pipeline.stepField(step, 'if'), "matrix.suite == 'js'");
+		assert.equal(pipeline.stepField(step, 'run'), command);
+		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	}
 }
 
 const core = pipeline.job('core');
@@ -127,6 +136,9 @@ for (const [from, to] of [
 	['fail-fast: false', 'fail-fast: true'],
 	['needs: [validate]', 'needs: [macos]'],
 	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
+	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
+	['npx playwright install --with-deps chromium webkit', 'npx playwright install chromium'],
+	["if: matrix.suite == 'js'", "if: matrix.suite == 'never'"],
 	[
 		'- uses: actions/checkout@v4',
 		'- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0'

@@ -97,6 +97,11 @@ button.primary {
 	color: #fff;
 }
 
+/* Native select backgrounds do not inherit the page's dark surface. */
+select {
+	background: var(--surface);
+}
+
 button:disabled {
 	cursor: default;
 	opacity: 0.45;
@@ -169,6 +174,7 @@ button:disabled {
 }
 
 .chip.layer-key {
+	background: var(--accent-soft);
 	border: 2px solid var(--accent);
 	padding: 0 7px;
 }
@@ -234,7 +240,8 @@ button:disabled {
 }
 
 #mouse .key .cap {
-	min-height: 44px;
+	min-height: 48px;
+	padding: 6px;
 }
 
 /* What the key types in the user's layout (or its translated name): one short
@@ -251,6 +258,7 @@ button:disabled {
 }
 
 #mouse .key .legend {
+	font-size: 11px;
 	white-space: normal;
 }
 
@@ -316,7 +324,9 @@ button:disabled {
 }
 
 /* The key whose hold enters the layer. */
-.key.layer-key .cap {
+.key.layer-key .cap,
+.key.layer-key.bound .cap {
+	background: var(--accent-soft);
 	border: 2px solid var(--accent);
 }
 
@@ -359,7 +369,7 @@ button:disabled {
 .lower {
 	display: grid;
 	gap: 12px;
-	grid-template-columns: minmax(170px, 1fr) 3fr;
+	grid-template-columns: minmax(240px, 1fr) 3fr;
 	min-height: 0;
 }
 
@@ -371,8 +381,17 @@ button:disabled {
 
 #mouse {
 	display: grid;
-	gap: 6px;
-	grid-template-columns: 1fr 1fr;
+	gap: 10px 6px;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+/* Three primary clicks, then pairs for history and each scrolling axis. */
+#mouse .key {
+	grid-column: span 3;
+}
+
+#mouse .key.primary-click {
+	grid-column: span 2;
 }
 
 /* ============================= */
