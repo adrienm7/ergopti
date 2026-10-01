@@ -438,8 +438,31 @@ is committed; one request is one commit with its regression test.
       writes the whole file, and make it write only what changed.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 125, macOS 209 and Linux 127 rows are still built by the
-      drivers (`tools/test/native-menu-rows-baseline.json`).
+      Windows 125, macOS 207 and Linux 127 rows are still built by the
+      drivers (`tools/test/native-menu-rows-baseline.json`). Read on
+      2026-10-01, the sites are of four kinds, and three of them need the
+      manifest to say more than it can today:
+      (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
+      `append` and `add`: the WPM widget rows of Metrics, the AI menus):
+      convert each to `check` or `command` with its predicate, as the
+      conversions of 2026-08-07 did; the rows that tick themselves on the
+      live menu need a rebuild after the click instead;
+      (b) fixed-key rows inside the result of a `list` provider (the
+      disable, tap and hold rows under each Tap-Hold key, the rows under a
+      gesture slot, a hotstring file or an AI profile): the manifest needs a
+      declared child template for a list parent, read by the three
+      renderers;
+      (c) separators a provider inserts between its own rows (155 of the 459
+      sites): they follow (b), as part of the template;
+      (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
+      `menu_init.ahk`).
+      Order: (a) for Metrics on the three drivers, then the template of (b)
+      on Tap-Holds (the smallest menu that has one), then Gestures and
+      Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
+      (Windows 41, macOS about 70), and Linux `menu_builder.lua` (123) along
+      each. One commit per menu, the baseline lowered in the same commit.
+      The update rows greyed on a local version (2026-10-01) were added as
+      provider rows and join the About slice.
 - [ ] **84.** Windows: while the navigation layer is held the driver turns
       CapsLock on as the layer's indicator (`UpdateCapsLockLED`), so every
       key the layer does not bind types in capitals. With an empty layer
