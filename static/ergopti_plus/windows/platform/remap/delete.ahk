@@ -91,8 +91,31 @@ $SC153:: {
 ; under a held modifier, as on every driver. Its own auto-repeat arrives under
 ; the modifier or layer the hold owns and matches none of them: swallow it for
 ; as long as the owner resolves the press (see TapHoldPressIsOwned).
+; An exact chord beats the wildcard: Space held as Shift repeated the layout
+; emulation's Shift+Space hotkey. The bare key and every chord of Ctrl, Alt,
+; Shift and Win are therefore declared too; a static variant is created before
+; every Hotkey() one, and the first eligible variant of an identity fires.
 #HotIf TapHoldPressIsOwned("delete")
-*SC153:: return
+*SC153::
+SC153::
+^SC153::
+!SC153::
+^!SC153::
++SC153::
+^+SC153::
+!+SC153::
+^!+SC153::
+#SC153::
+^#SC153::
+!#SC153::
+^!#SC153::
++#SC153::
+^+#SC153::
+!+#SC153::
+^!+#SC153::
+{
+	return
+}
 #HotIf
 
 

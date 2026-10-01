@@ -391,10 +391,6 @@ integrated, then publish one grouped release.
 Every request the maintainer makes is written here first and removed once it
 is committed; one request is one commit with its regression test.
 
-- [ ] **67.** Windows: Space with Shift as its hold, held down, types
-      « ------ » (Shift+Space repeated, which is « - » on the maintainer's
-      layout). A held tap-hold key must send nothing while it is held.
-      Check the other tap-hold keys and the other two drivers.
 - [ ] **68.** Gestures menu, « Tout effacer »: it switches the Gestures off,
       like item 66. It must only remove the assignments.
 - [ ] **69.** Windows: no automatic search for updates every N hours is
