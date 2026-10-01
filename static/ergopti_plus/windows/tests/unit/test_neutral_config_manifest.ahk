@@ -69,10 +69,23 @@ _NeutralConfigScopesExcludeConsent() {
 			FoundSubcategory := Row.Value == true
 	}
 	Assert(FoundSubcategory, "hotstrings restore must include its subordinate master gates")
+	Cleared := 0
 	for Row in ManifestScopeOperations("gestures", "clear") {
 		Assert(InStr(Row.Section, "gestures") == 1)
 		AssertEqual(Row.Delete, 1)
+		Assert(!(Row.Section == "gestures" && Row.Key == "enabled"),
+			"the Gestures clear leaves the switch as it is (gestures-clear-keeps-switch)")
+		Cleared += 1
 	}
+	Assert(Cleared > 5, "the Gestures clear still removes the assignments, got " . Cleared)
+	for Row in ManifestScopeOperations("global", "clear")
+		Assert(!(Row.Section == "gestures" && Row.Key == "enabled"), "no clear rewrites the Gestures switch")
+	Restored := false
+	for Row in ManifestScopeOperations("gestures", "recommended") {
+		if Row.Section == "gestures" && Row.Key == "enabled"
+			Restored := Row.HasOwnProp("Value") && Row.Value == true
+	}
+	Assert(Restored, "the Gestures restore still switches them on")
 }
 Test("neutral-config: shared scopes never restore metrics or AI consent", _NeutralConfigScopesExcludeConsent)
 

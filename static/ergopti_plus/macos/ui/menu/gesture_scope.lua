@@ -50,6 +50,15 @@ function M.new(options)
 	local ports = {}
 	for key, value in pairs(options) do ports[key] = value end
 	ports.scope, ports.demotion_feature = "gestures", "gestures"
+	-- A demotion is the saved switch held off for this session: only a scope
+	-- that publishes the switch ends it. A clear leaves the switch as it is
+	-- (the manifest's `clear_exclude`), so it leaves the demotion too.
+	ports.demotion_keys = function(rows)
+		for _, row in ipairs(rows) do
+			if row.section == "gestures" and row.key == "enabled" then return { gestures = true } end
+		end
+		return {}
+	end
 	ports.transaction_factory = function(config)
 		config.gestures = gestures
 		return Scope.new(config)
@@ -79,7 +88,9 @@ function M.new(options)
 					else master = value end
 				end
 			end
-			assert(type(master) == "boolean", "gesture scope omitted its master")
+			-- A scope with no row for the switch (a clear) keeps the live one.
+			if master == nil then master = gestures.is_enabled() end
+			assert(type(master) == "boolean", "gesture master is unavailable")
 			if apply_native(values, master) ~= true then return false end
 			return true
 		end,
