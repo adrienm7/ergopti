@@ -545,10 +545,13 @@ is committed; one request is one commit with its regression test.
       native Ergopti Windows layout leaves AltGr unusable until reload. Follow
       the foreground HKL and re-decide Kana/AltGr without restarting; cover both
       directions, same-window changes and active/deferred owners in native CI.
+      Current foreground-following, polling and deferred-owner regressions pass
+      in run 36931498806. No additional fault is established from the supplied
+      snapshot's unpublished local revision; retain the report for a concrete
+      reproduction rather than adding an unproven runtime workaround.
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
       shutdown debt (watchers=0), spurious AltGr dispatches while SC138 is not
-      physically held, and bound hotstring extension files ignored on Windows
-      (repeatcorrections, rolls, sfbsreduction). Keep privacy filtering fail-closed;
+      physically held. Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
 
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
@@ -579,6 +582,14 @@ means a very fast chord on these typing keys becomes a tap, as requested.
 The metrics privacy filter now reads "Ignore system authentication" in
 all 21 locales. The existing setting and system-authentication exclusion
 behavior stay with their current owners; only the label is shortened.
+
+The supplied diagnostic's three unsupported-bound-file warnings were obsolete:
+Windows already routes repeat corrections, rolls and SFB reduction through the
+real TOML loader. Successful discovery no longer raises those warnings or the
+diagnostic warning count. The portable source guard fails on the original claim
+and rejects its reintroduction; the registered native regression captures enabled
+warning output and verifies all 83 shipped source entries remain readable.
+That new native case requires the next non-release Windows CI run.
 
 ## Time estimate
 

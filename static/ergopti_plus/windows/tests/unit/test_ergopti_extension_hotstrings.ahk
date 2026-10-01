@@ -86,6 +86,45 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 Test("ergopti extension: the shipped groups load from the extension under their historical ids (ergopti-hotstrings-ext)",
 	_EHX_ShippedGroupsLoadFromTheExtension)
 
+; A successful boot discovery must not inflate the diagnostic's warning count
+; by announcing that the sources it just routed are unsupported.
+_EHX_BoundSourcesDoNotWarn() {
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _HealthCheckWarnCount
+	SavedSink := _LOGGER_TEST_SINK
+	SavedRepeat := _LOGGER_REPEAT_ENABLED
+	SavedWarnings := _HealthCheckWarnCount
+	try _TLOG_Isolated(Check)
+	finally {
+		_LOGGER_TEST_SINK := SavedSink
+		_LOGGER_REPEAT_ENABLED := SavedRepeat
+		_HealthCheckWarnCount := SavedWarnings
+	}
+	Check() {
+		global _LOGGER_REPEAT_ENABLED, _HealthCheckWarnCount
+		_ResetLogger()
+		_LOGGER_REPEAT_ENABLED := false
+		Captured := []
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		LoggerWarn("ExtensionReadinessTest", "Warning capture is active.")
+		AssertEqual(1, Captured.Length, "the sink must observe enabled warnings")
+		AssertContains(Captured[1], "[WARNING] [ExtensionReadinessTest]")
+		Captured.Length := 0
+		Before := _HealthCheckWarnCount
+		_EHX_WithRoutes(_LCT_RegistryDir(), CheckSources)
+		for Line in Captured
+			Assert(!InStr(Line, "[WARNING]"), "available extension sources must not warn: " . Line)
+		AssertEqual(Before, _HealthCheckWarnCount,
+			"successful source routing must not raise the diagnostic warning count")
+	}
+	CheckSources(Packs) {
+		Assert(Packs.Length > 0, "the real shipped registry must discover an extension")
+		AssertEqual(83, CountTomlHotstrings("sfbsreduction") + CountTomlHotstrings("rolls")
+			+ CountTomlSection("magickey", "repeat_corrections"), "all three routed sources remain readable")
+	}
+}
+Test("ergopti extension: available bound sources do not report unsupported loading (bound-source-warning)",
+	_EHX_BoundSourcesDoNotWarn)
+
 _EHX_NotInstalledSuppliesNothing() {
 	Directory := _LCT_TempDir()
 	try _EHX_WithRoutes(Directory . "missing-registry\", Check)

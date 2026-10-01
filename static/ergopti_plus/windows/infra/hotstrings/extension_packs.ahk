@@ -10,10 +10,9 @@
 ; A manifest may bind one of its files to a historical category
 ; ([extension.hotstring_bindings.<stem>]): the file then supplies that bundled
 ; category, or some of its sections, and is listed in bound_files instead of
-; toml_files, so it never becomes an ext: category. The Lua drivers load those
-; files into their category; this driver does not route them into its TOML
-; loader yet, so each one is reported at boot rather than dropped without a
-; word. A layout extension may also declare the physical key that types its
+; toml_files, so it never becomes an ext: category. Every driver routes those
+; files into their category through its TOML loader. A layout extension may
+; also declare the physical key that types its
 ; magic key ([extension.magic_key]).
 ; The Lua scanner (_shared/lua/hotstrings/extensions.lua) applies the same
 ; rules; both replay the extension_binding_vectors.json and
@@ -112,12 +111,6 @@ HotstringExtensions_Prepare(Target, Roots) {
 	Packs := HotstringExtensions_Scan(Roots)
 	_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
 	HotstringExtensions_Seed(Target, Packs, ManifestDefaultFor)
-	for Pack in Packs {
-		for File in Pack.bound_files
-			LoggerWarn("HotstringExtensions",
-				"Extension '{1}' binds '{2}' to the '{3}' category; bound files are not loaded on Windows yet.",
-				Pack.id, File.stem, File.binding["category"])
-	}
 	return Packs
 }
 
