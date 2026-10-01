@@ -14,6 +14,7 @@
 #Include suspend_handoff.ahk
 #Include reload_terminal_handoff.ahk
 #Include reload_successor.ahk
+#Include reload_deferral.ahk
 #Include lifecycle_transition.ahk
 
 ActivateEdit(*) {
@@ -195,10 +196,16 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		}
 	}
 	if !(OwnerBundle is Object) {
+		; A configuration write is in progress, and this thread interrupted it:
+		; a plain request waits for the write to end (infra/reload_deferral.ahk).
+		if _ReloadRequestIsPlain(SuccessFn, ExistingBundle, RefusedFn, StageFailureFn)
+				&& ReloadDeferralQueue(_ReloadAfterConfigWrite)
+			return true
 		try LoggerError("Lifecycle", "Reload refused because another configuration transaction owns config.toml.")
 		ReportStage.Call("config-lease", ConfigurationFile)
 		return false
 	}
+	ReloadDeferralSettle()
 	if !(_ConfigWriteLeaseSelectOwner(OwnerBundle,
 			ConfigurationFile) is Object) {
 		try LoggerError("Lifecycle", "Reload refused because its borrowed configuration bundle is stale or does not own the active path.")
@@ -231,6 +238,22 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		if OwnBundle && !Launched
 			_ConfigWriteTerminalRelease(OwnerBundle)
 	}
+}
+
+; Whether a reload request carries nothing a later retry could not carry: no
+; completion or refusal callback, no borrowed configuration bundle and the
+; default stage report. Only such a request is queued behind a write.
+_ReloadRequestIsPlain(SuccessFn, ExistingBundle, RefusedFn, StageFailureFn) {
+	return !HasMethod(SuccessFn, "Call") && !(ExistingBundle is Object)
+		&& !HasMethod(RefusedFn, "Call") && !HasMethod(StageFailureFn, "Call")
+}
+
+; The deferred reload's retry, run by its one-shot timer once the interrupted
+; writer could resume.
+_ReloadAfterConfigWrite(*) {
+	PreviousCritical := Critical("Off")
+	try _ReloadPreservingSuspendNonCritical(0, 0, 0, 0)
+	finally Critical(PreviousCritical)
 }
 
 ; A launched reload refused later leaves this instance running on its previous

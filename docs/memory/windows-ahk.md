@@ -163,6 +163,19 @@ asked for (the layout poll) retries a refusal a few times with a doubling wait,
 starts only while `LifecycleShutdownVetoHonored()`, and reports a refused stage
 without the "save failed" notice.
 
+### project-ahk-a-waiting-thread-cannot-outwait-the-one-it-interrupted
+
+A hotkey or a tray click runs as a new thread that interrupts the current one,
+and the interrupted thread resumes only when the new one returns. A thread
+that needs something the interrupted one holds (the configuration lease during
+a write) can therefore never get it by waiting or retrying in place. The
+reload shortcut pressed during the start-up write of config.toml (2 360 ms on
+a loaded machine) was refused with « another configuration transaction owns
+config.toml » and an error window. Action: return and ask again from a
+one-shot timer, as `ReloadDeferralQueue` does for a plain reload (bounded, one
+queued at a time); never `Sleep` or loop on a lease inside the request. A
+request with callbacks or a borrowed bundle is still refused at once.
+
 ## Input, suspension, and menus
 
 ### feedback-ahk-suspend-prefix-latch
