@@ -410,6 +410,21 @@ is committed; one request is one commit with its regression test.
       rows that open the windows goes, so they form one group. On the three
       drivers (seen on Windows); check that both opening actions exist in the
       action catalogue of each driver.
+- [ ] **72.** The Windows suite is red on `dev` before any of today's work
+      (run on a real Windows 11 on 2026-10-01, 10 of 7 567 tests, the same on
+      the tree of 3e6c45827):
+      `menu_models.ahk:106` reads a local variable that was never assigned,
+      which fails five AI menu tests (backend-row-selected-option twice,
+      llm-menu-build-submenu, ai-menu-no-clear, category-toggle-checkbox) and
+      very likely « restore-recommended-no-confirm: AI restores without a
+      dialog »; `modules/updater/release_install.ahk` opens a LoggerStart it
+      never closes (logger pairing); updater-consent-2026-09-25 counts four
+      download starts for two allowed; the AHK-15 persistence census counts 26
+      TOML writers for 25 audited; and AHK-901 no longer finds
+      `DirDelete(RTrim(CaptureDir` in `ShellRunner_Exec`. Also, the
+      hardening-c label count test walks into the local, git-ignored
+      `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
+      has personal shortcuts.
 
 ## Time estimate
 
