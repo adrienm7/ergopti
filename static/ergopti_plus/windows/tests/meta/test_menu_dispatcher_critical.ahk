@@ -61,9 +61,14 @@ _MDC_CriticalOffBeforeCallbackCall() {
 	; while Critical is on. The release associated with that commit, not an
 	; earlier stale-retry return, must occur before the real callback invocation.
 	CommitPos := InStr(Seg, "_MenuDispatchLastFire[ItemId] := A_TickCount")
-	CallPos := InStr(Seg, "Callback.Call(")
+	; The invocation is MenuCommandRun, which runs the command now or once a
+	; configuration write has ended, and never raises Critical itself.
+	CallPos := InStr(Seg, "MenuCommandRun(Callback,")
 	OffPos := InStr(Seg, 'Critical "Off"', , CommitPos)
 	Assert(CommitPos > 0 and OffPos > CommitPos and CallPos > OffPos,
-		"Critical Off must precede Callback.Call() in _DispatchIfMissed so the hook thread is never starved")
+		"Critical Off must precede the callback invocation in _DispatchIfMissed so the hook thread is never starved")
+	Assert(!InStr(Seg, "Callback.Call("), "_DispatchIfMissed must not call the command around MenuCommandRun")
+	Run := _DriverFuncBody("MenuCommandRun")
+	Assert(!InStr(Run, "Critical"), "MenuCommandRun must not hold Critical across a menu command")
 }
 Test("menu_dispatcher: Critical Off appears before Callback.Call() in source order", _MDC_CriticalOffBeforeCallbackCall)
