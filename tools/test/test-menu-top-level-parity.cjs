@@ -378,7 +378,8 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // the keyboard and trackpad features first, including daemon-owned Tap-Holds
 // on Linux, then what is about typing (layout, hotstrings, metrics), then
 // the two AI rows together, then the macOS applications in a group of their
-// own, then the configuration tail (the maintainer's order of 2026-10-01). The drivers build whatever the
+// own, then the tail: Versions, Configuration, Language (the maintainer's
+// order of 2026-10-01, its tail reordered on 2026-10-02). The drivers build whatever the
 // manifest declares, so this is the one place a reordering of the manifest is
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
@@ -396,9 +397,9 @@ const APPROVED_TOP_LEVEL = [
 	SEPARATOR,
 	'apps',
 	SEPARATOR,
+	'about',
 	'configuration',
 	'language',
-	'about',
 	SEPARATOR,
 	'suspend',
 	'reload',
@@ -425,10 +426,10 @@ if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(['hs'])) {
 // live, because the tail is how the user resumes, inspects or leaves a paused
 // script. The manifest marks those rows once, the macOS and Linux roots read the
 // mark, and the AHK pause test holds the Windows builders to it. The approved
-// order puts every feature before the Configuration tail, so the mark must cover
-// exactly the rows above it.
+// order puts every feature before the tail, which Versions (the About row)
+// opens, so the mark must cover exactly the rows above it.
 const PAUSE_MARK = 'greyed_when_paused';
-const tailAt = (topLevel || []).findIndex((row) => row.id === 'configuration');
+const tailAt = (topLevel || []).findIndex((row) => row.id === 'about');
 let pauseMarked = 0;
 (topLevel || []).forEach((row, index) => {
 	const mark = row[PAUSE_MARK];
