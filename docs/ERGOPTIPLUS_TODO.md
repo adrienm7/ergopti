@@ -46,6 +46,10 @@ tests in run 36925266946. Its three changed-file macOS fixture cases exposed
 a simulated metadata copy that depended on the runner's umask; the fixture now
 carries the real source metadata through that copy and passes under umask 022.
 The production permission checks remain strict; repeat the non-release CI.
+The rewrite wiring gate now follows the erasing-record contract introduced by
+the concurrent local commits: both corrections and rewrites must identify the
+deleted suffix and original span. Negative source mutations cover either guard
+being removed; the registered native parser tests cover actual admission.
 
 **Overnight session of 2026-09-29 (supersedes the "one item at a time"
 instruction: the maintainer asked for maximum parallelism).** Items 5 to 13
