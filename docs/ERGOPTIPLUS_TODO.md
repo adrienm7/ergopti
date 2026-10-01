@@ -426,8 +426,9 @@ is committed; one request is one commit with its regression test.
       regression fixtures reject an extra download or a missing audited path.
       The 26th TOML writer is the script-chords switch; its persistence census
       is audited and a real refused write proves reload is suppressed and the
-      existing configuration is byte-exact. Remaining: AHK-901 no longer finds
-      `DirDelete(RTrim(CaptureDir` in `ShellRunner_Exec`. Also, the
+      existing configuration is byte-exact. AHK-901 now follows the checked
+      native remover; real Windows regressions keep adjacent owners' output
+      and refuse recursive deletion of an unclaimed file. Remaining: the
       hardening-c label count test walks into the local, git-ignored
       `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
       has personal shortcuts.

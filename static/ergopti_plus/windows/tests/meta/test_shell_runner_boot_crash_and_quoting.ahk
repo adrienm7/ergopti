@@ -121,8 +121,8 @@ _TSRBC_ExecUsesExclusiveCaptureOwner() {
 		"ShellRunner_Exec must acquire an exclusive capture directory before redirecting output")
 	AssertContains(Body, 'TmpFile := CaptureDir . "output.tmp"',
 		"ShellRunner_Exec must put its capture file below the directory it owns")
-	AssertContains(Body, "DirDelete(RTrim(CaptureDir",
-		"ShellRunner_Exec must remove only the exclusive capture directory it acquired")
+	AssertContains(Body, '_SR_CaptureRemove(Map("TmpFile", TmpFile, "CaptureDir", CaptureDir))',
+		"ShellRunner_Exec must delegate the exact file and directory it owns to the checked native remover")
 }
 Test("shell_runner: synchronous capture owns an exclusive directory (AHK-901)",
 	_TSRBC_ExecUsesExclusiveCaptureOwner)
