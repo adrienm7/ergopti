@@ -143,10 +143,16 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 			on_open_today_log = function() return true end,
 			on_update_checked = function() recorded.notified = true end,
 		}
-		local rows = mb._about_update_rows({
+		-- An installed build's rows: the checkout the suite runs from greys them.
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return false end
+		local built, rows = pcall(mb._about_update_rows, {
 			updater = fake, on_menu_changed = hooks.on_menu_changed, on_update_finished = hooks.on_update_finished,
 			on_open_today_log = hooks.on_open_today_log, on_update_checked = hooks.on_update_checked,
 		})
+		Installation.is_source_run = real_is_source_run
+		if not built then error(rows, 0) end
 		for _, row in ipairs(rows) do
 			if row.label == "check" then row.action() end
 		end

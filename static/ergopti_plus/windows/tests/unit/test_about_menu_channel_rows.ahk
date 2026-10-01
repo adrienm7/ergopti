@@ -163,12 +163,39 @@ _AMCR_FrequencyPickerReadsTheSharedPresets() {
 Test("About menu: the frequency picker lists the shared presets with translated labels",
 	_AMCR_FrequencyPickerReadsTheSharedPresets)
 
-_AMCR_LocalCheckoutListsChannelsOnly() {
-	global _AMCR_PICKER_AT
-	Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
-	AssertEqual(_AMCR_PICKER_AT, Rows.Length,
-		"a local checkout lists the version and the channel picker, with no check row")
-	AssertTrue(Rows[_AMCR_PICKER_AT].Has("items"), "the channel picker closes the local block")
-	AssertTrue(Rows[1].Has("disabled") && Rows[1]["disabled"], "a local checkout's version is a label")
+; A local version has no installation to update, so it checks for nothing.
+; Its check row and its frequency row used to be left out, and nobody could
+; tell whether the automatic update existed: they are drawn greyed, with the
+; reason, and run nothing (update-rows-greyed-on-local-2026-10-01).
+_AMCR_LocalCheckoutGreysTheUpdateRows() {
+	global _AMCR_PICKER_AT, UPDATER_CHECK_INTERVAL
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		UPDATER_CHECK_INTERVAL := 86400
+		Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		AssertTrue(Rows[1].Has("disabled") && Rows[1]["disabled"], "a local checkout's version is a label")
+		AssertTrue(Rows[_AMCR_PICKER_AT].Has("items"), "the channel picker stays")
+		AssertEqual(_AMCR_PICKER_AT + 2, Rows.Length,
+			"a local checkout draws the check row and the frequency row after the channel picker")
+		Check := Rows[_AMCR_PICKER_AT + 1]
+		Frequency := Rows[_AMCR_PICKER_AT + 2]
+		AssertEqual(t("menu.about.check_for_updates"), Check["label"])
+		AssertEqual(t("menu.about.frequency_menu") . ": " . t("menu.about.frequency.1d"), Frequency["label"],
+			"the frequency row still names the preset in force")
+		for _, Row in [Check, Frequency] {
+			AssertTrue(Row.Has("disabled") && Row["disabled"], Row["label"] . " is greyed on a local version")
+			AssertEqual("menu.about.source_run_reason", Row.Get("disabled_reason_key", ""),
+				Row["label"] . " says why it is greyed")
+			AssertFalse(Row.Has("action"), Row["label"] . " runs nothing")
+			AssertFalse(Row.Has("items"), Row["label"] . " opens nothing")
+		}
+		Installed := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
+		AssertEqual(Rows.Length, Installed.Length, "a local version and an installed one draw the same rows")
+		for _, Row in [Installed[_AMCR_PICKER_AT + 1], Installed[_AMCR_PICKER_AT + 2]]
+			AssertFalse(Row.Has("disabled_reason_key"), "an installed build greys no update row for this reason")
+	} finally {
+		UPDATER_CHECK_INTERVAL := SavedInterval
+	}
 }
-Test("About menu: a local checkout shows the channels without a check row", _AMCR_LocalCheckoutListsChannelsOnly)
+Test("About menu: a local checkout draws the update rows greyed with their reason (update-rows-greyed-on-local-2026-10-01)",
+	_AMCR_LocalCheckoutGreysTheUpdateRows)

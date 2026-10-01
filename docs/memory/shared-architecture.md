@@ -306,6 +306,20 @@ generator, both renderers and `test-menu-unavailable-rows.cjs` hold the rule; a
 greyed reason's head must stay short in all 21 locales.
 Action: classify a restriction you add or touch, never with a long reason head.
 
+### project-a-local-version-greys-its-update-rows
+
+Maintainer decision (2026-10-01): a feature a build cannot use is drawn
+greyed with its reason, never left out, « or we will keep wondering whether
+the feature exists ». A local version run from source has no installation to
+update: on the three drivers its About submenu draws the check row and the
+frequency row greyed with `menu.about.source_run_reason`, with no action and
+no submenu, and no driver starts an automatic check for it (Windows and macOS
+never did; the Linux updater `init` now returns before
+`start_background_checks`). The frequency row still names the stored preset
+(macOS `AutoCheck.stored_interval_code`, since a local version has no check
+owner). Action: a new row an installed build needs follows the same shape;
+`update-rows-greyed-on-local-2026-10-01` holds the three trays.
+
 ### project-a-composite-scope-composes-revertible-owners
 
 The global restore/clear never writes category keys itself. On the Lua
