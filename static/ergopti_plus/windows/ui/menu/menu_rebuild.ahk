@@ -377,7 +377,12 @@ _TrayRootClaimLatest(&TargetGeneration, &AuthorizeFn, &WorkerFn,
 _TrayRootPublishAuthorized(TargetGeneration, LifecycleEpoch,
 		UpstreamAuthorizeFn := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootLifecycleEpoch
-	if A_IsSuspended
+	; A rebuild is refused under a pause so that the live root stays what the
+	; user sees. A driver with no root yet has nothing live to keep: a reload
+	; asked while paused restores the pause before or during the boot build, and
+	; refusing that first publication left the paused driver with the boot menu,
+	; without its pause row (first-root-under-pause).
+	if A_IsSuspended && !_TrayRootFirstPublicationPending()
 		return false
 	if TargetGeneration != _TrayRootRequestedGeneration
 		or LifecycleEpoch != _TrayRootLifecycleEpoch
@@ -389,6 +394,20 @@ _TrayRootPublishAuthorized(TargetGeneration, LifecycleEpoch,
 		return (Authorized is Integer) and Authorized == 1
 	}
 	return true
+}
+
+/**
+ * Whether the tray root was requested and never published: the one
+ * publication a paused driver still makes, and the one retained root its
+ * watchdog still serves (first-root-under-pause).
+ * @returns {Boolean} False before this file's globals are assigned too, since
+ *     the watchdog can tick in that window.
+ */
+_TrayRootFirstPublicationPending() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	if !IsSet(_TrayRootRequestedGeneration) || !IsSet(_TrayRootPublishedGeneration)
+		return false
+	return _TrayRootRequestedGeneration > 0 && _TrayRootPublishedGeneration == 0
 }
 
 _TrayRootRelease(PublishedGeneration := 0) {
