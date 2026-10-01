@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Rapportera på GitHub",
 	"healthcheck.toolbar.open_logs": "Öppna loggar",
 	"healthcheck.toolbar.refresh": "Uppdatera",
-	"healthcheck.toolbar.close": "Stäng",
 	"healthcheck.details_checkbox": "Inkludera detaljer (öppna program, enheter)",
 	"healthcheck.preview.title": "Förhandsvisning av det som delas",
 	"healthcheck.preview.hint": "Det är exakt den här texten som kopieras, sparas och skickas. Hemmappen, kontonamnet och hemligheter tas bort; inget annat samlas in.",

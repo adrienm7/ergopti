@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Повідомити на GitHub",
 	"healthcheck.toolbar.open_logs": "Відкрити журнали",
 	"healthcheck.toolbar.refresh": "Оновити",
-	"healthcheck.toolbar.close": "Закрити",
 	"healthcheck.details_checkbox": "Додати подробиці (відкриті застосунки, пристрої)",
 	"healthcheck.preview.title": "Попередній перегляд того, що передається",
 	"healthcheck.preview.hint": "Саме цей текст копіюється, зберігається та надсилається. Домашню теку, ім’я облікового запису й секрети видалено; нічого іншого не збирається.",

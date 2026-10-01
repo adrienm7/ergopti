@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "在 GitHub 上报告",
 	"healthcheck.toolbar.open_logs": "打开日志",
 	"healthcheck.toolbar.refresh": "刷新",
-	"healthcheck.toolbar.close": "关闭",
 	"healthcheck.details_checkbox": "包含详细信息（已打开的应用程序、设备）",
 	"healthcheck.preview.title": "共享内容预览",
 	"healthcheck.preview.hint": "复制、保存和发送的正是这段文本。您的主文件夹、帐户名和机密信息都会被移除，不会收集其他任何内容。",

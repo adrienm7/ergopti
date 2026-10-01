@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "الإبلاغ على GitHub",
 	"healthcheck.toolbar.open_logs": "فتح السجلات",
 	"healthcheck.toolbar.refresh": "تحديث",
-	"healthcheck.toolbar.close": "إغلاق",
 	"healthcheck.details_checkbox": "تضمين التفاصيل (التطبيقات المفتوحة، الأجهزة الطرفية)",
 	"healthcheck.preview.title": "معاينة ما تتم مشاركته",
 	"healthcheck.preview.hint": "هذا النص بعينه هو ما يُنسخ ويُحفظ ويُرسل. تُزال منه المجلد الشخصي واسم الحساب والأسرار، ولا يُجمع أي شيء آخر.",

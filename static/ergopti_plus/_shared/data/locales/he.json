@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "דווח ב-GitHub",
 	"healthcheck.toolbar.open_logs": "פתח יומנים",
 	"healthcheck.toolbar.refresh": "רענן",
-	"healthcheck.toolbar.close": "סגור",
 	"healthcheck.details_checkbox": "כלול פרטים (יישומים פתוחים, התקנים)",
 	"healthcheck.preview.title": "תצוגה מקדימה של מה שמשותף",
 	"healthcheck.preview.hint": "זה בדיוק הטקסט שמועתק, נשמר ונשלח. תיקיית הבית, שם החשבון והסודות מוסרים ממנו; שום דבר אחר לא נאסף.",

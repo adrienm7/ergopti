@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "GitHub’da bildir",
 	"healthcheck.toolbar.open_logs": "Günlükleri aç",
 	"healthcheck.toolbar.refresh": "Yenile",
-	"healthcheck.toolbar.close": "Kapat",
 	"healthcheck.details_checkbox": "Ayrıntıları ekle (açık uygulamalar, aygıtlar)",
 	"healthcheck.preview.title": "Paylaşılanların önizlemesi",
 	"healthcheck.preview.hint": "Kopyalanan, kaydedilen ve gönderilen tam olarak bu metindir. Ana klasörünüz, hesap adınız ve gizli bilgiler çıkarılır; başka hiçbir şey toplanmaz.",

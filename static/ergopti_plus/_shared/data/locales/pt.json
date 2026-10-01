@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Reportar no GitHub",
 	"healthcheck.toolbar.open_logs": "Abrir registos",
 	"healthcheck.toolbar.refresh": "Atualizar",
-	"healthcheck.toolbar.close": "Fechar",
 	"healthcheck.details_checkbox": "Incluir detalhes (aplicações abertas, dispositivos)",
 	"healthcheck.preview.title": "Pré-visualização do que é partilhado",
 	"healthcheck.preview.hint": "É exatamente este o texto copiado, guardado e enviado. A pasta pessoal, o nome da conta e os segredos são removidos; nada mais é recolhido.",

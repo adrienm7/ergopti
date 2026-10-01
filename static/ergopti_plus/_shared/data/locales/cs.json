@@ -729,7 +729,6 @@
 	"healthcheck.toolbar.report": "Nahlásit na GitHubu",
 	"healthcheck.toolbar.open_logs": "Otevřít protokoly",
 	"healthcheck.toolbar.refresh": "Obnovit",
-	"healthcheck.toolbar.close": "Zavřít",
 	"healthcheck.details_checkbox": "Zahrnout podrobnosti (otevřené aplikace, zařízení)",
 	"healthcheck.preview.title": "Náhled sdílených údajů",
 	"healthcheck.preview.hint": "Přesně tento text se kopíruje, ukládá a odesílá. Domovská složka, název účtu a tajné údaje jsou odstraněny; nic jiného se neshromažďuje.",

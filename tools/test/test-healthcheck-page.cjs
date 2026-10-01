@@ -195,7 +195,23 @@ function init(page, detailed, mode) {
 		fail(`the page's first message is ${JSON.stringify(page.posted[0])}, not "ready"`);
 	if (!page.elements['btn-copy'].disabled)
 		fail('Copy is enabled before the host sent anything to copy');
-	if (page.elements['btn-close'].disabled) fail('Close must work before the first snapshot');
+	// The window's own close button closes it: the toolbar once repeated it
+	// with a « Fermer » button, and « Actualiser » takes its place on the
+	// right (diagnostics-no-close-button).
+	const markup = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
+	const toolbarIds = [...markup.matchAll(/<button[^>]*\bid="(btn-[a-z-]+)"/g)].map((m) => m[1]);
+	if (toolbarIds.includes('btn-close') || page.elements['btn-close'])
+		fail('the page still draws a Close button');
+	if (/healthcheck\.toolbar\.close/.test(markup)) fail('the page still names the Close label');
+	if (toolbarIds[toolbarIds.length - 1] !== 'btn-refresh')
+		fail(`the last toolbar button is ${toolbarIds[toolbarIds.length - 1]}, not Refresh`);
+	const styles = fs
+		.readFileSync(path.join(PAGE, 'style.css'), 'utf8')
+		.replace(/\/\*[\s\S]*?\*\//g, '');
+	if (!/#btn-refresh\s*\{[^}]*margin-left:\s*auto/.test(styles))
+		fail('Refresh is not pushed to the right of the toolbar');
+	if (!page.elements['btn-refresh'].disabled)
+		fail('Refresh is enabled before the host sent its first snapshot');
 
 	init(page, true);
 	if (page.elements['btn-copy'].disabled) fail('Copy stays disabled after the init message');
@@ -313,9 +329,8 @@ function init(page, detailed, mode) {
 			fail('a file not created yet is shown as a failure');
 	}
 
-	page.elements['btn-close'].dispatch('click');
-	if (page.posted[page.posted.length - 1].action !== 'close')
-		fail('Close does not ask the host to close');
+	if (page.posted.some((message) => message && message.action === 'close'))
+		fail('the page asked the host to close: only the window itself closes it');
 }
 
 {
