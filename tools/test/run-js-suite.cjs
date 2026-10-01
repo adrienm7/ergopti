@@ -1662,6 +1662,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs'
 	},
 	{
+		name: 'report button is white on blue with enough contrast in both appearances (diagnostics and error windows)',
+		cmd: 'node',
+		args: ['tools/test/test-report-button-contrast.cjs'],
+		repro: 'npm run test:report-button-contrast'
+	},
+	{
 		name: 'hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)',
 		cmd: 'node',
 		args: ['tools/test/test-hotstrings-config-window-fold.cjs'],

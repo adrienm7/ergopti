@@ -450,9 +450,6 @@ is committed; one request is one commit with its regression test.
       paths it lists are cut in two less often (one line is too short for
       them). The geometry is shared (`native_windows` / the webview geometry
       single source), so the three drivers follow.
-- [ ] **76.** The « Signaler sur GitHub » button of that window is ugly:
-      white text on a blue background, with enough contrast, in the light and
-      the dark appearance. The error window draws the same button.
 - [ ] **78.** Metrics menu: rename, in the 21 locales, the two rows that
       open the metrics windows. Both start the same way and only the end
       names the window, in French something like « Ouvrir le tableau de bord
