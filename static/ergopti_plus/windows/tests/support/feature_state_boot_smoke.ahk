@@ -156,7 +156,9 @@ _FeatureStateSmokeNeutral() {
 	_FeatureStateSmokeAssert(4, AssertedScriptSlots, "the four script shortcut slots")
 	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
 		_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
-	_FeatureStateSmokeAssert(false, ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
+	; Not an activation: "auto" lets the layout's own probe name the AltGr key.
+	; A neutral false forced the standard family on every Kana-style layout.
+	_FeatureStateSmokeAssert("auto", ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
 }
 
 ; A config.toml that names "none" for a script slot keeps that chord off now

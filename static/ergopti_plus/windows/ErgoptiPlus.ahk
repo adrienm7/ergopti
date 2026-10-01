@@ -733,6 +733,14 @@ if (_ALTGR_LAYOUT_PROBE["source"] == "unresolved") {
 		LoggerError("AltGrDetect",
 				"HKL=0x{1:X}: a Kana-style AltGr is set (source={2}) but the layout gives the AltGr key no virtual key; every press or release of it the driver sends is refused.",
 				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["source"])
+} else if AltGrFamilyOverrideContradictsProbe(_ALTGR_LAYOUT_PROBE) {
+		; The same facts as the line below, as a warning: every AltGr feature now
+		; names the key of the family the layout does not have.
+		LoggerWarn("AltGrDetect",
+				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, AltGr level={4}: [script] alt_gr_is_kana_remap forces _ALTGR_KANA_FIXUP={5} against what the layout reads as; AltGr shortcuts and tap-holds name the other family's key unless the probe is wrong.",
+				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["rmenu_sc"], _ALTGR_LAYOUT_PROBE["altgr_vk"],
+				_ALTGR_LAYOUT_PROBE["altgr_level"] ? "true" : "false",
+				_ALTGR_KANA_FIXUP ? "true" : "false")
 } else {
 		LoggerInfo("AltGrDetect",
 				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, AltGr level={4}, _ALTGR_KANA_FIXUP={5} (source={6}).",

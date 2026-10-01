@@ -451,6 +451,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 	try {
 		LayoutDefault := Features["layout"]["ergopti_base"]
 		ContextDefault := Features["llm"]["generation"]["context_length"]
+		KanaDefault := Features["script"]["alt_gr_is_kana_remap"]
 		DelayDefault := (Features["hotstrings"]["french_autocorrection"]["accents"]
 			["time_activation_seconds"])
 		Path := _FM_WriteFixture("boolean_integer_aliasing",
@@ -465,7 +466,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		AssertEqual(0, Applied,
 			"TOML booleans and integers must retain their source types")
 		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
-		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(KanaDefault, Features["script"]["alt_gr_is_kana_remap"])
 		AssertEqual(ContextDefault,
 			Features["llm"]["generation"]["context_length"])
 		AssertEqual(DelayDefault,

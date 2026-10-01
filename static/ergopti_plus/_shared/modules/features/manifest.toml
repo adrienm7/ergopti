@@ -339,11 +339,17 @@ input_altering = false
 type = "boolean"
 description_key = "menu.debug.show_error_dialog"
 
+# "auto" reads the AltGr family from the layout; true and false force it when
+# that probe is wrong. It is a parameter, not an activation: it tells the driver
+# which key the layout's AltGr is and changes no input by itself, so an empty
+# configuration keeps "auto". A neutral false here forced the standard family
+# on every configuration that did not name the setting, and nothing built on
+# AltGr worked on a Kana-style layout (the script chords, 2026-10-01).
 [[features.script]]
 id = "alt_gr_is_kana_remap"
-default = false
+default = "auto"
 recommended = "auto"
-input_altering = true
+input_altering = false
 type = "enum"
 enum_values = ["auto", true, false]
 description_key = "menu.script.alt_gr_is_kana_remap"
