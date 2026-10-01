@@ -438,20 +438,14 @@ is committed; one request is one commit with its regression test.
       hardening-c label count test walks into the local, git-ignored
       `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
       has personal shortcuts.
-- [ ] **73.** Windows: the magic key's hotstrings do nothing. « ct★ » does
-      not become « c'était » and no tooltip shows (reported on 2026-10-01,
-      on the maintainer's machine run from the repository). Diagnosis so far,
-      from that machine's files: « ct★ » is a French magic-key hotstring
-      (`_shared/modules/hotstrings/french/magickey.toml`), and its config.toml
-      holds `category_enabled.french_magickey = false`, already in the
-      backups of 2026-09-30 18:06, while `magic_key`, `french_autocorrection`
-      and `french_distancesreduction` are on; the boot log says « 3 forced
-      off by a disabled category ». So the engine obeys the file. The
-      maintainer then reported the cause: the Hotstrings › Français submenu
-      of the Windows tray does not list the magic key category at all, so it
-      cannot be switched back on. To do: find why `_HS_LanguageRows` leaves
-      it out and list it; then find which action left the three French
-      categories off on 2026-09-30.
+- [ ] **73.** Follow-ups of the tray rows the Windows separator bug hid
+      (`submenu-read-as-separator-2026-10-01`, fixed): the three families of «
+      Combinaisons de touches » are back and read their raw `group_label`
+      (« AltGrLAlt », « AltGrCapsLock », « LAltCapsLock ») where a translated
+      name is expected; and find which action left the three French hotstring
+      categories off in the maintainer's config.toml on 2026-09-30 (a
+      restore, a clear or the wizard), since « ct★ » did nothing only because
+      `category_enabled.french_magickey` was false.
 - [ ] **74.** Windows: every start rewrites config.toml with 347 updates
       about three seconds after the driver is ready (15 to 30 ms, 2 360 ms on
       a loaded machine). A reload asked during that write now waits for it

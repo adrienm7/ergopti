@@ -163,6 +163,19 @@ asked for (the layout poll) retries a refusal a few times with a doubling wait,
 starts only while `LifecycleShutdownVetoHonored()`, and reports a refused stage
 without the "save failed" notice.
 
+### project-ahk-getmenustate-counts-rows-in-the-high-byte
+
+For a row that opens a submenu, `GetMenuState` returns the row's flags in the
+low byte and the submenu's row count in the high byte. `MF_SEPARATOR` (0x800)
+is a bit of that count, so a submenu of 8 to 15 rows (24 to 31, ...) read as a
+separator and `_MR_NormalizeSeparators` deleted it wherever it ended a menu or
+followed a separator, with no log line: Hotstrings › Français lost its magic
+key category (8 rows), « Combinaisons de touches » its three families, the
+Gestures menu its system status row. Action: test `MF_POPUP` first, as
+`TrayMenuIsSeparatorAt` does; when a row is missing from a tray and no
+renderer warning names it, dump the live tree (the startup-smoke wrapper
+exposes `_DriverStartupSmokeInspect`) before reading the builders.
+
 ### project-ahk-a-waiting-thread-cannot-outwait-the-one-it-interrupted
 
 A hotkey or a tray click runs as a new thread that interrupts the current one,
