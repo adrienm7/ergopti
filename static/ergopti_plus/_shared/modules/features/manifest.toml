@@ -4890,8 +4890,8 @@ platforms = ["linux"]
 # Three rows stood here until 2026-08-07 — "Session statistics", "Current WPM"
 # and "Per-application statistics" — and each one's entire effect was a line in
 # the driver's log. Their labels promised figures the user never saw. The same
-# menu already opens the windows that hold them: "Show typing metrics" and "Show
-# time per application" are declared above for all three drivers, and the WPM
+# menu already opens the windows that hold them: `show_typing` and `show_apps`
+# are declared above for all three drivers, and the WPM
 # widget toggle shows the live rate. They were removed rather than pointed at
 # those windows, which would have given this menu two rows opening one window.
 

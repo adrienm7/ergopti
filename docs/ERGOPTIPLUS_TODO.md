@@ -446,11 +446,6 @@ is committed; one request is one commit with its regression test.
       and was refused with an error window, the toggle lost. To do: a reload
       asked while a configuration write is in progress waits for it (bounded)
       instead of failing, and find why every start rewrites 347 keys.
-- [ ] **78.** Metrics menu: rename, in the 21 locales, the two rows that
-      open the metrics windows. Both start the same way and only the end
-      names the window, in French something like « Ouvrir le tableau de bord
-      des métriques de frappe » and « Ouvrir le tableau de bord du temps
-      passé dans les applications ».
 
 ## Time estimate
 
