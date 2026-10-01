@@ -10,29 +10,32 @@
 ; UNCONDITIONALLY. A chunk object carrying text but no `type` property makes that
 ; read throw in AHK v2 ("no property named type"); the throw unwinds into the
 ; build try/catch, which hides the tooltip — so the whole prediction silently
-; vanishes. The fix mirrors the sibling guard: every chunk.type read must be
-; co-located with a HasOwnProp("type") check.
+; vanishes.
 ;
-; Meta-static because the tooltip build path constructs a real Gui and cannot be
-; exercised headlessly; it scans ui/tooltip source for any unguarded chunk.type read.
+; The chunk loop used to sit inside the Gui build, which cannot run headlessly,
+; so this was a source scan for the guard's spelling. The loop is now
+; _LLM_SlotSegments, a pure function the build calls for every line: the
+; malformed chunks are handed to it directly.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 
-_LTCG_AssertChunkTypeGuarded() {
-	Q := Chr(34)
-	Src := _DriverDirConcat("ui/tooltip")
-	Assert(InStr(Src, "chunk.type ==") > 0, "the tooltip render must compare chunk.type (sanity check)")
-	pos := 0
-	unguarded := 0
-	while (pos := InStr(Src, "chunk.type ==", , pos + 1)) {
-		; The text just before each read must contain the HasOwnProp("type") guard.
-		ctx := SubStr(Src, Max(1, pos - 45), 45)
-		if !InStr(ctx, "HasOwnProp(" . Q . "type" . Q . ")")
-			unguarded += 1
+_LTCG_MalformedChunksDoNotThrow() {
+	Slot := {
+		Text: "ignored",
+		Chunks: [{ text: "no type" }, { type: "insert" }, { type: "equal", text: "kept" }],
+		NextWords: " next"
 	}
-	Assert(unguarded == 0,
-		"every chunk.type read in the tooltip render must be guarded by HasOwnProp(" . Q . "type" . Q . ") — an unguarded read on a type-less chunk throws and silently hides the whole prediction (llm-tooltip-chunk-type-guard)")
+	Segments := _LLM_SlotSegments(Slot)
+	AssertEqual(2, Segments.Length,
+		"a chunk with no type or no text is left out; the line still renders (llm-tooltip-chunk-type-guard)")
+	AssertEqual("kept", Segments[1].Text, "the well-formed chunk is kept")
+	AssertEqual("typed", Segments[1].Role, "with its role")
+	AssertEqual(" next", Segments[2].Text, "and the next words follow")
+	Build := _DriverFuncBody("_TooltipBuildGuiLlm")
+	Assert(Build != "", "_TooltipBuildGuiLlm must exist in the driver source")
+	Assert(InStr(Build, "_LLM_SlotSegments(") > 0 and InStr(Build, ".Chunks") == 0,
+		"the Gui build must read a slot's chunks through _LLM_SlotSegments only, never on its own")
 }
-Test("tooltip: every chunk.type read is HasOwnProp-guarded (llm-tooltip-chunk-type-guard)", _LTCG_AssertChunkTypeGuarded)
+Test("tooltip: a chunk with no type or no text never breaks the line (llm-tooltip-chunk-type-guard)", _LTCG_MalformedChunksDoNotThrow)

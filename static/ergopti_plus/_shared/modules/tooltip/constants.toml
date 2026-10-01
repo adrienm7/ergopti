@@ -287,15 +287,15 @@ ai_loading_hex = "#AD61FF"
 # AHK hex aliases (no leading #) mirror the RGBA tables for drivers that only
 # accept hex strings. Keep the hex aliases in sync whenever the RGBA values change.
 
-# Corrected text (equal diff chunks, selected slot) — green.
+# Corrected text (insert diff chunks, selected slot) — green.
 corr_sel = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 }
 corr_sel_hex = "#40E666"
 
-# Next-words text (insert diff chunks, selected slot) — orange.
+# Next-words text (the continuation after the corrected tail, selected slot) — orange.
 nw_sel = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 }
 nw_sel_hex = "#FF9E1A"
 
-# Unselected slot text — mid-gray.
+# Text already typed (equal diff chunks) and every unselected slot — mid-gray.
 unsel_gray = { white = 0.50, alpha = 1.0 }
 unsel_gray_hex = "#808080"
 

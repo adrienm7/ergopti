@@ -713,6 +713,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
+#Include unit/test_llm_line_style.ahk
 #Include unit/test_llm_tone.ahk
 #Include unit/test_llm_vision.ahk
 #Include unit/test_llm_translate.ahk
@@ -1525,7 +1526,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_deferred_crash_report_catch.ahk
 #Include meta/test_keylogger_webview_bridge_and_i18n.ahk
 #Include meta/test_keylogger_webview_range_bridge.ahk
-#Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
 #Include meta/test_keylogger_tick_overflow.ahk
@@ -1744,7 +1744,6 @@ _LogBootProgress("keylogger modules + tests included")
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
-#Include meta/test_llm_diff_french_accents.ahk
 #Include unit/test_audit_v5_fixes.ahk
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.

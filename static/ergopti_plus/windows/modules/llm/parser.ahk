@@ -1021,15 +1021,38 @@ _LLM_Parser_IsPhysicallyInjectable(pred) {
 }
 
 /**
+ * What the tooltip line of a parsed prediction reads, apart from what
+ * accepting it types: the typed tail as the model corrected it (equal chunks
+ * left as typed, insert chunks corrected), then the next words.
+ * @param {Map} pred A record returned by LLM_Parser_ProcessPrediction.
+ * @returns {Map} Map("chunks", [{type, text}], "nw", Text, "has_corrections", Flag).
+ */
+_LLM_Parser_DisplayOf(pred) {
+	Chunks := []
+	for , Chunk in pred.Get("chunks", [])
+		Chunks.Push({ type: Chunk["type"], text: Chunk["text"] })
+	return Map(
+		"chunks", Chunks,
+		"nw", pred.Get("nw", ""),
+		"has_corrections", pred.Get("has_corrections", false) ? true : false)
+}
+
+/**
  * Full post-API parse path — mirrors api_ollama.lua post_and_parse.
  * @param {VarRef} out_edits Receives Map(slot text → rewrite edit) for the
  *     slots that are rewrites: Map("deletes", Codepoints, "deleted_text",
  *     Text, "span", Span). The slots stay plain strings, so the tooltip, the
  *     cache and the dedup keep their shape; the edit travels beside them.
+ * @param {VarRef} out_displays Receives Map(slot text → what the tooltip line
+ *     reads): Map("chunks", [{type, text}], "nw", NextWords, "has_corrections",
+ *     Flag). A slot's text is only what accepting it types; the typed tail it
+ *     corrects and the split between correction and next words exist nowhere
+ *     else, so they travel beside the slots like the edits.
  * @returns {Array} Slot strings (to_type) ready for the tooltip.
  */
-LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "", &out_edits := "") {
+LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "", &out_edits := "", &out_displays := "") {
 	out_edits := Map()
+	out_displays := Map()
 	raw := LLM_Parser_StripThinking(raw)
 	if (raw = "")
 		return []
@@ -1057,6 +1080,8 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 	for _, p in slots {
 		text := _LLM_ApiCommon_PredText(p)
 		out.Push(text)
+		if (p is Map and text != "")
+			out_displays[text] := _LLM_Parser_DisplayOf(p)
 		if (p is Map and p.Get("rewrite", false) == true)
 			out_edits[text] := Map(
 				"deletes", p["deletes"],

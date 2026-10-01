@@ -171,9 +171,38 @@ function M.load()
 	return style
 end
 
+--- The chrome of an AI prediction line, read once.
+local _llm_line = nil
+
+--- The mark, the spacing and the colours of the AI prediction lines.
+---
+--- Apart from M.load() because the suggestion overlay builds its rows before
+--- any panel style reaches it, and what a line reads must not depend on which
+--- renderer draws it.
+--- @return table { mark, align, label_gap, colors = { typed, corrected, next,
+---   cursor, label_selected, label_unselected } }
+function M.llm_line()
+	if _llm_line then return _llm_line end
+	_llm_line = {
+		mark      = require_key("llm_ui", "active_prefix"),
+		align     = require_key("llm_ui", "inactive_align_char"),
+		label_gap = require_key("llm_ui", "shortcut_label_gap"),
+		colors = {
+			typed            = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
+			corrected        = parse_hex(require_key("llm_colors", "corr_sel_hex")),
+			next             = parse_hex(require_key("llm_colors", "nw_sel_hex")),
+			cursor           = parse_hex(require_key("llm_colors", "cursor_hex")),
+			label_selected   = parse_hex(require_key("llm_colors", "cmd_sel_hex")),
+			label_unselected = parse_hex(require_key("llm_colors", "cmd_dim_hex")),
+		},
+	}
+	return _llm_line
+end
+
 --- Test seam: forgets the parsed file so a case can drive a different one.
 function M._reset()
 	_sections = nil
+	_llm_line = nil
 end
 
 return M
