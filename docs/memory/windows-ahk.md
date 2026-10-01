@@ -212,6 +212,17 @@ Native `Suspend` disables hotkeys but not InputHooks, timers, or `OnMessage`.
 Every such callback that can type, display UI, record activity, or start network
 work must explicitly honor `A_IsSuspended`.
 
+### project-a-pause-guard-is-not-a-shutdown-debt
+
+A function that refuses to run under a pause returns the same `false` as one
+that ran and found work left. A shutdown gate that calls it must tell the two
+apart: the navigation owner's preflight took the paused receipt drain for a
+debt and refused every reload or exit asked while paused, then « compensated »
+by resuming the native hook the pause had suspended. Under a pause a gate
+skips the paused step, keeps the proof that reads state (`CanStop`), and
+compensates only the fence it took itself. Every refusal names the condition
+that refused: the lifecycle line alone says only which owner did.
+
 ### project-updater-nonblocking-http
 
 Background HTTP must be asynchronous because a synchronous native call can
