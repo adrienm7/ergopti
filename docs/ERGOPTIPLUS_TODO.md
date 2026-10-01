@@ -428,10 +428,11 @@ is committed; one request is one commit with its regression test.
       is audited and a real refused write proves reload is suppressed and the
       existing configuration is byte-exact. AHK-901 now follows the checked
       native remover; real Windows regressions keep adjacent owners' output
-      and refuse recursive deletion of an unclaimed file. Remaining: the
-      hardening-c label count test walks into the local, git-ignored
-      `_generated/personal_shortcuts.ahk`, so it fails on a machine whose user
-      has personal shortcuts.
+      and refuse recursive deletion of an unclaimed file. Source and include
+      censuses now share one production-ownership predicate; a generated
+      personal-shortcuts fixture verifies matching counts while preserving
+      inherited directives. Remaining: confirm the repaired suite and these
+      native regressions through the non-release CI lane before retiring item 72.
 - [ ] **73.** Follow-ups of the tray rows the Windows separator bug hid
       (`submenu-read-as-separator-2026-10-01`, fixed): the three families of «
       Combinaisons de touches » are back and read their raw `group_label`

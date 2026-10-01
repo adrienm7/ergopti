@@ -395,7 +395,7 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 	}
 	Labels := []
 	for Entry in Walked {
-		if !RegExMatch(Entry["file"], "i)\\(tests|vendor|_generated)\\")
+		if _DriverIsProductionSource(Entry["file"])
 			Labels.Push(Entry)
 	}
 	Assert(Seen.Count > 100, "the #Include walk from the driver root scripts must reach the driver, reached " . Seen.Count)
@@ -420,3 +420,59 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 }
 Test("hotkeys: no hook-owned hotkey names a character key (hardening-c-scan-code-precedence)",
 	_HCSC_NoHookHotkeyNamesACharacter)
+
+_HCSC_ProductionPathOwnership() {
+	for Path, Expected in Map(
+		"C:\driver\ui\hotkeys.ahk", true,
+		"C:/driver/ui/hotkeys.ahk", true,
+		"C:\driver\_generated\personal_shortcuts.ahk", false,
+		"C:/driver/_generated/personal_shortcuts.ahk", false,
+		"C:/driver/_GENERATED/personal_shortcuts.ahk", false,
+		"C:/driver/tests/fixture.ahk", false,
+		"C:/driver/vendor/fixture.ahk", false,
+		"C:/driver/ui/vendor_picker.ahk", true,
+		"C:/driver/_generated_extra/owned.ahk", true)
+		AssertEqual(Expected, _DriverIsProductionSource(Path), "source ownership: " . Path)
+}
+Test("hotkeys: source and include censuses share generated-code ownership",
+	_HCSC_ProductionPathOwnership)
+
+; Generated personal shortcuts affect directives after their include even
+; though their own hotkeys are not part of the production source census.
+_HCSC_PersonalIncludePreservesContext() {
+	Root := A_Temp . "\ergopti-hcsc-" . A_TickCount . "-" . Random(10000, 99999)
+	Driver := Root . "\driver.ahk"
+	Personal := Root . "\_generated\personal_shortcuts.ahk"
+	Owned := Root . "\ui\hotkeys.ahk"
+	DirCreate(Root . "\_generated")
+	DirCreate(Root . "\ui")
+	try {
+		FileAppend("#InputLevel 0`n#Include _generated/personal_shortcuts.ahk`n#Include ui/hotkeys.ahk`n",
+			Driver, "UTF-8")
+		FileAppend('#InputLevel 2`n#HotIf WinActive("fixture")`n^v::return`n#UseHook true`n',
+			Personal, "UTF-8")
+		FileAppend("SC02F::return`n", Owned, "UTF-8")
+		State := Map("level", 0, "hotif", false, "usehook", false)
+		Seen := Map(), Walked := [], Labels := []
+		_HCSC_WalkIncludes(Driver, State, Seen, Walked)
+		AssertEqual(3, Seen.Count, "the generated include is traversed too")
+		for Entry in Walked {
+			if _DriverIsProductionSource(Entry["file"])
+				Labels.Push(Entry)
+		}
+		AssertEqual(1, Labels.Length, "personal hotkeys never enter the driver census")
+		AssertEqual("SC02F", Labels[1]["text"], "the owned label remains visible")
+		AssertEqual(2, Labels[1]["context"]["level"], "generated directives still affect later code")
+		AssertTrue(Labels[1]["context"]["hotif"], "the generated criterion remains in force")
+		AssertTrue(Labels[1]["context"]["usehook"], "the generated hook directive remains in force")
+		Source := FileRead(Driver, "UTF-8") . "`n" . FileRead(Owned, "UTF-8")
+		Masked := _DriverMaskNonCode(&Source)
+		_HCSC_Declarations(Source, Masked, &Count, &Calls)
+		AssertEqual(Count, Labels.Length, "both ownership-aware censuses agree with a personal include")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("hotkeys: a generated personal include preserves context without changing the census",
+	_HCSC_PersonalIncludePreservesContext)
