@@ -34,6 +34,7 @@
 
 local M = {}
 local Terminators = require("keymap.terminators")
+local TerminatorScope = require("hotstrings.terminator_scope")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigPaths = require("infra.config_paths")
 local ConfigOutdated = require("config_outdated")
@@ -344,18 +345,7 @@ end
 --- @param document table Decoded config.toml.
 --- @return table paths Array of path segments.
 function M.builtin_state_leaves(document)
-	assert(type(document) == "table", "word-delimiter leaves need a decoded configuration")
-	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
-	local states = hotstrings.terminator_states
-	if type(states) ~= "table" or (next(states) ~= nil and #states > 0) then return {} end
-	local shipped, keys = builtins(), {}
-	for key in pairs(states) do
-		if type(key) == "string" and shipped[key] then keys[#keys + 1] = key end
-	end
-	table.sort(keys)
-	local paths = {}
-	for _, key in ipairs(keys) do paths[#paths + 1] = { STATES_PATH[1], STATES_PATH[2], key } end
-	return paths
+	return TerminatorScope.builtin_state_leaves(document)
 end
 
 

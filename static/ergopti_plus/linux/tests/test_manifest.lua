@@ -224,6 +224,7 @@ return {
 	"tests.unit.modules.hotstrings.test_repeat_key",
 	"tests.unit.modules.hotstrings.test_shortcuts_menu_dispatch",
 	"tests.unit.modules.hotstrings.test_terminator_settings",
+	"tests.unit.modules.hotstrings.test_terminator_scope_policy",
 	"tests.unit.modules.keylogger.test_focus_guard",
 	"tests.unit.modules.keylogger.test_aggregate_walker",
 	"tests.unit.modules.keylogger.test_app_switch_aggregate",
