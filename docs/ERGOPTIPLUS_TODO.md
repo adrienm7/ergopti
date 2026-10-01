@@ -401,10 +401,11 @@ is committed; one request is one commit with its regression test.
       `_MI_AboutUpdateRows` (`windows/ui/menu/menu_init.ahk`) returns after
       the version and the channel picker, so the « check for updates » row
       and the frequency submenu are not drawn at all, with no reason shown;
-      an installed build draws both. To do: on a source run draw the two
-      rows greyed with the source-run reason, as the Uninstall row is
-      (`disabled_reason_key`), check what the macOS and Linux trays do for a
-      source run, and compare the three row by row.
+      an installed build draws both. Maintainer decision (2026-10-01): the
+      automatic update rows are always drawn, and greyed on a local version,
+      on the three drivers, « or we will keep wondering whether the feature
+      exists ». To do: draw the check row and the frequency submenu greyed
+      with the source-run reason on Windows, macOS and Linux.
 - [ ] **71.** Metrics windows: retire what is left of their dedicated
       shortcuts. The two menu rows that set them are gone on the three
       drivers (2026-10-01): a shortcut that opens a metrics window is assigned
@@ -445,16 +446,20 @@ is committed; one request is one commit with its regression test.
       holds `category_enabled.french_magickey = false`, already in the
       backups of 2026-09-30 18:06, while `magic_key`, `french_autocorrection`
       and `french_distancesreduction` are on; the boot log says « 3 forced
-      off by a disabled category ». So the engine obeys the file. Still to
-      settle with the maintainer: whether the Hotstrings › Français › magic
-      key switch turns it back on from the tray, and which action left the
-      three French categories off on 2026-09-30 (a restore, a clear or the
-      wizard) when the maintainer expected them on.
+      off by a disabled category ». So the engine obeys the file. The
+      maintainer then reported the cause: the Hotstrings › Français submenu
+      of the Windows tray does not list the magic key category at all, so it
+      cannot be switched back on. To do: find why `_HS_LanguageRows` leaves
+      it out and list it; then find which action left the three French
+      categories off on 2026-09-30.
 - [ ] **74.** Windows: every start rewrites config.toml with 347 updates
       about three seconds after the driver is ready (15 to 30 ms, 2 360 ms on
       a loaded machine). A reload asked during that write now waits for it
       (`reload-during-config-write`); find why a start that changed nothing
       writes the whole file, and make it write only what changed.
+- [ ] **79.** Metrics menu: the two dashboard rows drop their verb. They
+      read « Tableau de bord des métriques de frappe » and « Tableau de bord
+      du temps sur les applications », without « Ouvrir », in the 21 locales.
 
 ## Time estimate
 
