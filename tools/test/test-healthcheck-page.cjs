@@ -354,6 +354,36 @@ function init(page, detailed, mode) {
 		fail('a snapshot without details shows a device name');
 }
 
+{
+	// The window opens wide enough for the paths it lists: at 860 pixels the
+	// value column held about 75 characters and most paths were cut in two
+	// (diagnostics-wide-enough). The estimate reads the page's own layout:
+	// the label column's share, the side paddings, and an average character
+	// of the 13 px interface font.
+	const PATH_CHARACTERS = 95;
+	const CHARACTER_PX = 6.5;
+	const CHROME_PX = 16 * 2 + 17;
+	const styles = fs
+		.readFileSync(path.join(PAGE, 'style.css'), 'utf8')
+		.replace(/\/\*[\s\S]*?\*\//g, '');
+	const labels = /table\.fields th\s*\{[^}]*width:\s*(\d+)%/.exec(styles);
+	const manifest = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'ui', 'apps.manifest.json'), 'utf8')
+	);
+	const geometry = Object.values(manifest).find((group) => group && group.healthcheck);
+	if (!labels || !geometry) {
+		fail('the diagnostics layout or its window geometry is no longer where this test reads it');
+	} else {
+		const valuePx = (geometry.healthcheck.width - CHROME_PX) * (1 - Number(labels[1]) / 100);
+		const characters = Math.floor(valuePx / CHARACTER_PX);
+		if (characters < PATH_CHARACTERS)
+			fail(
+				`the window opens ${geometry.healthcheck.width} px wide: its value column holds about ` +
+					`${characters} characters, and a path needs ${PATH_CHARACTERS} to stay on one line`
+			);
+	}
+}
+
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);
