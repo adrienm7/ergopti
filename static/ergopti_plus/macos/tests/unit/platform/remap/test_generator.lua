@@ -944,7 +944,11 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		helpers.assert_true(tostring(rule.description):find("Navigation layer", 1, true) ~= nil,
 			"the layer's rule, not Space's own tap/hold")
 		local alone = first_match(rules, "spacebar", variables(rules, false))
-		helpers.assert_true(layer_variable(alone.to) ~= nil, "alone, Space holds the layer as configured")
+		helpers.assert_nil(layer_variable(alone.to), "Space must not enable navigation before the typing threshold")
+		helpers.assert_true(layer_variable(alone.to_if_held_down) ~= nil,
+			"Space holds the configured layer after the typing threshold")
+		helpers.assert_eq(alone.to_delayed_action.to_if_canceled, { { key_code = "spacebar" } },
+			"another press before the threshold must type Space instead of starting navigation")
 	end)
 end)
 

@@ -482,15 +482,6 @@ is committed; one request is one commit with its regression test.
       the hold read as Shift (item 83). Keep an indicator that does not
       change what an unbound key types, and check what macOS and Linux type
       for a key their layer does not bind.
-- [ ] **87.** macOS: a typing key rolled over the next one is still typed
-      under its hold (item 86 covers Windows and Linux). Karabiner decides a
-      dual-role key at the next key's press (`to` + `to_if_alone`) and has
-      no rule on the order of the releases. Its `to_if_held_down` with
-      `to_delayed_action.to_if_canceled` recipe takes the hold only past the
-      threshold and types the tap when another key comes first: that fixes
-      typing but makes a quick chord type the tap. The maintainer chose typing
-      priority on 2026-10-01, like Windows/Linux: implement that recipe for the
-      keys of `[tap_hold.rollover]` and cover its generated event rules in CI.
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
   ported by Windows, pinned by
@@ -554,18 +545,6 @@ is committed; one request is one commit with its regression test.
       native Ergopti Windows layout leaves AltGr unusable until reload. Follow
       the foreground HKL and re-decide Kana/AltGr without restarting; cover both
       directions, same-window changes and active/deferred owners in native CI.
-- [~] **100.** Windows diagnostics must retain a structured UI under memory
-  pressure. The supplied 2026-10-01 snapshot reports 1,512,222,720 free bytes
-  and installed WebView2, below the current 1,536 MiB native-fallback gate.
-  Attempt the shared page and reuse a warm environment; a real browser
-  failure must still leave a structured readable native view. Add automatic
-  low-memory, warm/cold boot and native-fallback regressions.
-  The shared page is now attempted regardless of free RAM, and the other
-  hosts reuse an already-running browser without a cold-start RAM query.
-  Real browser failures render the shared schema as translated expandable
-  native sections and separate log entries. Native controls, resize, RAM
-  boundary decisions and warm reuse have Windows regressions; three JS
-  guards reproduced the original behavior before the fix. Native CI pending.
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
       shutdown debt (watchers=0), spurious AltGr dispatches while SC138 is not
       physically held, and bound hotstring extension files ignored on Windows
@@ -577,6 +556,25 @@ rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
 installation variants. Linux unit passes, but its real accessibility-bus probe
 exceeded the five-minute step timeout; Linux packaging/installation did not run.
 Keep that failure separate from the passing browser and native results.
+The next non-release run 36931498806 passes the complete Windows, macOS and Linux
+pipeline, including the previously timed-out accessibility-bus probe and every
+installation variant. It also proves the diagnostics correction: the rich page
+is attempted below the old RAM cutoff, warm browsers bypass the cold-start
+heuristic, and actual browser failures retain schema-ordered native controls.
+Windows unit tests create those controls and verify sections, separate logs and
+resize; the original three JS guards failed before the correction.
+
+The macOS typing-rollover slice resolves the shared canonical key list through
+its backend aliases. Native taps cancel pending holds on the next press; a long
+hold activates at the configured threshold, preserving prior physical modifiers.
+An inactive hold cannot clear another owner's navigation layer. Thirty-five
+actual generated-graph timer replays cover taps, holds, cancellation, key release,
+per-key timing, cleanup and inactive/revoked generation authority. Saved timer
+outputs carry live mode and tombstone conditions, while historical fingerprints
+retain the pre-timer immediate-hold graph (a deliberate mutation is rejected).
+The shared alias/refusal contract runs on both Lua
+runtimes for all three backend columns. Karabiner's lack of release-order rules
+means a very fast chord on these typing keys becomes a tap, as requested.
 
 ## Time estimate
 

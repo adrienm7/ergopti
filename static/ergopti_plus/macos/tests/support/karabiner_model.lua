@@ -33,7 +33,10 @@
 ---     or pressing a claimed Caps Lock into a sticky Caps Lock change, which
 ---     key_event_dispatcher.hpp sends to macOS as a Caps Lock key press: each
 ---     is recorded as a "lock" emission of caps_lock.
---- Lazy modifier dispatch, keyboard repeat, timers and sticky-modifier flag
+--- Held-down and delayed-action timers use an explicit advance() clock; both
+--- cancel at another key-down and are retired at their owner's key-up, matching
+--- basic.hpp and its to_if_held_down.hpp / to_delayed_action.hpp helpers.
+--- Lazy modifier dispatch, keyboard repeat and sticky-modifier flag
 --- bookkeeping are not modelled: the flags recorded for a key are the
 --- modifier_flag_manager state an application reads at that key's key_down,
 --- and Engine:held names the output keys left down, which macOS repeats.
@@ -212,6 +215,7 @@ function M.new(rules, options)
 		counts    = {},
 		sessions  = {},
 		emitted   = {},
+		now       = 0,
 	}, Engine)
 	for name, value in pairs(options.variables or {}) do engine.variables[name] = value end
 	for _, flag in ipairs(options.flags or {}) do engine.counts[flag] = 1 end
@@ -394,6 +398,37 @@ local function press_lifted(engine, session)
 	session.lifted = {}
 end
 
+--- Posts an extra event with the flags captured at the original key-down.
+--- @param engine table Engine.
+--- @param session table Active manipulation.
+--- @param phase string Emission phase.
+--- @param events table|nil To-event list.
+local function post_saved_extra(engine, session, phase, events)
+	local restored = {}
+	for _, flag in ipairs(M.FLAGS) do
+		local count = engine.counts[flag] or 0
+		if session.key_down_flags[flag] and count <= 0 then restored[flag] = 1 - count
+		elseif not session.key_down_flags[flag] and count > 0 then restored[flag] = -count end
+		if restored[flag] then change(engine, flag, restored[flag]) end
+	end
+	lift_claimed(engine, session)
+	post_extra(engine, phase, events)
+	press_lifted(engine, session)
+	for flag, delta in pairs(restored) do change(engine, flag, -delta) end
+end
+
+--- Releases the output previously held by one manipulation.
+--- @param engine table Engine.
+--- @param session table Active manipulation.
+local function release_held(engine, session)
+	for _, key in ipairs(session.deferred) do
+		if MODIFIER_KEY_CODES[key] then change(engine, key, -1) end
+	end
+	session.deferred = {}
+	for _, flag in ipairs(session.deferred_flags) do change(engine, flag, -1) end
+	session.deferred_flags = {}
+end
+
 -- Manipulators by physical key, in rule order, for each rule graph, so find()
 -- scans only one key's candidates. Weak keys release an index with its graph.
 local KEY_INDEX = setmetatable({}, { __mode = "k" })
@@ -449,11 +484,51 @@ local function start_session(engine, manipulator, claimed)
 		deferred_flags = {},
 		key_down_flags = engine:pressed(),
 		alone          = true,
+		key_down_at    = engine.now,
 	}
 	lift_claimed(engine, session)
 	post_to(engine, manipulator.to, session)
 	if not last_is_modifier_key(manipulator.to) then press_lifted(engine, session) end
+	local parameters = manipulator.parameters or {}
+	if manipulator.to_if_held_down then
+		session.held_due = engine.now + assert(parameters["basic.to_if_held_down_threshold_milliseconds"])
+	end
+	if manipulator.to_delayed_action then
+		session.delayed_due = engine.now + assert(parameters["basic.to_delayed_action_delay_milliseconds"])
+	end
 	return session
+end
+
+--- Advances the pinned timer callbacks, preserving event order at their due time.
+--- @param milliseconds number Finite non-negative elapsed time.
+function Engine:advance(milliseconds)
+	assert(type(milliseconds) == "number" and milliseconds >= 0 and milliseconds < math.huge)
+	local target = self.now + milliseconds
+	while true do
+		local next_session, kind, due
+		for _, session in pairs(self.sessions) do
+			for _, candidate in ipairs({ "held_due", "delayed_due" }) do
+				local time = session[candidate]
+				if time and time <= target and (due == nil or time < due) then
+					next_session, kind, due = session, candidate, time
+				end
+			end
+		end
+		if not next_session then break end
+		self.now = due
+		next_session[kind] = nil
+		local manipulator = next_session.manipulator
+		if kind == "held_due" then
+			release_held(self, next_session)
+			press_lifted(self, next_session)
+			lift_claimed(self, next_session)
+			post_to(self, manipulator.to_if_held_down, next_session)
+			if not last_is_modifier_key(manipulator.to_if_held_down) then press_lifted(self, next_session) end
+		else
+			post_saved_extra(self, next_session, "timer", manipulator.to_delayed_action.to_if_invoked)
+		end
+	end
+	self.now = target
 end
 
 --- Presses one physical key.
@@ -461,7 +536,14 @@ end
 --- @return table|nil manipulator The manipulator that took it, nil when it passed through.
 function Engine:down(key_code)
 	assert(self.sessions[key_code] == nil, key_code .. " is already down")
-	for _, session in pairs(self.sessions) do session.alone = false end
+	for _, session in pairs(self.sessions) do
+		session.alone = false
+		session.held_due = nil
+		if session.delayed_due then
+			session.delayed_due = nil
+			post_saved_extra(self, session, "tap", session.manipulator.to_delayed_action.to_if_canceled)
+		end
+	end
 	local manipulator, claimed = self:find(key_code)
 	if manipulator == nil then
 		if MODIFIER_KEY_CODES[key_code] then change(self, key_code, 1) end
@@ -526,30 +608,11 @@ end
 --- @param within_timeout boolean Released before the manipulator's to_if_alone timeout.
 local function post_key_up(engine, session, within_timeout)
 	local manipulator = session.manipulator
-	for _, key in ipairs(session.deferred) do
-		if MODIFIER_KEY_CODES[key] then change(engine, key, -1) end
-	end
-	session.deferred = {}
-	for _, flag in ipairs(session.deferred_flags) do change(engine, flag, -1) end
-	session.deferred_flags = {}
+	release_held(engine, session)
 	press_lifted(engine, session)
 
 	if manipulator.to_if_alone ~= nil and session.alone and within_timeout then
-		-- scoped_from_key_modifier_flags_state_restorer: the flags of key_down.
-		local restored = {}
-		for _, flag in ipairs(M.FLAGS) do
-			local count = engine.counts[flag] or 0
-			if session.key_down_flags[flag] and count <= 0 then
-				restored[flag] = 1 - count
-			elseif not session.key_down_flags[flag] and count > 0 then
-				restored[flag] = -count
-			end
-			if restored[flag] then change(engine, flag, restored[flag]) end
-		end
-		lift_claimed(engine, session)
-		post_extra(engine, "tap", manipulator.to_if_alone)
-		press_lifted(engine, session)
-		for flag, delta in pairs(restored) do change(engine, flag, -delta) end
+		post_saved_extra(engine, session, "tap", manipulator.to_if_alone)
 	end
 
 	if manipulator.to_after_key_up ~= nil then
@@ -569,6 +632,10 @@ end
 function Engine:up(key_code, within_timeout)
 	local session = assert(self.sessions[key_code], key_code .. " is not down")
 	self.sessions[key_code] = nil
+	if session.manipulator and session.manipulator.to_if_held_down then
+		local limit = session.manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+		within_timeout = within_timeout and self.now - session.key_down_at < limit
+	end
 	if session.passthrough then
 		if MODIFIER_KEY_CODES[key_code] then change(self, key_code, -1) end
 		return

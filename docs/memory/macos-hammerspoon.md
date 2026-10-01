@@ -1197,3 +1197,14 @@ ledger. Virtual-output sender identity therefore cannot resolve that collision.
 The reusable native fixture and exact receipts are routed through the
 [investigation report](../audits/hammerspoon/2026_09_09/discoveries.md).
 This validates a virtual fixture, not physical keyboard hardware.
+
+### project-karabiner-saved-timer-authority
+
+Karabiner's `to_if_held_down` runs from a saved manipulation and does not re-check
+its original `from` conditions at the threshold. Put current generation-mode
+and revocation conditions on the timed output events themselves, so a queued
+hold cannot press a modifier after pause or shutdown. The v16.0.0 callback also
+checks the unfiltered output's final key to decide whether to restore previously
+held modifiers; retain the existing never-posted trailer for timed modifier
+holds as well as immediate ones. Keep historical recognition graphs on their
+original immediate-hold recipe rather than deriving them from modern timer rules.
