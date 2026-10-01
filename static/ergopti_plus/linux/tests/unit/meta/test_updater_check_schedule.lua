@@ -23,8 +23,13 @@ local T0 = 1700000000
 
 --- Builds a fresh manager and runs body(ctx). ctx: M, timers (every armed
 --- timer, in order), storage, clock, dispatches (spied check callbacks),
---- config_path.
+--- config_path. The manager is an installed build's unless opts.source_run
+--- says otherwise: the suite itself runs from a checkout, which checks for
+--- nothing on its own.
 local function with_manager(opts, body)
+	local Installation = require("infra.installation")
+	local real_is_source_run = Installation.is_source_run
+	Installation.is_source_run = function() return opts.source_run == true end
 	local previous = {}
 	for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
 		previous[name] = package.loaded[name]
@@ -80,6 +85,7 @@ local function with_manager(opts, body)
 		body(ctx)
 	end)
 	ctx.M.stop_background_checks()
+	Installation.is_source_run = real_is_source_run
 	pcall(os.remove, ctx.config_path)
 	if not ok then error(err, 0) end
 end
@@ -102,6 +108,19 @@ local function record(ctx)
 end
 
 helpers.describe("updater (linux): the check schedule follows the persisted record", function()
+	-- A local version run from source has no installation to update. It used
+	-- to check on the schedule all the same, and announce releases it could
+	-- not install; the tray now greys its update rows and nothing is armed.
+	helpers.it("(update-rows-greyed-on-local-2026-10-01) a local version run from source arms no automatic check", function()
+		with_manager({ now = T0, source_run = true }, function(ctx)
+			helpers.assert_eq(#ctx.timers, 0, "no check is scheduled on a source run")
+			helpers.assert_eq(#ctx.dispatches, 0, "and none is dispatched")
+		end)
+		with_manager({ now = T0 }, function(ctx)
+			helpers.assert_true(#ctx.timers > 0, "an installed build still schedules its check")
+		end)
+	end)
+
 	helpers.it("notification refusal leaves the release retryable", function()
 		for _, refusal in ipairs({ "false", "throw" }) do
 			with_manager({ now = T0, record = { seed = SEED } }, function(ctx)

@@ -320,6 +320,10 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 		M._now = function() return now end
 		local config_path = os.tmpname()
 		pcall(os.remove, config_path)
+		-- An installed build: the checkout the suite runs from checks for nothing.
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return false end
 		local ok, err = pcall(function()
 			M.init({ config_path = config_path, channel = "dev", is_paused = function() return false end,
 				on_available = function(found) announced[#announced + 1] = found.tag; return true end })
@@ -333,6 +337,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 			end
 		end)
 		Installer.install = real_install
+		Installation.is_source_run = real_is_source_run
 		pcall(M.stop_background_checks)
 		pcall(os.remove, config_path)
 		for name, value in pairs(saved) do package.loaded[name] = value end

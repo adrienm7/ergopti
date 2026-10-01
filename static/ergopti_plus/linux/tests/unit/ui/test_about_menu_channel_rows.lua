@@ -55,13 +55,14 @@ local CHANNEL_AT = 3
 -- names is: the checkout itself is a source run, whose Update row is greyed.
 local IDENTITY = { kind = "release", version = "0.0.0-dev.140", commit = "c3005e0b9" }
 
-local function build(up, changed)
+--- @param source_run boolean|nil True to build the tray of a local version.
+local function build(up, changed, source_run)
 	local Version = require("infra.version")
 	local Installation = require("infra.installation")
 	local real_identity = Version.identity
 	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
-	Installation.is_source_run = function() return false end
+	Installation.is_source_run = function() return source_run == true end
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	local ok, items = pcall(mb.build, {
 		_version = "0.0.0-dev.140",
@@ -196,6 +197,43 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 				end
 			end
 			helpers.assert_eq(ticked, 1, "exactly one preset row is ticked for " .. pair[1] .. " s")
+		end
+	end)
+
+	-- A local version has no installation to update. Its check row and its
+	-- frequency row stay in the menu, greyed with the reason, and run nothing:
+	-- left live, they offered a check whose result could not be installed, and
+	-- left out (as on Windows and macOS) nobody could tell the feature existed.
+	helpers.it("(update-rows-greyed-on-local-2026-10-01) a local version draws the update rows greyed with their reason", function()
+		local i18n = require("infra.i18n")
+		local up, calls = fake_updater("dev")
+		local rows = submenu_of(build(up, nil, true), "menu.about.title")
+		local reason = i18n.get("menu.about.source_run_reason")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		local first = up.INTERVAL_PRESETS[1].code
+		local expected = {
+			i18n.get("menu.about.check_for_updates"),
+			i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. first),
+		}
+		local found = {}
+		for index, row in ipairs(rows) do
+			for at, label in ipairs(expected) do
+				if type(row.title) == "string" and row.title:find(label, 1, true) == 1 then found[at] = index end
+			end
+		end
+		helpers.assert_true(found[1] ~= nil and found[2] ~= nil, "both update rows are drawn on a local version")
+		helpers.assert_true(found[2] > found[1], "the frequency row follows the check row")
+		for at, label in ipairs(expected) do
+			local row = rows[found[at]]
+			helpers.assert_eq(row.title, label .. " — " .. head, "the row says why it is greyed")
+			helpers.assert_eq(row.disabled, true, label .. " is greyed")
+			helpers.assert_nil(row.fn, label .. " runs nothing")
+			helpers.assert_nil(row.menu, label .. " opens nothing")
+		end
+		helpers.assert_eq(calls.checks, 0, "a local version checks for nothing")
+		for _, row in ipairs(submenu_of(build(fake_updater("dev")), "menu.about.title")) do
+			helpers.assert_true(type(row.title) ~= "string" or row.title:find(head, 1, true) == nil,
+				"an installed build greys no row for this reason: " .. tostring(row.title))
 		end
 	end)
 

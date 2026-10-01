@@ -391,21 +391,6 @@ integrated, then publish one grouped release.
 Every request the maintainer makes is written here first and removed once it
 is committed; one request is one commit with its regression test.
 
-- [ ] **69.** Windows: no automatic search for updates every N hours is
-      visible to the maintainer, who remembers it on macOS and does not know
-      about Linux. The code exists on the three drivers (the shared schedule,
-      `windows/modules/updater/schedule.ahk` and `self_update.ahk`, the Linux
-      `modules/updater/manager.lua`, the About submenu's `about_updates` list
-      with its channel and frequency rows). Found on 2026-10-01: the
-      maintainer runs Windows from the repository, and for a local build
-      `_MI_AboutUpdateRows` (`windows/ui/menu/menu_init.ahk`) returns after
-      the version and the channel picker, so the « check for updates » row
-      and the frequency submenu are not drawn at all, with no reason shown;
-      an installed build draws both. Maintainer decision (2026-10-01): the
-      automatic update rows are always drawn, and greyed on a local version,
-      on the three drivers, « or we will keep wondering whether the feature
-      exists ». To do: draw the check row and the frequency submenu greyed
-      with the source-run reason on Windows, macOS and Linux.
 - [ ] **71.** Metrics windows: retire what is left of their dedicated
       shortcuts. The two menu rows that set them are gone on the three
       drivers (2026-10-01): a shortcut that opens a metrics window is assigned
