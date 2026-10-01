@@ -16,8 +16,8 @@
  * 2. The driver's built-in profile order is exactly the id list of
  *    _shared/modules/llm/profiles.json, since the llm_predict_<id> actions and
  *    the menu are built from it.
- * 3. The parser port carries the rewrite mode of the shared parser and still
- *    refuses every other erasure; the accept path erases in the same SendInput
+ * 3. The parser port carries the rewrite mode of the shared parser and refuses
+ *    erasures without the exact deleted text and span; accepting erases in one SendInput
  *    batch as the text, for both the direct and the clipboard sender.
  * 4. The action picker host sends what the page's prompt editor needs.
  * 5. The tone ladder port (modules/llm/tone.ahk) and its actions
@@ -242,7 +242,7 @@ for (const [needle, why] of [
 		"bounds a rewrite's erasure by its span"
 	],
 	['if (only_equals and !is_rewrite)', 'skips the orphaned-gray guard for a rewrite'],
-	['_LLM_Parser_RewriteRecord(', 'records the exact text a rewrite erases']
+	['_LLM_Parser_ErasingRecord(', 'records the exact text a correction or rewrite erases']
 ]) {
 	check(impl.includes(needle), `_LLM_Parser_ProcessPredictionImpl ${why}: ${needle}`);
 }
@@ -251,10 +251,26 @@ check(
 	'the output cleaner must normalise the bracketed rewrite tag'
 );
 const injectable = bodyOf(parser, '_LLM_Parser_IsPhysicallyInjectable');
+const namedErasure =
+	/if \(pred\.Get\("deleted_text", ""\) != "" and pred\.Get\("span", ""\) != ""\)\s+return true/;
 check(
-	injectable.includes('pred.Get("rewrite", false) == true') && injectable.includes('return false'),
-	'only a rewrite may carry an erasure; every other erase-bearing prediction is still refused'
+	namedErasure.test(injectable) && injectable.includes('return false'),
+	'an erase-bearing prediction must name both its exact deleted text and original span'
 );
+for (const field of ['deleted_text', 'span']) {
+	check(
+		!namedErasure.test(injectable.replace(`pred.Get("${field}", "") != ""`, 'true')),
+		`erasure admission must reject a missing ${field} guard`
+	);
+}
+const erasingRecord = bodyOf(parser, '_LLM_Parser_ErasingRecord');
+for (const field of [
+	'"deleted_text", DeletedText',
+	'"span", Span',
+	'"deletes", LLM_Rewrite_CodepointLength(DeletedText)'
+]) {
+	check(erasingRecord.includes(field), `the parser must record the exact erasure: ${field}`);
+}
 
 const sender = read('adapters/text_sender.ahk');
 check(
