@@ -433,6 +433,10 @@ is committed; one request is one commit with its regression test.
       personal-shortcuts fixture verifies matching counts while preserving
       inherited directives. Remaining: confirm the repaired suite and these
       native regressions through the non-release CI lane before retiring item 72.
+      CI run 36914974910 at bbdb51f42 reduced the original ten failures to one
+      (7,606 passed): the no-dialog AI case still invoked its deliberately
+      retired clear command. It now exercises restore alone, including the
+      assertion that the command factory exposes no clear; final CI is pending.
 - [ ] **73.** Follow-ups of the tray rows the Windows separator bug hid
       (`submenu-read-as-separator-2026-10-01`, fixed): the three families of «
       Combinaisons de touches » are back and read their raw `group_label`
