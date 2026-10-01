@@ -143,8 +143,8 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
-	Result := TapHoldOwnImmediateModifier("tab", "SC00F",
-		_TabHoldModKey(), TapHoldDuration(TapHold, "tab"))
+	Result := TapHoldOwnHoldModifier("tab", "SC00F",
+		_TabHoldModKey(), TapHoldDuration(TapHold, "tab"), _TabDispatch)
 	if Result["tap"]
 		_TabDispatch()
 }
@@ -168,7 +168,7 @@ $SC00F:: {
 $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
-	Result := TapHoldOwnImmediateLayer("tab", "SC00F", TapHoldDuration(TapHold, "tab"))
+	Result := TapHoldOwnHoldLayer("tab", "SC00F", TapHoldDuration(TapHold, "tab"), _TabDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("tab"))
 		_TabDispatch()
 }

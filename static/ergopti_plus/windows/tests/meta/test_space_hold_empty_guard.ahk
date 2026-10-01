@@ -40,8 +40,8 @@ _SHEG_GuardPresent() {
 	; Move-resilient: locate SpaceTapHold() across the whole driver source via the
 	; framework helper instead of a pinned modules path
 	block := _DriverFuncBody("SpaceTapHold")
-	Assert(InStr(block, 'TapHoldOwnImmediateModifier("space",') > 0,
-		"space.ahk: SpaceTapHold() must use the immediate configured-modifier owner")
+	Assert(InStr(block, 'TapHoldOwnHoldModifier("space",') > 0,
+		"space.ahk: SpaceTapHold() must use the shared configured-modifier owner")
 	Assert(!InStr(block, "ih.Input") and !InStr(block, "HoldFn.Call"),
 		"Space must not retain the obsolete empty-capture path")
 }

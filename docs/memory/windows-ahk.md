@@ -508,6 +508,28 @@ Alt the application receives (`KL_Watchers_DetectShortcut`). AHK keeps a modifie
 `{X Down}` around later non-blind Sends, so a tap-hold's synthetic AltGr is
 lifted around output on every layout (`TapHoldSendWithOwnedKeyUp`).
 
+### project-ahk-an-undecided-key-is-decided-by-the-thread-that-interrupts-it
+
+A tap-hold owner waiting in KeyWait is interrupted by the hotkey thread of
+the next key and cannot resume before that thread returns, so a decision
+that depends on the next key (a typing key rolled over it is a tap, a key
+let go under it is its hold) is taken in the interrupting thread, from the
+physical key states (`TapHoldRollOtherKey`), and read by the owner when it
+resumes. The next key must be a hotkey for that: `tap_hold_roll_keys.ahk`
+declares every text key, static, under `#HotIf TapHoldRollUndecided()`,
+bare, `*` and `+` (an exact chord beats the wildcard, and the emulation's
+Shift layer is exact), included before every key file so it is the
+earliest-created variant. The waiting key is then sent again by scan code
+with SendEvent at SendLevel 4, above every hotkey of the driver (the
+emulation's Alt chords are at 3), as press and release: the hook
+suppresses the release of a key whose press a hotkey suppressed. Never add
+the arrows or another key the driver binds by name to that block
+(`project-ahk-scan-code-hotkey-shadows-the-key-name`), nor a modifier key.
+The test suites include `tap_hold_roll.ahk` (logic) and not the block, so
+they hook no keyboard. Physical key state is not moved by injected events:
+this path has no synthetic end-to-end test, only its logic driven through
+ports in the order AutoHotkey runs the threads.
+
 ### project-ahk-worker-processes-inherit-driver-identity
 
 AHK creates the tray icon, the main window and every load-time hotkey before a

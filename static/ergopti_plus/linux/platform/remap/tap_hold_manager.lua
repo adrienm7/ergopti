@@ -200,6 +200,7 @@ local function _build(loaded)
 	end
 	local engine = Engine.new({
 		keys = loaded.keys,
+		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),

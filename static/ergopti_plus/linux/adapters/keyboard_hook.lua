@@ -826,8 +826,13 @@ end
 _tick_remapper = function(now_ms)
 	if not (_remapper and _intercept) then return end
 	for _, due in ipairs(_remapper:tick(now_ms)) do
-		_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true },
-			_remap_source_of[due.owner] or _device)
+		if due.tap ~= nil then
+			-- The action of a key replayed under a hold that just came due.
+			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap) end
+		else
+			_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true },
+				_remap_source_of[due.owner] or _device)
+		end
 		if not _running then return end
 	end
 end

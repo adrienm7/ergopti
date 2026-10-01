@@ -47,8 +47,8 @@ _BackspaceHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
-	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
-		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
+	Result := TapHoldOwnHoldModifier("backspace", "BackSpace",
+		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"), _BackspaceDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
@@ -68,7 +68,7 @@ $SC00E:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
-	Result := TapHoldOwnImmediateLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"))
+	Result := TapHoldOwnHoldLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"), _BackspaceDispatch)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }

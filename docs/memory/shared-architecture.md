@@ -398,6 +398,28 @@ chunk is at Lua's limit of 200 locals). Action: a new flow that imports a
 layer-holding key calls the same owner; never make a loader substitute the
 preset for an absent file.
 
+### project-a-typing-key-is-decided-by-the-order-of-the-releases
+
+A tap-hold key takes its hold at key-down, so a chord or a click under it
+never waits. For a key struck in the flow of text that rule types the next
+letter under the hold: with Shift on the hold of Space, « word, Space, a »
+gave « wordA » (Windows, then the space; Linux, no space at all, the other
+key cancelling the tap). The keys of `[tap_hold.rollover]` in
+`_shared/tap_hold/defaults.toml` (Escape, Tab, Enter, Space, Backspace,
+Delete) that keep their own key on a tap and have a hold therefore stay
+undecided: a tap when the key comes up first or a second key is struck
+before either came up, the hold when the key struck under it comes up first
+or the threshold passes. The keys struck meanwhile wait and are replayed in
+order, after the tap or under the hold. Such a tap has no minimum duration
+and is not cancelled by the keys around it, only by a click or the wheel. A
+key whose tap is an action, and every modifier key, keeps the immediate
+hold. Linux: `tap_hold_engine.lua` (`roll`, `resolve_roll`), which buffers
+events; Windows: `tap_hold_roll.ahk`. macOS is not covered: Karabiner
+decides a dual-role key at the next key's press (`to` + `to_if_alone`) and
+has no rule on the order of the releases. Action: a new typing key joins the
+shared list, and on Windows the block of `tap_hold_roll_keys.ahk`;
+`tap-hold-roll-is-a-tap-2026-10-01` holds both engines.
+
 ### project-key-combinations-have-their-own-gate
 
 The modifier combinations are the Shortcuts group `key_combinations_group`

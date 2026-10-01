@@ -64,8 +64,10 @@ _HLRB_AssertBounded(RelPath, Anchor, Where) {
 	Src := _HLRB_ReadSource(RelPath)
 	Body := _HLRB_Block(Src, Anchor)
 	Assert(Body != "", Where . " hold-layer #HotIf block must exist")
-	Assert(InStr(Body, "TapHoldOwnImmediateLayer(") > 0,
-		Where . " must activate the shared layer owner synchronously on key-down")
+	; A typing key enters through TapHoldOwnHoldLayer, which hands the layer to
+	; the same shared owner: at key-down, or once the order of the keys decided it.
+	Assert(InStr(Body, "TapHoldOwnImmediateLayer(") > 0 or InStr(Body, "TapHoldOwnHoldLayer(") > 0,
+		Where . " must hand the layer to the shared layer owner")
 	Assert(!InStr(Body, "KeyWait("),
 		Where . " must not wait for the tap threshold before publishing LayerEnabled")
 }

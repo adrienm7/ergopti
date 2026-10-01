@@ -28,6 +28,17 @@
 --- 4. It replaces kanata, which was optional, needed a newer glibc than Debian
 ---    12 and Ubuntu 22.04 ship, was never started by the daemon, and broke its
 ---    whole configuration on the first free-text action.
+--- 5. A typing key is decided by the order of the releases. Space, Enter, Tab,
+---    Backspace, Delete and Escape that keep their own key on a tap and gain a
+---    hold (the shared `roll_keys`) are struck in the flow of text, where the
+---    next key goes down before they come up: with the hold taken at key-down,
+---    « word, Space, a » typed « wordA » and no space. Such a key stays
+---    undecided and the keys struck meanwhile wait: it is a tap when it comes
+---    up first or when a second key is struck (typing rolling on), and a hold
+---    when the key struck under it comes up first or its threshold passes.
+---    The waiting keys are then replayed in order, after the tap or under the
+---    hold. Its tap needs no minimum duration and is not cancelled by the
+---    release of an earlier key: both are what fast typing looks like.
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
@@ -132,6 +143,8 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   roll_keys = { key_id }|nil, the typing keys decided by the order of the
+---     releases when they keep their own key on a tap and have a hold,
 ---   nav_layer = table|nil, explicitly compiled navigation chords; absent is native,
 ---   key_text = function(code) -> string|nil, the text a key would type now in
 ---     the live layout, nil for none;
@@ -181,7 +194,12 @@ function M.new(opts)
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
 		modifiers_down = {}, -- modifier keys that went through untouched, and are down
 		physical_down = {},  -- every physical key down now, whatever this engine made of it
+		undecided = nil,     -- code of the roll key down and not yet a tap or a hold
 	}
+	local roll_keys = {}
+	for _, key_id in ipairs(type(options.roll_keys) == "table" and options.roll_keys or {}) do
+		roll_keys[key_id] = true
+	end
 	for key_id, config in pairs(type(options.keys) == "table" and options.keys or {}) do
 		local code = M.KEY_CODES[key_id]
 		if code and type(config) == "table" and config.enabled ~= false then
@@ -230,6 +248,9 @@ function M.new(opts)
 				tap_at_down = rule and rule.tap_at_down or false,
 				native_under_modifier = rule and rule.native_under_modifier or false,
 				hold_past_threshold = rule and rule.hold_past_threshold or false,
+				-- A typing key that is itself on a tap and has a hold (see 5.).
+				roll = roll_keys[key_id] == true and not no_hold
+					and (tap == "" or M.KEY_TAPS[tap] == code),
 				skip_while_down = rule and rule.skip_while_down or nil,
 				tap_needs_up = TAP_NEEDS_UP[key_id],
 				tap_needs_up_at_release = (tap == "backspace" and layer)
@@ -258,10 +279,12 @@ end
 -- =========================================
 -- =========================================
 
---- Marks every held tap-hold key but one as used in a chord.
-local function cancel_taps(self, except)
+--- Marks every held tap-hold key but one as used in a chord. An undecided
+--- roll key is not used by the keys around it, which are typing: only a
+--- click or the wheel (`pointer`) makes its press something else than a tap.
+local function cancel_taps(self, except, pointer)
 	for code, state in pairs(self.held) do
-		if code ~= except then state.cancelled = true end
+		if code ~= except and (pointer or not state.undecided) then state.cancelled = true end
 	end
 end
 
@@ -591,6 +614,79 @@ local function fire_instant(self, out, config, now_ms)
 	return out, config.tap
 end
 
+--- Runs one event through the engine and appends what comes out, the event
+--- itself when the engine passes it unchanged.
+--- @return string|table|nil tap As M:process returns it.
+local function replay(self, out, code, value, now_ms)
+	local events, tap = self:process(code, value, now_ms)
+	if events == nil then
+		out[#out + 1] = { code = code, value = value }
+	else
+		for _, event in ipairs(events) do out[#out + 1] = event end
+	end
+	return tap
+end
+
+--- Decides an undecided roll key and replays the keys struck meanwhile, in
+--- order: after its tap, or under its hold.
+--- @param code integer The roll key.
+--- @param decision string "tap" or "hold".
+--- @param released boolean|nil True when the key itself came up.
+--- @return table out, string|table|nil tap As M:process returns them.
+local function resolve_roll(self, code, decision, now_ms, released)
+	local config, state = self.by_code[code], self.held[code]
+	local out, tap = {}, nil
+	local queue = state.queue
+	state.undecided, state.queue = nil, nil
+	self.undecided = nil
+	if released then self.held[code] = nil end
+	if decision == "hold" then
+		for _, mod in ipairs(config.mods) do
+			press(self, out, mod)
+			state.emitted[#state.emitted + 1] = mod
+		end
+		if config.layer then
+			state.layer = true
+			self.layer_depth = self.layer_depth + 1
+		end
+		-- A key struck under the hold made it a chord: no tap at the release.
+		if #queue > 0 then state.cancelled = true end
+	else
+		state.tapped = true
+		-- A click or the wheel during the press made it something else than typing.
+		if not state.cancelled then
+			tap = type_key_tap(self, out, config, config.tap == "" and code or M.KEY_TAPS[config.tap], now_ms)
+		end
+	end
+	for _, queued_code in ipairs(queue) do
+		local queued_tap = replay(self, out, queued_code, DOWN, now_ms)
+		tap = tap or queued_tap
+	end
+	return out, tap
+end
+
+--- Another key's event while a roll key is undecided.
+--- @return boolean handled False for an event of a key that was down before
+---   the roll key: its repeats and its release are its own.
+--- @return table|nil out, string|table|nil tap As M:process returns them.
+local function roll_other_key(self, pending, code, value, now_ms)
+	local state = self.held[pending]
+	if value == DOWN then
+		state.queue[#state.queue + 1] = code
+		-- A second key struck before either came up: typing rolling on.
+		if #state.queue >= 2 then return true, resolve_roll(self, pending, "tap", now_ms) end
+		return true, {}
+	end
+	local waiting = false
+	for _, queued_code in ipairs(state.queue) do waiting = waiting or queued_code == code end
+	if not waiting then return false end
+	if value == REPEAT then return true, {} end
+	-- Struck and let go while the roll key is still down: its hold.
+	local out, tap = resolve_roll(self, pending, "hold", now_ms)
+	local released_tap = replay(self, out, code, UP, now_ms)
+	return true, out, tap or released_tap
+end
+
 --- Presses a layer chord for `code` and remembers it until the key comes up.
 local function press_layer_key(self, code, spec)
 	local out = {}
@@ -625,6 +721,12 @@ function M:process(code, value, now_ms)
 		self.physical_down[code] = true
 	elseif value == UP then
 		self.physical_down[code] = nil
+	end
+
+	-- A roll key not yet decided: the keys struck meanwhile wait for it.
+	if self.undecided and code ~= self.undecided then
+		local handled, events, tap = roll_other_key(self, self.undecided, code, value, now_ms)
+		if handled then return events, tap end
 	end
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
@@ -699,6 +801,12 @@ function M:process(code, value, now_ms)
 				return fire_instant(self, out, config, now_ms)
 			end
 			cancel_taps(self, code)
+			-- A roll key takes nothing yet: the next events decide (resolve_roll).
+			if config.roll then
+				self.held[code] = { down_at = now_ms, cancelled = false, emitted = {}, undecided = true, queue = {} }
+				self.undecided = code
+				return out
+			end
 			local state = { down_at = now_ms, cancelled = false, emitted = {} }
 			for _, needed_up in ipairs(config.tap_needs_up or {}) do
 				if self.physical_down[needed_up] then state.tap_blocked = true end
@@ -728,6 +836,8 @@ function M:process(code, value, now_ms)
 		-- A release without its press here went down before this engine was
 		-- installed: the hook decides, from what it forwarded, what it means.
 		if not state then return nil end
+		-- A roll key that comes up first is a tap, then the key struck over it.
+		if state.undecided then return resolve_roll(self, code, "tap", now_ms, true) end
 		self.held[code] = nil
 		mask_lone_release(self, out, state)
 		for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
@@ -791,7 +901,7 @@ end
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
 --- chord.
 function M:activity()
-	cancel_taps(self, nil)
+	cancel_taps(self, nil, true)
 end
 
 --- Lets time pass: presses the hold of every key held past its threshold
@@ -801,10 +911,22 @@ end
 --- dispatched, so the hold is down for a key typed after the threshold and
 --- never for one typed sooner.
 --- @param now_ms number On the clock the key events carry.
---- @return table events Key-downs to dispatch, each with `owner`, the code of
----   the key whose hold it is.
+--- An undecided roll key past its threshold becomes its hold too, and the key
+--- struck under it is replayed.
+--- @return table events What to dispatch, each with `owner`, the code of the
+---   key whose hold it is: key events, and { tap = … } for an action a
+---   replayed key runs.
 function M:tick(now_ms)
 	local out = {}
+	local pending = self.undecided
+	if pending and now_ms - self.held[pending].down_at > self.by_code[pending].threshold_ms then
+		local events, tap = resolve_roll(self, pending, "hold", now_ms)
+		for _, event in ipairs(events) do
+			event.owner = pending
+			out[#out + 1] = event
+		end
+		if tap ~= nil then out[#out + 1] = { tap = tap, owner = pending } end
+	end
 	for code, state in pairs(self.held) do
 		local config = self.by_code[code]
 		if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
@@ -830,6 +952,7 @@ function M:release_all()
 		if not self.passed_down[code] then out[#out + 1] = { code = code, value = UP } end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
+	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}

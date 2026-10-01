@@ -36,10 +36,11 @@ global _SpaceHoldInputHook := ""
 ; ========================
 ; ========================
 
-; Design: both modifier and layer ownership begin synchronously on physical
-; Space down. The first following key therefore observes the configured hold,
-; even when it arrives before the tap threshold. On release the owner is
-; balanced first; only a quick, otherwise isolated press emits the tap action.
+; Design: Space that keeps its own key on a tap is decided by the order of
+; the releases (tap_hold_roll.ahk): a letter struck before Space comes up is
+; typed after the space, not under the hold. With a tap that is an action,
+; both modifier and layer ownership begin synchronously on physical Space
+; down, and only a quick, otherwise isolated press emits the tap action.
 ; The owned-press swallower at the end of this file silences Space's own
 ; auto-repeat while either hold is active.
 ;
@@ -47,18 +48,21 @@ global _SpaceHoldInputHook := ""
 ; SendInput bypasses the prefix-watcher InputHook.
 
 SpaceTapHold() {
-	Result := TapHoldOwnImmediateModifier("space", "SC039",
-		_SpaceHoldModKey(), TapHoldDuration(TapHold, "space"))
+	Result := TapHoldOwnHoldModifier("space", "SC039",
+		_SpaceHoldModKey(), TapHoldDuration(TapHold, "space"), _SpaceTapOrDispatch)
 	if Result["tap"]
 		_SpaceTapOrDispatch()
 }
 
 SpaceTapHoldLayer() {
-	Result := TapHoldOwnImmediateLayer("space", "SC039", TapHoldDuration(TapHold, "space"))
+	Result := TapHoldOwnHoldLayer("space", "SC039", TapHoldDuration(TapHold, "space"), _SpaceTapOrDispatch)
 	if Result["tap"] {
 		_SpaceTapOrDispatch()
 		return
 	}
+	; A press the roll owner already typed as a tap recorded its own space.
+	if (Result.Get("decision", "") == "tap")
+		return
 	UpdateLastSentCharacter("Space")
 }
 
