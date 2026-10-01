@@ -86,6 +86,16 @@ end
 --- @return boolean committed
 --- @return string|nil error_message
 local function publish(path, content, expected_source)
+	-- A synchronous fallback can acknowledge the current image after its exact
+	-- source recheck. Explicit adapters retain their own serialization boundary.
+	if type(expected_source) == "table" and expected_source.status == "ok"
+		and expected_source.content == content then
+		local current, detail, status = read_batch_source(path)
+		if status ~= "ok" or current ~= content then
+			return false, "source changed before unchanged acknowledgement: " .. tostring(detail or status)
+		end
+		return true
+	end
 	local tmp_path = path .. ".tmp"
 	local open_ok, fh, open_err = pcall(io.open, tmp_path, "w")
 	if not open_ok or not fh then

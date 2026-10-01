@@ -827,6 +827,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 						&& (!(U.Delete is Integer)
 							|| (U.Delete != 0 && U.Delete != 1))
 						throw TypeError("Delete must be the Integer 0 or 1")
+				; A neutral-value deletion must not create the missing section it
+				; was meant to leave absent, especially in the boot full-save batch.
+				if DeleteRequested && !Sections.Has(Sec)
+						continue
 				if !Sections.Has(Sec) {
 						Sections[Sec] := Map()
 						order.Push(Sec)
@@ -889,6 +893,17 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				; repository's canonical encoding policy.
 				return Map("status", "ok", "kind", "rendered",
 					"content", Chr(0xFEFF) . body)
+		}
+
+		; A canonical image already on disk needs no stage or atomic replacement.
+		; Keep the generation acknowledgement while preserving its existing inode.
+		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					"unchanged image; " . Updates.Length . " operation(s)")
+				return true
 		}
 
 		; Per-invocation scratch name. A fixed ``Path . ".tmp"`` made the staging

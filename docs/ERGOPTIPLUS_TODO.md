@@ -427,11 +427,6 @@ is committed; one request is one commit with its regression test.
       categories off in the maintainer's config.toml on 2026-09-30 (a
       restore, a clear or the wizard), since « ct★ » did nothing only because
       `category_enabled.french_magickey` was false.
-- [ ] **74.** Windows: every start rewrites config.toml with 347 updates
-      about three seconds after the driver is ready (15 to 30 ms, 2 360 ms on
-      a loaded machine). A reload asked during that write now waits for it
-      (`reload-during-config-write`); find why a start that changed nothing
-      writes the whole file, and make it write only what changed.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
       Windows 122, macOS 204 and Linux 127 rows are still built by the
@@ -462,7 +457,8 @@ is committed; one request is one commit with its regression test.
       census that counted Menu( inside domain-helper names. The counter now
       recognizes complete native tokens (including whitespace calls); a source
       fixture covers every family, helper suffixes and comments without raising
-      any baseline. Its repaired native lane is being revalidated.
+      any baseline. Native run 36922684126 now passes Windows unit, engine E2E,
+      packaging and installation, as well as the macOS and Linux test lanes.
       Order: finish other computed Metrics rows, then the template of (b)
       on Tap-Holds (the smallest menu that has one), then Gestures and
       Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
@@ -484,6 +480,13 @@ is committed; one request is one commit with its regression test.
       threshold and types the tap when another key comes first: that fixes
       typing but makes a quick chord type the tap, so decide which rule
       macOS gets for the keys of `[tap_hold.rollover]`, and verify on a Mac.
+
+- [ ] **88.** In the shared navigation-layer editor, give the layer activation
+      keys a blue background as well as their blue border, including the legend
+      chip. Arrange the mouse inputs by function: left/middle/right clicks in
+      three columns, back/forward below, then scroll up/down. Keep labels readable
+      in light and dark themes, and cover the shared layout and colors with
+      automated regressions used by all three drivers.
 
 ## Time estimate
 
