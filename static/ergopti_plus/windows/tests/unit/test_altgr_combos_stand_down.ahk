@@ -9,8 +9,8 @@
 ; typed the AltGr layer's character instead of Ctrl+C, and AltGr+Enter ran a
 ; script chord instead of Ctrl+Enter (kana-altgr-hold-other-2026-09-26). The
 ; key held as another modifier or a layer is that modifier or layer on every
-; layout, so the gate is false then. The Kana family is driven here: the
-; standard family's gate also needs the physical RAlt, which no test can press.
+; layout, so the gate is false then. Tests model the physical port without
+; injecting host input; both layout families require a physically held key.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -22,7 +22,7 @@ _ACSD_Gate(Entry) {
 	try {
 		TapHold := Map("keys", IsObject(Entry) ? Map("alt_gr", Entry) : Map(), "layers", Map())
 		; The owner cases model a held key; host input is never injected here.
-		return IsRealAltGrPress((Key, Mode) => true)
+		return IsRealAltGrPress((Key) => true)
 	} finally {
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
@@ -86,9 +86,10 @@ Test("altgr combos: an AltGr combination hold keeps them on every layout family 
 ; gate applies it before the physical check.
 _ACSD_EveryAltGrGateAppliesIt() {
 	Body := _DriverFuncBody("IsRealAltGrPress")
+	Assert(Body != "", "the eligibility function must exist")
 	Gate := InStr(Body, "AltGrKeyIsAltGr()")
-	AssertTrue(Gate > 0 and Gate < InStr(Body, 'GetKeyState("RAlt", "P")'),
-		"IsRealAltGrPress must stand down for a non-AltGr hold before its standard-layout physical check")
+	AssertTrue(Gate > 0 and Gate < InStr(Body, 'Query.Call("SC138")'),
+		"IsRealAltGrPress must stand down for a non-AltGr hold before its physical-state query")
 	Script := _DriverFuncBody("ScriptAltGrKanaChordRunsSlot")
 	AssertTrue(InStr(Script, 'ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P"))') > 0,
 		"the Kana suffix-only script chords must be gated by their criterion")
@@ -114,15 +115,14 @@ _ACSD_PhysicalEligibility(Family, Pressed) {
 	try {
 		TapHold := Map("keys", Map(), "layers", Map())
 		Queries := []
-		ReadPhysical(Key, Mode) {
-			Queries.Push(Map("key", Key, "mode", Mode))
+		ReadPhysical(Key) {
+			Queries.Push(Key)
 			return Pressed
 		}
 		AssertEqual(Pressed, IsRealAltGrPress(ReadPhysical),
 			Family . ": a latched prefix without a physical press must never admit a suffix")
 		AssertEqual(1, Queries.Length, "eligibility must read one physical key")
-		AssertEqual(Family == "kana" ? "SC138" : "RAlt", Queries[1]["key"])
-		AssertEqual("P", Queries[1]["mode"], "logical prefix state is not physical authority")
+		AssertEqual(Family == "kana" ? "SC138" : "RAlt", Queries[1])
 	} finally {
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
