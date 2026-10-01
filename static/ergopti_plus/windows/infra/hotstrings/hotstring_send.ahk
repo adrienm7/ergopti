@@ -244,6 +244,23 @@ OutputHostResolve(RequireTitle := false) {
 		Hwnd, Pid, Candidate["Exe"], Candidate["Class"], Title, TitleTimedOut)
 }
 
+; Whether the application of an output-host receipt must receive a text by
+; paste. Windows 11's Notepad loses characters typed as text in one burst and
+; types the last one in their place: a 32-character prediction came out as its
+; final « e » 32 times, and one SendInput of Unicode characters sent from
+; outside the driver gave « général eeee » for « général de l’histoire
+; militaire », where a classic Edit control receives them all. Slowing the
+; characters to one every 10 ms still dropped some. The one rule for every
+; sender: the hotstring expansions and TextSend's "auto" mode
+; (llm-accept-notepad-paste).
+; @param Host {Map} A receipt from OutputHostResolve.
+; @return {Boolean} True for Notepad; false for any other or an unknown host.
+OutputHostTakesTextByPaste(Host) {
+	if !(Host is Map) || !Host.Get("Valid", false)
+		return false
+	return StrLower(Host.Get("Exe", "")) = "notepad.exe"
+}
+
 OutputHostResolverPrimeForTest(Exe, ClassName := "fixture") {
 	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
 	Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")

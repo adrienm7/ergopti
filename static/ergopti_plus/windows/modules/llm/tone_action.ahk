@@ -229,7 +229,8 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "") {
 		return
 	}
 	Opts := Map(
-		"mode", "direct",
+		; Left to the adapter: typed, or pasted where typed text is garbled
+		"mode", "auto",
 		"atomic_input", true,
 		; Checked again at the instant the keys are sent
 		"admission", _LLM_Tone_FocusUnchanged.Bind(Focus)

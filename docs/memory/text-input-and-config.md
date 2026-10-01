@@ -25,6 +25,21 @@ macOS already owns the completing event and sends tagged deletion pairs to the
 exact application with the shared pacing delay. Keep terminal pacing off normal
 GUI applications.
 
+### project-windows-notepad-garbles-typed-text
+
+Windows 11's Notepad (`RichEditD2DPT`) loses the characters of a text typed
+as Unicode key events (`{Text}`, `KEYEVENTF_UNICODE`) and types the last one
+of the batch in their place: « général de l’histoire militaire » arrives as
+« général eeee », or as 32 « e ». It is the application, not the driver: one
+raw `SendInput` from a separate process reproduces it, a classic Edit control
+receives every character, and `SendEvent` with no key delay or one character
+every 10 ms still drops some (20 ms passed once). Never send a text there as
+typed characters: paste it. `OutputHostTakesTextByPaste` is the one rule,
+read by the hotstring expansions and by `TextSend`'s "auto" mode, so a new
+sender leaves the strategy to "auto" instead of forcing "direct". A log shows
+nothing in that case (the send succeeds); the keylogger's `llm_accepted` row
+holds the text that should have been typed.
+
 ### project-hotstring-engine-internals
 
 Each physical character enters the custom engine exactly once. Windows and macOS
