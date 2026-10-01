@@ -603,12 +603,20 @@ function cataloguePaths(driver) {
 	// The key combinations follow only their own switch, which the Shortcuts
 	// master no longer reaches: a No must still leave them off, as it did.
 	const described = CATALOGUE.platforms.windows.pages.find((p) => p.id === 'shortcuts');
-	const families = manifestToml.menu.key_combinations_group
-		.filter((row) => row.type === 'feature' && row.platforms.includes('ahk'))
-		.map((row) => row.path);
-	assert.ok(families.length >= 3, 'Windows has its AltGr / LAlt / CapsLock families');
+	// The sections the sub-switch governs: the tap slots of the pairs that ship
+	// a recommendation, the three chords the Windows driver always had.
+	const families = manifestToml.onboarding.pages.shortcuts.sub_switch.ahk.sections;
+	assert.deepEqual(families, ['shortcuts.key_combination_taps']);
 	const items = described.groups[0].items.filter((item) =>
 		families.some((family) => item.path.startsWith(family + '.'))
+	);
+	assert.equal(items.length, 3, 'AltGr then LAlt, AltGr then CapsLock, LAlt then CapsLock');
+	assert.deepEqual(
+		items.map((item) =>
+			item.label.map((segment) => (segment.key ? locale('en')[segment.key] : segment.text)).join('')
+		),
+		['AltGr + LAlt', 'AltGr + CapsLock', 'LAlt + CapsLock'],
+		'a pair is named by its two keys, the key held first then the key struck under it'
 	);
 	assert.deepEqual(described.sub_switch, {
 		path: 'category_enabled.key_combinations',
@@ -687,8 +695,13 @@ function cataloguePaths(driver) {
 
 	const without = shortcutsOver({ 'category_enabled.key_combinations': false });
 	answer(without, true);
-	const labels = new Set(items.map((item) => locale('en')[item.label[0].key]));
-	const familyRows = checkRows(without).filter((row) => labels.has(row.text));
+	const labels = new Set(
+		items.map((item) =>
+			item.label.map((segment) => (segment.key ? locale('en')[segment.key] : segment.text)).join('')
+		)
+	);
+	// A pair's row reads « keys » then « action »: its name is the first part.
+	const familyRows = checkRows(without).filter((row) => labels.has(row.name));
 	assert.equal(familyRows.length, items.length, 'each family item has its row');
 	familyRows.forEach(toggle);
 	const operations = finish(without).answers.operations;

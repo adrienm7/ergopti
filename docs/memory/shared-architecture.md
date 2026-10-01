@@ -425,18 +425,34 @@ shared list, and on Windows the block of `tap_hold_roll_keys.ahk`;
 The modifier combinations are the Shortcuts group `key_combinations_group`
 with a switch of their own, the only one they follow on every OS. macOS
 persists it as `[mod_combos] enabled` in `config_karabiner.toml`, read only by
-`Generator.key_combinations_enabled`; Windows as `KeyCombinations`, whose
-families the master gate reads from the group's `feature` rows and the
-Shortcuts master skips. Absent is on on both, because the sparse writer drops
-a value equal to the default and an absent key must keep the families. With
+`Generator.key_combinations_enabled`; Windows as `KeyCombinations`, read by
+the pair hotkeys themselves (`KeyCombinationsAreOn`), which no master gate
+rewrites. Absent is on on both, because the sparse writer drops a value equal
+to the default and an absent key must keep the pairs. With
 Tap-Holds off, the generator gives each key 1 of a hold slot a passthrough
 rule that only tracks its held variable, since the hold slots read it. The
 Windows wizard's Shortcuts answer writes the switch through its page's
-`sub_switch`, whose families come from the same `feature` rows, and only where
-the answer changes what is in force: off when it turns Shortcuts from Yes to
-No, on when it newly imports a family. Action: never mark combo rules as
-Tap-Holds feature rules again, add a Windows family as a row of the group, not
-as a gate list, and never make that default off.
+`sub_switch`, which names the feature sections it governs (the pair tap
+slots), and only where the answer changes what is in force: off when it turns
+Shortcuts from Yes to No, on when it newly imports a pair. Action: never mark
+combo rules as Tap-Holds feature rules again, and never make that default off.
+
+### project-key-combinations-are-ordered-pairs
+
+A key combination is an ordered pair of keys of `[tap_hold.catalog]`, the key
+held first then the key struck under it, on macOS (Karabiner, `mod_combos`)
+and on Windows (`infra/key_combinations.ahk`, since 2026-10-02; Linux has
+none yet). Windows keys a pair `first_then_second` and stores its two slots in
+`config.toml`: `[shortcuts.key_combination_taps]` (a catalogue action) and
+`[shortcuts.key_combination_holds]` (a hold-picker value). Only the pairs that
+ship a recommendation are manifest features; every other pair is an owned key
+of those sections (`TomlConfigForeignOwner`). Windows has no chord slot:
+macOS's needs the first key to wait for the second, which the Windows tap-hold
+owners, taking their hold at key-down, do not do. The group's two lists, one
+per hand of the first key, and the separator between them are declared in the
+manifest for both drivers; a provider returns the pairs only. Action: a new
+slot or row of this group goes in the manifest first, and a Windows pair id
+never uses a double underscore, which is the separator of a binding id.
 
 ### project-two-keys-for-one-row-is-two-menus
 

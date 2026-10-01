@@ -726,38 +726,53 @@
 		},
 		{
 			"type": "list",
-			"id": "key_combination_rows",
+			"id": "key_combination_rows_left",
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.alt_gr_lalt",
-			"group_label": "AltGrLAlt",
+			"type": "---",
 			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+				"ahk",
+				"hs"
+			]
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.alt_gr_caps_lock",
-			"group_label": "AltGrCapsLock",
+			"type": "list",
+			"id": "key_combination_rows_right",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		}
+	],
+	"key_combination_pair_menu": [
+		{
+			"type": "command",
+			"id": "key_combination_clear",
+			"i18n": "menu.tapholds.nothing_combo",
 			"platforms": [
 				"ahk"
 			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.lalt_caps_lock",
-			"group_label": "LAltCapsLock",
+			"type": "---",
+			"platforms": [
+				"ahk"
+			]
+		},
+		{
+			"type": "list",
+			"id": "key_combination_slots",
 			"platforms": [
 				"ahk"
 			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
 	],
 	"script_control_group": [

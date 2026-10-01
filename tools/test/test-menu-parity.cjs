@@ -90,6 +90,12 @@ const OPENS_SUBMENU = {
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	key_combinations: 'key_combinations_group',
+	// The menu one pair opens on Windows, from either hand's list: shown at the
+	// pointer when its row is clicked rather than hung under it as a submenu.
+	// On Windows only: macOS shows the same lists and hangs each pair's slots
+	// under its row, from its own cached trees.
+	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk'] },
+	key_combination_rows_right: { menu: 'key_combination_pair_menu', platforms: ['ahk'] },
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
@@ -227,9 +233,15 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
-			const target = OPENS_SUBMENU[row.id];
-			if (!target) continue;
-			const effective = PLATFORMS.filter((p) => visibleOn(row, p) && parentVisibility.includes(p));
+			const opened = OPENS_SUBMENU[row.id];
+			if (!opened) continue;
+			// A string names the menu the row opens wherever it is visible; an object
+			// also names the platforms where it opens that menu.
+			const target = typeof opened === 'string' ? opened : opened.menu;
+			const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
+			const effective = PLATFORMS.filter(
+				(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
+			);
 			const before = (reachableOn[target] || []).join(',');
 			if (before !== effective.join(',')) {
 				reachableOn[target] = effective;

@@ -681,15 +681,42 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 	}
 end
 
---- Builds all modifier combo items grouped by their "group" field.
+--- The hand a modifier combo is listed under: the hand of the key held first,
+--- as the shared tap-hold catalogue assigns it.
+--- @param combo_def table Entry from MOD_COMBOS.
+--- @return string|nil "left" or "right"; nil when its first key is not catalogued.
+local function combo_hand(combo_def)
+	local from = type(combo_def.from) == "table" and combo_def.from.simultaneous
+	local first = type(from) == "table" and from[1]
+	local key_code = type(first) == "table" and first.key_code
+	for _, entry in ipairs(key_catalog()) do
+		if entry.id == key_code then return entry.hand end
+	end
+	return nil
+end
+
+--- Logs every modifier combo whose first key the catalogue does not list: it
+--- belongs to no hand, so neither list of the group can show it.
+--- @param karabiner table The karabiner module.
+local function report_unplaced_combos(karabiner)
+	for _, combo_def in ipairs(karabiner.MOD_COMBOS or {}) do
+		if not combo_def.menu_hidden and combo_hand(combo_def) == nil then
+			Logger.error(LOG, "Modifier combo '%s' begins on a key missing from [tap_hold.catalog] — it has no menu row.",
+				tostring(combo_def.id))
+		end
+	end
+end
+
+--- Builds the modifier combo items of one hand, grouped by their "group" field.
 --- Items are grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
+--- @param hand        string   "left" or "right": the hand of the key held first.
 --- @return table List of hs.menubar menu item tables.
-local function build_raccourcis_items(karabiner, action_index, update_menu, enabled)
+local function build_raccourcis_items(karabiner, action_index, update_menu, enabled, hand)
 	local items         = {}
 	local current_group = nil
 	local is_symmetric  = karabiner.get_combo_symmetric()
@@ -702,6 +729,7 @@ local function build_raccourcis_items(karabiner, action_index, update_menu, enab
 		-- canonical entry) are hidden: the canonical half configures the chord for
 		-- both press orders, so showing the reverse would confuse the user.
 		if is_symmetric and non_canonical[combo_def.id] then goto continue end
+		if combo_hand(combo_def) ~= hand then goto continue end
 
 		if combo_def.group ~= current_group then
 			items[#items + 1] = MenuUtils.build_section_header(combo_def.group)
@@ -899,6 +927,7 @@ end
 --- Returns the (memoised) tap/hold and raccourcis picker trees, rebuilding only
 --- when the binding fingerprint changes. See _picker_cache rationale above.
 --- @return table tap_hold { left, right } key rows per hand, table raccourcis
+---         { left, right } combo rows per hand of the key held first
 local function build_picker_trees(karabiner, update_menu, enabled)
 	local fp = picker_fingerprint(karabiner, enabled)
 	if _picker_cache and _picker_cache.fp == fp then
@@ -912,7 +941,11 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 		left  = build_hand_items(karabiner, action_index, update_menu, enabled, "left"),
 		right = build_hand_items(karabiner, action_index, update_menu, enabled, "right"),
 	}
-	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
+	report_unplaced_combos(karabiner)
+	local raccourcis = {
+		left  = build_raccourcis_items(karabiner, action_index, update_menu, enabled, "left"),
+		right = build_raccourcis_items(karabiner, action_index, update_menu, enabled, "right"),
+	}
 	_picker_cache = { fp = fp, tap_hold = tap_hold, raccourcis = raccourcis }
 	return tap_hold, raccourcis
 end
@@ -1139,7 +1172,8 @@ end
 --- It opens with its own switch (persisted [mod_combos] enabled; on while the
 --- user never set it, whatever the Tap-Holds switch says), then the symmetry
 --- check, the chord delay, the tap → chord copy, and
---- one row per ordered pair of keys with its three slots.
+--- one row per ordered pair of keys with its three slots, left hand then
+--- right hand.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil The rendered rows of the group's submenu, or nil.
 function M.build_key_combinations(ctx)
@@ -1156,10 +1190,15 @@ function M.build_key_combinations(ctx)
 		["combo_timings"] = function()
 			return { build_simultaneous_threshold_item(karabiner, update_menu) }
 		end,
-		-- Greyed with « Ergopti uses Karabiner » off, and led by the reason.
-		["key_combination_rows"] = function()
+		-- Greyed with « Ergopti uses Karabiner » off, and led by the reason. One
+		-- list per hand of the key held first; the manifest separates them.
+		["key_combination_rows_left"] = function()
 			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
-			return with_karabiner_off_hint(chords, enabled)
+			return with_karabiner_off_hint(chords.left, enabled)
+		end,
+		["key_combination_rows_right"] = function()
+			local _, chords = build_picker_trees(karabiner, update_menu, enabled)
+			return with_karabiner_off_hint(chords.right, enabled)
 		end,
 	}
 

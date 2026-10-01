@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Shortcuts
 ; DESCRIPTION:
-; Defines all keyboard shortcuts (Win, Alt, Ctrl, AltGr combos) built on top
+; Defines all keyboard shortcuts (Win, Alt, Ctrl) built on top
 ; of the Ergopti layout. Includes CapsWord helpers and the AddShortcut/
 ; RetrieveScancode utilities that resolve layout-aware scan codes at runtime.
 ;
@@ -25,8 +25,6 @@
 ; ======================================
 
 #Include shortcuts/utils.ahk
-#Include shortcuts/base_modifier.ahk
 #Include shortcuts/ctrl.ahk
-#Include shortcuts/altgr.ahk
 #Include shortcuts/win.ahk
 #Include shortcuts/capsword.ahk

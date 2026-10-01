@@ -155,46 +155,6 @@ global Features := Map(
             "number_row_right_1", "none",
             "number_row_right_2", "none",
         ),
-        ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
-        ; A later refactor migrated the individual reads in modules/shortcuts.ahk
-        ; (AltGrLAlt) and platform/remap.ahk (LAltCapsLock); phase 10
-        ; added AltGrCapsLock when the dispatcher was inlined.
-        "alt_gr_caps_lock", Map(
-            "backspace",      false,
-            "caps_lock",      false,
-            "caps_word",      false,
-            "ctrl_backspace", false,
-            "ctrl_delete",    true,
-            "delete",         false,
-            "enter",          false,
-            "escape",         false,
-            "one_shot_shift", false,
-            "tab",            false,
-        ),
-        "alt_gr_lalt", Map(
-            "backspace",      false,
-            "caps_lock",      false,
-            "caps_word",      false,
-            "ctrl_backspace", true,
-            "ctrl_delete",    false,
-            "delete",         false,
-            "enter",          false,
-            "escape",         false,
-            "one_shot_shift", false,
-            "tab",            false,
-        ),
-        "lalt_caps_lock", Map(
-            "backspace",      false,
-            "caps_lock",      false,
-            "caps_word",      true,
-            "ctrl_backspace", false,
-            "ctrl_delete",    false,
-            "delete",         false,
-            "enter",          false,
-            "escape",         false,
-            "one_shot_shift", false,
-            "tab",            false,
-        ),
     ),
     ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with

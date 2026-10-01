@@ -21,9 +21,8 @@ ActivateEdit(*) {
 		Edit()
 }
 ; Physical keys registered as an AHK custom-combination PREFIX (the left side of
-; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk or
-; "SC038 & SC03A::" in modules/shortcuts/base_modifier.ahk). AHK's custom-
-; combination prefix-down flag latches across Suspend() and cannot be cleared by
+; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk).
+; AHK's custom-combination prefix-down flag latches across Suspend() and cannot be cleared by
 ; synthetic events -- see _SuspendPrefixesAreClear / _SuspendPendingPoll below.
 ; Single source of truth: EVERY key used as the prefix of an "X & Y" custom
 ; combination anywhere in the driver must appear here, so it is drained
@@ -32,8 +31,10 @@ ActivateEdit(*) {
 ; F42, F-30). The list is hand-maintained, so
 ; test_suspend_prefix_drain_covers_all_combos.ahk DERIVES the real prefix set
 ; from driver source and fails when a newly introduced combination is missing.
-;   SC138 = AltGr/Kana   SC038 = LAlt   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
-global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038", "SC01D", "SC02A", "SC11D"]
+; LAlt left the list with "SC038 & SC03A::": the key combinations are plain
+; hotkeys of their second key now (platform/remap/key_combination_keys.ahk).
+;   SC138 = AltGr/Kana   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
+global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC01D", "SC02A", "SC11D"]
 global _SuspendPending := false
 
 ; Wall-clock bound on the deferred suspend. The gate waits for a physically

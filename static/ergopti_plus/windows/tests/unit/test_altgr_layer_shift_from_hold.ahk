@@ -117,15 +117,13 @@ Test("altgr layer: a Shift held by the AltGr hold picks the Shifted entry on eve
 	_ALSH_ShiftFromTheHoldPicksShifted)
 
 ; Every AltGr-layer output that picks by Shift reads it through the same rule:
-; the table dispatcher, the two rolls it does not dispatch, and the AltGr+LAlt
-; shortcut ("Shift" + "AltGr" + "LAlt" swaps its Backspace and Delete).
+; the table dispatcher and the two rolls it does not dispatch.
 _ALSH_EveryAltGrShiftReadUsesTheRule() {
 	Dispatch := _DriverFuncBody("AltGrShiftDispatch")
 	Assert(Dispatch != "", "AltGrShiftDispatch must be found")
 	AssertTrue(InStr(Dispatch, "Cb := AltGrLayerEntryCallable(Entry)") > 0,
 		"AltGrShiftDispatch must pick its entry through AltGrLayerEntryCallable")
-	for _, Name in ["AltGrLayerEntryCallable", "_RollChevronEqualEmit", "_RollHashtagQuoteEmit",
-			"AltGrLAltShortcut"] {
+	for _, Name in ["AltGrLayerEntryCallable", "_RollChevronEqualEmit", "_RollHashtagQuoteEmit"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must be found")
 		AssertTrue(InStr(Body, "AltGrLayerShiftHeld()") > 0, Name . " must read Shift through AltGrLayerShiftHeld")

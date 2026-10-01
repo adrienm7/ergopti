@@ -18,7 +18,7 @@ local M = {}
 M.version = "2.0.0"
 
 M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
-M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  }, clear_exclude = { "tap_holds.enabled", "category_enabled.tap_holds" } }, shortcuts = { action_parameters = { domains = { "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  }, clear_exclude = { "gestures.enabled" } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
+M.scopes = { tap_holds = { action_parameters = { domains = { "tap_hold" }, restore = "remove" }, prefixes = { "tap_holds", "category_enabled.tap_holds" }, preset = "tap_hold", restore_exclude = {  }, clear_exclude = { "tap_holds.enabled", "category_enabled.tap_holds" } }, shortcuts = { action_parameters = { domains = { "combination", "keyboard", "script", "tap_key" }, restore = "remove" }, prefixes = { "shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations" }, restore_exclude = {  }, dynamic_defaults = { { prefix = "shortcuts.personal", depth = 1, default = false, recommended = false, type = "boolean" }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none", type = "string" }, { prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none", type = "string" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none", type = "string" } } }, gestures = { action_parameters = { domains = { "gesture" }, restore = "remove" }, prefixes = { "gestures" }, restore_exclude = {  }, clear_exclude = { "gestures.enabled" } }, keyboard_layout = { prefixes = { "layout", "category_enabled.layout", "script.alt_gr_is_kana_remap" }, restore_exclude = {  } }, hotstrings = { prefixes = { "hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key" }, restore_exclude = { "hotstrings.preview_ai_enabled" }, dynamic_defaults = { { prefix = "category_enabled", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false, type = "boolean" }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0, type = "integer" } } }, llm = { prefixes = { "llm" }, restore_exclude = { "llm.enabled" }, dynamic_defaults = { { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mods", default = {  }, recommended = {  }, type = "array" }, { prefix = "llm.profiles.shortcuts", depth = 2, suffix = "key", default = "", recommended = "", type = "string" } } }, metrics = { prefixes = { "metrics" }, restore_exclude = { "metrics.enabled", "metrics.metrics_enabled" } }, global = { includes = { "tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics" }, prefixes = { "script" }, restore_exclude = {  } } }
 
 M.sections = {
 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -41,11 +41,9 @@ M.sections = {
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control", "tap_keys" } },
-	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.alt_gr_lalt"] = { description_key = "menu.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
+	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys" } },
+	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
-	["shortcuts.lalt_caps_lock"] = { description_key = "menu.shortcuts.lalt_caps_lock", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -1022,94 +1020,13 @@ M.unavailable = {
 		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.alt_gr_caps_lock.backspace", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.alt_gr_caps_lock.caps_lock", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.alt_gr_caps_lock.caps_word", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.ctrl_backspace", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.ctrl_delete", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.delete", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.enter", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.escape", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.one_shot_shift", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_caps_lock.tab", section = "shortcuts.alt_gr_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.backspace", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.caps_lock", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.caps_word", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.ctrl_backspace", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.ctrl_delete", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.delete", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.enter", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.escape", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.one_shot_shift", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.alt_gr_lalt.tab", section = "shortcuts.alt_gr_lalt", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.backspace", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.caps_lock", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.caps_word", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.ctrl_backspace", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.ctrl_delete", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.delete", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.enter", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.escape", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.one_shot_shift", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.lalt_caps_lock.tab", section = "shortcuts.lalt_caps_lock", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },

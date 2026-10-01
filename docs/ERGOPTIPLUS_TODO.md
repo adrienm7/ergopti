@@ -492,21 +492,27 @@ is committed; one request is one commit with its regression test.
   the pixels); Windows draws the corrections of an unselected line in
   the regular weight, where the Lua drivers use bold (its text measure
   has one weight).
-- [ ] **91.** Windows: « Combinaisons de touches » works as on macOS. Today
-      it is three fixed families (AltGr+LAlt, AltGr+CapsLock, LAlt+CapsLock),
-      each one boolean per action, one direction, fired when the second key
-      goes down. macOS lists every ordered pair of its tap-hold keys (key 1
-      then key 2 is not key 2 then key 1), each with three slots: the chord
-      (both within the simultaneity delay), hold 1 + tap 2 and hold 1 +
-      hold 2, plus the chord symmetry, the chord delay and « copy tap to
-      chord ». Windows gets the same model over the keys of
-      `[tap_hold.catalog]`, the three families becoming the recommended
-      values of their pairs.
+- [~] **91.** Windows: « Combinaisons de touches » as on macOS. Done on
+  2026-10-02: every ordered pair of the keys of `[tap_hold.catalog]`
+  (key 1 then key 2 is not key 2 then key 1), each with « hold 1 + tap
+  2 » and « hold 1 + hold 2 », listed by hand; the three former families
+  are the recommended pairs (`infra/key_combinations.ahk`). Remaining:
+  (a) the chord slot (both keys within the simultaneity delay), with its
+  symmetry, its delay and « copy tap to chord »: the first key of a chord
+  must wait for the second, while every Windows tap-hold owner takes its
+  hold at key-down; (b) on a standard AltGr layout a pair that ends on
+  AltGr loses to the `~SC01D & ~SC138` combination that reads AltGr's
+  fake LCtrl, and a pair that ends on LCtrl fires on that fake LCtrl; (c)
+  a real-keyboard check of the order rule (a key held alone, then joined
+  by another, must not fire the pair), which rests on AutoHotkey
+  recording a key's physical state after its criteria have answered;
+  (d) macOS draws each pair's slots from its own code where Windows
+  reads `key_combination_pair_menu`.
 - [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
       binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
       taps when a second tap-hold key goes down) and the Shortcuts menu draws
       no `key_combinations` group. Port the pair model of item 91 (same pair
-      ids, slots and file section as Windows), decide the chord inside
+      ids, slots and config sections as Windows), decide the chord inside
       `M:process` / `M:tick`, and widen the manifest group to `linux`.
       `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
