@@ -4970,10 +4970,9 @@ type = "---"
 type = "section_header"
 i18n = "menu.layout.header_custom"
 
-# The custom layout picker, on every driver: the registry layouts the layout
-# manager installed (and, on Windows, the built-in Ergopti emulation), the one
-# typing uses checked; choosing another makes it the active layout (macOS and
-# Linux select the input source, Windows emulates it after a reload).
+# macOS and Linux list installed native input sources and select one through
+# the OS. Windows reports its enabled emulation as a disabled status row;
+# selection belongs to the shared layout manager immediately below it.
 [[menu.layout_menu]]
 type = "list"
 id = "custom_layouts"

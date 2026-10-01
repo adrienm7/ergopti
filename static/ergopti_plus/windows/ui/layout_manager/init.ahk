@@ -330,23 +330,6 @@ LayoutManager_Select(Id) {
 	return ReloadPreservingSuspend()
 }
 
-/**
- * Makes the built-in Ergopti emulation the layout typing uses, keeping its
- * Ergopti+ setting (the menu's Ergopti row). Persists, then reloads.
- * @returns {boolean} Whether the reload was started.
- */
-LayoutManager_SelectBuiltin() {
-	global Features
-	Entries := [
-		Map("path", "layout.emulated_layout", "value", ""),
-		Map("path", "layout.ergopti_base", "value", true),
-	]
-	LoggerInfo("LayoutManager", "Selecting the built-in Ergopti emulation and reloading.")
-	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
-		return ConfigReportPersistenceFailure("the layout selection")
-	return ReloadPreservingSuspend()
-}
-
 ; The successor discovers committed extension roots even for nonselected layouts.
 ; A launch acknowledgement is deliberately separate from terminal completion.
 _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
