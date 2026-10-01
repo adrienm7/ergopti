@@ -776,7 +776,7 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
 			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
-			"ui.menu.menu_llm.models_manager_mlx_download",
+			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
@@ -903,6 +903,12 @@ helpers.describe("model manager generation fences", function()
 					keymap = {set_llm_model = function() runtime_sets = runtime_sets + 1 end},
 				}
 				local obj = {start_server = function() starts = starts + 1; return true end}
+				-- The download exports the system network settings first; the faked
+				-- io.open hides the shared policy file, so its prelude is stubbed.
+				package.loaded["modules.llm.network_env"] = {
+					policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
+					prelude = function() return "", nil end,
+				}
 				require("ui.menu.menu_llm.models_manager_mlx_download").install({
 					obj = obj, deps = deps, presets = {},
 					project_venv_python_escaped = "/fixture/python",

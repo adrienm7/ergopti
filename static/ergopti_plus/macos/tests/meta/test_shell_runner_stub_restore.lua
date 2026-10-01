@@ -92,6 +92,12 @@ end
 --- @param content string Full source of a test file.
 --- @return boolean|nil True when a dangling install remains (nil = no install).
 local function has_dangling_install(content)
+	-- helpers.with_fresh_modules restores every module its list names after
+	-- each case, so a file that lists adapters.shell_runner there restores it.
+	if content:find("helpers.with_fresh_modules", 1, true)
+			and content:find('[{,]%s*"adapters%.shell_runner"%s*[,}]') then
+		return false
+	end
 	local last_install = nil
 	local search_from = 1
 	while true do
@@ -151,5 +157,9 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 			"an install with no later restore must be flagged")
 		helpers.assert_true(has_dangling_install(restored) == false,
 			"an install followed by a restore must pass")
+		local scoped = 'local OWNED = { "adapters.shell_runner" }\n' .. dangling
+			.. '\nhelpers.with_fresh_modules(OWNED, body)'
+		helpers.assert_true(has_dangling_install(scoped) == false,
+			"an install inside a with_fresh_modules scope that owns the module must pass")
 	end)
 end)
