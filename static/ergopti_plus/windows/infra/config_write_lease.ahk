@@ -62,6 +62,20 @@ _ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
 	}
 }
 
+; Whether a configuration write is in progress that a new thread can only have
+; interrupted: some path is owned and no terminal transition holds the table.
+; A hotkey or a tray click that sees this cannot get a lease before it returns
+; and lets the owner finish, so it defers its work instead of failing. A
+; terminal transition owns every path until the process ends: waiting for it
+; would only delay the refusal.
+; @returns {Boolean}
+ConfigWriteLeaseBusy() {
+	State := _ConfigWriteLeaseState()
+	PreviousCritical := Critical("On")
+	try return !(State.terminal is Object) && State.owners.Count > 0
+	finally Critical(PreviousCritical)
+}
+
 _ConfigWriteLeaseRelease(Token) {
 	if !(Token is Object) || !Token.HasOwnProp("key") || !Token.HasOwnProp("id")
 		return false

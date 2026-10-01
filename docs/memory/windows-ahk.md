@@ -188,6 +188,15 @@ config.toml » and an error window. Action: return and ask again from a
 one-shot timer, as `ReloadDeferralQueue` does for a plain reload (bounded, one
 queued at a time); never `Sleep` or loop on a lease inside the request. A
 request with callbacks or a borrowed bundle is still refused at once.
+A tray click meets this far more often than chance suggests: AutoHotkey runs
+no timer while a menu is open, so a save that came due meanwhile (the
+start-up full save, thirty seconds after a start) begins the moment the menu
+closes and the clicked row's command interrupts it. A category toggle was
+lost this way with « another configuration transaction is already in
+progress » (2026-10-01). Every menu command, native or rescued by the retry,
+now goes through `MenuCommandRun`, which waits for `ConfigWriteLeaseBusy()` to
+clear on a one-shot timer (bounded, then the command runs and reports its own
+refusal). A new dispatch path must go through it too.
 
 ## Input, suspension, and menus
 

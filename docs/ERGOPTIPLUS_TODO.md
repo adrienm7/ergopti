@@ -455,13 +455,6 @@ is committed; one request is one commit with its regression test.
       declared in the shared manifest, none built in a driver's folder):
       Windows 125, macOS 209 and Linux 127 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`).
-- [ ] **82.** Windows: a tray click made while a configuration write is in
-      progress loses its setting with an error window (« Could not persist
-      the 'FrenchMagicKey' category toggle: another configuration transaction
-      is already in progress », 2026-10-01 13:56:17, a few seconds after a
-      reload, during the start-up write of item 74). The click interrupts
-      the writer, so it cannot wait in place: defer the menu command until
-      the write ends, for every menu command, as the reload now does.
 - [ ] **83.** Changing the hold of Space from Shift to the navigation layer
       in the Tap-Hold menu leaves the hold typing capitals, as Shift did
       (Windows, 2026-10-01). The pick writes `hold_layer = "nav"` and nothing
