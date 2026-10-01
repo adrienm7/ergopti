@@ -37,8 +37,6 @@
 		--code: #2d2d2d;
 		--pre-background: #111;
 		--pre-text: #d4d4d4;
-		--accent: #4a9eff;
-		--accent-text: #0b0b0b;
 		--ok: #3fb950;
 		--fail: #ff7b72;
 		--pending: #d29922;
@@ -91,13 +89,16 @@ button:disabled {
 	opacity: 0.5;
 }
 
+/* White on blue in both appearances: the dark one declares no pair of its own. */
 button.primary {
 	background: var(--accent);
 	border-color: var(--accent);
 	color: var(--accent-text);
 }
 
-#btn-close {
+/* Collecting again stands apart on the right. The window's own close button
+   closes it, so the toolbar repeats none. */
+#btn-refresh {
 	margin-left: auto;
 }
 

@@ -118,9 +118,16 @@ TrayMenuItemCount(TargetMenu) {
 ; @param Position {Integer} Zero-based row position.
 ; @returns {Boolean} True for a separator row.
 TrayMenuIsSeparatorAt(TargetMenu, Position) {
-	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
+	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800, MF_POPUP := 0x10
 	State := DllCall("GetMenuState", "ptr", TargetMenu.Handle, "uint", Position, "uint", MF_BYPOSITION, "uint")
-	return (State != 0xFFFFFFFF) and (State & MF_SEPARATOR) != 0
+	if (State == 0xFFFFFFFF)
+		return false
+	; For a row that opens a submenu, only the low byte holds flags: the high
+	; byte is the submenu's row count, and 0x800 is one of its bits. A submenu
+	; of 8 to 15 rows read as a separator, and the normaliser deleted it.
+	if (State & MF_POPUP)
+		return false
+	return (State & MF_SEPARATOR) != 0
 }
 
 ; Resets the tray icon and menu to AHK defaults.

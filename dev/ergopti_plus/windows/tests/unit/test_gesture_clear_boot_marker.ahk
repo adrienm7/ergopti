@@ -60,6 +60,13 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 		Parsed := TOML_ParseFreshFile(RestartPath)
 		AssertEqual("keep", Parsed["gestures"]["unknown_user"])
 		AssertEqual("keep", Parsed["private"]["credential"])
+		; The clear once deleted the switch with the assignments, so the next
+		; gesture the user set did nothing until the switch was found again.
+		if Mode == "clear" && Outcome == "complete" {
+			Assert(!Parsed["gestures"].Has("tap_4"), "the clear removes the assignments")
+			AssertEqual(true, Parsed["gestures"]["enabled"],
+				Scope . " clear owns the assignments, not the Gestures switch (gestures-clear-keeps-switch)")
+		}
 		Raw := IniCacheGet(Parsed, "gestures", "auto_configure_on_next_start")
 		if _GestureAutoConfigureFlagEnabled(Raw)
 			Assert(GestureConsumeAutoConfigureFlag(RestartPath, 0, (*) => 0, Schedule))

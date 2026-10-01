@@ -42,15 +42,18 @@ local function fake_checks(code, latest)
 	}, calls
 end
 
---- Builds the About submenu of a packaged build through the real renderer.
-local function build(checks)
+--- Builds the About submenu through the real renderer.
+--- @param checks table|nil The automatic-check owner; a local version has none.
+--- @param local_source boolean|nil True for a local version run from source.
+--- @param state table|nil Menu state (the stored check interval).
+local function build(checks, local_source, state)
 	local Updater = require("modules.updater")
 	local real_local = Updater.is_local_source
-	Updater.is_local_source = function() return false end
+	Updater.is_local_source = function() return local_source == true end
 	package.loaded["ui.menu.menu_about"] = nil
 	local ok, rows = pcall(function()
 		local About = helpers.load_with_stubs("ui.menu.menu_about")
-		return About.build({ channel_owner = fake_owner("dev"), update_checks = checks }).submenu
+		return About.build({ channel_owner = fake_owner("dev"), update_checks = checks, state = state or {} }).submenu
 	end)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil
@@ -119,6 +122,50 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 		for _, row in ipairs(idle) do
 			helpers.assert_true(row.title:find("v0.0.0-dev.150", 1, true) == nil,
 				"without a found release no row names one")
+		end
+	end)
+
+	-- A local version has no installation to update, so it starts no
+	-- automatic check. Its check row and its frequency row used to be left
+	-- out, and nobody could tell whether the feature existed: they are drawn
+	-- greyed, with the reason, and run nothing.
+	helpers.it("(update-rows-greyed-on-local-2026-10-01) a local version draws the update rows greyed with their reason", function()
+		--- The reason as the renderer shortens it: its text before the first colon.
+		--- Read after a build, which loads the locale module the page was drawn with.
+		local function reason_head()
+			local reason = require("infra.i18n").get("menu.about.source_run_reason")
+			return reason:match("^(.-)%s*[:：]") or reason
+		end
+		for _, case in ipairs({ { state = {}, code = "1d" }, { state = { update_check_interval_seconds = 604800 }, code = "1w" } }) do
+			local rows = build(nil, true, case.state)
+			local i18n = require("infra.i18n")
+			local head = reason_head()
+			local expected = {
+				i18n.get("menu.about.check_for_updates"),
+				i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. case.code),
+			}
+			local found = {}
+			for index, row in ipairs(rows) do
+				for at, label in ipairs(expected) do
+					if type(row.title) == "string" and row.title:find(label, 1, true) == 1 then found[at] = index end
+				end
+			end
+			helpers.assert_true(found[1] ~= nil, "a local version draws the check row")
+			helpers.assert_true(found[2] ~= nil, "a local version draws the frequency row, naming the preset " .. case.code)
+			helpers.assert_eq(found[2], found[1] + 1, "the frequency row follows the check row")
+			for at, label in ipairs(expected) do
+				local row = rows[found[at]]
+				helpers.assert_eq(row.title, label .. " — " .. head, "the row says why it is greyed")
+				helpers.assert_eq(row.disabled, true, label .. " is greyed")
+				helpers.assert_nil(row.fn, label .. " runs nothing")
+				helpers.assert_nil(row.menu, label .. " opens nothing")
+			end
+		end
+		local installed = build(fake_checks("1d"))
+		local head = reason_head()
+		for _, row in ipairs(installed) do
+			helpers.assert_true(type(row.title) ~= "string" or row.title:find(head, 1, true) == nil,
+				"an installed build greys no row for this reason: " .. tostring(row.title))
 		end
 	end)
 end)

@@ -7,7 +7,8 @@
  * The diagnostics window of the three drivers: it renders the host's v2
  * snapshot through the shared model (model.js), keeps the preview of what
  * leaves the machine, and asks the host, by message, to copy, save, report,
- * open a folder or a settings page, collect again or close.
+ * open a folder or a settings page, or collect again. The window's own close
+ * button closes it.
  *
  * FEATURES & RATIONALE:
  * 1. One entry point for the host, window.receiveDiagnostics(message), with a
@@ -89,7 +90,7 @@
 	 */
 	function setToolbarEnabled(enabled) {
 		document.querySelectorAll('.toolbar button').forEach(function (button) {
-			if (button.id !== 'btn-close') button.disabled = !enabled;
+			button.disabled = !enabled;
 		});
 		document.getElementById('chk-details').disabled = !enabled;
 	}
@@ -264,9 +265,6 @@
 		'btn-refresh': function () {
 			setStatus(t('healthcheck.status.loading'), 'info');
 			post({ action: 'refresh', detailed: document.getElementById('chk-details').checked });
-		},
-		'btn-close': function () {
-			post({ action: 'close' });
 		}
 	};
 

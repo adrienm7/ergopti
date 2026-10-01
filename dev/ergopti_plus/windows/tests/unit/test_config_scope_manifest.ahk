@@ -244,7 +244,7 @@ _ScopeGestureMenuOwnsParameters() {
 	global GestureActionParameters, _MenuDispatchCallbacks
 	SavedParameters := GestureActionParameters
 	Fixture := _ScopeOwnerFixture()
-	Source := '[gestures]`nenabled = false`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
 	Assert(FSWriteDurable(Fixture.path, Source))
 	GestureActionParameters := Map("gesture__tap_4__open_url", "https://example.com/old",
 		"keyboard__win_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
@@ -282,9 +282,12 @@ _ScopeGestureMenuOwnsParameters() {
 			AssertEqual(Parsed["action_parameters"]["keyboard__win_a__open_url"], "https://example.com/keep")
 			AssertEqual(Parsed["action_parameters"]["unknown_user_key"], "keep")
 			AssertEqual(Parsed["llm"]["enabled"], true)
-			if Mode == "clear"
-				Assert(!Parsed["gestures"].Has("enabled"), "clear removes the master instead of only assigning none")
-			else
+			if Mode == "clear" {
+				; The clear once deleted the switch with the assignments
+				; (gestures-clear-keeps-switch).
+				AssertEqual(true, Parsed["gestures"]["enabled"], "clear removes the assignments and keeps the switch")
+				Assert(!Parsed["gestures"].Has("tap_4"), "clear removes the assignment")
+			} else
 				AssertEqual(Parsed["gestures"]["enabled"], ManifestRecommendedFor("gestures.enabled"))
 			AssertEqual(GestureActionParameters["gesture__tap_4__open_url"], "https://example.com/old",
 				"pending reload preserves current runtime authority")
@@ -299,7 +302,7 @@ _ScopeGestureMenuOwnsParameters() {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("config-scope: the gesture menu's first-group rows own the master and only its action parameters",
+Test("config-scope: the gesture menu's restore owns the master, its clear keeps it, and both own only its action parameters",
 	_ScopeGestureMenuOwnsParameters)
 
 _ScopeOwnerRetainsRollbackDebt() {

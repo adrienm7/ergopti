@@ -32,8 +32,6 @@
 		--border: #3a3a3a;
 		--pre-background: #111;
 		--pre-text: #d4d4d4;
-		--accent: #4a9eff;
-		--accent-text: #0b0b0b;
 		--ok: #3fb950;
 		--fail: #ff7b72;
 	}
@@ -171,6 +169,7 @@ button:disabled {
 	opacity: 0.5;
 }
 
+/* White on blue in both appearances: the dark one declares no pair of its own. */
 button.primary {
 	background: var(--accent);
 	border-color: var(--accent);

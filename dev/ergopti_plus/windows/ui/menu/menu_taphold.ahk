@@ -299,19 +299,26 @@ class _TH_HoldFnObj {
 	KeyId   := ""
 	HoldOpt := ""
 	Call(Args*) {
-		InheritedCritical := A_IsCritical
-		if InheritedCritical {
-			Critical("Off")
-			try return this.Call(Args*)
-			finally Critical(InheritedCritical)
-		}
-		Kind := this.HoldOpt["kind"]
-		OptId := this.HoldOpt["id"]
-		try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).", this.KeyId, Kind, OptId, DriverPid)
-		if !WriteTapHoldHold(this.KeyId, this.HoldOpt)
-			return false
-		return _TH_ReloadTapHoldMenu("hold_set", this.KeyId)
+		return _TH_ApplyHold(this.KeyId, this.HoldOpt)
 	}
+}
+
+; Apply a hold option chosen from the hold picker. The write goes through the
+; owner that brings the navigation layer along with a key that enters it: the
+; configuration folder is handed over here, by the tray alone.
+_TH_ApplyHold(KeyId, HoldOpt) {
+	global _ConfigDir
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_ApplyHold(KeyId, HoldOpt)
+		finally Critical(InheritedCritical)
+	}
+	try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).",
+		KeyId, HoldOpt["kind"], HoldOpt["id"], DriverPid)
+	if !TapHoldSetHold(KeyId, HoldOpt, _ConfigDir)
+		return false
+	return _TH_ReloadTapHoldMenu("hold_set", KeyId)
 }
 
 ; Build a bound callback that clears both tap and hold for a key.

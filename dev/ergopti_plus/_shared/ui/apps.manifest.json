@@ -50,7 +50,7 @@
 			"vhost": "ergopti.errordialog"
 		},
 		"healthcheck": {
-			"width": 860,
+			"width": 1060,
 			"height": 720,
 			"min_width": 640,
 			"min_height": 480,

@@ -146,3 +146,49 @@ _LT_EveryCalledOwnerIsRegistered() {
 }
 Test("lifecycle transition: every called owner is registered (system-intervals-lifecycle)",
 	_LT_EveryCalledOwnerIsRegistered)
+
+; Regression for resume-updater-nothing-pending (2026-10-01). The updater's
+; resume answers false when it retained neither a manual terminal nor a menu
+; rebuild, which is every ordinary resume. The reactor required true: each
+; resume logged « resume transition owner 'updater' failed: returned false »,
+; opened the error window and never reported the driver resumed. The test runs
+; the updater's real answer through the reactor's own spelling of the step.
+_LT_ResumeAcceptsAnUpdaterWithNothingRetained() {
+	global _UpdaterPendingManualPauseNoticeCount, _UpdaterMenuRebuildPending
+	global _LifecycleLatestTransition, _LifecycleTransitionsByPhase
+	Body := _DriverFuncBody("Ergopti_OnSuspendResume")
+	Assert(Body != "", "Ergopti_OnSuspendResume must exist")
+	Assert(RegExMatch(Body,
+		'_LifecycleRunRequiredStep\(\s*Transition\s*,\s*"updater"\s*,\s*Updater_OnSuspendResume\s*(,\s*true\s*)?\)',
+		&Step) > 0, "the resume reactor must run the updater owner")
+	RequireTrue := Step[1] != ""
+	SavedCount := _UpdaterPendingManualPauseNoticeCount
+	SavedPending := _UpdaterMenuRebuildPending
+	SavedLatest := _LifecycleLatestTransition
+	SavedPhases := _LifecycleTransitionsByPhase
+	try {
+		_LifecycleTransitionsByPhase := Map()
+		_UpdaterPendingManualPauseNoticeCount := 0
+		_UpdaterMenuRebuildPending := false
+		AssertEqual(false, Updater_OnSuspendResume(),
+			"an updater that retained nothing answers false")
+		Transition := LifecycleTransitionBegin("resume")
+		_LifecycleRunRequiredStep(Transition, "updater", Updater_OnSuspendResume, RequireTrue)
+		AssertEqual(0, Transition.debt.Length,
+			"a resume with nothing retained by the updater must leave no debt (resume-updater-nothing-pending)")
+		_LifecycleRunRequiredStep(Transition, "updater", () => _LT_ThrowUpdaterFailure(), RequireTrue)
+		AssertEqual(1, Transition.debt.Length,
+			"an updater resume that throws is still a debt")
+	} finally {
+		_UpdaterPendingManualPauseNoticeCount := SavedCount
+		_UpdaterMenuRebuildPending := SavedPending
+		_LifecycleLatestTransition := SavedLatest
+		_LifecycleTransitionsByPhase := SavedPhases
+	}
+}
+
+_LT_ThrowUpdaterFailure() {
+	throw Error("simulated updater resume failure")
+}
+Test("lifecycle transition: a resume accepts an updater with nothing retained (resume-updater-nothing-pending)",
+	_LT_ResumeAcceptsAnUpdaterWithNothingRetained)

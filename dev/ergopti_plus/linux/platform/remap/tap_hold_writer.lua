@@ -23,6 +23,13 @@
 ---    overwritten: the change is refused and the user's text stays as it was.
 --- 4. Temporary file then rename, so a crash mid-write cannot leave a file that
 ---    parses to nothing.
+--- 5. The layer comes with its key: a hold that enters Ergopti's recommended
+---    layer creates the folder's layers.toml from it when there is none
+---    (keymap.layer_preset), before the engine reloads. A key set to hold
+---    the navigation layer in a folder without that file entered a layer
+---    that binds no key. An existing file is the user's and stays; a change
+---    that is not saved removes only the file it created. The folder is
+---    named by init(): a writer bound to none touches no layer file.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +39,7 @@ local TomlCodec = require("toml_codec")
 local BasicString = require("toml_codec.basic_string")
 local Engine = require("platform.remap.tap_hold_engine")
 local Manifest = require("infra.manifest_reader")
+local LayerPreset = require("keymap.layer_preset")
 
 local LOG = "platform.remap.tap_hold_writer"
 
@@ -62,6 +70,7 @@ local _path = nil
 local _reload = nil
 local _is_tap_action = nil
 local _canonical_hold = nil
+local _layers = nil          -- { shared_root, config_dir, file_adapter } a layer hold imports into, or nil.
 local _backup_sequence = 0    -- Keeps the wizard import's backups unique.
 
 
@@ -197,24 +206,70 @@ end
 --- @param what string For the logs.
 --- @param mutate function(document) Changes the decoded document in place.
 --- @return boolean True when the change is saved and in force.
-local function commit(what, mutate)
+--- @return boolean saved True once the file holds the change, reloaded or not.
+local function save_and_reload(what, mutate)
 	if not _path then
 		Logger.error(LOG, "Tap-hold writer used before init() — '%s' not saved.", what)
-		return false
+		return false, false
 	end
 	local document, err = read_document(_path)
 	if not document then
 		Logger.error(LOG, "'%s' is %s — '%s' refused rather than overwrite it.", _path, tostring(err), what)
-		return false
+		return false, false
 	end
 	mutate(document)
-	if not write_document(_path, document) then return false end
+	if not write_document(_path, document) then return false, false end
 	Logger.info(LOG, "Tap-hold change saved: %s.", what)
 	if not _reload() then
 		Logger.error(LOG, "Tap-hold change '%s' saved but the engine did not reload.", what)
-		return false
+		return false, true
 	end
-	return true
+	return true, true
+end
+
+--- One tray change, as the public setters report it.
+--- @param what string For the logs.
+--- @param mutate function(document) Changes the decoded document in place.
+--- @return boolean True when the change is saved and in force.
+local function commit(what, mutate)
+	local in_force = save_and_reload(what, mutate)
+	return in_force
+end
+
+-- What import_layer() answers when a hold brings no layer file.
+local NO_LAYER = { status = LayerPreset.KEPT }
+
+--- Creates layers.toml from Ergopti's recommended layer when a hold enters
+--- that layer and the bound folder has none.
+--- @param kind string The hold's kind.
+--- @param layer_id string The canonical layer id of a layer hold.
+--- @return table|nil import What LayerPreset.import_if_absent() returned, NO_LAYER when nothing is due.
+--- @return string|nil err Why the absent file could not be created.
+local function import_layer(kind, layer_id)
+	if kind ~= "layer" or not _layers then return NO_LAYER end
+	local ok, import, err = pcall(function()
+		if LayerPreset.read(_layers.shared_root, TomlCodec.decode).layer_id ~= layer_id then return NO_LAYER end
+		return LayerPreset.import_if_absent({
+			shared_root = _layers.shared_root, config_dir = _layers.config_dir,
+			toml_decode = TomlCodec.decode, file_adapter = _layers.file_adapter,
+		})
+	end)
+	if not ok then return nil, tostring(import) end
+	if not import then return nil, err end
+	if import.status == LayerPreset.IMPORTED then
+		Logger.info(LOG, "Recommended navigation layer imported into '%s'.", import.path)
+	end
+	return import
+end
+
+--- Removes the layers.toml a change that was not saved created.
+--- @param import table What import_layer() returned.
+local function undo_layer(import)
+	local undone, err = LayerPreset.undo(import, _layers and _layers.file_adapter or nil)
+	if undone ~= true then
+		Logger.error(LOG, "The navigation layer '%s' an unsaved hold change created could not be removed: %s.",
+			tostring(import.path), tostring(err))
+	end
 end
 
 --- The [tap_hold] table of a document, created when absent.
@@ -266,7 +321,10 @@ end
 
 --- Binds the writer to the user's file and the engine's reload.
 --- @param opts table { path, reload() -> boolean, is_tap_action(id) -> boolean,
----   canonical_hold(kind, id) -> string|nil, string|nil }
+---   canonical_hold(kind, id) -> string|nil, string|nil,
+---   layers = { shared_root, config_dir, file_adapter|nil } | nil }: the folder
+---   whose layers.toml a hold entering the recommended layer creates when
+---   absent; without it no layer file is touched.
 function M.init(opts)
 	if _path then error("tap-hold writer already initialised", 2) end
 	if type(opts) ~= "table" or type(opts.path) ~= "string" or opts.path == "" then
@@ -274,6 +332,16 @@ function M.init(opts)
 	end
 	for _, name in ipairs({ "reload", "is_tap_action", "canonical_hold" }) do
 		if type(opts[name]) ~= "function" then error("tap-hold writer requires " .. name, 2) end
+	end
+	if opts.layers ~= nil then
+		if type(opts.layers) ~= "table" then error("tap-hold writer layers must be a table", 2) end
+		for _, name in ipairs({ "shared_root", "config_dir" }) do
+			if type(opts.layers[name]) ~= "string" or opts.layers[name] == "" then
+				error("tap-hold writer layers require " .. name, 2)
+			end
+		end
+		_layers = { shared_root = opts.layers.shared_root, config_dir = opts.layers.config_dir,
+			file_adapter = opts.layers.file_adapter }
 	end
 	_path = opts.path
 	_reload = opts.reload
@@ -313,7 +381,13 @@ function M.set_hold(key_id, kind, id)
 			tostring(kind), tostring(id), tostring(err))
 		return false
 	end
-	return commit(key_id .. " hold = " .. kind .. ":" .. canonical, function(document)
+	local layer, layer_err = import_layer(kind, canonical)
+	if not layer then
+		Logger.error(LOG, "set_hold: the recommended navigation layer cannot be imported (%s) — nothing written.",
+			tostring(layer_err))
+		return false
+	end
+	local in_force, saved = save_and_reload(key_id .. " hold = " .. kind .. ":" .. canonical, function(document)
 		local entry = key_entry(document, key_id)
 		entry.hold_modifier, entry.hold_layer, entry.enabled = nil, nil, nil
 		if kind == "layer" then
@@ -325,6 +399,9 @@ function M.set_hold(key_id, kind, id)
 			entry.hold_modifier = ""
 		end
 	end)
+	-- A saved key keeps the layer it enters, even when the reload failed.
+	if not saved then undo_layer(layer) end
+	return in_force
 end
 
 --- Makes a key itself again: its own key on a tap, no hold.

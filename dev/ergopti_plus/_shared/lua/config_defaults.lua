@@ -145,6 +145,7 @@ function M.new(manifest)
 	end
 	local function collect_scope(scope_id)
 		local prefixes, excluded, visiting, dynamic_definitions, presets, parameters = {}, {}, {}, {}, {}, {}
+		local kept = {}
 		local function visit(id)
 			local scope = manifest.scopes[id]
 			assert(type(scope) == "table", "unknown configuration scope: " .. tostring(id))
@@ -159,27 +160,32 @@ function M.new(manifest)
 			end
 			for _, prefix in ipairs(scope.prefixes or {}) do prefixes[#prefixes + 1] = prefix end
 			for _, path in ipairs(scope.restore_exclude or {}) do excluded[#excluded + 1] = path end
+			for _, path in ipairs(scope.clear_exclude or {}) do kept[#kept + 1] = path end
 			for _, definition in ipairs(scope.dynamic_defaults or {}) do dynamic_definitions[definition] = true end
 			for _, child in ipairs(scope.includes or {}) do visit(child) end
 			visiting[id] = nil
 		end
 		visit(scope_id)
-		return prefixes, excluded, dynamic_definitions, presets, parameters
+		return prefixes, excluded, dynamic_definitions, presets, parameters, kept
 	end
 	function contract.scope_operations(scope_id, mode, owned_paths, owners)
 		assert(mode == "recommended" or mode == "clear", "unknown configuration scope operation")
-		local prefixes, excluded, dynamic_definitions, _, parameters = collect_scope(scope_id)
+		local prefixes, excluded, dynamic_definitions, _, parameters, kept = collect_scope(scope_id)
+		-- A restore leaves `restore_exclude` alone and a clear `clear_exclude`:
+		-- no row is planned, so the stored value stays whatever it is.
+		local untouched = mode == "recommended" and excluded or kept
 		local operations = {}
 		local function emit(path, value)
-			if mode == "recommended" then
-				for _, prefix in ipairs(excluded) do if belongs(path, prefix) then return end end
-			end
+			for _, prefix in ipairs(untouched) do if belongs(path, prefix) then return end end
 			operations[#operations + 1] = mode == "clear" and row(path, value, true)
 				or contract.operation(path, value)
 		end
 		for _, entry in ipairs(manifest.features) do
 			local selected = false
 			for _, prefix in ipairs(prefixes) do selected = selected or belongs(entry.path, prefix) end
+			if mode == "clear" then
+				for _, prefix in ipairs(kept) do selected = selected and not belongs(entry.path, prefix) end
+			end
 			if selected and mode == "clear" and entry.cleared ~= nil then
 				-- An entry active by default restores its preset when its key is
 				-- deleted, so the system's behaviour is its off value, written.

@@ -732,12 +732,17 @@ local function main()
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
 	-- The tray's tap-hold rows write the user's file through this and reload
-	-- the engine live.
+	-- the engine live. A hold that enters the recommended layer creates the
+	-- configuration folder's layers.toml when it has none.
 	require("platform.remap.tap_hold_writer").init({
 		path = TapHold.user_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
 		canonical_hold = TapHold.canonical_hold,
+		layers = {
+			shared_root = require("infra.paths").shared_root(),
+			config_dir = require("infra.config_paths").get_config_dir(),
+		},
 	})
 
 	local script_actions = ScriptActions.new({

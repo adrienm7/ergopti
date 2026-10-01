@@ -122,6 +122,12 @@ global _MenuDispatchOwnerHandles := Map()
 ; drop has already occurred. The original 150ms was overly conservative.
 global _MENU_RETRY_DELAY_MS := 60
 
+; A command clicked while a configuration write is in progress waits for that
+; write: the delay between two looks and how many are made, ten seconds in
+; all, as for a reload asked during a write (infra/reload_deferral.ahk).
+global MENU_COMMAND_DEFERRAL_RETRY_MS := 100
+global MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS := 100
+
 
 
 
@@ -418,8 +424,53 @@ _TrackedDispatch(TrackedObj, Args*) {
 				and _MenuDispatchTokens.Has(TrackedObj.ItemId)
 				and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
 				_MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
-				TrackedObj.Callback.Call(Args*)
+				MenuCommandRun(TrackedObj.Callback, Args)
 		}
+}
+
+; Runs a menu command now, or once the configuration write it interrupted has
+; ended. AutoHotkey runs no timer while a menu is open, so a save that came due
+; meanwhile starts the moment the menu closes, and the clicked row's command
+; then interrupts it: the writer keeps its lease until this thread returns, and
+; a command that needs one could only be refused (« another configuration
+; transaction is already in progress », with an error window and the setting
+; lost). The command therefore returns at once and a one-shot timer runs it
+; when the write has ended. The wait is bounded: a lease that is never released
+; lets the command run and report its own refusal.
+; @param Callback {Func} The row's command.
+; @param Args {Array} The arguments AutoHotkey gave the row.
+; @param Attempt {Integer} Looks made so far; 0 for the click itself.
+; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
+; @param ArmFn {Func} Test seam for the one-shot timer, TimerArmOneShotMs by default.
+; @returns {Any} What the command returned, "" when it was deferred.
+MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0) {
+		global MENU_COMMAND_DEFERRAL_RETRY_MS, MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS
+		if !HasMethod(Callback, "Call")
+				throw TypeError("A menu command must be callable.")
+		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigWriteLeaseBusy()
+		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
+				if (Attempt == 0)
+						try LoggerInfo("MenuDispatcher", "Menu command deferred: a configuration write is in progress; it runs when that write ends.")
+				Arm := HasMethod(ArmFn, "Call") ? ArmFn : TimerArmOneShotMs
+				try {
+						Arm.Call(_MenuCommandRetry.Bind(Callback, Args, Attempt + 1, BusyFn, ArmFn), MENU_COMMAND_DEFERRAL_RETRY_MS)
+						return ""
+				} catch as Err {
+						; No timer, no later run: the command must not be lost.
+						try LoggerError("MenuDispatcher", "The deferred menu command could not be scheduled: {1}; it runs now.", Err.Message)
+				}
+		} else if Busy {
+				try LoggerWarn("MenuDispatcher", "The configuration write did not end in {1} ms: the menu command runs and reports its own refusal.",
+						Attempt * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		} else if (Attempt > 0) {
+				try LoggerInfo("MenuDispatcher", "Deferred menu command runs after {1} ms.", Attempt * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		}
+		return Callback.Call(Args*)
+}
+
+; The one-shot timer's callback of a deferred menu command.
+_MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, *) {
+		MenuCommandRun(Callback, Args, Attempt, BusyFn, ArmFn)
 }
 
 ; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
@@ -667,7 +718,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
 		try LoggerInfo("MenuDispatcher",
 				"AHK drop detected for ItemId={1} — firing bypass_dispatch.", ItemId)
 		try {
-				Callback.Call("", 0, 0)
+				MenuCommandRun(Callback, ["", 0, 0])
 		} catch as Err {
 				try LoggerError("MenuDispatcher",
 						"Bypass dispatch for ItemId={1} threw: {2}.", ItemId, Err.Message)

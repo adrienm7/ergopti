@@ -4390,19 +4390,23 @@ function M.set_tap_action(key_id, action_id)
 	return committed
 end
 
---- Sets the hold action for a key and saves the user config.
+--- Sets the hold action for a key and saves the user config. A hold on the
+--- navigation layer brings the recommended layer file along when the
+--- configuration folder has none (NavLayer.commit_hold).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param key_id string Key id.
 --- @param action_id string Action id from actions.json.
 function M.set_hold_action(key_id, action_id)
 	if not require_state("set_hold_action") then return false end
-	local committed = commit_state_mutation(function(candidate)
-		local cfg = candidate.tap_hold_config[key_id] or {}
-		candidate.tap_hold_config[key_id] = {
-			tap = cfg.tap or "none",
-			hold = action_id,
-			timeout_ms = cfg.timeout_ms,
-		}
+	local committed = NavLayer.commit_hold("Key hold", action_id, function()
+		return commit_state_mutation(function(candidate)
+			local cfg = candidate.tap_hold_config[key_id] or {}
+			candidate.tap_hold_config[key_id] = {
+				tap = cfg.tap or "none",
+				hold = action_id,
+				timeout_ms = cfg.timeout_ms,
+			}
+		end)
 	end)
 	if committed then Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id) end
 	return committed
@@ -4508,15 +4512,19 @@ function M.set_combo_tap_action(combo_id, action_id)
 	return committed
 end
 
---- Sets the hold action for a modifier combo and saves the user config.
+--- Sets the hold action for a modifier combo and saves the user config. A
+--- hold on the navigation layer brings the recommended layer file along, as
+--- for a key (NavLayer.commit_hold).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param combo_id string Combo id.
 --- @param action_id string Action id from actions.json.
 function M.set_combo_hold_action(combo_id, action_id)
 	if not require_state("set_combo_hold_action") then return false end
-	local committed = commit_state_mutation(function(candidate)
-		candidate.mod_combos_config[combo_id] = update_combo_slot(
-			candidate.mod_combos_config, combo_id, "hold", action_id)
+	local committed = NavLayer.commit_hold("Combination hold", action_id, function()
+		return commit_state_mutation(function(candidate)
+			candidate.mod_combos_config[combo_id] = update_combo_slot(
+				candidate.mod_combos_config, combo_id, "hold", action_id)
+		end)
 	end)
 	if committed then Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id) end
 	return committed
@@ -5118,17 +5126,8 @@ function M.apply_scope(request, on_done)
 	end
 	local function settle(ok, reason, change_count)
 		if ok ~= true then NavLayer.undo_import(layer) end
-		if ok == true and layer then
-			-- The imported layer binds the wheel, which Hammerspoon runs rather
-			-- than Karabiner: its owner reads the new file.
-			local reconciled, committed = pcall(function()
-				return require("modules.shortcuts.bindings").reconcile_layer_wheel()
-			end)
-			if not reconciled or committed ~= true then
-				Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",
-					label, tostring(reconciled and "a start is in progress" or committed))
-			end
-		end
+		-- The imported layer binds the wheel: its owner reads the new file.
+		if ok == true and layer then NavLayer.reconcile_wheel(label) end
 		if on_done then return on_done(ok, reason, change_count) end
 	end
 	return apply_bulk_settings_transaction(label, function(candidate)

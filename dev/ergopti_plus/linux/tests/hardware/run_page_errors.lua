@@ -219,7 +219,7 @@ end
 inspect("hotstrings_config_window", "setData")
 inspect("hotstring_editor", "initData")
 inspect("prompt_editor", "init", "ready")
-inspect("healthcheck", "receiveDiagnostics", "ready", { id = "btn-close", key = "healthcheck.toolbar.close" })
+inspect("healthcheck", "receiveDiagnostics", "ready", { id = "btn-refresh", key = "healthcheck.toolbar.refresh" })
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)

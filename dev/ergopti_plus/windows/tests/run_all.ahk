@@ -200,6 +200,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
 #Include ../infra/reload_successor.ahk
+#Include ../infra/reload_deferral.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
@@ -509,7 +510,6 @@ InstallSendNoOps()
 #Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
 #Include unit/test_metrics_shortcut_transactions.ahk
 #Include unit/test_config_shortcuts_types.ahk
-#Include unit/test_metrics_shortcut_menu_refresh.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
@@ -725,6 +725,11 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_reload_terminal_pending.ahk
+#Include unit/test_reload_deferral.ahk
+#Include unit/test_tray_menu_separator_popup.ahk
+#Include unit/test_tap_hold_hold_picker_options.ahk
+#Include unit/test_menu_command_deferral.ahk
+#Include unit/test_tap_hold_roll.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
@@ -990,6 +995,7 @@ global _AhkSubDir := ""
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
+#Include ../platform/remap/tap_hold_roll.ahk
 #Include ../platform/remap/altgr_criteria.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_tap_hold_owned_press.ahk
@@ -1036,6 +1042,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
 #Include meta/test_tap_hold_taps_use_held_modifier_emitter.ahk
 #Include meta/test_tap_hold_hotkeys_admit_held_modifiers.ahk
+#Include meta/test_tap_hold_owned_repeat_identities.ahk
 #Include meta/test_nav_layer_admits_held_modifiers.ahk
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
@@ -1261,6 +1268,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_llm_nav_cycle_windows.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
+#Include unit/test_llm_hotkeys_deferred_by_pause.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk
 #Include meta/test_llm_hotkey_cross_owner_policy.ahk
 #Include meta/test_config_transition_integration.ahk

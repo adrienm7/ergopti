@@ -474,7 +474,19 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 
 	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
 
+	; The preset in force, which both the live picker and its greyed stand-in name
+	; (a live value outside the presets reads as its nearest preset, the one a
+	; reload would load).
+	CurrentCode := UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Code
+	FrequencyLabel := t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode)
+
 	if IsLocal {
+		; A local version has no installation to update, so it checks for nothing.
+		; The two rows are still drawn, greyed with the reason: left out, nobody
+		; could tell whether the automatic update exists.
+		for _, Label in [t("menu.about.check_for_updates"), FrequencyLabel]
+			Rows.Push(Map("label", Label, "disabled", true,
+				"disabled_reason_key", "menu.about.source_run_reason"))
 		return Rows
 	}
 
@@ -484,10 +496,8 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"disabled", (Updater_GetUpdateState() == "checking")))
 
 	; Same shape for the shared check-frequency presets: one nested row per
-	; preset, the tick and the parent label on the preset in force (a live value
-	; outside them reads as its nearest preset, the one a reload would load).
+	; preset, the tick and the parent label on the preset in force.
 	FreqRows := []
-	CurrentCode := UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Code
 	for _, Preset in UpdateSchedule_Presets() {
 		FreqRows.Push(Map(
 			"label",   t("menu.about.frequency." . Preset["code"]),
@@ -495,7 +505,7 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 			"checked", (Preset["code"] == CurrentCode)))
 	}
 	Rows.Push(Map(
-		"label", t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode),
+		"label", FrequencyLabel,
 		"items", FreqRows))
 	return Rows
 }

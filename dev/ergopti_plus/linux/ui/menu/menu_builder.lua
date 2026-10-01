@@ -3723,8 +3723,21 @@ local function _about_update_rows(ctx)
 
 	out[#out + 1] = _channel_picker(ctx, up)
 
+	-- A local version has no installation to update, so it checks for nothing
+	-- (the updater starts no background check for it). Its check row and its
+	-- frequency row are still drawn, greyed with the reason: left out, nobody
+	-- could tell whether the automatic update exists.
+	local source_run = Installation.is_source_run()
+	local _, current_code = Schedule.snap_interval(up.get_check_interval(), up.TIMING)
+	local frequency_label = i18n_safe("menu.about.frequency_menu") .. ": "
+		.. i18n_safe("menu.about.frequency." .. current_code)
+
 	-- A check discovers releases; installation needs the separately named row.
-	out[#out + 1] = {
+	out[#out + 1] = source_run and {
+		label = i18n_safe("menu.about.check_for_updates"),
+		disabled = true,
+		disabled_reason_key = "menu.about.source_run_reason",
+	} or {
 		label = up.get_menu_label(),
 		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
 			or up.get_state() == "installing",
@@ -3761,7 +3774,7 @@ local function _about_update_rows(ctx)
 	-- "download" row that does nothing is indistinguishable from a broken one.
 	if up.get_state() == "available" then
 		local rel = up.get_cached_release()
-		if rel and Installation.is_source_run() then
+		if rel and source_run then
 			-- A source run offers the latest release to look at, but has no
 			-- installation to replace: the row stays, greyed, and the renderer
 			-- names why as on every greyed row with a reason, with no action a
@@ -3793,9 +3806,17 @@ local function _about_update_rows(ctx)
 	end
 
 
+	if source_run then
+		out[#out + 1] = {
+			label = frequency_label,
+			disabled = true,
+			disabled_reason_key = "menu.about.source_run_reason",
+		}
+		return out
+	end
+
 	-- The tick and the parent label name the preset in force; a live value
 	-- outside the presets reads as its nearest preset, the one a restart loads.
-	local _, current_code = Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 	local frequency_rows = {}
 	for _, preset in ipairs(up.INTERVAL_PRESETS) do
 		frequency_rows[#frequency_rows + 1] = {
@@ -3810,7 +3831,7 @@ local function _about_update_rows(ctx)
 		}
 	end
 	out[#out + 1] = {
-		label = i18n_safe("menu.about.frequency_menu") .. ": " .. i18n_safe("menu.about.frequency." .. current_code),
+		label = frequency_label,
 		items = frequency_rows,
 	}
 	return out

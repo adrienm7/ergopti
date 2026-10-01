@@ -127,9 +127,13 @@ _THG_EveryPickerKeyUsesTheImmediateModifierOwner() {
 			KeySrc .= _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . File, "UTF-8"))
 		Assert(InStr(KeySrc, 'TapHoldHoldModifier(TapHold, "' . Id . '")') > 0,
 			"key '" . Id . "' offers modifier holds but never reads the configured modifier")
-		Assert(InStr(KeySrc, 'TapHoldOwnImmediateModifier("' . Id . '",') > 0,
-			"key '" . Id . "' must synchronously enter the common modifier owner on physical key-down")
+		; A typing key enters the common owner through TapHoldOwnHoldModifier,
+		; which takes the hold at key-down unless the key is itself on a tap.
 		OwnerPos := InStr(KeySrc, 'TapHoldOwnImmediateModifier("' . Id . '",')
+		if !OwnerPos
+			OwnerPos := InStr(KeySrc, 'TapHoldOwnHoldModifier("' . Id . '",')
+		Assert(OwnerPos > 0,
+			"key '" . Id . "' must enter the common modifier owner from its physical key-down")
 		OwnerCall := SubStr(KeySrc, OwnerPos, 300)
 		ResolverIsDirect := InStr(OwnerCall, Resolvers[Id]) > 0
 		ResolverIsLocal := InStr(OwnerCall, ", ModKey,") > 0

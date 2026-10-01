@@ -491,3 +491,59 @@ helpers.describe("tap-holds end to end: nothing stays pressed", function()
 	end)
 
 end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= The hold picker's options =======
+-- =========================================
+-- =========================================
+
+-- The maintainer's rule of 2026-10-01: whatever option the hold picker offers
+-- (one modifier, every combination, the layer, none) is the hold the key has
+-- after the pick, on a key that held another one before.
+helpers.describe("tap-holds end to end: every option of the hold picker", function()
+
+	helpers.it("(hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local SPACE = Engine.KEY_CODES.space
+		with_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
+			local options = s.manager.hold_options()
+			local kinds = { none = 0, modifier = 0, layer = 0 }
+			for index, option in ipairs(options) do
+				local label = option.kind .. ":" .. option.id
+				helpers.assert_true(s.writer.set_hold("space", option.kind, option.id), label .. " must be written")
+				kinds[option.kind] = kinds[option.kind] + 1
+				-- Space held past its threshold, J typed under it, Space released.
+				local at = index * 10000
+				local emitted = s.drive({ { SPACE, DOWN, at }, { KEY_J, DOWN, at + 600 }, { KEY_J, UP, at + 650 },
+					{ SPACE, UP, at + 800 } })
+				assert_balanced(s.last)
+				if option.kind == "modifier" then
+					local down, up = {}, {}
+					for token in option.id:gmatch("[^+]+") do
+						local code = assert(Engine.MODIFIER_CODES[token], "unknown modifier " .. token)
+						down[#down + 1] = code .. ":1"
+						table.insert(up, 1, code .. ":0")
+					end
+					helpers.assert_true(#down > 0, label .. " must name at least one modifier")
+					helpers.assert_eq(emitted, table.concat(down, " ") .. " " .. KEY_J .. ":1 " .. KEY_J .. ":0 "
+						.. table.concat(up, " "), label .. " presses its own keys and no other")
+				elseif option.kind == "layer" then
+					helpers.assert_true(not emitted:find(LSHIFT .. ":1", 1, true), label .. " keeps nothing of the previous Shift")
+					helpers.assert_true(not emitted:find(KEY_J .. ":1", 1, true) and emitted ~= "",
+						label .. " hands the key to its layer, got '" .. emitted .. "'")
+				else
+					helpers.assert_eq(emitted, SPACE .. ":1 " .. KEY_J .. ":1 " .. KEY_J .. ":0 " .. SPACE .. ":0",
+						"the native option holds nothing: the key is itself again")
+				end
+			end
+			helpers.assert_true(kinds.none == 1 and kinds.layer >= 1, "the picker offers the native option and the layer")
+			helpers.assert_true(kinds.modifier >= 31, "the picker offers every combination of the five modifiers")
+		end)
+	end)
+
+end)

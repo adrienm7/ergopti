@@ -434,7 +434,8 @@ _HealthCheck_SortedLines(Text) {
 
 ; The window's size: the manifest's healthcheck entry
 ; (_shared/ui/apps.manifest.json), pinned by test-webview-geometry-single-source.
-global HC_WIDTH  := 860
+; Wide enough for a path to stay on one line (test-healthcheck-page).
+global HC_WIDTH  := 1060
 global HC_HEIGHT := 720
 
 ; Virtual host for the shared page — maps _SharedDir so relative assets

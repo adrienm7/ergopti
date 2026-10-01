@@ -227,3 +227,44 @@ _LNEO_SuspendFallbackKeepsRestartFenceUntilResume() {
 Test("LLM nav event owner: suspend fallback fences restart until resume",
 	_LNEO_SuspendFallbackKeepsRestartFenceUntilResume)
 
+; Regression for reload-refused-while-paused (2026-10-01). A reload asked
+; while the driver was paused was refused with « native keyboard receipts or
+; holds remain owned »: the shutdown preflight ran the receipt drain, which
+; refuses to run under a pause, and took that refusal for a debt. It then
+; resumed the native owner the pause had suspended, leaving its hook live
+; under a paused driver.
+_LNEO_ShutdownPreflightPassesUnderALifecyclePause() {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerShutdownFenced
+	State := _LNEO_Setup()
+	try {
+		AssertTrue(_LLM_NavEventOwnerStarted, "the fixture owner must be started")
+		AssertTrue(LLM_NavEventOwner_QuiesceForLifecycle(true),
+			"the pause must suspend the started owner")
+		AssertEqual(1, State.SuspendCalls.Length)
+		AssertEqual(1, State.SuspendCalls[1], "the pause suspends the native owner")
+		AssertTrue(LLM_NavEventOwner_PrepareShutdown(0, State.Port),
+			"an exit asked during a pause must pass when the native owner holds nothing (reload-refused-while-paused)")
+		AssertEqual(1, State.CanStopCalls,
+			"the native debt proof still decides the exit under a pause")
+		AssertEqual(1, State.SuspendCalls.Length,
+			"the pause already suspended the native owner: the preflight must not suspend it again")
+		AssertFalse(_LLM_NavEventOwnerShutdownFenced,
+			"the preflight owns no fence of its own under a pause")
+
+		State.CanStopMode := "refuse"
+		AssertFalse(LLM_NavEventOwner_PrepareShutdown(0, State.Port),
+			"a native hold still refuses the exit under a pause")
+		AssertTrue(LLM_NavEventOwner_CancelShutdown(),
+			"a later refusal has nothing to compensate under a pause")
+		AssertEqual(1, State.SuspendCalls.Length,
+			"a refused exit must never resume the native owner under a paused driver")
+	} finally {
+		State.CanStopMode := "accept"
+		try LLM_NavEventOwner_QuiesceForLifecycle(false)
+		_LNEO_Teardown()
+	}
+}
+
+Test("LLM nav event owner: shutdown preflight passes under a pause and never resumes the owner (reload-refused-while-paused)",
+	_LNEO_ShutdownPreflightPassesUnderALifecyclePause)
+

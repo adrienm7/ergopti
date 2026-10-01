@@ -99,6 +99,13 @@
 			"greyed_when_paused": true
 		},
 		{
+			"id": "metrics",
+			"greyed_when_paused": true
+		},
+		{
+			"id": "---"
+		},
+		{
 			"id": "llm",
 			"greyed_when_paused": true
 		},
@@ -110,10 +117,6 @@
 			"id": "---"
 		},
 		{
-			"id": "metrics",
-			"greyed_when_paused": true
-		},
-		{
 			"id": "apps",
 			"greyed_when_paused": true,
 			"platforms": [
@@ -122,7 +125,11 @@
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
-			"id": "---"
+			"id": "---",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
 			"id": "configuration"
@@ -805,41 +812,12 @@
 			]
 		},
 		{
-			"type": "list",
-			"id": "shortcut_typing",
-			"i18n_dynamic": "menu.metrics.shortcut_prefix",
-			"disabled_when": [
-				"keylogger_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
-		},
-		{
-			"type": "---"
-		},
-		{
 			"type": "command",
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
 			"disabled_when": [
 				"keylogger_enabled"
 			]
-		},
-		{
-			"type": "list",
-			"id": "shortcut_apps",
-			"i18n_dynamic": "menu.metrics.shortcut_prefix",
-			"disabled_when": [
-				"keylogger_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
 		},
 		{
 			"type": "---"

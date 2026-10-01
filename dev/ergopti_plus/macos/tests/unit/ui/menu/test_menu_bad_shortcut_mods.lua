@@ -57,10 +57,13 @@ helpers.describe("M-13: coerce_mods helper present (source)", function()
 			"menu_hotstrings_custom.lua must define coerce_mods to handle string-typed .mods")
 	end)
 
-	helpers.it("menu_metrics.lua defines coerce_mods", function()
+	-- The metrics menu drew two shortcut rows from a stored .mods and needed the
+	-- helper for them. The rows left the menu on 2026-10-01, so the invariant is
+	-- now that the menu reads no stored .mods at all.
+	helpers.it("menu_metrics.lua reads no stored shortcut modifiers", function()
 		local src = read_src("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
-		helpers.assert_true(src:find("coerce_mods", 1, true) ~= nil,
-			"menu_metrics.lua must define coerce_mods to handle string-typed .mods")
+		helpers.assert_true(src:find("%.mods") == nil,
+			"menu_metrics.lua draws no shortcut row, so it must not read a stored .mods")
 	end)
 end)
 

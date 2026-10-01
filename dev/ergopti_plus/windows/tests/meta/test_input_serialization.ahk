@@ -331,10 +331,14 @@ _MIS_CheckNotepadClipboardBranchIsAtomic() {
 	Assert(IsNotepadPos > 0,
         "HSE_DispatchMatch must gate the Notepad clipboard branch on IsNotepadApp")
 
-	; The non-atomic branch must reference notepad.exe.
-	NotepadExePos := InStr(Body, "notepad.exe")
-	Assert(NotepadExePos > 0,
-        "the IsNotepadApp check must be keyed on 'notepad.exe' — no other app must take the compatibility path")
+	; The gate must be the host rule every sender shares, and that rule must be
+	; keyed on notepad.exe alone.
+	Assert(InStr(Body, "IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)") > 0,
+		"the IsNotepadApp check must read the shared host rule from the dispatch's own receipt")
+	RuleBody := _DriverFuncBody("OutputHostTakesTextByPaste")
+	Assert(RuleBody != "", "OutputHostTakesTextByPaste(Host) must exist")
+	Assert(InStr(RuleBody, '"notepad.exe"') > 0,
+		"the host rule must be keyed on 'notepad.exe' — no other app must take the compatibility path")
 
 	; The else branch (atomic path) must contain SendInput with Critical On.
 	ElsePos := InStr(Body, "} else {", , InStr(Body, "if IsNotepadApp"))
