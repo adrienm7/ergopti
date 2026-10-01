@@ -474,6 +474,17 @@ is committed; one request is one commit with its regression test.
       the hold read as Shift (item 83). Keep an indicator that does not
       change what an unbound key types, and check what macOS and Linux type
       for a key their layer does not bind.
+- [ ] **85.** The hold a key gets must be the option picked, for every
+      option of the hold picker (Ctrl, Ctrl + Shift, Alt, every combination,
+      the layer), not only for the layer of item 83: hold each option to
+      what the engine presses, on the three drivers.
+- [ ] **86.** With Shift as the hold of Space, fast typing turns « word,
+      Space, letter » into the letter in capitals followed by the space
+      (« fonctionnerA ussi » for « fonctionner aussi », Windows,
+      2026-10-01): the hold is pressed as soon as Space goes down, so a
+      letter struck before Space is released is shifted. A key that rolls
+      over the next one is a tap: decide the hold from the order of the
+      releases and the threshold, and check the other two drivers.
 
 ## Time estimate
 
