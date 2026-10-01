@@ -109,6 +109,8 @@ end
 
 local sections = load_sections()
 
+D.rollover_keys = require("tap_hold.key_catalog").load_rollover(shared_defaults_path(), "hs")
+
 -- ----- Timeouts + flags ([hs_timeouts]) -----
 local timeouts = require_section(sections, "hs_timeouts")
 D.tap_hold_timeout_ms        = timeouts.tap_hold_timeout_ms        -- KE basic.to_if_alone_timeout_milliseconds

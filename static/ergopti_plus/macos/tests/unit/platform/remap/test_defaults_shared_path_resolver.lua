@@ -53,6 +53,15 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			end,
 			shared_root = function() return "/probe/_shared" end,
 		}
+		local rollover_path = nil
+		local saved_catalog = package.loaded["tap_hold.key_catalog"]
+		package.loaded["tap_hold.key_catalog"] = {
+			load_rollover = function(path, platform)
+				rollover_path = path
+				helpers.assert_eq(platform, "hs")
+				return { spacebar = true }
+			end,
+		}
 		local parsed_path = nil
 		package.loaded["infra.toml.reader"] = {
 			parse = function(p)
@@ -72,6 +81,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		package.loaded["platform.remap.defaults"] = nil
 		local ok, err = pcall(require, "platform.remap.defaults")
 
+		package.loaded["tap_hold.key_catalog"] = saved_catalog
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
@@ -80,6 +90,8 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		-- its own: `pcall` succeeding proves only that nothing threw, and this test
 		-- is about WHICH path was used. A raise shows up as a nil path with the
 		-- error text attached, which says more than "it crashed".
+		helpers.assert_eq(ok, true, "the resolved reader fixture must complete defaults initialization")
+		helpers.assert_eq(rollover_path, parsed_path, "both readers must use the same resolved defaults path")
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))
 		helpers.assert_eq("tap_hold/defaults.toml", asked_for,
 			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself" .. ctx)
