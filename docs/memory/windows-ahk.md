@@ -389,6 +389,16 @@ key-shaped event appeared in a hook.
 
 ## Tap-holds and synthetic modifiers
 
+### project-ahk-computed-hotkey-identities
+
+A hotkey name computed as `"~" . Key` has the same scan-code shadowing risk as
+a literal. The registry emulation's reset loop hid five unreachable dead-key
+cancel hotkeys from a literal-only source scan. Use physical scan-code identities
+for all its cancel/navigation keys, and test the actual registrar boundary against
+the shared registry, then drive its captured criterion and callback through a
+pending accent. The source guard resolves literal-array/prefix loops only;
+arbitrary computed registrations still need behavioral boundary tests.
+
 ### project-ahk-modifier-name-hotkey-shadows-scan-code
 
 `RAlt::` (also with `~ * $`, or as `vkA5`) is its own hotkey identity, hooked on

@@ -96,7 +96,8 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ; serve every configured modifier; the criterion demands the exact chord of the
 ; committed plan. #InputLevel 1 is the native routes' own level: both take
 ; physical input and AutoHotkey output above it. AutoHotkey resolves each arrow
-; name by its scan code (SC148, SC150, SC14B, SC14D).
+; by scan code (SC148, SC150, SC14B, SC14D). Naming an arrow would lose
+; to the registry emulation's dead-key reset on the same scan-code identity.
 ;
 ; Shift+Tab is the footer's other chord, whatever nav_modifiers holds: the left
 ; Shift steps back and the right one forward, as on macOS, with no other
@@ -106,13 +107,13 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ; owners, which keep every other Shift+Tab, when the criterion refuses it.
 #InputLevel 1
 #HotIf LLM_Menu_NavCycleChordIsOwned("Up")
-*Up:: LLM_Menu_NavCycleChord("Up")
+*SC148:: LLM_Menu_NavCycleChord("Up")
 #HotIf LLM_Menu_NavCycleChordIsOwned("Down")
-*Down:: LLM_Menu_NavCycleChord("Down")
+*SC150:: LLM_Menu_NavCycleChord("Down")
 #HotIf LLM_Menu_NavCycleChordIsOwned("Left")
-*Left:: LLM_Menu_NavCycleChord("Left")
+*SC14B:: LLM_Menu_NavCycleChord("Left")
 #HotIf LLM_Menu_NavCycleChordIsOwned("Right")
-*Right:: LLM_Menu_NavCycleChord("Right")
+*SC14D:: LLM_Menu_NavCycleChord("Right")
 #HotIf LLM_Menu_NavShiftTabIsOwned("LShift")
 <+SC00F:: LLM_Menu_NavShiftTabCycle("LShift")
 #HotIf LLM_Menu_NavShiftTabIsOwned("RShift")

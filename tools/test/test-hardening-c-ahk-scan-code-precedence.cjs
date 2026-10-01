@@ -43,7 +43,7 @@
  *    virtual key) is any registry key without a fixed name; the AltGr rows of
  *    the emulation golden fixture prove every one of them is declared by scan
  *    code, and a key that stops being so fails the guard instead of passing.
- * 3. Static labels and literal Hotkey() registrations are both scanned, with
+ * 3. Static labels, literal Hotkey() calls and literal-array prefix loops are scanned, with
  *    comments removed, and a floor on each count keeps the scan honest.
  *    #InputLevel, #HotIf and #UseHook are positional across #Include, so the
  *    context of each static label is read by walking the include graph of
@@ -228,6 +228,41 @@ const LABEL =
 	/^[ \t]*([~*$#!^+<>]*[A-Za-z][A-Za-z0-9_]*(?:[ \t]*&[ \t]*~?[A-Za-z][A-Za-z0-9_]*)?(?:[ \t]+up)?)[ \t]*::/gim;
 const CALL = /Hotkey\(\s*(?:[A-Za-z_]\w*\(\s*)?(["'])([^"']*)\1(?=\s*[,)])/g;
 
+/**
+ * Resolve the bounded form used by passthrough registrations: a literal key
+ * array and a loop concatenating a literal modifier prefix with each key.
+ * Do not claim to evaluate arbitrary AutoHotkey expressions.
+ */
+function arrayLoopDeclarations(code, file) {
+	const arrays = new Map();
+	for (const m of code.matchAll(/^global\s+(\w+)\s*:=\s*\[([^\]]*)\]/gm)) {
+		const tokens = m[2]
+			.split(',')
+			.map((token) => token.trim())
+			.filter(Boolean);
+		const keys = tokens.map((token) => token.match(/^(["'])([A-Za-z][A-Za-z0-9_]*)\1$/));
+		if (keys.length && keys.every(Boolean))
+			arrays.set(
+				m[1],
+				keys.map((key) => key[2])
+			);
+	}
+	const loops =
+		/for\s+(\w+)\s+in\s+(\w+)\s*\{\s*Hotkey(?:\w*\.Call)?\(\s*(["'])([~*$#!^+<>]*)\3\s*\.\s*\1\s*,/g;
+	const found = [];
+	for (const m of code.matchAll(loops)) {
+		for (const key of arrays.get(m[2]) || []) {
+			found.push({
+				text: m[4] + key,
+				file,
+				line: code.slice(0, m.index).split('\n').length,
+				kind: 'computed'
+			});
+		}
+	}
+	return found;
+}
+
 /** Every hotkey declaration of one comment-free source: static and Hotkey(). */
 function declarations(code, file) {
 	const found = [];
@@ -242,7 +277,7 @@ function declarations(code, file) {
 	for (const m of code.matchAll(CALL)) {
 		found.push({ text: m[2], file, line: code.slice(0, m.index).split('\n').length, kind: 'call' });
 	}
-	return found;
+	return found.concat(arrayLoopDeclarations(code, file));
 }
 
 /** The key names one declaration hooks: both keys of a combination. */
@@ -406,6 +441,31 @@ const errors = [];
 	if (got !== want) {
 		errors.push(`self-check: the scanner flagged [${got}], expected [${want}]`);
 	}
+}
+
+// Computed names must cover the pre-fix dead-key reset loop, without admitting
+// unrelated arrays or interpolated values the bounded resolver cannot judge.
+{
+	const fixture = stripComments(
+		[
+			'SC00E:: return',
+			'SC001:: return',
+			'global ResetKeys := ["BackSpace", "Escape"]',
+			'for Key in ResetKeys {',
+			'    HotkeyFn.Call("~" . Key, Reset)',
+			'}',
+			'global Unknown := [SomeFunction()]',
+			'for Key in Unknown {',
+			'    Hotkey("~" . Key, Reset)',
+			'}'
+		].join('\n')
+	);
+	const computed = arrayLoopDeclarations(fixture, 'fixture.ahk');
+	const got = computed.map((row) => row.text).join(', ');
+	if (got !== '~BackSpace, ~Escape') errors.push(`computed self-check: got [${got}]`);
+	const { offenders } = analyse(declarations(fixture, 'fixture.ahk'), names);
+	if (offenders.map((row) => row.text).join(', ') !== '~BackSpace, ~Escape')
+		errors.push('computed self-check: concatenated key names must retain scan-code precedence');
 }
 
 // ── Self-check: character keys the hook owns, registered ones spared ────────

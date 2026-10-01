@@ -378,10 +378,6 @@ integrated, then publish one grouped release.
       existing rows during the migration (proposal in the menu-first-group
       report: most hide; greyed: Linux edit_shortcuts, Linux key
       combinations, Linux metrics shortcut rows, Windows preview_bubbles).
-- [ ] **60.** Windows: the registry-layout emulation registers its dead-key
-      resets by key name ("~" plus Enter, Escape, BackSpace, Tab), which the scan
-      code declarations of the same keys shadow, so the resets never fire; the
-      scan-code precedence gate misses names built by concatenation.
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -628,6 +624,20 @@ retain their slot/emulation assertions and restore the query after each case.
 The script plan now also rejects assigned chords on a modeled released key;
 the actual emulation criterion rejects the released magic-key suffix.
 Repeat native CI for this correction and the maintainer's four new commits.
+
+The registry emulation's dead-key resets now use the scan-code identities of
+all 13 cancel/navigation keys. The shared physical-key registry independently
+pins the captured names; thirteen native cases drive the actual registered
+criteria and callbacks on Ergo-L, Ergopti and Ergopti+, covering pending/idle,
+disabled layout and active navigation ownership. The precedence guard on Linux
+and Windows now resolves the bounded literal-array/prefix-loop form, with a
+fixture that rejects the pre-fix names and leaves unknown expressions unjudged.
+Before the production change, the Linux guard failed on five shadowed reset
+names (Backspace, Escape, Enter, Tab and Delete). macOS/Linux use installed OS
+layouts for dead-key handling and have no corresponding AHK registration.
+The four prediction-navigation arrow hotkeys now share those scan-code
+identities too; their existing ownership, hook-order and step assertions remain
+intact. Native validation is pending the next non-release run.
 
 ## Time estimate
 

@@ -54,8 +54,10 @@ global KLE_NATIVE_CHORD_KEYS := Map("SC039", true)
 
 ; Keys that end a pending dead key without typing through the layout: the
 ; sequence is dropped the way a native Windows dead key drops it.
-global KLE_DEAD_RESET_KEYS := ["BackSpace", "Escape", "Enter", "Tab", "Delete",
-	"Left", "Right", "Up", "Down", "Home", "End", "PgUp", "PgDn"]
+; Physical identities match the shared registry; registering names would be
+; shadowed by the scan-code hotkeys of tap-holds and prediction navigation.
+global KLE_DEAD_RESET_KEYS := ["SC00E", "SC001", "SC01C", "SC00F", "SC153",
+	"SC14B", "SC14D", "SC148", "SC150", "SC147", "SC14F", "SC149", "SC151"]
 
 ; Scan code of AltGr (right Alt); the AltGr level uses it as a prefix key, the
 ; same form as the Ergopti AltGr layer so AHK's variant rules apply to both.
