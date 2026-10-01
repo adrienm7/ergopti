@@ -385,9 +385,18 @@ while it is absent (`_shared/lua/keymap/layer_preset.lua`; Windows
 even empty or unreadable, is the user's and is never replaced; a refused
 import or restore removes only the file it created. Windows threads the
 folder as the `layers_config_dir` option, set only by the tray's own command
-factories, so tests that inject options never write the real folder. Action:
-a new flow that imports a layer-holding key calls the same owner; never make
-a loader substitute the preset for an absent file.
+factories, so tests that inject options never write the real folder. The
+hold picker is such a flow too (2026-10-01): picking the layer as a hold
+wrote the hold alone, and on Windows a layer that binds no key only lights
+CapsLock while held, so the key typed capitals and « stayed on Shift ».
+The pick now creates the absent file first and removes it again when the
+hold is not saved: Windows `TapHoldSetHold` (the tray hands `_ConfigDir`),
+Linux `tap_hold_writer.set_hold` (the daemon binds `layers` at `init`; a
+writer bound to none touches no file), macOS `NavLayer.commit_hold` for keys
+and combinations (it lives in nav_layer.lua because the remap facade's main
+chunk is at Lua's limit of 200 locals). Action: a new flow that imports a
+layer-holding key calls the same owner; never make a loader substitute the
+preset for an absent file.
 
 ### project-key-combinations-have-their-own-gate
 

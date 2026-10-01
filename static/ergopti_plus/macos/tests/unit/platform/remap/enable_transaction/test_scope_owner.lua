@@ -175,39 +175,40 @@ end)
 -- left_command held an empty navigation layer. The tap-holds restore now
 -- creates the recommended layer where there is none, before the regeneration
 -- that deploys it, and takes it back when the transaction is refused.
-helpers.describe("remap scope transaction: the recommended navigation layer", function()
-	local LAYERS = "tests/unit/platform/remap/no-layers-toml/layers.toml"
+-- Where the fixture's configuration folder keeps its layer file.
+local LAYERS = "tests/unit/platform/remap/no-layers-toml/layers.toml"
 
-	--- The shipped preset's bytes.
-	local function preset()
-		local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
-		local text = fh:read("*a")
-		fh:close()
-		return text
+--- The shipped preset's bytes.
+local function preset()
+	local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
+	local text = fh:read("*a")
+	fh:close()
+	return text
+end
+
+--- Lets the disk double remove a file, as the macOS adapter does.
+local function removable(disk)
+	require("adapters.file_system").remove_exact = function(path)
+		disk.files[path] = nil
+		return true
 	end
+end
 
-	--- Lets the disk double remove a file, as the macOS adapter does.
-	local function removable(disk)
-		require("adapters.file_system").remove_exact = function(path)
-			disk.files[path] = nil
+--- Runs a case with an observable owner of the layer's wheel bindings,
+--- which Hammerspoon runs (layer-wheel-slots).
+--- @param body function Receives the reconciliation counter.
+local function with_wheel_owner(body)
+	helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
+		local owner = { reconciles = 0 }
+		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+			owner.reconciles = owner.reconciles + 1
 			return true
-		end
-	end
+		end }
+		body(owner)
+	end)
+end
 
-	--- Runs a case with an observable owner of the layer's wheel bindings,
-	--- which Hammerspoon runs (layer-wheel-slots).
-	--- @param body function Receives the reconciliation counter.
-	local function with_wheel_owner(body)
-		helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
-			local owner = { reconciles = 0 }
-			package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
-				owner.reconciles = owner.reconciles + 1
-				return true
-			end }
-			body(owner)
-		end)
-	end
-
+helpers.describe("remap scope transaction: the recommended navigation layer", function()
 	helpers.it("(nav-layer-fresh-install-default) the restore creates layers.toml before the regeneration", function()
 		with_fixture(function(fixture) with_wheel_owner(function(wheel)
 			local remap, _, disk = scoped_remap(fixture)
@@ -255,6 +256,77 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 				helpers.assert_true(request(remap, scope[1], scope[2], "/remap/backup-10"))
 				disk.terminal(true, "ready")
 				helpers.assert_nil(disk.files[LAYERS], scope[1] .. " " .. scope[2])
+			end)
+		end
+	end)
+end)
+
+-- Picking the navigation layer as the hold of a key or of a combination saved
+-- the hold and nothing else: in a folder with no layers.toml the key entered a
+-- layer that binds no key. The pick brings the recommended layer along, as
+-- the restore does.
+helpers.describe("remap setters: a hold that enters the layer brings it along", function()
+	local SETTERS = {
+		{ name = "key", set = function(remap, action) return remap.set_hold_action(KEY, action) end,
+			get = function(remap) return remap.get_hold_action(KEY) end },
+		{ name = "combination", set = function(remap, action) return remap.set_combo_hold_action(COMBO, action) end,
+			get = function(remap) return remap.get_combo_hold_action(COMBO) end },
+	}
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) the layer hold creates layers.toml and tells the wheel owner", function()
+		for _, setter in ipairs(SETTERS) do
+			with_fixture(function(fixture) with_wheel_owner(function(wheel)
+				local remap, _, disk = scoped_remap(fixture)
+				removable(disk)
+				helpers.assert_true(setter.set(remap, "shift"), setter.name)
+				helpers.assert_nil(disk.files[LAYERS], setter.name .. ": a modifier hold brings no layer file")
+				helpers.assert_true(setter.set(remap, "layer"), setter.name)
+				helpers.assert_eq(setter.get(remap), "layer", setter.name)
+				helpers.assert_eq(disk.files[LAYERS], preset(), setter.name .. ": the recommended layer's exact bytes")
+				helpers.assert_eq(wheel.reconciles, 1, setter.name .. ": the new layer's wheel reaches its owner")
+				helpers.assert_true(setter.set(remap, "layer"), setter.name)
+				helpers.assert_eq(wheel.reconciles, 1, setter.name .. ": a kept file changes nothing for the wheel")
+			end) end)
+		end
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) an existing layers.toml is never replaced", function()
+		for _, setter in ipairs(SETTERS) do
+			with_fixture(function(fixture)
+				local remap, calls, disk = scoped_remap(fixture)
+				removable(disk)
+				disk.files[LAYERS] = "# the user's own layer\n"
+				helpers.assert_true(setter.set(remap, "layer"), setter.name)
+				helpers.assert_eq(disk.files[LAYERS], "# the user's own layer\n", setter.name)
+				calls.set_save_succeeds(false)
+				helpers.assert_eq(setter.set(remap, "layer"), false, setter.name)
+				helpers.assert_eq(disk.files[LAYERS], "# the user's own layer\n",
+					setter.name .. ": a refused save removes only a file the pick created")
+			end)
+		end
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) a hold that is not saved takes the created layer back", function()
+		for _, setter in ipairs(SETTERS) do
+			with_fixture(function(fixture) with_wheel_owner(function(wheel)
+				local remap, calls, disk = scoped_remap(fixture)
+				removable(disk)
+				calls.set_save_succeeds(false)
+				helpers.assert_eq(setter.set(remap, "layer"), false, setter.name)
+				helpers.assert_nil(disk.files[LAYERS], setter.name .. ": no layer file outlives a refused save")
+				helpers.assert_eq(wheel.reconciles, 0, setter.name .. ": the wheel is left as it was")
+			end) end)
+		end
+	end)
+
+	helpers.it("(hold-picker-brings-the-layer-2026-10-01) a layer that cannot be imported refuses the hold", function()
+		for _, setter in ipairs(SETTERS) do
+			with_fixture(function(fixture)
+				local remap, calls, disk = scoped_remap(fixture)
+				disk.refuse = LAYERS
+				helpers.assert_eq(setter.set(remap, "layer"), false, setter.name)
+				helpers.assert_eq(setter.get(remap), "none", setter.name .. ": the hold is left as it was")
+				helpers.assert_eq(calls.save, 0, setter.name .. ": nothing is saved for a layer that is not there")
 			end)
 		end
 	end)

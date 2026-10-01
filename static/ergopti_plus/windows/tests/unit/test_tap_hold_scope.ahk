@@ -219,3 +219,69 @@ _TapHoldScopeRestoreCreatesLayer() {
 }
 Test("tap-hold-scope: the restore publishes the layer with the preset and a refusal takes it back (nav-layer-fresh-install-default)",
 	_TapHoldScopeRestoreCreatesLayer)
+
+; Picking the navigation layer as a key's hold wrote hold_layer and nothing
+; else. In a folder with no layers.toml the key then entered a layer that binds
+; no key, which only lights CapsLock while held: every letter came out in
+; capitals and the hold read as Shift. The picker's write brings the
+; recommended layer along, as the restore does.
+_TapHoldPickerBringsLayer() {
+	global _SharedDir
+	Fixture := _ScopeOwnerFixture()
+	LayersPath := Fixture.directory . "\layers.toml"
+	Preset := TapHoldRecommendedLayer(_SharedDir)
+	LayerOpt := Map("kind", "layer", "id", Preset["layer_id"])
+	Writes := []
+	Accept(KeyId, HoldOpt) {
+		Writes.Push(KeyId . ":" . HoldOpt["kind"] . ":" . HoldOpt["id"] . ":" . (FileExist(LayersPath) ? "layer" : "none"))
+		return 1
+	}
+	Refuse(KeyId, HoldOpt) => false
+	try {
+		AssertEqual(1, TapHoldSetHold("space", Map("kind", "modifier", "id", "shift"), Fixture.directory, Accept))
+		Assert(!FileExist(LayersPath), "a modifier hold brings no layer file")
+		AssertEqual(1, TapHoldSetHold("space", Map("kind", "layer", "id", "not_the_recommended_layer"), Fixture.directory, Accept))
+		Assert(!FileExist(LayersPath), "a layer the recommended file does not bind brings nothing")
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, "", Accept))
+		Assert(!FileExist(LayersPath), "without a configuration folder no layer file is written")
+
+		Assert(!TapHoldSetHold("space", LayerOpt, Fixture.directory, Refuse), "a refused key write is reported")
+		Assert(!FileExist(LayersPath), "a refused key write takes the layer it created back")
+
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, Fixture.directory, Accept))
+		AssertEqual(Preset["text"], FSReadUtf8Exact(LayersPath),
+			"picking the layer creates layers.toml with the recommended layer's exact bytes")
+		AssertEqual("space:layer:" . Preset["layer_id"] . ":layer", Writes[Writes.Length],
+			"the layer file is there before the key that enters it is written")
+		Assert(_ConfigWriteLeaseTryAcquire(LayersPath, "probe") is Object, "the import releases the layer file")
+
+		Own := "# the user's own layer`n"
+		Assert(FSDeleteStrict(LayersPath))
+		Assert(FSWriteDurable(LayersPath, Own))
+		AssertEqual(1, TapHoldSetHold("space", LayerOpt, Fixture.directory, Accept))
+		AssertEqual(Own, FSReadUtf8Exact(LayersPath), "an existing layers.toml is the user's and is never replaced")
+		Assert(!TapHoldSetHold("space", LayerOpt, Fixture.directory, Refuse))
+		AssertEqual(Own, FSReadUtf8Exact(LayersPath), "a refused key write removes only a file the picker created")
+	} finally {
+		Current := _ConfigWriteLeaseCurrent(LayersPath)
+		if Current is Object
+			_ConfigWriteLeaseRelease(Current)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("tap-hold-scope: picking the layer as a hold brings the recommended layer along (hold-picker-brings-the-layer-2026-10-01)",
+	_TapHoldPickerBringsLayer)
+
+; The tray's hold picker is the caller: it hands the configuration folder to
+; the owner above, never to the bare key writer.
+_TapHoldPickerCallsLayerOwner() {
+	Body := _DriverFuncBody("_TH_ApplyHold")
+	Assert(RegExMatch(Body, "TapHoldSetHold\(KeyId,\s*HoldOpt,\s*_ConfigDir\)"),
+		"the hold picker must write through TapHoldSetHold with the configuration folder")
+	Assert(!RegExMatch(Body, "[^A-Za-z_]WriteTapHoldHold\("),
+		"the hold picker must not call the bare key writer, which brings no layer")
+	Assert(InStr(_DriverSourceNoComments(), "return _TH_ApplyHold(this.KeyId, this.HoldOpt)"),
+		"the picker row's callback must reach _TH_ApplyHold")
+}
+Test("tap-hold-scope: the hold picker writes through the layer owner (hold-picker-brings-the-layer-2026-10-01)",
+	_TapHoldPickerCallsLayerOwner)
