@@ -134,7 +134,7 @@ graph TD
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
-        WINDOWS_tray_startup_panel["TrayStartupPanel.ahk"]
+        WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_uia_worker["UiaWorker.ahk"]
         WINDOWS_webview_profiles["WebviewProfiles.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]

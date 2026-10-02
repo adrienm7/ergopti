@@ -844,10 +844,15 @@ launch; detach any read-only junctions before removing the private fixture.
 
 An early native tray menu can suspend auto-execute and disables AHK timers until
 navigation ends. Deferred construction cannot make progress behind that menu.
-Use a modeless surface before full publication, then hand off after closing all
-build timing stages. Invalidate scheduled handoffs when the surface is dismissed
-or its command is accepted; clearing only the pending Boolean is too late once
-a callback has been scheduled.
+Publish the actual native lifecycle rows before revealing the icon. A temporary
+loading GUI was rejected by the user. Native navigation therefore deliberately
+pauses deferred feature construction until the user closes it. Pass that early
+notification through once; never queue a second opening without another explicit
+user click. Retain a repeat click until full publication, so another bootstrap
+navigation loop cannot repeatedly suspend the remaining initialization. Retain
+one accepted lifecycle intent until input readiness, and keep its command owner
+alive across root replacement because the dispatcher may already have admitted
+it. Close build timing stages before releasing any headless deferred navigation.
 
 ### project-tooltip-two-hwnd-zorder
 
