@@ -576,6 +576,7 @@ KeyCombinationScopedOperations(Mode, Path) {
 	for Key in Stored.Get("action_parameters", Map()) {
 		ParameterPath := "action_parameters." . Key
 		if ConfigScopeActionParameterDomain(ParameterPath) == "combination"
+			&& (KeyCombinationParsePair(StrSplit(Key, "__")[2]) is Map)
 			Parameters.Push(ParameterPath)
 	}
 	Plan := ManifestScopePlan("key_combinations", Mode, Parameters,
