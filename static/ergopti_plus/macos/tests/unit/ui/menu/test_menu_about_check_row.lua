@@ -41,7 +41,10 @@ local function build(latest)
 	local refresh = function() end
 	local ok, rows = pcall(function()
 		local About = helpers.load_with_stubs("ui.menu.menu_about")
-		return About.build({ channel_owner = owner, update_checks = checks, updateMenu = refresh }).submenu
+		return About.build({ channel_owner = owner, update_checks = checks, updateMenu = refresh }, {
+			start_at_login = function() error("Building About must not change startup.") end,
+			uninstall = function() error("Building About must not uninstall the application.") end,
+		}).submenu
 	end)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil

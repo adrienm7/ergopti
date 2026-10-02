@@ -418,19 +418,22 @@ _MI_BuildConfigurationMenu() {
 		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
 		"config_folder",       FilePathsEditor,
 		"setup_wizard",        Onboarding_ShowFromMenu,
-		"start_at_login",      ToggleStartAtLogin,
 		"restore_touchpad_gestures", TouchpadRegistryRestoreFromMenu
 	)
 		Commands[Id] := Callback
-	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)
-	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands, StateGetters)
+	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands)
 }
 
 
 ; Builds the About submenu (version, channels, update check, check frequency,
-; Versions and its GitHub page, then Uninstall after a separator).
-_MI_BuildAboutMenu() {
+; Versions and its GitHub page, then startup and Uninstall after a separator).
+_MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
+
+	if !IsObject(StartupCommand)
+		StartupCommand := ToggleStartAtLogin
+	if !IsObject(StartupState)
+		StartupState := StartAtLoginEnabled
 
 	; The updater block is provider DATA since 2026-08-07: one row per entry,
 	; with the channel and frequency pickers handed over as the native Menus they
@@ -441,11 +444,13 @@ _MI_BuildAboutMenu() {
 	Commands := Map(
 		"about_changelog",     Updater_ShowChangelog,
 		"about_releases_page", Updater_OpenReleasesPage,
+		"start_at_login",      StartupCommand,
 		"uninstall",           ShowUninstallErgopti
 	)
 	; A local version run from source has nothing to uninstall: the row stays,
 	; greyed, and says why (the manifest's disabled_reason_key).
-	StateGetters := Map("installed_build", () => !Updater_IsLocalSource())
+	StateGetters := Map("installed_build", () => !Updater_IsLocalSource(),
+		"start_at_login_enabled", StartupState)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands, StateGetters)
 }
 

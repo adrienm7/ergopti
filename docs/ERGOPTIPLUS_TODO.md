@@ -760,10 +760,13 @@ exact-boolean regressions also pass the focused runner.
       WebView paths, language changes, already branded inputs and an empty
       prefix with regression and cross-driver parity tests.
 
-- [ ] **110.** Move the automatic-start switch from Configuration to Updates,
-      immediately above Uninstall. Declare the placement once in the shared
-      menu manifest, preserve the existing native startup persistence owners,
-      and verify order, state and command dispatch on Windows, macOS and Linux.
+- [~] **110.** Move automatic startup from Configuration to Updates,
+  immediately above Uninstall. The shared declaration and all three native
+  command/getter contexts now use that placement. Existing startup persistence
+  owners and 21 translations remain intact. Native regressions cover order,
+  enabled/disabled checks, command dispatch, pause and rebuild; the parity guard
+  requires one declaration directly before Uninstall. Full three-OS validation
+  remains pending before this item can be removed.
 
 Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
 Windows/macOS/Linux pipeline, including package and installation lanes. It

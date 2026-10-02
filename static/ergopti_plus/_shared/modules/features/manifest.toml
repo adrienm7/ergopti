@@ -3891,7 +3891,7 @@ platforms = ["ahk", "hs", "linux"]
 # with the subscribed channel and listing every channel of the shared
 # update-channel registry, right before the check row, the check frequency (a
 # `list`, because its rows come from the registry and the updater state), then
-# Versions and its GitHub page, and last, after a separator, Uninstall. Linux
+# Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
@@ -3915,6 +3915,14 @@ i18n = "menu.about.open_releases_page"
 # bottom of Configuration until 2026-09, where it read as one more setting.
 [[menu.about_menu]]
 type = "---"
+
+# Startup and removal share the installation group; startup stays immediately
+# above Uninstall and reads each driver's native startup owner.
+[[menu.about_menu]]
+type = "check"
+id = "start_at_login"
+i18n = "menu.global.start_at_login"
+checked_when = ["start_at_login_enabled"]
 
 # A local version run from source has nothing to remove: the row stays in place,
 # greyed by `disabled_when`, and says why. A row greyed with a reason is drawn
@@ -4043,12 +4051,6 @@ i18n = "menu.global.config_folder"
 type = "command"
 id = "setup_wizard"
 i18n = "menu.global.setup_wizard"
-
-[[menu.configuration_menu]]
-type = "check"
-id = "start_at_login"
-i18n = "menu.global.start_at_login"
-checked_when = ["start_at_login_enabled"]
 
 # « Ergopti uses Karabiner » (config_karabiner.toml [karabiner]
 # integration_enabled, default on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
