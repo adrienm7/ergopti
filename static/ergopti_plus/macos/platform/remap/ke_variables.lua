@@ -962,12 +962,20 @@ end
 --- @return boolean accepted True when the write started or was safely queued.
 --- @return number|nil revision Logical revision assigned to the request.
 function M.set(name, value, on_done)
+	local previous_token, previous_value = _logical_token, _logical_values[name]
 	local batch = build_write(name, value, on_done)
 	if not batch then return false, nil end
 	local revision = batch.operations[batch.names[1]].revision
 	Logger.debug(LOG, "Queued exact-generation Karabiner runtime variable %s=%s.",
 		name, tostring(value))
-	return enqueue_batch(batch), revision
+	local accepted = enqueue_batch(batch)
+	if accepted ~= true and _logical_token == batch.token and _logical_revisions[name] == revision then
+		-- A rejected constructor/start has no native intent owner. Preserve its
+		-- prior value without rewinding the monotonic revision or overwriting a
+		-- newer operation accepted by a reentrant settlement callback.
+		_logical_values[name] = previous_token == batch.token and previous_value or nil
+	end
+	return accepted, revision
 end
 
 --- Refreshes the logical generation and returns the current CapsWord revision.
@@ -987,24 +995,24 @@ function M.capsword_revision()
 	return _logical_revisions[CAPSWORD_LOGICAL_NAME] or 0
 end
 
---- Returns the newest same-token operation for one logical variable.
---- Pending state wins because it represents intent newer than the active child.
---- @param logical_name string Runtime logical name.
---- @param token string Exact current token.
---- @return table|nil operation Latest in-flight operation.
-local function latest_operation(logical_name, token)
-	local function find_in(batch)
-		if not batch or batch.token ~= token then return nil end
-		for _, scoped_name in ipairs(batch.names) do
-			local operation = batch.operations[scoped_name]
-			if operation and operation.logical_name == logical_name then return operation end
-		end
-		return nil
-	end
-	return find_in(_pending_batch) or find_in(_active_batch)
+--- Records a control edge only for the already-adopted, currently ACTIVE lease.
+--- This bounded observation performs no native write or generation adoption.
+--- @param value integer Exact native CapsWord state, zero or one.
+--- @param expected_token string Token captured by the watcher at acquisition.
+--- @return boolean observed
+--- @return number revision Current or newly allocated logical revision.
+function M.observe_capsword_state(value, expected_token)
+	local revision = _logical_revisions[CAPSWORD_LOGICAL_NAME] or 0
+	if value ~= 0 and value ~= 1 then return false, revision end
+	if not LeaseContract.is_valid_token(expected_token) or _logical_token ~= expected_token
+		or _poisoned_tokens[expected_token] then return false, revision end
+	local status_ok, phase, snapshot = pcall(LeaseController.status)
+	if not status_ok or phase ~= "active" or type(snapshot) ~= "table"
+		or snapshot.token ~= expected_token then return false, revision end
+	return true, allocate_revision(CAPSWORD_LOGICAL_NAME, value)
 end
 
---- Queues a CapsWord clear only when the latest local write still activates it.
+--- Queues a CapsWord clear when the newest local intent or native edge activates it.
 --- This does not infer ownership from global Karabiner state, preserving personal
 --- CapsLock/Karabiner behavior when ErgoptiPlus has no activation in flight.
 --- @param on_done function|nil Optional fn(ok, reason, revision) callback.
@@ -1028,9 +1036,8 @@ function M.supersede_capsword_activation(on_done)
 		Logger.error(LOG, "supersede_capsword_activation(): lease generation changed during synchronization.")
 		return false, _logical_revisions[CAPSWORD_LOGICAL_NAME] or 0
 	end
-	local operation = latest_operation(CAPSWORD_LOGICAL_NAME, token)
 	local revision = _logical_revisions[CAPSWORD_LOGICAL_NAME] or 0
-	if not operation or operation.value ~= 1 then return false, revision end
+	if _logical_values[CAPSWORD_LOGICAL_NAME] ~= 1 then return false, revision end
 	local accepted, clear_revision = M.set(CAPSWORD_LOGICAL_NAME, 0, on_done)
 	return accepted, clear_revision or revision
 end

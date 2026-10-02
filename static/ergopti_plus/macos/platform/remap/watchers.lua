@@ -42,6 +42,9 @@ local Registrar      = require("adapters.hotkey_registrar")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
+-- Layout observation does not own keyboard-control resources. Acquire this
+-- dependency only when the CapsWord generation starts its gesture watcher.
+local ControlSentinels = nil
 
 
 local LOG = "karabiner"
@@ -156,6 +159,7 @@ local _capsword_probe_watchdog = nil
 -- lease-owned too; both must be cancellable when Ergopti remapping goes inert.
 local _capsword_led_timer = nil
 local _gestures_engine = nil
+local _capsword_listener_owned = false
 local _capsword_timer_cleanup_backlog = {}
 
 -- Monotonic probe generation. A terminated or timed-out probe's callback still
@@ -567,6 +571,14 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		Logger.error(LOG, "CapsWord watcher refused — %s.", tostring(scope_err))
 		return nil
 	end
+	if ControlSentinels == nil then
+		local owner_ok, owner_or_err = pcall(require, "modules.keymap.control_sentinels")
+		if not owner_ok then
+			Logger.error(LOG, "CapsWord control signal owner could not be loaded: %s.", tostring(owner_or_err))
+			return nil
+		end
+		ControlSentinels = owner_or_err
+	end
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	_capsword_gen = _capsword_gen + 1
 	local watcher_gen = _capsword_watcher_gen
@@ -635,6 +647,36 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		Logger.warn(LOG, "gestures_engine unavailable — bare-touch CapsWord detection disabled.")
 	end
 
+	-- Initialize the serialized owner's exact token off the HID callback. The
+	-- named listener then does only bounded in-memory observation; stale stopped
+	-- closures cannot adopt a replacement lease or invalidate its LED receipt.
+	local initialized, revision = pcall(KeVariables.capsword_revision)
+	local registered, register_err = false, nil
+	if initialized and type(revision) == "number" then
+		registered, register_err = pcall(ControlSentinels.set_listener, "karabiner.capsword", function(signal)
+			-- Tags use the existing reserved-key route, not a token-bearing IPC
+			-- payload. The active graph and captured watcher lease are the fences;
+			-- a queued identical tag cannot prove its original producing token.
+			if watcher_gen ~= _capsword_watcher_gen then return end
+			local value = signal == ControlSentinels.CAPSWORD_ACTIVATED and 1
+				or (signal == ControlSentinels.CAPSWORD_DEACTIVATED and 0 or nil)
+			if value ~= nil then KeVariables.observe_capsword_state(value, lease_token) end
+		end)
+	end
+	if not registered then
+		_capsword_watcher_gen = _capsword_watcher_gen + 1
+		if _gestures_engine then
+			local cleared = pcall(_gestures_engine.set_any_touch_hook, nil)
+			if cleared then _gestures_engine = nil end
+		end
+		if not stop_native_watcher(watcher, "CapsWord listener acquisition rollback") then
+			_capsword_watcher_backlog[#_capsword_watcher_backlog + 1] = watcher
+		end
+		Logger.error(LOG, "CapsWord control listener could not be acquired: %s.",
+			tostring(register_err or revision))
+		return nil
+	end
+	_capsword_listener_owned = true
 	return watcher
 end
 
@@ -646,6 +688,15 @@ function M.stop_gesture_watcher(watcher)
 	_capsword_check_pending = false
 	_capsword_last_check_ns = 0
 	local all_stopped = true
+	if _capsword_listener_owned then
+		local removed, remove_err = pcall(ControlSentinels.set_listener, "karabiner.capsword", nil)
+		if removed then
+			_capsword_listener_owned = false
+		else
+			all_stopped = false
+			Logger.error(LOG, "CapsWord control listener removal failed: %s.", tostring(remove_err))
+		end
+	end
 	if watcher then
 		if not stop_native_watcher(watcher, "Trackpad CapsWord eventtap") then all_stopped = false end
 	end

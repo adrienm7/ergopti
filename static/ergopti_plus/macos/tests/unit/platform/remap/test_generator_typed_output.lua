@@ -78,6 +78,8 @@ helpers.with_fresh_modules({
 	"platform.remap.config",
 	"platform.remap.generator",
 	"toml_codec",
+	"modules.keymap.control_sentinels",
+	"adapters.synthetic_input",
 }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
@@ -116,6 +118,21 @@ helpers.with_fresh_modules({
 	local keys    = assert(Config.load_tap_hold_keys(DATA_DIR .. "tap_hold_keys.json"))
 	local combos  = assert(Config.load_mod_combos(DATA_DIR .. "mod_combos.json"))
 	local non_canonical = Config.compute_non_canonical_combos(combos)
+	-- The application receives only events not consumed by the actual keymap
+	-- owner. Its diagnostic scheduler is inert unless a real listener fails.
+	local diagnostics = {}
+	package.loaded["adapters.synthetic_input"] = {
+		defer_after_callback = function(reason, callback)
+			diagnostics[#diagnostics + 1] = { reason = reason, callback = callback }
+			return true
+		end,
+	}
+	local ControlOwner = require("modules.keymap.control_sentinels")
+	local NativeKeycodes = require("keycodes")
+	local control_codes = {
+		key_90 = NativeKeycodes.F20_LAYER_NAV_ENTERED,
+		key_80 = NativeKeycodes.F19_LAYER_NAV_EXITED,
+	}
 	local by_id = {}
 	for _, action in ipairs(actions) do by_id[action.id] = action end
 
@@ -521,7 +538,22 @@ helpers.with_fresh_modules({
 		local lines = {}
 		for _, emission in ipairs(engine:emissions()) do
 			if emission.key_code ~= nil then
-				lines[#lines + 1] = emission.phase .. ":" .. emission.key_code .. "[" .. names(emission.flags) .. "]"
+				local code = control_codes[emission.key_code]
+				if code then
+					local flags = emission.flags
+					local quartz = {
+						ctrl = flags.left_control == true or flags.right_control == true,
+						alt = flags.left_option == true or flags.right_option == true,
+						cmd = flags.left_command == true or flags.right_command == true,
+						shift = flags.left_shift == true or flags.right_shift == true,
+						fn = flags.fn == true,
+					}
+					helpers.assert_true(ControlOwner.claim_key(code, emission.phase == "down", quartz),
+						"a control event can leave the application comparison only when the real owner consumes it")
+					helpers.assert_eq(#diagnostics, 0, "native control routing must not hide listener failures")
+				else
+					lines[#lines + 1] = emission.phase .. ":" .. emission.key_code .. "[" .. names(emission.flags) .. "]"
+				end
 			end
 		end
 		return table.concat(lines, " ")

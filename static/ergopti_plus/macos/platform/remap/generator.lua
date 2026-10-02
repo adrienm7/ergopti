@@ -42,7 +42,7 @@ local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
-local ControlSignals = require("platform.remap.control_signals")
+local ControlSignals = require("keymap.control_signals")
 local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
@@ -333,18 +333,10 @@ end
 --- (hs.json.decode shares equal JSON values, see adapters/json_codec.lua):
 --- it is refused here, where the graph is built, instead of deploying a
 --- manipulator with duplicated gates.
---- @param rules table Rules generated for one pause mode.
---- @param token string Canonical generation token.
---- @param mode string Managed mode (`normal` or `pause`).
---- @return table|nil rules The same list after central gating.
+--- @param rules table Independently owned raw rule graph.
+--- @return boolean|nil valid Identity and shape validation receipt.
 --- @return string|nil error_message Validation failure.
-local function gate_managed_rules(rules, token, mode)
-	if not LeaseContract.is_valid_token(token) then
-		return nil, LeaseContract.invalid_token_error(token)
-	end
-	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then
-		return nil, "managed rule mode must be 'normal' or 'pause'"
-	end
+local function validate_managed_rule_graph(rules)
 	if not is_dense_array(rules) then return nil, "managed rules must be a dense array" end
 
 	local gated = {}
@@ -405,6 +397,24 @@ local function gate_managed_rules(rules, token, mode)
 			end
 		end
 	end
+	return true
+end
+
+--- Applies the exact lease after the raw graph has passed identity validation.
+--- @param rules table Independently owned rule graph.
+--- @param token string Canonical lease token.
+--- @param mode string Normal or paused mode.
+--- @return table|nil rules
+--- @return string|nil error_message
+local function gate_managed_rules(rules, token, mode)
+	if not LeaseContract.is_valid_token(token) then
+		return nil, LeaseContract.invalid_token_error(token)
+	end
+	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then
+		return nil, "managed rule mode must be 'normal' or 'pause'"
+	end
+	local valid, validation_err = validate_managed_rule_graph(rules)
+	if not valid then return nil, validation_err end
 	local scoped, scope_err = scope_runtime_variable_references(rules, token)
 	if not scoped then return nil, scope_err end
 
@@ -868,6 +878,25 @@ end
 --- @param rules table Owned production rule graph.
 local function rewrite_control_output(rules)
 	local function rewrite(value)
+		-- Capture historical graphs above this boundary. Only the deployed graph
+		-- notifies the current watcher, before each variable edge and before the
+		-- last held key; exact hand-modifier variants keep tags unambiguous.
+		local index = 1
+		while index <= #value do
+			local event = value[index]
+			local variable = type(event) == "table" and event.set_variable or nil
+			if type(variable) == "table" and variable.name == "capsword"
+				and (variable.value == 0 or variable.value == 1) then
+				local signal = variable.value == 1 and "capsword_activated" or "capsword_deactivated"
+				table.insert(value, index, {
+					key_code = LAYER_NAV_SENTINEL_NAME,
+					modifiers = ControlSignals.modifiers_for(signal),
+					["repeat"] = false,
+				})
+				index = index + 1
+			end
+			index = index + 1
+		end
 		local emits_control = value.key_code == LAYER_NAV_SENTINEL_NAME
 		if emits_control then value["repeat"] = false end
 		local sticky_index, sticky_count = nil, 0
@@ -2003,6 +2032,10 @@ function M.build_karabiner_json(
 		all_rules = kept
 	end
 
+	-- Native control expansion detaches manipulators, so reject aliased source
+	-- graphs first instead of accidentally hiding the decoder's identity error.
+	local control_graph_valid, control_graph_err = validate_managed_rule_graph(all_rules)
+	if not control_graph_valid then return nil, control_graph_err end
 	rewrite_control_output(all_rules)
 
 	-- A single deployed config contains both pause states. Pause and resume only

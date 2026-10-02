@@ -119,6 +119,28 @@ end
 -- =================================================
 
 helpers.describe("karabiner.watchers: one layout, two names (layout-name-forms)", function()
+	helpers.it("(layout-name-forms) observing layouts never acquires the CapsWord control owner", function()
+		local module_name = "modules.keymap.control_sentinels"
+		local previous_loader = package.preload[module_name]
+		local acquisitions = 0
+		package.preload[module_name] = function()
+			acquisitions = acquisitions + 1
+			error("layout observation cannot acquire the CapsWord control owner")
+		end
+		local ok, failure = xpcall(function()
+			helpers.with_fresh_modules({ module_name }, function()
+				local h = load_watcher("ABC")
+				h.poll_reads("ABC")
+				helpers.assert_eq(#h.changes, 0)
+				helpers.assert_true(h.watchers.stop_input_source_watcher())
+			end)
+		end, debug.traceback)
+		package.preload[module_name] = previous_loader
+		restore_adapters()
+		if not ok then error(failure, 0) end
+		helpers.assert_eq(acquisitions, 0, "the layout owner must not initialize keyboard-control timers")
+	end)
+
 	helpers.it("(layout-name-forms) an Ergopti layout's two names are no change at the first poll", function()
 		local h = load_watcher("Ergopti+")
 		h.poll_reads("Ergopti_v2_2_2_plus")
