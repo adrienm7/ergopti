@@ -160,7 +160,7 @@ const STEP_CONDITIONS = [
 	[
 		ENTRY,
 		'release',
-		'Create release and upload all assets atomically',
+		'Create draft release, verify assets and publish',
 		"steps.preflight.outputs.create_release == 'true'"
 	],
 	[
@@ -330,7 +330,7 @@ const RELEASE_ORDER = [
 	'Download all build artifacts',
 	PREFLIGHT,
 	'Create git tag',
-	'Create release and upload all assets atomically',
+	'Create draft release, verify assets and publish',
 	'Publish channel feed for Sparkle',
 	'Build changelog section',
 	'Write release body with platform sections'
