@@ -28,6 +28,14 @@ TOML_ParseInlineTable(Raw, Coerce) {
 	; An explicit inline table is closed even when the supplied value is empty.
 	DottedParents := Map()
 	for Member in TOML_SplitArrayElements(SubStr(Raw, 2, StrLen(Raw) - 2), ",", true) {
+		; The strict outer scan has checked quotes and nesting. Ordinary registry
+		; members need neither a second delimiter scan nor a dotted-key scan.
+		if RegExMatch(Member, '^([A-Za-z0-9_-]+)[ \t]*=[ \t]*("(?:[^"\\]|\\.)*"|[A-Za-z0-9_-]+)\z', &SimpleMember) {
+			if Result.Has(SimpleMember[1])
+				throw ValueError("Duplicate TOML inline table key")
+			Result[SimpleMember[1]] := Coerce.Call(SimpleMember[2])
+			continue
+		}
 		Pair := TOML_SplitArrayElements(Member, "=", true)
 		if Pair.Length != 2 || Pair[1] == "" || Pair[2] == ""
 			throw ValueError("TOML inline table members require a key and value")
