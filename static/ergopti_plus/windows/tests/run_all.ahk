@@ -388,6 +388,7 @@ InstallSendNoOps()
 #Include unit/test_gesture_unhook_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/test_boot_menu_wait_clock.ahk
 #Include unit/test_llm_menu_build_coordinator.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
@@ -1911,6 +1912,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_suspend_boundary.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_latency_statistics.ahk
 #Include unit/test_hotpath_breakdown_reentry.ahk
 #Include unit/test_hook_timing_input_privacy.ahk
 #Include unit/test_hotpath_per_segment_threshold.ahk

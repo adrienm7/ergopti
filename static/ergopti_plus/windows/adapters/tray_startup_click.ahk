@@ -45,12 +45,14 @@ class TrayStartupClick {
 	}
 
 	OnNativeMenuLoop(wParam, lParam, msg, hwnd) {
-		if (msg == 0x211) {
+		if (msg == 0x211 && !this.MenuLoopOpen) {
 			this.MenuLoopAt := A_TickCount
 			this.MenuLoopOpen := true
+			try BootProfile_MenuNavigation(true)
 			try LoggerStart("TrayMenu", "Native menu navigation started; AHK timers are blocked.")
 		} else if (msg == 0x212 && this.MenuLoopOpen) {
 			this.MenuLoopOpen := false
+			try BootProfile_MenuNavigation(false)
 			try LoggerSuccess("TrayMenu", "Native menu navigation ended after {1} ms; AHK timers can resume.",
 				TickElapsed(this.MenuLoopAt))
 		}

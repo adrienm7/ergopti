@@ -24,9 +24,9 @@
 ; replayed lines are simply missing, and the profiler looks like it was never
 ; wired up rather than like it lost its data.
 ;
-; SCOPE: source introspection. infra/boot_profiler.ahk is not loaded by the
-; headless runner (it has no test-visible entry point and its only observable
-; effect is log output), so the invariants are asserted against its source.
+; SCOPE: source introspection. The headless runner loads the profiler for its
+; pure menu-wait clock tests; early include-order wiring and replay ownership
+; are asserted against production source rather than the runner's boot order.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

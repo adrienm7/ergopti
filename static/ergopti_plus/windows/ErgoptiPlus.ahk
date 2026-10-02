@@ -736,6 +736,7 @@ LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')â€
 ; Boot phase profiling â€” emits one INFO line per phase so a slow start can be
 ; diagnosed from the log alone (see infra/boot_profiler.ahk).
 BootProfile_Begin()
+HotPath_StartStatistics()
 ; The environment is logged FIRST, not only in the post-ready snapshot: a boot
 ; that dies half-way never reaches the snapshot, and then these facts are the
 ; only description of the machine it died on.

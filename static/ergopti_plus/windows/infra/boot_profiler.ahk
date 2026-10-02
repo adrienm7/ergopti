@@ -56,8 +56,8 @@ BootProfile_Begin() {
 ; top-level code, the config parse, HotstringEngineInit — used to arrive at
 ; BootProfile_Begin as a single opaque "script parse + load: ~N ms" number, so a
 ; user reporting a slow start could be told how much was pre-boot but never
-; which part of it. A stamp is two integer writes and no logging, which is the
-; only thing that is safe this early; BootProfile_Begin replays them all as
+; which part of it. Stamps retain clocks without logging or file I/O;
+; BootProfile_Begin replays them all as
 ; normal marks once the logger exists.
 ; @param PhaseName {String} Human-readable label for the phase that just ended.
 BootProfile_Stamp(PhaseName) {
@@ -86,7 +86,8 @@ _BootProfileStampStore(Op, PhaseName := "") {
 	static Stamps := []
 	if (Op == "push") {
 		if (Stamps.Length < CAP)
-			Stamps.Push({ Name: PhaseName, Tick: A_TickCount })
+			Stamps.Push({ Name: PhaseName, Tick: A_TickCount,
+				WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs() })
 		return []
 	}
 	Drained := Stamps
@@ -109,10 +110,23 @@ _BootProfileReplayStamps(ProcessStartTick) {
 	; the deltas between stamps stay correct, only the absolute total is lost.
 	Origin := (ProcessStartTick > 0) ? ProcessStartTick : Stamps[1].Tick
 	Prev := Origin
+	PrevStamp := 0
 	for , Stamp in Stamps {
 		try LoggerInfo("BootProfile", Format("(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
 			Stamp.Name, TickElapsed(Prev, Stamp.Tick), TickElapsed(Origin, Stamp.Tick)))
 		Prev := Stamp.Tick
+		if PrevStamp {
+			CpuText := (Stamp.CpuMs < 0 || PrevStamp.CpuMs < 0)
+				? "unknown" : Format("{:.3f}", Stamp.CpuMs - PrevStamp.CpuMs)
+			; Format first so distinct phases survive template-based repeat collapsing.
+			try LoggerInfo("BootProfile", Format(
+				"Pre-logger phase '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms.",
+				Stamp.Name, Stamp.WallMs - PrevStamp.WallMs, CpuText))
+		} else {
+			CpuText := Stamp.CpuMs < 0 ? "unknown" : Format("{:.3f}", Stamp.CpuMs)
+			try LoggerInfo("BootProfile", "Process CPU at first boot stamp: {1} ms.", CpuText)
+		}
+		PrevStamp := Stamp
 	}
 }
 
@@ -140,7 +154,7 @@ BootProfile_Mark(PhaseName) {
 ; @param Name {String} Stage label, reused verbatim by BootProfile_StageEnd.
 BootProfile_StageBegin(Name) {
 	_BootStagesInFlight()[Name] := { Tick: A_TickCount,
-		WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs() }
+		WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs(), MenuWaitMs: BootProfile_MenuWaitMs() }
 	try LoggerStart("BootProfile", "Boot stage '{1}'…", Name)
 }
 
@@ -225,9 +239,56 @@ BootProfile_ProcessUptimeMs() {
 ; These are stage-local differences; nested stages overlap and must not be summed.
 _BootProfileStageResources(Name, Started) {
 	WallMs := BootClockWallMs() - Started.WallMs
+	MenuWaitMs := Max(0, BootProfile_MenuWaitMs() - Started.MenuWaitMs)
 	CpuMs := BootClockCpuMs()
 	CpuText := (CpuMs < 0 || Started.CpuMs < 0)
 		? "unknown" : Format("{:.3f}", CpuMs - Started.CpuMs)
-	try LoggerInfo("BootProfile", Format("Boot stage '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms.",
-		Name, WallMs, CpuText))
+	try LoggerInfo("BootProfile", Format(
+		"Boot stage '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms, native_menu_wait={4:.3f} ms, wall_without_menu={5:.3f} ms.",
+		Name, WallMs, CpuText, MenuWaitMs, Max(0, WallMs - MenuWaitMs)))
+}
+
+/** Tracks native menu time separately because its modal loop interrupts boot. */
+class BootMenuWaitClock {
+	Waiting := false
+	StartedMs := 0
+	CompletedMs := 0
+
+	Enter(NowMs) {
+		if this.Waiting
+			throw Error("Native menu wait already active")
+		this.StartedMs := NowMs
+		this.Waiting := true
+	}
+
+	Leave(NowMs) {
+		if !this.Waiting
+			throw Error("Native menu wait is not active")
+		this.CompletedMs += NowMs - this.StartedMs
+		this.Waiting := false
+	}
+
+	Elapsed(NowMs) {
+		return this.CompletedMs + (this.Waiting ? NowMs - this.StartedMs : 0)
+	}
+}
+
+/** One clock belongs to the process, including menus entered before LoggerInit. */
+_BootProfileMenuClock() {
+	static Clock := BootMenuWaitClock()
+	return Clock
+}
+
+/** Records a matched native menu enter/leave notification. */
+BootProfile_MenuNavigation(Active) {
+	Clock := _BootProfileMenuClock()
+	if Active
+		Clock.Enter(BootClockWallMs())
+	else
+		Clock.Leave(BootClockWallMs())
+}
+
+/** Returns cumulative blocked menu time, including an active navigation. */
+BootProfile_MenuWaitMs() {
+	return _BootProfileMenuClock().Elapsed(BootClockWallMs())
 }
