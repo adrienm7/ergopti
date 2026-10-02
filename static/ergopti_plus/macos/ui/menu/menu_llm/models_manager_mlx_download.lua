@@ -30,6 +30,7 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
@@ -727,8 +728,8 @@ function M.install(ctx)
 					or ok_close ~= true or closed == false or closed == nil then
 					return false
 				end
-				local ok, session = pcall(hs.json.decode, raw)
-				if ok and type(session) == "table" and session.log_path == _log_path then
+				local session, decode_err = JsonCodec.decode(raw)
+				if decode_err == nil and type(session) == "table" and session.log_path == _log_path then
 					local remove_ok, removed = Logger.callback(LOG,
 						"MLX download session removal", os.remove, session_file)
 					if remove_ok ~= true or removed == false or removed == nil then return false end
@@ -1811,9 +1812,9 @@ function M.install(ctx)
 				end)
 				if read_ok ~= true or type(raw) ~= "string"
 					or close_ok ~= true or closed == false or closed == nil then return false end
-				local decode_ok, sess = Logger.callback(LOG,
-					"MLX download session PID decode", hs.json.decode, raw)
-				if decode_ok ~= true or type(sess) ~= "table"
+				local decode_ok, sess, decode_err = Logger.callback(LOG,
+					"MLX download session PID decode", JsonCodec.decode, raw)
+				if decode_ok ~= true or decode_err ~= nil or type(sess) ~= "table"
 					or sess.log_path ~= _log_path then return false end
 				sess.pid = owner.partial.pid
 				local encode_ok, encoded = Logger.callback(LOG,

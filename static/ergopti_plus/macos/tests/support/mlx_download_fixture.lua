@@ -9,6 +9,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.json_codec",
 	"hs",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
