@@ -10,6 +10,20 @@ const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 
+// Hosted logs may be unavailable independently of check-run annotations.
+// A source-contract or fixture assertion must remain diagnosable as well.
+process.on('uncaughtException', (error) => {
+	if (process.env.GITHUB_ACTIONS === 'true') {
+		const message = String(error.stack || error.message)
+			.replaceAll('%', '%25')
+			.replaceAll('\r', '%0D')
+			.replaceAll('\n', '%0A');
+		console.error(`::error::AHK suite contract failed: ${message}`);
+	}
+	console.error(error);
+	process.exit(1);
+});
+
 // A completed TAP receipt cannot compensate for a missing native exit receipt.
 // Start-Process without -Wait must retain its handle before the child exits.
 const processReceipts = [];
@@ -280,6 +294,38 @@ try {
 	assert.match(manifest.errors.join('\n'), /result ordinal 1/);
 } finally {
 	fs.rmSync(diagnosticFixture, { recursive: true, force: true });
+}
+
+const contractFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-contract-'));
+try {
+	const preload = path.join(contractFixture, 'broken-workflow.cjs');
+	fs.writeFileSync(
+		preload,
+		[
+			"const fs = require('node:fs');",
+			"const path = require('node:path');",
+			'const read = fs.readFileSync;',
+			'fs.readFileSync = function(file, ...args) {',
+			'  const result = read.call(this, file, ...args);',
+			"  if (path.basename(String(file)) === 'ci-windows.yml' && typeof result === 'string') {",
+			"    return result.replace('$null = $proc.Handle', '# missing native handle');",
+			'  }',
+			'  return result;',
+			'};'
+		].join('\n')
+	);
+	const failedContract = spawnSync(process.execPath, ['--require', preload, __filename], {
+		encoding: 'utf8',
+		env: { ...process.env, GITHUB_ACTIONS: 'true' },
+		timeout: 30000
+	});
+	assert.equal(failedContract.status, 1, 'a native source contract must still fail the gate');
+	assert.match(
+		failedContract.stderr,
+		/^::error::AHK suite contract failed:.*retain the native handle/m
+	);
+} finally {
+	fs.rmSync(contractFixture, { recursive: true, force: true });
 }
 
 console.log('AHK suite execution manifest: completeness and per-case timing guards passed.');
