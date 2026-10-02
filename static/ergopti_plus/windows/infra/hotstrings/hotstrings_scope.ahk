@@ -77,6 +77,22 @@ _HotstringsScopeAddressable(Value) {
 	return Value is String && Value != "" && !InStr(Value, ".")
 }
 
+; The legacy tray map also contains Layout, Gestures and Shortcuts. Only the
+; Hotstrings namespace belongs to this owner's discoverable category inventory.
+_HotstringsCategoryScopeInventory(Categories, ReadSections := ManifestFeaturesForSection) {
+	Inventory := Map()
+	for Id, Prefix in Categories {
+		if SubStr(Prefix, 1, StrLen("hotstrings.")) != "hotstrings."
+			continue
+		Inventory[Id] := []
+		for Entry in ReadSections.Call(Prefix) {
+			Parts := StrSplit(Entry["path"], ".")
+			Inventory[Id].Push(Parts[Parts.Length])
+		}
+	}
+	return Inventory
+}
+
 /**
  * Publishes a category/section batch through the existing fenced reload owner.
  * @param {Array} Targets Native category ids from the discovered tray catalogue.
@@ -89,14 +105,7 @@ HotstringsCategoryScopeApply(Targets, Enabled, Options := unset) {
 		Options := Map()
 	Operations() {
 		global Features, _LegacyTopCategoryMap
-		Inventory := Map()
-		for Id, Prefix in _LegacyTopCategoryMap {
-			Inventory[Id] := []
-			for Entry in ManifestFeaturesForSection(Prefix) {
-				Parts := StrSplit(Entry["path"], ".")
-				Inventory[Id].Push(Parts[Parts.Length])
-			}
-		}
+		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
 		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason)
 		if !(Choices is Array)
 			throw Error("Hotstring category selection refused: " . Reason)

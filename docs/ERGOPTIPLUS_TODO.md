@@ -608,6 +608,9 @@ branch has been removed; the run also covers the 21-locale privacy label.
   settings/source bytes, unrelated choices and immediate/late publication
   or writer refusal. The actual submenu migration remains pending; finish
   the owner CI checkpoint before wiring all category views.
+  The Windows discovery boundary now filters its mixed legacy tray map to
+  the Hotstrings namespace before requesting any feature metadata; a native
+  case excludes Layout, Gestures and Shortcuts from both discovery and selection.
 - [ ] **103.** Move the common "Distance reduction" hotstrings into the
       Ergopti+ extension: these bindings depend on the layout rather than being
       common to every user. Extensions own their hotstrings, shortcuts and
