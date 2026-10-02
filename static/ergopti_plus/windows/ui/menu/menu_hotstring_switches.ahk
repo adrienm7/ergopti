@@ -74,9 +74,10 @@ _HS_AllSectionsRow(AllOn, Apply) {
  * @param {String} TomlPath The category's resolved bundled source.
  * @param {Array} Sections Native section rows, in source order.
  * @param {Func} Apply The journal-backed category transaction.
+ * @param {Menu} TargetMenu Optional empty native menu held by repaint callbacks.
  * @returns {Menu} The rendered category submenu.
  */
-_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply) {
+_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply, TargetMenu := unset) {
 	Commands := Map(
 		"hotstring_category_enable_all", (*) => Apply([V1Cat], true),
 		"hotstring_category_disable_all", (*) => Apply([V1Cat], false))
@@ -84,7 +85,8 @@ _HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeAppl
 		"hotstring_category_file", (*) => FileExist(TomlPath)
 			? [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath))] : [],
 		"hotstring_category_sections", (*) => Sections)
-	return MenuRenderer_Build("hotstring_category_menu", "Hotstrings", "", "", Providers, Commands)
+	return MenuRenderer_Build("hotstring_category_menu", "Hotstrings", "", "", Providers, Commands, "",
+		IsSet(TargetMenu) ? TargetMenu : unset)
 }
 
 ; The « all sections » checkbox that opens a language submenu, for every section

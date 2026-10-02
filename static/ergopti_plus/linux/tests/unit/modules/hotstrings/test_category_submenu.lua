@@ -308,3 +308,38 @@ helpers.describe("category submenu: when the category is off", function()
 	end)
 
 end)
+
+helpers.describe("personal category scope parity", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, posture in ipairs({ true, false }) do
+			helpers.it("personal command " .. tostring(enabled) .. " behind gate " .. tostring(posture), function()
+				local config, log = fake_config({ enabled = posture })
+				local category = config.get_category("rolls")
+				category.id, category.path = "personal", "/user/hotstrings/personal.toml"
+				category.description, category.extension = { en = "Personal fixture", fr = "Personal fixture" }, nil
+				config.get_groups = function() return { "personal" } end
+				config.get_category = function(id) if id == "personal" then return category end end
+				config.is_group_enabled = function(id) return id == "personal" and posture end
+				local mb = helpers.load_module("ui.menu.menu_builder")
+				local captured = nil
+				local function find(rows)
+					for _, row in ipairs(rows or {}) do
+						if type(row.title) == "string" and row.title:find("Personal fixture", 1, true) then
+							captured = row
+						end
+						find(row.menu)
+					end
+				end
+				find(mb.build({ config = config, _version = "9.9.9", paused = false }))
+				helpers.assert_true(captured ~= nil, "the actual personal provider must render its category")
+				local i18n = require("infra.i18n")
+				helpers.assert_eq(captured.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
+				helpers.assert_eq(captured.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
+				helpers.assert_nil(captured.menu[enabled and 1 or 2].checked)
+				helpers.assert_eq(captured.menu[enabled and 1 or 2].fn(), true)
+				helpers.assert_eq(log.bulk, { "personal=" .. tostring(enabled) })
+				helpers.assert_eq(log.toggled, {}, "the independent engine/group toggles do not run")
+			end)
+		end
+	end
+end)

@@ -192,3 +192,111 @@ _HSCS_MenuOwner(Enabled) {
 for _HSCS_Enabled in [true, false]
 	Test("hotstring-category-menu-owner: native command " . _HSCS_Enabled . " commits through the journal",
 		_HSCS_MenuOwner.Bind(_HSCS_Enabled))
+
+; Personal inventory is file-owned, not part of the manifest catalogue. A cached
+; menu preview must not omit a section added before the configuration lease.
+_HSCS_PersonalMenuOwner(Enabled, LateRefusal) {
+	global ScriptInformation, Features, CategoryEnabled, _ReadPersonalTomlCache
+	global _PersonalExtTree, _FmtCountCache, _MenuDispatchCallbacks, _PrevDefaultLabel
+	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Launches := 0
+	PersonalPath := Fixture.path . ".personal.toml"
+	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.personal.first]`nenabled = false`ntime_activation_seconds = 0.75`n[hotstrings.personal.future]`nenabled = false`n[private]`ncredential = "retain-personal-fixture"`n'
+	SavedInfo := ScriptInformation, SavedFeatures := Features, SavedCategories := CategoryEnabled
+	SavedCache := _ReadPersonalTomlCache
+	SavedTree := IsSet(_PersonalExtTree) ? _PersonalExtTree : unset
+	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
+	SavedDefaultLabel := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
+	State := MasterGateState(), SavedState := State.Clone()
+	Launch(_Success, Borrowed, Refused) {
+		Launches += 1
+		Bundle := Borrowed, Refusal := Refused
+		return LateRefusal
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Assert(FSWriteDurable(Fixture.path, Source))
+		ScriptInformation := ScriptInformation.Clone()
+		ScriptInformation["PersonalTomlPath"] := PersonalPath
+		_PersonalExtTree := Map(), _FmtCountCache := Map()
+		Features := ManifestBuildFeaturesMap()
+		_ConfigSeedPersonalHotstring(Features, "first")
+		CategoryEnabled := Map("Hotstrings", false, "Rolls", true)
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+		Assert(FSWriteDurable(PersonalPath, '[[first]]`n'))
+		_ReadPersonalTomlCache := false
+		AssertEqual(1, ReadPersonalToml()["sections_order"].Length)
+		PersonalSource := '[[first]]`n[[second]]`n'
+		Assert(FSWriteDurable(PersonalPath, PersonalSource))
+		Rows := _HS_PersonalRows(Fixture.options)
+		AssertEqual(1, Rows.Length, "the personal file must be a real rendered submenu")
+		Built := Rows[1]["submenu"]
+		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")))
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")))
+		AssertFalse(_CTC_IsChecked(Built, Enabled ? 0 : 1))
+		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Enabled ? 0 : 1, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id))
+		Receipt := _MenuDispatchCallbacks[Id].Call()
+		AssertEqual(1, Launches, "one native click admits one reload transaction")
+		if LateRefusal {
+			AssertEqual("pending", Receipt["status"])
+			for Name in ["first", "second"]
+				AssertEqual(Enabled, TOML_Read(Fixture.path, "hotstrings.personal." . Name, "enabled",
+					ManifestDefaultFor("hotstrings.personal." . Name . ".enabled")),
+					"fresh discovery selects every actual section, including uncached additions")
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertFalse(Parsed["category_enabled"]["hotstrings"])
+			AssertTrue(Parsed["category_enabled"]["rolls"])
+			AssertFalse(Parsed["hotstrings.personal.future"]["enabled"], "unlisted personal sections retain their settings")
+			AssertEqual(0.75, Parsed["hotstrings.personal.first"]["time_activation_seconds"])
+			AssertEqual("retain-personal-fixture", Parsed["private"]["credential"])
+			AssertFalse(Features["hotstrings"]["personal"].Has("second"), "pending selection cannot seed public runtime")
+			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-personal-scope")))
+			Refusal.Call("native personal menu reload refused")
+		}
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "both refusal timings restore exact original bytes")
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
+		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath), "scope selection cannot rewrite the user's rules")
+	} finally {
+		if Built is Menu
+			_CTC_ReleaseMenu(Built)
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		ScriptInformation := SavedInfo, Features := SavedFeatures, CategoryEnabled := SavedCategories
+		_ReadPersonalTomlCache := SavedCache
+		_PersonalExtTree := IsSet(SavedTree) ? SavedTree : unset
+		_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
+		_PrevDefaultLabel := IsSet(SavedDefaultLabel) ? SavedDefaultLabel : unset
+		State.Clear()
+		for Key, Value in SavedState
+			State[Key] := Value
+		try FileDelete(PersonalPath)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+
+for _HSCS_Enabled in [true, false] {
+	for _HSCS_Late in [true, false]
+		Test("hotstring-personal-menu-owner: command " . _HSCS_Enabled . " preserves state after refusal " . _HSCS_Late,
+			_HSCS_PersonalMenuOwner.Bind(_HSCS_Enabled, _HSCS_Late))
+}
+
+_HSCS_ExistingMenuTarget() {
+	Target := Menu(), Asked := []
+	Apply(_Targets, Enabled) => Asked.Push(Enabled)
+	Built := _HS_CategoryMenu("Personal", "", [], Apply, Target)
+	try {
+		AssertEqual(ObjPtr(Target), ObjPtr(Built), "repaint callbacks retain the caller's native menu")
+		AssertEqual(2, TrayMenuItemCount(Target))
+		Rejected := false
+		try _HS_CategoryMenu("Personal", "", [], Apply, Target)
+		catch
+			Rejected := true
+		AssertTrue(Rejected, "an already populated target must refuse before appending duplicate commands")
+		AssertEqual(2, TrayMenuItemCount(Target))
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("hotstring-personal-menu: shared rendering preserves caller-owned repaint references", _HSCS_ExistingMenuTarget)

@@ -74,7 +74,9 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 			-- Explicit category scope commands select desired choices without starting
 			-- input capture. The four remaining runtime-enabling routes keep the gate.
 			{ marker = "function M.all_sections_switch", expected = 4, label = "common hotstrings" },
-			{ marker = "function M.build_custom", expected = 3, label = "custom hotstrings" },
+			-- Personal scope selection preserves stopped capture; only a live section
+			-- enable still requires the strict start gate, covered by callback tests.
+			{ marker = "function M.build_custom", expected = 1, label = "custom hotstrings" },
 			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },
 			-- The menu root (ui/menu/init.lua): the global « Tout activer » was retired

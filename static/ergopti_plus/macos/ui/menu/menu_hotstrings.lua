@@ -196,34 +196,6 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	end
 end
 
---- Commits a category gate and its section choices in the registry transaction.
---- The canonical save participates in that transaction; a failed save cannot
---- leave the live category changed or rebuild the tray as though it succeeded.
---- @param ctx table Menu context.
---- @param group_name string Native registry category id.
---- @param enabled boolean Explicit requested posture.
---- @return function
-local function setCategoryScopeFn(ctx, group_name, enabled)
-	return function()
-		local prior = ctx.state.hotstrings[group_name]
-		local scope_committed = false
-		local committed = KeymapLifecycle.commit_mutation(ctx, "set hotstring category scope", function()
-			local km = ctx.keymap
-			if not km or type(km.set_category_scope_enabled) ~= "function" then return false end
-			local result = km.set_category_scope_enabled({ group_name }, enabled, function()
-				ctx.state.hotstrings[group_name] = enabled
-				if ctx.save_prefs() ~= true then return false end
-				return true
-			end)
-			scope_committed = result == true
-			return result
-		end, function() ctx.updateMenu() end)
-		-- A refresh failure cannot undo an acknowledged file and registry choice.
-		if not scope_committed then ctx.state.hotstrings[group_name] = prior end
-		return committed
-	end
-end
-
 --- Force every section of EVERY hotstring group on or off (whole-tree bulk
 --- action for the top of the Hotstrings menu). Enabling lifts each group gate so
 --- the activation is immediately effective.
@@ -486,8 +458,8 @@ function M.build_groups(ctx, only, counts)
 			end
 			local toml_path = toml_path_for_group(ctx, name)
 			local render_ctx = { commands = {
-				["hotstring_category_enable_all"] = setCategoryScopeFn(ctx, name, true),
-				["hotstring_category_disable_all"] = setCategoryScopeFn(ctx, name, false),
+				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true),
+				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.

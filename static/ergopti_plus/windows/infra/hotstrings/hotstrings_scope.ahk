@@ -127,6 +127,25 @@ HotstringsCategoryScopeApply(Targets, Enabled, Options := unset) {
 	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
 }
 
+/**
+ * Publishes every discovered personal section through the fenced reload owner.
+ * The existing typed planner discovers and seeds personal paths inside the
+ * lease; runtime choices remain unpublished until replacement acknowledgement.
+ * @param {Integer} Enabled Explicit Boolean target.
+ * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ */
+HotstringsPersonalScopeApply(Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	Operations() {
+		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
+			throw TypeError("A personal hotstring scope requires an explicit Boolean target.")
+		return _ConfigBuildHotstringIntentPlan("personal", "", Enabled).updates
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
 ; Catalogue identity comes from the same owners as the settings window and L4.
 _HotstringsScopeCatalogue() {
 	Entries := []

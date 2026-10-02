@@ -19,8 +19,9 @@ local FAILURE_OUTCOMES = { "false", "nil", "throw" }
 --- @return function|nil
 local function find_action(rows, label)
 	for _, row in ipairs(type(rows) == "table" and rows or {}) do
-		if row.label == label and type(row.action) == "function" then return row.action end
-		local nested = find_action(row.items, label)
+		local action = row.action or row.fn
+		if (row.label == label or row.title == label) and type(action) == "function" then return action end
+		local nested = find_action(row.items or row.menu, label)
 		if nested then return nested end
 	end
 	return nil
@@ -178,7 +179,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			}
 
 			local built = Custom.build_custom(ctx, { group_counts = {} })
-			local action = find_action(built.items, "TARGET_CUSTOM_SECTION")
+			local action = find_action(built.submenu, "TARGET_CUSTOM_SECTION")
 			helpers.assert_eq(type(action), "function",
 				"the custom section row must be reachable below the submenu parent")
 			local ok, err = pcall(action)

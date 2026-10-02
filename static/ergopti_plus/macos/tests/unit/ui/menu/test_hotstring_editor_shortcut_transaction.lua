@@ -35,11 +35,11 @@ end
 --- @return table|nil row
 local function find_shortcut_row(rows, prefix)
 	for _, row in ipairs(type(rows) == "table" and rows or {}) do
-		if type(row.label) == "string"
-			and row.label:sub(1, #prefix) == prefix then
+		if type(row.title) == "string"
+			and row.title:sub(1, #prefix) == prefix then
 			return row
 		end
-		local nested = find_shortcut_row(row.items, prefix)
+		local nested = find_shortcut_row(row.menu, prefix)
 		if nested then return nested end
 	end
 	return nil
@@ -104,10 +104,10 @@ local function run_menu_action(raw, outcome)
 			updateMenu = function() calls.updates = calls.updates + 1 end,
 		}
 		local built = Custom.build_custom(ctx, { group_counts = {} })
-		local row = find_shortcut_row(built and built.items, shortcut_prefix)
+		local row = find_shortcut_row(built and built.submenu, shortcut_prefix)
 		helpers.assert_type(row, "table", "the rendered shortcut row must be reachable")
-		helpers.assert_type(row.action, "function", "the rendered shortcut row must be clickable")
-		return { result = row.action(), state = state, calls = calls }
+		helpers.assert_type(row.fn, "function", "the rendered shortcut row must be clickable")
+		return { result = row.fn(), state = state, calls = calls }
 	end, debug.traceback)
 
 	package.loaded["infra.dialog_util"] = saved_dialog
