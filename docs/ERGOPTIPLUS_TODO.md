@@ -756,6 +756,11 @@ exact-boolean regressions also pass the focused runner.
   owner, and the Dynamic fixture rejects its absence before menu construction.
   The eight transaction assertions remain unchanged; native validation remains
   pending for this additional harness correction.
+  Checkpoint 37056318950 exposed the next omitted boot dependency: dynamic
+  counting reads the personal-information map. The fixture now derives that
+  map from the real entrypoint and owns a fresh count cache, restoring both
+  assigned or unassigned globals afterwards. All transaction assertions remain
+  unchanged; actual AHK execution awaits the next native checkpoint.
 
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
@@ -774,6 +779,10 @@ exact-boolean regressions also pass the focused runner.
   typed render/readback and an isolated generic clone without the TOML class.
   Native Windows proof remains pending; unsupported opaque objects keep their
   previous identity contract.
+  The native clone probe now sets Map.CaseSense while the fixture map is
+  empty, before inserting values; AHK forbids changing that setting afterwards.
+  Checkpoint 37056318950 demonstrated the fixture setup error. Production
+  cloning and all independence/case-sensitivity assertions remain unchanged.
   Shared Lua, Windows and the JS reference now specify `copy_if_absent`:
   copy an existing source into an unoccupied destination, retaining the source
   and every explicit destination, including false and occupied ancestor or
@@ -875,6 +884,17 @@ exact-boolean regressions also pass the focused runner.
   generated-policy native probes cover real captions/bodies, timeout, password,
   default-button and cancellation receipts. Focused JS checks passed after the
   old audit accepted a caption bypass; actual AHK and full CI remain pending.
+  The macOS Package lane now prepares the repository-pinned Node before
+  Swift tests and retains their exact PTY transcript. A strict reporter preserves
+  both native and capture failures, requires complete non-vacuous XCTest
+  receipts, and annotates actual errors with an uploaded failure transcript.
+  Private verification passed formatting and all 350 JS checks, including the
+  actual reporter and pipeline wiring. Swift assertions remain unchanged; the
+  preceding native failure is still unqualified until the next CI observation.
+  Native checkpoint 37056318950 exposed two premature newline escapes in the
+  child AHK probe source. The producer now retains the child escape, preserving
+  every actual caption/body/options/timeout/cancellation assertion. Production
+  dialog code is unchanged; the corrected probe awaits native Windows CI.
   Remaining native caption paths include the seven pre-bootstrap dialogs,
   file pickers, notifications and genuine macOS/Linux dialog title APIs.
   Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
@@ -985,10 +1005,3 @@ results are in [the handoff package](handovers/2026-09-28-ergoptiplus/README.md)
 Read its `VERIFICATION.md` and `VERIFICATION.json` for composite gate results.
 Paths under `D:/ewt/` in those files are historical; that directory no longer
 exists.
-The macOS Package lane now prepares the repository-pinned Node before
-Swift tests and retains their exact PTY transcript. A strict reporter preserves
-both native and capture failures, requires complete non-vacuous XCTest
-receipts, and annotates actual errors with an uploaded failure transcript.
-Private verification passed formatting and all 350 JS checks, including the
-actual reporter and pipeline wiring. Swift assertions remain unchanged; the
-preceding native failure is still unqualified until the next CI observation.

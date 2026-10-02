@@ -320,7 +320,7 @@ _HSCS_DefaultMenuTargetsAreIndependent() {
 Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)
 
 ; The headless runner deliberately omits tray_menu.ahk's auto-execute block.
-; Read its real literal declarations and use the actual feature-manifest owner:
+; Read the real tray and personal-information declarations and feature manifest:
 ; no second curated order or hard-coded live feature map belongs in a fixture.
 _HSCS_TrayMapLiteral(Source, Name) {
 	if !RegExMatch(Source, "ms)^global " . Name . " := Map\((.*?)^\)", &Found)
@@ -337,6 +337,9 @@ _HSCS_TrayMapLiteral(Source, Name) {
 _HSCS_WithDynamicBootState(Body) {
 	Assert(IsSet(MenuLabelFromManifestEntry), "the headless menu must load its real manifest label owner")
 	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	global PersonalInformation, _TomlCountCache
+	HadInformation := IsSet(PersonalInformation), OldInformation := HadInformation ? PersonalInformation : 0
+	HadCounts := IsSet(_TomlCountCache), OldCounts := HadCounts ? _TomlCountCache : 0
 	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
 	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
 	HadKeys := IsSet(_LegacyDynamicHotstringsKeyMap), OldKeys := HadKeys ? _LegacyDynamicHotstringsKeyMap : 0
@@ -356,9 +359,14 @@ _HSCS_WithDynamicBootState(Body) {
 			Assert(ManifestFindEntryByPath("hotstrings.dynamic." . _LegacyDynamicHotstringsKeyMap[Id]) is Map,
 				"the boot family must resolve through the real feature manifest")
 		}
+		BootSource := _StripFullLineComments(FileRead(_DriverDir . "\ErgoptiPlus.ahk", "UTF-8"))
+		PersonalInformation := _HSCS_TrayMapLiteral(BootSource, "PersonalInformation")
+		_TomlCountCache := Map()
 		Features := ManifestBuildFeaturesMap()
 		Body.Call()
 	} finally {
+		PersonalInformation := HadInformation ? OldInformation : unset
+		_TomlCountCache := HadCounts ? OldCounts : unset
 		Features := HadFeatures ? OldFeatures : unset
 		_LegacyTopCategoryMap := HadTop ? OldTop : unset
 		_LegacyDynamicHotstringsKeyMap := HadKeys ? OldKeys : unset
