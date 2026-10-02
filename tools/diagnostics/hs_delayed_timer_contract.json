@@ -1,0 +1,30 @@
+{
+	"schema_version": 1,
+	"contract": "hs.timer.delayed",
+	"runtime_version": "1.1.1",
+	"boolean_observations": {
+		"idle_running": false,
+		"idle_next_trigger_nil": true,
+		"idle_set_delay_returns_self": true,
+		"idle_set_delay_keeps_idle": true,
+		"override_start_returns_self": true,
+		"default_start_returns_self": true,
+		"active_set_delay_returns_self": true,
+		"stop_returns_self": true,
+		"stopped_running": false,
+		"stopped_next_trigger_nil": true,
+		"zero_running": false,
+		"zero_next_trigger_nil": true,
+		"rearm_returns_self": true
+	},
+	"remaining_limits": {
+		"override_remaining": 1,
+		"default_remaining": 5,
+		"active_configured_remaining": 3
+	},
+	"greater_than": [
+		["default_remaining", "override_remaining"],
+		["active_configured_remaining", "override_remaining"]
+	],
+	"deliveries": { "rearm": 2, "zero": 1 }
+}

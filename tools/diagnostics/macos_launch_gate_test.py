@@ -2,6 +2,8 @@
 """Prove the packaged launch verdict rejects every failure it exists to catch."""
 
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -9,6 +11,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+
+import hs_delayed_timer_probe as timer_probe
 
 spec = importlib.util.spec_from_file_location(
     "launch_gate", Path(__file__).with_name("macos_launch_gate.py")
@@ -16,12 +21,30 @@ spec = importlib.util.spec_from_file_location(
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
+
+def timer_summary():
+    """Return the complete admission receipt produced by the native judge."""
+    return {
+        "schema_version": 1,
+        "contract": timer_probe.CONTRACT["contract"],
+        "runtime": "native Hammerspoon",
+        "version": timer_probe.CONTRACT["runtime_version"],
+        "complete": True,
+        "checks": timer_probe.CHECK_COUNT,
+        "nonce": "a" * 32,
+        "pid": 42,
+        "executable": "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon",
+        "preference_restored": True,
+    }
+
+
 HEALTHY = {
     "launcher_log": "[t] embedded Hammerspoon bootstrap logger configured\n",
     "driver_log": "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
     "alive_after_window": True,
     "quit_seconds": 1.5,
     "state_problems": [],
+    "native_delayed_timer": timer_summary(),
 }
 
 
@@ -38,6 +61,45 @@ def observe(**changes):
 
 class VerdictTests(unittest.TestCase):
     """Each criterion must fail on its own, and a healthy launch must pass."""
+
+    def test_clean_launch_requires_native_timer_evidence(self):
+        for value in (
+            None,
+            {},
+            dict(timer_summary(), complete=False),
+            dict(timer_summary(), preference_restored=False),
+        ):
+            with self.subTest(value=value):
+                failures = gate.evaluate("clean", observe(native_delayed_timer=value))
+                self.assertTrue(any("native delayed-timer" in failure for failure in failures))
+
+    def test_clean_launch_retains_native_probe_refusal(self):
+        failures = gate.evaluate("clean", observe(native_delayed_timer_error="scripting refused"))
+        self.assertTrue(any("scripting refused" in failure for failure in failures))
+
+    def test_cli_annotates_the_failure_cause_without_weakening_its_exit(self):
+        cause = "native scripting refused: 50%\r\n::notice::foreign text"
+        report = {"failures": [cause]}
+        with tempfile.TemporaryDirectory(prefix="ergopti-native-annotation-") as root:
+            output = Path(root) / "evidence"
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate, "run", return_value=report),
+                mock.patch.object(gate, "print_tails"),
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = gate.main(["/Applications/ErgoptiPlus.app", str(output), "clean"])
+            self.assertEqual(status, 1, "annotating a cause must retain the negative verdict")
+            self.assertEqual(
+                stdout.getvalue().splitlines(),
+                [
+                    "::error::macOS launch gate [clean] failed",
+                    "::error::native scripting refused: 50%25%0D%0A::notice::foreign text",
+                ],
+            )
+            self.assertEqual(json.loads((output / "result.json").read_text())["failures"], [cause])
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
@@ -334,6 +396,14 @@ class ProfileTests(unittest.TestCase):
         result = print_matrix("/Applications/ErgoptiPlus.app", "evidence")
         self.assertEqual(result.returncode, 2)
         self.assertIn("app, output and scenario", result.stderr)
+
+
+def load_tests(loader, tests, pattern):
+    """Keep native receipt and preference checks in the existing package self-test."""
+    import hs_delayed_timer_probe_test
+
+    tests.addTests(loader.loadTestsFromModule(hs_delayed_timer_probe_test))
+    return tests
 
 
 if __name__ == "__main__":
