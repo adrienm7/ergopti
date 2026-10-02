@@ -732,6 +732,12 @@ exact-boolean regressions also pass the focused runner.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.
+  Runs 37046976773 and 37047412149 exposed missing boot-owned globals in
+  headless Dynamic fixtures. They now consume the actual tray declarations,
+  validate their manifest families and restore previously set or unset state.
+  All ten native cases retain their ownership, pause and refusal assertions;
+  production still uses its curated boot order. The corrected native CI is
+  pending. Shared dynamic row ordering remains a separate follow-up.
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
