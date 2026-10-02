@@ -1421,6 +1421,9 @@
 							}
 						}
 						if (!payload) return;
+						// A retained Windows controller can deliver an older document's queue.
+						const hostEpoch = new URLSearchParams(window.location.search).get('epoch');
+						if (hostEpoch !== null && String(payload.host_epoch) !== hostEpoch) return;
 						if (payload.type === 'range_data') {
 							if (typeof window.receive_range_data === 'function') {
 								window.receive_range_data(payload.payload, payload.request_id);

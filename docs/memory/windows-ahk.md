@@ -806,6 +806,18 @@ serialize bridge payloads with the shared adapter, reject stale generations,
 and release native handlers on teardown. A page loading is not proof that its
 bridge is alive.
 
+### project-webview2-retained-host-document-fence
+
+A retained controller keeps native queues and virtual-host subresource caches
+across navigation. AHK epochs alone cannot fence a message delivered through a
+new subscription on the same controller. Give each document a distinct URL,
+validate message source and script destination, and tag pushed metrics envelopes
+with their document epoch. Fresh navigation alone, and even network-cache
+disablement, served an old same-size JavaScript edit in a native fixture; use
+the checked document-cache invalidation owner before navigation. Hidden HWND
+existence must also bypass thread-dependent window search settings. Retention
+revokes sessions before native teardown and disposes inactive hosts at shutdown.
+
 ### project-typing-latency-tooltip-coldstart
 
 Do not move WebView2 creation or cold native window construction onto the typing

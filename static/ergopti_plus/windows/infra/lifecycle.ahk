@@ -1142,6 +1142,7 @@ Ergopti_OnShutdown(reason, code) {
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try _HC_Close()
 		try OllamaWV_Close()
 		try _Updater_AbortStagingOnExit()
 		if (TerminalHandoff is Map) {
