@@ -903,7 +903,12 @@ exact-boolean regressions also pass the focused runner.
   bare captions in all 21 locales and live retitling of the retained progress
   panel. Actual AppKit tests and seven private generated/compiled policy cases
   cover empty, custom, quoted, interpolation-looking and Unicode prefixes;
-  native Swift CI remains pending. Captionless overlays retain their separate
+  native Swift CI remains pending. The private environment receipt now reads
+  each variable in its own native `printenv` invocation: Apple BSD `printenv`
+  accepts one name, so the previous GNU-style two-name call omitted `PATH`.
+  Both exact values, unchanged parent environment, child exit and empty stderr
+  remain asserted. The official Apple command reproduces the old mismatch;
+  complete macOS XCTest qualification remains pending. Captionless overlays retain their separate
   native presentation owner.
   Ninety-one post-bootstrap Windows message/input calls now compose actual
   native captions through one delegate; bodies, options, defaults and results
