@@ -755,6 +755,15 @@ exact-boolean regressions also pass the focused runner.
   typed render/readback and an isolated generic clone without the TOML class.
   Native Windows proof remains pending; unsupported opaque objects keep their
   previous identity contract.
+  Shared Lua, Windows and the JS reference now specify `copy_if_absent`:
+  copy an existing source into an unoccupied destination, retaining the source
+  and every explicit destination, including false and occupied ancestor or
+  descendant namespaces. Copies independently own supported collections and
+  preserve source records. Three independent fixtures and five registry
+  defects cover ordering, repeated/no-op copies and strict shape validation;
+  the original engine failed five new cases. Focused JS, macOS 40/40 and Linux
+  LuaJIT 37/37 passed; full/native Windows validation remains pending.
+  Schema version remains 8 and no runtime subsection split is introduced.
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples

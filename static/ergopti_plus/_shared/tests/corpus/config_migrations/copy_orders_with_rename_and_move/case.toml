@@ -1,0 +1,6 @@
+[case]
+description = "Copies observe earlier copies, renames, moves and value changes in order, and replay remains idempotent."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

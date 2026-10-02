@@ -24,6 +24,12 @@
 #   { op = "rename", section, key, to_section?, to_key? }
 #       Moves one value. Absent source: no-op. Existing target: the target
 #       keeps its value and the source is dropped.
+#   { op = "copy_if_absent", section, key, to_section?, to_key? }
+#       Copies a present value into an absent target, retaining the source.
+#       Copies own nested arrays and maps; an existing target keeps its value.
+#       At least one target field is required; copying to the same path is a no-op.
+#       An explicit ancestor value or descendant table also occupies a target:
+#       copying there is a no-op and leaves both namespaces untouched.
 #   { op = "move_section", section, to_section }
 #       Moves a section and every section below it. Same conflict rule.
 #   { op = "merge_into", section, to_section }
