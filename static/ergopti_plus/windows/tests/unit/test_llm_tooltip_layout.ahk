@@ -12,6 +12,35 @@
 
 #Requires AutoHotkey v2.0
 
+class _TLL_SpanGui {
+	__New() {
+		this.Options := ""
+		this.Text := ""
+		this.Font := ""
+	}
+	SetFont(Options, Name) {
+		this.Font := Options . "|" . Name
+	}
+	Add(Kind, Options, Text) {
+		this.Options := Options
+		this.Text := Text
+	}
+}
+
+_TLL_RetainedSpanSizePreservesGeometry() {
+	G := _TLL_SpanGui()
+	Size := { W: 37, H: 13 }
+	Width := _LLM_TooltipDrawText(G, 11, 7, 20, "112233", 10, "fresh span", "norm", Size)
+	AssertEqual(37, Width)
+	AssertEqual("BackgroundTrans x11 y14 w39 h13", G.Options,
+		"retained sizing must preserve bottom alignment and glyph overhang")
+	AssertEqual("fresh span", G.Text)
+	AssertEqual(0, _LLM_TooltipDrawText(G, 0, 0, 0, "112233", 10, "", "norm", Size))
+}
+
+Test("LLM tooltip: retained per-render span size preserves geometry (llm-span-cache-2026-10-02)",
+	_TLL_RetainedSpanSizePreservesGeometry)
+
 class _TLL_Native {
 	static Dpi := 120
 
