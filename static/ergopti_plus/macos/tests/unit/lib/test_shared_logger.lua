@@ -380,4 +380,9 @@ helpers.describe("SharedLogger: sink API", function()
 		-- Line should still be in ring buffer
 		helpers.assert_eq(Logger.ring_buffer_size(), 1)
 	end)
+
+	helpers.it("capacity eviction publishes before a reentrant sink (logger-repeat-atomic)", function()
+		local fresh = dofile(helpers.shared("lua/logger/init.lua"))
+		dofile(helpers.shared("tests/corpus/logger/capacity_reentry.lua"))(fresh)
+	end)
 end)

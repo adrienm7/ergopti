@@ -168,3 +168,54 @@ _TLRC_ExitFlushEmitsPending() {
 	_TLRC_WithDrivenLogger(_Scenario)
 }
 Test("logger repeat: the exit flush emits every pending summary", _TLRC_ExitFlushEmitsPending)
+
+; A timer may close a streak between enumeration and removal unless the entire
+; registry transaction is protected. Observe the real critical state at each
+; enumeration rather than relying on a probabilistic timer race.
+class _TLRC_ObservedStreaks extends Map {
+	AllEnumerationsCritical := true
+	Enumerations := 0
+	__Enum(NumberOfVars) {
+		this.Enumerations += 1
+		this.AllEnumerationsCritical := this.AllEnumerationsCritical && A_IsCritical != 0
+		return super.__Enum(NumberOfVars)
+	}
+}
+
+_TLRC_RegistryTransactionsAreAtomic() {
+	_Scenario(Lines, SetTime) {
+		global _LOGGER_REPEAT_STREAKS, LOGGER_REPEAT_CAPACITY
+		SavedCapacity := LOGGER_REPEAT_CAPACITY
+		PreviousCritical := A_IsCritical
+		AssertEqual(0, PreviousCritical, "the scenario must admit timer interruption before acquiring ownership")
+		try {
+			LOGGER_REPEAT_CAPACITY := 2
+			_LOGGER_REPEAT_STREAKS := _TLRC_ObservedStreaks()
+			Stamp := "2026-01-15 10:00:00:000"
+			_LoggerWithholdRepeat("DEBUG", "Atomic", "first", "first", Stamp, 0)
+			_LoggerWithholdRepeat("DEBUG", "Atomic", "first", "first", Stamp, 0)
+			_LoggerWithholdRepeat("DEBUG", "Atomic", "second", "second", Stamp, 0)
+			SummarySawPublication := false
+			SummaryCritical := -1
+			LoggerSetTestSink((Line) => (
+				SummarySawPublication := _LOGGER_REPEAT_STREAKS.Has("DEBUG" . Chr(31) . "Atomic" . Chr(31) . "third"),
+				SummaryCritical := A_IsCritical, Lines.Push(Line)))
+			_LoggerWithholdRepeat("DEBUG", "Atomic", "third", "third", Stamp, 0)
+			AssertTrue(_LOGGER_REPEAT_STREAKS.AllEnumerationsCritical,
+				"victim selection and removal cannot be interrupted by the flush timer")
+			AssertTrue(_LOGGER_REPEAT_STREAKS.Enumerations > 0, "the real eviction must enumerate the registry")
+			AssertTrue(SummarySawPublication, "publish the replacement before a summary sink can re-enter")
+			AssertEqual(PreviousCritical, SummaryCritical, "summary emission occurs after restoring caller critical state")
+			_LoggerCloseRepeatStreaks(0, true, Stamp)
+			AssertTrue(_LOGGER_REPEAT_STREAKS.AllEnumerationsCritical,
+				"closing snapshots and removals share the same atomic ownership")
+			AssertEqual(0, _LOGGER_REPEAT_STREAKS.Count)
+			AssertEqual(PreviousCritical, A_IsCritical, "all transactions restore the caller")
+		} finally {
+			LOGGER_REPEAT_CAPACITY := SavedCapacity
+		}
+	}
+	_TLRC_WithDrivenLogger(_Scenario)
+}
+Test("logger repeat: registry eviction and closure are atomic before summary callbacks (logger-repeat-atomic)",
+	_TLRC_RegistryTransactionsAreAtomic)
