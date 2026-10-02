@@ -396,13 +396,6 @@ integrated, then publish one grouped release.
       work's `unavailable = "grey"`; render both through one greyed-row path
       and label format, with one schema rule for the reason key.
 
-- [ ] **65.** macOS suite, order-dependent red: "(llm-tooltip-chords-consumed)
-      types a digit beyond the predictions, or with no tooltip" fails only in
-      the full `lua tests/run.lua` run ("attempt to index a boolean value" at
-      `_shared/lua/keymap/terminators.lua:80`) and passes alone: a test that
-      runs before it leaves a `package.loaded` slot set to `true`. Find it and
-      restore the slot.
-
 ## Maintainer requests on 2026-10-01
 
 Every request the maintainer makes is written here first and removed once it
@@ -585,6 +578,14 @@ warning output and verifies all 83 shipped source entries remain readable.
 That native case passes non-release run 36935760620 at `21de5dcea`: the complete
 three-OS pipeline, including every installation variant, is green. Its temporary
 branch has been removed; the run also covers the 21-locale privacy label.
+
+The order-dependent macOS terminator failure is resolved by the production-root
+module isolation already committed in `612000595`. Two additional regressions
+poison the shared terminator module and catalogue cache slots with boolean true,
+reproduce a real require failure, then run the actual purge and reload the real
+catalogue while preserving test infrastructure. The full macOS suite and the
+reported LLM tooltip case pass checkpoint 36957664162 at `68a8f1462`; these new
+exact-boolean regressions also pass the focused runner.
 
 - [~] **102.** Simplify each Hotstrings category submenu to two commands,
   "Enable all" and "Disable all", replacing the duplicate category and
