@@ -402,6 +402,10 @@ jobs:
           # creation rule; only a PAT with admin bypass can push tags.
           token: ${{ secrets.PAT_ERGOPTI }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
       - name: Download all build artifacts
         # Restricted to assets-*: the lanes also upload evidence (launch-gate-*,
         # linux-ci-evidence-*, the AHK execution manifest, the packaged startup
@@ -590,9 +594,11 @@ jobs:
               --field sha="${sha}"
           echo "Tag '$tag' created via API."
 
-      - name: Create release and upload all assets atomically
-        # The release is created here — after all three build jobs have
-        # succeeded — so it is never in a half-baked state. Skipped only when
+      - name: Create draft release, verify assets and publish
+        # Uploads remain a draft until GitHub acknowledges every actual asset.
+        # A successful gh create can silently lose an upload; verification
+        # repairs only missing/incomplete files before publication makes them
+        # immutable. Skipped only when
         # an earlier attempt of this run already published it; the steps below
         # still run, so a re-run finishes the feed and the notes.
         if: steps.preflight.outputs.create_release == 'true'
@@ -619,10 +625,15 @@ jobs:
           esac
 
           gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
               --target "$GITHUB_SHA" \
               --title "$TITLE" \
               "${flags[@]}" \
               "${assets[@]}"
+
+          node tools/build/publish-verified-release.cjs \
+              "$TAG" "$GITHUB_REPOSITORY" "${assets[@]}"
 
       # Skipped only when the preflight found a newer release of this channel:
       # this older feed would replace the one that points at it.

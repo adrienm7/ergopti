@@ -317,11 +317,20 @@ These are software implementations; final hardware verification remains below.
       activation a way to tell Hammerspoon (for example a sentinel key the
       activation rule emits, like the script-control ones) so every CapsWord is
       cancelled.
-- [ ] **45.** v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
-      `gh release create` listed the file and exited 0, but GitHub kept 12 of 13
-      assets, and published releases are immutable. Create the release as a draft,
-      verify every expected asset by name (re-upload a missing one), then publish;
-      fail the job if one is still missing.
+- [~] **45.** v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
+  `gh release create` listed the file and exited 0, but GitHub kept 12 of 13
+  assets, and published releases are immutable. Create the release as a draft,
+  verify every expected asset by name (re-upload a missing one), then publish;
+  fail the job if one is still missing.
+  The workflow now creates a draft and passes the exact uploaded file list to
+  one publication owner. It validates GitHub's actual names, sizes and upload
+  states, repairs only missing or incomplete receipts at most twice, and
+  publishes only after every draft receipt matches. Final published state is
+  read back too. The actual workflow regression failed before the change;
+  fault cases cover a silently lost RPM, incomplete receipts, permanent loss,
+  invalid metadata, lookup/upload refusal and unacknowledged publication.
+  Existing tag/channel/resume guards remain intact. Full three-OS validation
+  without release is pending; no release is published by these tests.
 - [ ] **46.** The AI agent and screen reading on Windows and Linux still send a
       local model Ollama may not have pulled (default qwen2.5:7b, vision
       qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags, names

@@ -61,7 +61,7 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
 const CREATE_TAG = 'Create git tag';
-const CREATE_RELEASE = 'Create release and upload all assets atomically';
+const CREATE_RELEASE = 'Create draft release, verify assets and publish';
 const PUBLISH_FEED = 'Publish channel feed for Sparkle';
 const REPOSITORY = 'owner/ergopti';
 const LINUX_BUNDLE = JSON.parse(
@@ -181,6 +181,7 @@ function repository(name, branch) {
 	// The extracted workflow calls the real channel resolver and its registry.
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/build/publish-verified-release.cjs',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js'
 	]) {
@@ -239,6 +240,9 @@ fs.writeFileSync(
 		'if [ -z "${GH_TOKEN:-}" ]; then echo "gh stub: GH_TOKEN is not set" >&2; exit 98; fi',
 		'case "$1 $2" in',
 		'    "release view")',
+		'        if [ "$*" = "release view ${GH_STUB_TAG:-} --repo ${GH_STUB_REPO:-} --json isDraft,assets" ]; then',
+		'            node "$GH_STUB_PUBLISH_RESPONDER" "$@"; exit $?;',
+		'        fi',
 		'        if [ "$*" != "release view $GH_STUB_TAG --repo $GH_STUB_REPO --json isDraft --jq .isDraft" ]; then',
 		'            echo "gh stub: unexpected call: $*" >&2; exit 99',
 		'        fi',
@@ -252,7 +256,10 @@ fs.writeFileSync(
 		'            *) echo "gh stub: no mode" >&2; exit 97 ;;',
 		'        esac ;;',
 		'    "release create")',
-		'        printf \'%s\\n\' "${@:3}" > "$GH_STUB_ARGS" ;;',
+		'        printf \'%s\\n\' "${@:3}" > "$GH_STUB_ARGS"',
+		'        if [ -n "${GH_STUB_PUBLISH_STATE:-}" ]; then node "$GH_STUB_PUBLISH_RESPONDER" "$@"; fi ;;',
+		'    "release upload"|"release edit")',
+		'        node "$GH_STUB_PUBLISH_RESPONDER" "$@" ;;',
 		'    "release download")',
 		'        feed="appcast-$GH_STUB_CHANNEL.xml"',
 		'        if [ "$*" != "release download $GH_STUB_TAG --repo $GH_STUB_REPO --pattern $feed --output release-assets/$feed --clobber" ]; then',
@@ -282,6 +289,64 @@ fs.writeFileSync(
 fs.chmodSync(path.join(stubs, 'gh'), 0o755);
 fs.chmodSync(path.join(stubs, 'curl'), 0o755);
 const STUB_PATH = `export PATH="${bashPath(stubs)}:$PATH"\n`;
+
+// A Node child must cross the same fake gh boundary on Windows: Node cannot
+// execute a POSIX shebang there. Preloading this exact boundary leaves the
+// extracted workflow and the production publication helper byte-identical.
+const ghPreload = path.join(stubs, 'gh-preload.cjs');
+fs.writeFileSync(
+	ghPreload,
+	`
+const cp = require('node:child_process');
+const original = cp.spawnSync;
+cp.spawnSync = function(file, args, options) {
+    if (file === 'gh') return original(${JSON.stringify(BASH)},
+        ['--noprofile', '--norc', ${JSON.stringify(bashPath(path.join(stubs, 'gh')))}, ...args], options);
+    return original(file, args, options);
+};
+`
+);
+const publishResponder = path.join(stubs, 'publish-responder.cjs');
+fs.writeFileSync(
+	publishResponder,
+	String.raw`
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const args = process.argv.slice(2);
+const file = process.env.GH_STUB_PUBLISH_STATE;
+const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+assert.equal(args[0], 'release');
+assert.equal(args[2], process.env.GH_STUB_TAG);
+if (args[1] === 'create') {
+    state.isDraft = args.includes('--draft');
+} else if (args[1] === 'view') {
+    assert.deepEqual(args.slice(3), ['--repo', process.env.GH_STUB_REPO, '--json', 'isDraft,assets']);
+    if (state.mode === 'lookup-refusal') throw new Error('native inventory lookup refused');
+    if (state.mode === 'malformed') { process.stdout.write('{invalid'); process.exit(0); }
+    if (state.mode === 'unexpected-published') state.isDraft = false;
+    process.stdout.write(JSON.stringify({ isDraft: state.isDraft, assets: state.assets }));
+} else if (args[1] === 'upload') {
+    assert.equal(state.isDraft, true, 'an immutable publication cannot be repaired');
+    const repo = args.indexOf('--repo');
+    assert.deepEqual(args.slice(repo), ['--repo', process.env.GH_STUB_REPO, '--clobber']);
+    if (state.mode === 'upload-refusal') throw new Error('native upload refused');
+    for (const local of args.slice(3, repo)) {
+        const name = path.basename(local);
+        if (state.mode === 'permanent-loss') continue;
+        state.assets = state.assets.filter(asset => asset.name !== name);
+        state.assets.push({ name, size: fs.statSync(local).size, state: 'uploaded' });
+    }
+} else if (args[1] === 'edit') {
+    assert.deepEqual(args.slice(3), ['--repo', process.env.GH_STUB_REPO, '--draft=false']);
+    if (state.mode === 'publish-refusal') throw new Error('native publication refused');
+    if (state.mode !== 'unacknowledged-publication') state.isDraft = false;
+} else {
+    throw new Error('unexpected native release operation');
+}
+fs.writeFileSync(file, JSON.stringify(state));
+`
+);
 
 /** Returns a fresh, empty log file for a stub. */
 function stubLog(name) {
@@ -939,12 +1004,27 @@ check('the stable channel compares stable tags only', () => {
 const createScript = scriptOf(pipeline.step(releaseJob, CREATE_RELEASE), CREATE_RELEASE);
 
 /** Runs the release creation with `prerelease`; returns the result and gh's arguments. */
-function createRelease(prerelease) {
+function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } = {}) {
 	const assets = path.join(runner, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
 	for (const name of requiredAssets('dev')) fs.writeFileSync(path.join(assets, name), `${name}\n`);
 	const ghArgs = stubLog('gh-args');
+	const ghLog = stubLog('gh');
+	const stateFile = stubLog('publish-state');
+	const receipts = requiredAssets('dev')
+		.filter((name) => name !== missing)
+		.map((name) => ({
+			name,
+			size: fs.statSync(path.join(assets, name)).size,
+			state: name === incomplete ? 'starter' : 'uploaded'
+		}));
+	if (mode === 'duplicate') receipts.push({ ...receipts[0] });
+	if (mode === 'wrong-size') receipts[0].size += 1;
+	if (mode === 'invalid-size') receipts[0].size = '1';
+	if (mode === 'missing-size') delete receipts[0].size;
+	if (mode === 'missing-state') delete receipts[0].state;
+	fs.writeFileSync(stateFile, JSON.stringify({ isDraft: true, mode, assets: receipts }));
 	const result = runScript(
 		createScript,
 		runner,
@@ -953,13 +1033,26 @@ function createRelease(prerelease) {
 			PRERELEASE: prerelease,
 			TITLE: 'Ergopti v0.0.0-dev.30',
 			GITHUB_SHA: head,
+			GITHUB_REPOSITORY: REPOSITORY,
 			GH_TOKEN: 'stub-token',
-			GH_STUB_LOG: bashPath(stubLog('gh')),
-			GH_STUB_ARGS: bashPath(ghArgs)
+			GH_STUB_LOG: bashPath(ghLog),
+			GH_STUB_ARGS: bashPath(ghArgs),
+			GH_STUB_TAG: 'v0.0.0-dev.30',
+			GH_STUB_REPO: REPOSITORY,
+			GH_STUB_PUBLISH_STATE: stateFile,
+			GH_STUB_PUBLISH_RESPONDER: bashPath(publishResponder),
+			NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require="${ghPreload.replaceAll('\\', '/')}"`]
+				.filter(Boolean)
+				.join(' ')
 		},
 		STUB_PATH
 	);
-	return { ...result, args: linesOf(ghArgs) };
+	return {
+		...result,
+		args: linesOf(ghArgs),
+		calls: linesOf(ghLog),
+		state: JSON.parse(fs.readFileSync(stateFile, 'utf8'))
+	};
 }
 
 /** Splits `gh release create` arguments into the tag, its options and its files. */
@@ -968,10 +1061,125 @@ function parseCreate(args) {
 	const files = [];
 	for (let index = 1; index < args.length; index++) {
 		if (args[index] === '--prerelease') options.prerelease = true;
+		else if (args[index] === '--draft') options.draft = true;
 		else if (args[index].startsWith('--')) options[args[index].slice(2)] = args[++index];
 		else files.push(args[index]);
 	}
 	return { tag: args[0], options, files: files.sort() };
+}
+
+check('release assets are verified while draft before publication can make them immutable', () => {
+	const result = createRelease('true');
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(
+		parseCreate(result.args).options.draft,
+		true,
+		'a successful upload command cannot prove GitHub retained every asset'
+	);
+	const read = result.calls.findIndex((call) => call.includes('--json isDraft,assets'));
+	const publish = result.calls.findIndex((call) => call.includes('--draft=false'));
+	assert.ok(read > 0, 'the actual GitHub draft inventory must be read after creation');
+	assert.ok(publish > read, 'publication must follow the successful draft inventory gate');
+});
+
+check('a silently lost RPM is reuploaded by name before publication', () => {
+	const result = createRelease('true', { missing: 'ErgoptiPlus-linux-noarch.rpm' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const uploads = result.calls.filter((call) => call.startsWith('release upload '));
+	assert.deepEqual(uploads, [
+		`release upload v0.0.0-dev.30 release-assets/ErgoptiPlus-linux-noarch.rpm --repo ${REPOSITORY} --clobber`
+	]);
+	assert.equal(result.state.isDraft, false);
+	assert.equal(result.state.assets.length, requiredAssets('dev').length);
+	const last = result.calls.at(-1);
+	assert.match(
+		last,
+		/release view .* --json isDraft,assets$/,
+		'the published state and inventory must be read back too'
+	);
+});
+
+check('an incomplete upload receipt is repaired without reuploading healthy siblings', () => {
+	const result = createRelease('true', { incomplete: 'ErgoptiPlus.app.zip' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.deepEqual(
+		result.calls.filter((call) => call.startsWith('release upload ')),
+		[
+			`release upload v0.0.0-dev.30 release-assets/ErgoptiPlus.app.zip --repo ${REPOSITORY} --clobber`
+		]
+	);
+	assert.equal(result.state.isDraft, false);
+});
+
+check('a wrong-size uploaded file must be replaced and read back before publication', () => {
+	const result = createRelease('true', { mode: 'wrong-size' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const name = requiredAssets('dev')[0];
+	assert.deepEqual(
+		result.calls.filter((call) => call.startsWith('release upload ')),
+		[`release upload v0.0.0-dev.30 release-assets/${name} --repo ${REPOSITORY} --clobber`]
+	);
+	assert.equal(
+		result.state.assets.find((asset) => asset.name === name).size,
+		fs.statSync(path.join(runner, 'release-assets', name)).size
+	);
+	assert.equal(result.state.isDraft, false);
+});
+
+check('a permanently lost RPM stays a draft after the bounded repair attempts', () => {
+	const result = createRelease('true', {
+		mode: 'permanent-loss',
+		missing: 'ErgoptiPlus-linux-noarch.rpm'
+	});
+	assert.equal(result.status, 1);
+	assert.equal(result.state.isDraft, true);
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 2);
+	assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
+	assert.match(result.stderr, /Release remains a draft.*ErgoptiPlus-linux-noarch\.rpm/);
+});
+
+for (const mode of [
+	'malformed',
+	'lookup-refusal',
+	'duplicate',
+	'invalid-size',
+	'missing-size',
+	'missing-state'
+]) {
+	check(`an invalid asset inventory (${mode}) never grants publication`, () => {
+		const result = createRelease('true', { mode });
+		assert.equal(result.status, 1);
+		assert.equal(result.state.isDraft, true);
+		assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
+		assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 0);
+	});
+}
+
+check('an already published release is not granted draft repair or a second publication', () => {
+	const result = createRelease('true', { mode: 'unexpected-published' });
+	assert.equal(result.status, 1);
+	assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 0);
+});
+
+check('a refused repair stops before publication', () => {
+	const result = createRelease('true', {
+		mode: 'upload-refusal',
+		missing: 'ErgoptiPlus-linux-noarch.rpm'
+	});
+	assert.equal(result.status, 1);
+	assert.equal(result.state.isDraft, true);
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 1);
+	assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
+});
+
+for (const mode of ['publish-refusal', 'unacknowledged-publication']) {
+	check(`a ${mode} cannot complete the release step or publish its feed`, () => {
+		const result = createRelease('true', { mode });
+		assert.equal(result.status, 1);
+		assert.equal(result.state.isDraft, true);
+		assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 1);
+	});
 }
 
 check(
@@ -982,6 +1190,8 @@ check(
 		const created = parseCreate(result.args);
 		assert.equal(created.tag, 'v0.0.0-dev.30');
 		assert.deepEqual(created.options, {
+			repo: REPOSITORY,
+			draft: true,
 			target: head,
 			title: 'Ergopti v0.0.0-dev.30',
 			prerelease: true
@@ -999,6 +1209,8 @@ check('a stable release is not a prerelease', () => {
 	const result = createRelease('false');
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	assert.deepEqual(parseCreate(result.args).options, {
+		repo: REPOSITORY,
+		draft: true,
 		target: head,
 		title: 'Ergopti v0.0.0-dev.30'
 	});
