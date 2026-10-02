@@ -147,7 +147,7 @@ KeylayoutEmulation_LayerIsActive(Feature) {
 	return Desired.Has("layout") && Desired["layout"].Get(Feature, false)
 }
 
-_KLE_BaseCriterion(Sc, Shift, *) {
+_KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 	global KLE_State, KEYLAYOUT_NEUTRAL_STATE
 	if !KeylayoutEmulation_IsActive()
 		return false
@@ -155,7 +155,7 @@ _KLE_BaseCriterion(Sc, Shift, *) {
 		return true
 	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
 		return false
-	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift)
+	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
 }
 
 ; The magic key is an Ergopti feature tied to the layout that declares it: when
@@ -172,14 +172,36 @@ _KLE_MagicKeyOwnsKey(Sc) {
 		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 }
 
-_KLE_DigitsOwnKey(Sc, Shift) {
+_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
 	global Features, _SHIFT_DIGIT_SCS
 	if !Features["layout"].Get("direct_access_digits", false)
 		return false
-	if Shift
-		return _SHIFT_DIGIT_SCS.Has(Sc) && DigitRowIsSwapped(GetForegroundKeyboardLayout())
+	if Shift {
+		Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
+		Code := Integer("0x" . SubStr(Sc, 3))
+		return _SHIFT_DIGIT_SCS.Has(Sc) && _DigitRowSwapResolution(Code, Hkl)["swap"]
+	}
 	Code := Integer("0x" . SubStr(Sc, 3))
 	return _SHIFT_DIGIT_SCS.Has(Sc) || ErgoptiNumberRowEdgeMapping().Has(Code)
+}
+
+/**
+ * Resolves the effective base/Shift descriptors without advancing dead-key state.
+ * @param {Integer} Sc Physical Windows scan code.
+ * @param {Boolean} Caps CapsLock state of the effective source.
+ * @returns {Map|Integer} Plain and Shift descriptors, or 0 if native input owns base.
+ */
+KeylayoutEmulation_NumberRowLevels(Sc, Caps) {
+	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex
+	if !KeylayoutEmulation_LayerIsActive("ergopti_base")
+		return 0
+	Name := Format("SC{:03X}", Sc)
+	if !KLE_KeyCodes.Has(Name)
+		return 0
+	Code := KLE_KeyCodes[Name]
+	return Map(
+		"plain", Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, Caps, false)], Code),
+		"shift", Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(true, Caps, false)], Code))
 }
 
 _KLE_ShortcutCriterion(*) {
@@ -399,6 +421,18 @@ _KLE_Emit(Sc, Shift, Option) {
 }
 
 _KLE_OnKey(Sc, Shift, *) {
+	global _SHIFT_DIGIT_SCS
+	if Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
+		Code := Integer("0x" . SubStr(Sc, 3))
+		Resolution := _DigitRowSwapResolution(Code, GetForegroundKeyboardLayout())
+		if Resolution["swap"] && Resolution["source"] == "emulated" {
+			; The pending-dead-key variant can already own this physical press.
+			; Keep the selected source's action machine, using the same level swap
+			; as the dedicated row callback instead of composing native HKL text.
+			_KLE_Emit(Sc, false, false)
+			return
+		}
+	}
 	if KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift) {
 		_KLE_Emit(Sc, Shift, false)
 		return
@@ -463,10 +497,11 @@ _KLE_PendingDeadKeyCriterion(*) {
  * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
  * @param {Func} HotkeyFn - Hotkey(Name, Callback, Options) implementation.
  * @param {Func} HotIfFn - HotIf(Criterion?) implementation.
+ * @param {Func|Integer} ForegroundFn Foreground layout reader; native by default.
  * @returns {Integer} Number of hotkeys registered.
  * @throws {Error} On a second registration.
  */
-KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf) {
+KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0) {
 	global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
 	global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
 	if KLE_Registered
@@ -480,9 +515,9 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf) 
 	_AtCrit := Critical("On")
 	try {
 		for Sc in ScanCodes {
-			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false))
+			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false, ForegroundFn))
 			HotkeyFn.Call(Sc, _KLE_OnKey.Bind(Sc, false), KLE_INPUT_LEVEL)
-			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, true))
+			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, true, ForegroundFn))
 			HotkeyFn.Call("+" . Sc, _KLE_OnKey.Bind(Sc, true), KLE_INPUT_LEVEL)
 			Count += 2
 			if KLE_NATIVE_CHORD_KEYS.Has(Sc)

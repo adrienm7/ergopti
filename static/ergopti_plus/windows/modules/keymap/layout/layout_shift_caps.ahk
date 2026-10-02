@@ -262,28 +262,56 @@ _DigitRowProfile(Hkl) {
 	return _DigitRowProfiles[Hkl]
 }
 
-; Whether "Chiffres en accès direct" swaps the digit row on layout Hkl: the
-; feature is on and the layout types its digits with Shift (AZERTY, bépo). The
-; digit keys then type the digits, Shift+digit key types the layout's own
-; unshifted symbol (modules/keymap/layout.ahk), and the Ergopti Shift and
-; CapsLock layers leave the row alone. The hotkeys ask it per press about the
-; foreground window's layout, which Windows' per-window input methods change
-; with every window switch.
-; @param Hkl {Integer} Keyboard layout handle.
-; @return {Boolean}
-DigitRowIsSwapped(Hkl) {
+; Resolve one effective digit-row key before the override chooses its level.
+; The native profile retains its measured MapVirtualKeyEx/VkKeyScan behavior.
+; A registry source instead owns its actual neutral-state descriptors, including
+; actions and dead keys: the foreground HKL cannot describe its Shift symbols.
+; @param Sc {Integer} Physical scan code in the 1-0 row.
+; @param Hkl {Integer} Foreground native keyboard layout.
+; @param Caps {Boolean} Explicit CapsLock state, or the live state when omitted.
+; @return {Map} Swap, Source and Descriptor; inspection never changes KLE_State.
+_DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 	global Features
-	return Features["layout"]["direct_access_digits"] and _DigitRowProfile(Hkl)["shifted"]
+	if !Features["layout"].Get("direct_access_digits", false) || Sc < 0x02 || Sc > 0x0B
+		return Map("swap", false, "source", "native", "descriptor", 0)
+	if !IsSet(Caps)
+		Caps := GetKeyState("CapsLock", "T")
+	Levels := KeylayoutEmulation_NumberRowLevels(Sc, Caps)
+	if Levels is Map {
+		Plain := Levels["plain"]
+		Shift := Levels["shift"]
+		Digit := Mod(Sc - 1, 10) . ""
+		Swap := !(Plain["Kind"] == "text" && StrCompare(Plain["Text"], Digit, true) == 0)
+			&& Shift["Kind"] == "text" && StrCompare(Shift["Text"], Digit, true) == 0
+		return Map("swap", Swap, "source", "emulated", "descriptor", Plain)
+	}
+	Profile := _DigitRowProfile(Hkl)
+	Text := Profile["symbols"].Get(Sc, "")
+	return Map("swap", Profile["shifted"] && Text != "", "source", "native",
+		"descriptor", Map("Kind", "text", "Text", Text, "State", "", "Action", ""))
 }
 
-; What Shift+digit key Sc types through the swap on layout Hkl: the key's
-; unshifted character there, or "" when the row is not swapped there or the key
-; types no character on that layout.
+; Whether any effective row key needs the direct-digit override to swap levels.
+; @param Hkl {Integer} Foreground native keyboard layout.
+; @param Caps {Boolean} CapsLock state, live when omitted.
+; @return {Boolean}
+DigitRowIsSwapped(Hkl, Caps := unset) {
+	global KS_DIGIT_ROW_KEYS
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		if _DigitRowSwapResolution(Key[2], Hkl, Caps?)["swap"]
+			return true
+	}
+	return false
+}
+
+; The native symbol or descriptor preview on the effective unshifted level.
+; The emission owner retains the full descriptor, so a dead key is never
+; flattened into this label text when the user actually presses the key.
 ; @param Sc {Integer} Scan code, 0x02 (the 1 key) to 0x0B (the 0 key).
-; @param Hkl {Integer} Keyboard layout handle.
-; @return {String}
-DigitRowSwapSymbol(Sc, Hkl) {
-	if !DigitRowIsSwapped(Hkl)
-		return ""
-	return _DigitRowProfile(Hkl)["symbols"].Get(Sc, "")
+; @param Hkl {Integer} Foreground native keyboard layout.
+; @param Caps {Boolean} CapsLock state, live when omitted.
+; @return {String} Symbol/preview, or empty when no swap owns this key.
+DigitRowSwapSymbol(Sc, Hkl, Caps := unset) {
+	Resolution := _DigitRowSwapResolution(Sc, Hkl, Caps?)
+	return Resolution["swap"] ? Resolution["descriptor"]["Text"] : ""
 }

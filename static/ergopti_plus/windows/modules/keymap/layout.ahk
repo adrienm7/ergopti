@@ -715,21 +715,28 @@ try {
 	HotIf()
 }
 
-_DigitRowSwapIsLive(Sc, *) {
-	return DigitRowSwapSymbol(Sc, GetForegroundKeyboardLayout()) != ""
+_DigitRowSwapIsLive(Sc, ForegroundFn := 0, *) {
+	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
+	return _DigitRowSwapResolution(Sc, Hkl)["swap"]
 }
 
 ; The symbol is read again on the layout of the press: a layout switch between
 ; the criterion and this thread leaves nothing to type, which is logged.
-_DigitRowSwapSend(Sc, *) {
-	Symbol := DigitRowSwapSymbol(Sc, GetForegroundKeyboardLayout())
-	if (Symbol == "") {
+_DigitRowSwapSend(Sc, ForegroundFn := 0, *) {
+	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
+	Resolution := _DigitRowSwapResolution(Sc, Hkl)
+	if !Resolution["swap"] {
 		try LoggerWarn("Layout", "Shift+SC{1:03X}: the foreground layout changed during the press; nothing typed.", Sc)
 		return
 	}
-	; {Text} sends the Unicode character directly, bypassing the AHK
-	; keyboard hook — so the SC002–SC00B digit remaps never fire again.
-	_DigitShiftSend(Symbol)
+	if Resolution["source"] == "emulated" {
+		; A real press, unlike the neutral-state probe, advances the source's own
+		; action/dead-key machine on its effective unshifted level.
+		_KLE_Emit(Format("SC{:03X}", Sc), false, false)
+		return
+	}
+	; Native symbols retain the established Unicode path and emission timing.
+	_DigitShiftSend(Resolution["descriptor"]["Text"])
 }
 
 ; Top-level helper for the shifted-symbol send — must be at module scope so
