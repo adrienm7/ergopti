@@ -176,6 +176,11 @@ These are software implementations; final hardware verification remains below.
   68 assertions now cover all causes, escaping, bounded oversized details and
   unchanged streamed output/counts/JSON/exit status. Full native CI remains
   pending for this evidence-only follow-up.
+  Both real detached-worker probes now capture exact owned launch/exit and
+  stdout/stderr receipts before a script window exists. Missing readiness and
+  cleanup retain the original failure together; the shell control and every
+  icon/title/priority assertion remain blocking. Checkpoint 37061649827 lacked
+  the worker parser output; the next native run must qualify its cause.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
@@ -768,6 +773,12 @@ exact-boolean regressions also pass the focused runner.
   map from the real entrypoint and owns a fresh count cache, restoring both
   assigned or unassigned globals afterwards. All transaction assertions remain
   unchanged; actual AHK execution awaits the next native checkpoint.
+  Checkpoint 37060216766 reached the transaction assertions and exposed
+  stale text-cache reuse by the pending-reload fixture. Its detached candidate
+  now reads an exact owned copy through the real config reader, matching a
+  replacement interpreter while preserving this process's cached authority.
+  The original posture/backup/refusal assertions stay intact; an additional
+  assertion proves the pending live text cache still contains the old source.
 
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
@@ -790,6 +801,11 @@ exact-boolean regressions also pass the focused runner.
   empty, before inserting values; AHK forbids changing that setting afterwards.
   Checkpoint 37056318950 demonstrated the fixture setup error. Production
   cloning and all independence/case-sensitivity assertions remain unchanged.
+  Checkpoint 37061649827 additionally exposed the redundant global class
+  declaration through the unchanged native namespace audit. Read-only class
+  references already resolve the global constant, so the clone owner now
+  keeps its IsSet guard without redeclaring TOML_Bool. The absent-class probe
+  and every typed-copy assertion remain intact; native validation is pending.
   Shared Lua, Windows and the JS reference now specify `copy_if_absent`:
   copy an existing source into an unoccupied destination, retaining the source
   and every explicit destination, including false and occupied ancestor or
