@@ -183,7 +183,22 @@ class AppleScriptPreference:
             capture_output=True,
             timeout=10,
         )
-        if result.returncode or plistlib.dumps(self.read_domain()) != plistlib.dumps(current):
+        restored = self.read_domain()
+        deleted = None
+        if APPLE_SCRIPT_KEY not in self.snapshot and APPLE_SCRIPT_KEY in restored:
+            # An imported dictionary can merge into the domain. Omission does
+            # not acknowledge removal of the key this probe temporarily owned.
+            deleted = self.runner(
+                ["/usr/bin/defaults", "delete", self.domain, APPLE_SCRIPT_KEY],
+                capture_output=True,
+                timeout=10,
+            )
+            restored = self.read_domain()
+        if (
+            result.returncode
+            or (deleted is not None and deleted.returncode)
+            or plistlib.dumps(restored) != plistlib.dumps(current)
+        ):
             raise RuntimeError("The native scripting preference did not acknowledge restoration")
 
 
@@ -255,6 +270,7 @@ class NativeDelayedTimerProbe:
             json.dumps(self.nonce),
         )
         self.started = True
+        primary_error = None
         try:
             self.execute(source)
             deadline = time.monotonic() + 15
@@ -272,13 +288,28 @@ class NativeDelayedTimerProbe:
                     "The native delayed-timer process changed before receipt admission"
                 )
             return validate_receipt(result, self.nonce, pid, self.executable, self.domain)
+        except Exception as error:
+            primary_error = error
+            raise
         finally:
-            if self.started and processes(self.executable) == [pid]:
-                self.execute(
-                    "return dofile({}).cleanup({})".format(
-                        json.dumps(str(fixture), ensure_ascii=False), json.dumps(self.nonce)
+            try:
+                if self.started and processes(self.executable) == [pid]:
+                    self.execute(
+                        "return dofile({}).cleanup({})".format(
+                            json.dumps(str(fixture), ensure_ascii=False), json.dumps(self.nonce)
+                        )
                     )
-                )
+            except Exception as cleanup_error:
+                cleanup_cause = f"{type(cleanup_error).__name__}: {cleanup_error}"
+                if primary_error is None:
+                    raise RuntimeError(
+                        f"Native delayed-timer cleanup failed: {cleanup_cause}"
+                    ) from cleanup_error
+                raise RuntimeError(
+                    "Native delayed-timer observation failed: "
+                    f"{type(primary_error).__name__}: {primary_error}; "
+                    f"native cleanup failed: {cleanup_cause}"
+                ) from primary_error
 
     def restore(self):
         """Restore the scripting key after ordinary Quit or exact process cleanup."""

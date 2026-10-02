@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 import plistlib
 import subprocess
+import tempfile
 import unittest
+from unittest import mock
 
 import hs_delayed_timer_probe as probe
 
@@ -116,6 +118,8 @@ class DefaultsFixture:
         self.fail_write = False
         self.fail_import = False
         self.refuse_import = False
+        self.fail_delete = False
+        self.refuse_delete = False
         self.calls = []
 
     def run(self, arguments, **options):
@@ -136,8 +140,15 @@ class DefaultsFixture:
             return subprocess.CompletedProcess(arguments, 1 if self.fail_write else 0, b"", b"")
         if action == "import":
             if not self.refuse_import:
-                self.state = plistlib.loads(options["input"])
+                if self.state is None:
+                    self.state = {}
+                # Native import can merge keys; omission is not a delete receipt.
+                self.state.update(plistlib.loads(options["input"]))
             return subprocess.CompletedProcess(arguments, 1 if self.fail_import else 0, b"", b"")
+        if action == "delete":
+            if not self.refuse_delete:
+                self.state.pop(arguments[3], None)
+            return subprocess.CompletedProcess(arguments, 1 if self.fail_delete else 0, b"", b"")
         raise AssertionError(f"Unexpected defaults command: {arguments!r}")
 
 
@@ -188,6 +199,89 @@ class PreferenceTests(unittest.TestCase):
                 setattr(native, fault, True)
                 with self.assertRaisesRegex(RuntimeError, "restoration"):
                     owner.restore()
+
+    def test_absent_key_requires_an_acknowledged_targeted_delete_after_import(self):
+        native = DefaultsFixture({"other": "kept"})
+        owner = probe.AppleScriptPreference(DOMAIN, native.run)
+        owner.enable()
+        native.state["runtime-added"] = "preserved"
+        owner.restore()
+        deletes = [call for call in native.calls if call[1] == "delete"]
+        self.assertEqual(deletes, [["/usr/bin/defaults", "delete", DOMAIN, probe.APPLE_SCRIPT_KEY]])
+        self.assertEqual(native.state, {"other": "kept", "runtime-added": "preserved"})
+
+    def test_refused_or_unacknowledged_delete_does_not_claim_restoration(self):
+        for fault in ("fail_delete", "refuse_delete"):
+            with self.subTest(fault=fault):
+                native = DefaultsFixture({"other": "kept"})
+                owner = probe.AppleScriptPreference(DOMAIN, native.run)
+                owner.enable()
+                setattr(native, fault, True)
+                with self.assertRaisesRegex(RuntimeError, "restoration"):
+                    owner.restore()
+
+
+class ObservationFailureTests(unittest.TestCase):
+    """Cleanup refusal must neither replace the primary cause nor admit success."""
+
+    def test_start_failure_and_cleanup_timeout_are_both_retained(self):
+        primary = RuntimeError("initial AppleScript command refused by native process")
+        cleanup = subprocess.TimeoutExpired(["osascript", "cleanup-owned-nonce"], 10)
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.nonce = NONCE
+            with mock.patch.object(owner, "execute", side_effect=[primary, cleanup]) as execute:
+                with self.assertRaisesRegex(
+                    RuntimeError, "initial AppleScript command refused"
+                ) as raised:
+                    owner.observe(42, lambda _: [42])
+                self.assertIn("cleanup", str(raised.exception))
+                self.assertIn("TimeoutExpired", str(raised.exception))
+                self.assertIs(raised.exception.__cause__, primary)
+                self.assertEqual(execute.call_count, 2)
+                self.assertIn(".cleanup", execute.call_args.args[0])
+
+    def test_bad_native_receipt_and_cleanup_refusal_are_both_retained(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+            )
+            owner.nonce = NONCE
+
+            def execute(source):
+                if ".cleanup" in source:
+                    raise RuntimeError("cleanup nonce was not acknowledged")
+                wrong = receipt()
+                wrong["nonce"] = "b" * 32
+                (output / "native-delayed-timers.json").write_text(json.dumps(wrong))
+
+            with mock.patch.object(owner, "execute", side_effect=execute):
+                with self.assertRaisesRegex(
+                    RuntimeError, "identity or completion differs: nonce"
+                ) as raised:
+                    owner.observe(42, lambda _: [42])
+                self.assertIn("cleanup nonce was not acknowledged", str(raised.exception))
+                self.assertIsInstance(raised.exception.__cause__, ValueError)
+
+    def test_cleanup_refusal_blocks_an_otherwise_valid_native_receipt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+            )
+            owner.nonce = NONCE
+
+            def execute(source):
+                if ".cleanup" in source:
+                    raise RuntimeError("cleanup nonce was not acknowledged")
+                (output / "native-delayed-timers.json").write_text(json.dumps(receipt()))
+
+            with mock.patch.object(owner, "execute", side_effect=execute):
+                with self.assertRaisesRegex(RuntimeError, "cleanup nonce was not acknowledged"):
+                    owner.observe(42, lambda _: [42])
 
 
 if __name__ == "__main__":

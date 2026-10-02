@@ -172,6 +172,11 @@ These are software implementations; final hardware verification remains below.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
+Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
+7,726 Windows unit cases, E2E, packages, installation and launch; release is
+skipped. It validates the GUI title policy and navigation case preservation
+after native captions were captured through explicit UTF-8 receipts.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
@@ -315,14 +320,24 @@ These are software implementations; final hardware verification remains below.
   setDelay receipts, and retains callback rearming. Five direct contract cases
   failed before the fix and now pass; a real SyntheticInput listener retry
   regression failed with one delivery before passing with two. Generic doAfter
-  semantics stay separate. Full verification remains pending for this slice.
+  semantics stay separate. The stub slice passed complete three-OS
+  checkpoint 37046598989 at `051504e0a`, including packages and installation,
+  with release skipped.
   The packaged clean macOS launch now qualifies these contracts in its real
   signed Hammerspoon process through a temporarily owned scripting preference.
   Strict receipts require 18 measured observations, runtime identity, nonce,
   self-rearm deliveries and acknowledged preference restoration; aggregate
   evidence refuses missing or partial proofs. Local probe judges passed their
-  red/green regressions; actual native execution remains pending macOS CI.
+  red/green regressions; actual native execution is not yet qualified. Run 37046757566 exposed
+  a clean-launch scripting timeout and a refused physical preference restore;
+  no incomplete proof is accepted.
   Audit other hs stubs for remaining divergences from native behaviour.
+  The probe now restores an initially absent scripting preference with an
+  acknowledged targeted deletion and exact physical readback, preserving
+  unrelated runtime changes. Observation and cleanup refusals retain both
+  causes; 14 focused and 40 aggregate Python cases passed after the new cases
+  first reproduced merged-import and masked-error failures. The 18 native
+  measurements remain mandatory; the real control channel still needs CI.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
@@ -517,15 +532,6 @@ is committed; one request is one commit with its regression test.
       each. One commit per menu, the baseline lowered in the same commit.
       The update rows greyed on a local version (2026-10-01) were added as
       provider rows and join the About slice.
-- [~] **84.** Navigation must not change what an unbound key types.
-  Windows now limits physical CapsLock to CapsWord and genuine hardware intent.
-  Its translated layer indicator borrows the tray tooltip and restores the
-  exact previous text through the existing native adapter; refusal retains
-  retryable cleanup without preventing layer release or suspend. The indicator
-  is visible on tray hover. Native Windows regressions execute the actual writer
-  across eight mode combinations and restore the machine toggle; macOS and
-  Linux regressions preserve native routing for unbound keys. Full three-OS
-  validation remains pending for this slice.
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
   ported by Windows, pinned by
@@ -772,19 +778,24 @@ exact-boolean regressions also pass the focused runner.
       Share the policy and behavior vectors wherever another driver supports
       number-row remapping, documenting genuine platform limits.
 
-- [~] **108.** Retire the fixed Win+magic editor shortcut in favour of ordinary
-  user-owned Shortcuts assignments. Windows now removes the inert personal
-  menu reminder and the dedicated layout hotkey; physical remap and Ctrl+save
-  remain. The existing shared neutral `win_d = none` and recommended editor
-  action use the standard assignment owner. Native regressions preserve a
-  custom Win+D, assign the editor elsewhere, explicitly recommend it, remove
-  and rebind it, refuse failed writes, and retain unrelated settings and pause.
-  JS mutations protect the neutral and recommended declarations. Native CI
-  remains pending. Physical-source-aware recommendations need a deliberately
-  shared physical-slot contract and registrar coexistence; macOS's persisted
-  legacy shortcut still requires an acknowledged migration. Do not invent a
-  Windows migration or overwrite personal assignments.
-
+- [~] **108.** Make the default hotstring-editor shortcut follow the effective
+  physical key that directly types the selected magic character: Ctrl on
+  macOS, Win/Super on Windows and Linux. It must work with every layout and
+  follow changes from the star to `ù`, `;` or another admitted magic character.
+  Represent it as one ordinary, editable logical slot; absence selects the
+  conditional editor default, and explicit none disables it. Require proven
+  direct-tap ownership; missing, ambiguous, dead, Shift or AltGr-only sources
+  stay inactive. Respect the Shortcuts master, pause and inhibition, preserve
+  personal assignments, and let an explicit resolved-chord choice win,
+  including explicit none. Retarget through the existing binding owners and
+  generation fences; never stack a second fixed physical hotkey.
+  Windows has removed the former fixed Win+magic registration and inert menu
+  reminder, retaining physical remap and Ctrl+save. The former Win+D editor
+  recommendation still needs replacement by this conditional slot; existing
+  saved Win+D/editor assignments must remain. macOS's persisted legacy
+  shortcut requires an acknowledged migration before its owner is retired.
+  Conditional-slot registration, live source resolution, collision handling,
+  21-locale labels and full three-OS regressions remain to implement.
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
   `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty
@@ -794,8 +805,9 @@ exact-boolean regressions also pass the focused runner.
   native captions use them across every supported app and all 21 locales.
   Native caption/retitle and private generated-policy regressions cover the
   hosts; the CLI regression failed against the original translated raw-Gui
-  bypass before passing with its stronger audit. Full three-OS validation is
-  pending. Its private native-policy probes now write the actual Gui caption to
+  bypass before passing with its stronger audit. Complete three-OS
+  checkpoint 37046411788 at `ea6b21bed` passed unit/E2E, packaging, installation
+  and launch with release skipped. Its private native-policy probes now write the actual Gui caption to
   UTF-8 receipts and use ASCII stdout acknowledgements; runs 37040137327 and
   37040369275 exposed ANSI decoding in the previous test transport. Native exit,
   stderr and the independent expected-caption assertions remain strict.
