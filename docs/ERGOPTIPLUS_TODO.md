@@ -618,8 +618,18 @@ branch has been removed; the run also covers the 21-locale privacy label.
   replay the real reload journal. Linux treats only exact true as an
   acknowledgement and surfaces one localized, keyboard-released error dialog
   on false/nil/throw; eight native-menu cases cover both requested postures.
-  Personal, dynamic and extension-file views
-  still need their own owner bindings before this item is complete.
+  The category-menu checkpoint 36957664162 at `68a8f1462` is green on all
+  three OSes, including native Windows menu callbacks, packages and installs.
+  This checkpoint precedes the following extension-file owner changes.
+  Windows extension-file submenus now consume the same shared commands as
+  their existing macOS/Linux category views. Their owner rediscovers the
+  extension under the configuration lease and commits the group plus every
+  section as one sparse batch. Two common vectors preserve colon namespaces
+  and Unicode section names; native cases retain the engine master, sibling
+  categories, private source and package contents across immediate/late
+  refusal, and reject unknown or uninstalled content before writing.
+  Personal and dynamic views still need their own owner bindings before
+  this item is complete.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.

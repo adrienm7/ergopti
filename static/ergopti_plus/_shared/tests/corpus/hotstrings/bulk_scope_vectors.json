@@ -293,6 +293,56 @@
 					"enabled": false
 				}
 			]
+		},
+		{
+			"name": "namespaced-extension-enable",
+			"inventory": {
+				"ext:demo:phrases": ["greetings", "résumé"],
+				"rolls": ["hc"]
+			},
+			"targets": ["ext:demo:phrases"],
+			"enabled": true,
+			"expected": [
+				{
+					"group": "ext:demo:phrases",
+					"enabled": true
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "greetings",
+					"enabled": true
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "résumé",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"name": "namespaced-extension-disable",
+			"inventory": {
+				"ext:demo:phrases": ["greetings", "résumé"],
+				"rolls": ["hc"]
+			},
+			"targets": ["ext:demo:phrases"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "ext:demo:phrases",
+					"enabled": false
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "greetings",
+					"enabled": false
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "résumé",
+					"enabled": false
+				}
+			]
 		}
 	]
 }
