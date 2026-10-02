@@ -56,6 +56,7 @@ ConfigMigrateRegistryPath() {
 _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
+		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
@@ -121,8 +122,8 @@ _ConfigMigrateValidateOp(Op, Where) {
 		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be one bare segment")
 	}
-	if (Op["op"] == "rename" && !Op.Has("to_section") && !Op.Has("to_key"))
-		throw Error(Where . ": rename needs to_section or to_key")
+	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
+		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
 	if (Op["op"] == "map_value") {
 		if !(Op["map"] is Array) || Op["map"].Length == 0
 			throw Error(Where . ": map_value needs a non-empty map")
@@ -379,6 +380,21 @@ _ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
 		ToSection, ToKey, Section, Key)
 }
 
+; Ancestor values and child sections occupy their whole destination namespace.
+; This check belongs only to conditional copies; existing operations keep
+; their own conflict rules.
+_ConfigMigrateCopyDestinationAbsent(Model, Section, Key) {
+	if Model.Has(Section) && Model[Section].Has(Key)
+		return false
+	Parent := ""
+	for Name in StrSplit(Section, ".") {
+		if Model.Has(Parent) && Model[Parent].Has(Name)
+			return false
+		Parent := Parent == "" ? Name : Parent . "." . Name
+	}
+	return _ConfigMigrateSectionsAtOrBelow(Model, Section . "." . Key).Length == 0
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op) {
 	Section := Op["section"]
@@ -388,6 +404,16 @@ _ConfigMigrateApplyOp(Model, Op) {
 			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
 			_ConfigMigrateDropIfEmpty(Model, Section)
 			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "copy_if_absent":
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			ToSection := Op.Get("to_section", Section)
+			ToKey := Op.Get("to_key", Op["key"])
+			if !_ConfigMigrateCopyDestinationAbsent(Model, ToSection, ToKey)
+				return
+			if !Model.Has(ToSection)
+				Model[ToSection] := Map()
+			Model[ToSection][ToKey] := ManifestCloneValue(Model[Section][Op["key"]])
 		case "move_section":
 			for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section) {
 				Target := Op["to_section"] . SubStr(Name, StrLen(Section) + 1)

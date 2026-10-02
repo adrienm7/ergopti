@@ -38,6 +38,14 @@ local function clone(value)
 	return copy
 end
 
+--- Detaches supported decoded TOML values, including nested arrays and maps.
+--- The codec represents these values as plain tables without metatables.
+--- @param value any
+--- @return any
+function M.clone_value(value)
+	return clone(value)
+end
+
 --- A collision-free identity for a key path.
 --- @param segments table
 --- @param count number|nil Leading segments to include.

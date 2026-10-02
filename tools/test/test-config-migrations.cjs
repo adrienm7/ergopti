@@ -50,6 +50,7 @@ const BARE = /^[A-Za-z0-9_-]+$/;
 // Required and optional fields of each op of the closed set.
 const OPS = {
 	rename: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
+	copy_if_absent: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
 	move_section: { required: ['section', 'to_section'], optional: [] },
 	merge_into: { required: ['section', 'to_section'], optional: [] },
 	map_value: { required: ['section', 'key', 'map'], optional: [] },
@@ -153,6 +154,8 @@ function validateOp(op, where) {
 			fail(where, 'rename must change the section or the key');
 		}
 	}
+	if (op.op === 'copy_if_absent' && op.to_section === undefined && op.to_key === undefined)
+		fail(where, 'copy_if_absent needs to_section or to_key');
 	if (op.op === 'move_section' || op.op === 'merge_into') {
 		const from = op.section;
 		const to = op.to_section;
@@ -349,6 +352,18 @@ function moveValue(model, section, key, toSection, toKey) {
 	if (!target.has(toKey)) target.set(toKey, value);
 }
 
+/** Whether a target's entire namespace is absent, including its ancestors. */
+function copyDestinationAbsent(model, section, key) {
+	if (model.get(section)?.has(key)) return false;
+	const segments = section.split('.');
+	let parent = '';
+	for (const segment of segments) {
+		if (model.get(parent)?.has(segment)) return false;
+		parent = parent === '' ? segment : `${parent}.${segment}`;
+	}
+	return sectionsAtOrBelow(model, `${section}.${key}`).length === 0;
+}
+
 /**
  * Applies one op of the closed set to the model.
  * @param {Map<string, Map<string, *>>} model
@@ -371,6 +386,16 @@ function applyOp(model, op) {
 				model.delete(name);
 				dropIfEmpty(model, op.to_section + suffix);
 			}
+			break;
+		}
+		case 'copy_if_absent': {
+			const source = model.get(op.section);
+			if (!source || !source.has(op.key)) break;
+			const toSection = op.to_section ?? op.section;
+			const toKey = op.to_key ?? op.key;
+			if (!copyDestinationAbsent(model, toSection, toKey)) break;
+			if (!model.has(toSection)) model.set(toSection, new Map());
+			model.get(toSection).set(toKey, structuredClone(source.get(op.key)));
 			break;
 		}
 		case 'merge_into': {
@@ -552,6 +577,75 @@ for (const name of onDisk) {
 			);
 		}
 	}
+}
+
+// Semantic file replay cannot detect shared references. Mutate actual copied
+// values and compare untouched destinations with handwritten corpus expectations.
+const copyDir = path.join(CORPUS_DIR, 'op_copy_if_absent');
+const copyRegistry = validateRegistry(
+	readToml(path.join(copyDir, 'migrations.toml')),
+	'copy ownership registry'
+);
+const copyExpected = readToml(path.join(copyDir, 'expected.toml'));
+if (copyRegistry && copyExpected) {
+	for (const driver of DRIVERS) {
+		const result = migrate(
+			flatten(readToml(path.join(copyDir, 'input.toml'))),
+			copyRegistry,
+			driver
+		);
+		const source = result.model.get('source').get('records');
+		const copied = result.model.get('destination').get('records');
+		const sibling = result.model.get('sibling').get('records');
+		source[0].palette[0].Key = 'edited source';
+		source.push({ future: 'source only' });
+		if (
+			!sameValue(copied, copyExpected.destination.records) ||
+			!sameValue(sibling, copyExpected.sibling.records)
+		)
+			fail('copy ownership', `${driver}: source edits changed a destination`);
+		copied[0].palette[0].key = 'edited copy';
+		copied[0].visible = true;
+		if (
+			source[0].palette[0].key !== 'lower' ||
+			source[0].visible !== false ||
+			!sameValue(sibling, copyExpected.sibling.records)
+		)
+			fail('copy ownership', `${driver}: destination edits changed the source or sibling`);
+		result.model.get('source').get('rows')[0][0] = 99;
+		if (!sameValue(result.model.get('destination').get('rows'), copyExpected.destination.rows))
+			fail('copy ownership', `${driver}: nested copied arrays share children`);
+	}
+}
+
+// This fixture's explicitly inline key is one flat value in both native
+// interpreters. Keep that address here; generic flattening turns maps into
+// sections and remains unsuitable for root inline values in other corpus cases.
+const inlineChoices = readToml(
+	path.join(CORPUS_DIR, 'copy_preserves_occupied_namespaces', 'inline_ancestor.toml')
+);
+if (inlineChoices) {
+	const model = new Map([
+		['source', new Map(Object.entries(inlineChoices.source))],
+		['settings', new Map(Object.entries(inlineChoices.settings))]
+	]);
+	const expected = structuredClone(normalized(model));
+	applyOp(model, {
+		op: 'copy_if_absent',
+		section: 'source',
+		key: 'choice',
+		to_section: 'settings.inline.deep',
+		to_key: 'child'
+	});
+	applyOp(model, {
+		op: 'copy_if_absent',
+		section: 'source',
+		key: 'choice',
+		to_section: 'settings',
+		to_key: 'inline'
+	});
+	if (!sameValue(normalized(model), expected))
+		fail('copy occupied namespace', 'the inline ancestor or source choice changed');
 }
 
 for (const op of Object.keys(OPS))

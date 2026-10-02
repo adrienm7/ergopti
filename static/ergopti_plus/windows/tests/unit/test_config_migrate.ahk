@@ -124,6 +124,61 @@ _CMG_CorpusPlansMatchExpected() {
 Test("config migrate: every corpus case plans the expected model and replays idempotently "
 	. "(config-migrate-corpus)", _CMG_CorpusPlansMatchExpected)
 
+_CMG_CopyOwnsNestedValues() {
+	Dir := _CMG_CorpusDir() . "\op_copy_if_absent"
+	Model := _CMG_Parse(Dir . "\input.toml")
+	Expected := _CMG_Parse(Dir . "\expected.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	ConfigMigrateApplySteps(Model, Registry, "ahk", 1)
+	Source := Model["source"]["records"]
+	Copied := Model["destination"]["records"]
+	Sibling := Model["sibling"]["records"]
+	Assert(ConfigMigrateSameValue(Copied, Expected["destination"]["records"]), "copy matches the whole independent expected value")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "sibling matches the independent expected value")
+	Source[1]["palette"][1]["Key"] := "edited source"
+	Source.Push(Map("future", "source only"))
+	Assert(ConfigMigrateSameValue(Copied, Expected["destination"]["records"]), "source edits cannot change the copy")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "source edits cannot change the sibling")
+	Copied[1]["palette"][1]["key"] := "edited copy"
+	Copied[1]["visible"].Value := true
+	AssertEqual("lower", Source[1]["palette"][1]["key"], "copy edits cannot change the source's nested Map")
+	AssertEqual(false, Source[1]["visible"].Value, "copy edits cannot change the source's typed Boolean")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "copy edits cannot change another destination")
+	Model["source"]["rows"][1][1] := 99
+	Assert(ConfigMigrateSameValue(Model["destination"]["rows"], Expected["destination"]["rows"]),
+		"nested copied arrays own every child")
+}
+Test("config migrate: conditional copies own nested values independently (config-migrate-copy-ownership)", _CMG_CopyOwnsNestedValues)
+
+_CMG_CopyPreservesOccupiedNamespaceBytes() {
+	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Plan := ConfigMigratePlan(Input, ConfigMigrateLoadRegistry(Dir . "\migrations.toml"), "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	AssertContains(Plan["candidate"], Input, "conditional copies preserve every source byte, including empty table headers")
+}
+Test("config migrate: conditional copies retain every occupied namespace byte (config-migrate-copy-bytes)",
+	_CMG_CopyPreservesOccupiedNamespaceBytes)
+
+_CMG_CopyPreservesInlineAncestor() {
+	Input := _CMG_Read(_CMG_CorpusDir() . "\copy_preserves_occupied_namespaces\inline_ancestor.toml")
+	Registry := ConfigMigrateValidateRegistry(_ConfigMigrateParse('[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk", "hs", "linux"]`n'
+		. 'reason = "Contract: preserve occupied inline namespaces."`n'
+		. 'ops = [{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.inline.deep", to_key = "child" },'
+		. '{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "inline" }]`n', "inline contract"))
+	Plan := ConfigMigratePlan(Input, Registry, "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	Expected := _ConfigMigrateParse(Input, "independent inline choices")
+	Expected["_meta"] := Map("schema_version", 2)
+	Assert(ConfigMigrateSameModel(Plan["model"], Expected), "all source choices and the complete inline ancestor survive")
+	for Line in StrSplit(Input, "`n") {
+		if Line != ""
+			AssertContains(Plan["candidate"], Line . "`n", "every original row keeps its exact bytes")
+	}
+}
+Test("config migrate: conditional copies preserve occupied inline namespaces (config-migrate-copy-namespace)", _CMG_CopyPreservesInlineAncestor)
+
 ; The boot transaction on a real file: backup, publication or refusal.
 _CMG_CorpusBootTransactions() {
 	global _CMG_STAMP

@@ -17,10 +17,13 @@
 cases = [
 	"chain_runs_every_step_in_order",
 	"chain_starts_at_file_version",
+	"copy_orders_with_rename_and_move",
+	"copy_preserves_occupied_namespaces",
 	"current_version_untouched",
 	"invalid_version_refused",
 	"newer_version_refused",
 	"op_delete",
+	"op_copy_if_absent",
 	"op_map_value",
 	"op_merge_into",
 	"op_move_section",

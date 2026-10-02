@@ -1,0 +1,10 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Defect: a conditional copy takes no literal replacement value."
+ops = [{ op = "copy_if_absent", section = "source", key = "choice", to_key = "copy", value = false }]
