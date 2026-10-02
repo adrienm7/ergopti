@@ -1006,14 +1006,7 @@ _HS_ExtensionRows(Options := unset) {
 		} else {
 			for _, TF in Ext.toml_files {
 				GroupPath := "hotstrings.groups." . TF.category
-				TFRows := [
-					Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path)),
-					Map("separator", true),
-					Map("label", t("menu.hotstrings.category_enable"),
-						"checked", ReadFeatureStateV2(GroupPath)["enabled"],
-						"action", _HS_ExtensionToggle.Bind(GroupPath, Options)),
-					Map("separator", true)
-				]
+				TFRows := []
 				if (TF.sections.Length == 0) {
 					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
 				} else {
@@ -1028,7 +1021,9 @@ _HS_ExtensionRows(Options := unset) {
 				ExtRows.Push(Map(
 					"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
 						[{ toml_files: [TF] }], MasterOn)) . ")",
-					"items", TFRows))
+					"checked", ReadFeatureStateV2(GroupPath)["enabled"],
+					"submenu", _HS_CategoryMenu(TF.category, TF.path, TFRows,
+						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))))
 			}
 		}
 		Rows.Push(Map(
