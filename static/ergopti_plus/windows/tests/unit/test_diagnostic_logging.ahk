@@ -150,9 +150,38 @@ _TDL_StagesPair() {
 	Text := _TDL_RingText()
 	Assert(InStr(Text, "[START] [BootProfile] Boot stage 'tdl stage'…"), Text)
 	Assert(RegExMatch(Text, "\[SUCCESS\] \[BootProfile\] Boot stage 'tdl stage' done in \d+ ms: 3 thing\(s\)\."), Text)
+	Assert(RegExMatch(Text, "Boot stage 'tdl stage' resources: wall=\d+\.\d+ ms, process_cpu=\d+\.\d+ ms\."),
+		"precise stage timing and process CPU must survive INFO collapsing")
 	Assert(InStr(Text, "[WARNING] [BootProfile] Boot stage 'tdl aborted' did not complete"), Text)
 	AssertEqual("", BootProfile_OpenStageNames(), "both stages are closed")
 }
+
+_TDL_RejectMenuRow() {
+	throw Error("menu row fixture rejected")
+}
+
+_TDL_MenuRowFailureClosesItsStage() {
+	_TDL_ResetLog()
+	Stage := "menu row tdl_rejected"
+	try {
+		Caught := ""
+		try _MI_StageTopLevel([Map("id", "tdl_rejected")],
+			Map("tdl_rejected", _TDL_RejectMenuRow))
+		catch as Err
+			Caught := Err.Message
+		AssertEqual("menu row fixture rejected", Caught,
+			"instrumentation must preserve the builder's original failure")
+		AssertFalse(_BootStagesInFlight().Has(Stage),
+			"a rejected row must close its START instead of reporting a permanent build hang")
+		Assert(InStr(_TDL_RingText(), "did not complete") > 0)
+	} finally {
+		if _BootStagesInFlight().Has(Stage)
+			BootProfile_StageAbort(Stage, "test cleanup")
+	}
+}
+
+Test("boot stages: menu row failure closes diagnostics and propagates (tray-row-failure-2026-10-02)",
+	_TDL_MenuRowFailureClosesItsStage)
 Test("boot stages: START pairs with a timed SUCCESS, an abort is a WARNING", _TDL_StagesPair)
 
 _TDL_EntryClosesEveryStage() {

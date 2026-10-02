@@ -22,6 +22,8 @@ if _DriverIsDetachedWorker {
 	WinSetTitle("ErgoptiPlus detached worker " . ProcessExist(), A_ScriptHwnd)
 }
 
+BootProfile_Stamp("Auto-execute entered")
+
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
 ; The real-process startup smoke runs this exact entry point under a uniquely
@@ -168,6 +170,8 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 	}
 }
 
+BootProfile_Stamp("Single-owner gate completed")
+
 ; Single source of truth for the driver's baseline (non-boosted) process
 ; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
 ; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
@@ -293,6 +297,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 #Warn LocalSameAsGlobal, Off
 
 #Include *i vendor/UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor/ (source: https://github.com/Descolada/UIA-v2)
+BootProfile_Stamp("UIA include initialised")
 ; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
 ; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
 ; that feature is disabled in your INI and you want to trim boot time / memory,
@@ -344,6 +349,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/hotpath_profiler.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
+BootProfile_Stamp("Diagnostics and core state initialised")
 
 ; The chord notation the HotkeyRegistrar adapter parses with, loaded before the
 ; adapters block that consumes it
@@ -383,6 +389,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/shell_runner.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
+BootProfile_Stamp("Adapters initialised")
 SFD_ConfigureUiaWorker(
 	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 
@@ -432,6 +439,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/toml/toml_loader.ahk
 #Include infra/hotstrings/extension_packs.ahk
 #Include infra/toml/toml_config_loader.ahk
+BootProfile_Stamp("Hotstring and TOML state initialised")
 ; The config.toml schema migration the boot runs before any reader or writer.
 #Include infra/config_migrate.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
@@ -473,6 +481,7 @@ if UIASW_IsWorkerInvocation()
 #Include _generated/locale_table.ahk
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
+BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
@@ -511,6 +520,7 @@ if UIASW_IsWorkerInvocation()
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
+BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include infra/webview_utils.ahk
 #Include ui/console_window.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
@@ -542,6 +552,7 @@ if UIASW_IsWorkerInvocation()
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
 #Include modules/keylogger/keylogger_ui.ahk
+BootProfile_Stamp("Keylogger modules initialised")
 
 ; A detached prefetch worker shares these projection modules but must never run
 ; the normal driver boot: no hooks, timers, tray, WebView, or config mutation.
@@ -563,6 +574,7 @@ KLPF_InitializeCleanup()
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
 ; prediction_engine.ahk and menu_llm.ahk initialise their state maps.
 LLM_Defaults_Load()
+BootProfile_Stamp("LLM defaults loaded")
 #Include _generated/llm_profiles_data.ahk
 #Include modules/llm/profiles.ahk
 #Include modules/llm/option_validation.ahk
@@ -603,8 +615,21 @@ BootProfile_Stamp("Module includes initialised")
 
 #Include infra/suspend_handoff.ahk
 #Include infra/boot.ahk
+BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
+; Settle parse-time personal includes before any process reveals the tray icon.
+try {
+		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
+				_DriverStartupSmokeDir == "")
+				throw Error("personal shortcuts bootstrap was not durable")
+} catch as _epsErr {
+		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+		LoggerAppendBootstrapLine("ERROR", "ErgoptiPlus", "Personal shortcuts bootstrap failed: " . _epsErr.Message)
+		ExitApp(1)
+}
 #Include infra/tray_bootstrap.ahk
+#Include adapters/tray_startup_click.ahk
+#Include adapters/tray_startup_panel.ahk
 
 ; AHK-21: atomically replace the stock AHK tray items
 ; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so
@@ -613,6 +638,18 @@ BootProfile_Stamp("Module includes initialised")
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 _InstallSafeBootstrapTray()
+global _TrayStartupPanel := TrayStartupPanel(
+	() => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand,
+	0, () => _TrayStartupClick.CancelPending())
+global _TrayStartupClick := TrayStartupClick(
+	() => IsSet(_DriverReady) && _DriverReady && _TrayRootPublishedGeneration > 0
+		&& !_TrayRootBootDetailsPending,
+	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0,
+	_DriverStartupSmokeDir != "" ? ObjBindMethod(_TrayStartupPanel, "Show", "NA AutoSize x-10000 y-10000")
+		: ObjBindMethod(_TrayStartupPanel, "Show"),
+	ObjBindMethod(_TrayStartupPanel, "Complete"), TrayStartupOnboarding)
+if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
+	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
 ; the safe menu, never with AutoHotkey's default icon and stock items.
 A_IconHidden := false
@@ -638,8 +675,10 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; untouched and every write to it is refused for the session
 ; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
+BootProfile_Stamp("Configuration migration checked")
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
+BootProfile_Stamp("Configuration TOML snapshot parsed")
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
 ; READ an existing config.toml. This snapshot is taken once and never refreshed,
 ; yet it seeds the locale, the magic key, every category master gate, both
@@ -652,11 +691,13 @@ if TOML_UnreadableFile(ConfigurationFile) {
 		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
+BootProfile_Stamp("Script preferences applied")
 ; Language-pack category gates come from the shared hotstring index, so they are
 ; added before the gates are read from config.toml.
 HotstringsSeedLanguageCategoryGates(CategoryEnabled)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
+_TrayStartupPanel.Prepare()
 BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
@@ -889,7 +930,6 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 		ReplaceFn := 0, ReadFn := 0) {
-		global PERSONAL_SHORTCUTS_TEMPLATE
 		InheritedCritical := A_IsCritical
 		if InheritedCritical {
 				Critical("Off")
@@ -908,7 +948,7 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 						if (Dir != "" and !DirExist(Dir)) {
 								DirCreate(Dir)
 						}
-						Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
+						Template := PersonalShortcutsTemplate()
 						; A complete same-directory stage is published atomically. The old
 						; FileAppend path could leave a truncated AHK source on interruption.
 						if !_PersonalShortcutsPublishFile(Path, Chr(0xFEFF) . Template,
@@ -1057,14 +1097,6 @@ _PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
 		}
 }
 
-try {
-		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
-				_DriverStartupSmokeDir == "")
-				throw Error("personal shortcuts bootstrap was not durable")
-} catch as _epsErr {
-		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
-		ExitApp(1)
-}
 #InputLevel 2
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
@@ -1257,6 +1289,7 @@ _RegisterScriptAltGrHotkeys()
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
 KeylayoutEmulation_Boot(_ConfigDir)
+BootProfile_Mark("LAYOUT: registry emulation registered")
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
 ; below. There used to be an inline forward-order load here at #InputLevel 0,
@@ -1278,8 +1311,11 @@ TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
 #Include modules/keymap/layout.ahk
+BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
+BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
+BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
 #Include modules/hotstrings.ahk
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
@@ -1319,6 +1355,12 @@ SuspendWatchdogStart()
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+; Publish global commands now; detailed feature trees remain on the deferred owner
+if !BuildReadyTrayShell()
+	throw Error("the ready tray global-command publication was refused")
+_TrayStartupPanel.NotifyReady()
+if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
+	_DriverStartupSmokeInspectShell.Call()
 _BootTotalMs := BootProfile_TotalBootMs()
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")

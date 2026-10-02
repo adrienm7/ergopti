@@ -33,12 +33,22 @@ _PSGE_UsesBomAndLf() {
     Assert(!InStr(EnsureBody, "`r`n"),
         "Forwarding stub text must use LF, never CRLF")
 
-    TemplateStart := InStr(ActionsSrc, "global PERSONAL_SHORTCUTS_TEMPLATE")
-    Assert(TemplateStart > 0,
-        "menu_actions.ahk must expose the personal shortcuts template")
-    TemplateBody := SubStr(ActionsSrc, TemplateStart, 4000)
+    TemplateBody := _PSGE_Body("PersonalShortcutsTemplate")
     Assert(!InStr(TemplateBody, "`r`n"),
-        "PERSONAL_SHORTCUTS_TEMPLATE must use LF-only lines so first-run source matches the encoding contract")
+        "the hoisted template must use LF-only lines so first-run source matches the encoding contract")
+	Assert(InStr(EnsureBody, "Template := PersonalShortcutsTemplate()") > 0,
+		"cold bootstrap must use the complete hoisted template before menu globals initialize")
+}
+
+_PSGE_ReparseNeverRevealsIntermediateIcon() {
+	Src := _DriverSourceConcat()
+	Assert(Src != "", "driver source must be available")
+	Settle := InStr(Src, 'if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"]')
+	Reveal := InStr(Src, "A_IconHidden := false")
+	Assert(Settle > 0 and Reveal > Settle,
+		"settle the parse-time include before icon reveal so a necessary reparse has no transient icon")
 }
 
 Test("meta personal-shortcuts: generator writes BOM + LF source", _PSGE_UsesBomAndLf)
+Test("meta personal-shortcuts: intermediate reparse never reveals an icon (reload-icon-2026-10-02)",
+	_PSGE_ReparseNeverRevealsIntermediateIcon)

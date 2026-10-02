@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Boot Profiler
 ; DESCRIPTION:
-; Lightweight A_TickCount-based phase timing for startup diagnosis. The driver
+; Coarse phase marks plus precise QPC/CPU stage timing for startup diagnosis. The driver
 ; loads ~228 source files, registers thousands of hotstrings and builds a large
 ; tray menu at boot; when a user reports a slow start there was previously no
 ; way to see WHICH phase dominated. BootProfile_Mark emits one INFO line per
@@ -11,10 +11,12 @@
 ; log alone tells you where boot time goes — no profiler attach, no rebuild.
 ;
 ; FEATURES & RATIONALE:
-; 1. Zero behavioural impact: pure timing reads plus one INFO log per phase.
+; 1. Timing reads only: each named stage also records wall and process CPU time.
 ; 2. Fail-safe: every log call is wrapped so a profiler glitch can never abort
 ;    or delay boot — if the logger is not ready yet the mark is simply silent.
 ; ==============================================================================
+
+#Include ../adapters/boot_clock.ahk
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
@@ -35,17 +37,15 @@ BootProfile_Begin() {
 	_BOOT_PROFILE_START := A_TickCount
 	_BOOT_PROFILE_LAST  := _BOOT_PROFILE_START
 	try LoggerInfo("BootProfile", "Boot timing started.")
-	; Everything BEFORE this line is invisible to the A_TickCount marks below:
-	; AHK tokenises every #Include'd file (~228 sources incl. UIA/WebView2/sqlite3)
-	; BEFORE the first auto-execute line runs. The tray icon (hidden by #NoTrayIcon
-	; until the safe bootstrap tray is in place) cannot appear earlier than that, so
-	; when the user reports "the tray icon takes 1-2s to even appear", the cost is
-	; usually HERE, not in any logged phase — surface it as the very first mark.
+	; This aggregate includes parsing AND every initializer before LoggerInit.
+	; The first retroactive stamp isolates process-load time; later stamps split
+	; mutex acquisition, includes, onboarding and configuration work. Calling the
+	; whole interval parser time falsely attributed executable work to #Include.
 	try {
 		Uptime := BootProfile_ProcessUptimeMs()
 		if (Uptime >= 0)
 			LoggerInfo("BootProfile",
-				"Script parse + load (pre-boot, until the first statement runs): ~{1} ms.", Uptime)
+				"Pre-logger initialization (including script parse + load): ~{1} ms.", Uptime)
 		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
 	}
 }
@@ -82,7 +82,7 @@ _BootProfileStampStore(Op, PhaseName := "") {
 	; Upper bound on retroactive stamps. The pre-logger window has a handful of
 	; meaningful boundaries; a caller wanting more is measuring the wrong thing,
 	; and the cap keeps a runaway loop from growing this array unbounded.
-	static CAP := 12
+	static CAP := 64
 	static Stamps := []
 	if (Op == "push") {
 		if (Stamps.Length < CAP)
@@ -110,8 +110,8 @@ _BootProfileReplayStamps(ProcessStartTick) {
 	Origin := (ProcessStartTick > 0) ? ProcessStartTick : Stamps[1].Tick
 	Prev := Origin
 	for , Stamp in Stamps {
-		try LoggerInfo("BootProfile", "(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
-			Stamp.Name, TickElapsed(Prev, Stamp.Tick), TickElapsed(Origin, Stamp.Tick))
+		try LoggerInfo("BootProfile", Format("(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
+			Stamp.Name, TickElapsed(Prev, Stamp.Tick), TickElapsed(Origin, Stamp.Tick)))
 		Prev := Stamp.Tick
 	}
 }
@@ -130,7 +130,7 @@ BootProfile_Mark(PhaseName) {
 	Delta := TickElapsed(_BOOT_PROFILE_LAST, Now)
 	Total := TickElapsed(_BOOT_PROFILE_START, Now)
 	_BOOT_PROFILE_LAST := Now
-	try LoggerInfo("BootProfile", "{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total)
+	try LoggerInfo("BootProfile", Format("{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total))
 }
 
 ; Opens a named boot stage: one START line now, and a SUCCESS line with the
@@ -139,7 +139,8 @@ BootProfile_Mark(PhaseName) {
 ; was inside — a START with no SUCCESS names it.
 ; @param Name {String} Stage label, reused verbatim by BootProfile_StageEnd.
 BootProfile_StageBegin(Name) {
-	_BootStagesInFlight()[Name] := A_TickCount
+	_BootStagesInFlight()[Name] := { Tick: A_TickCount,
+		WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs() }
 	try LoggerStart("BootProfile", "Boot stage '{1}'…", Name)
 }
 
@@ -155,7 +156,8 @@ BootProfile_StageEnd(Name, Detail := "") {
 	}
 	Started := Open.Delete(Name)
 	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
-		Name, TickElapsed(Started, A_TickCount), Detail != "" ? ": " . Detail : "")
+		Name, TickElapsed(Started.Tick, A_TickCount), Detail != "" ? ": " . Detail : "")
+	_BootProfileStageResources(Name, Started)
 }
 
 ; Closes a stage that did not complete, as a WARNING rather than a SUCCESS.
@@ -163,9 +165,9 @@ BootProfile_StageEnd(Name, Detail := "") {
 ; @param Reason {String}
 BootProfile_StageAbort(Name, Reason) {
 	Open := _BootStagesInFlight()
-	Started := Open.Has(Name) ? Open.Delete(Name) : A_TickCount
+	Started := Open.Has(Name) ? Open.Delete(Name) : { Tick: A_TickCount }
 	try LoggerWarn("BootProfile", "Boot stage '{1}' did not complete after {2} ms: {3}.",
-		Name, TickElapsed(Started, A_TickCount), Reason)
+		Name, TickElapsed(Started.Tick, A_TickCount), Reason)
 }
 
 ; Milliseconds from process creation to now: the figure a user perceives as the
@@ -217,4 +219,15 @@ BootProfile_ProcessUptimeMs() {
 	Created := NumGet(Creation, 0, "Int64")
 	Now     := NumGet(NowFt, 0, "Int64")
 	return (Now - Created) // FILETIME_TICKS_PER_MS
+}
+
+; CPU versus precise wall time separates actual work from scheduler/I/O stalls.
+; These are stage-local differences; nested stages overlap and must not be summed.
+_BootProfileStageResources(Name, Started) {
+	WallMs := BootClockWallMs() - Started.WallMs
+	CpuMs := BootClockCpuMs()
+	CpuText := (CpuMs < 0 || Started.CpuMs < 0)
+		? "unknown" : Format("{:.3f}", CpuMs - Started.CpuMs)
+	try LoggerInfo("BootProfile", Format("Boot stage '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms.",
+		Name, WallMs, CpuText))
 }

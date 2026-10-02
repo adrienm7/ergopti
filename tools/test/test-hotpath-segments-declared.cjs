@@ -126,14 +126,28 @@ for (const [name, where] of declared) {
 // ==================================================
 // ==================================================
 
-// The five stamps taken BEFORE BootProfile_Begin, when the logger does not exist
+// The stamps taken BEFORE BootProfile_Begin, when the logger does not exist
 // yet: they record a tick only, and are replayed as log lines once it does.
 // Without them the whole span from process creation to BootProfile_Begin is one
 // opaque "script parse + load: ~N ms" with no attribution inside it.
 const BOOT_STAMPS = [
+	'Auto-execute entered', // Separate source loading from executable initializers.
+	'Single-owner gate completed', // Attribute contention with the previous driver.
 	'Bundle extracted',
+	'UIA include initialised', // Attribute the selection dependency's include work.
+	'Diagnostics and core state initialised', // Bound core auto-execute state.
+	'Adapters initialised', // Bound native adapter state initialization.
+	'Hotstring and TOML state initialised', // Bound parser and engine declarations.
+	'Manifest, updater and locale state initialised', // Attribute data-backed defaults.
+	'WebView and metrics UI state initialised', // Detect eager UI initialization.
+	'Keylogger modules initialised', // Separate sensor state from registration.
+	'LLM defaults loaded', // Attribute shared model defaults parsing.
 	'Module includes initialised',
+	'Paths and shared configuration loaded', // Attribute locator and shared defaults.
 	'Tray reset + onboarding',
+	'Configuration migration checked', // Attribute migration registry parsing.
+	'Configuration TOML snapshot parsed', // Attribute the cached configuration read.
+	'Script preferences applied', // Separate preference application from locale load.
 	'Config parsed (TOML + i18n)',
 	'Hotstring engine initialised'
 ];

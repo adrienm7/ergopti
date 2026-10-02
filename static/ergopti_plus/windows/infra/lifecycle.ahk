@@ -1170,6 +1170,7 @@ Ergopti_OnShutdown(reason, code) {
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
+	global _TrayRootBootDetailsPending
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
 	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
@@ -1213,6 +1214,11 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; by menu_rebuild.ahk, next to the IfDisabled gate).
 	if _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
 		SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
+	; Release navigation only after every timed build stage is closed, otherwise
+	; the user's menu-reading time is charged to construction.
+	_TrayRootBootDetailsPending := false
+	if IsSet(_TrayStartupClick)
+		_TrayStartupClick.NotifyReady()
 	return true
 }
 
@@ -1292,4 +1298,42 @@ ActivateKeyHistory(*) {
 }
 ShowHealthCheck(*) {
 		HealthCheck_ShowWindow()
+}
+
+/**
+ * Publishes global commands before scanning and rendering feature submenus.
+ * @returns {Boolean} Whether the root coordinator accepted the publication.
+ */
+BuildReadyTrayShell() {
+	global _TrayRootBootDetailsPending
+	_TrayRootBootDetailsPending := true
+	return RebuildTrayMenu(0, _TrayRootBuildShell, false)
+}
+
+; The manifest decides both the order and which rows belong to features. Global
+; commands remain usable while the ordinary boot worker stages its detached tree.
+; The shell uses the same publication owner and dispatcher as every later root.
+_TrayRootBuildShell(PublishAuthorizeFn) {
+	global _DriverReady, _LangMenuBuildPending
+	SavedReady := _DriverReady
+	_DriverReady := false
+	BootProfile_StageBegin("tray global commands")
+	try {
+		Published := initMenu(PublishAuthorizeFn, true)
+	} catch as Err {
+		TrayMenuStage_Abort()
+		BootProfile_StageAbort("tray global commands", Err.Message)
+		throw Err
+	} finally {
+		_DriverReady := SavedReady
+	}
+	if !((Published is Integer) && Published == 1) {
+		BootProfile_StageAbort("tray global commands", "publication refused")
+		return false
+	}
+	UpdateTrayIcon()
+	BootProfile_StageEnd("tray global commands", "published; feature submenus are pending")
+	LoggerInfo("BootProfile", Format("Tray global commands usable at {1} ms since process start.",
+		BootProfile_TotalBootMs()))
+	return true
 }

@@ -25,6 +25,8 @@ global _TrayFeatureHeadLabels := []
 global _TrayRootRequestedGeneration := 0
 global _TrayRootPublishedGeneration := 0
 global _TrayRootActive := false
+; The usable global root does not retire the paused boot's detailed publication
+global _TrayRootBootDetailsPending := false
 global _TrayRootLifecycleEpoch := 0
 global _TrayRootLatestAuthorizeFn := 0
 global _TrayRootLatestWorkerFn := 0
@@ -260,10 +262,11 @@ _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
 	global _TrayRootRequestedGeneration, _TrayRootActive
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
 	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
+	global _TrayRootBootDetailsPending
 	PreviousCritical := Critical("On")
 	try {
 		HadPendingRoot := _TrayRootRequestedGeneration
-			> _TrayRootPublishedGeneration
+			> _TrayRootPublishedGeneration || _TrayRootBootDetailsPending
 		_TrayRootRequestedGeneration += 1
 		RequestedGeneration := _TrayRootRequestedGeneration
 		; A narrow projection can safely reuse sibling submenus only when it owns
@@ -405,9 +408,11 @@ _TrayRootPublishAuthorized(TargetGeneration, LifecycleEpoch,
  */
 _TrayRootFirstPublicationPending() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootBootDetailsPending
 	if !IsSet(_TrayRootRequestedGeneration) || !IsSet(_TrayRootPublishedGeneration)
 		return false
-	return _TrayRootRequestedGeneration > 0 && _TrayRootPublishedGeneration == 0
+	return _TrayRootRequestedGeneration > 0
+		&& (_TrayRootPublishedGeneration == 0 || _TrayRootBootDetailsPending)
 }
 
 _TrayRootRelease(PublishedGeneration := 0) {
@@ -451,11 +456,15 @@ _TrayRootRetireFatal(TargetGeneration) {
 }
 
 _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
+	global _TrayRootBootDetailsPending
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
 	_HS_InvalidatePersonalCache()
 	InitSubMenus()
-	return initMenu(PublishAuthorizeFn)
+	Published := initMenu(PublishAuthorizeFn)
+	if ((Published is Integer) && Published == 1)
+		_TrayRootBootDetailsPending := false
+	return Published
 }
 
 _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {

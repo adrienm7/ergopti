@@ -76,7 +76,7 @@ BuildLanguageMenuDeferred() {
 }
 
 
-initMenu(PublishAuthorizeFn := 0) {
+initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
 	TrayMenuStage_Begin()
 	try {
@@ -93,7 +93,11 @@ initMenu(PublishAuthorizeFn := 0) {
 	; sequence of calls here, compared with the manifest by a log line only, ahead
 	; of a tail read from the manifest — so the declared order reached half of
 	; the tray, and a reordered top level changed the other two drivers alone.
-	_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
+	if GlobalsOnly {
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders(),
+			(Entry) => !Entry.Get("greyed_when_paused", false), t("common.loading"))
+	} else
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
 	BootProfile_Mark("MENU/initMenu: top level staged")
 	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
 	return Published
@@ -136,12 +140,21 @@ _MI_TopLevelBuilders() {
 ; will not see: it is reported, and the rest of the root still builds.
 ; @param TopLevel {Array} The manifest's top_level rows.
 ; @param Builders {Map} Id → builder that stages the row.
+; @param IncludeFn {Func} Optional projection filter for manifest rows.
+; @param StatusLabel {String} Optional inert status for a partial boot projection.
 ; @returns {Integer} How many rows were dispatched.
-_MI_StageTopLevel(TopLevel, Builders) {
+_MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
+	if (StatusLabel != "") {
+		TrayMenuStage_Add(StatusLabel, _TrayBootstrapNoOp)
+		TrayMenuStage_Disable(StatusLabel)
+		TrayMenuStage_Add()
+	}
 	Dispatched := 0
 	SeparatorPending := false
 	for _, Entry in TopLevel {
 		if !(Entry is Map) || !Entry.Has("id")
+			continue
+		if HasMethod(IncludeFn, "Call") && !IncludeFn.Call(Entry)
 			continue
 		Id := Entry["id"]
 		if (Id == "---") {
@@ -158,7 +171,14 @@ _MI_StageTopLevel(TopLevel, Builders) {
 			TrayMenuStage_Add()
 			SeparatorPending := false
 		}
-		Builders[Id].Call()
+		BootProfile_StageBegin("menu row " . Id)
+		try {
+			Builders[Id].Call()
+			BootProfile_StageEnd("menu row " . Id)
+		} catch as Err {
+			BootProfile_StageAbort("menu row " . Id, Err.Message)
+			throw Err
+		}
 		Dispatched += 1
 	}
 	return Dispatched

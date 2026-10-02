@@ -832,6 +832,23 @@ sizing a prepared surface; keep the reveal explicit. A source assertion that
 only finds `Show("Hide` cannot prove invisibility. Check the native window after
 construction and after repositioning, as in the tooltip hidden-surface test.
 
+### project-startup-probe-parse-time-isolation
+
+Personal shortcut forwarders are parsed from both the driver's generated path
+and LOCALAPPDATA before auto-execute can redirect configuration. A wrapper with
+a temporary configuration alone can rewrite the live generated include. Copy
+the driver code and isolate LOCALAPPDATA in the child's environment before
+launch; detach any read-only junctions before removing the private fixture.
+
+### project-native-menu-blocks-startup
+
+An early native tray menu can suspend auto-execute and disables AHK timers until
+navigation ends. Deferred construction cannot make progress behind that menu.
+Use a modeless surface before full publication, then hand off after closing all
+build timing stages. Invalidate scheduled handoffs when the surface is dismissed
+or its command is accepted; clearing only the pending Boolean is too late once
+a callback has been scheduled.
+
 ### project-tooltip-two-hwnd-zorder
 
 `ShowWindow` with `SW_SHOWNOACTIVATE` reveals a window in the z-order slot it
