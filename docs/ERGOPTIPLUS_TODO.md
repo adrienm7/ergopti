@@ -501,7 +501,10 @@ is committed; one request is one commit with its regression test.
   The Windows bulk owner now limits action-parameter cleanup to known
   catalogue pairs, preserving future pair parameters as well as their
   slots. Both existing native preservation assertions remain intact.
-  Native CI validation of this menu fix is pending. Remaining:
+  The menu fix passed full three-OS checkpoint
+  [37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
+  at `b92d9dec8`: unit tests, E2E, packaging and installation, with release
+  publication skipped. Remaining:
   (a) the chord slot (both keys within the simultaneity delay), with its
   symmetry, its delay and « copy tap to chord »: the first key of a chord
   must wait for the second, while every Windows tap-hold owner takes its
@@ -650,31 +653,6 @@ exact-boolean regressions also pass the focused runner.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.
-- [~] **103.** Move the common "Distance reduction" hotstrings into the
-  Ergopti+ extension: these bindings depend on the layout rather than being
-  common to every user. Extensions own their hotstrings, shortcuts and
-  layouts. Migrate existing category/section choices without duplication
-  or enabling a previously disabled group, and cover source ownership,
-  menu placement and runtime loading on all three OSes.
-  The 101 historical rules now belong to the Ergopti+ extension through
-  the existing whole-category binding, retaining the common priority tier
-  and all feature identifiers. An independent corpus captured from
-  `58c6b05cb` preserves every rule, flag, localized description, section
-  order and delay. Native loaders replay this corpus; native owner cases
-  retain user-source precedence and disabled choices across reloads.
-  The French distance category remains independent and bundled. Shared
-  registry checks cover menu placement, absent-extension behavior and
-  unchanged opt-in defaults. Local validation passes all 349 JS checks,
-  12,846 macOS unit tests, 4,600 Linux unit tests and 97/142 macOS/Linux E2E
-  scenarios. Full native Windows and three-OS CI validation
-  is still required before closing this item. The first CI run exposed a
-  stale Windows cache catalogue; it now reads the shared category order
-  and invalidates its persisted cache when the index changes. Native
-  reference fixtures use the real path and typed Boolean writer. The
-  complete three-OS rerun must pass before this item can close. Native
-  fixtures now isolate resolver caches, read group gates through the real
-  boot owner rather than the stubbed feature tree, and supply the shared
-  index to cache freshness/header scenarios without changing assertions.
 - [ ] **104.** Split the common autocorrections file into meaningful, separately
       selectable sections and replace its misleading submenu/section labels.
       Classify the actual corrections first; preserve matching priority,
