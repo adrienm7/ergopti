@@ -120,8 +120,8 @@ _LPRS_StaleNavigationRepaintNeverHidesCurrentPixels() {
 		"_TooltipHideSurfaceObjects(RetiredSurface)", true, RetryPos)
 	SwapPos := InStr(Present,
 		"_TooltipActiveSurface := PreparedSurface", true, RetryPos)
-	RevealPos := InStr(Present,
-		"_TooltipRevealPreparedSurfaces(PreparedSurface)", true, RetryPos)
+	RevealPos := RegExMatch(Present,
+		"_TooltipRevealPreparedSurfaces\(\s*PreparedSurface(?:\s*,|\s*\))", , RetryPos)
 	Assert(BeginPos > 0 and RetryPos > BeginPos
 		and RetirePos > RetryPos and HidePos > RetryPos
 		and SwapPos > RetryPos and RevealPos > RetryPos,

@@ -1041,6 +1041,7 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("a metrics projection worker is still alive")
 		}
 		LoggerReady := false
+		try _TooltipLogRenderAccounting("shutdown preflight")
 		try LoggerReady := LoggerPrepareShutdown()
 		catch as Err
 			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)

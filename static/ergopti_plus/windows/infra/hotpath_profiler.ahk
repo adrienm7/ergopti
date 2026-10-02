@@ -70,10 +70,10 @@ global _HOTPATH_NEST_TRACK_CAP := 16
 ; Upper bound on the sub-steps one segment may attribute. A segment with more
 ; parts than this is not a segment any more, and the cap keeps the accumulator
 ; allocation-free in the steady state.
-; _TooltipPresentStack currently emits 15 marks. The cap must exceed the largest
+; _TooltipPresentStack currently emits 19 marks including transitive reveal. The cap must exceed the largest
 ; instrumented transaction or its tail labels are silently discarded while the
 ; QPC work is still paid. Guarded by test_tooltip_present_subsegmented.ahk.
-global _HOTPATH_BREAKDOWN_CAP := 16
+global _HOTPATH_BREAKDOWN_CAP := 24
 
 
 
