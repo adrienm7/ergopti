@@ -83,7 +83,9 @@ _WSERG_AssertGuardClearedInFinally() {
 	Assert(InStr(Body, "finally") > 0,
 		"WebView_SharedEnvironment must close synchronous setup ownership in a finally block")
 
-	FinallyPos := InStr(Body, "finally")
+	; The foreground join also has a finally; creation owns the last one.
+	FinallyPos := InStr(Body, "} finally {", true, -1)
+	Assert(FinallyPos > 0, "creation must retain its terminal finally block")
 	FinallyBody := SubStr(Body, FinallyPos, 300)
 	OwnerCheck := InStr(FinallyBody, "_WebView_SharedEnvBootPromise == 0")
 	ClearGuard := InStr(FinallyBody, "_WebView_SharedEnvCreating := false")
@@ -177,3 +179,108 @@ _WSERG_SharedBootHasFiniteDeadline() {
 Test("webview_utils: shared environment boot has a finite deadline "
 	. "(webview-shared-env-unbounded-await)",
 	_WSERG_SharedBootHasFiniteDeadline)
+
+_WSERG_WarmupFixture() {
+	State := {Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		Calls: [], EnvironmentCalls: 0, ControllerCalls: 0}
+	State.Controller := {IsVisible: true, Close: (*) => State.Calls.Push("close")}
+	Owner := WebViewBrowserWarmup(
+		(*) => (State.EnvironmentCalls += 1, State.Env),
+		(Env, Hwnd) => (State.ControllerCalls += 1, State.ControllerPromise),
+		(*) => {Hwnd: 123, Destroy: (*) => State.Calls.Push("destroy")})
+	return {Owner: Owner, State: State}
+}
+
+_WSERG_AsyncWarmupOwnsOneChain() {
+	Fixture := _WSERG_WarmupFixture()
+	Owner := Fixture.Owner
+	State := Fixture.State
+	try {
+		AssertTrue(Owner.Begin())
+		AssertFalse(Owner.Begin())
+		AssertEqual(1, State.EnvironmentCalls)
+		AssertEqual(0, State.ControllerCalls, "Begin never awaits its unresolved environment")
+		State.Env.Resolve({})
+		AssertEqual(1, State.ControllerCalls)
+		AssertEqual(0, State.Calls.Length)
+		State.ControllerPromise.Resolve(State.Controller)
+		AssertFalse(State.Controller.IsVisible)
+		AssertTrue(Owner.Controller == State.Controller)
+		AssertTrue(Owner.Stop())
+		AssertFalse(Owner.Stop())
+		AssertEqual("close", State.Calls[1])
+		AssertEqual("destroy", State.Calls[2], "host remains alive until controller Close")
+		AssertEqual(2, State.Calls.Length, "retirement runs once")
+	} finally Owner.Stop()
+}
+Test("webview_utils: browser warmup dispatches one async retained chain (webview-browser-warmup)",
+	_WSERG_AsyncWarmupOwnsOneChain)
+
+_WSERG_WarmupLateCompletion() {
+	for StopAt in ["environment", "controller"] {
+		Fixture := _WSERG_WarmupFixture()
+		Owner := Fixture.Owner
+		State := Fixture.State
+		try {
+			Owner.Begin()
+			if StopAt == "controller"
+				State.Env.Resolve({})
+			Owner.Stop()
+			if StopAt == "environment" {
+				State.Env.Resolve({})
+				AssertEqual(0, State.ControllerCalls, "late environment cannot create another native owner")
+				AssertEqual("destroy", State.Calls[1])
+			} else {
+				AssertEqual(0, State.Calls.Length, "pending controller retains its hidden HWND")
+				State.ControllerPromise.Resolve(State.Controller)
+				AssertEqual("close", State.Calls[1])
+				AssertEqual("destroy", State.Calls[2])
+			}
+			AssertEqual(0, Owner.Controller, "late completion cannot publish a retained controller")
+		} finally Owner.Stop()
+	}
+}
+Test("webview_utils: late warmup completions close before host retirement (webview-browser-warmup)",
+	_WSERG_WarmupLateCompletion)
+
+_WSERG_ForegroundJoinsBackground() {
+	global _WebView_SharedEnv, _WebView_SharedEnvCreating, _WebView_SharedEnvBootPromise
+	global _WebView_SharedEnvBackground, _WebView_SharedEnvBackgroundAwaiting
+	global _WebView_SharedEnvRetired
+	Saved := [_WebView_SharedEnv, _WebView_SharedEnvCreating, _WebView_SharedEnvBootPromise,
+		_WebView_SharedEnvBackground, _WebView_SharedEnvBackgroundAwaiting, _WebView_SharedEnvRetired]
+	try {
+		_WebView_SharedEnvRetired := false
+		_WebView_SharedEnv := 0
+		_WebView_SharedEnvCreating := true
+		_WebView_SharedEnvBootPromise := _WSERG_NeverCompletes()
+		_WebView_SharedEnvBackground := true
+		_WebView_SharedEnvBackgroundAwaiting := false
+		TimedOut := false
+		try WebView_SharedEnvironment("fixture-loader", (*) => _MSC_Throw())
+		catch as Err
+			TimedOut := Err is TimeoutError
+		AssertTrue(TimedOut, "foreground joins the owned background promise without creating an environment")
+		AssertFalse(_WebView_SharedEnvBackgroundAwaiting, "timeout releases only foreground wait ownership")
+		AssertTrue(_WebView_SharedEnvCreating, "the outstanding COM creation remains owned")
+		_WebView_SharedEnvBackgroundAwaiting := true
+		Refused := false
+		try WebView_SharedEnvironment("fixture-loader")
+		catch as Err
+			Refused := !(Err is TimeoutError)
+		AssertTrue(Refused, "nested foreground waits must fail fast")
+		_WebView_SharedEnvRetired := true
+		_WebView_SharedEnvironmentSettled(_WebView_SharedEnvBootPromise, true, {})
+		AssertEqual(0, _WebView_SharedEnv, "late environment completion cannot publish after shutdown")
+		AssertFalse(_WebView_SharedEnvCreating, "terminal completion still releases creation ownership")
+	} finally {
+		_WebView_SharedEnv := Saved[1]
+		_WebView_SharedEnvCreating := Saved[2]
+		_WebView_SharedEnvBootPromise := Saved[3]
+		_WebView_SharedEnvBackground := Saved[4]
+		_WebView_SharedEnvBackgroundAwaiting := Saved[5]
+		_WebView_SharedEnvRetired := Saved[6]
+	}
+}
+Test("webview_utils: foreground joins background creation without nested awaiting (webview-browser-warmup)",
+	_WSERG_ForegroundJoinsBackground)

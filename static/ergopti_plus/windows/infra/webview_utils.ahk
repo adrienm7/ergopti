@@ -11,14 +11,8 @@
 ; Shared helper functions for WebView2 instances.
 ; ==============================================================================
 
-; A single WebView2 environment shared by every short-lived UI window for the
-; whole session. Creating an environment boots an Edge/Chromium browser process,
-; the expensive part (seconds under RAM pressure). Reusing one environment for
-; every window means each new window only spins up a cheap controller, all
-; windows share ONE browser process (lower peak RAM), and the on-disk cache is
-; reused across opens -- so the second and later opens are near-instant even on a
-; RAM-starved machine. Booted lazily on the first WebView open, cached for the
-; rest of the session.
+; Environment objects share profile settings; a retained real-HWND controller
+; keeps the browser alive. Environment creation alone does not boot Chromium.
 global _WebView_SharedEnv := 0
 
 ; True while a CreateEnvironmentAsync boot is in flight. Promise.await() pumps
@@ -30,6 +24,9 @@ global _WebView_SharedEnv := 0
 ; ``finally`` so a boot failure cannot leave a waiting caller stuck forever.
 global _WebView_SharedEnvCreating := false
 global _WebView_SharedEnvBootPromise := 0
+global _WebView_SharedEnvBackground := false
+global _WebView_SharedEnvBackgroundAwaiting := false
+global _WebView_SharedEnvRetired := false
 
 ; A lost or wedged WebView2 COM completion must not freeze AHK's only
 ; interpreter indefinitely. The host catches the propagated TimeoutError and
@@ -61,6 +58,10 @@ global WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"
 WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR
 	global _WebView_SharedEnvBootPromise, WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS
+	global _WebView_SharedEnvBackground, _WebView_SharedEnvBackgroundAwaiting
+	global _WebView_SharedEnvRetired
+	if _WebView_SharedEnvRetired
+		throw Error("Shared browser ownership has retired")
 	; Warm path -- reuse the already-running browser process.
 	if _WebView_SharedEnv
 		return _WebView_SharedEnv
@@ -71,6 +72,12 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	; Fail this second open immediately so its normal native/unavailable fallback
 	; runs; the first owner publishes the shared environment when it completes.
 	if _WebView_SharedEnvCreating {
+		if _WebView_SharedEnvBackground && !_WebView_SharedEnvBackgroundAwaiting
+				&& IsObject(_WebView_SharedEnvBootPromise) {
+			_WebView_SharedEnvBackgroundAwaiting := true
+			try return _WebView_SharedEnvBootPromise.await(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS)
+			finally _WebView_SharedEnvBackgroundAwaiting := false
+		}
 		throw Error("WebView shared environment is still initializing")
 	}
 
@@ -124,14 +131,17 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 
 _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 	global _WebView_SharedEnv, _WebView_SharedEnvCreating
-	global _WebView_SharedEnvBootPromise
+	global _WebView_SharedEnvBootPromise, _WebView_SharedEnvBackground, _WebView_SharedEnvRetired
 	if (_WebView_SharedEnvBootPromise !== BootPromise)
 		return
-	if Succeeded
+	if Succeeded && !_WebView_SharedEnvRetired
 		_WebView_SharedEnv := Value
 	_WebView_SharedEnvBootPromise := 0
 	_WebView_SharedEnvCreating := false
+	_WebView_SharedEnvBackground := false
 }
+
+#Include webview_browser_warmup.ahk
 
 
 ; Below this much free physical RAM (MiB), a WebView window that has a native

@@ -387,7 +387,8 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 			; is handing over, so a Menu passed where row data was expected fails
 			; here instead of rendering an empty submenu.
 			TargetMenu.Add(Label, Row["submenu"])
-		} else if (Row.Has("action") and Row["action"] is Func and !Greyed) {
+		} else if (Row.Has("action") and (Row["action"] is Func
+				or Row["action"] is MenuStartupUiCommand) and !Greyed) {
 			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"])
 			if RequireTracking && Tracked != 1
 				throw Error("Native leaf command registration was refused")

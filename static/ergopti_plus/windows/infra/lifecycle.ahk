@@ -1143,6 +1143,9 @@ Ergopti_OnShutdown(reason, code) {
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
 		try _HC_Close()
+		try WebView_StopBrowserWarmup()
+		catch as Err
+			try LoggerError("Lifecycle", "Shared browser warmup teardown failed: {1}.", Err.Message)
 		try OllamaWV_Close()
 		try _Updater_AbortStagingOnExit()
 		if (TerminalHandoff is Map) {

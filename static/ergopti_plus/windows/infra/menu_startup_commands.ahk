@@ -25,6 +25,23 @@ class MenuStartupSafeCommand {
 	}
 }
 
+/** Admits a read-only window after its cleanup owner exists, before input readiness. */
+class MenuStartupUiCommand extends MenuStartupSafeCommand {
+	__New(Callback, ReadyFn) {
+		super.__New(Callback)
+		if !HasMethod(ReadyFn, "Call")
+			throw TypeError("Early UI commands require their own readiness owner")
+		this.ReadyFn := ReadyFn
+	}
+}
+
+/** Certifies diagnostic cleanup independently of hotstring registration. */
+MenuStartupDiagnosticsReady() {
+	global _DriverUiCleanupReady, _DriverMenuReady
+	return IsSet(_DriverUiCleanupReady) && _DriverUiCleanupReady
+		&& IsSet(_DriverMenuReady) && _DriverMenuReady
+}
+
 /** Retains bounded command intents until input initialization genuinely completes. */
 class MenuStartupCommands {
 	__New(ReadyFn, ScheduleFn := 0) {
@@ -151,6 +168,8 @@ MenuStartupCommands_Defer(Callback, Args, Registration := 0) {
 		return false
 	if !(_MenuStartupCommands is MenuStartupCommands)
 		throw TypeError("Startup menu commands require a valid admission owner")
+	if Callback is MenuStartupUiCommand
+		return !Callback.ReadyFn.Call() && _MenuStartupCommands.Retain(Callback, Args, Registration)
 	return !(Callback is MenuStartupSafeCommand)
 		&& _MenuStartupCommands.Retain(Callback, Args, Registration)
 }

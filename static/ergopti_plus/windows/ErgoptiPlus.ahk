@@ -1150,6 +1150,13 @@ TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
 #Include infra/lifecycle.ahk
+; Cleanup must own windows before the configured menu admits diagnostic clicks.
+; Empty, uninitialized metrics now pass the reversible persistence preflight.
+OnExit(Ergopti_OnShutdown, -1)
+global _DriverUiCleanupReady := true
+LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu publication.")
+if _DriverStartupSmokeDir == ""
+	WebView_BeginBrowserWarmup()
 global _FmtCountCache := Map()
 global _DriverInputInitPending := true
 global _DriverMenuReady := false
@@ -1204,7 +1211,7 @@ if ConfigFullStateCanPersist() {
 ; click-toggle cross-release, LLM tooltip dismiss-on-click). None of those are
 ; gated by the keylogger/metrics flag, so Start() must be unconditional here.
 ; Start() is idempotent (guarded by _started), so a stray second call is harmless.
-; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
+; HookDispatcher.Stop() is called by Ergopti_OnShutdown (already registered via
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
 ; can trigger a "hook already released" error on some AHK builds.
 BootProfile_StageBegin("keyboard hook")
@@ -1262,16 +1269,6 @@ if MetricsShortcuts.enabled {
 
 BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keylogger and sensors started" : "metrics disabled")
 BootProfile_Mark("Metrics/keylogger started")
-; Register the global shutdown handler now that the keylogger is up — Reload()/
-; ExitApp() run only OnExit callbacks, so this is the single seam that flushes the
-; RAM-buffered metrics (KL_Stop) before the process tears down. Registered
-; unconditionally: the handler is fully try-wrapped and KL_Stop is a no-op when
-; metrics are disabled (Keylogger.initialized stays false).
-; Prepend the refusal-capable lifecycle callback ahead of the logger flush.
-; Returning nonzero must stop every later callback before any teardown occurs;
-; on acceptance the logger remains last and persists terminal cleanup logs.
-OnExit(Ergopti_OnShutdown, -1)
-LoggerInfo("ErgoptiPlus", "Shutdown handler registered; the configured tray menu is already available.")
 
 
 
