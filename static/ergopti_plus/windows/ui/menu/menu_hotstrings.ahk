@@ -770,9 +770,6 @@ _HS_PersonalRows(Options := unset) {
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
 		PersonalRows.Push(Map("separator", true))
-		; A row with a label and nothing else renders inert and greyed — which is
-		; what this shortcut reminder is: it states the trigger, it is not a button.
-		PersonalRows.Push(Map("label", t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]))
 
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultRows := []

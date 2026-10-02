@@ -767,15 +767,18 @@ exact-boolean regressions also pass the focused runner.
       Share the policy and behavior vectors wherever another driver supports
       number-row remapping, documenting genuine platform limits.
 
-- [ ] **108.** Retire the greyed Win+magic-key editor-shortcut row from
-      Hotstrings > Personal hotstrings, along with its dedicated binding owner.
-      Recommend the hotstrings-editor action in Shortcuts > Win shortcuts
-      instead, through the ordinary user-owned assignment model. The user can
-      delete it, change it or assign the same action elsewhere; do not force a
-      fixed shortcut or replace an existing personal assignment. Account for
-      the chosen physical magic-key source, migrate any owned legacy setting
-      deliberately and cover neutral/recommended scopes, menu placement,
-      assignment removal/rebinding and editor invocation across drivers.
+- [~] **108.** Retire the fixed Win+magic editor shortcut in favour of ordinary
+  user-owned Shortcuts assignments. Windows now removes the inert personal
+  menu reminder and the dedicated layout hotkey; physical remap and Ctrl+save
+  remain. The existing shared neutral `win_d = none` and recommended editor
+  action use the standard assignment owner. Native regressions preserve a
+  custom Win+D, assign the editor elsewhere, explicitly recommend it, remove
+  and rebind it, refuse failed writes, and retain unrelated settings and pause.
+  JS mutations protect the neutral and recommended declarations. Native CI
+  remains pending. Physical-source-aware recommendations need a deliberately
+  shared physical-slot contract and registrar coexistence; macOS's persisted
+  legacy shortcut still requires an acknowledged migration. Do not invent a
+  Windows migration or overwrite personal assignments.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in

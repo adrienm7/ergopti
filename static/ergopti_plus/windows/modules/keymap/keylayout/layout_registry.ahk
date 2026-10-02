@@ -516,7 +516,8 @@ LayoutRegistry_MagicKeySource(Inputs) {
  * (modules/keymap/layout.ahk registers them). The key a layout declares,
  * detected or shipped, is the layout's own magic-key position: its other levels
  * follow the source character (Shift types its capital, Ctrl and Alt its
- * shortcuts), Ctrl+★ may save and Win+★ opens the personal editor. A key the
+ * shortcuts), and Ctrl+★ may save. Editor shortcuts belong to the ordinary
+ * user-owned keyboard slots, never the physical magic-key owner. A key the
  * user chose is a key of the layout they type on: only its plain press becomes
  * the magic key, and every level and chord stays the layout's, as on macOS and
  * Linux (_shared/lua/keymap/magic_key_source.lua).
@@ -524,8 +525,7 @@ LayoutRegistry_MagicKeySource(Inputs) {
  * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
  * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
  * @returns {Array} Maps of "kind" ("remap": every level through RemapKey,
- *   "magic": the plain press alone, "ctrl_save": Ctrl+S, "editor": the personal
- *   editor, registered under the replace section's criterion) and "hotkey".
+ *   "magic": the plain press alone, "ctrl_save": Ctrl+S) and "hotkey".
  */
 LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
 	if Chosen
@@ -533,7 +533,6 @@ LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
 	Hotkeys := [Map("kind", "remap", "hotkey", Scan)]
 	if CtrlSave
 		Hotkeys.Push(Map("kind", "ctrl_save", "hotkey", "^" . Scan))
-	Hotkeys.Push(Map("kind", "editor", "hotkey", "#" . Scan))
 	return Hotkeys
 }
 
