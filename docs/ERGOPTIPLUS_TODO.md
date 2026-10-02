@@ -656,10 +656,13 @@ branch has been removed; the run also covers the 21-locale privacy label.
       registry id. Update the shared naming owner and all applicable locale
       labels, and assert the rendered label on Windows/macOS/Linux.
 
-- [ ] **110.** Recommend monitor-local Alt+Tab for the Windows four-finger
-      tap gesture. Change its authoritative recommended action and generated
-      projections, preserve an existing personal assignment, and test the
-      recommended-scope/wizard import and actual action-dispatch binding.
+- [~] **110.** Windows four-finger tap now recommends monitor-local Alt+Tab
+      from the shared feature manifest and its generated wizard catalogue.
+      Startup stays neutral and loading keeps a personal assignment. The JS
+      regression refused the old screenshot recommendation; native tests cover
+      wizard admission, actual local/global recommended-scope writes, saved
+      assignment loading and the catalogue callback activating an owned window.
+      Finish after the native CI checkpoint passes.
 
 The shared Shortcuts declaration separates modifier-shortcut groups from key
 combinations. Linux currently omits the combinations group, so the same boundary

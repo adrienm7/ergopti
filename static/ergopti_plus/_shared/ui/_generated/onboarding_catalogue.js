@@ -1863,7 +1863,7 @@
 									},
 									{
 										"path": "gestures.tap_4",
-										"value": "screenshot_window_clipboard",
+										"value": "alt_tab_monitor",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1873,7 +1873,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.screenshot_window_clipboard"
+												"key": "sg_actions.alt_tab_monitor"
 											}
 										]
 									}

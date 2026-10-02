@@ -42,6 +42,12 @@ const WINDOWS_SLOTS_FILE = 'windows/modules/gestures/constants.ahk';
 
 const errors = [];
 
+// This user-visible Windows recommendation must not change another platform.
+if (manifestDefaults('ahk').get('tap_4') !== 'alt_tab_monitor')
+	errors.push('Windows four-finger tap must recommend monitor-local Alt-Tab.');
+if (manifestDefaults('hs').get('tap_4') !== 'win_app_next')
+	errors.push('The Windows four-finger recommendation must preserve the macOS application switch.');
+
 // ==================================================
 // ==================================================
 // ======= 1/ The manifest ==========================
