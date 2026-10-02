@@ -284,6 +284,17 @@ paused. Recheck suspension at dispatch and completion boundaries.
 Raw AHK tray callbacks have historically dropped clicks on this driver. Every
 actionable item goes through `RegisterMenuItem` and the menu dispatcher.
 
+### project-ahk-owned-test-menu-tree-teardown
+
+Deleting a test menu's top-level rows detaches its live submenus. Dispatcher
+callbacks that capture those submenu/parent objects then survive until AHK exit
+teardown, which can end with STATUS_HEAP_CORRUPTION after all assertions pass.
+Release the owned descendants while holding their Menu objects, clear their
+rows, and prune their registrations before clearing the parent; see
+`_CTC_ReleaseMenu`. Preserve foreign detached registrations: the production
+dispatcher deliberately uses ownership beyond tray reachability, so clearing
+its global maps would hide a different bug.
+
 ### project-ahk-sendinput-falls-back-to-sendevent
 
 SendInput removes the script's own keyboard hook only while no other AutoHotkey

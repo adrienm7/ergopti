@@ -263,6 +263,8 @@ jobs:
               if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
               $out = "$env:TEMP\$name.out"
               $err = "$env:TEMP\$name.err"
+              # Keep the main suite's TAP intact for its later annotation.
+              $env:ERGOPTI_AHK_RESULTS_FILE = Join-Path $env:RUNNER_TEMP "windows-ahk-isolated-$name.txt"
               # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
               # binary, so a direct invocation returns neither the exit code nor
               # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
@@ -272,6 +274,10 @@ jobs:
               if (Test-Path $out) { Get-Content $out | Write-Host }
               if (Test-Path $err) { Get-Content $err | Write-Host }
               if ($proc.ExitCode -ne 0) { $failed += 1 }
+              $manifestFile = Join-Path $env:RUNNER_TEMP "windows-ahk-isolated-$name.json"
+              node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
+                  --input $env:ERGOPTI_AHK_RESULTS_FILE --json $manifestFile
+              if ($LASTEXITCODE -ne 0) { $failed += 1 }
           }
           if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }
 
@@ -296,7 +302,9 @@ jobs:
         with:
           overwrite: true
           name: windows-ahk-execution-manifest
-          path: ${{ runner.temp }}/windows-ahk-execution-manifest.json
+          path: |
+            ${{ runner.temp }}/windows-ahk-execution-manifest.json
+            ${{ runner.temp }}/windows-ahk-isolated-*.json
           if-no-files-found: warn
 
       - name: Check for AHK compiler warnings
