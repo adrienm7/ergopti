@@ -42,12 +42,14 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 		global _TooltipActiveSurface, _LLM_AcceptInProgress
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
 		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+		global _SR_ActiveTasks
 		Saved := {
 			Live: _LLM_Live, Active: _LLM_Bridge_Active,
 			Coordinator: _LLM_MenuBuildCoordinator, Surface: _TooltipActiveSurface,
 			Accepting: _LLM_AcceptInProgress,
 			Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
-			Text: _Stub_LlmTooltipText, Record: _Stub_LlmPresentedRecord
+			Text: _Stub_LlmTooltipText, Record: _Stub_LlmPresentedRecord,
+			Tasks: _SR_ActiveTasks.Count
 		}
 		Builds := []
 		try {
@@ -68,6 +70,7 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			_LLM_Engine["instant_on_word_end"] := false
 			Body(Calls, Lines, Builds)
 		} finally {
+			LLM_Bridge_CancelPrefixObserver()
 			LLM_Engine_CancelTimer()
 			_Stub_LlmPresentedRecord := Saved.Record
 			_Stub_LlmTooltipText := Saved.Text
@@ -79,6 +82,8 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			_LLM_Bridge_Active := Saved.Active
 			_LLM_Live := Saved.Live
 		}
+		AssertEqual(Saved.Tasks, _SR_ActiveTasks.Count,
+			"the live-mode fixture must not launch a native positioning worker")
 	}
 }
 
@@ -89,11 +94,16 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 _LLV_Toggle(Value, &Notice := "") {
 	global GestureActionParameters, LLV_BINDING, _TooltipActiveSurface
 	GestureActionParameters[GestureActionParameterKey(LLV_BINDING, "llm_live_prompt_toggle")] := Value
-	Result := GestureInvokeAction("llm_live_prompt_toggle", LLV_BINDING)
-	Notice := _LPP_PendingNotice()
-	TooltipHide("LiveModeTest", true)
-	_TooltipActiveSurface := 0
-	return Result
+	; Capture and retire this notice before the next-turn render can query the
+	; user's foreground control. This fixture tests the AI owner, not native paint.
+	PreviousCritical := Critical("On")
+	try {
+		Result := GestureInvokeAction("llm_live_prompt_toggle", LLV_BINDING)
+		Notice := _LPP_PendingNotice()
+		TooltipHide("LiveModeTest", true)
+		_TooltipActiveSurface := 0
+		return Result
+	} finally Critical(PreviousCritical)
 }
 
 ; One keystroke of the automatic trigger: the buffer grows, the engine arms
@@ -125,10 +135,17 @@ _LLV_System(ProfileId, Count, MinWords) {
 ; running: Critical keeps the real timer from firing before it is cancelled.
 ; @returns {Object} { Fn, Active } the pending callback and the armed flag.
 _LLV_CaptureRealTimer(Action) {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Bridge_PrefixObserver
 	PreviousCritical := Critical("On")
 	try {
 		Action.Call()
+		; A hotstring now defers ancillary work until its atomic input commit ends.
+		; Drive that exact owner before capturing the resulting prediction timer.
+		if IsObject(_LLM_Bridge_PrefixObserver) {
+			Owner := _LLM_Bridge_PrefixObserver
+			TimerSetCallback(Owner.Timer, 0)
+			_LLM_Bridge_RunPrefixObserver(Owner)
+		}
 		Captured := { Fn: _LLM_Engine["pending_timer"], Active: _LLM_Engine["timer_active"] }
 		LLM_Engine_CancelTimer()
 	} finally {

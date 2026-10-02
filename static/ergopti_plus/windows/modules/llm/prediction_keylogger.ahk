@@ -52,10 +52,13 @@ _LLM_Engine_CaptureAcceptSource() {
  * Callers (llm_bridge.ahk) pass the current typed buffer.
  * @param {string} buffer - Full typed context up to the caret.
  */
-LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer) {
+LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
+		PublishGuard := unset) {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
 		if !_LLM_Engine["enabled"]
 			return
 
@@ -66,7 +69,9 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer) 
 		; blocked Ollama's single queue behind stale work, draining for many seconds
 		; after the user stopped typing — the lingering-spinner parity bug. Windows
 		; previously cancelled only the debounce timer here.
-		LLM_Engine_CancelInflight()
+		LLM_Engine_CancelInflight(IsSet(PublishGuard) ? PublishGuard : (*) => true)
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
 
 		; Arm debounce timer — closure captures the full buffer AND its focused
 		; control. PromptBuilder (macOS parity) derives capped context + tail
@@ -75,6 +80,8 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer) 
 		; Live mode redirects this same trigger to its own prompt, count and
 		; debounce; the override is bound with the buffer like the focus origin.
 		AcceptSource := _LLM_Engine_CaptureAcceptSource()
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
 		_LLM_Engine["last_buffer"] := buffer
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource,
 			LLM_Engine_LiveOverride())
@@ -194,6 +201,8 @@ LLM_Engine_IsBusy() {
  */
 LLM_Engine_StopGeneration() {
 	global _LLM_Engine
+	if IsSet(LLM_Bridge_CancelPrefixObserver)
+		LLM_Bridge_CancelPrefixObserver()
 	local _c := Critical("On")
 	NewRequestId := -1
 	try {
@@ -233,10 +242,12 @@ LLM_Engine_StopGeneration() {
  * superseded request before re-arming. StopGeneration (which also cancels the timer
  * and drops the cache) stays for the heavier nav-reset / pause path.
  */
-LLM_Engine_CancelInflight() {
+LLM_Engine_CancelInflight(PublishGuard := unset) {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
 		if IsSet(_LLM_Engine) {
 			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 			_LLM_Engine["active_request_signature"] := ""

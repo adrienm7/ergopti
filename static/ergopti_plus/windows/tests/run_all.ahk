@@ -594,6 +594,7 @@ _LogBootProgress("loading LLM modules")
 ; llm_bridge.ahk is needed by the canonical HSE -> LLM effect behaviour tests.
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
+#Include unit/test_prefix_char_admission.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk

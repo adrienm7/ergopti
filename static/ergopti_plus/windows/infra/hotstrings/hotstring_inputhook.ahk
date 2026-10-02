@@ -934,6 +934,8 @@ HotstringPrefixWatcherRebuildIndex() {
 HotstringPrefixWatcherStop() {
 	global _PrefixInputHook, _PrefixIndex
 	TooltipPositionWarmStop()
+	if IsSet(LLM_Bridge_CancelPrefixObserver)
+		LLM_Bridge_CancelPrefixObserver()
 	; Stop is a terminal lifecycle boundary (the sole production caller is the
 	; global shutdown handler). Retire every timer owner before clearing state so
 	; no captured callback can publish after teardown.
@@ -1238,245 +1240,289 @@ _PrefixCommitPostFireEffect(Effect) {
 ; Wrapped in try so that any exception from _LookupAndRender / TooltipShow
 ; does not silently kill the InputHook callback chain — AHK v2 stops invoking
 ; the OnChar callback permanently if an unhandled error propagates out of it.
-_OnPrefixChar(IH, Char) {
+_OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, HSE_Buffer
 	global _PrefixPrivateResidue
 	global _HSE_TerminalOwner
-	; No hotstring preview tooltip and no expansion dispatch while the script is
-	; paused or the Hotstrings master gate is off — this watcher uses its OWN
-	; InputHook, so the HookDispatcher guard does not cover it.
-	if A_IsSuspended
-		return
-	; A partial native SendInput can already have delivered a replay prefix while
-	; the remaining physical edges stay owned for retry. Retain those deferred
-	; callbacks without mutating either canonical buffer; the successful retry
-	; replays the pre-admission suffix first, then this exact observed prefix.
-	if _HSE_RetainTerminalReplayChar(Char)
-		return
-	; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
-	; fallback guard for standalone/manual HSE suppression, but do not treat the
-	; prefix render guard as evidence that this physical character is synthetic.
-	; LLM predictions stay on even when the Hotstrings master gate is off.
-	if (IsSet(LLM_Bridge_FeedCharIfActive))
-		LLM_Bridge_FeedCharIfActive(Char)
-	if !IsCategoryGated("Hotstrings")
-		return
-	; The pass-through character is already on screen. Before it can participate
-	; in a match, prove that the screen target still owns the buffered prefix. This
-	; guard sits before the main dispatch try, so contain it independently: an
-	; unhandled InputHook callback error permanently silences later characters.
+	; Serialize from admission, before any observer can yield and reorder ★.
+	; LLM mirroring is RAM-only; its ancillary work owns a deferred callback.
+	PreviousCritical := Critical("On")
 	try {
-		if !_PrefixEnsureInputContext()
+		; No hotstring preview tooltip and no expansion dispatch while the script is
+		; paused or the Hotstrings master gate is off — this watcher uses its OWN
+		; InputHook, so the HookDispatcher guard does not cover it.
+		if A_IsSuspended {
+			_PrefixRecordMagicOutcome(Char, "paused")
 			return
-	} catch as ContextErr {
-		try LoggerError("PrefixWatcher", "Input-context verification failed: {1}.", ContextErr.Message)
-		return
-	}
-	; UIA selection-wrap: when the user types a symbol while text is selected,
-	; wrap the selection instead of inserting the bare symbol.
-	; Active pairs come from WrapSymbols_GetActivePairs() so the user's enabled/
-	; disabled choices and custom symbols are respected without a Reload.
-	; IsSet(_WS_ACTIVE_PAIRS) guards against loading order issues — the global
-	; is defined in wrap_symbols_config.ahk which is #Include'd before this file.
-	if (IsSet(Features) and Features.Has("shortcuts")
-		and Features["shortcuts"].Has("wrap_text_if_selected")
-		and Features["shortcuts"]["wrap_text_if_selected"]
-		and IsSet(_WS_ACTIVE_PAIRS)
-	) {
-		; Snapshot the active-pairs map once so the pair lookup is consistent
-		; with the membership check even if WrapSymbols_Rebuild() runs concurrently.
-		_ActivePairsSnap := WrapSymbols_GetActivePairs()
-		; A physical character after a selection has collapsed it, even when the
-		; UIA poll has not run again yet.  Preserve the snapshot only for the
-		; wrapping symbol itself; any other printable input invalidates it.
-		if (IsSet(_UIA_SelectionCache) and IsObject(_UIA_SelectionCache) and !_ActivePairsSnap.Has(Char))
-			_UIA_SelectionCache := 0
-		if _ActivePairsSnap.Has(Char) {
-			try {
-				UIASel := GetUIASelection()
-				if (UIASel != "") {
-					Pair := _ActivePairsSnap[Char]
-					if _PrefixTryWrapSelection(UIASel, Pair)
-						return
+		}
+		; A partial native SendInput can already have delivered a replay prefix while
+		; the remaining physical edges stay owned for retry. Retain those deferred
+		; callbacks without mutating either canonical buffer; the successful retry
+		; replays the pre-admission suffix first, then this exact observed prefix.
+		if _HSE_RetainTerminalReplayChar(Char) {
+			_PrefixRecordMagicOutcome(Char, "terminal_replay")
+			return
+		}
+		; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
+		; fallback guard for standalone/manual HSE suppression, but do not treat the
+		; prefix render guard as evidence that this physical character is synthetic.
+		; LLM predictions stay on even when the Hotstrings master gate is off.
+		MirrorStarted := HotPath_Now()
+		if IsSet(PrefeedFn)
+			PrefeedFn.Call(Char)
+		else if IsSet(LLM_Bridge_FeedCharForPrefix)
+			LLM_Bridge_FeedCharForPrefix(Char)
+		HotPath_LogIfSlow("LLM.PrefixMirror", MirrorStarted)
+		if !IsCategoryGated("Hotstrings") {
+			_PrefixRecordMagicOutcome(Char, "disabled")
+			return
+		}
+		; The pass-through character is already on screen. Before it can participate
+		; in a match, prove that the screen target still owns the buffered prefix. This
+		; guard sits before the main dispatch try, so contain it independently: an
+		; unhandled InputHook callback error permanently silences later characters.
+		try {
+			FocusStarted := HotPath_Now()
+			ContextReady := IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext()
+			HotPath_LogIfSlow("Prefix.FocusAdmission", FocusStarted)
+			if !ContextReady {
+				_PrefixRecordMagicOutcome(Char, "focus_refused")
+				return
+			}
+		} catch as ContextErr {
+			try LoggerError("PrefixWatcher", "Input-context verification failed: {1}.", ContextErr.Message)
+			return
+		}
+		; UIA selection-wrap: when the user types a symbol while text is selected,
+		; wrap the selection instead of inserting the bare symbol.
+		; Active pairs come from WrapSymbols_GetActivePairs() so the user's enabled/
+		; disabled choices and custom symbols are respected without a Reload.
+		; IsSet(_WS_ACTIVE_PAIRS) guards against loading order issues — the global
+		; is defined in wrap_symbols_config.ahk which is #Include'd before this file.
+		ContextReleased := false
+		if (IsSet(Features) and Features.Has("shortcuts")
+			and Features["shortcuts"].Has("wrap_text_if_selected")
+			and Features["shortcuts"]["wrap_text_if_selected"]
+			and IsSet(_WS_ACTIVE_PAIRS)
+		) {
+			; Snapshot the active-pairs map once so the pair lookup is consistent
+			; with the membership check even if WrapSymbols_Rebuild() runs concurrently.
+			_ActivePairsSnap := WrapSymbols_GetActivePairs()
+			; A physical character after a selection has collapsed it, even when the
+			; UIA poll has not run again yet.  Preserve the snapshot only for the
+			; wrapping symbol itself; any other printable input invalidates it.
+			if (IsSet(_UIA_SelectionCache) and IsObject(_UIA_SelectionCache) and !_ActivePairsSnap.Has(Char))
+				_UIA_SelectionCache := 0
+			if _ActivePairsSnap.Has(Char) {
+				try {
+					; Selection wrapping owns a separate paced send; never hold the
+					; ordinary-character transaction across its Sleep.
+					Critical(PreviousCritical)
+					ContextReleased := true
+					UIASel := GetUIASelection()
+					if (UIASel != "") {
+						Pair := _ActivePairsSnap[Char]
+						if _PrefixTryWrapSelection(UIASel, Pair)
+							return
+					}
+				} catch as _UIAErr {
+					LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
 				}
-			} catch as _UIAErr {
-				LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
 			}
 		}
-	}
-	try {
-		; Serialize the whole match -> fire -> buffer-sync region: Critical makes
-		; this keystroke uninterruptible, so AHK cannot start the NEXT physical
-		; key's layout-remap SendEvent thread (nor a render/suppress timer) until
-		; this keystroke — including the synchronous HSE_DispatchMatch expansion
-		; burst below — has fully completed. That guarantees the expansion is
-		; emitted IN FULL before any following keystroke (no interleave / lost key
-		; / "outpubct"). Set AFTER the UIA-wrap branch above (which Sleeps via
-		; SendInstant) so Critical never spans a Sleep. The Notepad clipboard path
-		; does NOT release Critical — it takes its own on top (hotstring_dispatch)
-		; and holds it across the whole clipboard transaction, which is why that
-		; transaction is now gated on a contention probe rather than allowed to
-		; retry for #ClipboardTimeout with the keyboard hook starved behind it.
+		; A declined selection wrap may have yielded. Revalidate its screen target
+		; before returning to canonical input admission.
 		Critical("On")
-		; Lengths and suppression depths diagnose buffer synchronization without
-		; persisting either ordinary typing or resolved private expansions.
-		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "OnChar: input_units={1} prefix_units={2} engine_units={3} suppressed={4}/{5}.", StrLen(Char), _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
-		; Time every character the engine is fed, emulated or not. The layout
-		; emulation stamps what it types, but a key typed through the OS layout
-		; (the neutral layout setting) was never stamped, so every time-gated
-		; hotstring failed closed in _HSE_PrepareDispatchDecision: no expansion
-		; and no preview bubble (hotstring-preview-shows).
-		AppState_TouchLastSentKey(Char)
-		; Feed HSE — when HSE_FeedChar reports a match, fire the
-		; expansion right here. HSE_LastEndChar is the authoritative end
-		; character: empty for star (immediate) triggers, the just-typed
-		; terminator for end-char-gated triggers. We can no longer derive
-		; it from « is Char a terminator? » alone because the new HSE
-		; keeps terminators in its buffer, which means a terminator may
-		; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
-		; on the « a », not on the comma).
-		_HseFeedTick := HotPath_Now()
-                HSEMatch := HSE_FeedChar(Char, true)
-		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick)
-		; Physical input cannot pass the native hook after capture admission. A
-		; callback already posted just before admission can still arrive here; it is
-		; retained as visible trailing text. The owner erases/reinserts it on screen,
-		; then re-feeds it through this callback after canonical commit so a suffix
-		; can complete another hotstring exactly once.
-		if HSE_TerminalTransactionPending() {
-			if (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner["Pending"] {
-				_HSE_TerminalOwner["TrailingText"] .= Char
-				_HSE_TerminalOwner["TrailingChars"].Push(Char)
-			}
-			_PrefixAppendTypedChar(Char)
+		if ContextReleased && !(IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
 			return
-		}
-		; When no registered hotstring matched, try the engine-level repeat
-		; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
-		; letter of the current word. This replaces the now-removed [[repeat]]
-		; TOML entries and fires at the lowest priority (only on no-match).
-		if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
-			; The @-combo resolver first: it is the more specific of the two
-			; fallbacks (it requires a leading "@" and letters that all alias a
-			; personal_info field), so letting the repeat fallback see @nn★ before
-			; it would double the "n" instead of expanding two fields.
-			HSEMatch := HSE_TryPersonalInfoCombo(ScriptInformation["MagicKey"])
-		}
-		if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
-			HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
-		}
-		if (HSEMatch != "") {
-			; Kill the obsolete pre-expansion preview before the send burst so it
-			; cannot fire reentrantly inside HSE_DispatchMatch's message pump.
-			_PrefixCancelRender()
-			_HseDispatchTick := HotPath_Now()
-			; A match is not necessarily a FIRE: a raw callback may decline (the
-			; E-circumflex deadkey and ellipsis guards refuse in the wrong context), and
-			; the time-activation / mixed-case gates bail too. HSE_DispatchMatch reports
-			; which happened so we do not log an expansion the user never saw.
-			; A personal-info mapping carries the user's IBAN / card / SSN in its
-			; replacement AND a fragment of it in its trigger. The flag rides the
-			; Spec from registration so this path never has to recognise the value.
-			; Read BEFORE the profiler line below, not after it: the profiler logs at
-			; WARNING, which is ABOVE the default INFO level, so its detail reaches
-			; the driver's rotating log with no user action at all — unlike the DEBUG
-			; sites, which at least need the user to switch the level on.
-			HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
-			_HseFired := HSE_DispatchMatch(
-				HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
-			; The trigger is the profiler's only context here, and a slow-dispatch
-			; warning without it cannot be attributed to a mapping — so it is
-			; redacted, not dropped. The redaction preserves length, which is the
-			; part that actually correlates with dispatch cost.
-			HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick,
-				HotstringIsPrivate ? PersonalInfoRedactForLog(HSEMatch.Trigger) : HSEMatch.Trigger)
-			if (_HseFired is Map) && _HseFired.Has("Pending") {
-				; Scheduling is not a fire verdict. The owner will commit buffers,
-				; preview, metrics, and ring state after successful output.
+		try {
+			; Serialize the whole match -> fire -> buffer-sync region: Critical makes
+			; this keystroke uninterruptible, so AHK cannot start the NEXT physical
+			; key's layout-remap SendEvent thread (nor a render/suppress timer) until
+			; this keystroke — including the synchronous HSE_DispatchMatch expansion
+			; burst below — has fully completed. That guarantees the expansion is
+			; emitted IN FULL before any following keystroke (no interleave / lost key
+			; / "outpubct"). The UIA-wrap branch temporarily restores the caller
+			; scheduler before its paced send. The Notepad clipboard path
+			; does NOT release Critical — it takes its own on top (hotstring_dispatch)
+			; and holds it across the whole clipboard transaction, which is why that
+			; transaction is now gated on a contention probe rather than allowed to
+			; retry for #ClipboardTimeout with the keyboard hook starved behind it.
+			Critical("On")
+			; Lengths and suppression depths diagnose buffer synchronization without
+			; persisting either ordinary typing or resolved private expansions.
+			if LoggerIsDebugEnabled()
+				LoggerDebug("PrefixWatcher", "OnChar: input_units={1} prefix_units={2} engine_units={3} suppressed={4}/{5}.", StrLen(Char), _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
+			; Time every character the engine is fed, emulated or not. The layout
+			; emulation stamps what it types, but a key typed through the OS layout
+			; (the neutral layout setting) was never stamped, so every time-gated
+			; hotstring failed closed in _HSE_PrepareDispatchDecision: no expansion
+			; and no preview bubble (hotstring-preview-shows).
+			AppState_TouchLastSentKey(Char)
+			; Feed HSE — when HSE_FeedChar reports a match, fire the
+			; expansion right here. HSE_LastEndChar is the authoritative end
+			; character: empty for star (immediate) triggers, the just-typed
+			; terminator for end-char-gated triggers. We can no longer derive
+			; it from « is Char a terminator? » alone because the new HSE
+			; keeps terminators in its buffer, which means a terminator may
+			; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
+			; on the « a », not on the comma).
+			_HseFeedTick := HotPath_Now()
+	                HSEMatch := HSE_FeedChar(Char, true)
+			HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick)
+			; Physical input cannot pass the native hook after capture admission. A
+			; callback already posted just before admission can still arrive here; it is
+			; retained as visible trailing text. The owner erases/reinserts it on screen,
+			; then re-feeds it through this callback after canonical commit so a suffix
+			; can complete another hotstring exactly once.
+			if HSE_TerminalTransactionPending() {
+				if (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner["Pending"] {
+					_HSE_TerminalOwner["TrailingText"] .= Char
+					_HSE_TerminalOwner["TrailingChars"].Push(Char)
+				}
 				_PrefixAppendTypedChar(Char)
 				return
 			}
-			; Log the fired hotstring. ``h_type`` is taken from the
-			; preceding suggestion when available (richest categorisation —
-			; "autocorrection", "personal", …) and falls back to a basic
-			; star/endchar tag so dispatch paths that bypass the tooltip
-			; (single-char-after-magic-key triggers that fire below
-			; _MIN_PREFIX_LEN) still carry meaningful metadata.
-			HotstringHType := _ResolveFireHType(HSEMatch)
-			HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-			; IsRepeat matches have no Category property — pass "repeat_key" explicitly
-			; so the WPM widget knows to stay at the default color.
-			HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-				? "repeat_key"
-				: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
-			HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
-			; Metrics logging is analytics — enqueue it and return; the heavy
-			; KL_LogHotstring work runs off the keystroke path (see
-			; _HSE_QueueFireLog) so a disk/lookup spike can never stall the fire
-			; keystroke and stretch the suppress window into a key-swallow.
-			; Only a real expansion is a fire. A declined match must not reach the
-			; metrics/WPM pipeline as one — it inflated the hotstring counters and the
-			; per-section stats with expansions that never appeared on screen.
-			if _HseFired
-				_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection, HotstringIsPrivate)
-			; From here on the two keystroke buffers may hold the resolved value:
-			; the engine already applied the expansion to HSE_Buffer, and the sync
-			; below copies it into the watcher's. Raised for BOTH fire shapes — the
-			; end-char branch wipes the preview buffer but leaves the engine's.
-			if (_HseFired and HotstringIsPrivate)
-				_PrefixPrivateResidue := true
-			; The same rule the metrics pipeline above already follows, applied to
-			; the buffer: a match that did not FIRE changed nothing on screen. The
-			; trigger characters and the just-typed char are all still there, so
-			; rewriting the watcher buffer as though the replacement had been
-			; inserted made the tooltip describe text that does not exist — and
-			; every later lookup anchored on that fiction. Take the same path an
-			; outright no-match takes instead.
-			if !_HseFired {
-				_PrefixAppendTypedChar(Char)
+			; When no registered hotstring matched, try the engine-level repeat
+			; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
+			; letter of the current word. This replaces the now-removed [[repeat]]
+			; TOML entries and fires at the lowest priority (only on no-match).
+			if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+				; The @-combo resolver first: it is the more specific of the two
+				; fallbacks (it requires a leading "@" and letters that all alias a
+				; personal_info field), so letting the repeat fallback see @nn★ before
+				; it would double the "n" instead of expanding two fields.
+				HSEMatch := HSE_TryPersonalInfoCombo(ScriptInformation["MagicKey"])
+			}
+			if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+				HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
+			}
+			if (HSEMatch != "") {
+				; Kill the obsolete pre-expansion preview before the send burst so it
+				; cannot fire reentrantly inside HSE_DispatchMatch's message pump.
+				_PrefixCancelRender()
+				_HseDispatchTick := HotPath_Now()
+				; A match is not necessarily a FIRE: a raw callback may decline (the
+				; E-circumflex deadkey and ellipsis guards refuse in the wrong context), and
+				; the time-activation / mixed-case gates bail too. HSE_DispatchMatch reports
+				; which happened so we do not log an expansion the user never saw.
+				; A personal-info mapping carries the user's IBAN / card / SSN in its
+				; replacement AND a fragment of it in its trigger. The flag rides the
+				; Spec from registration so this path never has to recognise the value.
+				; Read BEFORE the profiler line below, not after it: the profiler logs at
+				; WARNING, which is ABOVE the default INFO level, so its detail reaches
+				; the driver's rotating log with no user action at all — unlike the DEBUG
+				; sites, which at least need the user to switch the level on.
+				HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
+				_HseFired := HSE_DispatchMatch(
+					HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
+				; The trigger is the profiler's only context here, and a slow-dispatch
+				; warning without it cannot be attributed to a mapping — so it is
+				; redacted, not dropped. The redaction preserves length, which is the
+				; part that actually correlates with dispatch cost.
+				HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick,
+					HotstringIsPrivate ? PersonalInfoRedactForLog(HSEMatch.Trigger) : HSEMatch.Trigger)
+				if (_HseFired is Map) && _HseFired.Has("Pending") {
+					_PrefixRecordMagicOutcome(Char, "pending")
+					; Scheduling is not a fire verdict. The owner will commit buffers,
+					; preview, metrics, and ring state after successful output.
+					_PrefixAppendTypedChar(Char)
+					return
+				}
+				; Log the fired hotstring. ``h_type`` is taken from the
+				; preceding suggestion when available (richest categorisation —
+				; "autocorrection", "personal", …) and falls back to a basic
+				; star/endchar tag so dispatch paths that bypass the tooltip
+				; (single-char-after-magic-key triggers that fire below
+				; _MIN_PREFIX_LEN) still carry meaningful metadata.
+				HotstringHType := _ResolveFireHType(HSEMatch)
+				HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+				; IsRepeat matches have no Category property — pass "repeat_key" explicitly
+				; so the WPM widget knows to stay at the default color.
+				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
+					? "repeat_key"
+					: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+				; Metrics logging is analytics — enqueue it and return; the heavy
+				; KL_LogHotstring work runs off the keystroke path (see
+				; _HSE_QueueFireLog) so a disk/lookup spike can never stall the fire
+				; keystroke and stretch the suppress window into a key-swallow.
+				; Only a real expansion is a fire. A declined match must not reach the
+				; metrics/WPM pipeline as one — it inflated the hotstring counters and the
+				; per-section stats with expansions that never appeared on screen.
+				if _HseFired
+					_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection, HotstringIsPrivate)
+				; From here on the two keystroke buffers may hold the resolved value:
+				; the engine already applied the expansion to HSE_Buffer, and the sync
+				; below copies it into the watcher's. Raised for BOTH fire shapes — the
+				; end-char branch wipes the preview buffer but leaves the engine's.
+				if (_HseFired and HotstringIsPrivate)
+					_PrefixPrivateResidue := true
+				; The same rule the metrics pipeline above already follows, applied to
+				; the buffer: a match that did not FIRE changed nothing on screen. The
+				; trigger characters and the just-typed char are all still there, so
+				; rewriting the watcher buffer as though the replacement had been
+				; inserted made the tooltip describe text that does not exist — and
+				; every later lookup anchored on that fiction. Take the same path an
+				; outright no-match takes instead.
+				if !_HseFired {
+					_PrefixRecordMagicOutcome(Char, "dispatch_refused")
+					_PrefixAppendTypedChar(Char)
+					return
+				}
+				; ── Sync the watcher buffer to the post-expansion screen state ──
+				; The naive "wipe to empty" used to drop the in-word context the
+				; user is still typing inside of. After a STAR fire (no end-char),
+				; the cursor sits IMMEDIATELY after the replacement and the user
+				; usually keeps typing the same word — so the next keystroke
+				; needs the post-expansion prefix as its lookup context. Without
+				; this sync, typing ``l`` then the apostrophe trigger (``l'``)
+				; would erase the watcher's memory of the ``l'`` boundary, and
+				; subsequent ``ia`` would never surface the ``ia`` trigger
+				; preview because the word-anchored lookup had no terminator to
+				; anchor against.
+				;
+				; The engine effect owns whether the screen now ends at a boundary.
+				; A consumed end character is absent from that screen, so it follows
+				; the same cascade path as a star fire. Send-key payloads and emitted
+				; terminators remain conservative resets.
+				_PrefixCommitPostFireEffect(CommittedScreenEffect)
+				_PrefixRecordMagicOutcome(Char, "sent")
 				return
 			}
-			; ── Sync the watcher buffer to the post-expansion screen state ──
-			; The naive "wipe to empty" used to drop the in-word context the
-			; user is still typing inside of. After a STAR fire (no end-char),
-			; the cursor sits IMMEDIATELY after the replacement and the user
-			; usually keeps typing the same word — so the next keystroke
-			; needs the post-expansion prefix as its lookup context. Without
-			; this sync, typing ``l`` then the apostrophe trigger (``l'``)
-			; would erase the watcher's memory of the ``l'`` boundary, and
-			; subsequent ``ia`` would never surface the ``ia`` trigger
-			; preview because the word-anchored lookup had no terminator to
-			; anchor against.
-			;
-			; The engine effect owns whether the screen now ends at a boundary.
-			; A consumed end character is absent from that screen, so it follows
-			; the same cascade path as a star fire. Send-key payloads and emitted
-			; terminators remain conservative resets.
-			_PrefixCommitPostFireEffect(CommittedScreenEffect)
-			return
-		}
 
-		; Word-terminator characters: the trigger index only contains
-		; word-internal sequences, and a leading terminator would prevent any
-		; match. OnKeyDown handles VK-only keys (arrows, Escape…); this guard
-		; covers printable terminators (space, punctuation, …) that produce a
-		; char event — including those arriving via tap-hold or AltGr layers
-		; whose VK event may be swallowed before reaching the InputHook.
-		;
-		; The terminator was ALREADY fed to HSE by the single HSE_FeedChar at
-		; the top of this function — that is where end-char hotstrings fire
-		; (e.g. "ia"+space → "IA", handled above when HSEMatch != ""). Reaching
-		; here means nothing matched, so we must NOT feed the terminator a
-		; second time: re-feeding doubled it in HSE_Buffer (e.g. "nnbsp::e"),
-		; which silently broke every trigger that CONTAINS a terminator as a
-		; non-final char — the nnbsp/nbsp + ';'/':' + vowel "J" triggers. We
-		; only reset the UI prefix buffer here; HSE_Buffer keeps the single
-		; terminator so such triggers still match on the next keystroke.
-		_PrefixAppendTypedChar(Char)
-	} catch as Err {
-		LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
+			; Word-terminator characters: the trigger index only contains
+			; word-internal sequences, and a leading terminator would prevent any
+			; match. OnKeyDown handles VK-only keys (arrows, Escape…); this guard
+			; covers printable terminators (space, punctuation, …) that produce a
+			; char event — including those arriving via tap-hold or AltGr layers
+			; whose VK event may be swallowed before reaching the InputHook.
+			;
+			; The terminator was ALREADY fed to HSE by the single HSE_FeedChar at
+			; the top of this function — that is where end-char hotstrings fire
+			; (e.g. "ia"+space → "IA", handled above when HSEMatch != ""). Reaching
+			; here means nothing matched, so we must NOT feed the terminator a
+			; second time: re-feeding doubled it in HSE_Buffer (e.g. "nnbsp::e"),
+			; which silently broke every trigger that CONTAINS a terminator as a
+			; non-final char — the nnbsp/nbsp + ';'/':' + vowel "J" triggers. We
+			; only reset the UI prefix buffer here; HSE_Buffer keeps the single
+			; terminator so such triggers still match on the next keystroke.
+			_PrefixRecordMagicOutcome(Char, "no_match")
+			_PrefixAppendTypedChar(Char)
+		} catch as Err {
+			LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
+		}
+	} finally {
+		Critical(PreviousCritical)
 	}
+}
+
+; Numeric outcome counts expose silent no-match/refusal paths without storing text.
+_PrefixRecordMagicOutcome(Char, Outcome) {
+	global ScriptInformation
+	if IsSet(ScriptInformation) && ScriptInformation.Has("MagicKey")
+		&& Char == ScriptInformation["MagicKey"]
+		HotPath_RecordLatency("HSE.Magic." . Outcome, 0, 5)
 }
 
 ; OnKeyDown — handles word-breaking / navigation keys that should reset the

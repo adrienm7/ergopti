@@ -54,6 +54,18 @@ _TimerAdapterCancelNative(BoundFn) {
 	SetTimer(BoundFn, 0)
 }
 
+/** Schedules or cancels an owned native callback without replacing its identity. */
+TimerSetCallback(Callback, PeriodMs) {
+	global TIMER_ADAPTER_MAX_INTERVAL_MS
+	if !HasMethod(Callback, "Call")
+		throw TypeError("TimerSetCallback requires a callable callback")
+	if !IsNumber(PeriodMs) || PeriodMs != Round(PeriodMs)
+		|| Abs(PeriodMs) > TIMER_ADAPTER_MAX_INTERVAL_MS
+		throw ValueError("TimerSetCallback requires an integer native timer period")
+	_TimerAdapterSetNative(Callback, PeriodMs)
+	return true
+}
+
 _TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
 	global _TIMER_ADAPTER_REGISTRY
 	if !HasMethod(NativeSetFn, "Call")
