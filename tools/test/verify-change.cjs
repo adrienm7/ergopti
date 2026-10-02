@@ -358,6 +358,11 @@ function isPerformanceReport(f) {
  * Every rule states WHY the gate is required, because the non-obvious pairings
  * are the whole point of this file.
  */
+/** Identifies portable AHK policy parsed and executed by the Windows driver. */
+function isSharedAhkSource(f) {
+	return f.startsWith('static/ergopti_plus/_shared/') && f.endsWith('.ahk');
+}
+
 const RULES = [
 	{
 		gate: 'format',
@@ -374,6 +379,7 @@ const RULES = [
 		why: 'the AHK unit + meta suite covers the Windows driver — and replays the shared corpora and port contracts',
 		match: (f) =>
 			(f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) ||
+			isSharedAhkSource(f) ||
 			isCrossDriverContract(f)
 	},
 	{
@@ -385,13 +391,17 @@ const RULES = [
 		// nothing at all catches the rest.
 		why: 'a compile parses the WHOLE #Include graph, including the files run_all.ahk cannot include',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/')
+			((f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) ||
+				isSharedAhkSource(f)) &&
+			!f.includes('/tests/')
 	},
 	{
 		gate: 'ahk-e2e',
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/')
+			((f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) ||
+				isSharedAhkSource(f)) &&
+			!f.includes('/tests/')
 	},
 	{
 		gate: 'report-style',

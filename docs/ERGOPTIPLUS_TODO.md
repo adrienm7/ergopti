@@ -196,6 +196,12 @@ interrupting the observation; an isolated actual-production probe requires
 the same assertion to fail under a private inline mutation. Native Windows
 qualification remains pending.
 
+The verification planner now selects native AHK parsing/unit/E2E gates for
+every shared AHK source, including pure shared policies. Independent planner
+regressions fail against the missing selection and retain platform-specific
+deferral behavior; changing only a portable AHK policy cannot bypass its
+native qualification.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.

@@ -97,6 +97,20 @@ assert.deepEqual(
 	['format', 'js'],
 	'tool changes must retain the full JS gate, which already covers report style'
 );
+for (const file of [
+	'static/ergopti_plus/_shared/modules/shortcuts/magic_editor.ahk',
+	'static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk',
+	'static/ergopti_plus/_shared/modules/llm/local_model_policy.ahk',
+	'static/ergopti_plus/_shared/modules/future/owner.ahk'
+]) {
+	const gates = selectGates([file]);
+	for (const gate of ['ahk-encoding', 'ahk-suite', 'ahk-parse', 'ahk-e2e'])
+		assert(gates.has(gate), `${file}: portable AHK policy must retain ${gate}`);
+	assert(
+		!gates.has('hs') && !gates.has('linux'),
+		`${file}: AHK policy does not select unrelated Lua suites`
+	);
+}
 const mixedAhk = selectGates([
 	'docs/audits/performance/ahk/report.md',
 	'static/ergopti_plus/windows/modules/keylogger/keylogger_reader_db.ahk'
