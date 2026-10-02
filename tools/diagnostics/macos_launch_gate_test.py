@@ -7,6 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
+import plistlib
 import subprocess
 import sys
 import tempfile
@@ -103,6 +104,89 @@ class VerdictTests(unittest.TestCase):
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
+
+    def test_window_timeout_does_not_discard_other_native_evidence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder) / "home"
+            home.mkdir()
+            output = Path(folder) / "output"
+            output.mkdir()
+            calls = []
+
+            def native_run(arguments, **options):
+                calls.append(arguments[0])
+                if arguments[0] == "osascript":
+                    raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                return subprocess.CompletedProcess(arguments, 0, "retained native evidence", "")
+
+            with mock.patch.object(gate.subprocess, "run", side_effect=native_run):
+                errors = gate.collect(output, {"logs_dir": home / "missing-logs"}, home)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("TimeoutExpired", errors[0])
+            self.assertIn("TimeoutExpired", (output / "windows.txt").read_text())
+            self.assertIn(
+                "log", calls, "the window timeout must not prevent unified-log collection"
+            )
+            self.assertEqual((output / "unified.log").read_text(), "retained native evidence")
+
+    def test_quit_and_collection_failures_still_write_primary_report(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder) / "home"
+            app = Path(folder) / "ErgoptiPlus.app"
+            for executable in (
+                app / "Contents/MacOS/ErgoptiPlus",
+                timer_probe.NativeDelayedTimerProbe.executable_path(app),
+            ):
+                executable.parent.mkdir(parents=True, exist_ok=True)
+                executable.write_text("owned fixture executable")
+            with (app / "Contents/Info.plist").open("wb") as handle:
+                plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
+            live = {"started": False}
+            killed = []
+
+            def processes(executable):
+                return [42 if executable.name == "Hammerspoon" else 41] if live["started"] else []
+
+            def native_run(arguments, **options):
+                if arguments[0] == "open":
+                    live["started"] = True
+                return subprocess.CompletedProcess(arguments, 0, "arm64", "")
+
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate.Path, "home", return_value=home),
+                mock.patch.object(
+                    gate, "seed", return_value={"logs_dir": home / "logs", "symlinks": []}
+                ),
+                mock.patch.object(gate, "processes", side_effect=processes),
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
+                mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
+                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
+                mock.patch.object(gate, "check_state", return_value=[]),
+                mock.patch.object(
+                    gate, "quit_application", side_effect=RuntimeError("original quit failure")
+                ),
+                mock.patch.object(
+                    gate, "collect", side_effect=RuntimeError("independent collection failure")
+                ),
+                mock.patch.object(gate.os, "kill", side_effect=lambda pid, _: killed.append(pid)),
+                mock.patch.object(gate, "print_tails"),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                status = gate.main([str(app), str(Path(folder) / "evidence"), "symlink_logs_dir"])
+            report = json.loads((Path(folder) / "evidence/result.json").read_text())
+            self.assertEqual(status, 1)
+            self.assertIn("RuntimeError: original quit failure", report["failures"])
+            self.assertTrue(
+                any("independent collection failure" in error for error in report["failures"])
+            )
+            self.assertEqual(
+                sorted(killed),
+                [41, 42],
+                "failed evidence collection must still stop both exact processes",
+            )
 
     def test_published_symlink_failure_is_rejected(self):
         # The exact launcher.log of the reported dev.127 failure.

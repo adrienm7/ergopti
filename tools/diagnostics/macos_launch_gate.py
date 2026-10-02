@@ -414,6 +414,7 @@ def quit_application(bundle_id, executables):
 
 def collect(output, state, home):
     """Retain every early log location and the state tree for the artifact."""
+    errors = []
     for path in (
         logs_folder(home) / LAUNCHER_LOG_NAME,
         home / "Library/Application Support/ErgoptiPlus/paths.toml",
@@ -438,18 +439,27 @@ def collect(output, state, home):
     subprocess.run(
         ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
     )
-    windows = subprocess.run(
-        [
-            "osascript",
-            "-e",
-            'tell application "System Events" to get '
-            "{name, name of every window} of every process whose background only is false",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    (output / "windows.txt").write_text(windows.stdout + windows.stderr, encoding="utf-8")
+    try:
+        windows = subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'tell application "System Events" to get '
+                "{name, name of every window} of every process whose background only is false",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        window_text = windows.stdout + windows.stderr
+        if windows.returncode:
+            raise RuntimeError(
+                f"Window collection refused (exit {windows.returncode}): {window_text}"
+            )
+    except (OSError, subprocess.TimeoutExpired, RuntimeError) as error:
+        window_text = f"{type(error).__name__}: {error}\n"
+        errors.append(f"Window collection failed: {type(error).__name__}: {error}")
+    (output / "windows.txt").write_text(window_text, encoding="utf-8")
     # Unified log and crash reports explain a child that dies or a launcher that
     # stops logging, which the file logs alone cannot distinguish.
     try:
@@ -482,6 +492,7 @@ def collect(output, state, home):
                 ):
                     (output / "crash-reports").mkdir(exist_ok=True)
                     shutil.copyfile(report, output / "crash-reports" / report.name)
+    return errors
 
 
 def print_tails(output):
@@ -522,6 +533,7 @@ def run(app, output, scenario, seed_tag):
     state = seed(scenario, home, seed_tag, datetime.date.today().isoformat())
     started = time.monotonic()
     observation = {}
+    diagnostic_errors = []
     native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN) if scenario == "clean" else None
     try:
         if native_probe:
@@ -569,20 +581,33 @@ def run(app, output, scenario, seed_tag):
             if observation["alive_after_window"]
             else None
         )
+    except Exception as error:
+        observation["launch_gate_error"] = f"{type(error).__name__}: {error}"
     finally:
         try:
             observation["launcher_log"] = read_text(launcher_log)
             observation["boot_log"] = read_text(logs_folder(home) / FALLBACK_BOOT_LOG_NAME)
             observation["driver_log"] = driver_logs(state)
             observation["state_problems"] = check_state(scenario, state, home)
-            collect(output, state, home)
+            try:
+                diagnostic_errors.extend(collect(output, state, home))
+            except Exception as error:
+                diagnostic_errors.append(
+                    f"Evidence collection failed: {type(error).__name__}: {error}"
+                )
             for name, executable in (("launcher", launcher), ("hammerspoon", child)):
                 for pid in processes(executable):
-                    subprocess.run(
-                        ["sample", str(pid), "2", "-file", str(output / f"sample-{name}.txt")],
-                        capture_output=True,
-                        timeout=60,
-                    )
+                    try:
+                        subprocess.run(
+                            ["sample", str(pid), "2", "-file", str(output / f"sample-{name}.txt")],
+                            capture_output=True,
+                            timeout=60,
+                            check=True,
+                        )
+                    except Exception as error:
+                        diagnostic_errors.append(
+                            f"{name} sample failed: {type(error).__name__}: {error}"
+                        )
             for executable in (launcher, child):
                 for pid in processes(executable):
                     try:
@@ -618,9 +643,14 @@ def run(app, output, scenario, seed_tag):
         report["native_delayed_timer"] = observation.get("native_delayed_timer")
         if observation.get("native_delayed_timer_error"):
             report["native_delayed_timer_error"] = observation["native_delayed_timer_error"]
-    report["quit_seconds"] = observation["quit_seconds"]
-    report["alive_after_window"] = observation["alive_after_window"]
+    report["quit_seconds"] = observation.get("quit_seconds")
+    report["alive_after_window"] = observation.get("alive_after_window", False)
     report["failures"] = evaluate(scenario, observation)
+    if observation.get("launch_gate_error"):
+        report["failures"].append(observation["launch_gate_error"])
+    if diagnostic_errors:
+        report["diagnostic_errors"] = diagnostic_errors
+        report["failures"].extend(diagnostic_errors)
     return report
 
 

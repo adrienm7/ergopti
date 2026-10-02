@@ -11,6 +11,11 @@ import time
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
 APPLE_SCRIPT_KEY = "HSAppleScriptEnabledKey"
+SCRIPTING_TIMEOUT_SECONDS = 10
+SCRIPT_SAMPLE_SECONDS = 1
+SCRIPT_CLEANUP_TIMEOUT_SECONDS = 2
+SCRIPT_SAMPLE_READ_LIMIT = 65536
+SCRIPT_SAMPLE_FRAME_LIMIT = 6
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -213,6 +218,8 @@ class NativeDelayedTimerProbe:
         self.preference = AppleScriptPreference(domain)
         self.nonce = secrets.token_hex(16)
         self.started = False
+        self.scripting_commands = []
+        self.scripting_command_number = 0
 
     @staticmethod
     def executable_path(app):
@@ -240,19 +247,117 @@ class NativeDelayedTimerProbe:
 
     def execute(self, source):
         """Target the already running installed bundle and require its exact reply."""
+        if self.scripting_commands:
+            raise RuntimeError("The prior native scripting command has not settled")
         script = (
             "on run argv\n"
             f"tell application {json.dumps(str(self.app))}\n"
             "return execute lua code (item 1 of argv)\nend tell\nend run"
         )
-        result = subprocess.run(
-            ["/usr/bin/osascript", "-e", script, source], capture_output=True, text=True, timeout=10
+        command = subprocess.Popen(
+            ["/usr/bin/osascript", "-e", script, source],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
-        if result.returncode or result.stdout.strip() != self.nonce:
+        self.scripting_commands.append(command)
+        self.scripting_command_number += 1
+        try:
+            stdout, stderr = command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
+        except Exception as primary:
+            diagnostics = []
+            if isinstance(primary, subprocess.TimeoutExpired):
+                try:
+                    diagnostics = self.sample_scripting_command(command)
+                except Exception as sampling:
+                    diagnostics.append(
+                        f"native scripting sample failed: {type(sampling).__name__}: {sampling}"
+                    )
+            try:
+                self.retire_scripting_command(command)
+            except Exception as cleanup:
+                diagnostics.append(
+                    f"owned scripting process cleanup failed: {type(cleanup).__name__}: {cleanup}"
+                )
+            detail = "; ".join(diagnostics)
+            raise RuntimeError(
+                f"Native scripting command failed: {type(primary).__name__}: {primary}"
+                + (f"; {detail}" if detail else "")
+            ) from primary
+        if command.returncode is None:
+            raise RuntimeError(
+                "The native scripting command did not acknowledge actual process exit"
+            )
+        self.scripting_commands.remove(command)
+        if command.returncode != 0 or stdout.strip() != self.nonce:
             raise RuntimeError(
                 "The packaged native timer scripting command did not acknowledge its nonce "
-                f"(exit {result.returncode}): {result.stderr.strip()[:1000]}"
+                f"(exit {command.returncode}): {stderr.strip()[:1000]}"
             )
+
+    def sample_scripting_command(self, command):
+        """Sample only an unreaped own child before any timeout retirement signal."""
+        diagnostics = []
+        if command.poll() is not None:
+            return ["native scripting process exited before its timeout sample"]
+        # This Popen has not reaped the child: its PID cannot be reused while
+        # the independent sampler runs, even if the child exits meanwhile.
+        sample = self.output / f"sample-osascript-{self.scripting_command_number}.txt"
+        try:
+            result = subprocess.run(
+                [
+                    "/usr/bin/sample",
+                    str(command.pid),
+                    str(SCRIPT_SAMPLE_SECONDS),
+                    "-file",
+                    str(sample),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS,
+            )
+            if result.returncode or not sample.is_file():
+                diagnostics.append(
+                    f"native scripting sample refused (exit {result.returncode}): {result.stderr.strip()[:1000]}"
+                )
+            else:
+                diagnostics.append(f"native scripting sample retained: {sample.name}")
+                # Job annotations remain readable when artifact downloads fail.
+                # Report observed native frames, without guessing a permission
+                # or run-loop diagnosis from an unresponsive AppleEvent alone.
+                with sample.open(encoding="utf-8", errors="replace") as handle:
+                    sample_text = handle.read(SCRIPT_SAMPLE_READ_LIMIT)
+                markers = (
+                    "TCC",
+                    "AppleEvent",
+                    "AESend",
+                    "AEWait",
+                    "NSAppleScript",
+                    "LaunchServices",
+                )
+                frames = list(
+                    dict.fromkeys(
+                        line.strip()
+                        for line in sample_text.splitlines()
+                        if any(marker in line for marker in markers)
+                    )
+                )[:SCRIPT_SAMPLE_FRAME_LIMIT]
+                if frames:
+                    diagnostics.append("observed native scripting frames: " + " | ".join(frames))
+        except Exception as error:
+            diagnostics.append(f"native scripting sample failed: {type(error).__name__}: {error}")
+        return diagnostics
+
+    def retire_scripting_command(self, command):
+        """Retain the child until bounded communicate acknowledges its actual exit."""
+        if command.poll() is None:
+            command.kill()
+        command.communicate(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+        if command.returncode is None:
+            raise RuntimeError(
+                "The native scripting cleanup did not acknowledge actual process exit"
+            )
+        self.scripting_commands.remove(command)
 
     def observe(self, pid, processes):
         """Retain and judge the async native receipt within a bounded observation."""
@@ -313,4 +418,6 @@ class NativeDelayedTimerProbe:
 
     def restore(self):
         """Restore the scripting key after ordinary Quit or exact process cleanup."""
+        for command in list(self.scripting_commands):
+            self.retire_scripting_command(command)
         self.preference.restore()

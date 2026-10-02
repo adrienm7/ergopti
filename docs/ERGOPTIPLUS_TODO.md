@@ -210,6 +210,17 @@ before both planning and boot classification. A schema version forged inside
 a multiline string cannot bypass the guard. Current bytes, receipts and
 unknown user data remain protected; native Windows qualification is pending.
 
+Native macOS launch diagnostics now sample the exact owned AppleScript child
+before timeout retirement and require its actual exit. Timer observations
+keep the same ten-second script deadline and all eighteen checks; bounded
+diagnostic sampling does not turn timeout into success. Collected native
+frames are included in annotations without assigning an unproven cause.
+System Events collection failure cannot replace the primary failure or
+prevent result.json publication; primary and cleanup errors remain distinct.
+Forty-five diagnostic regressions pass, including a real blocked child that
+is sampled before termination and reaped. Native cause and qualification
+remain pending in the next macOS install/launch run.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
