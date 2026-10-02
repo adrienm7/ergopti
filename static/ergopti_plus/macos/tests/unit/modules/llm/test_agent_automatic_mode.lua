@@ -209,6 +209,23 @@ helpers.describe("AI agent learning (macOS)", function()
 		helpers.assert_eq(world.learning.threshold(CONFIG, "Mail", "mail"), 0.75, "each application its own")
 	end)
 
+	helpers.it("reloads only flushed learning while a later change waits for its debounce", function()
+		local world = auto_world()
+		world.learning.record(CONFIG, "Notes", "mail", true)
+		helpers.assert_eq(world.learning.flush(), true)
+		local saved = world.learning.threshold(CONFIG, "Notes", "mail")
+		local changed = world.learning.record(CONFIG, "Notes", "mail", false)
+		helpers.assert_true(changed ~= saved, "the pending change must be observable in memory")
+		local Storage = require("adapters.storage")
+		local ok, stored = Storage.read_exact(world.learning.STORAGE_KEY)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(stored.apps.Notes.intents.mail, saved,
+			"an unflushed map mutation must not update native persisted settings")
+		world.learning.reset()
+		helpers.assert_eq(world.learning.threshold(CONFIG, "Notes", "mail"), saved,
+			"cancelled debounce must reload the acknowledged snapshot")
+	end)
+
 	helpers.it("keeps at most MAX_APPS applications, dropping the least recently used", function()
 		local world = auto_world()
 		local learning = world.learning

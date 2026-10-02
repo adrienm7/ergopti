@@ -298,7 +298,15 @@ These are software implementations; final hardware verification remains below.
   The direct-call baseline now contains only the adapter's own implementation.
   The complete three-OS pipeline, including packaging and installation,
   passed checkpoint 37033032620 at `6275cac35` with release skipped.
-  Audit the other hs stubs for the same divergence from native behaviour.
+  The settings stub now snapshots valid acyclic values on write and returns
+  independent graphs per read, retaining native equal-child aliasing within a
+  read. Its clear receipt matches native true/false; set remains void. Direct
+  snapshot regressions failed before the fix, and a real learning/debounce
+  regression prevents unflushed updates from appearing persisted. Focused
+  cases passed; full macOS and three-OS verification remain pending for this
+  stub slice. The separate delayed-timer audit remains open: default-delay
+  restoration, chainable setDelay/running and self-rearming callback semantics.
+  Audit other hs stubs for remaining divergences from native behaviour.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
