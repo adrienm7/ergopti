@@ -221,10 +221,21 @@ Test("ergopti extension: the settings window keeps the repeat corrections row (e
 ; The menu consumes the discovered name, without renaming historical ids.
 _EHX_ShippedLabelInMenu() {
 	global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	global HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus
 	Saved := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache]
-	try _EHX_WithRoutes(_LCT_RegistryDir(), Check)
-	finally {
+	SavedStd := IsSet(HotstringCategoriesStd) ? HotstringCategoriesStd : unset
+	SavedErgopti := IsSet(HotstringCategoriesErgopti) ? HotstringCategoriesErgopti : unset
+	SavedMenus := IsSet(SubMenus) ? SubMenus : unset
+	try {
+		; The unit runner omits main's category discovery. This name-only case
+		; owns a neutral menu context without changing another case's globals.
+		HotstringCategoriesStd := [], HotstringCategoriesErgopti := [], SubMenus := Map()
+		_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	} finally {
 		_HS_ExtensionsCacheLoaded := Saved[1], _HS_ExtensionsCache := Saved[2]
+		HotstringCategoriesStd := IsSet(SavedStd) ? SavedStd : unset
+		HotstringCategoriesErgopti := IsSet(SavedErgopti) ? SavedErgopti : unset
+		SubMenus := IsSet(SavedMenus) ? SavedMenus : unset
 	}
 	Check(Packs) {
 		for Pack in Packs {
