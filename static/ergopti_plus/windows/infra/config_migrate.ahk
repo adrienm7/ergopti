@@ -575,7 +575,7 @@ _ConfigMigrateStampCandidate(Source, Version) {
 			if Section == "_meta"
 				MetaInsert := Offset + StrLen(Row) + (Offset + StrLen(Row) <= StrLen(Text) ? 1 : 0)
 		} else if RegExMatch(Line, '^(?:"schema_version"|schema_version)\s*=', &KeyMatch) && Section == "_meta" {
-			if !RegExMatch(Row, '^(\s*(?:"schema_version"|schema_version)\s*=\s*)(\S+)', &ValueMatch)
+			if !RegExMatch(Row, '^(\s*(?:"schema_version"|schema_version)\s*=\s*)([^\s#]+)', &ValueMatch)
 				throw Error("The migration metadata stamp cannot be located.")
 			Start := Offset + ValueMatch.Pos(2) - 1
 			return Bom . SubStr(Text, 1, Start - 1) . Version . SubStr(Text, Start + ValueMatch.Len(2))

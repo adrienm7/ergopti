@@ -187,7 +187,9 @@ _CMG_StampOnlyPreservesExactRecords() {
 	OldMeta := '[_meta] # metadata owner`nschema_version = 1.0 # retain this comment`nunknown = "keep"`n`n'
 	NewMeta := StrReplace(OldMeta, "= 1.0", "= 2")
 	Missing := '[_meta]`nunknown = "keep"`n`n'
+	TightMeta := '[_meta]`nschema_version = 1.0#metadata-owner`nunknown = "keep"`n`n'
 	Cases := [
+		{ Source: TightMeta . Input, Expected: StrReplace(TightMeta, "1.0#", "2#") . Input },
 		{ Source: OldMeta . Input, Expected: NewMeta . Input },
 		{ Source: Missing . Input, Expected: '[_meta]`nschema_version = 2`nunknown = "keep"`n`n' . Input },
 		{ Source: Chr(0xFEFF) . StrReplace(OldMeta . Input, "`n", "`r`n"),
