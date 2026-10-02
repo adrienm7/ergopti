@@ -751,6 +751,12 @@ exact-boolean regressions also pass the focused runner.
   global master, pause, overrides, personal sources and unknown neighbours stay
   preserved. The old menu failed eight meaningful cases; 57 affected cases
   pass locally. Full three-OS validation remains pending for this slice.
+  Native checkpoint 37052939737 then exposed a missing label-module include
+  in the headless runner. It now loads the actual pure manifest descriptions
+  owner, and the Dynamic fixture rejects its absence before menu construction.
+  The eight transaction assertions remain unchanged; native validation remains
+  pending for this additional harness correction.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue

@@ -335,6 +335,7 @@ _HSCS_TrayMapLiteral(Source, Name) {
 }
 
 _HSCS_WithDynamicBootState(Body) {
+	Assert(IsSet(MenuLabelFromManifestEntry), "the headless menu must load its real manifest label owner")
 	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
 	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
