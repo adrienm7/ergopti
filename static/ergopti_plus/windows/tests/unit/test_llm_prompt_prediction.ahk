@@ -126,7 +126,7 @@ _LPP_LastFinalRender() {
 ; Runs Body(Calls, Lines) with the menu, the engine, the bridge buffer, the
 ; binding parameters, the fake transport and a log capture in place, then puts
 ; every one of them back.
-_LPP_Run(Menu, Buffer, Body) {
+_LPP_Run(Menu, Buffer, Body, AllowTimers := false) {
 	global _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer, _LLM_Engine_RemoteTransport
 	global GestureActionParameters, _Stub_LlmTooltipCalls
 	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED
@@ -137,9 +137,9 @@ _LPP_Run(Menu, Buffer, Body) {
 	}
 	Calls := []
 	Lines := []
-	; Notices are inspected synchronously; retire their next-turn display before
-	; the fixture relinquishes its fake engine and foreground boundaries.
-	PreviousCritical := Critical("On")
+	; Synchronous scenarios retire notices before relinquishing their fake ports.
+	; Live-mode scenarios opt in to the deferred observers they exercise.
+	PreviousCritical := AllowTimers ? A_IsCritical : Critical("On")
 	try {
 		_LLM_Menu := Menu
 		_LLM_Engine := _LPP_Engine(Saved.Engine)
