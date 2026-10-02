@@ -1045,17 +1045,29 @@ _LLM_GetInactivePrefix(slotCount) {
 ; and a space is restored between the corrected tail and the next words when
 ; neither side brings one. A slot that carries neither (a stream still coming
 ; in) is words to come as a whole.
-; Windows has one font weight for the tooltip, so the bold the Lua drivers give
-; the corrections of an unselected line is not ported.
+; Unselected corrections and next words are bold only when typed reference
+; text exists and the parser has not disabled emphasis, as in the shared rule.
 ; @param {Object|String} slot - A tooltip slot (LLM_TooltipShow).
-; @returns {Array} of { Text, Role } - Role "typed" | "corrected" | "next".
-_LLM_SlotSegments(slot) {
+; @param {Integer} IsSelected - Whether this line owns the selected marker.
+; @returns {Array} of { Text, Role, Bold } - Role "typed" | "corrected" | "next".
+_LLM_SlotSegments(slot, IsSelected := true) {
 	; The ASCII spacing Lua's %s matches, so both ports cut at the same place.
 	static SPACING := "[ \t\n\x0B\f\r]"
 	Segments := []
 	LeadingDropped := false
 	LastChar := ""
 	Chunks := (IsObject(slot) and slot.HasOwnProp("Chunks")) ? slot.Chunks : []
+	HasTypedReference := false
+	for Chunk in Chunks {
+		if IsObject(Chunk) && Chunk.HasOwnProp("type") && Chunk.type == "equal"
+				&& Chunk.HasOwnProp("text") && RegExMatch(Chunk.text, "[^ \t\n\x0B\f\r]") {
+			HasTypedReference := true
+			break
+		}
+	}
+	Emphasis := !IsSelected && IsObject(slot)
+		&& slot.HasOwnProp("HasCorrections") && slot.HasCorrections == true
+		&& HasTypedReference && !(slot.HasOwnProp("DisableBold") && slot.DisableBold)
 	for , Chunk in Chunks {
 		Text := Chunk.HasOwnProp("text") ? Chunk.text : ""
 		if (!LeadingDropped and Text != "") {
@@ -1067,9 +1079,9 @@ _LLM_SlotSegments(slot) {
 		LastChar := SubStr(Text, -1)
 		Kind := Chunk.HasOwnProp("type") ? Chunk.type : ""
 		if (Kind == "insert")
-			Segments.Push({ Text: Text, Role: "corrected" })
+			Segments.Push({ Text: Text, Role: "corrected", Bold: Emphasis })
 		else if (Kind == "equal")
-			Segments.Push({ Text: Text, Role: "typed" })
+			Segments.Push({ Text: Text, Role: "typed", Bold: false })
 	}
 	NextWords := (IsObject(slot) and slot.HasOwnProp("NextWords")) ? slot.NextWords : ""
 	if (Segments.Length == 0 and NextWords == "")
@@ -1079,7 +1091,7 @@ _LLM_SlotSegments(slot) {
 	if (NextWords != "") {
 		if (LastChar != "" and !(LastChar ~= SPACING) and !(NextWords ~= "^" . SPACING))
 			NextWords := " " . NextWords
-		Segments.Push({ Text: NextWords, Role: "next" })
+		Segments.Push({ Text: NextWords, Role: "next", Bold: Emphasis })
 	}
 	return Segments
 }
@@ -1419,14 +1431,33 @@ _LLM_SlotBodyText(slot) {
 ; what is painted into it.
 ; @param {Array} Segments - _LLM_SlotSegments() result.
 ; @returns {Object} { W, H }
-_LLM_TooltipMeasureSegments(Segments) {
+_LLM_TooltipMeasureSegments(Segments, Measure := _TooltipMeasureText) {
 	Size := { W: 0, H: 0 }
 	for , Segment in Segments {
-		Piece := _TooltipMeasureText(Segment.Text)
+		Piece := Measure.Call(Segment.Text, Segment.Bold)
 		Size.W += Piece.W
 		Size.H := Max(Size.H, Piece.H)
 	}
 	return Size
+}
+
+; Reserve the widest selected/unselected body so navigation never clips an
+; emphasized correction or makes the panel jump to another width.
+_LLM_TooltipMeasureSlotBody(Slot, Measure := _TooltipMeasureText) {
+	Selected := _LLM_TooltipMeasureSegments(_LLM_SlotSegments(Slot, true), Measure)
+	Unselected := _LLM_TooltipMeasureSegments(_LLM_SlotSegments(Slot, false), Measure)
+	return { W: Max(Selected.W, Unselected.W), H: Max(Selected.H, Unselected.H),
+		Selected: Selected, Unselected: Unselected }
+}
+
+; Prefix, body weight and acceptance suffix belong to one rendering. Taking
+; their maxima separately can reserve a width that neither rendering uses.
+_LLM_TooltipMeasurePredictionRow(Slot, ActivePrefix, InactivePrefix, SuffixW,
+		ShortcutW, Measure := _TooltipMeasureText) {
+	Body := _LLM_TooltipMeasureSlotBody(Slot, Measure)
+	return { W: Max(ActivePrefix.W + Body.Selected.W + SuffixW,
+		InactivePrefix.W + Body.Unselected.W) + ShortcutW,
+		H: Max(ActivePrefix.H, InactivePrefix.H, Body.H) }
 }
 
 ; One transparent text span; the Gui background shows through.
@@ -1434,12 +1465,24 @@ _LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm") {
 	global _TOOLTIP_FONT_NAME
 	if (Text = "")
 		return 0
-	Size := _TooltipMeasureTextSize(Text, FontSize)
+	Bold := RegExMatch(Style, "i)(^|\s)bold(\s|$)") != 0
+	Size := _TooltipMeasureTextSize(Text, FontSize, , , Bold)
 	G.SetFont(Style . " c" . ColorHex . " s" . FontSize, _TOOLTIP_FONT_NAME)
 	; +2: a GDI extent rounded to layout units can clip the last glyph's overhang.
 	G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 		X, Y + Max(0, H - Size.H), Size.W + 2, Size.H), Text)
 	return Size.W
+}
+
+; Keep the paint owner and its measured advance together for every line piece.
+_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected) {
+	global _TOOLTIP_FONT_SIZE
+	Start := X
+	for Segment in Segments
+		X += _LLM_TooltipDrawText(G, X, Y, H,
+			_LLM_SegmentColorHex(Segment.Role, IsSelected), _TOOLTIP_FONT_SIZE,
+			Segment.Text, Segment.Bold ? "bold" : "norm")
+	return X - Start
 }
 
 ; Draws the 1 px rule and the footer rows at the positions _LLM_TooltipLayout
@@ -1522,7 +1565,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 			Body := LLM_TOOLTIP_PLACEHOLDER
 			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		} else {
-			Segments := _LLM_SlotSegments(slot)
+			Segments := _LLM_SlotSegments(slot, i == active_idx)
 			Body := ""
 			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		}
@@ -1538,13 +1581,10 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		if (Segments.Length > 0) {
 			; A real line is drawn piece by piece after its prefix, so it is
 			; measured the same way.
-			BodySize := _LLM_TooltipMeasureSegments(Segments)
 			SuffixW := (LLM_TOOLTIP_TAB_SUFFIX != "")
 				? _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W : 0
-			PredRows.Push({
-				W: Max(ActivePrefixSize.W, InactivePrefixSize.W) + BodySize.W
-					+ SuffixW + ShortcutW,
-				H: Max(ActivePrefixSize.H, InactivePrefixSize.H, BodySize.H) })
+			PredRows.Push(_LLM_TooltipMeasurePredictionRow(slot,
+				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutW))
 			continue
 		}
 		Active := _TooltipMeasureText(activePrefix . Body)
@@ -1590,10 +1630,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 					_TOOLTIP_FONT_SIZE, activePrefix)
 			else
 				X += InactivePrefixSize.W
-			for , Segment in RowSegments[Idx]
-				X += _LLM_TooltipDrawText(G, X, RowY, RowH,
-					_LLM_SegmentColorHex(Segment.Role, is_active),
-					_TOOLTIP_FONT_SIZE, Segment.Text)
+			X += _LLM_TooltipDrawSegments(G, X, RowY, RowH, RowSegments[Idx], is_active)
 			if is_active
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
 					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX)

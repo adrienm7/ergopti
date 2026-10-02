@@ -61,16 +61,15 @@ _LLS_SlotOf(Prediction) {
 	for Chunk in Prediction["chunks"]
 		Chunks.Push({ type: Chunk["type"], text: Chunk["text"] })
 	return { Text: "", Chunks: Chunks, NextWords: Prediction["nw"],
-		HasCorrections: Prediction["has_corrections"] }
+		HasCorrections: Prediction["has_corrections"], DisableBold: Prediction.Get("disable_bold", false) }
 }
 
-; Text and role only: Windows has one font weight, so the corpus's bold is the
-; Lua drivers' alone.
+; Replay the complete shared line policy, including unselected emphasis.
 _LLS_SegmentsMatchTheCorpus() {
 	Corpus := _LLS_LoadCorpus()
 	AssertTrue(Corpus["segments"].Length > 0, "the corpus must carry segment vectors")
 	for Vec in Corpus["segments"] {
-		Got := _LLM_SlotSegments(_LLS_SlotOf(Vec["prediction"]))
+		Got := _LLM_SlotSegments(_LLS_SlotOf(Vec["prediction"]), Vec["selected"])
 		AssertEqual(Vec["expected"].Length, Got.Length,
 			"segments '" . Vec["id"] . "': piece count")
 		for Index, Expected in Vec["expected"] {
@@ -79,6 +78,7 @@ _LLS_SegmentsMatchTheCorpus() {
 			Where := "segments '" . Vec["id"] . "' #" . Index
 			AssertEqual(Expected["text"], Got[Index].Text, Where . ": text")
 			AssertEqual(Expected["role"], Got[Index].Role, Where . ": role")
+			AssertEqual(Expected["bold"] ? true : false, Got[Index].Bold, Where . ": bold")
 		}
 	}
 }
@@ -213,3 +213,130 @@ _LLS_ReadingBelongsToItsContext() {
 }
 Test("(llm-line-style) a line's reading lives and dies with its context",
 	_LLS_ReadingBelongsToItsContext)
+
+; A parser decision must survive the ordinary display-store handoff, rather
+; than being reconstructed from whether a painted line contains insert chunks.
+_LLS_ParserEmphasisSuppressionReachesTheSlot() {
+	Store := _LLM_Engine_SlotDisplayStore()
+	SavedContext := Store.Ctx, SavedDisplays := Store.ByText
+	try {
+		_LLM_Engine_ForgetSlotDisplays()
+		for Suppressed in [false, true] {
+			Prediction := Map("chunks", [Map("type", "equal", "text", "bonjou"),
+				Map("type", "insert", "text", "r")], "nw", " le monde",
+				"has_corrections", true, "disable_bold", Suppressed)
+			Context := Suppressed ? "suppressed context" : "emphasized context"
+			_LLM_Engine_RememberSlotDisplays(Context,
+				Map("r le monde", _LLM_Parser_DisplayOf(Prediction)))
+			Slot := _LLM_Engine_DisplaySlot("r le monde", Context)
+			AssertEqual(Suppressed, Slot.DisableBold,
+				"the parser's presentation receipt must reach the real slot")
+			Segments := _LLM_SlotSegments(Slot, false)
+			AssertEqual(false, Segments[1].Bold, "typed reference stays regular")
+			AssertEqual(!Suppressed, Segments[2].Bold, "correction honors suppression")
+			AssertEqual(!Suppressed, Segments[3].Bold, "next words honor suppression")
+		}
+	} finally {
+		Store.Ctx := SavedContext
+		Store.ByText := SavedDisplays
+	}
+}
+Test("(llm-line-style) parser emphasis suppression survives the ordinary display handoff",
+	_LLS_ParserEmphasisSuppressionReachesTheSlot)
+
+class _LLS_WeightedMeasure {
+	static Calls := []
+	static Measure(Text, Bold) {
+		this.Calls.Push({ Text: Text, Bold: Bold })
+		return { W: StrLen(Text) * (Bold ? 20 : 10), H: Bold ? 22 : 18 }
+	}
+}
+
+_LLS_WidestBodyIncludesTheUnselectedWeight() {
+	Slot := { Text: "", Chunks: [{ type: "equal", text: "a" },
+		{ type: "insert", text: "b" }], NextWords: " c", HasCorrections: true }
+	_LLS_WeightedMeasure.Calls := []
+	Size := _LLM_TooltipMeasureSlotBody(Slot,
+		(Text, Bold) => _LLS_WeightedMeasure.Measure(Text, Bold))
+	AssertEqual(70, Size.W, "regular reference plus bold correction and next words reserve 70 units")
+	AssertEqual(22, Size.H, "the row also reserves the bold font's actual height")
+	Calls := _LLS_WeightedMeasure.Calls
+	AssertEqual(6, Calls.Length, "both complete renderings must be measured")
+	for Index in [1, 2, 3, 4]
+		AssertEqual(false, Calls[Index].Bold, "selected pieces and unselected reference stay regular")
+	AssertEqual(true, Calls[5].Bold, "unselected correction must request bold metrics")
+	AssertEqual(true, Calls[6].Bold, "unselected continuation must request bold metrics")
+	Row := _LLM_TooltipMeasurePredictionRow(Slot, { W: 30, H: 18 }, { W: 5, H: 18 },
+		10, 7, (Text, Bold) => _LLS_WeightedMeasure.Measure(Text, Bold))
+	AssertEqual(87, Row.W,
+		"the actual selected width 30+40+10 wins over inactive 5+70, then adds the common shortcut")
+	AssertEqual(22, Row.H, "bold height remains reserved when the selected width wins")
+}
+Test("(llm-line-style) panel geometry reserves the widest selected or emphasized body",
+	_LLS_WidestBodyIncludesTheUnselectedWeight)
+
+; Measure the HFONT actually attached to a native Text control, independently
+; of the cached measurement font the production drawing helper selected.
+_LLS_PaintedControlGeometry(Control, Text) {
+	static WM_GETFONT := 0x31
+	Font := DllCall("User32\SendMessageW", "Ptr", Control.Hwnd,
+		"UInt", WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
+	Assert(Font != 0, "the actual Text control must acknowledge its font")
+	LogFont := Buffer(92, 0)
+	AssertEqual(92, DllCall("Gdi32\GetObjectW", "Ptr", Font,
+		"Int", LogFont.Size, "Ptr", LogFont, "Int"))
+	Receipt := _TooltipMeasureNewGdiReceipt()
+	try {
+		Receipt["screen_dc"] := _TooltipMeasureGdiNative.GetScreenDC()
+		Assert(Receipt["screen_dc"] != 0)
+		Receipt["old_font"] := _TooltipMeasureGdiNative.SelectObject(Receipt["screen_dc"], Font)
+		AssertTrue(_TooltipGdiSelectSucceeded(Receipt["old_font"]))
+		Receipt["font_selected"] := true
+		Dpi := _TooltipMeasureGdiNative.GetVerticalDpi(Receipt["screen_dc"])
+		Assert(Dpi > 0)
+		Size := Buffer(8, 0)
+		AssertTrue(_TooltipMeasureGdiNative.MeasureText(Receipt["screen_dc"], Text, Size))
+		return { Weight: NumGet(LogFont, 16, "Int"),
+			W: Ceil(NumGet(Size, 0, "Int") * 96 / Dpi),
+			H: Ceil(NumGet(Size, 4, "Int") * 96 / Dpi) }
+	} finally {
+		AssertTrue(_TooltipMeasureSettleGdiReceipt(Receipt),
+			"the paint-font observation must restore the font and release its DC")
+	}
+}
+
+_LLS_DrawMeasuresTheActualPaintedWeight() {
+	global _TOOLTIP_FONT_SIZE
+	G := Gui("-Caption +ToolWindow")
+	Slot := { Text: "", Chunks: [{ type: "equal", text: "Regular typed reference " },
+		{ type: "insert", text: "Bold correction WWWMMMM" }],
+		NextWords: " and continuation", HasCorrections: true }
+	Segments := _LLM_SlotSegments(Slot, false)
+	Texts := []
+	for Segment in Segments
+		Texts.Push(Segment.Text)
+	Texts.Push("Regular after bold")
+	try {
+		BodyWidth := _LLM_TooltipDrawSegments(G, 0, 0, 40, Segments, false)
+		FinalWidth := _LLM_TooltipDrawText(G, BodyWidth, 0, 40, "808080",
+			_TOOLTIP_FONT_SIZE, Texts[4], "norm")
+		Index := 0
+		PaintedBodyWidth := 0
+		for Control in G {
+			Index += 1
+			Geometry := _LLS_PaintedControlGeometry(Control, Texts[Index])
+			AssertEqual((Index == 2 || Index == 3) ? 700 : 400, Geometry.Weight,
+				"bold painting is explicit and cannot leak into the following regular span")
+			if Index <= 3
+				PaintedBodyWidth += Geometry.W
+			else
+				AssertEqual(Geometry.W, FinalWidth, "the next normal piece must use its own font metrics")
+			Assert(Geometry.W > 0 && Geometry.H > 0)
+		}
+		AssertEqual(4, Index, "all actual piece controls and the following normal label must be inspected")
+		AssertEqual(PaintedBodyWidth, BodyWidth,
+			"the production segment painter must advance by the actual painted fonts")
+	} finally G.Destroy()
+}
+Test("(llm-line-style) actual Text controls paint and advance with the measured regular/bold font",
+	_LLS_DrawMeasuresTheActualPaintedWeight)

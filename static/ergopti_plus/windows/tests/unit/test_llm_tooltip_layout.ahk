@@ -27,7 +27,7 @@ class _TLL_Native {
 		return this.Dpi
 	}
 
-	static CreateFont(HeightPx, FontName) {
+	static CreateFont(HeightPx, FontName, Bold := false) {
 		return 301
 	}
 

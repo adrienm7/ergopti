@@ -1043,7 +1043,8 @@ _LLM_Parser_DisplayOf(pred) {
 	return Map(
 		"chunks", Chunks,
 		"nw", pred.Get("nw", ""),
-		"has_corrections", pred.Get("has_corrections", false) ? true : false)
+		"has_corrections", pred.Get("has_corrections", false) ? true : false,
+		"disable_bold", pred.Get("disable_bold", false) ? true : false)
 }
 
 /**
