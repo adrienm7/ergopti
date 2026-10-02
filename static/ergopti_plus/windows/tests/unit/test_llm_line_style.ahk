@@ -306,7 +306,8 @@ _LLS_PaintedControlGeometry(Control, Text) {
 }
 
 _LLS_DrawMeasuresTheActualPaintedWeight() {
-	global _TOOLTIP_FONT_SIZE
+	global _SharedDir, _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
+	SavedFamily := _TOOLTIP_FONT_NAME, SavedSize := _TOOLTIP_FONT_SIZE
 	G := Gui("-Caption +ToolWindow")
 	Slot := { Text: "", Chunks: [{ type: "equal", text: "Regular typed reference " },
 		{ type: "insert", text: "Bold correction WWWMMMM" }],
@@ -317,6 +318,17 @@ _LLS_DrawMeasuresTheActualPaintedWeight() {
 		Texts.Push(Segment.Text)
 	Texts.Push("Regular after bold")
 	try {
+		; The headless runner does not load UI styles at boot. Paint with the
+		; actual shared typography instead of the empty-family/zero-size sentinels,
+		; which select a legacy stock font that cannot represent the bold spans.
+		Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+		Family := IniCacheGet(Constants, "typography", "font_main_ahk")
+		PointSize := IniCacheGet(Constants, "typography", "font_size_main_ahk")
+		Assert(Family != "_" && Family != "", "the native fixture requires the shared font family")
+		Assert(PointSize != "_" && IsNumber(PointSize) && PointSize > 0,
+			"the native fixture requires the shared positive point size")
+		_TOOLTIP_FONT_NAME := Family
+		_TOOLTIP_FONT_SIZE := Integer(PointSize)
 		BodyWidth := _LLM_TooltipDrawSegments(G, 0, 0, 40, Segments, false)
 		FinalWidth := _LLM_TooltipDrawText(G, BodyWidth, 0, 40, "808080",
 			_TOOLTIP_FONT_SIZE, Texts[4], "norm")
@@ -336,7 +348,13 @@ _LLS_DrawMeasuresTheActualPaintedWeight() {
 		AssertEqual(4, Index, "all actual piece controls and the following normal label must be inspected")
 		AssertEqual(PaintedBodyWidth, BodyWidth,
 			"the production segment painter must advance by the actual painted fonts")
-	} finally G.Destroy()
+	} finally {
+		try G.Destroy()
+		finally {
+			_TOOLTIP_FONT_NAME := SavedFamily
+			_TOOLTIP_FONT_SIZE := SavedSize
+		}
+	}
 }
 Test("(llm-line-style) actual Text controls paint and advance with the measured regular/bold font",
 	_LLS_DrawMeasuresTheActualPaintedWeight)

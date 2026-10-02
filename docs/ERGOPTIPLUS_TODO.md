@@ -580,6 +580,12 @@ is committed; one request is one commit with its regression test.
   widths and painted geometry. Focused portable checks passed; full integration
   and native Windows CI remain pending. The Mac/Linux visual acceptance remains
   under this item.
+  Native checkpoint 37069995600 exposed missing typography initialization in
+  the headless Windows paint fixture. It now reads the canonical font family
+  and size, asserts valid values and restores the prior aliases in finally.
+  Actual WM_GETFONT bold/regular weights, geometry, control counts and GDI
+  retirement assertions remain unchanged; native Windows confirmation is
+  pending.
 - [~] **91.** Windows: « Combinaisons de touches » as on macOS. Done on
   2026-10-02: every ordered pair of the keys of `[tap_hold.catalog]`
   (key 1 then key 2 is not key 2 then key 1), each with « hold 1 + tap
