@@ -225,6 +225,12 @@ _MP_RealBackgroundTimer() {
 		Leaves.Push(Owner.Create(_MP_TestRows(), "timer", 1))
 	try {
 		AssertTrue(Owner.Start())
+		Sleep(50)
+		AssertEqual(3, Owner.Pending.Count,
+			"background preparation cannot interrupt a foreground thread")
+		; The headless runner is itself a foreground thread. Lower its priority
+		; to model an idle driver while exercising actual one-shot callbacks.
+		Thread("Priority", -2)
 		Deadline := A_TickCount + 1500
 		while Owner.Pending.Count > 0 && A_TickCount < Deadline
 			Sleep(5)
@@ -234,7 +240,10 @@ _MP_RealBackgroundTimer() {
 		AssertFalse(HasMethod(Owner.Timer, "Call"), "completion releases the timer callback's self-reference")
 		for Leaf in Leaves
 			_MP_AssertComplete(Leaf)
-	} finally Owner.Stop()
+	} finally {
+		Thread("Priority", 0)
+		Owner.Stop()
+	}
 }
 Test("menu population: one-shot background callbacks drain and release timer ownership (menu-leaf-perf-2026-10-02)",
 	_MP_RealBackgroundTimer)
@@ -353,3 +362,14 @@ _MP_PartialBatchFailure() {
 }
 Test("menu population: partial batch failures retain ownership without replay (menu-batch-perf-2026-10-02)",
 	_MP_PartialBatchFailure)
+
+_MP_BackgroundTimerPreservesPriority() {
+	Source := _DriverSourceNoComments()
+	Assert(Source != "" && InStr(Source, "class MenuPopulation") > 0, "the production owner must exist")
+	AssertContains(Source, "global MENU_POPULATION_THREAD_PRIORITY := -1")
+	AssertEqual(2, StrSplit(Source,
+		"SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)").Length - 1,
+		"both initial scheduling and one-shot rearming retain foreground priority")
+}
+Test("menu population: background timer never interrupts foreground controller initialization (menu-background-priority)",
+	_MP_BackgroundTimerPreservesPriority)
