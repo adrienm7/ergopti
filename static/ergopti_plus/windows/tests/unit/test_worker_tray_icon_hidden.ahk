@@ -47,6 +47,51 @@ _WTIH_ScriptWindow(Pid, TimeoutMs) {
 	finally DetectHiddenWindows(PreviousDetect)
 }
 
+; An inert owner captures load-time parser failures before any script HWND exists.
+_WTIH_NewOwnedWorker(Args) {
+	Receipt := {Calls: 0, Code: "pending", Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	return {Handle: ShellRunner_SpawnTreeOwned(A_AhkPath, Args, OnDone), Receipt: Receipt, Pid: 0}
+}
+
+_WTIH_WorkerEvidence(Probe) {
+	Receipt := Probe.Receipt
+	return Format(" [worker pid={1}, completions={2}, exit={3}, stdout={4}, stderr={5}]",
+		Probe.Pid, Receipt.Calls, Receipt.Code, Receipt.Output, Receipt.Errors)
+}
+
+; Polling joins the exact native/capture owner even when parsing exits immediately.
+_WTIH_OwnedScriptWindow(Probe, TimeoutMs) {
+	PreviousDetect := A_DetectHiddenWindows
+	DetectHiddenWindows(true)
+	try {
+		Started := A_TickCount
+		loop {
+			_SR_TreePoll()
+			Hwnd := WinExist("ahk_class AutoHotkey ahk_pid " . Probe.Pid)
+			if Hwnd
+				return Hwnd
+			if Probe.Receipt.Calls || (A_TickCount - Started) >= TimeoutMs
+				return 0
+			Sleep(50)
+		}
+	} finally DetectHiddenWindows(PreviousDetect)
+}
+
+; A Boolean receipt acknowledges the owned tree; a reused PID is never authority.
+_WTIH_RetireOwnedWorker(Probe) {
+	Released := Probe.Handle.terminate()
+	Detached := Probe.Handle.detach()
+	Assert(Released = true && Detached = true,
+		"the fixture must settle its exact worker tree and completion owner"
+			. _WTIH_WorkerEvidence(Probe))
+}
+
 ; The title AutoHotkey gives the entry's main window, which Reload and
 ; #SingleInstance use to find the instance they close.
 _WTIH_DriverTitle(Entry) {
@@ -110,19 +155,29 @@ _WTIH_WorkerShowsNoTrayIcon() {
 		ReadyFrom := wParam
 	}
 	OnMessage(0x004A, _WTIH_OnCopyData, -1)
-	Pid := 0
+	Probe := 0, Failure := 0
 	try {
 		; /force keeps #SingleInstance Force from closing a live driver that runs
 		; this same entry; the production spawn passes it for the same reason.
-		Run('"' . A_AhkPath . '" /force /ErrorStdOut "' . Entry
-			. '" --uia-selection-worker ' . A_ScriptHwnd . ' 1', , "Hide", &Pid)
-		WorkerHwnd := _WTIH_ScriptWindow(Pid, _WTIH_READY_TIMEOUT_MS)
-		Assert(WorkerHwnd != 0, "the worker must start and create its script window")
+		Probe := _WTIH_NewOwnedWorker(["/force", "/ErrorStdOut", Entry,
+			"--uia-selection-worker", A_ScriptHwnd . "", "1"])
+		Started := Probe.Handle.start()
+		Probe.Pid := Probe.Handle.processId()
+		Assert(Started = true, "the worker's exact native launch must commit"
+			. _WTIH_WorkerEvidence(Probe))
+		WorkerHwnd := _WTIH_OwnedScriptWindow(Probe, _WTIH_READY_TIMEOUT_MS)
+		Assert(WorkerHwnd != 0, "the worker must start and create its script window"
+			. _WTIH_WorkerEvidence(Probe))
 		Started := A_TickCount
-		while (ReadyFrom != WorkerHwnd) && (A_TickCount - Started) < _WTIH_READY_TIMEOUT_MS
+		while (ReadyFrom != WorkerHwnd) && (A_TickCount - Started) < _WTIH_READY_TIMEOUT_MS {
+			_SR_TreePoll()
+			if Probe.Receipt.Calls
+				break
 			Sleep(50)
+		}
 		Assert(ReadyFrom = WorkerHwnd,
-			"the worker must reach its main and announce readiness to this runner")
+			"the worker must reach its main and announce readiness to this runner"
+				. _WTIH_WorkerEvidence(Probe))
 		; Observe for a while: the worker lives until its parent window goes away.
 		loop 10 {
 			Assert(!_WTIH_ShellHasIcon(WorkerHwnd),
@@ -131,11 +186,20 @@ _WTIH_WorkerShowsNoTrayIcon() {
 		}
 		Assert(_WTIH_WindowTitle(WorkerHwnd) != _WTIH_DriverTitle(Entry),
 			"a worker must not keep the driver's window title, or Reload can close it instead of the driver")
+	} catch as Err {
+		Failure := Err
 	} finally {
 		OnMessage(0x004A, _WTIH_OnCopyData, 0)
-		if Pid
-			try ProcessClose(Pid)
+		if IsObject(Probe) {
+			try _WTIH_RetireOwnedWorker(Probe)
+			catch as CleanupError {
+				Failure := Error((IsObject(Failure) ? Failure.Message . " | " : "")
+					. "Worker cleanup failed: " . CleanupError.Message)
+			}
+		}
 	}
+	if IsObject(Failure)
+		throw Failure
 }
 Test("boot: a detached worker re-running the entry shows no tray icon (worker-tray-icon-2026-09-25)",
 	_WTIH_WorkerShowsNoTrayIcon)
@@ -147,19 +211,25 @@ _WTIH_ShortWorkerNeverShowsDriverIdentity() {
 	_WTIH_ControlProbeSeesAnOrdinaryIcon()
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Entry := WindowsDir . "\ErgoptiPlus.ahk"
-	Pid := 0
+	Pid := 0, Probe := 0, Failure := 0
 	IconSightings := 0
 	RaisedPriority := false
 	LastTitle := ""
 	try {
-		Run('"' . A_AhkPath . '" /force /ErrorStdOut "' . Entry
-			. '" --keylogger-prefetch-worker', , "Hide", &Pid)
+		Probe := _WTIH_NewOwnedWorker(["/force", "/ErrorStdOut", Entry,
+			"--keylogger-prefetch-worker"])
+		Started := Probe.Handle.start()
+		Probe.Pid := Probe.Handle.processId()
+		Assert(Started = true, "the short worker's exact native launch must commit"
+			. _WTIH_WorkerEvidence(Probe))
+		Pid := Probe.Pid
 		PreviousDetect := A_DetectHiddenWindows
 		DetectHiddenWindows(true)
 		try {
 			Hwnd := 0
 			Started := A_TickCount
-			while ProcessExist(Pid) && (A_TickCount - Started) < 30000 {
+			while !Probe.Receipt.Calls && (A_TickCount - Started) < 30000 {
+				_SR_TreePoll()
 				if !Hwnd
 					Hwnd := WinExist("ahk_class AutoHotkey ahk_pid " . Pid)
 				if Hwnd {
@@ -171,18 +241,30 @@ _WTIH_ShortWorkerNeverShowsDriverIdentity() {
 					RaisedPriority := true
 			}
 		} finally DetectHiddenWindows(PreviousDetect)
-		Assert(!ProcessExist(Pid), "the payload-less worker must refuse and exit on its own")
-		Assert(LastTitle != "", "the worker's main window must have been observed")
+		Assert(Probe.Receipt.Calls = 1 && !ProcessExist(Pid),
+			"the payload-less worker must refuse and exit on its own"
+				. _WTIH_WorkerEvidence(Probe))
+		Assert(LastTitle != "", "the worker's main window must have been observed"
+			. _WTIH_WorkerEvidence(Probe))
 		AssertEqual(0, IconSightings,
 			"a detached worker must never own a tray icon, not even for the first milliseconds")
 		Assert(LastTitle != _WTIH_DriverTitle(Entry),
 			"a worker must not keep the driver's window title, or Reload can close it instead of the driver")
 		Assert(!RaisedPriority,
 			"a background worker must not raise itself to the driver's AboveNormal priority")
+	} catch as Err {
+		Failure := Err
 	} finally {
-		if Pid && ProcessExist(Pid)
-			try ProcessClose(Pid)
+		if IsObject(Probe) {
+			try _WTIH_RetireOwnedWorker(Probe)
+			catch as CleanupError {
+				Failure := Error((IsObject(Failure) ? Failure.Message . " | " : "")
+					. "Worker cleanup failed: " . CleanupError.Message)
+			}
+		}
 	}
+	if IsObject(Failure)
+		throw Failure
 }
 Test("boot: a detached worker never shows the driver's identity, from launch to exit (worker-tray-icon-2026-09-25)",
 	_WTIH_ShortWorkerNeverShowsDriverIdentity)

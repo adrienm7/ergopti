@@ -155,7 +155,6 @@ ManifestFindEntryByPath(V2Path) {
 
 ; Detached values keep mutable runtime state from changing neutral absence.
 ManifestCloneValue(Value) {
-	global TOML_Bool
 	if IsSet(TOML_Bool) && (Value is TOML_Bool)
 		return TOML_Bool(Value.Value)
 	if Value is Map {

@@ -377,7 +377,7 @@ _HSCS_WithDynamicBootState(Body) {
 ; Dynamic scopes have seven canonical families and no separate category gate.
 ; The native submenu reaches the same journal while the master or pause is off.
 _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
-	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks
+	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks, _TomlFileCache
 	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Accepted := 0, Launches := 0
 	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
 		"iban_prefixes", "text_expansion_personal_information"]
@@ -434,8 +434,20 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 		if Outcome != "immediate_refusal" {
 			AssertEqual("pending", Receipt["status"], "accepted launch is not replacement acknowledgement")
 			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the exact source is backed up before publication")
+			; Replacement boot reads pending bytes in a fresh interpreter. Mirror
+			; that read boundary with an exact owned copy, retaining this process
+			; cache until its transaction receives acknowledgement or refusal.
+			CandidatePath := Fixture.directory . "\replacement-reader.toml"
+			CandidateBytes := FSReadUtf8Exact(Fixture.path)
+			Assert(FSWriteDurable(CandidatePath, CandidateBytes))
+			AssertEqual(CandidateBytes, FSReadUtf8Exact(CandidatePath))
 			Target := ManifestBuildFeaturesMap()
-			ApplyConfigToml(Target, Fixture.path)
+			try ApplyConfigToml(Target, CandidatePath)
+			finally {
+				if _TomlFileCache.Has(CandidatePath)
+					_TomlFileCache.Delete(CandidatePath)
+			}
+			AssertEqual(Source, ReadTomlFile(Fixture.path), "pending publication preserves the live text cache")
 			Actual := ManifestFeaturesForSection("hotstrings.dynamic")
 			AssertEqual(Names.Length, Actual.Length, "every current dynamic family belongs to the canonical inventory")
 			for Name in Names {
