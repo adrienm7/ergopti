@@ -1443,6 +1443,9 @@ if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected
 	&& Features["shortcuts"]["wrap_text_if_selected"]
 	SetTimer(UIASW_Start, -1)
 
+if _DriverStartupSmokeDir == "" && IsCategoryGated("Hotstrings")
+	SetTimer(TooltipPositionWarmStart, -1)
+
 ; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
 ; All the heavy off-critical-path work is armed HERE, after the driver is ready,
 ; rather than mid-boot. A SetTimer armed earlier fires ~its-delay later and AHK

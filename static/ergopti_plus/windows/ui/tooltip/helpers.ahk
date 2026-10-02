@@ -425,7 +425,8 @@ _UiOracleReportError(Message) {
 ; keystroke callback.
 _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 	ClearDequeue := false, ExpectedRequestSerial := -1,
-	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset) {
+	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset, PositionContext := 0) {
+		; A provider receipt must survive GUI preparation, not just worker return.
 		global _TOOLTIP_SAFETY_SEC
 		global _TooltipActiveSurface
 		global _TooltipGeneration, _TooltipTimerGeneration
@@ -497,6 +498,11 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 				DecisionCurrent := _TooltipDecisionItemsStillCurrent(PublishItems)
 				HotPath_BreakdownMark("decision", _hpDecision, Breakdown)
 				if DecisionCurrent {
+					_hpPositionContext := HotPath_Now()
+					PositionCurrent := _TooltipPreparedPositionStillCurrent(PositionContext)
+					HotPath_BreakdownMark("position_context", _hpPositionContext, Breakdown)
+					if !PositionCurrent
+						Selection.Committed := false
 					; Deadline is the last predicate before commit/reveal. A row with 1 ms
 					; remaining cannot expire while a slower decision oracle runs afterward.
 					_hpAbsoluteDeadline := HotPath_Now()
@@ -510,7 +516,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 					if DeadlineBounds.Expired
 						DeadlinesLive := false
 					HotPath_BreakdownMark("deadline", _hpDeadline, Breakdown)
-					if DeadlinesLive {
+					if DeadlinesLive && PositionCurrent {
 						RetiredSurface := Selection.Retired
 
 						; Attach all semantic ownership to the detached candidate before
@@ -634,6 +640,8 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			HotPath_BreakdownMark("accounting", _hpPostPresent, Breakdown)
 			_hpPostPresent := HotPath_Now()
 			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
+			HotPath_BreakdownMark("notify", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
 		}
 		if IsSet(_LLM_TooltipScheduleMetricDrain)
 			_LLM_TooltipScheduleMetricDrain()
@@ -1751,7 +1759,7 @@ _TooltipCaretHeightPx() {
 		return Round(_TooltipMeasureText("Ag").H * _TooltipDpiScale())
 }
 
-_TooltipResolvePosition() {
+_TooltipResolvePosition(DeferUia := false) {
 		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
 		global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
 		global _TooltipPositionCache, TOOLTIP_POSITION_CACHE_MS
@@ -1768,13 +1776,15 @@ _TooltipResolvePosition() {
 		if (GotCaret and (Cx != 0 or Cy != 0)) {
 				_TooltipCountResolveExit("caret")
 				return _TooltipCachePosition(WinExist("A"),
-						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx() })
+						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx(),
+							NativeCaret: true })
 		}
 
 		ActiveHwnd := WinExist("A")
 		CurrentEnvironment := _TooltipReadPositionReceipt(ActiveHwnd)
 		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, ActiveHwnd,
-				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS) {
+				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS,
+				WIGetFocusedControlToken()) {
 				_TooltipCountResolveExit("cache")
 				return { Type: _TooltipPositionCache["type"],
 						X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"],
@@ -1785,9 +1795,9 @@ _TooltipResolvePosition() {
 		ProcName := ""
 		try ProcName := WinGetProcessName("ahk_id " . ActiveHwnd)
 		UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
-		UiaAllowed := !UiaSkippedForIdle
+		UiaAllowed := !DeferUia && !UiaSkippedForIdle
 				and !_TooltipUiaProcessIsHostile(ProcName)
-		UiaProbeDeferred := UiaSkippedForIdle
+		UiaProbeDeferred := DeferUia || UiaSkippedForIdle
 		if UiaAllowed {
 				Context := _TooltipCurrentUiaContext()
 				if (Context is Map) && Context["Hwnd"] = ActiveHwnd
@@ -1846,16 +1856,18 @@ _TooltipCacheUnlessProbePending(Hwnd, Pos, ProbePending) {
 		return _TooltipCachePosition(Hwnd, Pos)
 }
 
-_TooltipCachePosition(Hwnd, Pos) {
+_TooltipCachePosition(Hwnd, Pos, Context := 0) {
 		global _TooltipPositionCache
 		_TooltipPositionCache := Map(
 				"hwnd", Hwnd,
+				"control", Context is Map ? Context["Control"] : WIGetFocusedControlToken(),
 				"type", Pos.Type,
 				"x", Pos.X,
 				"y", Pos.Y,
 				"h", Pos.H,
 				"tick", A_TickCount,
-				"environment", _TooltipReadPositionReceipt(Hwnd)
+				"environment", Context is Map ? Context["Environment"]
+					: _TooltipReadPositionReceipt(Hwnd)
 		)
 		return Pos
 }

@@ -10,9 +10,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Single InputHook in pass-through mode (V flag) so the watcher observes
 ;    every keystroke without intercepting it.
-; 2. Debounced render (_PREFIX_RENDER_DEBOUNCE_MS = 150 ms) — continuous
-;    typing produces no tooltip rebuild; the preview surfaces on the
-;    deliberate pause before the magic-key press.
+; 2. Next-turn render (_PREFIX_RENDER_DEBOUNCE_MS = 1 ms) — coalesce pending
+;    work without delaying a complete trigger until typing has paused.
 ; 3. Suppression depth counter (_PrefixWatcherSuppressed) — refcount semantics
 ;    so nested suppress/release pairs from concurrent paths balance correctly.
 ; 4. Deferred fire-log drain — KL_LogHotstring runs off the synchronous
@@ -104,7 +103,7 @@ global _MAX_BUFFER_LEN := 256
 ; a fast typist's inter-keystroke gap (~120-150 ms) so continuous typing produces
 ; NO render at all; the preview then appears on the deliberate pause that precedes
 ; a magic-key press. Lowered once the render itself is made cheap (GUI reuse).
-global _PREFIX_RENDER_DEBOUNCE_MS := 150
+global _PREFIX_RENDER_DEBOUNCE_MS := 1
 
 ; Hotstring-fired metrics logging (KL_LogHotstring: buffer flush + JSONL append +
 ; per-char WPM pushes) is analytics, NOT user-facing, yet it ran synchronously on
@@ -129,6 +128,7 @@ global _HSE_FireLogTimer := 0
 global _PrefixDeferredGeneration := 0
 global _PrefixRenderScheduledGeneration := -1
 global _PrefixRenderTimer := 0
+global _PrefixRenderQueuedWallMs := 0
 
 ; What a diagnostic line may print of a keystroke buffer.
 ;
@@ -933,6 +933,7 @@ HotstringPrefixWatcherRebuildIndex() {
 ; preview from the tray menu or before reloading.
 HotstringPrefixWatcherStop() {
 	global _PrefixInputHook, _PrefixIndex
+	TooltipPositionWarmStop()
 	; Stop is a terminal lifecycle boundary (the sole production caller is the
 	; global shutdown handler). Retire every timer owner before clearing state so
 	; no captured callback can publish after teardown.
@@ -1935,6 +1936,9 @@ HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken) {
 		return _NotifySuggestionDismissedForSurfaceReplacement(SurfaceToken)
 	if !IsObject(PrimaryItem)
 		return false
+	if PrimaryItem.HasOwnProp("PreviewStartedWallMs") && PrimaryItem.PreviewStartedWallMs > 0
+		HotPath_RecordLatency("Prefix.InputToVisible",
+			BootClockWallMs() - PrimaryItem.PreviewStartedWallMs, 50)
 	; This callback is deliberately outside the renderer Critical span. The metric
 	; helper binds its state + final keylogger queue push to SurfaceToken without
 	; running privacy work under Critical.
@@ -2146,7 +2150,7 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; project them into tooltip rows. The file catalogue is deliberately absent.
 ; Debounced render scheduler — see _PREFIX_RENDER_DEBOUNCE_MS. Each keystroke
 ; re-arms a one-shot timer (negative period), so a burst of keystrokes collapses
-; into ONE trailing render once typing pauses. The flush re-runs the lookup
+; into ONE next-turn render. The flush re-runs the lookup
 ; against the CURRENT buffer, so the coalesced render always reflects the latest
 ; typed state. Only the visual preview is deferred — the expansion/fire path
 ; (HSE_DispatchMatch) stays fully synchronous, and _ResetPrefixBuffer keeps its
@@ -2155,8 +2159,11 @@ _PrefixScheduleRender() {
 	global _PREFIX_RENDER_DEBOUNCE_MS
 	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
 	global _PrefixDeferredGeneration
+	global _PrefixRenderQueuedWallMs
+	QueuedWallMs := BootClockWallMs()
 	PreviousCritical := Critical("On")
 	try {
+		_PrefixRenderQueuedWallMs := QueuedWallMs
 		; Reuse one adapter handle and BoundFunc throughout a lifecycle so the
 		; per-keystroke debounce stays allocation-free. A new lifecycle gets a
 		; new immutable owner.
@@ -2204,6 +2211,8 @@ _PrefixCancelRender() {
 _PrefixRenderFlush(Generation := unset) {
 	global _PrefixWatcherSuppressed, HSE_Suppressed
 	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
+	global _PrefixRenderQueuedWallMs, _PREFIX_RENDER_DEBOUNCE_MS
+	QueuedWallMs := 0
 	if !IsSet(Generation)
 		Generation := _PrefixRenderScheduledGeneration
 	; Belt-and-suspenders: retire only this exact owner. A stale callback must
@@ -2211,6 +2220,7 @@ _PrefixRenderFlush(Generation := unset) {
 	PreviousCritical := Critical("On")
 	try {
 		if (Generation == _PrefixRenderScheduledGeneration) {
+			QueuedWallMs := _PrefixRenderQueuedWallMs
 			TimerCancel(_PrefixRenderTimer)
 			_PrefixRenderTimer := 0
 			_PrefixRenderScheduledGeneration := -1
@@ -2223,6 +2233,9 @@ _PrefixRenderFlush(Generation := unset) {
 	; pause so the old state can never repaint itself into the new context.
 	if !_PrefixDeferredCanPublish(Generation)
 		return
+	if QueuedWallMs > 0
+		HotPath_RecordLatency("Prefix.RenderQueue", BootClockWallMs() - QueuedWallMs,
+			_PREFIX_RENDER_DEBOUNCE_MS)
 	; Skip while a send burst is in flight: TooltipShow is a ~20-55 ms Gui rebuild
 	; (Build + Present + DWM border) that pumps the message loop, so running it
 	; during an expansion could let the preview straddle the burst. The fire path
@@ -2367,6 +2380,7 @@ _PrefixCollectCandidates(ContentGeneration := unset,
 
 _LookupAndRender() {
 	global _PrefixBuffer
+	global _PrefixRenderQueuedWallMs
 	global _PrefixContentGeneration, _PrefixInputContextGeneration
 	; Capture text and both ownership epochs as one in-memory context. Candidate
 	; resolution may yield in a callable; these immutable values follow every
@@ -2376,6 +2390,7 @@ _LookupAndRender() {
 		PrefixSnapshot := _PrefixBuffer
 		ContentGeneration := _PrefixContentGeneration
 		InputContextGeneration := _PrefixInputContextGeneration
+		PreviewStartedWallMs := _PrefixRenderQueuedWallMs
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -2385,8 +2400,10 @@ _LookupAndRender() {
 	; DEBUG site that fires on the expansion itself rather than on a keystroke.
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Lookup and render: buffer_units={1} len={2}.", _PrefixLogSafe(PrefixSnapshot), Len)
+	CandidateStarted := HotPath_Now()
 	Candidates := _PrefixCollectCandidates(
 		ContentGeneration, InputContextGeneration)
+	HotPath_LogIfSlow("Prefix.PreviewDecisions", CandidateStarted)
 	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "No prefix match: buffer_units={1}.", _PrefixLogSafe(PrefixSnapshot))
@@ -2401,6 +2418,7 @@ _LookupAndRender() {
 	; each completion key, ordered end-char then magic. There are no speculative
 	; losers to dim and no trigger-suffix heuristic to classify.
 	Items := []
+	MetadataStarted := HotPath_Now()
 	for _, Entry in Candidates {
 		Cfg := HotstringsResolve(Entry.Category, Entry.Section)
 		if !Cfg.ShowTooltip
@@ -2421,12 +2439,14 @@ _LookupAndRender() {
 		          Trigger: Entry.Trigger, Category: Entry.Category,
 		          IsDimmed: false, FireDecision: Decision,
 		          IsPrivate: (Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? true : false }
+		Item.PreviewStartedWallMs := PreviewStartedWallMs
 		if GateDurationMs > 0 {
 			Item.ExpireOriginTick := Decision.GateOriginTick
 			Item.ExpireDurationMs := GateDurationMs
 		}
 		Items.Push(Item)
 	}
+	HotPath_LogIfSlow("Prefix.PreviewMetadata", MetadataStarted)
 	if (Items.Length == 0) {
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")

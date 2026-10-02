@@ -39,4 +39,5 @@
 #Include border_gdi_ownership.ahk
 #Include measure_gdi_ownership.ahk
 #Include helpers.ahk
+#Include position_refinement.ahk
 #Include llm.ahk
