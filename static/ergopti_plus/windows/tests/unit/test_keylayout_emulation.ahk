@@ -738,12 +738,13 @@ _KLT_ResetKeyCase(Code) {
 		AssertTrue(Capture.Rows.Has(Name), Code . ": the computed reset must share its scan-code identity")
 		AssertFalse(Capture.Rows.Has("~" . Record["ahk_send"]), Code . ": no shadowed name twin")
 		Row := Capture.Rows[Name]
-		for Seed in [["ergol", "SC018"], ["ergopti", "SC02B"], ["ergopti", "SC01B"],
-			["ergopti_plus", "SC02B"], ["ergopti_plus", "SC01B"]] {
+		for Seed in [["ergol", "SC018", false], ["ergopti", "SC02B", false], ["ergopti", "SC01B", false],
+			["ergopti_plus", "SC02B", false], ["ergopti_plus", "SC01B", true]] {
 			_KLT_Load(Seed[1])
 			Plain := KeylayoutEmulation_Press("SC020", false, false, false)
 			AssertFalse(Row["criterion"].Call(), "a reset stays inert without a pending dead key")
-			AssertEqual("", KeylayoutEmulation_Press(Seed[2], false, false, false), "the seed starts a dead key")
+			AssertEqual("", KeylayoutEmulation_Press(Seed[2], Seed[3], false, false),
+				Seed[1] . " " . Seed[2] . " shift=" . Seed[3] . ": the seed starts a dead key")
 			AssertTrue(Row["criterion"].Call(), Name . ": the registered reset owns a pending dead key")
 			CategoryEnabled["Layout"] := false
 			AssertFalse(Row["criterion"].Call(), "a disabled layout leaves navigation native")

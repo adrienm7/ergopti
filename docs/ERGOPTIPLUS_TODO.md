@@ -619,14 +619,49 @@ branch has been removed; the run also covers the 21-locale privacy label.
       suspended/privacy-filtered input with automated cross-driver tests.
 
 - [ ] **106.** Expand the shared gesture/keyboard action catalogue for user
-      automation. Discover and offer Apple Shortcuts on macOS, and let every
-      driver assign actions that launch a user script, Python file or other
-      executable with explicit parameters. Use the same parameter model,
+      automation. Discover and offer Apple Shortcuts on macOS; inventory and
+      expose available Windows/Linux equivalents, installed automation tools,
+      shell/PowerShell scripts, launchers and application actions. Verify each
+      provider's real invocation contract and availability rather than listing
+      unimplemented actions. Let every driver assign a user script, Python file
+      or other executable with explicit parameters. Use the same parameter model,
       picker and persistence for gestures, keyboard shortcuts and other action
       consumers; keep discovery and execution in platform adapters, with
       translated reasons for unavailable OS-specific actions. Test real fixture
       scripts, paths/arguments with spaces and Unicode, process-start refusal,
       execution errors, lifecycle/cancellation and cross-consumer parity.
+
+- [ ] **107.** Make the number-row policy explicit: native behavior, digits
+      directly, or symbols directly. Enabling direct digits on QWERTY must keep
+      its already-direct digits rather than swap them; the inverse choice puts
+      QWERTY symbols on plain presses and digits on Shift. Migrate the existing
+      Windows `direct_access_digits` choice through its configuration owner,
+      preserving unowned settings. Derive the effective native/emulated levels
+      rather than assuming AZERTY, and cover 1–0, both Shift states, AZERTY,
+      QWERTY, emulation changes and live HKL transitions in native regressions.
+      Share the policy and behavior vectors wherever another driver supports
+      number-row remapping, documenting genuine platform limits.
+
+- [ ] **108.** Retire the greyed Win+magic-key editor-shortcut row from
+      Hotstrings > Personal hotstrings, along with its dedicated binding owner.
+      Recommend the hotstrings-editor action in Shortcuts > Win shortcuts
+      instead, through the ordinary user-owned assignment model. The user can
+      delete it, change it or assign the same action elsewhere; do not force a
+      fixed shortcut or replace an existing personal assignment. Account for
+      the chosen physical magic-key source, migrate any owned legacy setting
+      deliberately and cover neutral/recommended scopes, menu placement,
+      assignment removal/rebinding and editor invocation across drivers.
+
+- [ ] **109.** Name the bundled hotstrings extension "Ergopti+", including
+      the Hotstrings submenu label that currently omits "+". Keep internal
+      layout/extension identifiers stable; distinguish a display name from a
+      registry id. Update the shared naming owner and all applicable locale
+      labels, and assert the rendered label on Windows/macOS/Linux.
+
+- [ ] **110.** Recommend monitor-local Alt+Tab for the Windows four-finger
+      tap gesture. Change its authoritative recommended action and generated
+      projections, preserve an existing personal assignment, and test the
+      recommended-scope/wizard import and actual action-dispatch binding.
 
 The shared Shortcuts declaration separates modifier-shortcut groups from key
 combinations. Linux currently omits the combinations group, so the same boundary
@@ -680,7 +715,11 @@ names (Backspace, Escape, Enter, Tab and Delete). macOS/Linux use installed OS
 layouts for dead-key handling and have no corresponding AHK registration.
 The four prediction-navigation arrow hotkeys now share those scan-code
 identities too; their existing ownership, hook-order and step assertions remain
-intact. Native validation is pending the next non-release run.
+intact. Non-release run 36941345120 caught an incorrect new fixture seed: Ergopti+
+places diaeresis on Shift+SC01B, unlike Ergopti. The seed now follows that
+actual shipped level and reports its layout/key/modifiers on refusal. Thirteen
+cases refused the wrong seed; one additional Windows failure still needs the
+next native run's evidence. The production identity repair remains unchanged.
 
 ## Time estimate
 
