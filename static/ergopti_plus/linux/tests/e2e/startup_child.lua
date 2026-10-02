@@ -16,7 +16,9 @@
 ---     [<config.toml to seed>]
 --- Actions: boot (start and idle), restore_recommended (start, then the menu's
 --- « Restore recommended values », committed through the same composition the
---- row calls). Output: the daemon's log lines, E2E_* observation lines and a
+--- row calls), delimiters_add (persist a custom delimiter through its owner),
+--- and delimiters_verify (check its state after a cold start).
+--- Output: the daemon's log lines, E2E_* observation lines and a
 --- final E2E_DONE line.
 --- ==============================================================================
 
@@ -244,6 +246,30 @@ package.preload["adapters.event_loop"] = function()
 				end
 				soak(loop)
 			end
+		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
+			local Terminators = require("keymap.terminators")
+			local Settings = require("modules.hotstrings.terminator_settings")
+			if ACTION == "delimiters_add" then
+				record("FACT", "delimiter_added=" .. tostring(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false)))
+				record("FACT", "delimiter_committed=" .. tostring(Settings.persist()))
+			end
+			local path = require("infra.config_paths").config("config.toml")
+			local source = io.open(path, "rb")
+			local bytes = source and source:read("*a") or ""
+			if source then source:close() end
+			local document = require("toml_codec").decode(bytes)
+			local hotstrings = type(document) == "table" and document.hotstrings or nil
+			local list = type(hotstrings) == "table" and hotstrings.terminators or nil
+			local first = type(list) == "table" and list[1] or nil
+			local second = type(list) == "table" and list[2] or nil
+			local verified = type(first) == "table" and first.key == "custom_¤" and first.future == "kept"
+				and type(second) == "table" and second.key == "custom_µ" and second.char == "µ" and second.consume == false
+				and #list == 2 and hotstrings.unknown == "kept"
+				and type(document.other) == "table" and document.other.value == 42
+				and bytes:find("# Keep this user comment.", 1, true) ~= nil
+				and Terminators.is_terminator("¤") and Terminators.is_terminator("µ")
+				and Terminators.terminator_is_consumed("¤") and not Terminators.terminator_is_consumed("µ")
+			record("FACT", "custom_list_verified=" .. tostring(verified == true))
 		elseif ACTION ~= "boot" then
 			record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 		end
