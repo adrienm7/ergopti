@@ -90,12 +90,10 @@ const OPENS_SUBMENU = {
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	key_combinations: 'key_combinations_group',
-	// The menu one pair opens on Windows, from either hand's list: shown at the
-	// pointer when its row is clicked rather than hung under it as a submenu.
-	// On Windows only: macOS shows the same lists and hangs each pair's slots
-	// under its row, from its own cached trees.
-	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk'] },
-	key_combination_rows_right: { menu: 'key_combination_pair_menu', platforms: ['ahk'] },
+	// Both drivers render each pair's declaration: Windows opens it at the
+	// pointer, while macOS hangs it under the cached pair row.
+	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
+	key_combination_rows_right: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
@@ -547,7 +545,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // (key_combinations_group) renders the Karabiner chords through the renderer.
 // hs 15 → 16, linux 13 → 14: « Raccourcis de gestion du script »
 // (script_control_group), the script chords the three drivers share.
-const RENDERED_THROUGH_SHARED = { hs: 16, linux: 14 };
+// hs 16 → 17: every ordered pair reads key_combination_pair_menu; only its
+// native slot picker data stays in the driver.
+const RENDERED_THROUGH_SHARED = { hs: 17, linux: 14 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

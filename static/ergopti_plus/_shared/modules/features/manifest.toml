@@ -4431,22 +4431,24 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 # a copy of the hold picker as submenus would be thousands of menu rows built
 # at every start. Its clear row and its separator are declared here; the two
 # slots are data (their labels carry the action and the hold in force). macOS
-# draws each pair's slots as submenus of its row, from its own cached trees.
+# uses the same declaration for the submenu attached to each pair; the native
+# providers supply their supported slots and cached action-picker trees.
 [[menu.key_combination_pair_menu]]
 type = "command"
 id = "key_combination_clear"
 i18n = "menu.tapholds.nothing_combo"
-platforms = ["ahk"]
+disabled_when = ["key_combination_pair_assigned"]
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combination_pair_menu]]
 type = "---"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
 
 [[menu.key_combination_pair_menu]]
 type = "list"
 id = "key_combination_slots"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # « Raccourcis de gestion du script », the maintainer's first group of every

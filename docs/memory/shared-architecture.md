@@ -450,7 +450,12 @@ of those sections (`TomlConfigForeignOwner`). Windows has no chord slot:
 macOS's needs the first key to wait for the second, which the Windows tap-hold
 owners, taking their hold at key-down, do not do. The group's two lists, one
 per hand of the first key, and the separator between them are declared in the
-manifest for both drivers; a provider returns the pairs only. Action: a new
+manifest for both drivers; a provider returns the pairs only. Each pair also
+reads `key_combination_pair_menu`: the shared declaration owns its clear row,
+separator and slot list. Native providers supply their supported picker slots;
+`key_combination_pair_assigned` disables Clear on an unassigned pair. macOS
+attaches the already-rendered child as `submenu`, preserving its command and
+disabled state without a second translation/render pass. Action: a new
 slot or row of this group goes in the manifest first, and a Windows pair id
 never uses a double underscore, which is the separator of a binding id.
 

@@ -624,23 +624,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 	local combo_label = is_empty and NONE_DISPLAY
 		or string.format("%s  /  %s  /  %s", combo_slbl, tap_slbl, hold_slbl)
 
-	local combo_submenu = {
-		{
-			label    = i18n.get("menu.tapholds.nothing_combo"),
-			disabled = is_empty,
-			action       = function()
-				return run_bulk_menu_command(
-					karabiner,
-					"clear_combo_binding",
-					"Clearing one modifier combo…",
-					"Modifier combo cleared.",
-					false,
-					update_menu,
-					cid
-				)
-			end,
-		},
-		{ separator = true },
+	local slots = {
 		{
 			label = string.format(i18n.get("menu.shortcuts.key_combinations_chord"), combo_slbl),
 			items  = build_action_picker(
@@ -673,11 +657,24 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		},
 	}
 
+	local render_ctx = {
+		commands = {
+			["key_combination_clear"] = function()
+				return run_bulk_menu_command(karabiner, "clear_combo_binding",
+					"Clearing one modifier combo…", "Modifier combo cleared.", false, update_menu, cid)
+			end,
+		},
+		state_getters = { ["key_combination_pair_assigned"] = function() return is_active end },
+	}
+	local combo_submenu = ManifestMenu.build("key_combination_pair_menu", "KeyCombinations", nil, nil,
+		render_ctx, { ["key_combination_slots"] = function() return slots end })
+
 	return {
 		label    = string.format("%s  :  %s", combo_def.label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
-		items     = enabled and combo_submenu or nil,
+		-- This child has already passed through the shared renderer.
+		submenu   = enabled and combo_submenu or nil,
 	}
 end
 
