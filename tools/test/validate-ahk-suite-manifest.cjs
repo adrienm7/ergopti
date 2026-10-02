@@ -134,6 +134,19 @@ function validateAhkSuiteManifest(source) {
 	};
 }
 
+/** Emits readable local errors and escaped GitHub annotations in hosted CI. */
+function manifestError(message) {
+	if (process.env.GITHUB_ACTIONS === 'true') {
+		const escaped = String(message)
+			.replaceAll('%', '%25')
+			.replaceAll('\r', '%0D')
+			.replaceAll('\n', '%0A');
+		console.error(`::error::${escaped}`);
+	} else {
+		console.error(message);
+	}
+}
+
 function main(argv) {
 	const inputIndex = argv.indexOf('--input');
 	const jsonIndex = argv.indexOf('--json');
@@ -148,7 +161,7 @@ function main(argv) {
 	try {
 		source = fs.readFileSync(input, 'utf8');
 	} catch (error) {
-		console.error(`AHK execution manifest unavailable: ${error.message}`);
+		manifestError(`AHK execution manifest unavailable: ${error.message}`);
 		return 2;
 	}
 	const manifest = validateAhkSuiteManifest(source);
@@ -156,10 +169,10 @@ function main(argv) {
 		fs.writeFileSync(argv[jsonIndex + 1], `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 	}
 	if (!manifest.complete) {
-		console.error(
+		manifestError(
 			`AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`
 		);
-		for (const error of manifest.errors.slice(0, 20)) console.error(`  - ${error}`);
+		for (const error of manifest.errors.slice(0, 20)) manifestError(`  - ${error}`);
 		return 1;
 	}
 	console.log(
