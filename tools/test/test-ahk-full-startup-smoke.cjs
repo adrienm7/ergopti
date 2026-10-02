@@ -31,6 +31,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const {
+	createStartupCodeFixture,
+	prepareStartupPersonalInclude
+} = require('./lib/ahk-startup-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
@@ -172,7 +176,7 @@ function logTail(configRoot) {
 		.join('\n');
 }
 
-function main() {
+async function main() {
 	if (process.platform !== 'win32') {
 		console.log('\x1b[33m[SKIP] full AHK startup smoke — AutoHotkey is Windows-only.\x1b[0m');
 		return 0;
@@ -189,15 +193,22 @@ function main() {
 	if (!fs.existsSync(ENTRY)) return fail(`entry point missing: ${ENTRY}`);
 
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-full-startup-'));
-	const wrapper = path.join(WINDOWS, `.ergopti_startup_smoke_${process.pid}.ahk`);
+	const productionForwarder = path.join(WINDOWS, '_generated/personal_shortcuts.ahk');
+	const originalForwarder = fs.existsSync(productionForwarder)
+		? fs.readFileSync(productionForwarder)
+		: null;
+	const code = createStartupCodeFixture(path.join(scratch, 'code'), WINDOWS);
+	const wrapper = path.join(code.windows, `.ergopti_startup_smoke_${process.pid}.ahk`);
 	try {
-		// Keeping the wrapper beside ErgoptiPlus.ahk preserves A_ScriptDir and every
-		// relative #Include, while its unique filename prevents #SingleInstance Force
-		// from replacing a maintainer's live driver.
+		// The private entry preserves relative includes without sharing writable
+		// generated code. Its identity cannot replace the maintainer's live driver.
 		fs.writeFileSync(
 			wrapper,
-			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n#Include ErgoptiPlus.ahk\n' +
+			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n_DriverStartupSmokeInspectShell := _StartupSmokeShellReceipt\n_DriverStartupSmokeInspectBootstrap := _StartupSmokeEarlyClick\n#Include ErgoptiPlus.ahk\n' +
+				'_StartupSmokeEarlyClick(*) {\n\tglobal _TrayStartupClick\n\t_TrayStartupClick.PopupFn := _StartupSmokeShowPanel.Bind(_TrayStartupClick.PopupFn)\n\tPostMessage(0x404, 0, 0x205, , A_ScriptHwnd)\n}\n_StartupSmokeShowPanel(PopupFn) {\n\tPopupFn.Call()\n\tSetTimer(_StartupSmokePumpReceipt, -1)\n}\n' +
+				'_StartupSmokePumpReceipt(*) {\n\tglobal _TrayStartupPanel, _TrayStartupClick, _DriverReady\n\tif !IsObject(_TrayStartupPanel.Surface) || !DllCall("IsWindowVisible", "Ptr", _TrayStartupPanel.Surface.Hwnd) || (IsSet(_DriverReady) && _DriverReady) || _TrayStartupClick.MenuLoopOpen\n\t\tthrow Error("the modeless panel must leave bootstrap and timers running")\n\tFileAppend("pumped", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\modeless-pump.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeReceipts(*) {\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
+				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick\n\tif _TrayStartupClick.RequestCount != 1 || !_TrayStartupClick.Pending\n\t\tthrow Error("the early context click must stay modeless until the detailed root is ready")\n\tif _TrayFeatureHeadLabels.Length != 0 || !_TrayRootBootDetailsPending\n\t\tthrow Error("the ready shell must precede every detailed feature root")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif !Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the ready shell has no enabled root command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
 				'_ScriptChordSmokeReceipt() {\n' +
 				'\tglobal _ScriptAltGrChordRows\n' +
 				'\tLines := ""\n' +
@@ -269,12 +280,14 @@ function main() {
 			const markerBearing = fixture === 'suspend-marker';
 			const marker = path.join(configRoot, 'suspend_restore.marker');
 			if (markerBearing) fs.writeFileSync(marker, '1\n', 'utf8');
+			prepareStartupPersonalInclude(code.windows, path.join(configRoot, 'config'));
 			const result = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
-				cwd: WINDOWS,
+				cwd: code.windows,
 				encoding: 'utf8',
 				timeout: 120000,
 				env: {
 					...process.env,
+					LOCALAPPDATA: configRoot,
 					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
 					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : ''
 				}
@@ -287,6 +300,12 @@ function main() {
 					`${fixture} exited ${result.status}.${output ? `\n${output}` : ''}${logs ? `\n${logs}` : ''}`
 				);
 			}
+			if (!fs.existsSync(path.join(configRoot, 'modeless-pump.txt')))
+				return fail(`${fixture}: timers did not progress while the startup command panel was open`);
+			if (!fs.existsSync(path.join(configRoot, 'tray-shell.txt')))
+				return fail(
+					`${fixture}: no usable global-command root was published before feature construction`
+				);
 			if (extensionFixture) {
 				const receipt = path.join(configRoot, 'extension-receipt.txt');
 				const expected = [selected, selected, effective, false].map(Number).join('|');
@@ -318,10 +337,10 @@ function main() {
 			// Reuse the first fixture once so the no-bootstrap path is exercised too.
 			if (fixture === 'fresh-config') {
 				const second = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
-					cwd: WINDOWS,
+					cwd: code.windows,
 					encoding: 'utf8',
 					timeout: 120000,
-					env: { ...process.env, ERGOPTI_STARTUP_SMOKE_DIR: configRoot }
+					env: { ...process.env, LOCALAPPDATA: configRoot, ERGOPTI_STARTUP_SMOKE_DIR: configRoot }
 				});
 				if (second.error || second.status !== 0) {
 					const output = `${second.stdout || ''}${second.stderr || ''}`.trim();
@@ -341,9 +360,33 @@ function main() {
 		);
 		return 0;
 	} finally {
+		code.close();
 		fs.rmSync(wrapper, { force: true });
-		fs.rmSync(scratch, { recursive: true, force: true });
+		await new Promise((resolve) => setImmediate(resolve));
+		await fs.promises.rm(scratch, {
+			recursive: true,
+			force: true,
+			maxRetries: 12,
+			retryDelay: 100
+		});
+		const currentForwarder = fs.existsSync(productionForwarder)
+			? fs.readFileSync(productionForwarder)
+			: null;
+		if (
+			originalForwarder === null
+				? currentForwarder !== null
+				: !originalForwarder.equals(currentForwarder || Buffer.alloc(0))
+		)
+			throw new Error('The startup smoke modified the production personal-shortcuts include.');
 	}
 }
 
-process.exit(main());
+main().then(
+	(code) => {
+		process.exitCode = code;
+	},
+	(error) => {
+		console.error(error);
+		process.exitCode = 1;
+	}
+);

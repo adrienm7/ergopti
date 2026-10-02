@@ -236,3 +236,33 @@ _TRLR_PreTrayWorkerMustNotRun(PublishAuthorizeFn) {
 Test("tray root: pre-tray watchdog tolerates uninitialized retained state "
 	. "(ahk6-04-pretray-watchdog)",
 	_TRLR_PreTrayServiceIsSafeBeforeInitializer)
+
+; Publishing the small global-command root must not retire the paused boot's
+; remaining feature tree. Otherwise the ready shell stays live forever paused.
+_TRLR_ShellDoesNotRetireDetailedBoot() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootBootDetailsPending, _TrayRootLifecycleEpoch
+	Saved := _TRLR_SaveRootState()
+	SavedDetails := _TrayRootBootDetailsPending
+	WasSuspended := A_IsSuspended
+	try {
+		_TRLR_ResetRootState()
+		_TrayRootRequestedGeneration := 1
+		_TrayRootPublishedGeneration := 1
+		_TrayRootBootDetailsPending := true
+		Suspend(true)
+		AssertTrue(_TrayRootFirstPublicationPending(),
+			"the ready shell leaves the feature publication pending")
+		AssertTrue(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch),
+			"the detailed first root must publish under the restored pause")
+		_TrayRootBootDetailsPending := false
+		AssertFalse(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch),
+			"a completed detailed root restores the normal pause refusal")
+	} finally {
+		Suspend(WasSuspended)
+		_TrayRootBootDetailsPending := SavedDetails
+		_TRLR_RestoreRootState(Saved)
+	}
+}
+Test("tray root: the ready shell preserves paused feature publication (tray-shell-2026-10-02)",
+	_TRLR_ShellDoesNotRetireDetailedBoot)
