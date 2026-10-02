@@ -139,6 +139,11 @@ TrayMenuIsSeparatorAt(TargetMenu, Position) {
 	return (State & MF_SEPARATOR) != 0
 }
 
+/** Ends native navigation before a failed or reentered popup can be painted. */
+TrayMenuCancelNavigation() {
+	return DllCall("EndMenu", "int") != 0
+}
+
 ; Resets the tray icon and menu to AHK defaults.
 ; Calling this before ExitApp prevents orphaned tray icons.
 TrayMenuDestroy() {

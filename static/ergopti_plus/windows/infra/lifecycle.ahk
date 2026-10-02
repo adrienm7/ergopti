@@ -1133,6 +1133,9 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
+		try MenuPopulation_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Native menu preparation teardown failed: {1}.", Err.Message)
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
@@ -1172,16 +1175,24 @@ Ergopti_OnShutdown(reason, code) {
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
 	global _TrayRootBootDetailsPending
+	global _MenuPopulationBuilding, _MenuPopulationPublished
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
 	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
 	_DriverReady := false
 	BootProfile_StageBegin("tray menu")
+	if _MenuPopulationBuilding is MenuPopulation
+		throw Error("Native menu population already has a build owner")
+	PopulationOwner := MenuPopulation()
+	_MenuPopulationBuilding := PopulationOwner
 	try {
 		InitSubMenus()
 		Published := initMenu(PublishAuthorizeFn)
 	} finally {
 		_DriverReady := _SavedReady
+		_MenuPopulationBuilding := false
+		if _MenuPopulationPublished != PopulationOwner
+			PopulationOwner.Pending.Clear()
 	}
 	if !((Published is Integer) and Published == 1) {
 		; Closes the stage explicitly: a refused publication retries later, and an
@@ -1192,6 +1203,7 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	}
 	UpdateTrayIcon()
 	BootProfile_StageEnd("tray menu", "published")
+	PopulationOwner.Start()
 	if _LangMenuBuildPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
@@ -1271,6 +1283,7 @@ UpdateTrayIcon() {
 		; sees: grey every feature submenu on pause and restore them on resume.
 		; The global rows, « Suspendre » included, are not feature rows.
 		TrayMenu_ApplyPauseGreying(A_IsSuspended)
+		MenuPopulation_Resume()
 }
 ; The tray menu's own « Recharger » item — the single most obviously
 ; paused-reachable reload in the driver, and it dropped the pause like all the

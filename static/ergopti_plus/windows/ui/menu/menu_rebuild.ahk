@@ -244,6 +244,7 @@ TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 		}
 		; The new subtrees are now reachable from the tray. One whole-tree walk
 		; drops only registrations left behind by the retired generation.
+		MenuPopulation_Publish(A_TrayMenu)
 		MenuDispatcher_PruneMenu(A_TrayMenu)
 		; A new root starts with every row enabled. Re-apply the pause state
 		; right here so a root published while paused never offers a live
