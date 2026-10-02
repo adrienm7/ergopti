@@ -101,7 +101,7 @@ end
 --- @param ctx table Menu context.
 --- @param reason string|nil Diagnostic action label.
 --- @param mutation function Must return exact true on commitment.
---- @param publish function|nil State/persistence/notification callback.
+--- @param publish function|nil State/persistence/notification callback; false refuses commitment.
 --- @return boolean committed
 function M.commit_mutation(ctx, reason, mutation, publish)
 	if type(ctx) ~= "table" or type(mutation) ~= "function" then
@@ -121,7 +121,9 @@ function M.commit_mutation(ctx, reason, mutation, publish)
 
 	if type(publish) == "function" then
 		local publish_ok, publish_err = xpcall(publish, debug.traceback)
-		if not publish_ok then
+		-- A save owner can successfully return a refusal after rolling back.
+		-- Void UI callbacks still have no persistence result to acknowledge.
+		if not publish_ok or publish_err == false then
 			Logger.error(LOG, "Keymap mutation publication failed (%s): %s.",
 				tostring(reason or "menu action"), tostring(publish_err))
 			notify_mutation_failure()
