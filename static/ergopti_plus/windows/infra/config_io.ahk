@@ -912,6 +912,24 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 		"the '" . V1Cat . "' section toggle")
 }
 
+/**
+ * Publishes the dynamic families through the conditional reload journal.
+ * This category follows the Hotstrings master and owns no additional gate.
+ * @param {Integer} Enabled Explicit Boolean posture for every dynamic family.
+ * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ */
+HotstringsDynamicScopeApply(Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	Operations() {
+		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
+			throw TypeError("A dynamic hotstring scope requires an explicit Boolean target.")
+		return _ConfigBuildHotstringIntentPlan("dynamic", "", Enabled).updates
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
 ; Select one language pack in a single transaction without changing its masters.
 ToggleLanguageAllSections(Pack, Enable) {
 	return _ConfigCommitHotstringIntent("language", Pack, Enable,
@@ -949,6 +967,11 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			if !_LegacyTopCategoryMap.Has(Selector)
 				throw Error("Unknown hotstring category: " . Selector)
 			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
+				Entries.Push(Map("path", Entry["path"], "value", Bool))
+		case "dynamic":
+			; Discover the canonical families inside the admitted lease, independent
+			; of a menu preview or the mixed legacy tray map. There is no extra gate.
+			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
 				Entries.Push(Map("path", Entry["path"], "value", Bool))
 		case "language":
 			for Category in Selector["categories"] {

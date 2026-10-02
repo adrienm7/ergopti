@@ -318,3 +318,143 @@ _HSCS_DefaultMenuTargetsAreIndependent() {
 	}
 }
 Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)
+
+; Dynamic scopes have seven canonical families and no separate category gate.
+; The native submenu reaches the same journal while the master or pause is off.
+_HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
+	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks
+	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Accepted := 0, Launches := 0
+	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
+		"iban_prefixes", "text_expansion_personal_information"]
+	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.dynamic]`nenabled = false`n'
+	for Index, Name in Names {
+		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Mod(Index, 2) ? "true" : "false") . '`n'
+		if Name == "date"
+			Source .= 'time_activation_seconds = 0.75`n'
+	}
+	Source .= '[hotstrings.dynamic.future_family]`nenabled = true`n[private]`ncredential = "retain-dynamic-fixture"`n'
+	SavedFeatures := Features, SavedCategories := CategoryEnabled, SavedLegacy := _LegacyTopCategoryMap
+	SavedSuspend := A_IsSuspended
+	State := MasterGateState(), SavedState := State.Clone()
+	Launch(Success, Borrowed, Refused) {
+		Launches += 1
+		Bundle := Borrowed, Refusal := Refused, Accepted := Success
+		return Outcome != "immediate_refusal"
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Assert(FSWriteDurable(Fixture.path, Source))
+		Fixture.source := Source
+		Features := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Features, Fixture.path)
+		CategoryEnabled := Map("Hotstrings", false, "Rolls", true)
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+		Suspend(Paused)
+		RuntimeBefore := KL_JsonEncode(Features)
+		Cached := ParseTomlFile(Fixture.path)
+		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
+		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven families and their editor")
+		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")), "there is no invented dynamic category switch")
+		AssertEqual(1, _CTC_CountLabel(Built, t("menu.shortcuts.edit_personal_info")), "the existing editor stays reachable")
+		AssertFalse(_CTC_IsChecked(Built, 0))
+		AssertFalse(_CTC_IsChecked(Built, 1))
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "building the menu cannot persist a preference")
+		; A preview's legacy map cannot retarget the scope into another namespace.
+		_LegacyTopCategoryMap := Map("DynamicHotstrings", "shortcuts")
+		Position := Enabled ? 0 : 1
+		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id), "both commands retain their native callbacks behind a closed master")
+		Receipt := _MenuDispatchCallbacks[Id].Call()
+		AssertEqual(1, Launches, "one native click admits one whole-family transaction")
+		AssertEqual(Enabled ? "enable_all" : "disable_all", Receipt["mode"])
+		AssertEqual(RuntimeBefore, KL_JsonEncode(Features), "pending or refused replacement cannot publish runtime choices")
+		AssertEqual(Paused, A_IsSuspended, "the scope never resumes a paused driver")
+		AssertFalse(CategoryEnabled["Hotstrings"], "the native engine master stays off")
+		AssertTrue(CategoryEnabled["Rolls"], "another category keeps its native gate")
+		if Outcome != "immediate_refusal" {
+			AssertEqual("pending", Receipt["status"], "accepted launch is not replacement acknowledgement")
+			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the exact source is backed up before publication")
+			Target := ManifestBuildFeaturesMap()
+			ApplyConfigToml(Target, Fixture.path)
+			Actual := ManifestFeaturesForSection("hotstrings.dynamic")
+			AssertEqual(Names.Length, Actual.Length, "every current dynamic family belongs to the canonical inventory")
+			for Name in Names {
+				Loc := FeatureLocateV2(Target, "hotstrings.dynamic." . Name)
+				Assert(Loc is Map, "the independent family must resolve: " . Name)
+				AssertEqual(Enabled, Loc["v2_node"][Loc["key"]], "the real config reader sees the explicit posture of " . Name)
+			}
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertFalse(Parsed["category_enabled"]["hotstrings"])
+			AssertTrue(Parsed["category_enabled"]["rolls"])
+			AssertFalse(Parsed["category_enabled"].Has("dynamichotstrings"), "no additional category gate is written")
+			AssertFalse(Parsed["hotstrings.dynamic"]["enabled"], "an unrelated scalar keeps its stored value")
+			AssertTrue(Parsed["hotstrings.dynamic.future_family"]["enabled"], "unrecognized future families stay untouched")
+			AssertEqual(0.75, Parsed["hotstrings.dynamic.date"]["time_activation_seconds"])
+			AssertEqual("retain-dynamic-fixture", Parsed["private"]["credential"])
+			AssertEqual(ObjPtr(Cached), ObjPtr(ParseTomlFile(Fixture.path)), "pending bytes cannot replace cached desired authority")
+			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-dynamic-scope")))
+			if Outcome == "committed" {
+				Accepted.Call()
+				AssertEqual("committed", Receipt["status"], "only native acknowledgement completes publication")
+			} else {
+				Refusal.Call("native dynamic menu reload refused")
+			}
+		}
+		if Outcome != "committed" {
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "immediate and late refusal restore exact source bytes")
+			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
+			Assert(!(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object))
+		}
+	} finally {
+		if Built is Menu
+			_CTC_ReleaseMenu(Built)
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		Features := SavedFeatures, CategoryEnabled := SavedCategories, _LegacyTopCategoryMap := SavedLegacy
+		Suspend(SavedSuspend)
+		State.Clear()
+		for Key, Value in SavedState
+			State[Key] := Value
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+
+for _HSCS_Enabled in [true, false] {
+	for _HSCS_Outcome in ["immediate_refusal", "late_refusal", "committed"]
+		Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " keeps the master and handles " . _HSCS_Outcome,
+			_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, _HSCS_Outcome))
+	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " preserves pause across a late refusal",
+		_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, "late_refusal", true))
+}
+
+_HSCS_DynamicInvalidPosture() {
+	for Value in ["true", 2] {
+		Fixture := _ScopeOwnerFixture(), Launches := 0
+		try {
+			Fixture.options["reload"] := (*) => Launches += 1
+			Receipt := HotstringsDynamicScopeApply(Value, Fixture.options)
+			AssertEqual("refused", Receipt["status"], "an invalid request cannot publish a partial selection")
+			AssertEqual(0, Launches)
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+			AssertFalse(FSStrictExists(Receipt["backup"]), "an invalid request creates no backup or write")
+		} finally _ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstring-dynamic-menu-owner: invalid postures are refused before backup or reload", _HSCS_DynamicInvalidPosture)
+
+; This layout-only regression runs unchanged against the old zero-argument
+; builder: the original checkbox fails before any native action is invoked.
+_HSCS_DynamicMenuHead() {
+	Built := _BuildDynamicHotstringsSubmenu()
+	try {
+		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0), "the first command has explicit enable intent")
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1), "the second command has explicit disable intent")
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the state-dependent checkbox is retired")
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("hotstring dynamic submenu: explicit shared command head (hotstring-dynamic-menu-head)", _HSCS_DynamicMenuHead)

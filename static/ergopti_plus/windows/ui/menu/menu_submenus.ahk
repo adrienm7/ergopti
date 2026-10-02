@@ -186,13 +186,11 @@ _HS_LanguageRows() {
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring
 ; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
 ; the personal-info editor entry right after the text-expansion item.
-_BuildDynamicHotstringsSubmenu() {
+_BuildDynamicHotstringsSubmenu(Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	Rows := []
-	; One « all sections » checkbox for the dynamic-hotstrings category.
-	Rows.Push(_HS_AllSectionsRow(_HS_ScopeAllOn(["DynamicHotstrings"], _HS_SectionPaths("hotstrings.dynamic")),
-		(Bool) => ToggleCategoryAllSections("DynamicHotstrings", Bool)))
-	Rows.Push(Map("separator", true))
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
 			Rows.Push(Map("separator", true))
@@ -220,9 +218,8 @@ _BuildDynamicHotstringsSubmenu() {
 				"action", PersonalInformationEditor))
 		}
 	}
-	SubMenu := Menu()
-	MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_DynamicHotstrings", Rows)
-	return SubMenu
+	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
+		(_Targets, Enabled) => HotstringsDynamicScopeApply(Enabled, Options))
 }
 
 ; Sum hotstring entries for a flat category (Autocorrection, Rolls, …)

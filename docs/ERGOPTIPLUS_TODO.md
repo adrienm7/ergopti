@@ -714,8 +714,15 @@ exact-boolean regressions also pass the focused runner.
   Full three-OS checkpoint 37033032620 at `6275cac35` passed native unit,
   E2E, packaging, installation and launch gates with release skipped, after
   correcting owned submenu teardown in the Windows fixtures.
-  Windows's additional personal-file views and the dynamic views still need
-  their own owner bindings before this item is complete.
+  Windows Dynamic now renders the shared explicit commands and journals the
+  seven canonical family choices, rediscovered under the lease. Its scope owns
+  no extra category gate and preserves the Hotstrings master and pause. Native
+  cases cover both targets, immediate/late refusal, exact recovery, unknown
+  neighbours and concurrent ownership; full CI remains pending for this slice.
+  Additional Windows personal-file views still need an identity and gate owner
+  shared by the live engine and previews. Linux dynamic publication needs one
+  acknowledged batch; macOS's personal-info placeholder still needs admission
+  to its otherwise shared dynamic scope.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.
