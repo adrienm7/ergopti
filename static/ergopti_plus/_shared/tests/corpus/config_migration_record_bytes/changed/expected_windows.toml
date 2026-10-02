@@ -1,0 +1,19 @@
+# Comments around owned records remain in their original positions.
+[_meta] # schema owner
+schema_version = 2
+
+[source] # section header untouched
+# Leading user explanation stays.
+mode = "modern"
+rows = [
+  "[fake.header]", # this line belongs to the array
+  "second # text"
+]
+"Future.Choice" = "keep literal spelling" # unknown key untouched
+new_flag = false
+# Trailing explanation stays.
+
+# This independent comment survives removal.
+
+[unrelated] # future section untouched
+value = "keep \"quotes\" and # hash" # unchanged comment

@@ -21,8 +21,8 @@
 ; 2. The loader's model. A section is a ``[header]`` path and a key one entry
 ;    inside it, exactly as the typed TOML parse returns them. Booleans stay
 ;    TOML_Bool, so map_value tells ``true`` from ``1`` like the other drivers.
-; 3. The writer's layout. The candidate is rendered from the exact bytes the
-;    backup holds by the canonical writer every Windows save uses, read back,
+; 3. Physical records. A migration-specific renderer preserves every untouched
+;    source byte while applying explicit deltas. The candidate is read back
 ;    and must equal the migrated model before it may replace the file. The
 ;    stamp is set after every op; the publication refuses when the file
 ;    changed since it was read.
@@ -32,6 +32,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include config_migrate_records.ahk
 
 
 
@@ -559,18 +560,33 @@ ConfigMigratePlan(Source, Registry, Driver) {
 		Plan["detail"] := "the file is not valid TOML: " . Err.Message
 		return Plan
 	}
+	try {
+		Scan := _ConfigMigrateRecordScan(Source)
+		_ConfigMigrateRecordValidateModel(Scan, Before)
+	} catch as Err {
+		Plan["detail"] := "the migration record owner refused: " . Err.Message
+		return Plan
+	}
 	Outcome := ConfigMigrateClassify(Before, Registry, &Version)
 	Plan["version"] := Version
 	if (Outcome != "migrate") {
 		Plan["outcome"] := Outcome
 		return Plan
 	}
+	try _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, Version)
+	catch as Err {
+		Plan["detail"] := "the migration record source refused: " . Err.Message
+		return Plan
+	}
 	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version)
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
-	Built := _TOML_BatchWriteImpl("config-migration:candidate", Updates, DropSections,
-		"build", Source)
+	try Built := _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan)
+	catch as Err {
+		Plan["detail"] := "the migration record renderer refused: " . Err.Message
+		return Plan
+	}
 	if !(Built is Map) || Built.Get("status", "") != "ok" || !(Built.Get("content", 0) is String) {
-		Plan["detail"] := "the canonical writer refused the migrated configuration"
+		Plan["detail"] := "the record renderer refused the migrated configuration"
 		return Plan
 	}
 	try Reread := _ConfigMigrateParse(Built["content"], "the migrated candidate")
@@ -669,13 +685,21 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 	if !(Owner is Object)
 		return Refuse("failed", "another configuration transaction owns the file")
 	try {
-		; The loader's own lenient read decides the version, so a current file
-		; the loader can read never needs the exact bytes a backup does.
+		; Keep the loader's lenient current-file contract, but prove physical
+		; ownership before a fabricated version could authorize later writes.
 		Before := TOML_ParseFreshFileTyped(FilePath, &Discarded)
 		if TOML_ReadFailed(FilePath)
 			return Refuse("failed", "the file could not be read")
 		if Discarded
 			return Refuse("failed", "the file has " . Discarded . " unterminated array(s)")
+		try {
+			VersionSource := FSReadStrict(FilePath)
+			VersionScan := _ConfigMigrateRecordScan(VersionSource)
+			_ConfigMigrateRecordValidateModel(VersionScan, Before)
+			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
+				return Refuse("failed", "the file changed while its physical version ownership was checked")
+		} catch as Err
+			return Refuse("failed", "the physical version owner refused: " . Err.Message)
 		Outcome := ConfigMigrateClassify(Before, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {

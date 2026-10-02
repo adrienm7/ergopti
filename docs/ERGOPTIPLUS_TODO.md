@@ -202,6 +202,14 @@ regressions fail against the missing selection and retain platform-specific
 deferral behavior; changing only a portable AHK policy cannot bypass its
 native qualification.
 
+The Windows migration owner now renders explicit deltas from physical TOML
+records instead of rebuilding unrelated content. Shared independent byte
+corpora cover comments, empty headers and occupied inline namespaces;
+physical ownership guards refuse multiline/array-of-table parser inventions
+before both planning and boot classification. A schema version forged inside
+a multiline string cannot bypass the guard. Current bytes, receipts and
+unknown user data remain protected; native Windows qualification is pending.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
