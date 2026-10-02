@@ -3,9 +3,11 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -282,6 +284,109 @@ class ObservationFailureTests(unittest.TestCase):
             with mock.patch.object(owner, "execute", side_effect=execute):
                 with self.assertRaisesRegex(RuntimeError, "cleanup nonce was not acknowledged"):
                     owner.observe(42, lambda _: [42])
+
+
+class ScriptingLifecycleTests(unittest.TestCase):
+    """An expired scripting child remains owned through sampling and real reaping."""
+
+    def test_real_hanging_child_is_sampled_before_retirement(self):
+        native_popen = subprocess.Popen
+        children = []
+        calls = []
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+
+            def launch(arguments, **options):
+                calls.append(("launch", arguments))
+                child = native_popen(
+                    [sys.executable, "-c", "import time; time.sleep(30)"], **options
+                )
+                children.append(child)
+                return child
+
+            def sample(arguments, **options):
+                if arguments[0] == "/usr/bin/osascript":
+                    raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                pid = int(arguments[1])
+                os.kill(pid, 0)
+                calls.append(("sample", pid, options["timeout"]))
+                Path(arguments[-1]).write_text(
+                    "Owned fixture process observed before retirement\nAESendMessage (fixture frame)\n"
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            try:
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", side_effect=launch),
+                    mock.patch.object(probe.subprocess, "run", side_effect=sample),
+                    mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "TimeoutExpired") as raised:
+                        owner.execute("return 'fixture'")
+                self.assertIsInstance(raised.exception.__cause__, subprocess.TimeoutExpired)
+                self.assertIn("sample-osascript-1.txt", str(raised.exception))
+                self.assertIn("AESendMessage (fixture frame)", str(raised.exception))
+                self.assertEqual(calls[0][1][0], "/usr/bin/osascript")
+                self.assertIn(str(owner.app), calls[0][1][2])
+                self.assertEqual(
+                    calls[1], ("sample", children[0].pid, probe.SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                )
+                self.assertIsNotNone(
+                    children[0].returncode, "the original child must actually be reaped"
+                )
+                self.assertEqual(owner.scripting_commands, [])
+            finally:
+                for child in children:
+                    if child.poll() is None:
+                        child.kill()
+                    child.communicate(timeout=2)
+
+    def test_sampling_and_retirement_failures_keep_primary_and_owner_debt(self):
+        primary = subprocess.TimeoutExpired(["osascript"], probe.SCRIPTING_TIMEOUT_SECONDS)
+        cleanup = subprocess.TimeoutExpired(["osascript"], probe.SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+        command = mock.Mock(pid=42)
+        command.returncode = -9
+        command.poll.return_value = None
+        command.communicate.side_effect = [primary, cleanup, ("", "")]
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=command) as launch,
+                mock.patch.object(
+                    probe.subprocess, "run", side_effect=RuntimeError("sampler refused")
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "sampler refused") as raised:
+                    owner.execute("return 'fixture'")
+                self.assertIs(raised.exception.__cause__, primary)
+                self.assertIn("owned scripting process cleanup failed", str(raised.exception))
+                self.assertEqual(owner.scripting_commands, [command])
+                with self.assertRaisesRegex(RuntimeError, "prior native scripting command"):
+                    owner.execute("return 'successor'")
+                self.assertEqual(launch.call_count, 1)
+                with mock.patch.object(owner.preference, "restore") as restore:
+                    owner.restore()
+                    restore.assert_called_once_with()
+                self.assertEqual(owner.scripting_commands, [])
+                self.assertEqual(command.communicate.call_args_list[0].kwargs["timeout"], 10)
+
+    def test_complete_command_requires_exact_nonce_and_reaped_zero_status(self):
+        for code, output in ((2, NONCE), (None, NONCE), (0, "wrong")):
+            with self.subTest(code=code, output=output), tempfile.TemporaryDirectory() as folder:
+                owner = probe.NativeDelayedTimerProbe(
+                    Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+                )
+                owner.nonce = NONCE
+                command = mock.Mock(returncode=code)
+                command.communicate.return_value = (output, "explicit refusal")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=command):
+                    with self.assertRaisesRegex(RuntimeError, "did not acknowledge"):
+                        owner.execute("return 'fixture'")
+                self.assertEqual(owner.scripting_commands, [command] if code is None else [])
 
 
 if __name__ == "__main__":
