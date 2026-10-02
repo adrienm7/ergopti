@@ -51,11 +51,11 @@
 	},
 	"hotstring_groups": {
 		"standard": [
-			"distances_reduction",
 			"autocorrection",
 			"magic_key"
 		],
 		"ergopti": [
+			"distances_reduction",
 			"sfbs_reduction",
 			"rolls"
 		],

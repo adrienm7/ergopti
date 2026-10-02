@@ -478,5 +478,73 @@ check(
 	}
 );
 
+check(
+	'distance reduction belongs only to Ergopti with its historical rules, metadata and preference ids',
+	() => {
+		const { parse } = require('smol-toml');
+		const shared = path.join(ROOT, 'static/ergopti_plus/_shared');
+		const reference = JSON.parse(
+			fs.readFileSync(
+				path.join(shared, 'tests/corpus/hotstrings/distance_reduction_entries.json'),
+				'utf8'
+			)
+		);
+		const extension = parse(
+			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/manifest.toml'), 'utf8')
+		).extension;
+		assert.deepStrictEqual(extension.hotstring_bindings.distancesreduction, {
+			category: reference.category,
+			feature_section: reference.feature_section,
+			source: reference.source
+		});
+		assert.strictEqual(reference.entries.length, 101);
+		const document = parse(
+			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/hotstrings/distancesreduction.toml'), 'utf8')
+		);
+		assert.deepStrictEqual(document._meta, reference.meta);
+		const entries = Object.entries(document)
+			.filter(([section]) => section !== '_meta')
+			.flatMap(([section, blocks]) =>
+				blocks.flatMap((block) =>
+					Object.entries(block).map(([trigger, fields]) => ({ section, trigger, ...fields }))
+				)
+			);
+		assert.deepStrictEqual(entries, reference.entries, 'relocation must not change a rule or flag');
+		assert.strictEqual(
+			fs.existsSync(path.join(shared, 'modules/hotstrings/distancesreduction.toml')),
+			false
+		);
+		const manifest = parse(
+			fs.readFileSync(path.join(shared, 'modules/features/manifest.toml'), 'utf8')
+		);
+		assert.ok(!manifest.menu.hotstring_groups.standard.includes('distances_reduction'));
+		assert.ok(manifest.menu.hotstring_groups.ergopti.includes('distances_reduction'));
+		const index = parse(
+			fs.readFileSync(path.join(shared, 'modules/hotstrings/_index.toml'), 'utf8')
+		);
+		assert.ok(!index.menu.categories_order.includes(reference.category));
+		assert.ok(index.languages.french.categories_order.includes(reference.category));
+		assert.ok(
+			fs.existsSync(path.join(shared, 'modules/hotstrings/french/distancesreduction.toml'))
+		);
+		const distanceFeatures = manifest.features.hotstrings.flatMap(
+			(entry) => entry.distances_reduction || []
+		);
+		assert.strictEqual(
+			distanceFeatures.length,
+			6,
+			'all historical distance switches must remain declared'
+		);
+		for (const feature of distanceFeatures) {
+			assert.strictEqual(feature.default.enabled, false, `${feature.id} must stay opt-in`);
+			assert.strictEqual(
+				feature.recommended.enabled,
+				false,
+				`${feature.id} must not be newly recommended`
+			);
+		}
+	}
+);
+
 console.log(`\n${passes} passed, ${failures} failed`);
 if (failures > 0) process.exit(1);

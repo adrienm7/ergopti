@@ -3606,8 +3606,8 @@ description_key = "menu.layout.menubar_icon"
 5 = ["tap_5", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"]
 
 [menu.hotstring_groups]
-standard = ["distances_reduction", "autocorrection", "magic_key"]
-ergopti = ["sfbs_reduction", "rolls"]
+standard = ["autocorrection", "magic_key"]
+ergopti = ["distances_reduction", "sfbs_reduction", "rolls"]
 dynamic = ["dynamic_hotstrings"]
 
 [menu.hotstring_category_keys]

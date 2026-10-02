@@ -52,7 +52,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 				Ergopti := Pack
 		Assert(IsObject(Ergopti), "the Ergopti extension the driver ships is installed")
 		AssertEqual("Ergopti+", Ergopti.name, "the shared pack keeps its plus in the display name")
-		AssertEqual(3, Ergopti.bound_files.Length)
+		AssertEqual(4, Ergopti.bound_files.Length)
 		AssertEqual(0, Ergopti.toml_files.Length, "none of its files becomes an ext: category")
 		Registry := _LCT_RegistryDir() . "ergopti\hotstrings\"
 		AssertEqual(Registry . "sfbsreduction.toml", HotstringsBoundTomlPath("sfbsreduction", "comma"))
@@ -135,6 +135,7 @@ _EHX_NotInstalledSuppliesNothing() {
 		AssertEqual("", HotstringsBoundTomlPath("rolls"))
 		AssertEqual("", HotstringsBoundTomlPath("magickey", "repeat_corrections"))
 		AssertEqual(0, CountTomlHotstrings("sfbsreduction"), "no file supplies SFB reduction")
+		AssertEqual(0, CountTomlHotstrings("distancesreduction"), "no file supplies common distance reduction")
 		AssertEqual(0, CountTomlSection("magickey", "repeat_corrections"))
 	}
 }
@@ -143,7 +144,7 @@ Test("ergopti extension: without the Ergopti extension the groups are absent (er
 
 _EHX_CacheCompilesOnlyTheBundledFolder() {
 	for Cat in HotstringsBundledCategories() {
-		Assert(Cat != "sfbsreduction" && Cat != "rolls",
+		Assert(Cat != "distancesreduction" && Cat != "sfbsreduction" && Cat != "rolls",
 			"a category an extension supplies never enters the bundled cache: " . Cat)
 	}
 }
@@ -252,3 +253,111 @@ _EHX_ShippedLabelInMenu() {
 	}
 }
 Test("ergopti extension: the actual Hotstrings menu names Ergopti+", _EHX_ShippedLabelInMenu)
+
+; Replay the independent pre-move reference through the native loader, never a
+; synthetic registrar that could agree with a changed source by construction.
+_EHX_DistanceReferenceLoadsNatively() {
+	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	Check(Packs) {
+		global HSE_RegistryByGroup, _SharedDir
+		CorpusPath := _SharedDir . "tests\corpus\hotstrings\distance_reduction_entries.json"
+		Reference := JsonParse(FileRead(CorpusPath, "UTF-8"))
+		AssertEqual(101, Reference["entries"].Length)
+		AssertEqual(101, CountTomlHotstrings("distancesreduction"))
+		AssertEqual("ergopti", _HotstringBoundSources["distancesreduction"]["extension"])
+		Assert(!FileExist(_SharedDir . "modules\hotstrings\distancesreduction.toml"),
+			"the common folder must not duplicate the extension's file")
+		HSE_TestReset()
+		try {
+			for Section, Count in Reference["section_counts"] {
+				AssertEqual(Count, CountTomlSection("distancesreduction", Section))
+				LoadHotstringsSection("distancesreduction", Section, { Enabled: true })
+			}
+			for Row in Reference["entries"] {
+				Group := "distancesreduction." . Row["section"]
+				Assert(HSE_RegistryByGroup.Has(Group), "the real loader registers " . Group)
+				Found := 0
+				for Spec in HSE_RegistryByGroup[Group]
+					if Spec.Trigger == Row["trigger"] {
+						Found := Spec
+						break
+					}
+				Assert(IsObject(Found), "the real loader registers " . Row["trigger"])
+				AssertEqual(Row["output"], Found.Replacement)
+				AssertEqual(Row["is_word"], Found.IsWord)
+				AssertEqual(Row["auto_expand"], Found.Auto)
+				AssertEqual(Row["final_result"], Found.FinalResult)
+				AssertEqual(!Row["is_case_sensitive"] && !InStr(Row["trigger"], ",") && !InStr(Row["trigger"], Chr(0x27)),
+					Found.HasOwnProp("CaseConform") && Found.CaseConform, "comma rules retain explicit shifted-symbol variants")
+				AssertEqual(HSE_PRIORITY_COMMON, Found.Priority, "relocation must keep the common tier")
+				Delay := Row["section"] == "comma_j" ? Reference["meta"]["section_delays"]["comma_j"] : Reference["meta"]["delay"]
+				AssertEqual(Delay, Found.TimeActivationSeconds, "historical delays survive relocation")
+			}
+		} finally HSE_TestReset()
+	}
+}
+Test("ergopti extension: all 101 distance rules load natively from the historical reference (ergopti-distance-ext)",
+	_EHX_DistanceReferenceLoadsNatively)
+
+; Exercise the real sparse writer and configuration reader before and after
+; extension rediscovery. Moving a source never changes a desired posture.
+_EHX_DistanceChoicesSurviveReload(GroupEnabled) {
+	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	Check(Packs) {
+		Directory := _LCT_TempDir()
+		try {
+			ConfigPath := Directory . "config.toml"
+			Assert(TOML_BatchWrite(ConfigPath, [
+				ManifestSparseOperation("category_enabled.distances_reduction", GroupEnabled),
+				ManifestSparseOperation("hotstrings.distances_reduction.qu.enabled", true),
+				ManifestSparseOperation("hotstrings.distances_reduction.comma_j.enabled", false)]))
+			Before := FSReadUtf8Exact(ConfigPath)
+			Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", _LCT_RegistryDir())
+			loop 2 {
+				Target := ManifestBuildFeaturesMap()
+				HotstringExtensions_Prepare(Target, Roots)
+				ApplyConfigToml(Target, ConfigPath)
+				HotstringExtensions_Prepare(Target, Roots)
+				AssertEqual(GroupEnabled, Target["category_enabled"]["distances_reduction"])
+				for Path, Expected in Map("hotstrings.distances_reduction.qu.enabled", true,
+					"hotstrings.distances_reduction.comma_j.enabled", false) {
+					Location := FeatureLocateV2(Target, Path)
+					AssertEqual(Expected, Location["v2_node"][Location["key"]])
+				}
+				AssertEqual(Before, FSReadUtf8Exact(ConfigPath), "rediscovery must never rewrite the user's choices")
+				AssertEqual(101, CountTomlHotstrings("distancesreduction"))
+			}
+		} finally DirDelete(Directory, true)
+	}
+}
+Test("ergopti extension: disabled distance group survives native owner reload (ergopti-distance-ext)",
+	_EHX_DistanceChoicesSurviveReload.Bind(false))
+Test("ergopti extension: disabled distance section survives native owner reload (ergopti-distance-ext)",
+	_EHX_DistanceChoicesSurviveReload.Bind(true))
+
+_EHX_UserDistanceCopyWins() {
+	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	Check(Packs) {
+		Directory := _LCT_TempDir()
+		try {
+			DirCreate(Directory . "extensions")
+			UserPack := Directory . "extensions\ergopti"
+			DirCopy(_LCT_RegistryDir() . "ergopti", UserPack)
+			UserPath := UserPack . "\hotstrings\distancesreduction.toml"
+			Source := '[_meta]`nsections_order = ["qu"]`n[[qu]]`n'
+				. '"qa" = { output = "user distance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
+			Assert(FSWriteDurable(UserPath, Source))
+			Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", _LCT_RegistryDir())
+			HotstringExtensions_Prepare(ManifestBuildFeaturesMap(), Roots)
+			AssertEqual(UserPath, HotstringsBoundTomlPath("distancesreduction", "qu"))
+			AssertEqual(1, CountTomlHotstrings("distancesreduction"), "the shipped file must not add duplicates to an explicit user copy")
+			Entry := _EHX_Entry(UserPath, "qu", "qa")
+			Assert(IsObject(Entry), "the real source still contains the user rule")
+			AssertEqual("user distance", Entry["output"])
+			AssertEqual(Source, FSReadUtf8Exact(UserPath), "discovery must retain exact user-source bytes")
+			AssertEqual(HSE_PRIORITY_COMMON, _HSE_SourcePriority("distancesreduction"))
+		} finally DirDelete(Directory, true)
+	}
+}
+Test("ergopti extension: the user's distance source keeps precedence and exact bytes (ergopti-distance-ext)",
+	_EHX_UserDistanceCopyWins)
