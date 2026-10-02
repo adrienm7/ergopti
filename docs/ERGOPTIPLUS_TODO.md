@@ -169,6 +169,13 @@ These are software implementations; final hardware verification remains below.
   The isolated LLM runners now own separate canonical result paths and strict
   manifests so their small suites cannot replace the main suite's later
   annotation. This receipt-isolation follow-up awaits its full native CI.
+  CI reporting now emits one bounded aggregate notice with every ordinary
+  failure, alongside unchanged error annotations and strict native statuses.
+  Checkpoint 37056318950 had 17 failures but GitHub retained only ten error
+  annotations. An actual CLI regression fails against the previous reporter;
+  68 assertions now cover all causes, escaping, bounded oversized details and
+  unchanged streamed output/counts/JSON/exit status. Full native CI remains
+  pending for this evidence-only follow-up.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
