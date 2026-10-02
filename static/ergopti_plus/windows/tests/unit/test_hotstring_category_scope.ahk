@@ -300,3 +300,21 @@ _HSCS_ExistingMenuTarget() {
 	} finally _CTC_ReleaseMenu(Built)
 }
 Test("hotstring-personal-menu: shared rendering preserves caller-owned repaint references", _HSCS_ExistingMenuTarget)
+
+_HSCS_DefaultMenuTargetsAreIndependent() {
+	Apply(_Targets, Enabled) => true
+	First := _HS_CategoryMenu("Personal", "", [], Apply)
+	Second := _HS_CategoryMenu("Personal", "", [], Apply)
+	try {
+		AssertTrue(ObjPtr(First) != ObjPtr(Second), "default rendering creates a fresh native menu for each caller")
+		AssertEqual(2, TrayMenuItemCount(First))
+		AssertEqual(2, TrayMenuItemCount(Second))
+		First.Add("fixture", (*) => true)
+		AssertEqual(3, TrayMenuItemCount(First))
+		AssertEqual(2, TrayMenuItemCount(Second), "mutating one native menu cannot duplicate sibling rows")
+	} finally {
+		_CTC_ReleaseMenu(First)
+		_CTC_ReleaseMenu(Second)
+	}
+}
+Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)

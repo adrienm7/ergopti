@@ -656,7 +656,12 @@ exact-boolean regressions also pass the focused runner.
   select only their own group. Windows uses the conditional reload journal,
   reads personal section inventory afresh under the lease, preserves native
   repaint references and restores exact configuration bytes after immediate or
-  late replacement refusal. Full three-OS validation of this slice is pending.
+  late replacement refusal. The native CI owner cases passed in run
+  37016239316; its two remaining Windows failures exposed a direct native call
+  and a default-menu freshness guard. Rendering now reads item counts through
+  the tray adapter and keeps an explicit fresh default path, with native
+  regressions proving independent default menus and refusal of populated targets.
+  Full three-OS validation of this slice is pending.
   Windows's additional personal-file views and the dynamic views still need
   their own owner bindings before this item is complete.
   The Windows discovery boundary now filters its mixed legacy tray map to
