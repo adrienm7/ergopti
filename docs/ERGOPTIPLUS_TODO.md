@@ -338,6 +338,11 @@ after native captions were captured through explicit UTF-8 receipts.
   causes; 14 focused and 40 aggregate Python cases passed after the new cases
   first reproduced merged-import and masked-error failures. The 18 native
   measurements remain mandatory; the real control channel still needs CI.
+  The pasteboard stub now retains isolated UTI-to-bytes snapshots, returns
+  nil for absent text and keeps clearContents void. Four direct cases and the
+  actual SyntheticInput consumer first exposed missing payload publication;
+  they now pass, including exact text at Cmd+V and later text/RTF/PNG recovery.
+  The complete pipeline remains pending for this stub slice.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «

@@ -62,8 +62,25 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 	helpers.it("keeps paste echoes event-only while returning the full logical output", function()
 		local fixture = load_fixture()
 		local logical = ("p"):rep(60)
+		local original = {
+			["public.utf8-plain-text"] = "User clipboard",
+			["public.rtf"] = "{\\rtf1 User clipboard}",
+			["public.png"] = "\137PNG\0\255",
+		}
+		helpers.assert_eq(fixture.hs.pasteboard.writeAllData(original), true)
+		local handoff = nil
+		local transaction = fixture.synthetic.begin("test.telemetry", "action")
+		fixture.synthetic.on_complete(transaction, function(_, status)
+			-- Completion callbacks are protected in production; observe here and
+			-- assert after the owner has returned to the test harness.
+			handoff = { status = status, text = fixture.hs.pasteboard.getContents() }
+		end)
 		local results, consume, events = collect(fixture, function()
-			return fixture.utils.emit_text(logical)
+			local emitted = table.pack(fixture.synthetic.with_transaction(transaction, function()
+				return fixture.utils.emit_text(logical)
+			end))
+			fixture.synthetic.seal(transaction)
+			return table.unpack(emitted, 1, emitted.n)
 		end)
 
 		helpers.assert_true(consume)
@@ -78,6 +95,29 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(down.ordinal, up.ordinal)
 		helpers.assert_eq(down.phase, "down")
 		helpers.assert_eq(up.phase, "up")
+		helpers.assert_eq(fixture.hs.pasteboard.getContents(), logical,
+			"the returned Cmd+V batch must have its exact clipboard payload")
+		-- The first turn confirms the returned batch; the second lets the
+		-- retained lifecycle dispatcher deliver completion observers.
+		for _ = 1, 2 do
+			for _, timer in ipairs(fixture.hs.timer.__timers) do
+				if timer.running and timer.delay == 0 then timer:fire() end
+			end
+		end
+		helpers.assert_not_nil(handoff, "the real completion owner must observe the handoff")
+		helpers.assert_eq(handoff.status, "complete")
+		helpers.assert_eq(handoff.text, logical,
+			"restoration must wait until after Cmd+V has been handed off")
+		local restores = 0
+		for _, timer in ipairs(fixture.hs.timer.__timers) do
+			if timer.running and timer.delay == 0.15 then
+				restores = restores + 1
+				timer:fire()
+			end
+		end
+		helpers.assert_eq(restores, 1, "one exact completion must own one clipboard restoration")
+		helpers.assert_eq(fixture.hs.pasteboard.readAllData(), original,
+			"the production restore must retain every original type and binary byte")
 	end)
 
 	helpers.it("keeps typed and pasted token output in one ordered generation", function()
