@@ -858,7 +858,8 @@ TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped() {
 Test("ApplyConfigToml: a second hotstrings.personal.<user-chosen-name> section is also applied",
 	TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped)
 
-TestFMv2_ApplyPersonalEditorSectionNotSkipped() {
+TestFMv2_PersonalEditorPreferencesKeepTheirOwner() {
+	global _LLM_Menu
 	; [personal_editor] (ahk. prefix already stripped) holds flat UI-preference
 	; keys written by ui/personal_toml_editor.ahk (_EditorPrefSet/_EditorPrefGet)
 	; via the legacy flat TOML_Write/TOML_Read path -- it is never part of the
@@ -867,17 +868,37 @@ TestFMv2_ApplyPersonalEditorSectionNotSkipped() {
 	try {
 		Path := _FM_WriteFixture("personal_editor_section",
 			"[personal_editor]`r`n"
-			. "default_section = " . '"' . "code" . '"' . "`r`n")
+			. 'default_section = "code"' . "`r`n"
+			. 'compact_view = "1"' . "`r`n"
+			. 'close_on_add = "0"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
-		AssertEqual(1, Applied)
-		AssertTrue(Features.Has("personal_editor"))
-		AssertEqual("code", Features["personal_editor"]["default_section"])
-		FileDelete(Path)
+		AssertEqual(0, Applied, "editor-owned preferences never enter the Features tree")
+		AssertTrue(!Features.Has("personal_editor"))
+		for Key in ["compact_view", "close_on_add", "default_section"] {
+			AssertEqual("PersonalEditor", TomlConfigForeignOwner("personal_editor", Key))
+			AssertEqual("", TomlConfigUnknownKind(Features, "personal_editor", Key))
+		}
+		AssertTrue(TomlConfigUnknownKind(Features, "personal_editor", "compact_veiw") != "",
+			"a typo does not inherit a broad namespace exemption")
+		Menu := _HSDeepCloneMap(_LLM_Menu)
+		Menu["onboarding_seen"] := false
+		Menu["app_profile_overrides"] := Map()
+		Menu["user_profiles"] := []
+		Updates := _ConfigCollectFullSaveUpdates(Features, Menu)
+		AssertTrue(Updates.Length > 0, "the full-save collector must complete")
+		AssertTrue(TOML_BatchWrite(Path, Updates), "the collected full save must publish")
+		Prefs := TOML_ParseFreshFile(Path)["personal_editor"]
+		AssertEqual("code", Prefs["default_section"])
+		AssertEqual("1", Prefs["compact_view"])
+		AssertEqual("0", Prefs["close_on_add"])
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigToml: [personal_editor] is applied, not skipped as unknown",
-	TestFMv2_ApplyPersonalEditorSectionNotSkipped)
+Test("ApplyConfigToml: editor preferences stay owned and survive full saves (personal-editor-config-owner)",
+	TestFMv2_PersonalEditorPreferencesKeepTheirOwner)
 
 TestFMv2_ApplyArrayValue() {
 	OldFeatures := _FM_BeginIsolated()
