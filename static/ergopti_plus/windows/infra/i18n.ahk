@@ -157,7 +157,12 @@ I18nInit(Cache) {
 		; language rather than always French.
 		_I18nLocale := _I18nDetectSystemLocale()
 	}
-	_I18nCacheLoaded := false
+	if I18nActiveCacheCanReuse() {
+		try LoggerInfo("i18n", "Active locale '{1}' cache retained after configuration initialization.", _I18nLocale)
+	} else {
+		_I18nCacheLoaded := false
+		try LoggerDebug("i18n", "Active locale cache requires loading after configuration initialization.")
+	}
 	try LoggerDone("i18n", "i18n initialised (locale: '{1}').", _I18nLocale)
 }
 
