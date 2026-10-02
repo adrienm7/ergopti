@@ -20,6 +20,104 @@ _NeutralConfigManifestProjections() {
 }
 Test("neutral-config: manifest projections preserve recommended intent", _NeutralConfigManifestProjections)
 
+_NeutralConfigClonePreservesMapCaseSense() {
+	Source := TOML_CoerceValue('{ "Key" = "upper", "key" = "lower" }', true)
+	Copy := ManifestCloneValue(Source)
+	AssertEqual("On", Copy.CaseSense, "the clone retains case-sensitive TOML inline keys")
+	AssertEqual(2, Copy.Count, "distinct key spellings must survive copying")
+	AssertEqual("upper", Copy["Key"])
+	AssertEqual("lower", Copy["key"])
+	Copy["Key"] := "copied upper"
+	Source["key"] := "source lower"
+	AssertEqual("upper", Source["Key"], "editing the copy must leave the source key intact")
+	AssertEqual("lower", Copy["key"], "editing the source must leave the copied key intact")
+	for Mode in ["Off", "Locale"] {
+		Other := Map()
+		Other.CaseSense := Mode
+		Other["Key"] := "value"
+		AssertEqual(Mode, ManifestCloneValue(Other).CaseSense, "retain every supported comparison mode")
+	}
+}
+Test("neutral-config: value clones preserve every Map comparison mode and distinct keys", _NeutralConfigClonePreservesMapCaseSense)
+
+_NeutralConfigCloneOwnsNestedTypedValues() {
+	Source := TOML_CoerceValue('{ records = [{ enabled = true, values = ["before", { visible = false }] }] }', true)
+	Copy := ManifestCloneValue(Source)
+	Assert(Copy["records"][1]["enabled"] is TOML_Bool, "true retains its TOML Boolean type")
+	Assert(Copy["records"][1]["values"][2]["visible"] is TOML_Bool, "false retains its TOML Boolean type")
+	AssertEqual(true, Copy["records"][1]["enabled"].Value)
+	AssertEqual(false, Copy["records"][1]["values"][2]["visible"].Value)
+	Reread := TOML_CoerceValue(TOML_RenderValue(Copy), true)
+	Assert(Reread["records"][1]["enabled"] is TOML_Bool, "the clone renders true with its source type")
+	Assert(Reread["records"][1]["values"][2]["visible"] is TOML_Bool, "the clone renders false with its source type")
+	AssertEqual(true, Reread["records"][1]["enabled"].Value)
+	AssertEqual(false, Reread["records"][1]["values"][2]["visible"].Value)
+	Copy["records"][1]["enabled"].Value := false
+	Copy["records"][1]["values"][1] := "copy"
+	Copy["records"].Push(Map("enabled", TOML_Bool(false)))
+	AssertEqual(true, Source["records"][1]["enabled"].Value, "the copied Boolean wrapper is independent")
+	AssertEqual("before", Source["records"][1]["values"][1], "nested copied arrays own their elements")
+	AssertEqual(1, Source["records"].Length, "appending to the copy does not grow the source array")
+	Source["records"][1]["values"][2]["visible"].Value := true
+	Source["records"][1]["values"].Push("source")
+	Source["records"][1]["future"] := "source only"
+	AssertEqual(false, Copy["records"][1]["values"][2]["visible"].Value, "source Boolean edits cannot alter the copy")
+	AssertEqual(2, Copy["records"][1]["values"].Length, "source appends cannot grow the copied nested array")
+	AssertFalse(Copy["records"][1].Has("future"), "source Map edits cannot add copied keys")
+	AssertEqual("true", TOML_RenderValue(Source["records"][1]["enabled"]))
+	AssertEqual("false", TOML_RenderValue(Copy["records"][1]["enabled"]))
+}
+Test("neutral-config: nested value clones own arrays, Maps and typed Boolean wrappers", _NeutralConfigCloneOwnsNestedTypedValues)
+
+_NeutralConfigClonePreservesOpaqueValues() {
+	Opaque := { FutureValue: "opaque" }
+	Source := Map("text", "001", "integer", 1, "float", 1.5, "opaque", Opaque)
+	Copy := ManifestCloneValue(Source)
+	for Key in ["text", "integer", "float"] {
+		AssertEqual(Type(Source[Key]), Type(Copy[Key]), "cloning preserves scalar types: " . Key)
+		AssertEqual(Source[Key], Copy[Key], "cloning preserves scalar values: " . Key)
+	}
+	AssertEqual(ObjPtr(Opaque), ObjPtr(Copy["opaque"]), "unsupported objects retain the existing opaque identity contract")
+}
+Test("neutral-config: value clones preserve scalars and leave unsupported objects opaque", _NeutralConfigClonePreservesOpaqueValues)
+
+_NeutralConfigCloneWithoutTypedCodec() {
+	Root := A_Temp . "\ergopti_manifest_clone_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Root, "Ptr", 0, "Int"),
+		"the isolated clone fixture must exclusively own its directory")
+	try {
+		Script := Root . "\probe.ahk"
+		Receipt := Root . "\result.txt"
+		; Run the actual production function in a fresh process whose typed TOML
+		; class is absent. The suite itself already includes that class.
+		FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
+			. _DriverFuncBody("ManifestCloneValue") . "`n"
+			. "try {`n"
+			. 'if IsSet(TOML_Bool)' . "`n"
+			. 'throw Error("the isolated probe must not load the typed TOML class")' . "`n"
+			. 'Source := Map("values", ["before"])' . "`n"
+			. 'Source.CaseSense := "On"' . "`n"
+			. 'Source["Key"] := "upper"' . "`n"
+			. 'Source["key"] := "lower"' . "`n"
+			. 'Copy := ManifestCloneValue(Source)' . "`n"
+			. 'Copy["values"][1] := "copy"' . "`n"
+			. 'if Copy.CaseSense != "On" || Copy.Count != 3 || Copy["Key"] != "upper" || Copy["key"] != "lower"' . "`n"
+			. 'throw Error("generic cloning lost case-sensitive keys")' . "`n"
+			. 'if Source["values"][1] != "before"' . "`n"
+			. 'throw Error("generic cloning shared a nested array")' . "`n"
+			. 'FileAppend("complete", A_Args[1], "UTF-8-RAW")' . "`n"
+			. "} catch Error as Err {`n"
+			. 'FileAppend(Err.Message . "``n" . Err.Stack, A_Args[1], "UTF-8-RAW")' . "`n"
+			. "ExitApp(1)`n}`nExitApp(0)`n", Script, "UTF-8")
+		Code := RunWait('"' . A_AhkPath . '" /ErrorStdOut "' . Script . '" "' . Receipt . '"', , "Hide")
+		AssertTrue(FileExist(Receipt), "the actual clone probe must report its outcome; exit=" . Code)
+		Result := FileRead(Receipt, "UTF-8")
+		AssertEqual(0, Code, Result)
+		AssertEqual("complete", Result)
+	} finally DirDelete(Root, true)
+}
+Test("neutral-config: actual value cloning remains usable without the typed TOML class", _NeutralConfigCloneWithoutTypedCodec)
+
 _NeutralConfigSparseOperations() {
 	Removed := ManifestSparseOperation("category_enabled.shortcuts", false)
 	AssertEqual(Removed.Delete, 1)
