@@ -56,3 +56,37 @@ _KJS_DebtRefusesBorrower() {
 }
 
 Test("keylogger: unresolved repair refuses nested journal access (keylogger-journal-scope)", _KJS_DebtRefusesBorrower)
+
+_KJS_PreInitializationShutdown() {
+	Fields := ["initialized", "buffer_events", "buffer_text", "rich_chunks", "session_clicks",
+		"session_scrolls", "mouse_distance", "_retry_snapshots", "_pending_entries", "_flush_in_progress"]
+	Saved := Map()
+	for Name in Fields
+		Saved[Name] := Keylogger.%Name%
+	try {
+		Keylogger.initialized := false
+		Keylogger.buffer_events := []
+		Keylogger.buffer_text := ""
+		Keylogger.rich_chunks := []
+		Keylogger.session_clicks := 0
+		Keylogger.session_scrolls := 0
+		Keylogger.mouse_distance := 0
+		Keylogger._retry_snapshots := []
+		Keylogger._pending_entries := []
+		Keylogger._flush_in_progress := false
+		Port := Map("owner", KL_JournalOwner())
+		AssertTrue(KL_FlushShutdownReady(Port), "empty pre-initialization owner has no persistence debt")
+		Keylogger._pending_entries := [Map("type", "system_event")]
+		AssertFalse(KL_FlushShutdownReady(Port), "accepted queue must not be discarded after failed initialization")
+		Keylogger._pending_entries := []
+		Token := Port["owner"].Acquire()
+		AssertFalse(KL_FlushShutdownReady(Port), "active journal ownership still refuses shutdown")
+		Port["owner"].Rollback(Token, {}, 0, (*) => false)
+		Port["owner"].Release(Token)
+		AssertFalse(KL_FlushShutdownReady(Port), "uninitialized compensation debt is never bypassed")
+	} finally {
+		for Name, Value in Saved
+			Keylogger.%Name% := Value
+	}
+}
+Test("keylogger: early UI shutdown accepts only an empty owner (early-ui-admission)", _KJS_PreInitializationShutdown)

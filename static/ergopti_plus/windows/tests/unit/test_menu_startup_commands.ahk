@@ -150,3 +150,32 @@ _MSC_Throw() {
 }
 Test("menu startup: scheduling failure cannot lose the accepted selection",
 	(*) => _MSC_WithOwner(_MSC_SchedulingFailure))
+
+_MSC_DiagnosticsAdmission(Owner, State) {
+	global _MenuDispatchCallbacks, _MenuDispatchOwnerHandles
+	Window := MenuStartupUiCommand((*) => State.Calls.Push("diagnostic"), () => true)
+	NativeMenu := Menu()
+	try {
+		_MR_RenderRows(NativeMenu, [Map("label", "diagnostic", "action", Window)], "diagnostic", 1)
+		ItemId := _MenuItemIdAtPosition(NativeMenu, 0)
+		AssertTrue(_MenuDispatchCallbacks.Has(ItemId) && _MenuDispatchCallbacks[ItemId] == Window,
+			"the actual native renderer must retain the certified window callback")
+		Flags := DllCall("GetMenuState", "Ptr", NativeMenu.Handle, "UInt", 0, "UInt", 0x400, "UInt")
+		AssertTrue(Flags != 0xFFFFFFFF && !(Flags & 3), "early window row is enabled")
+	} finally {
+		NativeMenu.Delete()
+		MenuDispatcher_PruneMenu(NativeMenu)
+		if _MenuDispatchOwnerHandles.Has(NativeMenu.Handle)
+			_MenuDispatchOwnerHandles.Delete(NativeMenu.Handle)
+	}
+	MenuCommandRun(Window, [])
+	AssertEqual(1, State.Calls.Length, "certified diagnostic does not await input registration")
+	MenuCommandRun((*) => State.Calls.Push("mutation"), [])
+	AssertEqual(1, State.Calls.Length, "mutations still await full readiness")
+	Unready := MenuStartupUiCommand((*) => State.Calls.Push("unready"), () => false)
+	MenuCommandRun(Unready, [])
+	AssertEqual(2, Owner.Pending.Length, "a window without its cleanup owner remains retained")
+	Owner.Cancel()
+}
+Test("menu startup: diagnostic admission uses its own cleanup milestone (early-ui-admission)",
+	(*) => _MSC_WithOwner(_MSC_DiagnosticsAdmission))
