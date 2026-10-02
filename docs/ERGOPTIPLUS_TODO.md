@@ -493,6 +493,9 @@ is committed; one request is one commit with its regression test.
   Restoring imports the three historical shared recommendations (AltGr +
   left Alt: previous word; AltGr + CapsLock: next word; left Alt + CapsLock:
   CapsWord). Linux still needs the combination engine tracked by item 93.
+  The Windows bulk owner now limits action-parameter cleanup to known
+  catalogue pairs, preserving future pair parameters as well as their
+  slots. Both existing native preservation assertions remain intact.
   Native CI validation of this menu fix is pending. Remaining:
   (a) the chord slot (both keys within the simultaneity delay), with its
   symmetry, its delay and « copy tap to chord »: the first key of a chord
