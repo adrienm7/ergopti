@@ -11,7 +11,8 @@
  *   - the macOS Lua runner:          "  ok   name" / "  FAIL name — err" plus the
  *                                    "Passed tests:  N" / "Failed tests:  M" block.
  * On GitHub Actions it emits one ::error:: annotation per failing test and a
- * ::notice:: summary; always writes a JSON summary (--json) and a step summary
+ * ::notice:: summary plus bounded failure details outside the error quota; always
+ * writes a JSON summary (--json) and a step summary
  * if GITHUB_STEP_SUMMARY is set. Exits with the wrapped command's exit code so
  * CI gating is unchanged. Counts read by people (annotations, step summary,
  * final line) group thousands; the JSON keeps plain numbers for tools.
@@ -123,12 +124,46 @@ function ghEscape(s) {
 	return String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 }
 
+/**
+ * Retains ordinary failure lists outside GitHub's ten-error annotation quota.
+ * Bound the escaped UTF-8 message below the 64 KiB annotation limit; only a
+ * genuinely oversized detail is omitted, so it cannot hide later small causes.
+ * @param {string[]} failures Ordered, independently parsed failure details.
+ * @returns {string} Complete details or an explicit exact omission count.
+ */
+function failureNotice(failures) {
+	const limit = 48 * 1024;
+	const footer = (count) =>
+		`\n${count} failure detail${count === 1 ? '' : 's'} omitted because the annotation message budget was exceeded. Full details remain in the runner output.`;
+	let text = `${failures.length} failure detail${failures.length === 1 ? '' : 's'}:\n`;
+	const complete = text + failures.map((failure, index) => `${index + 1}. ${failure}\n`).join('');
+	if (Buffer.byteLength(ghEscape(complete), 'utf8') <= limit) return complete;
+	let bytes = Buffer.byteLength(ghEscape(text), 'utf8');
+	const reserve = Buffer.byteLength(ghEscape(footer(failures.length)), 'utf8');
+	let omitted = 0;
+	for (const [index, failure] of failures.entries()) {
+		const line = `${index + 1}. ${failure}\n`;
+		const size = Buffer.byteLength(ghEscape(line), 'utf8');
+		if (bytes + size + reserve > limit) {
+			omitted++;
+			continue;
+		}
+		text += line;
+		bytes += size;
+	}
+	return omitted ? text + footer(omitted) : text;
+}
+
 function emit(opts, res, code) {
 	const onGitHub = !!process.env.GITHUB_ACTIONS;
 	if (onGitHub) {
 		for (const f of res.failures) {
 			process.stdout.write(`::error title=${ghEscape(opts.name)} test failed::${ghEscape(f)}\n`);
 		}
+		if (res.failures.length)
+			process.stdout.write(
+				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
+			);
 		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
