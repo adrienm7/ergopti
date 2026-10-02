@@ -189,6 +189,13 @@ Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
 skipped. It validates the GUI title policy and navigation case preservation
 after native captions were captured through explicit UTF-8 receipts.
 
+The native deferred-logger fixture now takes its immediate observation
+inside a bounded Critical region and restores the exact prior state.
+The unchanged causal assertion distinguishes inline delivery from a timer
+interrupting the observation; an isolated actual-production probe requires
+the same assertion to fail under a private inline mutation. Native Windows
+qualification remains pending.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
