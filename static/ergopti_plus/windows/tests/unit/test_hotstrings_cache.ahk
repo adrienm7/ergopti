@@ -71,23 +71,17 @@ TestHsCache_BuildExtractsKnownEntry() {
 	Rows := _HotstringsCacheBuildRows()
 
 	Assert(Rows.Count > 0, "cache build must yield at least one section")
-	; rolls.assign, the section this test pinned first, left the cache with the
-	; rest of rolls for the Ergopti extension; a small bundled section with a
-	; spaced output takes its place.
-	Key := "distancesreduction.comma_far_letters"
+	; Layout-bound categories never enter this cache. The bundled symbol
+	; expansion retains the whitespace and strict-case coverage of this parser.
+	Key := "magickey.text_expansion_symbols"
 	Assert(Rows.Has(Key), "cache build must contain the stable " . Key . " section")
-
-	FarRows := Rows[Key]
-	Assert(FarRows.Length == 5, Key . " must register exactly 5 entries (got " . FarRows.Length . ")")
-	; First TOML entry is  ',c' = { output = c-cedilla, is_word=false, auto_expand=true,
-	; is_case_sensitive=false, final_result=false }  -> flags *? and caseSens false.
-	; The 7th element is the per-entry priority override, empty here (no `priority =`).
-	Expected := ["*?", ",c", Chr(0xE7), false, false, false, ""]
-	Assert(_HsCacheRowsEqual(FarRows[1], Expected),
-		Key . " first row must extract as [*?, ',c', c-cedilla, !final, !repeat, !caseSens, no-priority-override]")
-	; Its fourth entry keeps the trailing space of its output.
-	Assert(FarRows[4][2] == ",x" && FarRows[4][3] == ("o" . Chr(0xF9) . " "),
-		Key . " fourth row must extract ',x' with its spaced output whole")
+	SymbolRows := Rows[Key]
+	AssertEqual(140, SymbolRows.Length, "every symbol expansion must reach the cache")
+	Expected := ["*?C", " -> ★", " ➜ ", false, false, true, ""]
+	Assert(_HsCacheRowsEqual(SymbolRows[1], Expected),
+		"the first symbol retains its flags, literal case and absent priority override")
+	Assert(SymbolRows[1][2] == " -> ★" && SymbolRows[1][3] == " ➜ ",
+		"trigger and output retain leading and trailing spaces whole")
 }
 
 TestHsCache_BuildCoversEveryBundledCategory() {
@@ -102,10 +96,10 @@ TestHsCache_BuildCoversEveryBundledCategory() {
 		Totals[Cat] := (Totals.Has(Cat) ? Totals[Cat] : 0) + RowList.Length
 		Grand += RowList.Length
 	}
-	for Cat in ["distancesreduction", "autocorrection", "magickey"]
+	for Cat in ["autocorrection", "magickey"]
 		Assert(Totals.Has(Cat) and Totals[Cat] > 0, "bundled category '" . Cat . "' must contribute rows")
 	; SFB reduction and rolls are the Ergopti extension's files, loaded from there.
-	for Cat in ["sfbsreduction", "rolls"]
+	for Cat in ["distancesreduction", "sfbsreduction", "rolls"]
 		Assert(!Totals.Has(Cat), "the extension category '" . Cat . "' must not be compiled into the cache")
 	; Floor well below the ~2992 current total: a builder that silently drops most
 	; entries (regex/flag regression) fails here, while legitimate TOML edits pass.

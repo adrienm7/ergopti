@@ -48,7 +48,29 @@ const readToml = (p) => parse(fs.readFileSync(p, 'utf8'));
 const index = readToml(path.join(HS, '_index.toml'));
 const manifest = readToml(MANIFEST);
 const locales = JSON.parse(fs.readFileSync(LOCALE_NAMES, 'utf8')).locales;
-const neutralStems = new Set(index.menu?.categories_order ?? []);
+const neutralFiles = new Map(
+	(index.menu?.categories_order ?? []).map((stem) => [stem, path.join(HS, `${stem}.toml`)])
+);
+// A layout-specific neutral category retains its title and language siblings
+// when its whole-file binding moves its source into a registry extension.
+const registry = path.join(ROOT, 'static/layouts/registry');
+for (const folder of fs
+	.readdirSync(registry, { withFileTypes: true })
+	.filter((entry) => entry.isDirectory())) {
+	const manifestPath = path.join(registry, folder.name, 'manifest.toml');
+	if (!fs.existsSync(manifestPath)) continue;
+	const bindings = readToml(manifestPath).extension?.hotstring_bindings ?? {};
+	for (const [stem, binding] of Object.entries(bindings)) {
+		if (binding.sections) continue;
+		if (neutralFiles.has(binding.category))
+			errors.push(`${binding.category}: duplicate neutral category source`);
+		neutralFiles.set(
+			binding.category,
+			path.join(registry, folder.name, 'hotstrings', `${stem}.toml`)
+		);
+	}
+}
+const neutralStems = new Set(neutralFiles.keys());
 // [[features.hotstrings]] is itself an array of tables, so TOML files every
 // [[features.hotstrings.<category>]] under its LAST element. Merge them all.
 const featureRows = {};
@@ -91,7 +113,7 @@ for (const lang of languages) {
 		if (!(manifest.sections?.hotstrings?.subsections ?? []).includes(group)) {
 			errors.push(`${group}: missing from [sections.hotstrings] subsections`);
 		}
-		const neutral = readToml(path.join(HS, `${stem}.toml`));
+		const neutral = readToml(neutralFiles.get(stem));
 		const neutralSections = new Set(sectionsOf(neutral));
 		for (const section of sectionsOf(doc)) {
 			if (!rows.has(section))

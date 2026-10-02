@@ -92,10 +92,13 @@ clearing the key.
 
 ### project-layout-extension-bound-hotstrings
 
-SFB reduction, rolls and the magic key's `repeat_corrections` section live in
+Distance reduction, SFB reduction, rolls and the magic key's `repeat_corrections` section live in
 the Ergopti layout extension (`static/layouts/registry/ergopti/hotstrings/`),
 bound by `[extension.hotstring_bindings.<stem>]` to their historical category,
-feature section and common tier, so preference ids never change. Resolve their
+feature section and common tier, so preference ids never change. Binding
+`source = "common"` identifies the historical priority, not the directory.
+The separate `french/distancesreduction.toml` stays a bundled language category.
+Resolve their
 file through the bound-source owner (`HotstringsBoundTomlPath`, macOS
 `ExtensionPacks.route`, Linux `route_bound_sources`), never the shared folder;
 the Windows TSV cache must not compile them. "Installed" is discovery: the

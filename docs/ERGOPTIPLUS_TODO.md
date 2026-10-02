@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-01. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
+Updated: 2026-10-02. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
 ahead of it without a release (CI cancelled on purpose).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
@@ -28,7 +28,7 @@ journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 The current session requires one atomic commit per fix or feature, updating this
 checklist in the same commit. Push each commit immediately to `dev`, then cancel
 every CI run triggered by that exact push to avoid releases. Run the full CI
-through `workflow_dispatch` on a temporary `backup/*` branch: a non-dev ref runs
+through `workflow_dispatch` on a temporary `codex/ci-*` branch: a non-dev ref runs
 the CI profile and publishes nothing. Use its Windows and macOS runners for
 native behavior and parity regression tests. Preserve unrelated changes, stage
 exact paths, never force-push `dev`/`main`, and delete only the temporary CI
@@ -236,9 +236,9 @@ These are software implementations; final hardware verification remains below.
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 - [ ] **37.** Item 23 decisions: whether « Hotstrings Ergopti » should appear
       only when the layout is really installed (today: always, shipped copy), and
-      whether to move distancesreduction `qu`, `comma_j`, `comma_far_letters`, the
-      `ê` sections, French `suffixes_a` and the magickey `replace` section into the
-      Ergopti extension.
+      whether to move French `suffixes_a` and the magickey `replace` section into
+      the Ergopti extension. The common distance rules are handled by item 103;
+      the French distance category remains independent.
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
@@ -634,12 +634,24 @@ exact-boolean regressions also pass the focused runner.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.
-- [ ] **103.** Move the common "Distance reduction" hotstrings into the
-      Ergopti+ extension: these bindings depend on the layout rather than being
-      common to every user. Extensions own their hotstrings, shortcuts and
-      layouts. Migrate existing category/section choices without duplication
-      or enabling a previously disabled group, and cover source ownership,
-      menu placement and runtime loading on all three OSes.
+- [~] **103.** Move the common "Distance reduction" hotstrings into the
+  Ergopti+ extension: these bindings depend on the layout rather than being
+  common to every user. Extensions own their hotstrings, shortcuts and
+  layouts. Migrate existing category/section choices without duplication
+  or enabling a previously disabled group, and cover source ownership,
+  menu placement and runtime loading on all three OSes.
+  The 101 historical rules now belong to the Ergopti+ extension through
+  the existing whole-category binding, retaining the common priority tier
+  and all feature identifiers. An independent corpus captured from
+  `58c6b05cb` preserves every rule, flag, localized description, section
+  order and delay. Native loaders replay this corpus; native owner cases
+  retain user-source precedence and disabled choices across reloads.
+  The French distance category remains independent and bundled. Shared
+  registry checks cover menu placement, absent-extension behavior and
+  unchanged opt-in defaults. Local validation passes all 349 JS checks,
+  12,846 macOS unit tests, 4,600 Linux unit tests and 97/142 macOS/Linux E2E
+  scenarios. Full native Windows and three-OS CI validation
+  is still required before closing this item.
 - [ ] **104.** Split the common autocorrections file into meaningful, separately
       selectable sections and replace its misleading submenu/section labels.
       Classify the actual corrections first; preserve matching priority,
