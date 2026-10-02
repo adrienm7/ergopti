@@ -34,6 +34,7 @@ local KeyCatalog  = require("tap_hold.key_catalog")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
+local WindowTitles = require("window_titles")
 
 
 
@@ -59,7 +60,7 @@ local function delay_dialog_script(prompt, default_ms, title, btn_cancel, btn_ok
 	return text_utils.applescript_format(
 		"display dialog \"%s\" default answer \"%d\" with title \"%s\" "
 			.. "buttons {\"%s\", \"%s\"} default button \"%s\"",
-		prompt, integral_default_ms, title, btn_cancel, btn_ok, btn_ok)
+		prompt, integral_default_ms, WindowTitles.compose(title), btn_cancel, btn_ok, btn_ok)
 end
 
 -- Label displayed when both tap and hold are "none"

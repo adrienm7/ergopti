@@ -971,8 +971,8 @@ exact-boolean regressions also pass the focused runner.
   class under #Warn All. It now uses InputControlHwnd; warnings and exact
   receipt assertions remain enabled. Production dialog code is unchanged;
   the corrected probe awaits native Windows CI.
-  Remaining native caption paths include the seven pre-bootstrap dialogs,
-  file pickers, notifications and genuine macOS/Linux dialog title APIs.
+  Remaining native caption paths include file pickers, notifications and
+  genuine Linux dialog title APIs.
   Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
   Windows/macOS/Linux pipeline, including package and installation lanes. It
   validates the shared "Ergopti+" extension name in the actual tray providers,
@@ -1065,6 +1065,18 @@ order changed, then passed after migration. All five focused menu tests, 12,801
 Lua tests, selected E2E scenarios and 349 JS checks pass; the menu parity ratchet
 now requires 17 shared-rendered macOS menus. Two Windows cases inspect the actual
 menu's disabled flag in native CI. Item 91's remaining engine issues stay open.
+
+Native AppleScript dialogs and numeric tap/hold prompts now compose their
+captions through the shared owner before escaping; five existing bare keys
+retain all 21 translations and their bodies/buttons/defaults/focus semantics.
+Independent regressions reject both original Mac bypasses. The seven
+pre-bootstrap Windows modals now use the same hoisted native-dialog delegate;
+no entry include order changes or duplicated product prefixes are needed.
+The title audit has zero bootstrap exclusions and rejects all seven original
+consumers; 46 independent mutation cases pass. Native probes invoke the
+actual delegates before their includes and preserve caption/body/options/
+cancellation checks. Actual Windows and AppleScript GUI qualification remains
+pending.
 
 ## Time estimate
 

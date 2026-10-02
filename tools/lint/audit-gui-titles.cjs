@@ -167,21 +167,12 @@ function functionRanges(ts) {
 	return ranges;
 }
 
-// These seven last-resort startup modals precede the runtime dialog owner.
-// Both function ownership and exact counts are bounded until their own migration.
-const EARLY_DIALOGS = {
-	'windows/infra/bundle.ahk': { owner: 'Bundle_Init', count: 6 },
-	'windows/infra/error_net.ahk': { owner: 'ErgoptiGlobalErrorHandler', count: 1 }
-};
-
 function auditSource(source, lua, locales, relative = '') {
 	const ts = tokens(source, lua),
 		findings = [],
 		debt = [],
 		stats = { checked: 0, dynamic: 0 };
 	const scopes = lua ? [] : functionRanges(ts);
-	const early = EARLY_DIALOGS[relative];
-	let earlyCalls = 0;
 	// Only simple same-line assignments are followed. Parameters, table paths,
 	// callback results and cross-function argument flow are deliberately unresolved.
 	function alias(name, before, seen) {
@@ -267,14 +258,6 @@ function auditSource(source, lua, locales, relative = '') {
 			const scope = scopes
 				.filter((s) => s.start < i && i < s.end)
 				.sort((a, b) => a.end - a.start - (b.end - b.start))[0];
-			if (early && name === 'MsgBox' && scope?.name === early.owner) {
-				earlyCalls++;
-				debt.push({
-					line: t.line,
-					reason: 'pre-bootstrap native caption migration remains pending'
-				});
-				continue;
-			}
 			const caption = call.args[1];
 			const composed =
 				caption?.length === 4 &&
@@ -359,13 +342,6 @@ function auditSource(source, lua, locales, relative = '') {
 				values: bad
 			});
 	}
-	if (early && earlyCalls !== early.count)
-		findings.push({
-			line: 1,
-			call: 'MsgBox',
-			reason: `bounded pre-bootstrap dialog count changed: expected ${early.count}, found ${earlyCalls}`,
-			values: []
-		});
 	return { findings, debt, ...stats };
 }
 

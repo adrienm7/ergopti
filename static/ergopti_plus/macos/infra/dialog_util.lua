@@ -28,6 +28,7 @@ local Logger         = require("infra.logger")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local text_utils     = require("infra.text_utils")
+local WindowTitles   = require("window_titles")
 
 -- Absolute path: this process does not inherit the login shell's PATH.
 local OPEN_BIN = "/usr/bin/open"
@@ -195,6 +196,7 @@ end
 --- @param ok_label string Label of the list's confirm button.
 --- @return string script
 function M.choose_script(title, message, choices, cancel_label, ok_label)
+	title = WindowTitles.compose(title)
 	if #choices <= MAX_ALERT_CHOICES then
 		-- AppleScript lays the buttons out from left to right
 		local buttons = { cancel_label }
