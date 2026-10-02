@@ -31,6 +31,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 const { parse } = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -83,6 +84,91 @@ const gateKeys = manifest.menu?.hotstring_category_keys ?? {};
 
 /** Sections a hotstring file declares, in its [_meta] order, without separators. */
 const sectionsOf = (doc) => (doc._meta?.sections_order ?? []).filter((s) => s !== '-');
+
+// This capture predates the proposed section split. It must stay independent of
+// its source and classification: an edited rule cannot bless its own expectation.
+try {
+	const reference = JSON.parse(
+		fs.readFileSync(
+			path.join(SHARED, 'tests/corpus/hotstrings/common_autocorrection_entries.json'),
+			'utf8'
+		)
+	);
+	const classification = JSON.parse(
+		fs.readFileSync(
+			path.join(SHARED, 'data/hotstrings/common_autocorrection_sections.json'),
+			'utf8'
+		)
+	);
+	assert.strictEqual(reference.schema_version, 1);
+	assert.strictEqual(reference.category, 'autocorrection');
+	assert.strictEqual(reference.legacy_section, 'caps');
+	assert.strictEqual(reference.source, 'common');
+	assert.strictEqual(reference.source_priority, 10);
+	assert.match(reference.captured_commit, /^[a-f0-9]{40}$/);
+	assert.match(reference.source_sha256, /^[a-f0-9]{64}$/);
+	assert.deepStrictEqual(reference.section_counts, { caps: 140 });
+	assert.strictEqual(reference.entries.length, 140);
+	const document = readToml(path.join(HS, 'autocorrection.toml'));
+	assert.deepStrictEqual(document._meta, reference.meta, 'all historical metadata remains exact');
+	const actualEntries = Object.entries(document)
+		.filter(([section]) => section !== '_meta')
+		.flatMap(([section, blocks]) =>
+			blocks.flatMap((block) =>
+				Object.entries(block).map(([trigger, fields]) => ({ section, trigger, ...fields }))
+			)
+		)
+		.map((row, index) => ({ ordinal: index + 1, ...row }));
+	assert.deepStrictEqual(
+		actualEntries,
+		reference.entries,
+		'the complete historical corpus, flags and source order remain exact'
+	);
+	const tiers = JSON.parse(fs.readFileSync(path.join(HS, 'priority.json'), 'utf8'));
+	assert.strictEqual(tiers.common, reference.source_priority);
+	assert.strictEqual(new Set(reference.entries.map((row) => row.trigger)).size, 140);
+	assert.strictEqual(classification.schema_version, 1);
+	assert.strictEqual(classification.status, 'classification_only');
+	assert.strictEqual(classification.category, reference.category);
+	assert.strictEqual(classification.legacy_section, reference.legacy_section);
+	assert.deepStrictEqual(
+		classification.sections.map((section) => section.id),
+		['names', 'abbreviations', 'technical_terms']
+	);
+	assert.deepStrictEqual(
+		classification.sections.map((section) => section.triggers.length),
+		[34, 95, 11]
+	);
+	const classified = classification.sections.flatMap((section) => section.triggers);
+	assert.strictEqual(
+		new Set(classified).size,
+		140,
+		'each trigger belongs to exactly one proposed section'
+	);
+	assert.deepStrictEqual(
+		[...classified].sort(),
+		reference.entries.map((row) => row.trigger).sort()
+	);
+	for (const section of classification.sections) {
+		assert.strictEqual(typeof section.description, 'string');
+		assert.ok(section.description.length > 0, 'the reviewed classification explains its meaning');
+	}
+	assert.deepStrictEqual(
+		sectionsOf(document),
+		['caps'],
+		'the editorial catalogue must not change live preferences'
+	);
+	assert.deepStrictEqual(
+		featureRows.autocorrection.map((row) => row.id),
+		['caps']
+	);
+	assert.deepStrictEqual(featureRows.autocorrection[0].default, {
+		enabled: false,
+		time_activation_seconds: 0.5
+	});
+} catch (error) {
+	errors.push(`common autocorrection independent reference: ${error.message}`);
+}
 
 const languages = index.languages?.order ?? [];
 if (languages.length === 0)
