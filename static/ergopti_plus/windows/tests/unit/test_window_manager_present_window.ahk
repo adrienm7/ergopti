@@ -357,12 +357,18 @@ _WMPW_GeneratedTitlePoliciesExecuteNatively() {
 			FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
 				. '#Include ' . Artifact . "`n"
 				. 'OnError(_WMPWPolicyError)' . "`n"
-				. 'FileAppend(WindowTitle(A_Args[1]), "*", "UTF-8-RAW")' . "`nExitApp(0)`n"
+				. 'OwnedWindow := Gui(, WindowTitle(A_Args[1]))' . "`n"
+				. 'FileAppend(OwnedWindow.Title, A_Args[2], "UTF-8-RAW")' . "`n"
+				. 'OwnedWindow.Destroy()' . "`n"
+				. 'FileAppend("caption-written", "*", "UTF-8-RAW")' . "`nExitApp(0)`n"
 				. '_WMPWPolicyError(Err, *) {' . "`n"
 				. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n",
 				Harness, "UTF-8")
-			AssertEqual(Spec.Expected, _WMPW_TitlePolicyChild(A_AhkPath,
-				["/ErrorStdOut", Harness, "Navigation layer"]),
+			Caption := Root . "\caption_" . Index . ".txt"
+			AssertEqual("caption-written", _WMPW_TitlePolicyChild(A_AhkPath,
+				["/ErrorStdOut", Harness, "Navigation layer", Caption]),
+				"the native caption owner acknowledges its private receipt with ASCII stdout")
+			AssertEqual(Spec.Expected, FileRead(Caption, "UTF-8"),
 				"native AHK executes private title policy " . Index . " without data becoming source")
 		}
 	} finally DirDelete(Root, true)

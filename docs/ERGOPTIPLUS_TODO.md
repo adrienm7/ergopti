@@ -62,6 +62,12 @@ The maintainer demos Ergopti on 2026-09-30 in the afternoon. Read
 lists every branch, the in-flight fixes, the maintainer's decisions and the
 exact release procedure.
 
+Automatic startup placement is complete: non-release run 37039552367 at
+`506931224` passed every Windows/macOS/Linux unit, E2E, package, installation
+and launch gate, with Release / Publish skipped. All three native menus draw
+startup immediately above Uninstall from the shared declaration. Item 110 is
+removed after this full checkpoint.
+
 ## Already integrated functionality
 
 The history on `dev` contains the following substantial parts of the overhaul.
@@ -303,8 +309,8 @@ These are software implementations; final hardware verification remains below.
   read. Its clear receipt matches native true/false; set remains void. Direct
   snapshot regressions failed before the fix, and a real learning/debounce
   regression prevents unflushed updates from appearing persisted. Focused
-  cases passed; full macOS and three-OS verification remain pending for this
-  stub slice. The separate delayed-timer audit remains open: default-delay
+  cases passed, and the settings slice passed the complete three-OS pipeline
+  in non-release run 37039329959 at `ea5d64ef6`. The separate delayed-timer audit remains open: default-delay
   restoration, chainable setDelay/running and self-rearming callback semantics.
   Audit other hs stubs for remaining divergences from native behaviour.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
@@ -764,17 +770,13 @@ exact-boolean regressions also pass the focused runner.
   Native caption/retitle and private generated-policy regressions cover the
   hosts; the CLI regression failed against the original translated raw-Gui
   bypass before passing with its stronger audit. Full three-OS validation is
-  pending. Remaining: native message/input dialogs, native file pickers and
+  pending. Its private native-policy probes now write the actual Gui caption to
+  UTF-8 receipts and use ASCII stdout acknowledgements; runs 37040137327 and
+  37040369275 exposed ANSI decoding in the previous test transport. Native exit,
+  stderr and the independent expected-caption assertions remain strict.
+  Remaining: native message/input dialogs, native file pickers and
   notifications, and Swift launcher-owned dialogs still have legacy branding
   paths. Captionless overlays retain their separate native presentation owner.
-
-- [~] **110.** Move automatic startup from Configuration to Updates,
-  immediately above Uninstall. The shared declaration and all three native
-  command/getter contexts now use that placement. Existing startup persistence
-  owners and 21 translations remain intact. Native regressions cover order,
-  enabled/disabled checks, command dispatch, pause and rebuild; the parity guard
-  requires one declaration directly before Uninstall. Full three-OS validation
-  remains pending before this item can be removed.
 
 Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
 Windows/macOS/Linux pipeline, including package and installation lanes. It

@@ -9,6 +9,16 @@
 Every `.ahk` source file is UTF-8 with BOM and LF endings. Encoding drift can
 stop parsing mid-file and look like missing tests; always run the encoding gate.
 
+### project-ahk-native-fixture-caption-receipts
+
+Tree-owned completion reads its stdout capture with `FileRead(path)` in
+`_SR_TreeFinishClaim`, so decoding follows `A_FileEncoding`. A child writing
+UTF-8 without a BOM can therefore produce mojibake under a test runner's native
+code page. For native caption probes, write the actual `Gui.Title` to a private
+UTF-8 receipt and read it with an explicit encoding; retain an ASCII completion
+acknowledgement, the exact exit status and strict error checks. Do not change
+the general process port's decoding contract to repair one fixture.
+
 ### feedback-ahk-ui-syntax-validation
 
 Some UI modules are outside the headless unit include graph. Validate the real
