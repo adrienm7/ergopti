@@ -783,6 +783,14 @@ exact-boolean regressions also pass the focused runner.
   the original engine failed five new cases. Focused JS, macOS 40/40 and Linux
   LuaJIT 37/37 passed; full/native Windows validation remains pending.
   Schema version remains 8 and no runtime subsection split is introduced.
+  The Windows registry now owns every registration sequence identity;
+  transported builder or caller metadata cannot replace it. The independent
+  140-rule corpus exposed the second sequence allocator in native CI; its
+  historical order assertions remain intact. Four registered native cases
+  cover prebuilt metadata, mixed factories, override attempts and group
+  isolation. The corresponding Lua registries retain their existing single
+  sequence owners. Actual Windows validation remains pending.
+
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples
