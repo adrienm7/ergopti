@@ -41,6 +41,43 @@ _TLL_RetainedSpanSizePreservesGeometry() {
 Test("LLM tooltip: retained per-render span size preserves geometry (llm-span-cache-2026-10-02)",
 	_TLL_RetainedSpanSizePreservesGeometry)
 
+class _TLL_SegmentGui extends _TLL_SpanGui {
+	__New() {
+		super.__New()
+		this.Spans := []
+	}
+	Add(Kind, Options, Text) {
+		super.Add(Kind, Options, Text)
+		this.Spans.Push({ Font: this.Font, Options: Options })
+	}
+}
+
+_TLL_RetainedSegmentSizesPreserveEmphasis() {
+	Slot := { Text: "", Chunks: [{ type: "equal", text: "a" },
+		{ type: "insert", text: "b" }], NextWords: " c", HasCorrections: true }
+	Row := _LLM_TooltipMeasurePredictionRow(Slot, { W: 30, H: 18 },
+		{ W: 5, H: 18 }, 10, 7,
+		(Text, Bold) => { W: StrLen(Text) * (Bold ? 20 : 10), H: Bold ? 22 : 18 })
+	for Selected in [true, false] {
+		G := _TLL_SegmentGui()
+		Segments := _LLM_SlotSegments(Slot, Selected)
+		Body := Selected ? Row.Selected : Row.Unselected
+		Width := _LLM_TooltipDrawSegments(G, 0, 0, 40,
+			Segments, Selected, Body.Pieces)
+		AssertEqual(Body.W, Width,
+			"cached painting must use the dimensions of this exact emphasis state")
+		AssertEqual(3, G.Spans.Length)
+		for Index, Span in G.Spans {
+			AssertEqual(Segments[Index].Bold, InStr(Span.Font, "bold") > 0,
+				"retained dimensions must not erase the requested font weight")
+			Assert(InStr(Span.Options, " w" . (Body.Pieces[Index].W + 2)
+				. " h" . Body.Pieces[Index].H), "every retained piece controls native geometry")
+		}
+	}
+}
+Test("LLM tooltip: retained segments preserve shared emphasis geometry (llm-span-cache-2026-10-02)",
+	_TLL_RetainedSegmentSizesPreserveEmphasis)
+
 class _TLL_Native {
 	static Dpi := 120
 
