@@ -37,6 +37,9 @@ _TtkbOnCharDefersHide() {
 	; helper instead of a pinned modules/keymap/llm_bridge.ahk read.
 	Seg := _DriverFuncBody("LLM_Bridge_OnChar")
 	Assert(Seg != "", "LLM_Bridge_OnChar(ch) declaration must exist in llm_bridge.ahk")
+	AssertContains(Seg, "_LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)")
+	Seg := _DriverFuncBody("_LLM_Bridge_NotifyChar")
+	Assert(Seg != "", "the shared character observer must exist")
 	; The dismiss branch must hand the teardown to a fresh timer thread, not run
 	; it inline on the InputHook thread.
 	Assert(InStr(Seg, "LLM_Bridge_DeferTooltipHide()") > 0,

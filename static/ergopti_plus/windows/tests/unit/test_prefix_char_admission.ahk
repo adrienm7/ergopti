@@ -1,0 +1,286 @@
+﻿; tests/unit/test_prefix_char_admission.ahk
+
+; ==============================================================================
+; MODULE: Ordered Prefix Character Admission Tests
+; DESCRIPTION:
+; A yielded pre-feed observer allowed the magic key to enter HSE before the
+; trigger's last character. Actual callbacks and timer reentry reproduce that
+; failure without a keyboard hook, foreground input, or a visible tooltip.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_PCA_Call(Char, PrefeedFn) {
+	_OnPrefixChar(0, Char, PrefeedFn, (*) => true)
+}
+
+_PCA_TimerOrderAndOutput() {
+	global CategoryEnabled, Features, ScriptInformation, _SendHook
+	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixVisibleFireDecisions
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _KLLastShownSuggestion
+	global HSE_Buffer
+	global _HSResolveCache, _HSResolveGen, _SR_ActiveTasks
+	Saved := { Categories: CategoryEnabled, Features: Features, Script: ScriptInformation,
+		Send: _SendHook, Active: _LLM_Bridge_Active, Agent: _LLM_Bridge_AgentFeeding,
+		Decisions: _PrefixVisibleFireDecisions, Suggestion: _KLLastShownSuggestion,
+		ResolverCache: _HSResolveCache, Tasks: _SR_ActiveTasks.Count }
+	State := { Screen: "", Sends: 0, AdmittedCritical: false, Completed: false }
+	Timer := 0
+	Prefeed(Char) {
+		if Char != "t"
+			return
+		State.AdmittedCritical := A_IsCritical > 0
+		Timer := Later
+		SetTimer(Timer, -1)
+		Started := A_TickCount
+		while ((A_TickCount - Started) & 0xFFFFFFFF) < 50
+			Sleep(-1)
+	}
+	Later() {
+		Input("★")
+		Input("x")
+		State.Completed := true
+	}
+	Input(Char) {
+		State.Screen .= Char
+		_PCA_Call(Char, Prefeed)
+	}
+	Capture(Name, Args*) {
+		AssertEqual("SendFinalResult", Name, "the regular application uses one atomic burst")
+		Payload := Args[1]
+		AssertEqual("{BackSpace 3}{Text}c’était", Payload)
+		State.Screen := SubStr(State.Screen, 1, Max(0, StrLen(State.Screen) - 3)) . "c’était"
+		State.Sends += 1
+		return true
+	}
+	try {
+		HSE_TestReset()
+		SimulateRegularApp()
+		CategoryEnabled := Map("Hotstrings", true)
+		Features := Map()
+		ScriptInformation := Map("MagicKey", "★")
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_AgentFeeding := false
+		_PrefixBuffer := ""
+		_PrefixFocusedControlToken := 1
+		_PrefixVisibleFireDecisions := []
+		_KLLastShownSuggestion := ""
+		; The scenario deliberately has no visual preview. A due render must not
+		; launch a real position worker against the user's foreground application.
+		_HSResolveCache := Map("magickey|replace", {
+			gen: _HSResolveGen, val: { ShowTooltip: false } })
+		_SendHook := Capture
+		HSE_Register("*", "ct★", 0, Map("Replacement", "c’était", "OnlyText", true,
+			"Category", "magickey", "Section", "replace"))
+		Input("c")
+		Input("t")
+		AssertFalse(A_IsCritical, "the direct callback restores the caller's scheduler")
+		Started := A_TickCount
+		while !State.Completed && ((A_TickCount - Started) & 0xFFFFFFFF) < 300
+			Sleep(-1)
+		AssertTrue(State.Completed, "the queued completing key actually runs")
+		AssertTrue(State.AdmittedCritical, "serialization starts before pre-feed work")
+		AssertEqual(1, State.Sends, "one expansion fires without any painted preview")
+		AssertEqual("c’étaitx", State.Screen, "the later character follows the complete expansion")
+		AssertEqual(State.Screen, HSE_Buffer, "the engine agrees with the recorded screen")
+		AssertEqual(Saved.Tasks, _SR_ActiveTasks.Count, "the callback fixture creates no native worker")
+	} finally {
+		if IsObject(Timer)
+			SetTimer(Timer, 0)
+		_PrefixInvalidateDeferredEffects()
+		HSE_TestReset()
+		CategoryEnabled := Saved.Categories
+		Features := Saved.Features
+		ScriptInformation := Saved.Script
+		_SendHook := Saved.Send
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_AgentFeeding := Saved.Agent
+		_PrefixVisibleFireDecisions := Saved.Decisions
+		_KLLastShownSuggestion := Saved.Suggestion
+		_HSResolveCache := Saved.ResolverCache
+		_PrefixSetBuffer("")
+	}
+}
+Test("prefix: rapid magic key keeps callback order and output without preview (prefix-char-admission)",
+	_PCA_TimerOrderAndOutput)
+
+_PCA_WithObserverFixture(Body) {
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LLM_Engine
+	global _PrefixDeferredGeneration, _KS_PhysicalInputGeneration
+	Saved := { Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_Buffer,
+		Content: _LLM_Bridge_ContentGeneration, Agent: _LLM_Bridge_AgentBuffer,
+		Feeding: _LLM_Bridge_AgentFeeding, Engine: _LLM_Engine,
+		Lifecycle: _PrefixDeferredGeneration, Physical: _KS_PhysicalInputGeneration }
+	State := { Focus: Map("hwnd", 101, "control", 102), Scheduled: [] }
+	Schedule(Fn, Period) => State.Scheduled.Push({ Fn: Fn, Period: Period })
+	Focus() => State.Focus.Clone()
+	LLM_Bridge_CancelPrefixObserver()
+	try {
+		_LLM_Bridge_Active := true
+		_LLM_Bridge_Buffer := ""
+		_LLM_Bridge_AgentBuffer := ""
+		_LLM_Bridge_AgentFeeding := false
+		_LLM_Engine := Map("enabled", false, "request_id", 10,
+			"timer_active", false, "pending_timer", "")
+		Body.Call(State, Schedule, Focus)
+	} finally {
+		LLM_Bridge_CancelPrefixObserver()
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_Buffer := Saved.Buffer
+		_LLM_Bridge_ContentGeneration := Saved.Content
+		_LLM_Bridge_AgentBuffer := Saved.Agent
+		_LLM_Bridge_AgentFeeding := Saved.Feeding
+		_LLM_Engine := Saved.Engine
+		_PrefixDeferredGeneration := Saved.Lifecycle
+		_KS_PhysicalInputGeneration := Saved.Physical
+	}
+}
+
+_PCA_MirrorIsBoundedAndCoalesced() {
+	_Body(State, Schedule, Focus) {
+		global _LLM_Bridge_Buffer, _LLM_Bridge_PrefixObserver, _LLM_Engine
+		PreviousCritical := Critical("On")
+		try {
+			LLM_Bridge_FeedCharForPrefix("c", Schedule, Focus)
+			Old := _LLM_Bridge_PrefixObserver
+			LLM_Bridge_FeedCharForPrefix("t", Schedule, Focus)
+			AssertEqual("ct", _LLM_Bridge_Buffer)
+			AssertEqual(12, _LLM_Engine["request_id"], "responses are invalidated synchronously")
+			AssertFalse(_LLM_Engine["timer_active"], "prediction observers have not run inline")
+			AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Old))
+			_LLM_Bridge_ApplyBufferEdit(2, "expanded")
+			AssertTrue(_LLM_Bridge_PrefixObserverStillCurrent(_LLM_Bridge_PrefixObserver),
+				"the current observer reads the canonical expansion rather than its trigger")
+			AssertEqual("expanded", _LLM_Bridge_Buffer)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		AssertEqual(2, State.Scheduled.Length, "each snapshot has a single owned one-shot")
+		AssertEqual(-1, State.Scheduled[2].Period)
+	}
+	_PCA_WithObserverFixture(_Body)
+}
+Test("prefix: AI context mirrors synchronously while observers coalesce (prefix-char-admission)",
+	_PCA_MirrorIsBoundedAndCoalesced)
+
+_PCA_ObserverRejectsStaleOwners() {
+	_Body(State, Schedule, Focus) {
+		global _LLM_Bridge_PrefixObserver, _PrefixDeferredGeneration
+		global _KS_PhysicalInputGeneration, _LLM_Bridge_Active
+		PreviousCritical := Critical("On")
+		try LLM_Bridge_FeedCharForPrefix("c", Schedule, Focus)
+		finally Critical(PreviousCritical)
+		Owner := _LLM_Bridge_PrefixObserver
+		AssertTrue(_LLM_Bridge_PrefixObserverStillCurrent(Owner))
+		for Key in ["hwnd", "control"] {
+			Old := State.Focus[Key]
+			State.Focus[Key] += 1
+			AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Owner), "changed " . Key)
+			State.Focus[Key] := Old
+		}
+		_PrefixDeferredGeneration += 1
+		AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Owner), "reload/suspend lifecycle ABA")
+		_PrefixDeferredGeneration -= 1
+		_KS_PhysicalInputGeneration += 1
+		AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Owner), "intervening physical input")
+		_KS_PhysicalInputGeneration -= 1
+		_LLM_Bridge_Active := false
+		AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Owner), "bridge mode changed")
+		_LLM_Bridge_Active := true
+		LLM_Bridge_CancelPrefixObserver()
+		AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Owner), "retired timer")
+	}
+	_PCA_WithObserverFixture(_Body)
+}
+Test("prefix: deferred AI work rejects stale focus input lifecycle and mode (prefix-char-admission)",
+	_PCA_ObserverRejectsStaleOwners)
+
+_PCA_AgentMirrorOwnsItsFeed() {
+	_Body(State, Schedule, Focus) {
+		global _LLM_Bridge_Active, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+		_LLM_Bridge_Active := false
+		PreviousCritical := Critical("On")
+		try {
+			AssertTrue(LLM_Bridge_FeedCharForPrefix("c", Schedule, Focus, (*) => true))
+			AssertTrue(_LLM_Bridge_AgentFeeding)
+			AssertEqual("c", _LLM_Bridge_AgentBuffer, "the first character is retained before notification")
+			LLM_Bridge_MirrorAgentEdit(1, "expanded")
+			AssertEqual("expanded", _LLM_Bridge_AgentBuffer)
+			AssertFalse(LLM_Bridge_FeedCharForPrefix("t", Schedule, Focus, (*) => false))
+			AssertFalse(_LLM_Bridge_AgentFeeding)
+			AssertEqual("", _LLM_Bridge_AgentBuffer, "disabling observation clears its context immediately")
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+	_PCA_WithObserverFixture(_Body)
+}
+Test("prefix: agent-only mirroring owns enable disable and canonical edits (prefix-char-admission)",
+	_PCA_AgentMirrorOwnsItsFeed)
+
+_PCA_StalePredictionCannotCancel() {
+	_Body(State, Schedule, Focus) {
+		global _LLM_Engine
+		Timer := (*) => true
+		_LLM_Engine["enabled"] := true
+		_LLM_Engine["pending_timer"] := Timer
+		_LLM_Engine["timer_active"] := true
+		AssertFalse(LLM_Engine_OnKeystroke("old", "", Schedule, (*) => false))
+		AssertEqual(ObjPtr(Timer), ObjPtr(_LLM_Engine["pending_timer"]))
+		AssertTrue(_LLM_Engine["timer_active"])
+		AssertEqual(10, _LLM_Engine["request_id"], "a refused observer does not invalidate newer work")
+		AssertEqual(0, State.Scheduled.Length)
+	}
+	_PCA_WithObserverFixture(_Body)
+}
+Test("prefix: stale prediction observer cannot cancel a newer timer (prefix-char-admission)",
+	_PCA_StalePredictionCannotCancel)
+
+_PCA_StaleTransportCancellationCannotMutate() {
+	_Body(State, Schedule, Focus) {
+		global _LLM_Engine
+		_LLM_Engine["active_request_signature"] := "new request"
+		AssertFalse(LLM_Engine_CancelInflight((*) => false))
+		AssertEqual(10, _LLM_Engine["request_id"])
+		AssertEqual("new request", _LLM_Engine["active_request_signature"])
+	}
+	_PCA_WithObserverFixture(_Body)
+}
+Test("prefix: stale observer cannot invalidate newer transport ownership (prefix-char-admission)",
+	_PCA_StaleTransportCancellationCannotMutate)
+
+_PCA_StaleAgentCannotCancel() {
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Agent_Generation, _LLM_Agent_Auto
+		Timer := (*) => true
+		_LLM_Agent_Auto["timer"] := Timer
+		Generation := _LLM_Agent_Generation
+		Calls := 0
+		Guard() => (++Calls == 1)
+		AssertFalse(LLM_Agent_OnTyping("old", Guard), "cold preparation must revalidate before mutation")
+		AssertEqual(2, Calls)
+		AssertEqual(Generation, _LLM_Agent_Generation)
+		AssertEqual(ObjPtr(Timer), ObjPtr(_LLM_Agent_Auto["timer"]))
+	}
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+}
+Test("prefix: agent observer revalidates before replacing the pause owner (prefix-char-admission)",
+	_PCA_StaleAgentCannotCancel)
+
+_PCA_ProductionUsesOnlyRamPrefeed() {
+	Watcher := _DriverFuncBody("_OnPrefixChar")
+	Mirror := _DriverFuncBody("LLM_Bridge_FeedCharForPrefix")
+	Reissue := _DriverFuncBody("LLM_Bridge_ReissueLiveAfterExpansion")
+	Assert(Watcher != "" && Mirror != "" && Reissue != "", "all ordered input owners exist")
+	Assert(InStr(Watcher, 'PreviousCritical := Critical("On")')
+		< InStr(Watcher, "LLM_Bridge_FeedCharForPrefix(Char)"))
+	AssertContains(Watcher, "Critical(PreviousCritical)")
+	Assert(!InStr(Mirror, "LLM_Agent_Config("), "the mirror never reads cold agent configuration")
+	Assert(!InStr(Mirror, "LLM_Agent_OnTyping("), "the mirror never runs the agent observer")
+	Assert(!InStr(Mirror, "LLM_Engine_OnKeystroke("), "the mirror never runs prediction observers")
+	Assert(!InStr(Reissue, "LLM_Engine_OnKeystroke("), "live expansions use the same deferred owner")
+	AssertContains(Reissue, "_LLM_Bridge_SchedulePrefixObserver(")
+}
+Test("prefix: production pre-feed and live reissue exclude ancillary work (prefix-char-admission)",
+	_PCA_ProductionUsesOnlyRamPrefeed)
