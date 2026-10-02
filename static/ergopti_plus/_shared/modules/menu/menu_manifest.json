@@ -755,22 +755,28 @@
 			"type": "command",
 			"id": "key_combination_clear",
 			"i18n": "menu.tapholds.nothing_combo",
+			"disabled_when": [
+				"key_combination_pair_assigned"
+			],
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
 			"type": "---",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			]
 		},
 		{
 			"type": "list",
 			"id": "key_combination_slots",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}

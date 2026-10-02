@@ -121,3 +121,59 @@ helpers.describe("the key combinations are a group of their own under Shortcuts"
 		helpers.assert_true(has_prefix(all, "menu.tapholds.sticky_title"), "the sticky delay stays")
 	end)
 end)
+
+--- Finds the rendered pair row without depending on its hand header position.
+--- @param rows table Rendered rows.
+--- @return table|nil
+local function pair_row(rows)
+	for _, row in ipairs(rows or {}) do
+		if type(row.title) == "string" and row.title:sub(1, 10) == "Shift pair" then return row end
+		local found = pair_row(row.menu)
+		if found then return found end
+	end
+end
+
+helpers.describe("key-combination pairs use the shared declaration", function()
+	helpers.it("a changed template controls actual row order (key-combination-pair-menu)", function()
+		helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu" }, function()
+			local observed = { combos = true, writes = {}, regenerations = 0 }
+			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local saved = root.key_combination_pair_menu
+			-- The real renderer reads this temporary in-memory declaration. Moving
+			-- clear below the slots catches a driver that still builds them itself.
+			root.key_combination_pair_menu = {
+				{ type = "list", id = "key_combination_slots" },
+				{ type = "command", id = "key_combination_clear", i18n = "menu.tapholds.nothing_combo" },
+			}
+			local ok, err = xpcall(function()
+				local built = menu.build_key_combinations({ karabiner = remap_double(observed) })
+				local row = pair_row(built)
+				helpers.assert_not_nil(row, "the declared pair must render")
+				helpers.assert_eq(#row.menu, 4, "three native slots and the declared clear command")
+				helpers.assert_true(row.menu[1].title:find("menu.shortcuts.key_combinations_chord", 1, true) == 1,
+					"the template placed slots before clear")
+				helpers.assert_eq(row.menu[4].title, "menu.tapholds.nothing_combo", "clear follows the changed declaration")
+			end, debug.traceback)
+			root.key_combination_pair_menu = saved
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	for _, assigned in ipairs({ false, true }) do
+		helpers.it("clear availability follows assignment=" .. tostring(assigned) .. " (key-combination-pair-menu)", function()
+			local observed = { combos = true, writes = {}, regenerations = 0 }
+			local remap = remap_double(observed)
+			remap.get_combo_tap_action = function() return assigned and "escape" or "none" end
+			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local built = menu.build_key_combinations({ karabiner = remap })
+			local row = pair_row(built)
+			helpers.assert_not_nil(row)
+			helpers.assert_eq(row.menu[1].title, "menu.tapholds.nothing_combo")
+			helpers.assert_eq(row.menu[1].disabled == true, not assigned, "an empty pair has nothing to clear")
+			helpers.assert_eq(row.menu[2].title, "-", "one shared separator precedes the slots")
+			helpers.assert_eq(#row.menu, 5, "clear, separator, chord, tap and hold")
+		end)
+	end
+end)

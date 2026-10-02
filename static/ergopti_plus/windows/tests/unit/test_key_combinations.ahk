@@ -678,3 +678,22 @@ _KCT_EveryKeyHasItsPairHotkeys() {
 }
 Test("key combinations: every key has its pair hotkeys, created first (key-combinations-2026-10-01)",
 	_KCT_EveryKeyHasItsPairHotkeys)
+
+_KCT_PairClearAvailability(Assigned) {
+	PairId := "left_alt_then_caps_lock"
+	Taps := Assigned ? Map(PairId, "caps_word") : Map()
+	_KCT_With(Taps, Map(), Inspect)
+	Inspect() {
+		Shown := []
+		KeyCombinationShowPairMenu(PairId, "LAlt + CapsLock", (Built) => Shown.Push(Built))
+		AssertEqual(1, Shown.Length)
+		try {
+			Flags := DllCall("GetMenuState", "ptr", Shown[1].Handle, "uint", 0, "uint", 0x400, "uint")
+			Assert(Flags != 0xFFFFFFFF, "the declared clear command must exist")
+			AssertEqual(!Assigned, (Flags & 3) != 0, "an empty pair has nothing to clear on either driver")
+		} finally Shown[1].Delete()
+	}
+}
+for Assigned in [false, true]
+	Test("key combinations: shared clear availability assigned=" . Assigned . " (key-combination-pair-menu)",
+		_KCT_PairClearAvailability.Bind(Assigned))

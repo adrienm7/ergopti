@@ -501,9 +501,7 @@ is committed; one request is one commit with its regression test.
   fake LCtrl, and a pair that ends on LCtrl fires on that fake LCtrl; (c)
   a real-keyboard check of the order rule (a key held alone, then joined
   by another, must not fire the pair), which rests on AutoHotkey
-  recording a key's physical state after its criteria have answered;
-  (d) macOS draws each pair's slots from its own code where Windows
-  reads `key_combination_pair_menu`.
+  recording a key's physical state after its criteria have answered.
 - [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
       binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
       taps when a second tap-hold key goes down) and the Shortcuts menu draws
@@ -720,6 +718,15 @@ places diaeresis on Shift+SC01B, unlike Ergopti. The seed now follows that
 actual shipped level and reports its layout/key/modifiers on refusal. Thirteen
 cases refused the wrong seed; one additional Windows failure still needs the
 next native run's evidence. The production identity repair remains unchanged.
+
+Windows and macOS now render each key-combination pair from the shared
+`key_combination_pair_menu` declaration. Native providers supply their supported
+slots; Clear is disabled for an unassigned pair on both drivers. A macOS
+regression first rejected the old native assembly when the real declaration's
+order changed, then passed after migration. All five focused menu tests, 12,801
+Lua tests, selected E2E scenarios and 349 JS checks pass; the menu parity ratchet
+now requires 17 shared-rendered macOS menus. Two Windows cases inspect the actual
+menu's disabled flag in native CI. Item 91's remaining engine issues stay open.
 
 ## Time estimate
 

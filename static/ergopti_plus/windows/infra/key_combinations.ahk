@@ -637,7 +637,10 @@ _KeyCombinationPairMenuOpener(PairId, PairLabel) {
 KeyCombinationShowPairMenu(PairId, PairLabel, ShowFn := 0) {
 	Commands := Map("key_combination_clear", (*) => ClearKeyCombination(PairId))
 	ListProviders := Map("key_combination_slots", () => KeyCombinationSlotRows(PairId, PairLabel))
-	PairMenu := MenuRenderer_Build("key_combination_pair_menu", "Shortcuts", "", "", ListProviders, Commands)
+	global KEY_COMBINATION_NONE
+	Getters := Map("key_combination_pair_assigned", () => KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
+		or KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE)
+	PairMenu := MenuRenderer_Build("key_combination_pair_menu", "Shortcuts", "", "", ListProviders, Commands, Getters)
 	if HasMethod(ShowFn, "Call")
 		return ShowFn.Call(PairMenu)
 	PairMenu.Show()
