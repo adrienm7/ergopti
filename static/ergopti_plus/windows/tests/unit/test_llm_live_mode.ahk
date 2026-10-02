@@ -36,7 +36,7 @@ global LLV_BINDING := "keyboard__live_test"
 ; Body(Calls, Lines, Builds) runs with live mode off, the bridge active, no
 ; hotstring tooltip and a menu-build recorder; all of it is put back after.
 _LLV_Run(Buffer, Body, Menu := unset) {
-	_LPP_Run(IsSet(Menu) ? Menu : _LPP_Menu(), Buffer, _Inner)
+	_LPP_Run(IsSet(Menu) ? Menu : _LPP_Menu(), Buffer, _Inner, true)
 	_Inner(Calls, Lines) {
 		global _LLM_Live, _LLM_Bridge_Active, _LLM_MenuBuildCoordinator, _LLM_Engine
 		global _TooltipActiveSurface, _LLM_AcceptInProgress
