@@ -8,6 +8,72 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
+const pipeline = require('./ci-pipeline.cjs');
+
+// A completed TAP receipt cannot compensate for a missing native exit receipt.
+// Start-Process without -Wait must retain its handle before the child exits.
+const processReceipts = [];
+for (const [job, name] of [
+	['test-ahk', 'Run AHK test suite'],
+	['e2e-ahk', 'Run E2E suite (Strategy A — pure engine injection)']
+]) {
+	const script = pipeline.runOf(pipeline.step(pipeline.job(job), name)).join('\n');
+	const start = /\$proc = Start-Process[^\n]+\n([\s\S]*?)\$fstream =/.exec(script);
+	assert.ok(start, `${name}: asynchronous process start must exist`);
+	assert.match(
+		start[1],
+		/\$null = \$proc\.Handle/,
+		`${name}: retain the native handle before polling`
+	);
+	const finish = /\$proc\.WaitForExit\(\)\s*\n\s*\$exit = \$proc\.ExitCode/.exec(script);
+	assert.ok(finish, `${name}: join the process before reading its exit receipt`);
+	processReceipts.push({ name, start: start[0].replace(/\$fstream =$/, ''), finish: finish[0] });
+}
+
+const ahkIndex = process.argv.indexOf('--ahk');
+if (ahkIndex >= 0) {
+	assert.equal(process.platform, 'win32', 'native exit receipt probes require Windows');
+	const ahk = process.argv[ahkIndex + 1];
+	assert.ok(ahk && fs.existsSync(ahk), 'native exit receipt probes require the actual AHK binary');
+	const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-exit-'));
+	const quote = (value) => `'${value.replaceAll("'", "''")}'`;
+	try {
+		for (const receipt of processReceipts) {
+			for (const expected of [0, 7]) {
+				const runner = path.join(probeRoot, `exit-${expected}.ahk`);
+				fs.writeFileSync(
+					runner,
+					`\uFEFF#Requires AutoHotkey v2.0\nSleep(200)\nExitApp(${expected})\n`
+				);
+				const command = [
+					"$ErrorActionPreference = 'Stop'",
+					`$ahk = ${quote(ahk)}; $runner = ${quote(runner)}`,
+					receipt.start,
+					'while (-not $proc.HasExited) { Start-Sleep -Milliseconds 10 }',
+					receipt.finish,
+					'if ($null -eq $exit) { throw "Native exit receipt is unavailable" }',
+					'Write-Output $exit'
+				].join('\n');
+				const probe = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+					encoding: 'utf8',
+					timeout: 30000
+				});
+				assert.equal(
+					probe.status,
+					0,
+					`${receipt.name}: ${probe.stderr || probe.error || probe.stdout}`
+				);
+				assert.equal(
+					probe.stdout.trim(),
+					String(expected),
+					`${receipt.name}: preserve native exit ${expected}`
+				);
+			}
+		}
+	} finally {
+		fs.rmSync(probeRoot, { recursive: true, force: true });
+	}
+}
 
 const beforeSlowTail = [
 	'\uFEFF1..3',
