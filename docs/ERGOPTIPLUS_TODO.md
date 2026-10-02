@@ -151,8 +151,8 @@ These are software implementations; final hardware verification remains below.
   results remain.
   The personal-menu native assertions reached 7713/7713 in runs 37019308363
   and 37019563500, but their native unit step still failed. Run 37022297730
-  emitted no execution-manifest error, so the manifest was not established as
-  the cause. Both asynchronous AHK launchers now retain their process handle
+  exposed no execution-manifest annotation; that does not establish which
+  receipt failed because PowerShell can decorate native stderr. Both asynchronous AHK launchers now retain their process handle
   before polling and join before reading ExitCode, refusing a missing receipt
   explicitly. Windows executes native zero/nonzero exit probes against the
   actual workflow launch/receipt fragments. The strict manifest assertions
@@ -161,8 +161,14 @@ These are software implementations; final hardware verification remains below.
   suite started. Every uncaught contract or fixture assertion now exposes its
   exact stack as a GitHub annotation and retains exit code 1. A CLI mutation
   removes the launcher's handle capture and proves both the refusal and its
-  annotation. Full Windows packaging/install validation remains pending until
-  the native run confirms the launcher correction.
+  annotation. Hosted workflow commands now use stdout, preserving their leading
+  delimiter through PowerShell; local diagnostics still use stderr. The CLI
+  regressions require the commands on stdout and keep all failing exit checks,
+  including a large annotation drained before exit. The native timing probe
+  also consumes the exact runtime selected by CI; it previously searched only
+  Program Files while CI installs into C:/AutoHotkey.
+  Full Windows packaging/install validation remains pending until the native
+  run identifies the refusal and confirms the launcher correction.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
