@@ -109,7 +109,10 @@ assert.equal(
 assert.match(cli.output, /hs: baseline-or-history/);
 cli = reportCli('lint:conventions:strict', false);
 assert.equal(cli.exitCode, 1, 'standalone report lint failure must propagate to the CLI exit');
-assert.deepEqual(cli.commands, ['lint:conventions:strict']);
+assert.deepEqual(cli.commands, ['format:check', 'lint:conventions:strict']);
+cli = reportCli('format:check', false);
+assert.equal(cli.exitCode, 1, 'an actual formatting refusal must fail scoped verification');
+assert.deepEqual(cli.commands, ['format:check', 'lint:conventions:strict']);
 console.log(
 	'verify-change report coverage: standalone, covering and unrelated failures classified correctly.'
 );

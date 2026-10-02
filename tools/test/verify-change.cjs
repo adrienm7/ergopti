@@ -30,6 +30,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const { includeClosure } = require('./test-ahk-test-coverage.cjs');
+const { PRETTIER_EXTENSIONS } = require('../lint/format.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_TESTS = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
@@ -359,6 +360,11 @@ function isPerformanceReport(f) {
  */
 const RULES = [
 	{
+		gate: 'format',
+		why: 'CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files',
+		match: (f) => PRETTIER_EXTENSIONS.has(path.extname(f)) || f.endsWith('.py')
+	},
+	{
 		gate: 'ahk-encoding',
 		why: 'every .ahk must stay UTF-8 BOM + LF; a stray CRLF or a lost BOM breaks the parser in ways that are hard to read',
 		match: (f) => f.endsWith('.ahk')
@@ -519,6 +525,7 @@ function runNpm(script) {
 // Explicit full audits use this same inventory and order: generated writers
 // in the JS gate finish before any Lua driver readers execute.
 const GATE_COMMANDS = {
+	format: { npm: 'format:check' },
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
 	'report-style': { npm: 'lint:conventions:strict', coveredBy: 'js' },
 	js: { npm: 'test:js' },
