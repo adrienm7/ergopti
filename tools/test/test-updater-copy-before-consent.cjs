@@ -38,7 +38,8 @@ const errors = [];
 const PRE_CONSENT_KEYS = [
 	'updater.tray_new_version_title',
 	'updater.tray_new_version_body',
-	'updater.title_update_available',
+	'updater.available_window_title',
+	'updater.window_title',
 	'updater.update_found_body',
 	'updater.update_window_title',
 	'updater.update_dialog_header',

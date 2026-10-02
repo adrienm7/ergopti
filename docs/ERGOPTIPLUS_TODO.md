@@ -799,9 +799,12 @@ exact-boolean regressions also pass the focused runner.
   UTF-8 receipts and use ASCII stdout acknowledgements; runs 37040137327 and
   37040369275 exposed ANSI decoding in the previous test transport. Native exit,
   stderr and the independent expected-caption assertions remain strict.
-  Remaining: native message/input dialogs, native file pickers and
-  notifications, and Swift launcher-owned dialogs still have legacy branding
-  paths. Captionless overlays retain their separate native presentation owner.
+  Swift updater panels now use a generated composer from that same policy,
+  bare captions in all 21 locales and live retitling of the retained progress
+  panel. Actual AppKit tests and seven private generated/compiled policy cases
+  cover empty, custom, quoted, interpolation-looking and Unicode prefixes;
+  native Swift CI remains pending. Remaining: native message/input dialogs,
+  native file pickers and notifications still have legacy branding paths. Captionless overlays retain their separate native presentation owner.
 
 Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
 Windows/macOS/Linux pipeline, including package and installation lanes. It

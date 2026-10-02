@@ -114,7 +114,7 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			userInitiated: false, informationOnly: false) { replies.append($0) }
 
 		let shown = try XCTUnwrap(presenter.prompts.first)
-		XCTAssertEqual(shown.prompt.title, french.text("updater.title_update_available"))
+		XCTAssertEqual(shown.prompt.title, french.text("updater.available_window_title"))
 		XCTAssertEqual(shown.prompt.message, french.text("updater.update_found_body", ["0.0.0-dev.140"]))
 		XCTAssertEqual(shown.prompt.buttons, [
 			try XCTUnwrap(french.text("updater.update_dialog_install")),
@@ -244,6 +244,76 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		let response = try XCTUnwrap(box.response)
 		XCTAssertTrue(response.automaticUpdateChecks)
 		XCTAssertNotEqual(response.automaticUpdateDownloading?.boolValue, true)
+	}
+
+	/// Reads the source policy independently of the generated Swift composer.
+	private static func nativeCaption(_ label: String) throws -> String {
+		let manifestURL = URL(fileURLWithPath: localesDirectory)
+			.deletingLastPathComponent().deletingLastPathComponent()
+			.appendingPathComponent("ui/apps.manifest.json")
+		let data = try Data(contentsOf: manifestURL)
+		let manifest = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+		let policy = try XCTUnwrap(manifest["window_title"] as? [String: String])
+		let prefix = try XCTUnwrap(policy["prefix"])
+		let separator = try XCTUnwrap(policy["separator"])
+		return prefix.isEmpty ? label : prefix + separator + label
+	}
+
+	/// Finds the actual new native panel without adding a production test seam.
+	private func newNativePanel(since previous: Set<ObjectIdentifier>) throws -> NSPanel {
+		return try XCTUnwrap(NSApplication.shared.windows.first {
+			$0 is NSPanel && !previous.contains(ObjectIdentifier($0))
+		} as? NSPanel, "the updater must create a real native panel")
+	}
+
+	func testEveryLocaleUsesBareUpdaterHeadingsAndSharedNativePanelCaptions() throws {
+		_ = NSApplication.shared
+		let presenter = UpdatePromptPanel()
+		defer { presenter.closeAll() }
+		var answers: [Int?] = []
+		for code in try Self.localeCodes() {
+			let catalog = try Self.localization(code)
+			let texts = try XCTUnwrap(UpdatePromptTexts(localization: catalog))
+			let offer = texts.updateFound(version: "2", stage: .notDownloaded, informationOnly: false)
+			let bareOffer = try XCTUnwrap(catalog.text("updater.available_window_title"))
+			XCTAssertEqual(offer.prompt.title, bareOffer, "\(code) exposes a brandless heading")
+			var previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
+			presenter.present(offer.prompt, activate: false) { answers.append($0) }
+			let offerPanel = try newNativePanel(since: previous)
+			XCTAssertEqual(offerPanel.title, try Self.nativeCaption(bareOffer), "\(code) native offer caption")
+			let stack = try XCTUnwrap(offerPanel.contentView as? NSStackView)
+			let heading = try XCTUnwrap(stack.arrangedSubviews.first as? NSTextField)
+			XCTAssertEqual(heading.stringValue, bareOffer, "native chrome branding does not alter the heading")
+			XCTAssertEqual(offerPanel.level, .normal, "an updater window must not be topmost")
+
+			let progress = texts.checking()
+			let bareProgress = try XCTUnwrap(catalog.text("updater.window_title"))
+			XCTAssertEqual(progress.title, bareProgress)
+			previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
+			presenter.showProgress(progress, fraction: nil) {}
+			let progressPanel = try newNativePanel(since: previous)
+			XCTAssertEqual(progressPanel.title, try Self.nativeCaption(bareProgress), "\(code) native progress caption")
+			presenter.closeAll()
+		}
+		XCTAssertTrue(answers.isEmpty, "caption updates and programmatic closes never consent to a download")
+	}
+
+	func testReusedProgressPanelRetitlesWithoutReplacingItsOwner() throws {
+		_ = NSApplication.shared
+		let presenter = UpdatePromptPanel()
+		defer { presenter.closeAll() }
+		let previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
+		var cancellations = 0
+		presenter.showProgress(UpdateProgressText(title: "Update", message: "Checking", cancelTitle: "Cancel"),
+			fraction: nil) { cancellations += 1 }
+		let panel = try newNativePanel(since: previous)
+		XCTAssertEqual(panel.title, try Self.nativeCaption("Update"))
+		presenter.showProgress(UpdateProgressText(title: "Mise à jour", message: "Downloading", cancelTitle: "Cancel"),
+			fraction: 0.5) { cancellations += 1 }
+		XCTAssertTrue(NSApplication.shared.windows.contains { $0 === panel && $0.isVisible },
+			"a progress refresh retains the same visible native panel")
+		XCTAssertEqual(panel.title, try Self.nativeCaption("Mise à jour"), "a reused panel follows its new localized caption")
+		XCTAssertEqual(cancellations, 0, "retitling must not invoke the cancellation action")
 	}
 
 	func testPanelOpensAndClosesWithoutReportingAChoice() {

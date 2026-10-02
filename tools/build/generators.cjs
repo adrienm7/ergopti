@@ -42,7 +42,8 @@ const GENERATORS = [
 		script: 'codegen/codegen-window-titles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/window_titles.lua',
-			'static/ergopti_plus/windows/_generated/window_titles.ahk'
+			'static/ergopti_plus/windows/_generated/window_titles.ahk',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/WindowTitles.generated.swift'
 		]
 	},
 	{
