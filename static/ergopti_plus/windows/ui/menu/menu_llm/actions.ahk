@@ -284,6 +284,9 @@ _LLM_Menu_ApplyModelRuntimeCommitted(Candidate) {
 ; the suspend guard deliberately sits ahead of it.
 _LLM_Menu_FireHealthProbe(Force := false) {
 	global _LLM_Menu, LLM_HEALTH_PROBE_IDLE_MAX_MS, LLM_HEALTH_PROBE_THROTTLE_MS
+	global _DriverInputInitPending
+	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
+		return
 	; Edge trigger for the idle-gate log: an unattended machine must produce one
 	; line when it goes quiet and one when it wakes, not one line per tick
 	static _idle_gated := false
@@ -351,6 +354,9 @@ _LLM_Menu_FireHealthProbe(Force := false) {
  */
 _LLM_Menu_FireInstalledTagsProbe() {
 	global _LLM_Menu, _LLM_InstalledTagsCacheAt, LLM_INSTALLED_CACHE_TTL_MS
+	global _DriverInputInitPending
+	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
+		return
 	; Same Pause invariant as the health probe: SetTimer-driven rebuilds bypass
 	; native Suspend, so a probe firing while paused could repaint the tray.
 	if A_IsSuspended
@@ -508,6 +514,10 @@ LLM_Menu_StartBridge() {
  */
 LLM_Menu_EnsureModelReady() {
 	global _LLM_Menu
+	global _DriverInputInitPending
+	; Early menu rendering must not correct or persist runtime model state.
+	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
+		return true
 	if (_LLM_Menu["backend"] != "ollama")
 		return true
 	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s

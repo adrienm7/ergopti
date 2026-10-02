@@ -63,11 +63,19 @@ if (!entry.includes('EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkP
 	);
 }
 const smokeReady = entry.indexOf('_DriverBootPhase := "ready"');
-const smokeMenuBuild = entry.indexOf('BuildTrayMenuDeferred()', smokeReady);
-const smokeExit = entry.indexOf('DllCall("ExitProcess", "UInt", 0)', smokeMenuBuild);
-if (smokeReady < 0 || smokeMenuBuild < 0 || smokeExit < 0 || smokeMenuBuild > smokeExit) {
+const smokeMenuBuild = entry.indexOf('if !BuildTrayMenuDeferred()');
+const smokePublicationReceipt = entry.indexOf('_DriverStartupSmokeInspectShell.Call()');
+const smokeExit = entry.indexOf('DllCall("ExitProcess", "UInt", 0)', smokeReady);
+if (
+	smokeReady < 0 ||
+	smokeMenuBuild < 0 ||
+	smokePublicationReceipt < smokeMenuBuild ||
+	smokePublicationReceipt > smokeReady ||
+	smokeExit < smokeReady ||
+	!entry.includes('throw Error("the configured startup menu could not be published")')
+) {
 	errors.push(
-		'the startup smoke must consume the deferred tray-menu build before reporting a clean boot'
+		'the startup smoke must verify accepted configured-menu publication before input readiness and clean exit'
 	);
 }
 if (
@@ -76,6 +84,18 @@ if (
 	!lifecycle.includes('return true')
 ) {
 	errors.push('the deferred tray-menu builder must expose a status the startup smoke can consume');
+}
+
+const startupClickOwner = entry.indexOf('global _TrayStartupClick := TrayStartupClick(');
+const startupClickOwnerEnd = entry.indexOf('\nif ', startupClickOwner);
+if (
+	startupClickOwner < 0 ||
+	startupClickOwnerEnd < startupClickOwner ||
+	entry.slice(startupClickOwner, startupClickOwnerEnd).includes('_TrayStartupCommands.Active')
+) {
+	errors.push(
+		'the first early context request must await the complete root instead of entering a blocking bootstrap menu'
+	);
 }
 
 const suspendInclude = entry.indexOf('#Include infra/suspend_handoff.ahk');

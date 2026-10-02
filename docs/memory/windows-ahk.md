@@ -844,15 +844,15 @@ launch; detach any read-only junctions before removing the private fixture.
 
 An early native tray menu can suspend auto-execute and disables AHK timers until
 navigation ends. Deferred construction cannot make progress behind that menu.
-Publish the actual native lifecycle rows before revealing the icon. A temporary
-loading GUI was rejected by the user. Native navigation therefore deliberately
-pauses deferred feature construction until the user closes it. Pass that early
-notification through once; never queue a second opening without another explicit
-user click. Retain a repeat click until full publication, so another bootstrap
-navigation loop cannot repeatedly suspend the remaining initialization. Retain
-one accepted lifecycle intent until input readiness, and keep its command owner
-alive across root replacement because the dispatcher may already have admitted
-it. Close build timing stages before releasing any headless deferred navigation.
+Retain context requests until the configured root publishes; even the first
+bootstrap popup can add the user's reading interval to startup. A temporary
+loading GUI was rejected by the user. Close construction timing stages before
+releasing retained navigation. Menu publication and input readiness are distinct:
+retain feature selections until their runtime owners exist, while lifecycle
+commands retain their existing startup owner across root replacement. Restored
+pause and pending lifecycle intent must take precedence over releasing feature
+selections. The isolated full-startup smoke exercises both publication order and
+selection admission, including inherited pause.
 
 ### project-tooltip-two-hwnd-zorder
 

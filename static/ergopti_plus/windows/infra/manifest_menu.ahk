@@ -862,6 +862,7 @@ MenuRenderer_ResolveCheckedWhen(MenuKey, ItemId, Getters) {
 ; @param Provider Func Returns the row array.
 ; @returns {Integer} Rows added.
 MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
+	global _MenuPopulationBuilding
 	try TargetMenu.Delete()
 	Rows := ""
 	try {
@@ -869,6 +870,10 @@ MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
 	} catch as e {
 		try LoggerError("MenuRenderer", "List '{1}.{2}' provider threw ({3}) — menu left empty.", MenuKey, ListId, e.Message)
 		return 0
+	}
+	if _MenuPopulationBuilding is MenuPopulation && MenuPopulation_IsLeaf(Rows) {
+		_MenuPopulationBuilding.Fill(TargetMenu, Rows, ListId, 1)
+		return TrayMenuItemCount(TargetMenu)
 	}
 	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
 }

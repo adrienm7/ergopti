@@ -1216,6 +1216,9 @@ _LogBootProgress("keylogger modules + tests included")
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../infra/manifest_menu.ahk
 #Include unit/test_menu_population.ahk
+#Include unit/test_menu_startup_commands.ahk
+#Include unit/test_config_registry_cache.ahk
+#Include unit/test_llm_runtime_activation.ahk
 ; The tray root builder: its top-level dispatcher and the id → builder table.
 ; Function definitions only, and the table names only its own _MI_ builders,
 ; so pulling it in stages nothing and resolves no menu dependency at load.

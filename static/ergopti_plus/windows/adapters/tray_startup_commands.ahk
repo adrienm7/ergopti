@@ -81,5 +81,5 @@ TrayStartupOnboarding() {
 /** Executes admitted intents through the ordinary menu command owner. */
 TrayStartupCommand(Id) {
 	Commands := Map("suspend", ToggleSuspend, "reload", ActivateReload, "quit", ActivateExitApp)
-	return MenuCommandRun(Commands[Id], [])
+	return MenuCommandRun(MenuStartupSafeCommand(Commands[Id]), [])
 }

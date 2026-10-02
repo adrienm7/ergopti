@@ -66,9 +66,10 @@ _BDA_ThreeArgCallPresent() {
 	; The command runs through MenuCommandRun since a click made during a
 	; configuration write waits for it: the three arguments are handed there,
 	; and it calls the command with exactly what it was given.
-	Assert(InStr(Seg, 'MenuCommandRun(Callback, ["", 0, 0])') > 0,
+	Assert(InStr(Seg, 'MenuCommandRun(Callback, ["", 0, 0], 0, 0, 0, Registration)') > 0,
 		"_DispatchIfMissed must run the callback with 3 args matching the menu callback contract")
 	Run := _DriverFuncBody("MenuCommandRun")
+	Assert(Run != "", "the command admission owner must exist")
 	Assert(InStr(Run, "return Callback.Call(Args*)") > 0,
 		"MenuCommandRun must call the command with the arguments it was given, all of them")
 }

@@ -25,7 +25,7 @@ _InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {
 	; Locale cache misses may read disk; finish them before atomic publication.
 	Rows := []
 	for Id in ["suspend", "reload", "quit"]
-		Rows.Push({Id: Id, Label: t("menu.global." . Id), Callback: RequestFn.Bind(Id)})
+		Rows.Push({Id: Id, Label: t("menu.global." . Id), Callback: MenuStartupSafeCommand(RequestFn.Bind(Id))})
 	PreviousCritical := Critical("On")
 	try {
 		MenuDispatcher_BeginReplacement()
