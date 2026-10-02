@@ -209,6 +209,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		Section     := ""
 		PendingKey  := ""   ; key whose value spans multiple lines
 		PendingVal  := ""   ; accumulated raw characters of the multi-line value
+		PendingDepth := 0
+		PendingQuote := ""
+		PendingEscaped := false
 
 		loop parse, Content, "`n", "`r" {
 				Line := Trim(A_LoopField)
@@ -241,8 +244,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						}
 						PendingVal .= " " . Line
 						; Count only unquoted brackets to detect the real terminator.
-						Depth := _TOML_ArrayBracketDepth(PendingVal)
-						if (Depth <= 0) {
+						PendingDepth := _TOML_ArrayScanFragment(" " . Line, PendingDepth,
+								&PendingQuote, &PendingEscaped)
+						if (PendingDepth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
 								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
@@ -286,8 +290,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				val := TOML_StripInlineComment(val)
 
 				; A quoted ] on the opening line is data, not the array terminator.
-				if (SubStr(val, 1, 1) = "["
-						&& _TOML_ArrayBracketDepth(val) > 0) {
+				PendingQuote := ""
+				PendingEscaped := false
+				PendingDepth := (SubStr(val, 1, 1) = "[")
+						? _TOML_ArrayScanFragment(val, 0, &PendingQuote, &PendingEscaped) : 0
+				if (PendingDepth > 0) {
 						PendingKey := key
 						PendingVal := val
 						continue
@@ -373,9 +380,20 @@ TOML_ArrayRecoveryHeader(Line) {
 ; escapes are consumed only inside a basic string so an escaped quote cannot expose a
 ; data bracket to the structural scanner.
 _TOML_ArrayBracketDepth(Value) {
-		Depth := 0
 		Quote := ""
 		Escaped := false
+		return _TOML_ArrayScanFragment(Value, 0, &Quote, &Escaped)
+}
+
+/**
+ * Scans only the newly appended array fragment, retaining string state.
+ * @param {String} Value The opening value or the space-prefixed continuation.
+ * @param {Integer} Depth Bracket depth before this fragment.
+ * @param {String} Quote Active string delimiter, updated by the scan.
+ * @param {Integer} Escaped Whether a basic-string escape is pending.
+ * @returns {Integer} Bracket depth after this fragment.
+ */
+_TOML_ArrayScanFragment(Value, Depth, &Quote, &Escaped) {
 		Loop Parse Value {
 				Char := A_LoopField
 				if Escaped {
@@ -417,6 +435,9 @@ _TOML_ArrayBracketDepth(Value) {
 ; Literal quotes open only at token boundaries, preserving apostrophes in legacy
 ; bare values. Backslashes escape characters only inside basic strings.
 TOML_StripInlineComment(Line) {
+		; With no comment marker, quoting cannot change the returned bytes
+		if !InStr(Line, "#")
+				return Trim(Line)
 		Quote := ""
 		Escaped := false
 		Loop Parse Line {
