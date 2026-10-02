@@ -13,8 +13,13 @@
 
 ; Runs Callback with the routes one discovery commits, restoring the boot's.
 _EHX_WithRoutes(RegistryDir, Callback) {
-	global _HotstringBoundSources
+	global _HotstringBoundSources, HotstringGroupConfig, _HotstringsOverrides, _HSResolveCache
+	global _HotstringExtensionPaths
 	Saved := _HotstringBoundSources
+	SavedGroups := HotstringGroupConfig, SavedOverrides := _HotstringsOverrides, SavedResolved := _HSResolveCache
+	SavedPaths := _HotstringExtensionPaths
+	HotstringGroupConfig := Map(), _HotstringsOverrides := Map(), _HSResolveCache := Map()
+	_HotstringExtensionPaths := Map()
 	Directory := _LCT_TempDir()
 	try {
 		Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", RegistryDir)
@@ -22,6 +27,8 @@ _EHX_WithRoutes(RegistryDir, Callback) {
 		Callback.Call(Packs)
 	} finally {
 		_HotstringBoundSources := Saved
+		HotstringGroupConfig := SavedGroups, _HotstringsOverrides := SavedOverrides, _HSResolveCache := SavedResolved
+		_HotstringExtensionPaths := SavedPaths
 		DirDelete(Directory, true)
 	}
 }
@@ -318,7 +325,7 @@ _EHX_DistanceChoicesSurviveReload(GroupEnabled) {
 				HotstringExtensions_Prepare(Target, Roots)
 				ApplyConfigToml(Target, ConfigPath)
 				HotstringExtensions_Prepare(Target, Roots)
-				AssertEqual(GroupEnabled, Target["category_enabled"]["distances_reduction"])
+				_EHX_DistanceGateReadByNativeOwner(ConfigPath, GroupEnabled)
 				for Path, Expected in Map("hotstrings.distances_reduction.qu.enabled", true,
 					"hotstrings.distances_reduction.comma_j.enabled", false) {
 					Location := FeatureLocateV2(Target, Path)
@@ -361,3 +368,13 @@ _EHX_UserDistanceCopyWins() {
 }
 Test("ergopti extension: the user's distance source keeps precedence and exact bytes (ergopti-distance-ext)",
 	_EHX_UserDistanceCopyWins)
+
+; CategoryEnabled is a separate production owner, intentionally absent from
+; the unit runner's stub. Read the same source through its boot smoke process.
+_EHX_DistanceGateReadByNativeOwner(Path, Expected) {
+	Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
+	Quote := Chr(34)
+	Command := Quote . A_AhkPath . Quote . " " . Quote . Harness . Quote
+		. " distance_gate " . Quote . Path . Quote . " " . (Expected ? "true" : "false")
+	AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"), "the actual gate owner preserves the distance choice")
+}
