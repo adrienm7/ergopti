@@ -267,11 +267,16 @@ These are software implementations; final hardware verification remains below.
       merge its Karabiner configuration in the real Hammerspoon runtime (into the
       runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
       without needing the Karabiner driver.
-- [ ] **41.** Remaining direct `hs.json.decode` calls (ratchet
-      `tests/meta/test_json_decode_through_codec.lua`, 21 calls in 19 files): they
-      only read what they decode today; move them to `adapters/json_codec.lua`,
-      which returns a tree, and lower the baseline. Audit the other hs stubs for the
-      same kind of divergence from the native behaviour.
+- [~] **41.** Remaining direct `hs.json.decode` calls (ratchet
+  `tests/meta/test_json_decode_through_codec.lua`, 14 calls in 12 files outside
+  the adapter). Locale, manifest menus, personal hotstrings, keylogger
+  aggregation, keymap priority and both shortcut readers now decode through
+  `adapters/json_codec.lua`, which returns a tree. A menu regression preserves
+  independent equal arrays, rows and nested options after mutation; it failed
+  before the migration. The single-reader guard recognizes codec bindings
+  and detects competing readers in one directory without lowering its limits.
+  Migrate the remaining readers and lower the baseline.
+  Audit the other hs stubs for the same divergence from native behaviour.
 - [ ] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
       an old build's scalar where a table is now expected (`magickey = true` under
       `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «

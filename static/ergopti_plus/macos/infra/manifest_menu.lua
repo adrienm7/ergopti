@@ -19,7 +19,7 @@
 --- nine functions on the value returned here.
 --- ==============================================================================
 
-local hs     = hs
+local JsonCodec = require("adapters.json_codec")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
@@ -32,9 +32,9 @@ local instance, err = Renderer.new({
 	-- Resolved on every read, not once here: Paths.shared is what the renderer's
 	-- unit files redirect to a throwaway fixture directory, per case.
 	manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
-	-- Injected rather than replaced: this is a boot-path parse of an 11.9 KB
-	-- file and hs.json.decode is C. Linux passes the pure-Lua decoder instead.
-	json_decode   = hs.json.decode,
+	-- Native decoding stays in the adapter, which returns independent tables
+	-- even when the manifest contains equal rows, options or menu arrays.
+	json_decode   = JsonCodec.decode,
 	i18n          = i18n,
 	-- This driver's logger, not the shared shim: the renderer's warnings belong
 	-- in this driver's log, at this driver's levels.

@@ -18,7 +18,7 @@
 
 local M = {}
 
-local hs          = hs
+local JsonCodec   = require("adapters.json_codec")
 local text_utils  = require("infra.text_utils")
 -- The collision cascade is shared with the Linux driver rather than defined here:
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
@@ -93,8 +93,8 @@ do
 		end
 		local raw = fh:read("*a")
 		fh:close()
-		local ok, data = pcall(hs.json.decode, raw)
-		if not ok or type(data) ~= "table" then
+		local data, decode_error = JsonCodec.decode(raw)
+		if decode_error or type(data) ~= "table" then
 			Logger.error(LOG, "priority.json: JSON parse failed — keeping hardcoded tiers.")
 			return
 		end

@@ -15,6 +15,7 @@ local M = {}
 
 local hs      = hs
 local utf8    = utf8
+local JsonCodec = require("adapters.json_codec")
 local Logger  = require("infra.logger")
 local Paths   = require("infra.paths")
 local Timings = require("infra.timings")
@@ -110,10 +111,10 @@ local function load_shared_kc_to_finger()
 	local content = fh:read("*a")
 	fh:close()
 	if type(content) ~= "string" or content == "" then return nil end
-	-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
+	-- Strip a leading UTF-8 BOM before native JSON decoding.
 	if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
-	local ok, data = pcall(hs.json.decode, content)
-	if not ok or type(data) ~= "table" or type(data.keys) ~= "table" then return nil end
+	local data, decode_error = JsonCodec.decode(content)
+	if decode_error or type(data) ~= "table" or type(data.keys) ~= "table" then return nil end
 
 	local wanted = {}
 	for _, kc in ipairs(CONTENT_KCS) do wanted[kc] = true end

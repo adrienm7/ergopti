@@ -37,6 +37,8 @@
 'use strict';
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
+const os = require('node:os');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -71,7 +73,7 @@ function stripComments(text, marker) {
 }
 
 const DRIVERS = {
-	macos: { ext: /\.lua$/, comment: '--', read: /io\.open|json\.decode/ },
+	macos: { ext: /\.lua$/, comment: '--', read: /io\.open|(?:json|JsonCodec)\.decode/ },
 	windows: { ext: /\.ahk$/, comment: ';', read: /FileRead|Jxon_Load|JSON\.parse|_MM_ReadJson/ },
 	// Linux does not read the menu manifest at all — its tray menu is built by
 	// hand. Zero is the correct count, and pinning it here is what makes the
@@ -133,13 +135,53 @@ function readersIn(dir, spec) {
 				const window = codeLines.slice(Math.max(0, i - NEAR_LINES), i + NEAR_LINES + 1).join('\n');
 				if (spec.read.test(window)) {
 					found.push(`${path.relative(dir, p).replace(/\\/g, '/')}:${i + 1}`);
-					return;
+					break;
 				}
 			}
 		}
 	})(dir);
 	return found;
 }
+
+/**
+ * Proves the detector keeps counting bindings after native decoding moves into
+ * its adapter, including two competing bindings in the same directory.
+ * @returns {void}
+ */
+function verifyReaderDetection() {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-manifest-readers-'));
+	const binding = [
+		'local JsonCodec = require("adapters.json_codec")',
+		'return {',
+		'  manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,',
+		'  json_decode = JsonCodec.decode,',
+		'}'
+	].join('\n');
+	try {
+		fs.writeFileSync(path.join(fixture, 'binding.lua'), binding);
+		assert.equal(readersIn(fixture, DRIVERS.macos).length, 1, 'count the codec-backed binding');
+		fs.writeFileSync(path.join(fixture, 'duplicate.lua'), binding);
+		assert.equal(readersIn(fixture, DRIVERS.macos).length, 2, 'count every sibling binding');
+		fs.writeFileSync(
+			path.join(fixture, 'documentation.lua'),
+			'-- menu_manifest.json is decoded through JsonCodec.decode\nreturn {}\n'
+		);
+		assert.equal(readersIn(fixture, DRIVERS.macos).length, 2, 'comments are not readers');
+		fs.writeFileSync(
+			path.join(fixture, 'native.lua'),
+			binding.replace('JsonCodec.decode', 'hs.json.decode')
+		);
+		assert.equal(
+			readersIn(fixture, DRIVERS.macos).length,
+			3,
+			'keep detecting direct native bindings'
+		);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
+verifyReaderDetection();
 
 const errors = [];
 const summary = [];
