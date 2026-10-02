@@ -643,11 +643,11 @@ global _TrayStartupCommands := TrayStartupCommands(
 if FileExist(ConfigurationFile)
 	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
-	() => IsSet(_DriverReady) && _DriverReady && _TrayRootPublishedGeneration > 0
-		&& !_TrayRootBootDetailsPending,
+	() => IsSet(_DriverMenuReady) && _DriverMenuReady,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
-	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding,
-	_DriverStartupSmokeDir != "" ? 0 : () => _TrayStartupCommands.Active)
+	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding)
+; Retain context requests until the complete root exists. Entering the native
+; bootstrap menu here blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
@@ -881,37 +881,6 @@ global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
-; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
-; key the user chose in [hotstrings] magic_key_source always wins; then the key
-; the active layout's extension declares — the emulated registry layout, or the
-; built-in Ergopti emulation; then, with no layout emulated, the key that types
-; MagicKeySourceChar ("j" by default) on the user's own OS layout — on bépo not
-; the SC02E Ergopti/QWERTY position; then the key the shipped Ergopti layout
-; declares. A layout is emulated only while the base layer is on
-; (_KLE_BaseCriterion): a layout left selected in the manager with the base
-; layer off types nothing, so the OS layout is still probed.
-;
-; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
-; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
-; thread, then the system default), so the scan and the AltGr family describe
-; one layout and the layout poll, seeded with the same HKL, reloads when the
-; user switched — only when the key follows the OS layout at all.
-_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
-	"chosen", ScriptInformation["MagicKeySourceChosen"],
-	"configured", ScriptInformation["MagicKeySource"],
-	"declared", LayoutRegistry_DeclaredMagicKey(
-		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
-			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
-		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"]["ergopti_base"],
-	"keycodes", LayoutRegistry_Keycodes(),
-	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
-	"shipped", LayoutRegistry_ShippedMagicKey))
-ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
-ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
-ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
-LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 
 ; Safe nested read
@@ -1162,10 +1131,9 @@ if MetricsShortcuts.enabled
 
 BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
 BootProfile_Mark("Config, features & shortcuts loaded")
-; The tray menu build (~157 ms: per-category TOML submenus + manifest items) was the
-; single largest remaining time-to-ready chunk, and the menu is only needed once the
-; user right-clicks the tray. So it is DEFERRED off the boot critical path: built by
-; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
+; Publish the configured native root before registering the input surface. Leaf
+; pickers finish before paint or prewarm after input readiness; command admission
+; retains feature selections until their runtime owners genuinely exist.
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
 ; Keep the real native commands throughout boot and refresh their locale before
@@ -1174,8 +1142,57 @@ _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
-MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
+MENU_BUILD_DEFER_MS := 16  ; offer optional configuration maintenance after ready
 _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
+#Include infra/tap_keys.ahk
+TapKeysReadConfig(_IniCache)
+#Include infra/key_combinations.ahk
+KeyCombinationsReadConfig(_IniCache)
+#Include infra/lifecycle.ahk
+global _FmtCountCache := Map()
+global _DriverInputInitPending := true
+global _DriverMenuReady := false
+MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated)
+_TrayRootBootDetailsPending := true
+if !BuildTrayMenuDeferred()
+	throw Error("the configured startup menu could not be published")
+if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
+	_DriverStartupSmokeInspectShell.Call()
+ConfigRegistryCacheFlushPending()
+BootProfile_StageBegin("magic key source")
+; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
+; key the user chose in [hotstrings] magic_key_source always wins; then the key
+; the active layout's extension declares — the emulated registry layout, or the
+; built-in Ergopti emulation; then, with no layout emulated, the key that types
+; MagicKeySourceChar ("j" by default) on the user's own OS layout — on bépo not
+; the SC02E Ergopti/QWERTY position; then the key the shipped Ergopti layout
+; declares. A layout is emulated only while the base layer is on
+; (_KLE_BaseCriterion): a layout left selected in the manager with the base
+; layer off types nothing, so the OS layout is still probed.
+;
+; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
+; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
+; thread, then the system default), so the scan and the AltGr family describe
+; one layout and the layout poll, seeded with the same HKL, reloads when the
+; user switched — only when the key follows the OS layout at all.
+_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
+	"chosen", ScriptInformation["MagicKeySourceChosen"],
+	"configured", ScriptInformation["MagicKeySource"],
+	"declared", LayoutRegistry_DeclaredMagicKey(
+		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
+			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
+		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
+	"emulated", Features["layout"]["ergopti_base"],
+	"keycodes", LayoutRegistry_Keycodes(),
+	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
+	"shipped", LayoutRegistry_ShippedMagicKey))
+ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
+ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
+ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
+LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
+
+BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
 if ConfigFullStateCanPersist() {
 	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
@@ -1253,9 +1270,7 @@ BootProfile_Mark("Metrics/keylogger started")
 ; Returning nonzero must stop every later callback before any teardown occurs;
 ; on acceptance the logger remains last and persists terminal cleanup logs.
 OnExit(Ergopti_OnShutdown, -1)
-; The full tray menu is built after "ready" (BuildTrayMenuDeferred); this line
-; used to claim it was already built, which misdated every tray bug report.
-LoggerInfo("ErgoptiPlus", "Shutdown handler registered; the tray menu is built after ready.")
+LoggerInfo("ErgoptiPlus", "Shutdown handler registered; the configured tray menu is already available.")
 
 
 
@@ -1266,7 +1281,6 @@ LoggerInfo("ErgoptiPlus", "Shutdown handler registered; the tray menu is built a
 
 #Include ui/editors.ahk
 
-global _FmtCountCache := Map()
 
 
 
@@ -1278,7 +1292,6 @@ global _FmtCountCache := Map()
 #Include ui/layer_editor/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
-#Include infra/lifecycle.ahk
 
 #Include infra/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
@@ -1301,13 +1314,9 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 ; The number-row tap keys first: AutoHotkey fires the earliest-created eligible
 ; #HotIf variant of a hotkey, and the digit-row emulation below binds the same
 ; three scancodes. Their assignments are read before a press can reach them.
-#Include infra/tap_keys.ahk
 #Include modules/shortcuts/tap_keys.ahk
-TapKeysReadConfig(_IniCache)
 ; The key combinations: their slots are read before the pair hotkeys of
 ; platform/remap.ahk can answer a press.
-#Include infra/key_combinations.ahk
-KeyCombinationsReadConfig(_IniCache)
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
@@ -1350,15 +1359,18 @@ HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
 SuspendWatchdogStart()
+_SuspendStateWatchdog()
+_DriverInputInitPending := false
+#InputLevel 0
+LLM_Menu_ActivateRuntime()
 _DriverReady := true
+if _LLM_Menu_RuntimeActivated
+	_MenuStartupCommands.NotifyReady()
+_MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
-; Publish global commands now; detailed feature trees remain on the deferred owner
-if !BuildReadyTrayShell()
-	throw Error("the ready tray global-command publication was refused")
+; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
-if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
-	_DriverStartupSmokeInspectShell.Call()
 _BootTotalMs := BootProfile_TotalBootMs()
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
@@ -1380,16 +1392,12 @@ if (_DriverStartupSmokeDir != "") {
 				if !A_IsSuspended
 						throw Error("suspend marker was not restored before ready")
 		}
-		; Ready precedes the deferred tray build in production, so process-alive at
-		; this point used to miss deterministic post-ready boot failures. Exercise
-		; that first deferred owner synchronously and consume its status before the
-		; isolated smoke exits; this caught Func("...") -> Invalid base in LLM replay.
-		; A driver restored paused is held to the same build: its first tray root
-		; publishes under the pause (first-root-under-pause). Skipping this fixture
-		; hid every owner that refuses to work under a pause during that build, the
-		; AI hotkeys first (llm-hotkeys-deferred-by-pause).
-		if !BuildTrayMenuDeferred()
-				throw Error("deferred tray-menu construction failed after ready")
+		; The complete configured root precedes input registration, including a
+		; paused reload. Reaching ready alone cannot prove that publication order.
+		if !_DriverMenuReady
+				throw Error("the complete configured menu was not published before input readiness")
+		if IsSet(_DriverStartupSmokeInspectAdmission)
+				_DriverStartupSmokeInspectAdmission.Call()
 		; The same driver must come back from that pause: lift it and wait for the
 		; AI hotkeys its paused build deferred. Any error the resume logs fails
 		; the fixture like any other.
@@ -1443,21 +1451,16 @@ if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected
 ; preempts the still-running auto-execute (the ~5400-hotstring registration) to
 ; run it — which (a) drags heavy work like the WebView2 cold-start back into
 ; contention with registration, and (b) pumps the message queue mid-boot, so a
-; tray click the user queued during startup is painted against a half-built menu
-; (the "menu shows only the first items" bug). Arming after "ready" means the
-; countdowns start once the critical path is done, so they fire on the idle
-; message loop with the menu fully built and registration complete.
+; heavy background work competes with the first native menu. Arming after
+; "ready" leaves early publication free of optional provider and widget work.
 ;
 ; Order by delay so the passes never contend (same-priority AHK timers serialise,
 ; they never preempt one another): the LLM submenu populates first (fast, so its
 ; dropdown is ready), then the text-expansion pass (core magic-key abbreviations,
 ; brought online quickly), then the emoji/symbol pass, then the WebView2 widget
 ; last (its delay clears the registration passes).
-; Build the full tray menu off the time-to-ready path, FIRST in the deferred
-; sequence so the menu is populated within ~tens of ms of "ready". _DriverReady is
-; already true here, so the deferred initMenu builds the language submenu inline (no
-; separate _LangMenuBuildPending pass needed on this boot path).
-SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
+; The configured root and language rows are already published. Only remaining
+; native leaf rows and optional post-ready work need the idle message loop.
 ; Obsolete configuration keys are a maintenance task, not a runtime error.
 ; Offer the existing backed-up cleanup only after the driver is ready.
 SetTimer(ConfigUnusedKeysOffer.Bind(ConfigurationFile), -MENU_BUILD_DEFER_MS)

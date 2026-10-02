@@ -291,11 +291,11 @@ _MI_StageHotstrings() {
 ; timer can build the IA menu before this root does, and the stale flag would
 ; then skip the row in the root being staged.
 _MI_StageLlm() {
-	global _LLM_Menu_InTray
+	global _LLM_Menu_InTray, _DriverInputInitPending
 	_LLM_Menu_InTray := false
 	_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
 	_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
-	LLM_Menu_Init(_LlmSavedOpts)
+	LLM_Menu_Init(_LlmSavedOpts, !(IsSet(_DriverInputInitPending) && _DriverInputInitPending))
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 }
 
@@ -373,11 +373,11 @@ _MI_StageConfiguration() {
 ; The 21-locale language submenu costs ~156 ms on the first build. On the boot
 ; pass, defer it; on a live rebuild populate synchronously.
 _MI_StageLanguage() {
-	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
+	global _DriverReady, _LangMenuRef, _LangMenuBuildPending, _DriverInputInitPending
 	LangMenu := Menu()
 	TrayMenuStage_Add(t("menu.global.language"), LangMenu)
 	_LangMenuRef := LangMenu
-	if _DriverReady
+	if _DriverReady || (IsSet(_DriverInputInitPending) && _DriverInputInitPending)
 		I18nBuildLanguageMenu(LangMenu)
 	else {
 		; A disabled placeholder makes the deferred population visible as
@@ -397,7 +397,7 @@ _MI_StageAbout() {
 _MI_StageSuspend() {
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
-	TrayMenuStage_AddAction(MenuSuspend, ToggleSuspend)
+	TrayMenuStage_AddAction(MenuSuspend, MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("suspend", ToggleSuspend)))
 	; The row carries its own checked state at its single construction
 	; point, so no rebuild caller can forget it. UpdateTrayIcon owns the
 	; indicator but is wired only to state TRANSITIONS and to the boot
@@ -412,12 +412,12 @@ _MI_StageSuspend() {
 
 
 _MI_StageReload() {
-	TrayMenuStage_AddAction(t("menu.global.reload"), ActivateReload)
+	TrayMenuStage_AddAction(t("menu.global.reload"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
 }
 
 
 _MI_StageQuit() {
-	TrayMenuStage_AddAction(t("menu.global.quit"), ActivateExitApp)
+	TrayMenuStage_AddAction(t("menu.global.quit"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
 }
 
 

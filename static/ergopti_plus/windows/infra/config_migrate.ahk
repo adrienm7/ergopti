@@ -34,6 +34,8 @@
 #Requires AutoHotkey v2.0
 #Include config_migrate_records.ahk
 
+#Include config_registry_cache.ahk
+
 
 
 
@@ -239,7 +241,8 @@ ConfigMigrateLoadRegistry(Path) {
 ConfigMigrateShippedRegistry() {
 	static Registry := 0
 	if !(Registry is Map)
-		Registry := ConfigMigrateLoadRegistry(ConfigMigrateRegistryPath())
+		Registry := ConfigRegistryCacheLoad(ConfigMigrateRegistryPath(),
+			EnvGet("LOCALAPPDATA") . "\ergopti_plus\cache\migration-registry-v1.cache")
 	return Registry
 }
 

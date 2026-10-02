@@ -72,13 +72,16 @@ _LTLG_CheckInitSetsFlag() {
 	Body := _DriverFuncBody("LLM_Menu_Init")
 	Assert(Body != "", "LLM_Menu_Init must be present in ui/menu/menu_llm/init.ahk")
 
-	HotkeyBarrierPos := InStr(Body,
-		"_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)")
 	LoadedPos := InStr(Body, "_LLM_Menu_Loaded := true")
 	Assert(LoadedPos > 0,
 		"LLM_Menu_Init() must set _LLM_Menu_Loaded := true before returning")
-	Assert(HotkeyBarrierPos > 0 && HotkeyBarrierPos < LoadedPos,
-		"profile and navigation hotkeys must be complete before loaded publication")
+	Assert(InStr(Body, "LLM_Menu_ActivateRuntime()") > LoadedPos,
+		"state restoration must precede separately owned runtime activation")
+	RuntimeBody := _DriverFuncBody("LLM_Menu_ActivateRuntime")
+	Assert(RuntimeBody != "", "the runtime activation owner must exist")
+	Assert(InStr(RuntimeBody, "Activate.Call(true)") > 0
+		&& InStr(RuntimeBody, "Activate.Call(true)") < InStr(RuntimeBody, "_LLM_Menu_RuntimeActivated := true"),
+		"runtime readiness requires canonical profile/navigation activation")
 	RequireBody := _DriverFuncBody("_LLM_Menu_RequireFirstRestoreHotkeys")
 	Assert(RequireBody != "",
 		"the typed first-restore terminal must remain reachable")

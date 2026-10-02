@@ -138,11 +138,13 @@ Test("menu command deferral: a write in progress is an owned path outside a term
 ; The call sites: the native dispatch and the retry that rescues a dropped click.
 _MCD_DispatcherDefersBothPaths() {
 	Native := _DriverFuncBody("_TrackedDispatch")
-	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args)") > 0,
+	Assert(Native != "", "native dispatch must exist")
+	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0, TrackedObj)") > 0,
 		"a native menu dispatch must go through the deferral")
 	Assert(!InStr(Native, "TrackedObj.Callback.Call("), "and must not call the command directly")
 	Bypass := _DriverFuncBody("_DispatchIfMissed")
-	Assert(InStr(Bypass, 'MenuCommandRun(Callback, ["", 0, 0])') > 0,
+	Assert(Bypass != "", "fallback dispatch must exist")
+	Assert(InStr(Bypass, 'MenuCommandRun(Callback, ["", 0, 0], 0, 0, 0, Registration)') > 0,
 		"the bypass dispatch of a dropped click must go through the deferral too")
 	Assert(!InStr(Bypass, "Callback.Call("), "and must not call the command directly")
 }

@@ -46,9 +46,11 @@ _TNV_Check() {
 	InitBody := _DriverFuncBody("LLM_Menu_Init")
 	Assert(InitBody != "",
 		"LLM_Menu_Init must remain reachable to the first-restore guard")
-	Assert(InStr(InitBody,
-		"_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)") > 0,
-		"boot must consume the first-restore binding owner and retain failures")
+	RuntimeBody := _DriverFuncBody("LLM_Menu_ActivateRuntime")
+	Assert(RuntimeBody != "", "the separate startup activation owner must exist")
+	Assert(InStr(InitBody, "LLM_Menu_ActivateRuntime()") > 0
+		&& InStr(RuntimeBody, "_LLM_Menu_RequireFirstRestoreHotkeys") > 0,
+		"boot activation must consume the first-restore binding owner and retain failures")
 	Assert(InStr(InitBody, "LLM_Menu_BindNavHotkeys") == 0,
 		"ordinary tray rebuilds must not bypass the first-restore owner")
 }

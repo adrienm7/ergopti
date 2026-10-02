@@ -1136,6 +1136,9 @@ Ergopti_OnShutdown(reason, code) {
 		try MenuPopulation_Shutdown()
 		catch as Err
 			try LoggerError("Lifecycle", "Native menu preparation teardown failed: {1}.", Err.Message)
+		try MenuStartupCommands_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Startup menu command teardown failed: {1}.", Err.Message)
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
@@ -1169,11 +1172,12 @@ Ergopti_OnShutdown(reason, code) {
 				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
-; Build the full tray menu off the boot critical path (armed after "ready").
+; Publish the configured tray before input registration, then prewarm its leaves.
 ; initMenu stages every subtree while the old root remains live and enters
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
+	global _DriverInputInitPending, _DriverMenuReady
 	global _TrayRootBootDetailsPending
 	global _MenuPopulationBuilding, _MenuPopulationPublished
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
@@ -1203,10 +1207,12 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	}
 	UpdateTrayIcon()
 	BootProfile_StageEnd("tray menu", "published")
-	PopulationOwner.Start()
-	if _LangMenuBuildPending
+	InputPending := IsSet(_DriverInputInitPending) && _DriverInputInitPending
+	if !InputPending
+		PopulationOwner.Start()
+	if _LangMenuBuildPending && !InputPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+	BootProfile_Mark("Configured tray menu published")
 	; The independent LLM timer used to preempt this root worker, invalidate
 	; its generation, and force a second full InitSubMenus scan. Arm the cheap
 	; OFF-state population only after this root and its boot finalizer publish.
@@ -1214,7 +1220,7 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; Either projection stands down when initMenu already populated the IA
 	; handle inline: re-running the whole menu then only re-renders an
 	; unchanged tree (~109-156 ms wall on real boots for 13 free rows).
-	if _TrayRootBootIaPopulationNeeded() && _TrayRootScheduleBootProjectionIfDisabled(
+	if !InputPending && _TrayRootBootIaPopulationNeeded() && _TrayRootScheduleBootProjectionIfDisabled(
 			_LLM_Menu["enabled"], LLM_Menu_RequestBuild.Bind("boot"),
 			SetTimer, LLM_MENU_BUILD_DEFER_MS) {
 		try LoggerDebug("TrayMenu",
@@ -1225,11 +1231,14 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; case nothing else populates the IA submenu after boot. Arm the same
 	; deferred population whenever the api backend is enabled (predicates owned
 	; by menu_rebuild.ahk, next to the IfDisabled gate).
-	if _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
+	if !InputPending && _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
 		SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
 	; Release navigation only after every timed build stage is closed, otherwise
 	; the user's menu-reading time is charged to construction.
 	_TrayRootBootDetailsPending := false
+	_DriverMenuReady := true
+	try LoggerInfo("BootProfile", "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
+		BootProfile_TotalBootMs(), InputPending ? "true" : "false")
 	if IsSet(_TrayStartupClick)
 		_TrayStartupClick.NotifyReady()
 	return true

@@ -9,8 +9,9 @@
  * Prints startup timing lines only, never configuration or general log content.
  *
  * FEATURES & RATIONALE:
- * 1. Comparable workload: each launch uses the same configuration and the same
- *    startup-smoke path, including its intentional 650 ms message-pump fixture.
+ * 1. Comparable workload: default samples retain the correctness smoke's 650 ms
+ *    pump. Menu-latency samples omit that synthetic wait in the private entry
+ *    and reuse its cache across launches to measure cold and repeated startup.
  * 2. No generated-code cache: the production entry resolves its ordinary shared
  *    caches, so a source edit invalidates them through their real owners.
  * 3. Private copies are deleted; measurements remain in stdout for archiving.
@@ -36,8 +37,11 @@ async function main() {
 	const args = process.argv.slice(2);
 	const configArg = args.find((arg) => arg.startsWith('--config-dir='));
 	const samplesArg = args.find((arg) => arg.startsWith('--samples='));
-	if (args.some((arg) => arg !== configArg && arg !== samplesArg))
-		throw new Error('Usage: --config-dir=<existing configuration folder> [--samples=3]');
+	const menuLatency = args.includes('--menu-latency');
+	if (args.some((arg) => arg !== configArg && arg !== samplesArg && arg !== '--menu-latency'))
+		throw new Error(
+			'Usage: --config-dir=<existing configuration folder> [--samples=3] [--menu-latency]'
+		);
 	if (!configArg) throw new Error('--config-dir is required; the live configuration is read only.');
 	const configSource = path.resolve(configArg.slice('--config-dir='.length));
 	if (!fs.statSync(configSource).isDirectory())
@@ -52,19 +56,41 @@ async function main() {
 	const wrapper = path.join(code.windows, `.ergopti_startup_benchmark_${process.pid}.ahk`);
 	const results = [];
 	try {
+		if (menuLatency) {
+			// Only the private copied entry drops the synthetic onboarding pump.
+			// The live driver and the correctness smoke keep their original behavior.
+			const entry = path.join(code.windows, 'ErgoptiPlus.ahk');
+			const source = fs.readFileSync(entry, 'utf8');
+			const guard = 'while !TickExpired(_StartupSmokePumpStarted, 650)';
+			if (source.split(guard).length !== 2)
+				throw new Error('The private onboarding-pump seam changed; refusing misleading timings.');
+			fs.writeFileSync(
+				entry,
+				source.replace(guard, 'while !TickExpired(_StartupSmokePumpStarted, 0)')
+			);
+		}
 		fs.writeFileSync(wrapper, '\uFEFF#Requires AutoHotkey v2.0+\n#Include ErgoptiPlus.ahk\n');
 		for (let sample = 0; sample < samples; sample++) {
-			const fixture = path.join(scratch, String(sample));
+			const fixture = path.join(scratch, menuLatency ? 'reload' : String(sample));
 			const config = path.join(fixture, 'config');
-			fs.cpSync(configSource, config, {
-				recursive: true,
-				filter: (file) => !/[\\/](metrics|logs|cache)([\\/]|$)/.test(file)
-			});
+			if (!fs.existsSync(config))
+				fs.cpSync(configSource, config, {
+					recursive: true,
+					filter: (file) => !/[\\/](metrics|logs|cache)([\\/]|$)/.test(file)
+				});
 			fs.writeFileSync(
 				path.join(fixture, 'paths.toml'),
 				`ConfigDirPath = "${config.replace(/\\/g, '/')}"\n`
 			);
 			prepareStartupPersonalInclude(code.windows, config);
+			const logDir = path.join(fixture, 'ergopti_plus/logs');
+			const logOffsets = new Map(
+				fs.existsSync(logDir)
+					? fs
+							.readdirSync(logDir)
+							.map((name) => [name, fs.readFileSync(path.join(logDir, name), 'utf8').length])
+					: []
+			);
 			const started = performance.now();
 			const child = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 				cwd: code.windows,
@@ -77,11 +103,15 @@ async function main() {
 				throw new Error(
 					`Sample ${sample} failed (exit=${child.status}): ${child.error?.message || child.stderr || child.stdout}`
 				);
-			const logDir = path.join(fixture, 'ergopti_plus/logs');
 			const lines = fs
 				.readdirSync(logDir)
 				.filter((name) => /^ErgoptiPlus_\d/.test(name))
-				.flatMap((name) => fs.readFileSync(path.join(logDir, name), 'utf8').split(/\r?\n/));
+				.flatMap((name) =>
+					fs
+						.readFileSync(path.join(logDir, name), 'utf8')
+						.slice(logOffsets.get(name) || 0)
+						.split(/\r?\n/)
+				);
 			if (lines.some((line) => /\[(ERROR|FATAL)\]/.test(line)))
 				throw new Error(
 					`Sample ${sample} logged a startup error; it is not a performance success.`
@@ -89,7 +119,11 @@ async function main() {
 			const result = {
 				sample,
 				elapsed_ms: Math.round(performance.now() - started),
-				smoke_pump_ms: 650,
+				smoke_pump_ms: menuLatency ? 0 : 650,
+				cache: menuLatency ? (sample === 0 ? 'cold' : 'reused') : 'independent',
+				cache_events: lines.filter((line) =>
+					/Registry parse cache|Active locale.*cache retained/.test(line)
+				),
 				timing: lines.filter((line) => line.includes('[BootProfile]'))
 			};
 			results.push(result);

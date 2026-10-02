@@ -32,8 +32,14 @@ class MenuPopulation {
 
 	/** Builds a real first row; the remaining leaf choices stay build-local. */
 	Create(Rows, ListId, Depth) {
-		global MR_MAX_LIST_DEPTH
 		MenuObj := Menu()
+		this.Fill(MenuObj, Rows, ListId, Depth)
+		return MenuObj
+	}
+
+	/** Seeds an existing detached picker without replacing its native identity. */
+	Fill(MenuObj, Rows, ListId, Depth) {
+		global MR_MAX_LIST_DEPTH
 		if Depth > MR_MAX_LIST_DEPTH {
 			_MR_RenderRows(MenuObj, Rows, ListId, Depth, 0)
 			return MenuObj
