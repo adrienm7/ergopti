@@ -1253,11 +1253,59 @@ M.urlevent = {
 	end,
 	__reset   = function() M.urlevent.__opened = {} end,
 }
+local PASTEBOARD_DATA = {}
+local GENERAL_PASTEBOARD = {}
+local PASTEBOARD_TEXT_UTI = "public.utf8-plain-text"
+
+local function pasteboard_key(name)
+	if name == nil then return GENERAL_PASTEBOARD end
+	assert(type(name) == "string" or type(name) == "number",
+		"pasteboard name must be a string or number")
+	return tostring(name)
+end
+
+-- The healthy native contract stores independent UTI-to-byte maps, not Lua
+-- table references. Raw strings are immutable, so one table copy suffices.
+-- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
-	getContents  = function() return "" end,
-	setContents  = function(_) return true end,
-	readAllData  = function() return {} end,
-	writeAllData = function(_) return true end,
+	getContents = function(name)
+		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
+		local text = data[PASTEBOARD_TEXT_UTI]
+		if text == nil or utf8.len(text) == nil then return nil end
+		-- libpasteboard.m pushes UTF8String with lua_pushstring, stopping at NUL.
+		return text:match("^[^%z]*")
+	end,
+	setContents = function(text, name)
+		PASTEBOARD_DATA[pasteboard_key(name)] = { [PASTEBOARD_TEXT_UTI] = tostring(text) }
+		return true
+	end,
+	readAllData = function(name)
+		local snapshot = {}
+		for uti, bytes in pairs(PASTEBOARD_DATA[pasteboard_key(name)] or {}) do
+			snapshot[uti] = bytes
+		end
+		return snapshot
+	end,
+	writeAllData = function(...)
+		local name, contents
+		if select("#", ...) == 1 then
+			contents = ...
+		else
+			name, contents = ...
+		end
+		local key = pasteboard_key(name)
+		local data = {}
+		PASTEBOARD_DATA[key] = data
+		for uti, bytes in pairs(contents) do
+			assert(type(uti) == "string" and type(bytes) == "string",
+				"pasteboard raw data must map UTI strings to byte strings")
+			data[uti] = bytes
+		end
+		return true
+	end,
+	clearContents = function(name)
+		PASTEBOARD_DATA[pasteboard_key(name)] = nil
+	end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
 M.spaces = {
@@ -1402,6 +1450,7 @@ M.host = {
 function M.__reset()
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
+	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end
