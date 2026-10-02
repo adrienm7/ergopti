@@ -92,15 +92,15 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		helpers.assert_true(sfbs ~= nil and rolls ~= nil, "SFB reduction and rolls keep their category ids")
 		helpers.assert_true(sfbs.path:find("layouts/registry/ergopti/hotstrings/sfbsreduction.toml", 1, true) ~= nil,
 			sfbs.path)
-		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti" }, "the menu files it under Ergopti")
-		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti" })
+		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti+" }, "the menu files it under Ergopti+")
+		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti+" })
 		helpers.assert_eq(sfbs.count, 34)
 		helpers.assert_eq(rolls.count, 35)
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, 14,
 			"the repeat corrections stay a section of the magic key category")
 		helpers.assert_nil(catalogue.categories.magickey.extension, "the magic key category stays bundled")
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.extension,
-			{ id = "ergopti", name = "Ergopti" }, "its bound section names the extension the menu lists it under")
+			{ id = "ergopti", name = "Ergopti+" }, "its bound section names the extension the menu lists it under")
 		helpers.assert_nil(catalogue.categories.magickey.sections.text_expansion_symbols.extension)
 	end)
 
@@ -185,7 +185,7 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 			"the user's copy of a category is an explicit override, extension or not")
 		helpers.assert_eq(categories.rolls.count, 1, "and it is the only source of the category")
 		helpers.assert_eq(categories.rolls.sections.mine.count, 1)
-		helpers.assert_eq(categories.rolls.extension, { id = "ergopti", name = "Ergopti" },
+		helpers.assert_eq(categories.rolls.extension, { id = "ergopti", name = "Ergopti+" },
 			"the category is still listed under the extension that binds it")
 		helpers.assert_eq(categories.sfbsreduction.count, 34, "the other bound category still comes from the extension")
 	end)
@@ -214,7 +214,7 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 			helpers.assert_eq(categories.magickey.sections.replace.count, 1)
 			helpers.assert_eq(categories.magickey.sections.repeat_corrections.count, 14)
 			helpers.assert_eq(categories.magickey.sections.repeat_corrections.extension,
-				{ id = "ergopti", name = "Ergopti" })
+				{ id = "ergopti", name = "Ergopti+" })
 		end)
 end)
 

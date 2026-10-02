@@ -86,10 +86,10 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "6c768979b9b4886fd78c2bc4428d837a0f9d1557b3469229533a2c2b6d9f9ebd",
+				"sha256": "c058267da554bd6db0b7c38526367ec8b624cf37844862b52c96a4a175289d5c",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -118,8 +118,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1156,
+						"sha256": "4b5a4b3c512ffe00db7b597643af6ee34ee1aed553db34c06d2ba0d2a084bb5d"
 					}
 				]
 			},
@@ -185,10 +185,10 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "55dc514a86a63c61e21f4cebd883a8abf40c085b6e41e08d6be101249947a8ad",
+				"sha256": "81d6ac119d5e427dbbdc5ef6c9171e0e1eec1dab33942d0f0ac78a29f4e07db5",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -217,8 +217,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1156,
+						"sha256": "4b5a4b3c512ffe00db7b597643af6ee34ee1aed553db34c06d2ba0d2a084bb5d"
 					}
 				]
 			},
@@ -284,10 +284,10 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "cae8cdca3695b794ea8f06bc7aad9506211a6daf180e2f36f0d21851d6b23a0c",
+				"sha256": "28cc07ab46ae37b30801e051f42a2f25efbbb6877f5ae35371963d8cc1f65fea",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -316,8 +316,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1156,
+						"sha256": "4b5a4b3c512ffe00db7b597643af6ee34ee1aed553db34c06d2ba0d2a084bb5d"
 					}
 				]
 			},
@@ -383,10 +383,10 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "fce69b8b3e0f3607bd39daec26032fd20abcba09b80d415916d1f758f2f0fd60",
+				"sha256": "53396f20a9844564614e134693c83c54577a564ca7ec8219acd17a8870710355",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -415,8 +415,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1156,
+						"sha256": "4b5a4b3c512ffe00db7b597643af6ee34ee1aed553db34c06d2ba0d2a084bb5d"
 					}
 				]
 			},

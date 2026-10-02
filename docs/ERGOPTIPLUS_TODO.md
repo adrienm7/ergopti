@@ -650,11 +650,13 @@ branch has been removed; the run also covers the 21-locale privacy label.
       deliberately and cover neutral/recommended scopes, menu placement,
       assignment removal/rebinding and editor invocation across drivers.
 
-- [ ] **109.** Name the bundled hotstrings extension "Ergopti+", including
-      the Hotstrings submenu label that currently omits "+". Keep internal
-      layout/extension identifiers stable; distinguish a display name from a
-      registry id. Update the shared naming owner and all applicable locale
-      labels, and assert the rendered label on Windows/macOS/Linux.
+- [~] **109.** The bundled hotstrings extension now displays "Ergopti+" from
+      its shared manifest; its registry index and package digests are regenerated.
+      Internal layout/extension identifiers stay unchanged. Existing localized
+      templates carry the shared display name in all 21 languages. Four macOS
+      tests and ten Linux discovery/routing/menu tests pass, including the actual
+      tray trees; Windows tests check the discovered name and actual menu provider.
+      The complete local gates pass. Finish after the native CI checkpoint passes.
 
 - [~] **110.** Windows four-finger tap now recommends monitor-local Alt+Tab
       from the shared feature manifest and its generated wizard catalogue.

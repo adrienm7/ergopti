@@ -11,9 +11,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local shipped = require("toml_codec.codec").decode(require("tests.support.source_file").read(
+	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension
 
 local ERGOPTI = {
-	id = "ergopti", name = "Ergopti", toml_files = {},
+	id = shipped.id, name = shipped.name, toml_files = {},
 	bound_files = {
 		{ stem = "repeatcorrections", binding = { category = "magickey", sections = { "repeat_corrections" } } },
 		{ stem = "rolls", binding = { category = "rolls" } },
@@ -31,6 +33,31 @@ local function context(hotfiles, packs)
 end
 
 helpers.describe("Hotstrings menu: extension submenus", function()
+	helpers.it("renders the shipped Ergopti+ name in the actual tray tree", function()
+		local Builder = helpers.load_with_stubs("ui.menu.builder")
+		local Hotstrings = require("ui.menu.menu_hotstrings")
+		local ctx = context({ "sfbsreduction", "rolls" }, { ERGOPTI })
+		ctx.config, ctx.base_dir = { log_level = 2 }, helpers.driver_root()
+		ctx.state = { keymap = false, hotstrings = {}, sections_order_overrides = {} }
+		ctx.applyTriggerChar = function(text) return text end
+		ctx.keymap = {
+			get_sections = function() return { { name = "section", count = 1 } } end,
+			is_group_enabled = function() return false end,
+			is_section_enabled = function() return false end,
+		}
+		local actions = setmetatable({}, { __index = function() return function() end end })
+		local tree = Builder.generate(ctx, { hotstrings = Hotstrings }, actions)
+		local expected = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #expected) == expected then return row end
+				local nested = type(row.menu) == "table" and find(row.menu)
+				if nested then return nested end
+			end
+		end
+		helpers.assert_true(find(tree) ~= nil, "the rendered extension name must retain its plus")
+	end)
+
 	helpers.it("(ergopti-hotstrings-ext) lists SFB reduction and rolls under the Ergopti extension", function()
 		local Builder = helpers.load_with_stubs("ui.menu.builder")
 		local ctx = context({ "autocorrection", "magickey", "rolls", "sfbsreduction", "ext:demo:phrases" },
@@ -48,7 +75,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 			{ id = "demo", name = "Demo", groups = { "ext:demo:phrases" }, sections = {}, total = 3 },
 			-- The menu manifest's order, which Windows walks too and every driver
 			-- listed before the move: SFB reduction, then rolls.
-			{ id = "ergopti", name = "Ergopti", groups = { "sfbsreduction", "rolls" },
+			{ id = "ergopti", name = "Ergopti+", groups = { "sfbsreduction", "rolls" },
 				sections = { { group = "magickey", section = "repeat_corrections" } }, total = 12 },
 		})
 		local source = helpers.read_driver_source("function M.extension_menus")

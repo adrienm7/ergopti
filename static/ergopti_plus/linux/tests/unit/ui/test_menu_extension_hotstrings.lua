@@ -11,12 +11,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local manifest_file = assert(io.open(helpers.driver_root() .. "/../../layouts/registry/ergopti/manifest.toml", "r"))
+local shipped = require("toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
+assert(manifest_file:close())
 
 --- A hotstrings config double whose loaded categories name their extension.
 --- @param with_ergopti boolean Whether the Ergopti extension supplied its categories.
 --- @return table
 local function fake_config(with_ergopti)
-	local ergopti = { id = "ergopti", name = "Ergopti" }
+	local ergopti = { id = shipped.id, name = shipped.name }
 	local categories = {
 		magickey = { id = "magickey", count = 3, sections_order = { "symbols" },
 			sections = { symbols = { count = 3 } } },
@@ -78,7 +81,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) lists SFB reduction and rolls in a Hotstrings Ergopti submenu", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local i18n = require("infra.i18n")
-		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local row = row_starting(mb.build({ config = fake_config(true), _version = "9.9.9" }), label)
 		helpers.assert_true(row ~= nil, "the « " .. label .. " » submenu must be drawn")
 		local inside = {}
@@ -97,7 +100,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) takes the repeat corrections out of the magic key submenu", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local built = mb.build({ config = fake_config(true), _version = "9.9.9" })
-		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local seen = 0
 		for _, row in ipairs(titles(built)) do
 			if row.title:find("repeat_corrections", 1, true) then seen = seen + 1 end
@@ -111,7 +114,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) draws no Ergopti submenu when the extension is not installed", function()
 		local mb = helpers.load_module("ui.menu.menu_builder")
 		local i18n = require("infra.i18n")
-		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		helpers.assert_nil(row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label))
 	end)
 end)
