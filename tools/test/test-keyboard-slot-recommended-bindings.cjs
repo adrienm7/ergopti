@@ -61,6 +61,15 @@ function validate(input) {
 			);
 		}
 	}
+	const editor = slots.filter(
+		(entry) =>
+			entry.platforms.includes('ahk') &&
+			((entry.recommended_per_platform || {}).ahk ?? entry.recommended) === 'open_hotstrings_editor'
+	);
+	check(
+		editor.length === 1 && editor[0].id === 'win_d' && editor[0].default === 'none',
+		'editor: Windows must recommend the editor in exactly one neutral ordinary Win slot'
+	);
 	for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {
 		const recommended = slots.filter(
 			(entry) =>
@@ -150,6 +159,24 @@ const input = {
 };
 const result = validate(input);
 const mutations = [
+	[
+		'editor',
+		(copy) => {
+			copy.slots.find((entry) => entry.id === 'win_d').recommended_per_platform = { ahk: 'copy' };
+		}
+	],
+	[
+		'editor',
+		(copy) => {
+			copy.slots.find((entry) => entry.id === 'win_d').recommended = 'copy';
+		}
+	],
+	[
+		'editor',
+		(copy) => {
+			copy.slots.find((entry) => entry.id === 'win_d').default = 'open_hotstrings_editor';
+		}
+	],
 	[
 		'neutral',
 		(copy) => {

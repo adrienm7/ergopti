@@ -1110,24 +1110,31 @@ Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 
 
 
-; F42 (audit 2026-07-20): the Win+<magic-key-source> hotkey that opens the personal
-; editor was registered with no #HotIf and outside the magic-key feature block, so it
-; stole an OS Win+<key> combo even with every Ergopti feature disabled — "all features
-; off" must mean no keyboard interception.
-TestFMv2_PersonalEditorHotkeyIsFeatureGated() {
+; The personal editor is an ordinary, neutral keyboard slot. Its former fixed
+; Win+magic-key owner intercepted input outside that assignment model and could
+; not be removed or rebound from the Shortcuts menu.
+TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	Src := ""
-	try Src := FileRead(WindowsDir . "\modules\keymap\layout.ahk")
-	Assert(Src != "", "modules/keymap/layout.ahk must be readable")
-	Code := _StripFullLineComments(Src)
-
-	HotkeyPos := InStr(Code, "OpenPersonalEditor()")
-	Assert(HotkeyPos > 0, "layout.ahk must register the personal-editor hotkey")
-	; A HotIf criterion must be established immediately before the registration.
-	Before := SubStr(Code, 1, HotkeyPos)
-	GatePos := InStr(Before, "HotIf(", , -1)
-	Assert(GatePos > 0 && (HotkeyPos - GatePos) < 400,
-		"the personal-editor Win hotkey must be registered under a HotIf feature criterion, so disabling the feature releases the OS Win combo")
+	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
+	Assert(!InStr(Code, "OpenPersonalEditor()"),
+		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
+	for Chosen in [false, true] {
+		for CtrlSave in [false, true] {
+			for Entry in LayoutRegistry_MagicKeyHotkeys("SC02E", Chosen, CtrlSave)
+				Assert(Entry["kind"] != "editor",
+					"neither chosen nor layout-owned physical magic sources may reserve an editor chord")
+		}
+	}
+	Personal := _StripFullLineComments(_DriverFuncBody("_HS_PersonalRows"))
+	Assert(Personal != "", "the actual personal-hotstring provider must be readable")
+	Assert(!InStr(Personal, '"menu.hotstrings.shortcut_prefix"'),
+		"the Personal menu must not advertise a dedicated fixed editor chord")
+	Assert(InStr(Personal, "OpenPersonalEditor()") > 0,
+		"the ordinary editor opening command remains in the Personal menu")
+	AssertEqual("none", ManifestDefaultFor("shortcuts.keyboard.win_d"),
+		"an empty configuration must never install the editor recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.win_d"),
+		"the shared recommendation remains an ordinary editable Win slot")
 }
-Test("layout: personal-editor Win hotkey is feature-gated, not unconditional",
-	TestFMv2_PersonalEditorHotkeyIsFeatureGated)
+Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
+	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)
