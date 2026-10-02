@@ -552,6 +552,47 @@ KeyCombinationScopeRows() {
 }
 
 
+; Applies the combination-only scope using fresh disk inventory inside the
+; admitted lifecycle. Unrecognized slots and other shortcut owners stay intact.
+; @param Mode {String} "recommended" or "clear".
+; @param Options {Map} Configuration lifecycle ports for tests.
+; @returns {Map} The asynchronous scope receipt.
+KeyCombinationsApplyScope(Mode, Options := unset) {
+	global ConfigurationFile
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	Path := OwnedOptions.Has("path") ? OwnedOptions["path"] : ConfigurationFile
+	return ConfigScopeCommitOperations("key_combinations", Mode,
+		KeyCombinationScopedOperations.Bind(Mode, Path), OwnedOptions)
+}
+
+; The pair catalogue owns slot identities; the shared manifest owns presets.
+; Read after admission so edits made since boot participate in this scope.
+KeyCombinationScopedOperations(Mode, Path) {
+	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION
+	Stored := TOML_ParseFreshFile(Path)
+	if TOML_ReadFailed(Path)
+		throw Error("Key combination configuration could not be read.")
+	Parameters := []
+	for Key in Stored.Get("action_parameters", Map()) {
+		ParameterPath := "action_parameters." . Key
+		if ConfigScopeActionParameterDomain(ParameterPath) == "combination"
+			Parameters.Push(ParameterPath)
+	}
+	Plan := ManifestScopePlan("key_combinations", Mode, Parameters,
+		Map("action_parameter_domain", ConfigScopeActionParameterDomain))
+	for Section in [KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION] {
+		for PairId in Stored.Get(Section, Map()) {
+			if !(KeyCombinationParsePair(PairId) is Map)
+				continue
+			SlotPath := Section . "." . PairId
+			if !(ManifestFindEntryByPath(SlotPath) is Map)
+				Plan.operations.Push(ManifestConfigRow(SlotPath, , true))
+		}
+	}
+	return Plan.operations
+}
+
+
 
 
 
@@ -586,9 +627,9 @@ _KeyCombinationHoldLabel(PairId) {
 ; The list provider of the manifest's "key_combination_rows_left" and
 ; "key_combination_rows_right" entries: one group per first key of that hand,
 ; as the shared catalogue assigns it (Space is a left-hand key), holding one
-; row per second key, « First + Second », ticked and followed by its two
-; slots once one of them is set. The manifest declares the two lists and the
-; separator between them: no row is built here but the pairs themselves.
+; row per second key, « First + Second : action », ticked when assigned.
+; Empty pairs name their disabled action. The manifest declares the two lists
+; and their separator: the provider builds only the pairs themselves.
 ; A click on a pair opens its own menu (KeyCombinationShowPairMenu).
 ; @param Hand {String} "left" or "right": the hand of the key held first.
 ; @returns {Array} Rows of Map("label", ..., "checked", ..., "items", ...).
@@ -611,17 +652,18 @@ KeyCombinationRows(Hand) {
 	return Rows
 }
 
-; The row of one pair: its label, ticked and followed by its two slots once
-; one is set. A click opens the pair's menu.
+; Every pair names its current action before the user opens its picker.
 _KeyCombinationPairRow(First, Second) {
 	global KEY_COMBINATION_NONE
 	PairId := KeyCombinationPairId(First["id"], Second["id"])
 	PairLabel := t(First["i18n"]) . " + " . t(Second["i18n"])
 	IsAssigned := KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
-	Label := IsAssigned
-		? PairLabel . " : " . _KeyCombinationTapLabel(PairId) . " / " . _KeyCombinationHoldLabel(PairId)
-		: PairLabel
+	ActionLabel := _KeyCombinationTapLabel(PairId)
+	if KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
+		ActionLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE
+			? _KeyCombinationHoldLabel(PairId) : ActionLabel . " / " . _KeyCombinationHoldLabel(PairId)
+	Label := PairLabel . " : " . ActionLabel
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
 }
 

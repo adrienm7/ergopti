@@ -99,6 +99,8 @@ package.loaded["infra.config_paths"] = {
 local function find_item(item, label)
 	for _, row in ipairs(item.submenu or item.menu or item.items or {}) do
 		if row.title == label or row.label == label then return row end
+		local nested = find_item(row, label)
+		if nested then return nested end
 	end
 	return nil
 end
@@ -357,7 +359,9 @@ local function build_menu(mode, configure)
 	-- de touches » group under Shortcuts, which the same module builds; both
 	-- trees are searched as one.
 	local group = menu.build_key_combinations(ctx)
-	for _, row in ipairs(group) do built.submenu[#built.submenu + 1] = row end
+	-- Preserve the second group's boundary: its scope rows belong to that
+	-- group, not to the Tap-Holds first-row contract asserted below.
+	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
 	package.loaded["infra.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
 	package.loaded["infra.manifest_menu"] = saved_manifest

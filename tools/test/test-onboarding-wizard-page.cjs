@@ -465,8 +465,17 @@ function cataloguePaths(driver) {
 // ======================================
 
 (function everyScopeHasAPageInTheApprovedOrder() {
-	const scopes = Object.keys(manifestToml.scopes).filter((scope) => scope !== 'global');
-	assert.deepEqual([...scopes].sort(), [...APPROVED_ORDER].sort(), 'the wizard covers every scope');
+	const scopes = manifestToml.scopes.global.includes;
+	assert.deepEqual(
+		manifestToml.scopes.shortcuts.includes,
+		['key_combinations'],
+		'the combination scope belongs to the existing Shortcuts question'
+	);
+	assert.deepEqual(
+		[...scopes].sort(),
+		[...APPROVED_ORDER].sort(),
+		'the wizard covers every root scope, including its nested scopes'
+	);
 	assert.deepEqual(manifestToml.onboarding.order, APPROVED_ORDER);
 	assert.deepEqual(CATALOGUE.order, APPROVED_ORDER);
 	for (const driver of Object.keys(DRIVER_MANIFESTS)) {

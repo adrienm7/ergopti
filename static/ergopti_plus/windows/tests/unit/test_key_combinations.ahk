@@ -537,6 +537,7 @@ _KCT_MenuListsEveryOrderedPair() {
 				Pairs += Group["items"].Length
 				for _, Pair in Group["items"] {
 					Assert(!Pair.Has("separator"), "nor between the pairs of a group")
+					Assert(InStr(Pair["label"], " : ") > 0, "every pair exposes its action without opening the picker")
 					Assert(HasMethod(Pair["action"], "Call"), "a pair's row opens its menu")
 					Assert(!Pair.Has("items"), "and carries no submenu of its own: 182 of them at every start")
 				}
@@ -559,7 +560,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		Assert(InStr(Forward["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its tap")
 		Assert(InStr(Forward["label"], _TH_HoldOptionLabel("ctrl")) > 0, "and its hold")
 		AssertFalse(Backward["checked"], "the other order has its own, empty, slots")
-		AssertEqual(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt"), Backward["label"])
+		AssertEqual(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt") . " : "
+			. t("dialog.action_picker.disabled"), Backward["label"], "an empty pair explicitly names its disabled action")
 		AssertTrue(Groups["left_alt"]["checked"], "a first key with a pair is ticked")
 		AssertFalse(Groups["caps_lock"]["checked"])
 		; The menu a pair opens is the manifest's: its clear row, a separator,
@@ -697,3 +699,62 @@ _KCT_PairClearAvailability(Assigned) {
 for Assigned in [false, true]
 	Test("key combinations: shared clear availability assigned=" . Assigned . " (key-combination-pair-menu)",
 		_KCT_PairClearAvailability.Bind(Assigned))
+
+; The actual shared menu commands change only their native combination owner.
+; Fresh disk slots deliberately differ from the runtime maps in the fixture.
+_KCT_GroupScope(Mode) {
+	global _MenuDispatchCallbacks
+	Fixture := _ScopeOwnerFixture()
+	Source := '[shortcuts.key_combination_taps]`nleft_alt_then_caps_lock = "open_url"`nspace_then_enter = "caps_word"`nfuture_pair = "keep"`n'
+		. '[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`nfuture_pair = "keep"`n'
+		. '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
+		. '[action_parameters]`ncombination__left_alt_then_caps_lock__open_url = "https://pair.test"`n'
+		. 'combination__future_pair__open_url = "keep"`nkeyboard__win_b__open_url = "keep"`n'
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	Rendered := Menu()
+	try {
+		Commands := _SC_KeyCombinationCommands(Fixture.options)
+		Id := Mode == "recommended" ? "scope_restore" : "scope_clear"
+		AssertEqual(1, MenuRenderer_AppendCommand(Rendered, "key_combinations_group", Id, Commands),
+			"the shared combination submenu declares its own bulk command")
+		ItemId := DllCall("GetMenuItemID", "ptr", Rendered.Handle, "int", 0, "uint")
+		Receipt := (_MenuDispatchCallbacks[ItemId])()
+		AssertEqual("pending", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "backup contains the exact previous bytes")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		Taps := Parsed.Get("shortcuts.key_combination_taps", Map())
+		Holds := Parsed.Get("shortcuts.key_combination_holds", Map())
+		Expected := Map("alt_gr_then_left_alt", "ctrl_backspace", "alt_gr_then_caps_lock", "ctrl_delete",
+			"left_alt_then_caps_lock", "caps_word")
+		for PairId, Action in Expected {
+			AssertEqual(Mode == "recommended" ? Action : "none", Taps.Get(PairId, "none"), PairId)
+		}
+		Assert(!Taps.Has("space_then_enter"), "a valid pair absent from runtime is still owned")
+		Assert(!Holds.Has("space_then_enter"), "the clear and preset remove custom holds")
+		AssertEqual("keep", Taps["future_pair"], "an unknown slot remains outside this owner")
+		AssertEqual("keep", Holds["future_pair"])
+		Assert(!Parsed["action_parameters"].Has("combination__left_alt_then_caps_lock__open_url"))
+		AssertEqual("keep", Parsed["action_parameters"]["combination__future_pair__open_url"])
+		AssertEqual("keep", Parsed["action_parameters"]["keyboard__win_b__open_url"])
+		AssertEqual("copy", Parsed["shortcuts.keyboard"]["win_b"])
+		AssertEqual(false, Parsed["category_enabled"]["shortcuts"])
+		AssertEqual(Mode == "recommended", Parsed["category_enabled"].Get("key_combinations",
+			ManifestDefaultFor("category_enabled.key_combinations")), "clear preserves the disabled switch")
+		Refusal.Call("native close refused")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "late refusal restores the complete owner image")
+	} finally {
+		Rendered.Delete()
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("key combinations: restore the three shared recommendations and recover refusal", _KCT_GroupScope.Bind("recommended"))
+Test("key combinations: clear only owned pairs and preserve the group switch", _KCT_GroupScope.Bind("clear"))

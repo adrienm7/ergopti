@@ -5081,7 +5081,7 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos" }
+local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos", key_combinations = "mod_combos" }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
 --- verified backup of config_karabiner.toml, a save that only replaces those
@@ -5092,7 +5092,7 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- tap_holds « recommended » first creates layers.toml from Ergopti's
 --- recommended layer when the folder has none, so the regeneration deploys the
 --- layer the preset's key enters; a refused transaction removes that file.
---- @param request table `{ scope = "tap_holds"|"shortcuts",
+--- @param request table `{ scope = "tap_holds"|"shortcuts"|"key_combinations",
 ---   mode = "recommended"|"clear", backup_path = string }`.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
 --- @return boolean accepted True only when exact regeneration was accepted.
@@ -5135,9 +5135,11 @@ function M.apply_scope(request, on_done)
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		if section == "mod_combos" then
-			-- The key-combinations switch returns to absent (on) as on a fresh
-			-- install, like the whole-remap reset.
-			candidate.mod_combos_enabled = target.mod_combos_enabled
+			-- The shared combination scope keeps its switch on clear, including
+			-- when composed into Shortcuts; restore imports the neutral-on gate.
+			if request.mode ~= "clear" then
+				candidate.mod_combos_enabled = target.mod_combos_enabled
+			end
 			candidate.mod_combos_config = target.mod_combos_config
 			candidate.simultaneous_threshold_ms = target.simultaneous_threshold_ms
 			candidate.combo_symmetric = target.combo_symmetric

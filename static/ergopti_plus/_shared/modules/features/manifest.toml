@@ -4372,6 +4372,20 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
 type = "---"
 platforms = ["ahk", "hs"]
 
@@ -5698,10 +5712,20 @@ restore_exclude = []
 clear_exclude = ["tap_holds.enabled", "category_enabled.tap_holds"]
 
 [scopes.shortcuts]
-action_parameters = { domains = ["combination", "keyboard", "script", "tap_key"], restore = "remove" }
+includes = ["key_combinations"]
+action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
 prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations"]
 restore_exclude = []
-dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }]
+dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
+
+# Combination assignments have their own menu owner. Clearing keeps its
+# switch; restoring imports the recommendation without changing other shortcuts.
+[scopes.key_combinations]
+action_parameters = { domains = ["combination"], restore = "remove" }
+prefixes = ["shortcuts.key_combination_taps", "shortcuts.key_combination_holds", "mod_combos", "category_enabled.key_combinations"]
+restore_exclude = []
+clear_exclude = ["mod_combos.enabled", "category_enabled.key_combinations"]
+dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }]
 
 # The Gestures clear removes the assignments and keeps the switch, like the
 # Tap-Holds one: the user assigns the next gesture from there.

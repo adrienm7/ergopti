@@ -21,6 +21,7 @@ async function main() {
 		[
 			'tap_holds',
 			'shortcuts',
+			'key_combinations',
 			'gestures',
 			'keyboard_layout',
 			'hotstrings',
@@ -29,6 +30,22 @@ async function main() {
 			'global'
 		],
 		'one ordered scopes registry must own every configuration action'
+	);
+	assert.deepEqual(
+		manifest.scopes.shortcuts.includes,
+		['key_combinations'],
+		'the root Shortcuts owner includes its combination menu scope'
+	);
+	assert.deepEqual(manifest.scopes.key_combinations.action_parameters.domains, ['combination']);
+	assert.deepEqual(
+		manifest.scopes.key_combinations.clear_exclude,
+		['mod_combos.enabled', 'category_enabled.key_combinations'],
+		'both native clears preserve their group switch'
+	);
+	assert.deepEqual(
+		manifest.menu.key_combinations_group.slice(0, 3).map((row) => row.id),
+		['key_combinations_toggle', 'scope_restore', 'scope_clear'],
+		'the shared menu exposes both bulk commands'
 	);
 	let inputCount = 0;
 	// The declared exceptions to "an empty configuration alters no input": the

@@ -686,6 +686,26 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
 			"type": "---",
 			"platforms": [
 				"ahk",

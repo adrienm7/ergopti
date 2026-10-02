@@ -459,6 +459,14 @@ disabled state without a second translation/render pass. Action: a new
 slot or row of this group goes in the manifest first, and a Windows pair id
 never uses a double underscore, which is the separator of a binding id.
 
+The group also declares its bulk commands in this shared menu. Its
+`key_combinations` scope owns pair assignments and combination action parameters;
+its clear keeps the group switch. Windows inventories valid pair identities
+from fresh disk inside the admitted configuration lifecycle, preserving unknown
+slots and other shortcuts. macOS uses the same remap transaction as Shortcuts,
+restricted to its combination section. Presets still come from the shared
+manifest, never from a menu-local copy of the three historical recommendations.
+
 ### project-two-keys-for-one-row-is-two-menus
 
 Two manifest keys that describe one visible row create two sources of truth.
