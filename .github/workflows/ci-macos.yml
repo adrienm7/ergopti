@@ -150,6 +150,11 @@ jobs:
       # A depth-1 clone: the build reads tracked files and HEAD, never history.
       - uses: actions/checkout@v4
 
+      - name: Prepare Node for native policy fixtures and XCTest evidence
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@v4
         with:
@@ -174,18 +179,31 @@ jobs:
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
       - name: Run Swift launcher tests
+        id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
         run: |
           set -euo pipefail
-          xctest_log="$(mktemp)"
-          trap 'rm -f "$xctest_log"' EXIT
+          mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"
+          xctest_log="$(mktemp "$RUNNER_TEMP/swift-launcher-evidence/xctest.log.XXXXXX")"
+          set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"
+          swift_pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
           if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
           fi
         timeout-minutes: 10
+
+      - name: Upload Swift launcher failure transcript
+        if: ${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-launcher-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swift-launcher-evidence
+          if-no-files-found: error
 
       # LauncherLogTests append to the real launcher log,
       # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
