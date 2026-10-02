@@ -171,15 +171,21 @@ try {
 		{ prefix: '', separator: ' — ' },
 		{ prefix: 'Other product', separator: ': ' },
 		{ prefix: 'Quoted "product" `name`', separator: '' },
-		{ prefix: 'Other ; product', separator: ' ; ' }
+		{ prefix: 'Other ; product', separator: ' ; ' },
+		{ prefix: 'Émoji 😀', separator: ' / ' },
+		{ prefix: 'Literal \\(1 + 1)', separator: ' / ' }
 	]) {
 		put(titles.SOURCE, JSON.stringify({ window_title: policy, apps: {} }));
 		titles.main(root);
 		const lua = fs.readFileSync(path.join(root, titles.LUA_OUTPUT), 'utf8');
 		const ahk = fs.readFileSync(path.join(root, titles.AHK_OUTPUT), 'utf8');
+		const swift = fs.readFileSync(path.join(root, titles.SWIFT_OUTPUT), 'utf8');
+		assert.ok(swift.includes('let prefix = ' + JSON.stringify(policy.prefix)));
+		assert.ok(swift.includes('let separator = ' + JSON.stringify(policy.separator)));
+		assert.match(swift, /guard !prefix.isEmpty else \{ return label \}/);
 		assert.ok(lua.includes('local PREFIX = ' + JSON.stringify(policy.prefix)));
 		assert.ok(ahk.startsWith('\uFEFF'), 'AHK generated titles retain their UTF-8 BOM');
-		assert.equal(/[\r]/.test(lua + ahk), false, 'both generated hosts retain LF');
+		assert.equal(/[\r]/.test(lua + ahk + swift), false, 'all generated hosts retain LF');
 		assert.match(
 			lua,
 			/if PREFIX == "" then return label end/,
@@ -213,7 +219,9 @@ try {
 		{ prefix: '\u0001', separator: '' },
 		{ prefix: '', separator: '\t' },
 		{ prefix: '\uD800', separator: '' },
-		{ prefix: '', separator: '\uDC00' }
+		{ prefix: '', separator: '\uDC00' },
+		{ prefix: '\u2028', separator: '' },
+		{ prefix: '', separator: '\u2029' }
 	])
 		assert.throws(
 			() => titles.render(policy),
