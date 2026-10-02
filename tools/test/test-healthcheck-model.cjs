@@ -421,6 +421,47 @@ for (const driver of DRIVERS) {
 		fail(`${driver}: the developer section is not collapsed`);
 }
 
+// Feature collection order differs across hosts. Alphabetical presentation is
+// defined by translated labels, with decorative prefixes ignored, in both views.
+for (const driver of DRIVERS) {
+	const snapshot = fixture(driver);
+	snapshot.sections.features.items = [
+		{ id: 'hotstrings', enabled: true },
+		{ id: 'gestures', enabled: false },
+		{ id: 'shortcuts', enabled: true },
+		{ id: 'unknown_feature', enabled: false }
+	];
+	const labels = {
+		[schema.feature_labels.hotstrings]: '🔠 Zèbre',
+		[schema.feature_labels.gestures]: '🖱️ Éclair',
+		[schema.feature_labels.shortcuts]: '⌨️ Alpha'
+	};
+	const translated = (key, ...args) => labels[key] || t(key, ...args);
+	const expected = ['⌨️ Alpha', '🖱️ Éclair', 'unknown_feature', '🔠 Zèbre'];
+	const original = JSON.stringify(snapshot);
+	const html = Model.renderHtml(snapshot, schema, translated);
+	const featureHtml = html.match(/id="section-features">([\s\S]*?)<\/section>/);
+	const markdown = Model.formatMarkdown(snapshot, schema, translated);
+	const featureMarkdown = markdown.split(`## ${translated('healthcheck.section.features')}\n`)[1];
+	if (!featureHtml || !featureMarkdown) fail(`${driver}: the feature views disappeared`);
+	else {
+		let lastHtml = -1;
+		let lastMarkdown = -1;
+		for (const label of expected) {
+			const htmlAt = featureHtml[1].indexOf(`<td>${label}</td>`);
+			const markdownAt = featureMarkdown.indexOf(`| ${label} |`);
+			if (htmlAt < 0 || htmlAt <= lastHtml)
+				fail(`${driver}: ${label} is not in translated alphabetical page order`);
+			if (markdownAt < 0 || markdownAt <= lastMarkdown)
+				fail(`${driver}: ${label} is not in translated alphabetical report order`);
+			lastHtml = htmlAt;
+			lastMarkdown = markdownAt;
+		}
+	}
+	if (JSON.stringify(snapshot) !== original)
+		fail(`${driver}: ordering features mutated the host snapshot`);
+}
+
 // The features this platform lacks, collapsed, each with its translated reason
 {
 	const html = Model.renderHtml(fixture('macos'), schema, t);

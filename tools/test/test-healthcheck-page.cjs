@@ -203,13 +203,35 @@ function init(page, detailed, mode) {
 	if (toolbarIds.includes('btn-close') || page.elements['btn-close'])
 		fail('the page still draws a Close button');
 	if (/healthcheck\.toolbar\.close/.test(markup)) fail('the page still names the Close label');
+	if (toolbarIds[0] !== 'btn-open-logs')
+		fail(`the first toolbar button is ${toolbarIds[0]}, not Open logs`);
 	if (toolbarIds[toolbarIds.length - 1] !== 'btn-refresh')
 		fail(`the last toolbar button is ${toolbarIds[toolbarIds.length - 1]}, not Refresh`);
+	for (const [area, expected] of [
+		['left', ['btn-open-logs']],
+		['center', ['btn-copy', 'btn-save', 'btn-report']],
+		['right', ['btn-refresh']]
+	]) {
+		const group = new RegExp(`<div class="toolbar-${area}">([\\s\\S]*?)</div>`).exec(markup);
+		const ids = group ? [...group[1].matchAll(/\bid="(btn-[a-z-]+)"/g)].map((m) => m[1]) : [];
+		if (ids.join(',') !== expected.join(','))
+			fail(`the ${area} toolbar area contains ${ids.join(',')}, expected ${expected.join(',')}`);
+	}
 	const styles = fs
 		.readFileSync(path.join(PAGE, 'style.css'), 'utf8')
 		.replace(/\/\*[\s\S]*?\*\//g, '');
-	if (!/#btn-refresh\s*\{[^}]*margin-left:\s*auto/.test(styles))
-		fail('Refresh is not pushed to the right of the toolbar');
+	if (
+		!/\.toolbar \.buttons\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\)/.test(
+			styles
+		)
+	)
+		fail('the centered toolbar actions do not have equal side columns');
+	if (!/\.toolbar-center\s*\{[^}]*justify-content:\s*center/.test(styles))
+		fail('Copy, Save and Report are not centered together');
+	if (!/\.toolbar-right\s*\{[^}]*justify-content:\s*flex-end/.test(styles))
+		fail('Refresh is not aligned to the right of its toolbar area');
+	if (!/@media[^}]*\{[\s\S]*?\.toolbar-center\s*\{[^}]*grid-column:\s*1 \/ -1/.test(styles))
+		fail('narrow windows do not give the central actions their own row');
 	if (!page.elements['btn-refresh'].disabled)
 		fail('Refresh is enabled before the host sent its first snapshot');
 
