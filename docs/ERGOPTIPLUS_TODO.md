@@ -716,9 +716,13 @@ names (Backspace, Escape, Enter, Tab and Delete). macOS/Linux use installed OS
 layouts for dead-key handling and have no corresponding AHK registration.
 The four prediction-navigation arrow hotkeys now share those scan-code
 identities too; their existing ownership, hook-order and step assertions remain
-intact. Non-release run 36941345120 caught an incorrect new fixture seed: Ergopti+
-places diaeresis on Shift+SC01B, unlike Ergopti. The seed now follows that
-actual shipped level and reports its layout/key/modifiers on refusal. Thirteen
+intact. Non-release runs 36941345120 and 36944695471 caught incorrect new
+fixture seeds for Ergopti+: plain SC01B types j, Shift+SC01B types underscore,
+and Shift+AltGr+SC01B starts diaeresis. The five seeds now live in the shared
+keystroke corpus, replayed by the Windows reset cases and independently checked
+against the Linux conversion's actual dead-state triggers, including custom
+Ergo-L triggers. The portable regression rejected the old underscore seed;
+all five conversion/keystroke tests pass after correction. Thirteen native
 cases refused the wrong seed; one additional Windows failure still needs the
 next native run's evidence. The production identity repair remains unchanged.
 
