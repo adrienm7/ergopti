@@ -5,6 +5,9 @@
 ; DESCRIPTION:
 ; Owns native Windows dialog captions through the shared window-title policy.
 ; Message bodies, options, defaults and native return values pass through intact.
+; Both this owner and the generated composer consist of hoisted functions only:
+; bootstrap failures can call them before their #Include lines execute, without
+; requiring configuration, translations, bundle extraction or logger state.
 ; ==============================================================================
 
 /**

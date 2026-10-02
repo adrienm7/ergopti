@@ -6,6 +6,7 @@
 ; Executes the actual native caption owner and actual generated policy in private
 ; AHK children. Visible message/input captions are captured independently of the
 ; shared composer, alongside body, timeout and exact default-text receipts.
+; Calls precede both owner #Includes, exercising their pre-bootstrap availability.
 ; ==============================================================================
 
 /**
@@ -53,8 +54,6 @@ _NDT_RunChild(Executable, Args, Ownership) {
  */
 _NDT_ProbeSource(Artifact, Owner) {
 	return "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
-		. '#Include ' . Artifact . "`n"
-		. '#Include ' . Owner . "`n"
 		. 'OnError(_NDTProbeError)' . "`n"
 		. 'global _NDTReceipt := ""' . "`n"
 		. '_NDTReceipt := A_Args[1] . "\message"' . "`n"
@@ -97,6 +96,8 @@ _NDT_ProbeSource(Artifact, Owner) {
 		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`nreturn`n}`n}`n"
 		. '_NDTProbeError(Err, *) {' . "`n"
 		. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n"
+		. '#Include ' . Artifact . "`n"
+		. '#Include ' . Owner . "`n"
 }
 
 /**

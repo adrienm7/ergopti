@@ -145,22 +145,43 @@ const cases = [
 	[
 		'windows',
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(6) + '}',
-		0,
-		'six bounded bundle startup dialogs remain explicitly pending',
+		1,
+		'all six former bootstrap exceptions now require shared policy',
 		'static/ergopti_plus/windows/infra/bundle.ahk'
 	],
 	[
 		'windows',
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(7) + '}',
 		1,
-		'early-bootstrap exception cannot grow',
+		'additional bootstrap native calls cannot bypass shared policy',
 		'static/ergopti_plus/windows/infra/bundle.ahk'
+	],
+	[
+		'windows',
+		'ErgoptiGlobalErrorHandler(Exc, Mode) {\nMsgBox("Fatal", "ErgoptiPlus — erreur de démarrage")\n}',
+		1,
+		'the original startup error caption no longer bypasses policy',
+		'static/ergopti_plus/windows/infra/error_net.ahk'
+	],
+	[
+		'windows',
+		'Bundle_Init() {\n' + 'Ui_MsgBox("Fatal", "")\n'.repeat(6) + '}',
+		0,
+		'all six bundle startup calls use the shared owner',
+		'static/ergopti_plus/windows/infra/bundle.ahk'
+	],
+	[
+		'windows',
+		'ErgoptiGlobalErrorHandler(Exc, Mode) {\nUi_MsgBox("Fatal", "erreur de démarrage")\n}',
+		0,
+		'the startup error supplies a brandless caption',
+		'static/ergopti_plus/windows/infra/error_net.ahk'
 	],
 	[
 		'windows',
 		'Other() {\nMsgBox("Fatal", "ErgoptiPlus")\n}',
 		1,
-		'early-bootstrap path cannot authorize another owner',
+		'bootstrap file cannot authorize another native owner',
 		'static/ergopti_plus/windows/infra/error_net.ahk'
 	],
 	[

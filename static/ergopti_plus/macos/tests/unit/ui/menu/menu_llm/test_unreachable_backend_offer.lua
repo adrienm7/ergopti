@@ -84,7 +84,7 @@ helpers.describe("A choice among several fixes (unreachable-backend-dialog)", fu
 				"Keep off", "Apply")
 			helpers.assert_eq(index, 1)
 			local script = scripts[1]
-			helpers.assert_true(script:find('display dialog "Rien à C:\\\\x" with title "Ollama ne répond pas"', 1, true) ~= nil,
+			helpers.assert_true(script:find('display dialog "Rien à C:\\\\x" with title "ErgoptiPlus — Ollama ne répond pas"', 1, true) ~= nil,
 				script)
 			helpers.assert_true(script:find('buttons {"Keep off", "Start", "Use \\"oMLX\\" 50%"}', 1, true) ~= nil,
 				"cancel at the left, the preferred fix at the right: " .. script)
@@ -98,6 +98,8 @@ helpers.describe("A choice among several fixes (unreachable-backend-dialog)", fu
 		with_dialog(function() return true, "C", "" end, function(Dialog, scripts)
 			helpers.assert_eq(Dialog.choose("T", "M", { "A", "B", "C" }, "Keep off", "Apply"), 3)
 			helpers.assert_true(scripts[1]:find('choose from list {"A", "B", "C"}', 1, true) ~= nil, scripts[1])
+			helpers.assert_true(scripts[1]:find('with title "ErgoptiPlus — T" with prompt "M"', 1, true) ~= nil,
+				scripts[1])
 			helpers.assert_true(scripts[1]:find('default items {"A"} OK button name "Apply" cancel button name "Keep off"',
 				1, true) ~= nil, scripts[1])
 		end)
