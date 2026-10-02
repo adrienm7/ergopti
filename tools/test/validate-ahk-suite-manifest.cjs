@@ -141,10 +141,11 @@ function manifestError(message) {
 			.replaceAll('%', '%25')
 			.replaceAll('\r', '%0D')
 			.replaceAll('\n', '%0A');
-		console.error(`::error::${escaped}`);
-	} else {
-		console.error(message);
+		// PowerShell may decorate native stderr as an ErrorRecord. Workflow
+		// commands must use stdout so their leading delimiter stays intact.
+		console.log(`::error::${escaped}`);
 	}
+	console.error(message);
 }
 
 function main(argv) {
@@ -183,4 +184,4 @@ function main(argv) {
 
 module.exports = { validateAhkSuiteManifest };
 
-if (require.main === module) process.exit(main(process.argv.slice(2)));
+if (require.main === module) process.exitCode = main(process.argv.slice(2));

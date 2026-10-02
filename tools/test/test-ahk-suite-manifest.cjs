@@ -18,10 +18,10 @@ process.on('uncaughtException', (error) => {
 			.replaceAll('%', '%25')
 			.replaceAll('\r', '%0D')
 			.replaceAll('\n', '%0A');
-		console.error(`::error::AHK suite contract failed: ${message}`);
+		console.log(`::error::AHK suite contract failed: ${message}`);
 	}
 	console.error(error);
-	process.exit(1);
+	process.exitCode = 1;
 });
 
 // A completed TAP receipt cannot compensate for a missing native exit receipt.
@@ -90,7 +90,7 @@ if (ahkIndex >= 0) {
 				.replaceAll('%', '%25')
 				.replaceAll('\r', '%0D')
 				.replaceAll('\n', '%0A');
-			console.error(`::error::AHK native exit probe failed: ${message}`);
+			console.log(`::error::AHK native exit probe failed: ${message}`);
 		}
 		throw error;
 	} finally {
@@ -256,7 +256,7 @@ assert.equal(failedTimed.complete, true, failedTimed.errors.join('\n'));
 assert.equal(failedTimed.failed, 1);
 assert.equal(failedTimed.executed[1].duration_ms, 12.375, 'failed cases are measured too');
 
-require('./support/ahk-timing-runtime.cjs')();
+require('./support/ahk-timing-runtime.cjs')(ahkIndex >= 0 ? process.argv[ahkIndex + 1] : undefined);
 
 const diagnosticFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-diagnostics-'));
 try {
@@ -278,12 +278,12 @@ try {
 	);
 	assert.equal(result.status, 1, 'a green test count cannot override an invalid execution receipt');
 	assert.match(
-		result.stderr,
+		result.stdout,
 		/^::error::AHK execution manifest incomplete/m,
 		'GitHub annotations must expose the actual receipt failure without downloading logs'
 	);
 	assert.match(
-		result.stderr,
+		result.stdout,
 		/^::error::.*result ordinal 1.*100%25 identity/m,
 		'the exact mismatching identity must be annotated, with reserved percent signs escaped'
 	);
@@ -292,6 +292,24 @@ try {
 	assert.equal(manifest.passed, 1);
 	assert.equal(manifest.failed, 0);
 	assert.match(manifest.errors.join('\n'), /result ordinal 1/);
+	const longName = `long receipt ${'x'.repeat(131072)} 100% identity`;
+	fs.writeFileSync(
+		input,
+		`1..1\nRUNNING 1/1 - ${longName}\nok 1 - mismatch\n# 1 passed, 0 failed.\n`
+	);
+	const buffered = spawnSync(
+		process.execPath,
+		[path.join(__dirname, 'validate-ahk-suite-manifest.cjs'), '--input', input],
+		{
+			encoding: 'utf8',
+			env: { ...process.env, GITHUB_ACTIONS: 'true' }
+		}
+	);
+	assert.equal(buffered.status, 1, 'a large diagnostic must retain its failing exit');
+	assert.ok(
+		buffered.stdout.includes(longName.replaceAll('%', '%25')),
+		'the complete annotation must drain before the process exits'
+	);
 } finally {
 	fs.rmSync(diagnosticFixture, { recursive: true, force: true });
 }
@@ -321,7 +339,7 @@ try {
 	});
 	assert.equal(failedContract.status, 1, 'a native source contract must still fail the gate');
 	assert.match(
-		failedContract.stderr,
+		failedContract.stdout,
 		/^::error::AHK suite contract failed:.*retain the native handle/m
 	);
 } finally {

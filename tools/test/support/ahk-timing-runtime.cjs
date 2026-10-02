@@ -13,14 +13,20 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('../validate-ahk-suite-manifest.cjs');
 
-module.exports = function checkNativeTimings() {
+module.exports = function checkNativeTimings(runtimePath) {
 	if (process.platform !== 'win32') return;
-	const ahk = [
-		'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe',
-		'C:/Program Files/AutoHotkey/v2/AutoHotkey.exe',
-		'C:/Program Files (x86)/AutoHotkey/v2/AutoHotkey.exe'
-	].find((candidate) => fs.existsSync(candidate));
-	assert.ok(ahk, 'native timing verification requires AutoHotkey v2 on Windows');
+	const ahk =
+		runtimePath === undefined
+			? [
+					'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe',
+					'C:/Program Files/AutoHotkey/v2/AutoHotkey.exe',
+					'C:/Program Files (x86)/AutoHotkey/v2/AutoHotkey.exe'
+				].find((candidate) => fs.existsSync(candidate))
+			: runtimePath;
+	assert.ok(
+		ahk && fs.existsSync(ahk),
+		'native timing verification requires the actual AutoHotkey v2 binary on Windows'
+	);
 	const fixture = path.resolve(
 		__dirname,
 		'../../../static/ergopti_plus/windows/tests/fixtures/framework_timings_fixture.ahk'
