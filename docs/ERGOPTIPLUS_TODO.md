@@ -167,8 +167,15 @@ These are software implementations; final hardware verification remains below.
   including a large annotation drained before exit. The native timing probe
   also consumes the exact runtime selected by CI; it previously searched only
   Program Files while CI installs into C:/AutoHotkey.
-  Full Windows packaging/install validation remains pending until the native
-  run identifies the refusal and confirms the launcher correction.
+  Run 37028949327 exposed the actual native failure: all 7713 assertions
+  passed, then AHK exited with STATUS_HEAP_CORRUPTION (0xC0000374). Personal
+  menu fixtures cleared only their parent; detached default-section submenus
+  retained capturing dispatcher callbacks until interpreter teardown. Fixture
+  cleanup now releases the owned descendants first. A native regression keeps
+  foreign detached registrations intact and demonstrates the root-only leak;
+  CI also runs the five personal-menu cases in their own process and requires
+  complete timings plus a clean native exit. Full three-OS validation, Windows
+  packaging and installation remain pending for this correction.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 

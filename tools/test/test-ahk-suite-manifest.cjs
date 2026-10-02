@@ -257,6 +257,9 @@ assert.equal(failedTimed.failed, 1);
 assert.equal(failedTimed.executed[1].duration_ms, 12.375, 'failed cases are measured too');
 
 require('./support/ahk-timing-runtime.cjs')(ahkIndex >= 0 ? process.argv[ahkIndex + 1] : undefined);
+if (ahkIndex >= 0) {
+	require('./support/ahk-menu-lifecycle-runtime.cjs')(process.argv[ahkIndex + 1]);
+}
 
 const diagnosticFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-diagnostics-'));
 try {
