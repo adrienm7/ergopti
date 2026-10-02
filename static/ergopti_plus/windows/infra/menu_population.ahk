@@ -13,6 +13,9 @@
 global _MenuPopulationBuilding := false
 global _MenuPopulationPublished := false
 global MENU_POPULATION_TICK_MS := 10
+; Native flag decoding measured ~6 ms per row. Background work must not
+; interrupt a foreground WebView Promise wait; navigation still completes inline.
+global MENU_POPULATION_THREAD_PRIORITY := -1
 ; A 384-choice native fixture took 17–23 ms in one critical section. Sixteen
 ; rows keep ordinary batches near 1 ms while retaining synchronous before-paint
 ; completion for navigation; this bounds work, not native-call wall time.
@@ -120,7 +123,8 @@ class MenuPopulation {
 				Entry.Busy := false
 			Critical(PreviousCritical)
 			HotPath_LogIfSlow("Menu.populate_leaf", StartedAt,
-				Format("{1}; rows={2}; remaining={3}", Reason, Appended, Remaining))
+				Format("{1}; list={2}; rows={3}; remaining={4}",
+					Reason, IsSet(Entry) ? Entry.ListId : "unowned", Appended, Remaining))
 		}
 		if Finished
 			try LoggerDebug("MenuPopulation", "Leaf '{1}' completed for {2}; {3} pending.",
@@ -132,7 +136,7 @@ class MenuPopulation {
 
 	/** Arms bounded background preparation after the actual root is published. */
 	Start() {
-		global MENU_POPULATION_TICK_MS
+		global MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY
 		this.Eligible := true
 		if A_IsSuspended || this.Failed
 			return false
@@ -141,13 +145,13 @@ class MenuPopulation {
 		this.Started := true
 		this.Timer := ObjBindMethod(this, "Pump")
 		try LoggerStart("MenuPopulation", "Prewarming {1} native leaf menu(s)…", this.Pending.Count)
-		SetTimer(this.Timer, -MENU_POPULATION_TICK_MS)
+		SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
 		return true
 	}
 
 	/** Appends one bounded row batch, then yields to input and tray requests. */
 	Pump(*) {
-		global MENU_POPULATION_TICK_MS, MENU_POPULATION_BATCH_ROWS
+		global MENU_POPULATION_TICK_MS, MENU_POPULATION_BATCH_ROWS, MENU_POPULATION_THREAD_PRIORITY
 		if A_IsSuspended {
 			this.Stop()
 			return
@@ -155,7 +159,7 @@ class MenuPopulation {
 		for Handle in this.Pending {
 			this.Complete(Handle, "background", 0, MENU_POPULATION_BATCH_ROWS)
 			if this.Pending.Count > 0 && HasMethod(this.Timer, "Call")
-				SetTimer(this.Timer, -MENU_POPULATION_TICK_MS)
+				SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
 			return
 		}
 		this.Stop(true)
