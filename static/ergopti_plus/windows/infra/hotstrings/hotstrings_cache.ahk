@@ -36,12 +36,9 @@
 ; ======================================
 ; ======================================
 
-; Bundled categories compiled into the cache. "personal" is excluded — its TOML
-; can live outside the repo and always loads through the runtime TOML parser.
-; SFB reduction and rolls moved into the Ergopti layout extension: a category or
-; section an extension binds (HotstringsBoundTomlPath) never enters the cache,
-; since its file lives outside this folder and follows the installed extension.
-global HS_BUNDLED_CATEGORIES := ["distancesreduction", "autocorrection", "magickey"]
+; Common categories are populated from the shared index by the cache owner.
+; Extension and personal files always use their native runtime TOML owners.
+global HS_BUNDLED_CATEGORIES := []
 
 ; Language-pack gate name (PascalCase, e.g. "FrenchAutocorrection") → the
 ; category_enabled key it persists under (its group id). Filled by
@@ -199,9 +196,26 @@ HotstringsIsLanguageGroup(Group) {
 
 ; Every bundled category a cache or catalogue must cover: the neutral root files
 ; followed by each language pack's categories, as group ids.
+HotstringsCommonCategories() {
+	global _SharedDir, HS_BUNDLED_CATEGORIES
+	IndexPath := _SharedDir . "\modules\hotstrings\_index.toml"
+	Content := ReadTomlFile(IndexPath)
+	Table := ""
+	loop parse, Content, "`n", "`r" {
+		Line := Trim(TOML_StripInlineComment(Trim(A_LoopField, " `t")), " `t")
+		if RegExMatch(Line, "^\[([A-Za-z0-9_.]+)\]$", &Head)
+			Table := Head[1]
+		else if Table == "menu" && RegExMatch(Line, "^categories_order\s*=\s*\[(.*)\]$", &Order) {
+			HS_BUNDLED_CATEGORIES := _HotstringsIndexStringArray(Order[1])
+			if HS_BUNDLED_CATEGORIES.Length
+				return HS_BUNDLED_CATEGORIES.Clone()
+		}
+	}
+	throw Error("Hotstring index has no common category order: " . IndexPath)
+}
+
 HotstringsBundledCategories() {
-	global HS_BUNDLED_CATEGORIES
-	All := HS_BUNDLED_CATEGORIES.Clone()
+	All := HotstringsCommonCategories()
 	for _, Pack in HotstringsLanguagePacks() {
 		for _, Stem in Pack["categories"]
 			All.Push(HotstringsLanguageGroupId(Pack["id"], Stem))
@@ -294,9 +308,11 @@ HotstringsBundledTomlPath(Category) {
 ; the rare tie, never a silently ignored edit). Any stat failure returns false so
 ; the caller rebuilds defensively (mirrors _I18nTsvIsFresh).
 _HotstringsCacheIsFresh(TsvPath) {
-	global HS_BUNDLED_CATEGORIES
+	global _SharedDir
 	try {
 		TsvTime := FileGetTime(TsvPath, "M")
+		if FileGetTime(_SharedDir . "\modules\hotstrings\_index.toml", "M") >= TsvTime
+			return false
 		for Category in HotstringsBundledCategories() {
 			TomlPath := _HotstringsCacheTomlPath(Category)
 			if FileExist(TomlPath) and FileGetTime(TomlPath, "M") >= TsvTime
