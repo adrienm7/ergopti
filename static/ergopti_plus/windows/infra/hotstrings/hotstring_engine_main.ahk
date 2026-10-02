@@ -389,7 +389,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 		if (Trigger == "") {
 				return
 		}
-		HSE_SeqCounter++
+		RegistrationSeq := ++HSE_SeqCounter
 		; Resolve the group used by HSE_EnableGroup / HSE_DisableGroup for live,
 		; reload-free section toggling. An explicit Meta "group" always wins; when
 		; absent we derive "<category>.<section>" from the dispatch metadata so every
@@ -434,7 +434,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 				PlainRepl:     "",
 				IsWord:        InStr(Flags, "?") == 0,
 				Auto:          IsStar,
-				Seq:           HSE_SeqCounter,
+				Seq:           RegistrationSeq,
 				TLen:          StrLen(Trigger),
 				TriggerBytes:  StrLen(Trigger),   ; AHK StrLen is codepoint-based; good enough
 				TailChar:      TailChar,
@@ -466,6 +466,11 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 						}
 				}
 		}
+		; The registry owns insertion order and group-splice identity. Metadata
+		; construction may precede a clear or registration of another spec, so
+		; its fields cannot replace this allocation. Keep the captured local even
+		; if metadata transport causes a nested registration.
+		Spec.Seq := RegistrationSeq
 		; Propagate Repl → PlainRepl when the caller set Repl directly.
 		if (Spec.PlainRepl == "" and Spec.Repl != "") {
 				Spec.PlainRepl := Spec.Repl
