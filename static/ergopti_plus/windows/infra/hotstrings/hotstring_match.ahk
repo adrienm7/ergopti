@@ -81,6 +81,23 @@ _HSE_EndCharBeats(Cand, Best, BestIsEndChar) {
 		return _HSE_Beats(Cand, Best)
 }
 
+; Case-folded lookup finds candidates, not a promise that their case policy
+; accepts the typed suffix. A declined conform form must yield to an executable
+; exact entry before priority/sequence arbitration, as the shared Lua engine does.
+; The pure dispatch policy supplies eligibility without resolving replacements or
+; calling user callbacks. Buf ends at the trigger body for both match paths.
+_HSE_CaseConformAllows(Buf, Spec) {
+		if !Spec.HasOwnProp("CaseConform") or !Spec.CaseConform
+				return true
+		if StrLen(Buf) < Spec.Length
+				return false
+		Typed := SubStr(Buf, -Spec.Length)
+		DoFire := true
+		_HSE_ConformReplacement("", Typed, Spec.Trigger,
+				Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar, &DoFire)
+		return DoFire
+}
+
 ; Look for a trigger that fires given the just-typed char.
 ;
 ; Two paths, both scanned because they can both succeed and longest-match
@@ -164,7 +181,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 						; Case-sensitive triggers: exact suffix key.
 						if HasCS and HSE_StarByTriggerCS.Has(Suffix) {
 								for _, Spec in HSE_StarByTriggerCS[Suffix] {
-										if !_HSE_Beats(Spec, BestMatch) {
+										if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch) {
 												continue
 										}
 										if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
@@ -178,7 +195,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 								LowerSuffix := StrLower(Suffix)
 								if HSE_StarByTriggerCI.Has(LowerSuffix) {
 										for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
-												if !_HSE_Beats(Spec, BestMatch) {
+												if !_HSE_CaseConformAllows(HSE_Buffer, Spec) or !_HSE_Beats(Spec, BestMatch) {
 														continue
 												}
 												if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
@@ -295,7 +312,7 @@ _HSE_IsLiteralNoOp(Spec, Buffer, EndChar, TypoNbspStripped) {
 
 _HSE_ConsiderEndSpecs(Specs, EffBody, JustTypedChar, &BestMatch, &BestEndChar) {
 		for _, Spec in Specs {
-				if !_HSE_WordBoundaryAllows(EffBody, Spec)
+				if !_HSE_WordBoundaryAllows(EffBody, Spec) or !_HSE_CaseConformAllows(EffBody, Spec)
 						continue
 				if _HSE_StarTriggerCoversBody(EffBody, Spec, JustTypedChar)
 						continue

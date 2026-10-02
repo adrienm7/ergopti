@@ -1537,3 +1537,71 @@ TestHSE_InputContextGenerationGuardsRelocation() {
 }
 Test("HSE input-context-generation: focused-control ownership blocks stale Ctrl+F/Ctrl+L fires",
     TestHSE_InputContextGenerationGuardsRelocation)
+
+
+; Invalid conform input is not an executable candidate. Its earlier sequence or
+; higher priority must never mask an exact spelling that the user can type.
+_TestHSE_ConformCompetition(Star, ExactFirst) {
+    HSE_TestReset()
+    Calls := []
+    Callback := (*) => Calls.Push("unexpected matcher callback")
+    Flags := Star ? "*?" : "?"
+    ExactMeta := { Replacement: "EXACT", Priority: 1 }
+    ConformMeta := { Replacement: "conformed", CaseConform: true,
+        ConformOneChar: false, Priority: 100 }
+    if ExactFirst
+        HSE_Register(Flags . "C", "aBc", Callback, ExactMeta)
+    HSE_Register(Flags, "abc", Callback, ConformMeta)
+    if !ExactFirst
+        HSE_Register(Flags . "C", "aBc", Callback, ExactMeta)
+    for Char in StrSplit("aBc")
+        Match := HSE_FeedChar(Char)
+    if !Star
+        Match := HSE_FeedChar(" ")
+    Assert(IsObject(Match), "the executable exact entry must survive conform refusal")
+    AssertEqual("aBc", Match.Trigger)
+    AssertEqual(1, Match.Priority, "a declined high-priority candidate never participates in arbitration")
+    AssertEqual(ExactFirst ? 1 : 2, Match.Seq,
+        "case admission leaves the registry's own insertion sequence unchanged")
+    Decision := _HSE_PrepareDispatchDecision(Match, Star ? "aBc" : "aBc ", Star ? "" : " ")
+    Assert(IsObject(Decision), "the matcher winner must have an executable dispatch decision")
+    AssertEqual("EXACT", Decision.Replacement)
+    AssertEqual(0, Calls.Length, "matching and preparation invoke no user callback")
+}
+
+TestHSE_ConformAdmissionPrecedesArbitration() {
+    for Star in [true, false]
+        for ExactFirst in [true, false]
+            _TestHSE_ConformCompetition(Star, ExactFirst)
+}
+Test("HSE: mixed conform case yields to exact STAR and END candidates in either insertion order",
+    TestHSE_ConformAdmissionPrecedesArbitration)
+
+TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking() {
+    for Typed in ["abc", "Abc", "ABC"] {
+        HSE_TestReset()
+        HSE_Register("*?", "abc", (*) => 0,
+            { Replacement: "word", CaseConform: true, ConformOneChar: false, Priority: 100 })
+        HSE_Register("*?C", Typed, (*) => 0, { Replacement: "fallback", Priority: 1 })
+        for Char in StrSplit(Typed)
+            Match := HSE_FeedChar(Char)
+        Assert(IsObject(Match), "clean lower, Title and UPPER remain conform candidates")
+        AssertEqual(100, Match.Priority, "admitted conform candidates retain their actual priority")
+        AssertEqual(1, Match.Seq, "admitted conform candidates retain their actual insertion order")
+    }
+    HSE_TestReset()
+    HSE_Register("*?", "abc", (*) => 0,
+        { Replacement: "abc", CaseConform: true, ConformOneChar: false, Priority: 100 })
+    HSE_Register("*?C", "ABC", (*) => 0, { Replacement: "fallback", Priority: 1 })
+    for Char in StrSplit("ABC")
+        Match := HSE_FeedChar(Char)
+    AssertEqual("", Match, "an admitted conform identity still masks lower-priority replacements")
+    HSE_TestReset()
+    HSE_Register("*?", "abc", (*) => 0,
+        { Replacement: "word", CaseConform: true, ConformOneChar: false })
+    for Char in StrSplit("aBc")
+        Match := HSE_FeedChar(Char)
+    AssertEqual("", Match, "a declined mixed form invents no fallback when none is registered")
+}
+Test("HSE: conform admission preserves clean casing, registry precedence and identity masking",
+    TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking)
