@@ -81,9 +81,11 @@ final class WindowTitlePolicyTests: XCTestCase {
 				catch { XCTFail("The private policy environment fixture did not retire: \(error)") }
 			}
 		}
-		XCTAssertEqual(try runChild("/usr/bin/printenv", arguments: ["SWIFT_BACKTRACE", "PATH"], root: root),
-			"enable=no\n" + inheritedPath + "\n",
-			"The actual private child disables unsupported crash backtracing and preserves executable lookup")
+		// BSD printenv reads one variable per invocation, unlike GNU printenv.
+		XCTAssertEqual(try runChild("/usr/bin/printenv", arguments: ["SWIFT_BACKTRACE"], root: root),
+			"enable=no\n", "The actual private child disables unsupported crash backtracing")
+		XCTAssertEqual(try runChild("/usr/bin/printenv", arguments: ["PATH"], root: root),
+			inheritedPath + "\n", "The actual private child preserves executable lookup")
 		XCTAssertEqual(ProcessInfo.processInfo.environment["SWIFT_BACKTRACE"], inherited["SWIFT_BACKTRACE"],
 			"Parent XCTest retains its own crash backtrace setting")
 	}
