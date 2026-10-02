@@ -46,7 +46,8 @@ jobs:
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job. Its name says "stubbed" because it is the check a
-  # reviewer reads: no job of this lane runs the driver in real Hammerspoon.
+  # reviewer reads: this Ubuntu entry uses the Hammerspoon stub. The packaged
+  # clean launch additionally qualifies the real native delayed-timer API.
   test-hs:
     name: 'Unit tests (stubbed)'
     runs-on: ubuntu-latest

@@ -12,8 +12,32 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { verify } = require('./desktop-ci-evidence.cjs');
+const { verify, recordMac } = require('./desktop-ci-evidence.cjs');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const pipeline = require('./ci-pipeline.cjs');
+
+/** Returns the measured native admission summary that every clean launch owes. */
+function timerSummary() {
+	return {
+		schema_version: 1,
+		contract: timerContract.contract,
+		runtime: 'native Hammerspoon',
+		version: timerContract.runtime_version,
+		complete: true,
+		checks:
+			Object.keys(timerContract.boolean_observations).length +
+			Object.keys(timerContract.remaining_limits).length +
+			Object.keys(timerContract.deliveries).length,
+		nonce: 'a'.repeat(32),
+		pid: 42,
+		executable:
+			'/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon',
+		preference_restored: true
+	};
+}
 
 for (const platform of ['windows', 'macos']) {
 	for (const release of [false, true]) {
@@ -44,7 +68,10 @@ for (const platform of ['windows', 'macos']) {
 					package_sha256: 'b'.repeat(64),
 					failures: [],
 					marker_seen: true,
-					crashed_early: false
+					crashed_early: false,
+					...(platform === 'macos' && scenario === 'clean'
+						? { native_delayed_timer: timerSummary() }
+						: {})
 				}))
 			)
 		};
@@ -86,11 +113,63 @@ for (const platform of ['windows', 'macos']) {
 				value.evidence[0].crashed_early = true;
 			});
 		} else {
+			for (const [field, replacement] of [
+				['complete', false],
+				['checks', 0],
+				['preference_restored', false],
+				['nonce', ''],
+				['pid', 0],
+				['version', '0.0.0'],
+				['runtime', 'stubbed Hammerspoon'],
+				['executable', '/other/Hammerspoon']
+			])
+				rejects((value) => {
+					value.evidence[0].native_delayed_timer[field] = replacement;
+				});
+			for (const field of Object.keys(timerSummary())) {
+				rejects((value) => {
+					delete value.evidence[0].native_delayed_timer[field];
+				});
+			}
+			rejects((value) => {
+				delete value.evidence[0].native_delayed_timer;
+			});
 			rejects((value) => {
 				value.evidence[0].package_sha256 = 'c'.repeat(64);
 			});
 		}
 	}
+}
+
+const timerEvidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-timer-evidence-'));
+try {
+	const resultFile = path.join(timerEvidenceRoot, 'result.json');
+	const archive = path.join(timerEvidenceRoot, 'archive.zip');
+	const output = path.join(timerEvidenceRoot, 'evidence.json');
+	fs.writeFileSync(archive, 'owned archive fixture');
+	for (const summary of [undefined, {}, { ...timerSummary(), complete: false }]) {
+		fs.writeFileSync(
+			resultFile,
+			JSON.stringify({ scenario: 'clean', failures: [], native_delayed_timer: summary })
+		);
+		assert.throws(
+			() => recordMac(resultFile, archive, output),
+			'recording may not admit an incomplete native probe'
+		);
+		assert.equal(fs.existsSync(output), false, 'a refused record must publish no evidence');
+	}
+	fs.writeFileSync(
+		resultFile,
+		JSON.stringify({ scenario: 'clean', failures: [], native_delayed_timer: timerSummary() })
+	);
+	recordMac(resultFile, archive, output);
+	assert.deepEqual(
+		JSON.parse(fs.readFileSync(output, 'utf8')).native_delayed_timer,
+		timerSummary(),
+		'the aggregate judge must retain the exact admitted native summary'
+	);
+} finally {
+	fs.rmSync(timerEvidenceRoot, { recursive: true, force: true });
 }
 
 /** Pins a fresh shallow checkout and the exact independently gated core suites. */

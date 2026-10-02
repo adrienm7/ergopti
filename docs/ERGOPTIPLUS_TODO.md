@@ -316,6 +316,12 @@ These are software implementations; final hardware verification remains below.
   failed before the fix and now pass; a real SyntheticInput listener retry
   regression failed with one delivery before passing with two. Generic doAfter
   semantics stay separate. Full verification remains pending for this slice.
+  The packaged clean macOS launch now qualifies these contracts in its real
+  signed Hammerspoon process through a temporarily owned scripting preference.
+  Strict receipts require 18 measured observations, runtime identity, nonce,
+  self-rearm deliveries and acknowledged preference restoration; aggregate
+  evidence refuses missing or partial proofs. Local probe judges passed their
+  red/green regressions; actual native execution remains pending macOS CI.
   Audit other hs stubs for remaining divergences from native behaviour.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under

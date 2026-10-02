@@ -17,6 +17,45 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
+const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
+
+/** Requires the complete measured native admission receipt on every clean Mac. */
+function verifyNativeTimer(summary) {
+	assert.ok(summary && typeof summary === 'object', 'Missing native delayed-timer evidence');
+	assert.deepEqual(
+		Object.keys(summary).sort(),
+		[
+			'schema_version',
+			'contract',
+			'runtime',
+			'version',
+			'complete',
+			'checks',
+			'nonce',
+			'pid',
+			'executable',
+			'preference_restored'
+		].sort(),
+		'Malformed native delayed-timer evidence'
+	);
+	for (const [key, expected] of Object.entries({
+		schema_version: 1,
+		contract: timerContract.contract,
+		runtime: 'native Hammerspoon',
+		version: timerContract.runtime_version,
+		complete: true,
+		checks:
+			Object.keys(timerContract.boolean_observations).length +
+			Object.keys(timerContract.remaining_limits).length +
+			Object.keys(timerContract.deliveries).length,
+		preference_restored: true,
+		executable:
+			'/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon'
+	}))
+		assert.equal(summary[key], expected, `Incomplete native delayed-timer evidence: ${key}`);
+	assert.match(summary.nonce, /^[0-9a-f]{32}$/, 'Invalid native timer nonce');
+	assert.ok(Number.isSafeInteger(summary.pid) && summary.pid > 0, 'Invalid native timer PID');
+}
 
 /** Checks mandatory job results and the exact set of successful launch records. */
 function verify({ platform, needs, evidence, sha, scenarios, release }) {
@@ -50,6 +89,8 @@ function verify({ platform, needs, evidence, sha, scenarios, release }) {
 		if (platform === 'windows') {
 			assert.equal(record.marker_seen, true, 'Bundle was not extracted');
 			assert.equal(record.crashed_early, false, 'Application exited early');
+		} else if (record.scenario === 'clean') {
+			verifyNativeTimer(record.native_delayed_timer);
 		}
 	}
 	assert.equal(hashes.size, 1, 'Scenarios launched different packages');
@@ -69,6 +110,7 @@ function recordMac(resultFile, archive, output) {
 	const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
 	assert.deepEqual(result.failures, [], 'Launch reported failures');
 	assert.equal(typeof result.scenario, 'string', 'Missing scenario');
+	if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
 	fs.writeFileSync(
 		output,
 		JSON.stringify({
@@ -78,7 +120,8 @@ function recordMac(resultFile, archive, output) {
 			runner: process.env.MATRIX_RUNNER,
 			scenario: result.scenario,
 			package_sha256: crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
-			failures: result.failures
+			failures: result.failures,
+			...(result.scenario === 'clean' ? { native_delayed_timer: result.native_delayed_timer } : {})
 		}) + '\n'
 	);
 }

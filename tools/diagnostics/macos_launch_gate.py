@@ -50,6 +50,8 @@ import subprocess
 import sys
 import time
 
+from hs_delayed_timer_probe import NativeDelayedTimerProbe, validate_summary
+
 READY_MARKER = "Onboarding wizard opened."
 # The configured boot on a runner without Accessibility waits for the grant
 # (infra/accessibility_wait.lua) instead of reaching the wizard.
@@ -285,6 +287,15 @@ def seed(scenario, home, seed_tag, today):
 def evaluate(scenario, observation):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
+    if scenario == "clean":
+        probe_error = observation.get("native_delayed_timer_error")
+        if probe_error:
+            failures.append(f"the native delayed-timer probe failed: {probe_error}")
+        else:
+            try:
+                validate_summary(observation.get("native_delayed_timer"))
+            except ValueError as error:
+                failures.append(f"the native delayed-timer proof is incomplete: {error}")
     launcher = observation.get("launcher_log", "")
     fatal = [line for line in launcher.splitlines() if FATAL_WORD.search(line)]
     expected = EXPECTED_REFUSALS.get(scenario)
@@ -511,7 +522,13 @@ def run(app, output, scenario, seed_tag):
     state = seed(scenario, home, seed_tag, datetime.date.today().isoformat())
     started = time.monotonic()
     observation = {}
+    native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN) if scenario == "clean" else None
     try:
+        if native_probe:
+            try:
+                native_probe.enable()
+            except Exception as error:
+                observation["native_delayed_timer_error"] = f"{type(error).__name__}: {error}"
         result = subprocess.run(
             launch_command(scenario, app), capture_output=True, text=True, timeout=15
         )
@@ -533,30 +550,74 @@ def run(app, output, scenario, seed_tag):
                 break
             time.sleep(1)
         observation["alive_after_window"] = bool(processes(launcher)) and bool(processes(child))
+        if (
+            native_probe
+            and observation["alive_after_window"]
+            and not observation.get("native_delayed_timer_error")
+        ):
+            try:
+                child_pids = processes(child)
+                if len(child_pids) != 1:
+                    raise RuntimeError(
+                        "The native timer probe requires the launcher's single exact child"
+                    )
+                observation["native_delayed_timer"] = native_probe.observe(child_pids[0], processes)
+            except Exception as error:
+                observation["native_delayed_timer_error"] = f"{type(error).__name__}: {error}"
         observation["quit_seconds"] = (
             quit_application(bundle_id, (launcher, child))
             if observation["alive_after_window"]
             else None
         )
     finally:
-        observation["launcher_log"] = read_text(launcher_log)
-        observation["boot_log"] = read_text(logs_folder(home) / FALLBACK_BOOT_LOG_NAME)
-        observation["driver_log"] = driver_logs(state)
-        observation["state_problems"] = check_state(scenario, state, home)
-        collect(output, state, home)
-        for name, executable in (("launcher", launcher), ("hammerspoon", child)):
-            for pid in processes(executable):
-                subprocess.run(
-                    ["sample", str(pid), "2", "-file", str(output / f"sample-{name}.txt")],
-                    capture_output=True,
-                    timeout=60,
-                )
-        for executable in (launcher, child):
-            for pid in processes(executable):
+        try:
+            observation["launcher_log"] = read_text(launcher_log)
+            observation["boot_log"] = read_text(logs_folder(home) / FALLBACK_BOOT_LOG_NAME)
+            observation["driver_log"] = driver_logs(state)
+            observation["state_problems"] = check_state(scenario, state, home)
+            collect(output, state, home)
+            for name, executable in (("launcher", launcher), ("hammerspoon", child)):
+                for pid in processes(executable):
+                    subprocess.run(
+                        ["sample", str(pid), "2", "-file", str(output / f"sample-{name}.txt")],
+                        capture_output=True,
+                        timeout=60,
+                    )
+            for executable in (launcher, child):
+                for pid in processes(executable):
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+        finally:
+            if native_probe:
                 try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                    # Evidence collection can itself fail. Reap the exact writer
+                    # before restoring its key even when that earlier cleanup aborted.
+                    for pid in processes(child):
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    deadline = time.monotonic() + QUIT_TIMEOUT_SECONDS
+                    while processes(child):
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError(
+                                "The native preference writer did not stop before restoration"
+                            )
+                        time.sleep(0.05)
+                    native_probe.restore()
+                    if "native_delayed_timer" in observation:
+                        observation["native_delayed_timer"]["preference_restored"] = True
+                except Exception as error:
+                    previous = observation.get("native_delayed_timer_error", "")
+                    observation["native_delayed_timer_error"] = (
+                        previous + "; " if previous else ""
+                    ) + f"preference restoration failed: {error}"
+    if scenario == "clean":
+        report["native_delayed_timer"] = observation.get("native_delayed_timer")
+        if observation.get("native_delayed_timer_error"):
+            report["native_delayed_timer_error"] = observation["native_delayed_timer_error"]
     report["quit_seconds"] = observation["quit_seconds"]
     report["alive_after_window"] = observation["alive_after_window"]
     report["failures"] = evaluate(scenario, observation)
@@ -573,6 +634,17 @@ def run(app, output, scenario, seed_tag):
 def matrix_line(profile):
     """Return the GitHub Actions output line that feeds the launch matrix of one profile."""
     return "scenarios=" + json.dumps(list(PROFILES[profile]), separators=(",", ":"))
+
+
+def failure_annotations(scenario, failures):
+    """Retain native refusal causes in GitHub annotations when artifacts are unavailable."""
+
+    def escape(value):
+        return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+    return [f"::error::macOS launch gate [{escape(scenario)}] failed"] + [
+        "::error::" + escape(failure) for failure in failures
+    ]
 
 
 def parse_arguments(argv):
@@ -621,9 +693,8 @@ def main(argv=None):
     report = run(Path(args.app).resolve(), output, args.scenario, args.seed_tag)
     (output / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if report["failures"]:
-        print(f"::error::macOS launch gate [{args.scenario}] failed")
-        for failure in report["failures"]:
-            print(f"  - {failure}")
+        for annotation in failure_annotations(args.scenario, report["failures"]):
+            print(annotation)
         print_tails(output)
         return 1
     print(
