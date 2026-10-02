@@ -307,8 +307,8 @@ I18n_LocaleRows() {
 }
 
 ; Path of a locale's flag icon for a Win32 menu row, or "" when none ships.
-; Win32 menus cannot render flag emoji, so this driver draws the PNG the site
-; ships for the locale; every menu row that shows a language (the selector and
+; Win32 menus cannot render flag emoji. Generated BMP sidecars avoid decoding
+; the site's authoritative PNG per row; every language row (the selector and
 ; the hotstring language packs) takes its flag from here.
 I18nFlagIconPath(Code) {
 	global _StaticDir, _I18nFlagExistsCache
@@ -320,7 +320,7 @@ I18nFlagIconPath(Code) {
 		_I18nFlagExistsCache := Map()
 	}
 
-	Path := _StaticDir . "\img\flags\" . Code . ".png"
+	Path := _StaticDir . "\img\flags\" . Code . ".bmp"
 	HasFlag := false
 	try {
 		if _I18nFlagExistsCache.Has(Code) {
