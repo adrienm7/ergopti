@@ -76,15 +76,17 @@ Test("meta healthcheck-singleton: _HC_Close destroys the previous window, not on
 	_HCSW_CloseDestroysTheWindow)
 
 
-; The handle must be dropped when the user closes the window by hand too, or the
-; next _HC_Close would Destroy() a Gui that is already gone.
+; Manual closure retains one hidden host. A stale GUI callback still cannot
+; revoke the newer singleton; destructive disposal remains owned by _HC_Close.
 _HCSW_ManualCloseClearsTheHandle() {
 	Body := _DriverFuncBody("_HealthCheck_CloseGui")
 	Assert(Body != "", "_HealthCheck_CloseGui must exist in the driver source")
-	Assert(InStr(Body, "_HC_Gui") > 0,
-		"_HealthCheck_CloseGui must clear _HC_Gui — a stale handle left behind by a manual close makes the next open Destroy() a window that no longer exists")
+	Assert(InStr(Body, "G == _HC_Gui") > 0,
+		"manual closure must validate the exact singleton GUI before retiring its session")
+	Assert(InStr(Body, "G == _HC_Gui") < InStr(Body, "_HC_WindowEpoch += 1"),
+		"stale GUI callbacks must be refused before the active epoch changes")
 }
-Test("meta healthcheck-singleton: closing the window by hand clears the singleton handle",
+Test("meta healthcheck-singleton: manual closure validates the exact retained singleton",
 	_HCSW_ManualCloseClearsTheHandle)
 
 
@@ -121,3 +123,15 @@ _HCSW_MessagesOwnWindowSession() {
 }
 Test("meta healthcheck-singleton: page messages and probe answers cannot cross window sessions (AHK-152)",
 	_HCSW_MessagesOwnWindowSession)
+
+; Closing the UI must retire the session while preserving its bounded native host.
+_HCSW_WarmReopen() {
+	HideBody := _DriverFuncBody("_HealthCheck_CloseGui")
+	ShowBody := _DriverFuncBody("HealthCheck_ShowWindow")
+	Assert(HideBody != "" && ShowBody != "", "diagnostics lifecycle must exist")
+	Assert(InStr(HideBody, ".Hide()") > 0 && InStr(HideBody, ".Destroy()") = 0,
+		"manual close must hide the owned diagnostics host rather than rebuilding Chromium next time")
+	Assert(InStr(ShowBody, "_HC_CanReuse(") > 0,
+		"opening diagnostics must reuse its certified live host before creating another")
+}
+Test("diagnostics: warm reopen retains the native host (ui-warm-reopen)", _HCSW_WarmReopen)

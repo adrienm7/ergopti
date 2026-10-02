@@ -1260,7 +1260,11 @@
 								return;
 							}
 						}
-						if (payload && payload.type === 'rebuild_progress') {
+						if (!payload) return;
+						// A retained Windows controller can deliver an older document's queue.
+						const hostEpoch = new URLSearchParams(window.location.search).get('epoch');
+						if (hostEpoch !== null && String(payload.host_epoch) !== hostEpoch) return;
+						if (payload.type === 'rebuild_progress') {
 							if (window.metrics_rebuild) window.metrics_rebuild.show_progress(payload.progress);
 							return;
 						}

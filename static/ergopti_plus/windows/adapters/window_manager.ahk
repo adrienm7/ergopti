@@ -88,6 +88,11 @@ WMExists(Spec) {
 	}
 }
 
+/** Checks an owned HWND even while hidden, independently of thread search settings. */
+WMHandleExists(HWnd) {
+	return _WMForegroundNative.IsWindow(HWnd)
+}
+
 ; Forcefully terminates all windows matching Spec.
 ; @param Spec {String} AHK WinTitle spec.
 ; @return {Boolean} True on success, false on error.

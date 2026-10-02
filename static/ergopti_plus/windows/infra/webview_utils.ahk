@@ -35,6 +35,19 @@ global _WebView_SharedEnvBootPromise := 0
 ; interpreter indefinitely. The host catches the propagated TimeoutError and
 ; opens its native fallback, leaving the rest of the driver responsive.
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
+global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
+
+/** Invalidate virtual-host subresources before reusing a native document host. */
+WebView_ClearDocumentCache(WebView) {
+	global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS
+	LoggerTrace("WebView", "Invalidating the retained browser document cache…")
+	try WebView.CallDevToolsProtocolMethodAsync("Network.clearBrowserCache", "{}").await(WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS)
+	catch as Err {
+		LoggerError("WebView", "Browser document cache invalidation failed: {1}.", Err.Message)
+		throw Err
+	}
+	LoggerDone("WebView", "Retained browser document cache invalidated.")
+}
 
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
