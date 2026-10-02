@@ -735,9 +735,10 @@ Ergo-L triggers. The portable regression rejected the old underscore seed;
 all five conversion/keystroke tests pass after correction. Thirteen native
 cases refused the wrong seed. Checkpoint 36947209412 passes all thirteen
 corrected cases and identifies the remaining old failure: the tooltip hotkey
-fixture still expects name-based arrow declarations. Update its independent
-physical identities while retaining consuming-hook and ordering assertions.
-The production identity repair remains unchanged.
+fixture still expected name-based arrow declarations. It now derives physical
+identities independently from the shared registry while retaining every
+consuming-hook, action, criterion and ordering assertion. Its native rerun is
+pending; the production identity repair remains unchanged.
 
 Windows and macOS now render each key-combination pair from the shared
 `key_combination_pair_menu` declaration. Native providers supply their supported
