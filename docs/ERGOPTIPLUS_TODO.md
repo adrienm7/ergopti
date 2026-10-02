@@ -821,7 +821,14 @@ exact-boolean regressions also pass the focused runner.
   historical order assertions remain intact. Four registered native cases
   cover prebuilt metadata, mixed factories, override attempts and group
   isolation. The corresponding Lua registries retain their existing single
-  sequence owners. Actual Windows validation remains pending.
+  sequence owners. Checkpoint 37061649827 then exposed a distinct Windows
+  admission bug: an earlier case-conform rule wins mixed input it subsequently
+  refuses, hiding an executable exact-case entry. STAR and END matchers now
+  consult the existing pure conform policy before arbitration, matching the
+  shared Lua engine. Regressions cover both insertion orders, actual priorities
+  and sequences, valid case forms, exact mixed fallback and no-op masking,
+  without invoking callbacks during matching. The original circumflex matrix
+  and independent historical corpora remain intact; native validation is pending.
 
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide

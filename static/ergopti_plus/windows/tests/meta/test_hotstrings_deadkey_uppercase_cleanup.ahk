@@ -58,6 +58,11 @@ _HSDU_CircumflexCaseMatrixHasOneExactWinner() {
 		Match := HSE_FeedChar(SubStr(Fixture.Typed, 2, 1))
 		Assert(IsObject(Match),
 			"case " . Fixture.Typed . " must produce exactly one matcher winner")
+		if Fixture.Typed == "êA" {
+			AssertEqual("êA", Match.Trigger, "mixed input must select the actual exact dead-key rule")
+			Assert(Match.HasOwnProp("RawCallback") && Match.RawCallback,
+				"the conform rule cannot claim input its dispatch policy declines")
+		}
 		AssertEqual(Fixture.Expected, _HSDU_PreparedReplacement(Match, Fixture.Typed),
 			"case " . Fixture.Typed . " must preserve its exact circumflex output")
 	}
