@@ -3,6 +3,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 
 const beforeSlowTail = [
@@ -164,5 +168,43 @@ assert.equal(failedTimed.failed, 1);
 assert.equal(failedTimed.executed[1].duration_ms, 12.375, 'failed cases are measured too');
 
 require('./support/ahk-timing-runtime.cjs')();
+
+const diagnosticFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-diagnostics-'));
+try {
+	const input = path.join(diagnosticFixture, 'results.tap');
+	const output = path.join(diagnosticFixture, 'manifest.json');
+	fs.writeFileSync(
+		input,
+		[
+			'1..1',
+			'RUNNING 1/1 - name with 100% identity',
+			'ok 1 - a different identity',
+			'# 1 passed, 0 failed.'
+		].join('\n')
+	);
+	const result = spawnSync(
+		process.execPath,
+		[path.join(__dirname, 'validate-ahk-suite-manifest.cjs'), '--input', input, '--json', output],
+		{ encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: 'true' } }
+	);
+	assert.equal(result.status, 1, 'a green test count cannot override an invalid execution receipt');
+	assert.match(
+		result.stderr,
+		/^::error::AHK execution manifest incomplete/m,
+		'GitHub annotations must expose the actual receipt failure without downloading logs'
+	);
+	assert.match(
+		result.stderr,
+		/^::error::.*result ordinal 1.*100%25 identity/m,
+		'the exact mismatching identity must be annotated, with reserved percent signs escaped'
+	);
+	const manifest = JSON.parse(fs.readFileSync(output, 'utf8'));
+	assert.equal(manifest.complete, false);
+	assert.equal(manifest.passed, 1);
+	assert.equal(manifest.failed, 0);
+	assert.match(manifest.errors.join('\n'), /result ordinal 1/);
+} finally {
+	fs.rmSync(diagnosticFixture, { recursive: true, force: true });
+}
 
 console.log('AHK suite execution manifest: completeness and per-case timing guards passed.');

@@ -149,6 +149,14 @@ These are software implementations; final hardware verification remains below.
   encoding (1740 files), gen:check (40 outputs of 23 generators); full CI
   without release: run 36697666039 (CI #633). The maintainer's manual test
   results remain.
+  The personal-menu native assertions reached 7713/7713 in runs 37019308363
+  and 37019563500, but their strict execution-manifest gate refused completion.
+  The validator now emits escaped GitHub annotations for the exact receipt
+  failures, keeping every planned/result/name/timing assertion and the failing
+  exit code. Its CLI regression reproduces a green test count with mismatched
+  identity and verifies both the annotation and the unchanged invalid receipt.
+  Full Windows packaging/install validation remains pending until that refusal
+  is diagnosed and resolved.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
