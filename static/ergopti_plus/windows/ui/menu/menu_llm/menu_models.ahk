@@ -584,7 +584,7 @@ _LLM_Menu_PullModel(name) {
 	global LLM_MENU_POST_PULL_REBUILD_MS
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "") {
-		MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
+		Ui_MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
 		return
 	}
 	; Open a persistent cmd window so the download progress (layer-by-layer
@@ -624,7 +624,7 @@ _LLM_Menu_OpenUrl(url, RunFn := 0, NotifyFn := 0, LogFn := 0) {
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Body, Title)
 		else
-			try MsgBox(Body, Title, "Iconx")
+			try Ui_MsgBox(Body, Title, "Iconx")
 		return false
 	}
 }
@@ -679,7 +679,7 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 		return
 	title := t("menu.llm.delete_model_title")
 	body  := StrReplace(t("menu.llm.delete_model_body"), "%s", name)
-	choice := MsgBox(body, title, "YesNo Icon!")
+	choice := Ui_MsgBox(body, title, "YesNo Icon!")
 	if (choice != "Yes")
 		return
 	Owner := _LLM_Menu_BeginOllamaAux("menu_delete:" . tag, tag)

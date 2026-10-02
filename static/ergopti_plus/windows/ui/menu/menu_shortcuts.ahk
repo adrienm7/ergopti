@@ -367,24 +367,24 @@ _WS_MenuRemoveCustom(Idx, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 ; Open a two-step GUI dialog to add a custom wrap-symbol pair.
 _WS_MenuAddCustom() {
 	; Step 1 — opening character
-	IB1 := InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
+	IB1 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
 	if (IB1.Result != "OK") {
 		return
 	}
 	LeftChar := Trim(IB1.Value, " `t")
 	if (StrLen(LeftChar) != 1) {
-		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
+		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
 		return
 	}
 
 	; Step 2 — closing character (optional — empty means symmetric)
-	IB2 := InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
+	IB2 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
 	if (IB2.Result != "OK") {
 		return
 	}
 	RightChar := Trim(IB2.Value, " `t")
 	if (RightChar != "" and StrLen(RightChar) != 1) {
-		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
+		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
 		return
 	}
 	if (RightChar == "") {

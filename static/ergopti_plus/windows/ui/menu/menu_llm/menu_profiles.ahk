@@ -327,7 +327,7 @@ LLM_Menu_OnUserProfileClick(profile) {
 	pid    := profile.Has("id")    ? profile["id"]    : ""
 	plabel := profile.Has("label") ? profile["label"] : pid
 
-	choice := MsgBox(
+	choice := Ui_MsgBox(
 		t("menu.profiles.use_profile") . "`n"
 		. t("menu.profiles.edit_profile") . "`n"
 		. t("menu.profiles.delete_profile"),
@@ -342,7 +342,7 @@ LLM_Menu_OnUserProfileClick(profile) {
 		; Edit this profile
 		LLM_Menu_PromptEditProfile(profile)
 	} else if (choice == "Cancel") {
-		confirm := MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
+		confirm := Ui_MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
 		if (confirm == "Yes") {
 			return LLM_Menu_CommitMutation("the custom LLM profile removal",
 				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
@@ -604,12 +604,12 @@ LLM_Menu_PromptCreateProfile() {
 		return
 
 	; Step 1: label
-	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
+	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
 
 	; Step 2: system prompt (multi-line via Edit control)
-	ib_prompt := InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
+	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
@@ -657,12 +657,12 @@ LLM_Menu_PromptEditProfile(profile) {
 	if _PromptEdWeb_TryOpen(profile)
 		return
 
-	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
+	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
 		profile.Has("label") ? profile["label"] : "")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
-	ib_prompt := InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
+	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
 		profile.Has("system_single") ? profile["system_single"] : "")
 	if (ib_prompt.Result != "OK")
 		return

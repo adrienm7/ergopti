@@ -120,6 +120,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../_generated/window_titles.ahk
+#Include ../infra/native_dialogs.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
@@ -325,6 +326,7 @@ InstallSendNoOps()
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_window_manager_present_window.ahk
+#Include unit/test_native_dialog_titles.ahk
 #Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk

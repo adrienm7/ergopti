@@ -139,7 +139,7 @@ _UiStyleFatal(section, key, detail := "") {
 	if (detail != "")
 		msg .= "`n" . detail
 	LoggerError("UiStyle", msg)
-	MsgBox(msg . "`n" . t("dialog.fatal_error.cannot_start"), "ErgoptiPlus", 16)
+	Ui_MsgBox(msg . "`n" . t("dialog.fatal_error.cannot_start"), "", 16)
 	ExitApp()
 }
 
@@ -195,7 +195,7 @@ UiStyle_LoadSharedConst() {
 	c := ParseTomlFile(path)
 	if !c.Count {
 		LoggerError("UiStyle", "_shared/modules/tooltip/constants.toml not found — cannot start.")
-		MsgBox(t("dialog.fatal_error.toml_not_found") . "`n" . t("dialog.fatal_error.cannot_start"), "ErgoptiPlus", 16)
+		Ui_MsgBox(t("dialog.fatal_error.toml_not_found") . "`n" . t("dialog.fatal_error.cannot_start"), "", 16)
 		ExitApp()
 	}
 

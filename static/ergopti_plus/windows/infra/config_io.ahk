@@ -1435,7 +1435,7 @@ _ConfigResetShowFailure(ReasonKey, Result := 0) {
 			? Result["kind"] : "malformed_result"
 		Reason := Format(Reason, Status, Kind)
 	}
-	try MsgBox(Format(t("dialog.reset_defaults.failed"), Reason),
+	try Ui_MsgBox(Format(t("dialog.reset_defaults.failed"), Reason),
 		t("dialog.reset_defaults.failed_title"), "Iconx")
 }
 

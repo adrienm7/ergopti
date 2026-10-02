@@ -418,7 +418,7 @@ LayoutManager_Open(*) {
 	global LAYMGR_HOST_ACCESS_ALLOW
 	if !_LayMgrWeb_Available() {
 		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
-		MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
+		Ui_MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
 		return false
 	}
 	if (_LayMgrWeb_Gui != 0) {

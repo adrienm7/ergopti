@@ -928,7 +928,7 @@ _CLW_ReportInstall(Message) {
 	global _CLW_Gui
 	if !IsSet(_CLW_Gui) {
 		if (Message["phase"] == "failed")
-			MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+			Ui_MsgBox(t("updater.install_error"), t("updater.window_title"), "Icon!")
 		return
 	}
 	_CLW_Eval("setInstallProgress(" . ReleaseInstall_MessageJson(Message) . ")")

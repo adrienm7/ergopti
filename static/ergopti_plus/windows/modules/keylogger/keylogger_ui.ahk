@@ -292,7 +292,7 @@ KLUI_LaunchEdge(which, url, title) {
 				if IsSet(Owner) && IsObject(Owner)
 						_KLUI_CancelEdgeOwner(which, Owner)
 				WebView_AbandonProfile(udir)
-				MsgBox(Format(t("keylogger_ui.launch_error"), err.Message),
+				Ui_MsgBox(Format(t("keylogger_ui.launch_error"), err.Message),
 						t("common.error_title"), "Iconx")
 				return false
 		}
@@ -316,7 +316,7 @@ KLUI_LaunchEdge(which, url, title) {
 KLUI_RequireEnabled() {
 		if MetricsShortcuts.enabled
 				return true
-		MsgBox(
+		Ui_MsgBox(
 				t("keylogger_ui.metrics_disabled") . "`n`n" . t("keylogger_ui.metrics_disabled_body"),
 				t("keylogger_ui.metrics_title"), "Iconi"
 		)

@@ -1282,7 +1282,7 @@ WindowSpy(*) {
 		if FileExist(spyPath)
 				Run(spyPath)
 		else
-				MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
+				Ui_MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
 }
 ActivateListVars(*) {
 		return ConsoleWindow_Open("list_vars")

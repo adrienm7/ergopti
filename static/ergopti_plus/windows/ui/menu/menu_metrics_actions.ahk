@@ -195,7 +195,7 @@ _MetricsSetEnabledAndReload(Target, WriterFn := 0, NotifyFn := 0,
 ToggleMetricsEnabled() {
 	if MetricsShortcuts.enabled {
 		; Disabling — no warning needed, just confirm.
-		res := MsgBox(
+		res := Ui_MsgBox(
 			t("dialog.metrics.disable_confirm"),
 			t("dialog.metrics.title"),
 			"OKCancel Icon?"
@@ -215,7 +215,7 @@ ToggleMetricsEnabled() {
 	; Icon! = exclamation triangle (warning). Iconx is the red error stop
 	; sign and was the wrong choice for a "you are about to enable a
 	; logging feature" notice.
-	res := MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
+	res := Ui_MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
 	if (res != "OK")
 		return
 	return _MetricsSetEnabledAndReload(true)

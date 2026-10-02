@@ -614,7 +614,7 @@ MS_PromptShortcut(which, ToggleFn) {
 		label := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("keylogger_ui.app_metrics")
 		cur   := (which = "typing") ? MetricsShortcuts.typing_str : MetricsShortcuts.apps_str
 		msg := t("metrics.shortcut_format_hint")
-		ib := InputBox(msg, Format(t("metrics.shortcut_prompt_title"), label), "w400 h160", cur)
+		ib := Ui_InputBox(msg, Format(t("metrics.shortcut_prompt_title"), label), "w400 h160", cur)
 		if (ib.Result != "OK")
 				return
 		raw := Trim(StrLower(ib.Value))
