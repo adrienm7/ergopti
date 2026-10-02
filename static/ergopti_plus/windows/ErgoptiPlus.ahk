@@ -629,7 +629,7 @@ try {
 }
 #Include infra/tray_bootstrap.ahk
 #Include adapters/tray_startup_click.ahk
-#Include adapters/tray_startup_panel.ahk
+#Include adapters/tray_startup_commands.ahk
 
 ; AHK-21: atomically replace the stock AHK tray items
 ; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so
@@ -638,16 +638,16 @@ try {
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 _InstallSafeBootstrapTray()
-global _TrayStartupPanel := TrayStartupPanel(
-	() => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand,
-	0, () => _TrayStartupClick.CancelPending())
+global _TrayStartupCommands := TrayStartupCommands(
+	() => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand)
+if FileExist(ConfigurationFile)
+	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
 	() => IsSet(_DriverReady) && _DriverReady && _TrayRootPublishedGeneration > 0
 		&& !_TrayRootBootDetailsPending,
-	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0,
-	_DriverStartupSmokeDir != "" ? ObjBindMethod(_TrayStartupPanel, "Show", "NA AutoSize x-10000 y-10000")
-		: ObjBindMethod(_TrayStartupPanel, "Show"),
-	ObjBindMethod(_TrayStartupPanel, "Complete"), TrayStartupOnboarding)
+	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
+	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding,
+	_DriverStartupSmokeDir != "" ? 0 : () => _TrayStartupCommands.Active)
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
@@ -697,7 +697,6 @@ BootProfile_Stamp("Script preferences applied")
 HotstringsSeedLanguageCategoryGates(CategoryEnabled)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
-_TrayStartupPanel.Prepare()
 BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
@@ -1169,15 +1168,14 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
-; Replace the neutral pre-i18n brand row with a truthful localized status.
-; The helper owns Delete + Add + Disable under one Critical transaction, so no
-; tray click can observe an empty root. _DriverReady stays false until "ready".
+; Keep the real native commands throughout boot and refresh their locale before
+; feature initialization. No temporary loading surface replaces the tray root.
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
-_InstallSafeBootstrapTray(t("menu.global.starting"))
+_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 if ConfigFullStateCanPersist() {
 	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
@@ -1358,7 +1356,7 @@ LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Publish global commands now; detailed feature trees remain on the deferred owner
 if !BuildReadyTrayShell()
 	throw Error("the ready tray global-command publication was refused")
-_TrayStartupPanel.NotifyReady()
+_TrayStartupCommands.NotifyReady()
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
 	_DriverStartupSmokeInspectShell.Call()
 _BootTotalMs := BootProfile_TotalBootMs()

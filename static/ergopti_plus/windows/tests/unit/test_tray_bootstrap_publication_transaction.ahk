@@ -170,14 +170,14 @@ _TBPT_EarlyClickCannotEnterNativeMenuLoop() {
 Test("tray bootstrap: early clicks wait without blocking startup (tray-click-2026-10-02)",
 	_TBPT_EarlyClickCannotEnterNativeMenuLoop)
 
-_TBPT_ModelessCommandsRetainOneIntent() {
+_TBPT_NativeCommandsRetainOneIntent() {
 	State := Map("ready", false, "commands", [], "timers", [])
-	Panel := TrayStartupPanel(() => State["ready"],
+	Panel := TrayStartupCommands(() => State["ready"],
 		(Id) => State["commands"].Push(Id),
 		(Fn, Delay) => State["timers"].Push(Fn))
 	AssertTrue(Panel.Request("suspend"))
 	AssertFalse(Panel.Request("reload"), "one click owns one retained intent")
-	AssertFalse(Panel.Dispatch(), "a modeless callback cannot enter partial lifecycle state")
+	AssertFalse(Panel.Dispatch(), "a native startup callback cannot enter partial lifecycle state")
 	AssertEqual(0, State["timers"].Length)
 	State["ready"] := true
 	AssertTrue(Panel.NotifyReady())
@@ -193,24 +193,80 @@ _TBPT_ModelessCommandsRetainOneIntent() {
 	AssertEqual(1, State["commands"].Length)
 }
 
-_TBPT_ModelessClickReturnsBeforeNativeNavigation() {
+_TBPT_EarlyNativeClickUsesTheActualRoot() {
 	State := Map("ready", false, "popup", 0, "native", 0, "closed", 0, "timers", [])
 	Gate := TrayStartupClick(() => State["ready"],
 		() => State["native"] += 1,
 		(Fn, Delay) => State["timers"].Push(Fn), (*) => 0,
-		() => State["popup"] += 1, () => State["closed"] += 1)
-	AssertEqual(0, Gate.OnTrayMessage(0, 0x205, 0x404, 0))
-	AssertEqual(1, State["popup"], "the early click must produce immediate modeless feedback")
-	AssertEqual(0, State["native"], "native navigation must not stall background construction")
+		() => State["popup"] += 1, () => State["closed"] += 1, 0, () => true)
+	AssertEqual("", Gate.OnTrayMessage(0, 0x205, 0x404, 0),
+		"an early click must reach AHK's real native tray immediately")
+	AssertEqual(0, State["popup"], "no temporary loading UI may replace the native menu")
+	AssertFalse(Gate.Pending, "native navigation must not reopen a second menu later")
+	AssertEqual(0, State["timers"].Length)
 	State["ready"] := true
-	Gate.NotifyReady()
-	State["timers"][1].Call()
-	AssertEqual(1, State["closed"])
-	AssertEqual(1, State["native"])
+	AssertFalse(Gate.NotifyReady())
+	AssertEqual(0, State["native"])
 }
 
-Test("tray bootstrap: modeless commands retain exactly one intent (tray-modeless-2026-10-02)",
-	_TBPT_ModelessCommandsRetainOneIntent)
+_TBPT_RepeatedEarlyClickWaitsForCompleteRoot() {
+	State := Map("ready", false, "popup", 0, "native", 0, "timers", [])
+	Gate := TrayStartupClick(() => State["ready"],
+		() => State["native"] += 1,
+		(Fn, Delay) => State["timers"].Push(Fn), (*) => 0,
+		() => State["popup"] += 1, 0, 0, () => true)
+	AssertEqual("", Gate.OnTrayMessage(0, 0x205, 0x404, 0))
+	Gate.OnNativeMenuLoop(0, 0, 0x211, 0)
+	Gate.OnNativeMenuLoop(0, 0, 0x212, 0)
+	AssertEqual(0, Gate.OnTrayMessage(0, 0x205, 0x404, 0),
+		"the next early click must not enter another loop that suspends initialization")
+	AssertEqual(0, Gate.OnTrayMessage(0, 0x7B, 0x404, 0))
+	AssertTrue(Gate.Pending)
+	AssertEqual(0, State["popup"], "retaining a repeat never constructs a loading UI")
+	AssertEqual(0, State["timers"].Length, "full publication owns the release")
+	State["ready"] := true
+	AssertTrue(Gate.NotifyReady())
+	AssertFalse(Gate.NotifyReady())
+	AssertEqual(1, State["timers"].Length, "repeat requests coalesce into one full-menu opening")
+	State["timers"][1].Call()
+	AssertEqual(1, State["native"])
+	AssertEqual("", Gate.OnTrayMessage(0, 0x205, 0x404, 0),
+		"ready clicks retain normal native behavior")
+}
+
+Test("tray bootstrap: repeated early clicks wait for the complete root (tray-native-repeat-2026-10-02)",
+	_TBPT_RepeatedEarlyClickWaitsForCompleteRoot)
+
+Test("tray bootstrap: native commands retain exactly one intent (tray-native-2026-10-02)",
+	_TBPT_NativeCommandsRetainOneIntent)
+
+_TBPT_AcceptedNativeCommandSurvivesReplacement() {
+	global _MenuDispatcherEpoch, _MenuDispatchClickSequences
+	SavedEpoch := _MenuDispatcherEpoch
+	SavedSequences := _MenuDispatchClickSequences
+	State := Map("busy", true, "commands", [], "timers", [])
+	Owner := TrayStartupCommands(() => true, (Id) => State["commands"].Push(Id),
+		(Fn, Delay) => State["timers"].Push(Fn))
+	try {
+		MenuCommandRun(ObjBindMethod(Owner, "Request", "reload"), [], 0,
+			() => State["busy"], (Fn, Delay) => State["timers"].Push(Fn))
+		AssertEqual(1, State["timers"].Length)
+		MenuDispatcher_BeginReplacement()
+		State["busy"] := false
+		State["timers"][1].Call()
+		AssertEqual(2, State["timers"].Length,
+			"an already accepted command remains admitted after full-root publication")
+		State["timers"][2].Call()
+		State["timers"][2].Call()
+		AssertEqual(1, State["commands"].Length)
+		AssertEqual("reload", State["commands"][1])
+	} finally {
+		_MenuDispatcherEpoch := SavedEpoch
+		_MenuDispatchClickSequences := SavedSequences
+	}
+}
+Test("tray bootstrap: accepted commands survive dispatcher replacement (tray-native-2026-10-02)",
+	_TBPT_AcceptedNativeCommandSurvivesReplacement)
 
 _TBPT_CancelInvalidatesScheduledMenu() {
 	State := Map("ready", false, "native", 0, "timers", [])
@@ -225,16 +281,33 @@ _TBPT_CancelInvalidatesScheduledMenu() {
 	AssertEqual(0, State["native"], "Escape or a command cancels even an already scheduled native menu")
 }
 
-_TBPT_PanelPositionClampsPhysicalCoordinates() {
-	Pos := TrayStartupPanelPosition(1910, 1070, 300, 220, 0, 0, 1920, 1040)
-	AssertEqual(1610, Pos.X)
-	AssertEqual(820, Pos.Y, "the taskbar is excluded from the work area")
-	Pos := TrayStartupPanelPosition(-1910, -790, 450, 330, -1920, -800, 0, 1040)
-	AssertEqual(-1920, Pos.X)
-	AssertEqual(-800, Pos.Y, "scaled native dimensions and negative origins stay physical")
-	Pos := TrayStartupPanelPosition(1910, 10, 300, 220, 0, 0, 1920, 1040)
-	AssertEqual(1610, Pos.X)
-	AssertEqual(0, Pos.Y)
+_TBPT_RegisterNativeFake(MenuObj, Label, Callback) {
+	MenuObj.Add(Label, Callback)
+	return 1
+}
+
+_TBPT_NativeRootHasNoLoadingStep() {
+	global _MenuDispatcherEpoch, _MenuDispatchClickSequences
+	SavedEpoch := _MenuDispatcherEpoch
+	SavedSequences := _MenuDispatchClickSequences
+	MenuPort := _TBPT_FakeMenu()
+	Commands := []
+	try {
+		AssertTrue(_InstallNativeStartupTray((Id, *) => Commands.Push(Id), MenuPort, _TBPT_RegisterNativeFake))
+		AssertEqual(3, MenuPort.Items.Count, "only genuine native commands are published")
+		AssertEqual(0, MenuPort.DisableCalls)
+		AssertFalse(MenuPort.Items.Has(t("common.loading")))
+		AssertFalse(MenuPort.Items.Has(t("menu.global.starting")))
+		for Id in ["suspend", "reload", "quit"] {
+			Item := MenuPort.Items[t("menu.global." . Id)]
+			AssertTrue(Item["enabled"])
+			Item["callback"].Call()
+			AssertEqual(Id, Commands[Commands.Length])
+		}
+	} finally {
+		_MenuDispatcherEpoch := SavedEpoch
+		_MenuDispatchClickSequences := SavedSequences
+	}
 }
 
 _TBPT_OnboardingOwnsEarlyClick() {
@@ -248,12 +321,12 @@ _TBPT_OnboardingOwnsEarlyClick() {
 
 Test("tray bootstrap: cancellation invalidates scheduled navigation (tray-modeless-2026-10-02)",
 	_TBPT_CancelInvalidatesScheduledMenu)
-Test("tray bootstrap: physical panel geometry stays in the work area (tray-modeless-2026-10-02)",
-	_TBPT_PanelPositionClampsPhysicalCoordinates)
+Test("tray bootstrap: real native commands have no loading step (tray-native-2026-10-02)",
+	_TBPT_NativeRootHasNoLoadingStep)
 Test("tray bootstrap: first-run setup owns early clicks (tray-modeless-2026-10-02)",
 	_TBPT_OnboardingOwnsEarlyClick)
-Test("tray bootstrap: modeless feedback precedes native navigation (tray-modeless-2026-10-02)",
-	_TBPT_ModelessClickReturnsBeforeNativeNavigation)
+Test("tray bootstrap: early clicks use the actual native root (tray-native-2026-10-02)",
+	_TBPT_EarlyNativeClickUsesTheActualRoot)
 Test("tray bootstrap: invalid label is complete-or-absent (ahk-009-tray-bootstrap-publication)",
 	_TBPT_InvalidLabelCannotPartiallyPublish)
 Test("tray bootstrap: pre-i18n default truthfully says Starting (ahk-009-tray-bootstrap-publication)",

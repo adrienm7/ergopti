@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Tray Startup Click Admission
 ; DESCRIPTION:
-; Retains a context-menu request until the usable root publishes. Native menu
-; navigation blocks AHK timers and can suspend bootstrap itself, so displaying
-; the inert Starting root turns an early click into an unbounded startup wait.
+; Observes native menu navigation and admits early context requests once the real
+; bootstrap commands are installed. Headless probes may retain a request until
+; publication instead of entering an interactive native loop.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -19,13 +19,14 @@ class TrayStartupClick {
 	 * @param {Func} InstallFn Optional message registration port.
 	 */
 	__New(ReadyFn, ShowFn := 0, ScheduleFn := 0, InstallFn := 0,
-			PopupFn := 0, CloseFn := 0, EarlyOwnerFn := 0) {
+			PopupFn := 0, CloseFn := 0, EarlyOwnerFn := 0, EarlyNativeFn := 0) {
 		if !HasMethod(ReadyFn, "Call")
 			throw TypeError("Tray startup admission requires a readiness owner")
 		this.ReadyFn := ReadyFn
 		this.PopupFn := PopupFn
 		this.CloseFn := CloseFn
 		this.EarlyOwnerFn := EarlyOwnerFn
+		this.EarlyNativeFn := EarlyNativeFn
 		this.Generation := 0
 		this.Scheduled := false
 		this.ShowFn := HasMethod(ShowFn, "Call") ? ShowFn : () => A_TrayMenu.Show()
@@ -62,6 +63,23 @@ class TrayStartupClick {
 			return
 		if HasMethod(this.EarlyOwnerFn, "Call") && this.EarlyOwnerFn.Call()
 			return 0
+		if HasMethod(this.EarlyNativeFn, "Call") && this.EarlyNativeFn.Call() {
+			if this.RequestCount > 0 {
+				; A second bootstrap menu would suspend the remaining work again.
+				; Retain this explicit request until the full root publishes instead.
+				if !this.Pending
+					this.RequestedAt := A_TickCount
+				this.Pending := true
+				this.RequestCount += 1
+				try LoggerInfo("BootProfile", Format("Repeated early tray request retained for complete publication: requests={1}.",
+					this.RequestCount))
+				return 0
+			}
+			this.RequestCount += 1
+			try LoggerInfo("BootProfile", Format("Early click admitted to the native tray: notification_lag={1} ms.",
+				TickElapsed(DllCall("GetMessageTime", "UInt"))))
+			return
+		}
 		if !this.Pending
 			this.RequestedAt := A_TickCount
 		this.Pending := true
@@ -71,7 +89,7 @@ class TrayStartupClick {
 			MessageLagMs := TickElapsed(DllCall("GetMessageTime", "UInt"))
 			this.PopupFn.Call()
 			this.PopupElapsedMs := BootClockWallMs() - StartMs
-			try LoggerInfo("BootProfile", Format("Startup command panel shown: notification_lag={1} ms, presentation={2:.3f} ms.",
+			try LoggerInfo("BootProfile", Format("Early tray callback completed: notification_lag={1} ms, callback={2:.3f} ms.",
 				MessageLagMs, this.PopupElapsedMs))
 		}
 		; A numeric result consumes this notification before AHK enters its menu loop.

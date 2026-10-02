@@ -4,8 +4,8 @@
 ; MODULE: Cold Tray Bootstrap Publication Transaction
 ; DESCRIPTION:
 ; AHK-009 regression guard. The stock tray must be replaced before the blocking
-; onboarding pump, and the post-i18n cold root must truthfully say that startup
-; is still in progress until the root coordinator publishes one complete tree.
+; onboarding pump, and the post-i18n cold root must keep genuine native commands
+; without a temporary loading surface until the coordinator publishes the tree.
 ; The LLM builder owns only a detached child and may never create an IA-only
 ; live root. Source order is required here because these statements execute in
 ; include order before the driver publishes ready; runtime unit tests cannot
@@ -22,14 +22,16 @@ _TBPT_ColdRootHasOneTruthfulOwner() {
 	Onboarding := InStr(Source, "Onboarding_Run()", , FirstBootstrap)
 	I18nReady := InStr(Source, "I18nInit(", , Onboarding)
 	LocalizedBootstrap := InStr(Source,
-		'_InstallSafeBootstrapTray(t("menu.global.starting"))', , Max(1, I18nReady))
+		'_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))', , Max(1, I18nReady))
 	Ready := InStr(Source, '_DriverBootPhase := "ready"', , Max(1, LocalizedBootstrap))
 
 	Assert(FirstBootstrap > 0 && Onboarding > FirstBootstrap,
 		"stock actions must be replaced immediately by a safe bootstrap before the blocking onboarding pump")
 	Assert(I18nReady > Onboarding && LocalizedBootstrap > I18nReady
 		&& Ready > LocalizedBootstrap,
-		"after i18n is ready, the cold root must publish a localized Starting status before the driver advertises ready")
+		"after i18n is ready, genuine native commands must remain available before input readiness")
+	Assert(InStr(Source, "TrayStartupPanel(") == 0,
+		"a loading window must never replace the native startup menu")
 
 	Bootstrap := _DriverFuncBody("_InstallSafeBootstrapTray")
 	Assert(Bootstrap != "", "the bootstrap publication helper must remain source-visible")

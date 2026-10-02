@@ -95,7 +95,7 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
 	; the tray, and a reordered top level changed the other two drivers alone.
 	if GlobalsOnly {
 		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders(),
-			(Entry) => !Entry.Get("greyed_when_paused", false), t("common.loading"))
+			(Entry) => !Entry.Get("greyed_when_paused", false))
 	} else
 		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
 	BootProfile_Mark("MENU/initMenu: top level staged")
