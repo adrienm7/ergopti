@@ -51,6 +51,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 			if (Pack.id == "ergopti")
 				Ergopti := Pack
 		Assert(IsObject(Ergopti), "the Ergopti extension the driver ships is installed")
+		AssertEqual("Ergopti+", Ergopti.name, "the shared pack keeps its plus in the display name")
 		AssertEqual(3, Ergopti.bound_files.Length)
 		AssertEqual(0, Ergopti.toml_files.Length, "none of its files becomes an ext: category")
 		Registry := _LCT_RegistryDir() . "ergopti\hotstrings\"
@@ -216,3 +217,27 @@ _EHX_SettingsWindowKeepsTheBoundSection() {
 }
 Test("ergopti extension: the settings window keeps the repeat corrections row (ergopti-hotstrings-ext)",
 	_EHX_SettingsWindowKeepsTheBoundSection)
+
+; The menu consumes the discovered name, without renaming historical ids.
+_EHX_ShippedLabelInMenu() {
+	global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	Saved := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache]
+	try _EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	finally {
+		_HS_ExtensionsCacheLoaded := Saved[1], _HS_ExtensionsCache := Saved[2]
+	}
+	Check(Packs) {
+		for Pack in Packs {
+			if Pack.id != "ergopti"
+				continue
+			_HS_ExtensionsCache := [Pack], _HS_ExtensionsCacheLoaded := true
+			Rows := _HS_ExtensionRows()
+			AssertEqual(1, Rows.Length)
+			Prefix := StrReplace(t("menu.extensions.hotstrings_of"), "%s", "Ergopti+")
+			Assert(InStr(Rows[1]["label"], Prefix . " (") == 1, "the actual menu provider keeps the plus")
+			return
+		}
+		throw Error("The shipped extension must be discovered before inspecting its menu.")
+	}
+}
+Test("ergopti extension: the actual Hotstrings menu names Ergopti+", _EHX_ShippedLabelInMenu)
