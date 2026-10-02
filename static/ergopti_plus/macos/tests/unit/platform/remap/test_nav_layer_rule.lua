@@ -202,6 +202,28 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_nil(NavLayer.build_rule({}, ctx.registry), "Karabiner refuses a rule with no manipulator")
 	end)
 
+	helpers.it("(navigation-native-case) leaves every unbound key and its case outside the layer rule", function()
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyB" = "none"\n'), ctx.registry)
+		local actual, count = normalise(rule)
+		helpers.assert_eq(count, 1, "only the explicitly bound key may acquire a layer manipulator")
+		helpers.assert_eq(actual.b, "to=vk_none")
+		helpers.assert_nil(actual.a, "an unbound letter remains native, including genuine Shift/CapsLock case")
+		helpers.assert_nil(actual.caps_lock, "navigation may not synthesize a CapsLock indicator")
+		local actions = Json.decode(read_file(helpers.driver_root() .. "/platform/remap/data/actions.json"))
+		local hold
+		for _, action in ipairs(actions) do
+			if action.id == "layer" then hold = action end
+		end
+		helpers.assert_not_nil(hold, "the real navigation hold action must exist")
+		for _, field in ipairs({ "karabiner_to", "karabiner_to_after_key_up" }) do
+			helpers.assert_eq(#hold[field], 1, "entry and release each have an explicit layer-variable event")
+			for _, event in ipairs(hold[field]) do
+				helpers.assert_nil(event.key_code, "layer entry/release must not inject a case-changing key")
+				helpers.assert_nil(event.modifiers, "layer entry/release must not inject Shift")
+			end
+		end
+	end)
+
 	helpers.it("swallows a key bound to none and takes a mouse button as a layer key", function()
 		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
 			.. '"KeyB" = "none"\n"MouseBack" = "keystroke:alt+ArrowLeft"\n'), ctx.registry)
