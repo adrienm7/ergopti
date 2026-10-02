@@ -39,6 +39,7 @@ local TomlReader = require("toml_codec.reader")
 local TomlCodec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
+local BulkScope = require("hotstrings.bulk_scope")
 local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
@@ -1627,6 +1628,25 @@ function M.set_categories_sections(categories, enabled)
 	local committed = commit_choices(changes, "Language sections")
 	if committed then notify_change() end
 	return committed
+end
+
+--- Sets category gates and their sections as one acknowledged choice batch.
+--- Independent engine gates and categories outside this scope are retained.
+--- @param targets table Dense discovered category ids.
+--- @param enabled boolean Explicit target state.
+--- @return boolean committed
+--- @return string|nil reason Stable planner or persistence refusal.
+function M.set_category_scope_enabled(targets, enabled)
+	local inventory = {}
+	for id in pairs(_categories) do inventory[id] = known_sections(id) end
+	local changes, reason = BulkScope.plan(inventory, targets, enabled)
+	if not changes then
+		Logger.error(LOG, "Category selection refused: %s.", reason)
+		return false, reason
+	end
+	local committed, refusal = commit_choices(changes, "Hotstring category selection")
+	if committed then notify_change() end
+	return committed, refusal
 end
 
 --- Rereads the canonical choices and republishes the catalogue with them.
