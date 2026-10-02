@@ -144,9 +144,8 @@ _HS_RegisterLanguageMenuCategories() {
 ; is exactly the state ToggleAllHotstrings(true) establishes.
 _HS_AllHotstringsOn() {
 	global Features
-	; A detached copy: the collector seeds runtime-discovered personal nodes into
-	; the map it is given, and a menu read must not publish them.
-	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(MasterGateDesiredFeatures(Features))))
+	; Menu enumeration discovers paths without seeding or copying configuration.
+	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(Features, false))
 }
 
 ; List provider: one row per language pack, labelled with the language's native
@@ -255,7 +254,7 @@ _CountEnabledForCategory(V1Cat) {
 ; dynamic hotstrings, and personal TOML sections. Runtime-discovered personal
 ; nodes are seeded only in the caller's detached candidate, never in live state
 ; before persistence succeeds.
-_CollectAllHotstringsV2Paths(FeaturesTarget) {
+_CollectAllHotstringsV2Paths(FeaturesTarget, SeedPersonal := true) {
 	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
 	Paths := []
 
@@ -282,7 +281,8 @@ _CollectAllHotstringsV2Paths(FeaturesTarget) {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
-				_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
+				if SeedPersonal
+					_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
 				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}

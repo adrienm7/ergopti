@@ -313,3 +313,40 @@ Test("hotstring bulk: unticking the whole tree keeps every gate (hotstring-bulk-
 	_HBC_WholeTreeUntickKeepsGates)
 Test("hotstring bulk: ticking the whole tree preserves disabled gates (hotstring-bulk-checkboxes)",
 	_HBC_WholeTreeTickOpensEveryGate)
+
+_HBC_ReadOnlyEnumerationDoesNotSeed() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
+	Saved := ScriptInformation
+	SavedCache := _ReadPersonalTomlCache
+	SavedFlat := IsSet(_FLAT_HOTSTRING_V1_CATS) ? _FLAT_HOTSTRING_V1_CATS : false
+	SavedLegacy := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : false
+	Path := A_Temp . "\ergopti-enumeration-" . A_ScriptHwnd . "-" . A_TickCount . ".toml"
+	try {
+		FileAppend('[[First]]`n"first" = "one"`n[[Second]]`n"second" = "two"`n', Path, "UTF-8-RAW")
+		ScriptInformation := Map("PersonalTomlPath", Path)
+		_ReadPersonalTomlCache := false
+		; Scope the fixture to dynamic and personal paths; flat-category ownership
+		; belongs to the entry and is deliberately absent in the unit harness.
+		_FLAT_HOTSTRING_V1_CATS := []
+		_LegacyTopCategoryMap := Map()
+		Target := Map("hotstrings", Map())
+		ReadOnly := _CollectAllHotstringsV2Paths(Target, false)
+		AssertFalse(Target["hotstrings"].Has("personal"), "a checkbox read cannot seed live configuration")
+		Detached := _HSDeepCloneMap(Target)
+		Writable := _CollectAllHotstringsV2Paths(Detached)
+		AssertTrue(Detached["hotstrings"].Has("personal"), "writers still seed their detached candidate")
+		AssertEqual(Writable.Length, ReadOnly.Length)
+		loop Writable.Length
+			AssertEqual(Writable[A_Index], ReadOnly[A_Index], "read-only enumeration preserves canonical order")
+		AssertEqual("hotstrings.personal.first", ReadOnly[ReadOnly.Length - 1])
+		AssertEqual("hotstrings.personal.second", ReadOnly[ReadOnly.Length])
+	} finally {
+		ScriptInformation := Saved
+		_ReadPersonalTomlCache := SavedCache
+		_FLAT_HOTSTRING_V1_CATS := SavedFlat is Array ? SavedFlat : unset
+		_LegacyTopCategoryMap := SavedLegacy is Map ? SavedLegacy : unset
+		FileDelete(Path)
+	}
+}
+Test("hotstring bulk: read-only whole-tree enumeration preserves order without seeding live state", _HBC_ReadOnlyEnumerationDoesNotSeed)
