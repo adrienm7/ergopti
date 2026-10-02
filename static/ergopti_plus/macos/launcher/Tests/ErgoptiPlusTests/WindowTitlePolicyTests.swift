@@ -43,6 +43,11 @@ final class WindowTitlePolicyTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: executable)
 		process.arguments = arguments
+		// Private compiler/probe binaries do not carry get-task-allow. Swift refuses
+		// forced crash backtracing for that capability; keep it on for parent XCTest.
+		var environment = ProcessInfo.processInfo.environment
+		environment["SWIFT_BACKTRACE"] = "enable=no"
+		process.environment = environment
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)
@@ -63,6 +68,24 @@ final class WindowTitlePolicyTests: XCTestCase {
 		}
 		XCTAssertTrue(stderr.isEmpty, "A generated native policy must emit no errors: \(stderr)")
 		return stdout
+	}
+
+	func testPrivateProbeEnvironmentPreservesParentAndExecutableSearchPath() throws {
+		let inherited = ProcessInfo.processInfo.environment
+		let inheritedPath = try XCTUnwrap(inherited["PATH"], "Native policy generation requires the inherited executable search path")
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent("ErgoptiPolicyEnvironment-" + UUID().uuidString)
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+		defer {
+			if fixtureCanRetire {
+				do { try FileManager.default.removeItem(at: root) }
+				catch { XCTFail("The private policy environment fixture did not retire: \(error)") }
+			}
+		}
+		XCTAssertEqual(try runChild("/usr/bin/printenv", arguments: ["SWIFT_BACKTRACE", "PATH"], root: root),
+			"enable=no\n" + inheritedPath + "\n",
+			"The actual private child disables unsupported crash backtracing and preserves executable lookup")
+		XCTAssertEqual(ProcessInfo.processInfo.environment["SWIFT_BACKTRACE"], inherited["SWIFT_BACKTRACE"],
+			"Parent XCTest retains its own crash backtrace setting")
 	}
 
 	func testPrivateGeneratedPoliciesCompileAndExecuteWithoutInterpolationOrDuplicateBranding() throws {

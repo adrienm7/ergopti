@@ -896,12 +896,20 @@ exact-boolean regressions also pass the focused runner.
   both native and capture failures, requires complete non-vacuous XCTest
   receipts, and annotates actual errors with an uploaded failure transcript.
   Private verification passed formatting and all 350 JS checks, including the
-  actual reporter and pipeline wiring. Swift assertions remain unchanged; the
-  preceding native failure is still unqualified until the next CI observation.
+  actual reporter and pipeline wiring. Checkpoint 37059479394 exposed the
+  exact private Swift probe failure: forced crash backtracing is unsupported
+  for executable capabilities classified as privileged by the runtime. Each
+  private child now receives the supported enable=no option, preserving its
+  inherited environment and parent XCTest setting. An actual printenv child
+  asserts this boundary; all seven exact caption/exit/empty-stderr checks stay
+  intact. Native macOS qualification remains pending.
   Native checkpoint 37056318950 exposed two premature newline escapes in the
   child AHK probe source. The producer now retains the child escape, preserving
-  every actual caption/body/options/timeout/cancellation assertion. Production
-  dialog code is unchanged; the corrected probe awaits native Windows CI.
+  every actual caption/body/options/timeout/cancellation assertion. Checkpoint
+  37060216766 then exposed a fixture local named Edit shadowing AHK's built-in
+  class under #Warn All. It now uses InputControlHwnd; warnings and exact
+  receipt assertions remain enabled. Production dialog code is unchanged;
+  the corrected probe awaits native Windows CI.
   Remaining native caption paths include the seven pre-bootstrap dialogs,
   file pickers, notifications and genuine macOS/Linux dialog title APIs.
   Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
