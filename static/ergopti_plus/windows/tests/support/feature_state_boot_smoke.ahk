@@ -41,9 +41,13 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\first_boot.ahk
 
 try {
-    if (A_Args.Length != 1)
+    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+        case "distance_gate":
+			ReadCategoryEnabled(TOML_ParseFreshFile(A_Args[2]))
+			if CategoryEnabled["DistancesReduction"] != (A_Args[3] == "true")
+				throw Error("The native distance gate differs from the saved preference.")
         case "parsed":
             _FeatureStateSmokeParsedConfig()
         case "missing":

@@ -655,7 +655,10 @@ exact-boolean regressions also pass the focused runner.
   stale Windows cache catalogue; it now reads the shared category order
   and invalidates its persisted cache when the index changes. Native
   reference fixtures use the real path and typed Boolean writer. The
-  complete three-OS rerun must pass before this item can close.
+  complete three-OS rerun must pass before this item can close. Native
+  fixtures now isolate resolver caches, read group gates through the real
+  boot owner rather than the stubbed feature tree, and supply the shared
+  index to cache freshness/header scenarios without changing assertions.
 - [ ] **104.** Split the common autocorrections file into meaningful, separately
       selectable sections and replace its misleading submenu/section labels.
       Classify the actual corrections first; preserve matching priority,
