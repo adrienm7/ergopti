@@ -1036,7 +1036,11 @@ const WINDOWS_GATES = [
 	},
 	{
 		name: 'Run AHK test suite',
-		uses: ['tests\\run_all.ahk', 'tools\\test\\validate-ahk-suite-manifest.cjs'],
+		uses: [
+			'tests\\run_all.ahk',
+			'tools\\test\\validate-ahk-suite-manifest.cjs',
+			'tools\\test\\test-ahk-suite-manifest.cjs" --ahk $ahk'
+		],
 		exits: [
 			['if ($manifestExit -ne 0) {', '$manifestExit'],
 			['if ($exit -ne 0) {', '$exit']

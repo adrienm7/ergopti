@@ -167,6 +167,8 @@ jobs:
           $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
               Select-Object -First 1 -ExpandProperty FullName
           if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          node "${{ github.workspace }}\tools\test\test-ahk-suite-manifest.cjs" --ahk $ahk
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
           if (-not (Test-Path $runner)) {
               Write-Error "Test runner not found at $runner"; exit 2
@@ -186,6 +188,8 @@ jobs:
           # dialog that no one can dismiss headlessly — which otherwise hangs the
           # runner until the 15 min step timeout. Must precede the script path.
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          # Retain the native handle while the asynchronous child is alive.
+          $null = $proc.Handle
           $fstream = $null
           $reader  = $null
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -213,7 +217,12 @@ jobs:
               while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
               $reader.Close(); $fstream.Close()
           }
+          $proc.WaitForExit()
           $exit = $proc.ExitCode
+          if ($null -eq $exit) {
+              Write-Host "::error::AHK native process exit receipt is unavailable."
+              exit 2
+          }
           Write-Host "------------------------------------------------------------"
           Write-Host "AHK exit code: $exit"
           if (-not (Test-Path $resultsFile)) {
@@ -229,6 +238,7 @@ jobs:
               Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
           }
           if ($exit -ne 0) {
+              Write-Host "::error::AHK native process failed (exit $exit)."
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
@@ -399,6 +409,8 @@ jobs:
           # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
           # hanging on an undismissable modal dialog in the headless runner.
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          # Retain the native handle while the asynchronous child is alive.
+          $null = $proc.Handle
           $fstream = $null; $reader = $null
           while (-not $proc.HasExited) {
               if ($null -eq $fstream -and (Test-Path $resultsFile)) {
@@ -422,13 +434,19 @@ jobs:
               while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
               $reader.Close(); $fstream.Close()
           }
+          $proc.WaitForExit()
           $exit = $proc.ExitCode
+          if ($null -eq $exit) {
+              Write-Host "::error::AHK native process exit receipt is unavailable."
+              exit 2
+          }
           Write-Host "------------------------------------------------------------"
           Write-Host "Exit code: $exit"
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
           if ($exit -ne 0) {
+              Write-Host "::error::AHK E2E native process failed (exit $exit)."
               Write-Error "E2E suite failed (exit $exit)."; exit $exit
           }
 
