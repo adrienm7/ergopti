@@ -1,0 +1,1469 @@
+{
+	"schema_version": 1,
+	"captured_from": "static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
+	"captured_commit": "e9c00eb6252be77ffd2cd6ddb662c6f9564e85d8",
+	"source_sha256": "6aa39e0cf0b216e8a5ae47d84ef15dd00019dbbe35a8f77c7c9d332f7b6394f8",
+	"category": "autocorrection",
+	"legacy_section": "caps",
+	"source": "common",
+	"source_priority": 10,
+	"meta": {
+		"color": "#2e7d32",
+		"delay": 1.0,
+		"show_tooltip": true,
+		"description": {
+			"fr": "Autocorrection",
+			"en": "Autocorrection",
+			"de": "Autokorrektur",
+			"es": "Autocorrección",
+			"zh": "自动纠错",
+			"ar": "تصحيح تلقائي",
+			"cs": "Automatická oprava",
+			"da": "Autokorrektur",
+			"he": "תיקון אוטומטי",
+			"hi": "स्वत: सुधार",
+			"it": "Correzione automatica",
+			"ja": "自動修正",
+			"ko": "자동 수정",
+			"nl": "Autocorrectie",
+			"no": "Autokorrektur",
+			"pl": "Autokorekta",
+			"pt": "Autocorreção",
+			"ru": "Автокоррекция",
+			"sv": "Autokorrigering",
+			"tr": "Otomatik düzeltme",
+			"uk": "Автовиправлення"
+		},
+		"sections_order": ["caps"],
+		"sections": {
+			"caps": {
+				"fr": "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"en": "Auto capitalisation: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"de": "Automatische Großschreibung: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"es": "Mayúsculas automáticas: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"zh": "自动大写：chatgpt = ChatGPT，powerpoint = PowerPoint，…",
+				"ar": "أحرف كبيرة تلقائية: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"cs": "Automatická velká písmena: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"da": "Automatisk stort begyndelsesbogstav: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"he": "אותיות גדולות אוטומטיות: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"hi": "स्वचालित बड़े अक्षर: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"it": "Maiuscole automatiche: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"ja": "自動大文字化：chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"ko": "자동 대문자: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"nl": "Automatische hoofdletters: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"no": "Automatisk stor bokstav: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"pl": "Automatyczne wielkie litery: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"pt": "Maiúsculas automáticas: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"ru": "Автоматические заглавные буквы: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"sv": "Automatisk versalisering: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"tr": "Otomatik büyük harf: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+				"uk": "Автоматичні великі літери: chatgpt = ChatGPT, powerpoint = PowerPoint, …"
+			}
+		}
+	},
+	"section_counts": {
+		"caps": 140
+	},
+	"entries": [
+		{
+			"ordinal": 1,
+			"section": "caps",
+			"trigger": "adaboost",
+			"output": "AdaBoost",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 2,
+			"section": "caps",
+			"trigger": "adn",
+			"output": "ADN",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 3,
+			"section": "caps",
+			"trigger": "ag",
+			"output": "AG",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 4,
+			"section": "caps",
+			"trigger": "api",
+			"output": "API",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 5,
+			"section": "caps",
+			"trigger": "autohotkey",
+			"output": "AutoHotkey",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 6,
+			"section": "caps",
+			"trigger": "aws",
+			"output": "AWS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 7,
+			"section": "caps",
+			"trigger": "axa",
+			"output": "AXA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 8,
+			"section": "caps",
+			"trigger": "azure devops",
+			"output": "Azure DevOps",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 9,
+			"section": "caps",
+			"trigger": "bbc",
+			"output": "BBC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 10,
+			"section": "caps",
+			"trigger": "bbq",
+			"output": "BBQ",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 11,
+			"section": "caps",
+			"trigger": "bdd",
+			"output": "BDD",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 12,
+			"section": "caps",
+			"trigger": "bdds",
+			"output": "BDDs",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 13,
+			"section": "caps",
+			"trigger": "bic",
+			"output": "BIC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 14,
+			"section": "caps",
+			"trigger": "bpce",
+			"output": "BPCE",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 15,
+			"section": "caps",
+			"trigger": "bspce",
+			"output": "BSPCE",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 16,
+			"section": "caps",
+			"trigger": "caas",
+			"output": "CaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 17,
+			"section": "caps",
+			"trigger": "captcha",
+			"output": "CAPTCHA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 18,
+			"section": "caps",
+			"trigger": "catboost",
+			"output": "CatBoost",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 19,
+			"section": "caps",
+			"trigger": "cdd",
+			"output": "CDD",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 20,
+			"section": "caps",
+			"trigger": "cdi",
+			"output": "CDI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 21,
+			"section": "caps",
+			"trigger": "chatgpt",
+			"output": "ChatGPT",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 22,
+			"section": "caps",
+			"trigger": "cli",
+			"output": "CLI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 23,
+			"section": "caps",
+			"trigger": "comex",
+			"output": "COMEX",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 24,
+			"section": "caps",
+			"trigger": "cpu",
+			"output": "CPU",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 25,
+			"section": "caps",
+			"trigger": "csp",
+			"output": "CSP",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 26,
+			"section": "caps",
+			"trigger": "css",
+			"output": "CSS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 27,
+			"section": "caps",
+			"trigger": "cv",
+			"output": "CV",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 28,
+			"section": "caps",
+			"trigger": "data science",
+			"output": "Data Science",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 29,
+			"section": "caps",
+			"trigger": "data scientist",
+			"output": "Data Scientist",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 30,
+			"section": "caps",
+			"trigger": "databricks",
+			"output": "Databricks",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 31,
+			"section": "caps",
+			"trigger": "dbaas",
+			"output": "DBaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 32,
+			"section": "caps",
+			"trigger": "dna",
+			"output": "DNA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 33,
+			"section": "caps",
+			"trigger": "docker",
+			"output": "Docker",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 34,
+			"section": "caps",
+			"trigger": "ds",
+			"output": "DS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 35,
+			"section": "caps",
+			"trigger": "dynatrace",
+			"output": "Dynatrace",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 36,
+			"section": "caps",
+			"trigger": "ergopti",
+			"output": "Ergopti",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 37,
+			"section": "caps",
+			"trigger": "esg",
+			"output": "ESG",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 38,
+			"section": "caps",
+			"trigger": "faas",
+			"output": "FaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 39,
+			"section": "caps",
+			"trigger": "facebook",
+			"output": "Facebook",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 40,
+			"section": "caps",
+			"trigger": "firefox",
+			"output": "Firefox",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 41,
+			"section": "caps",
+			"trigger": "fmi",
+			"output": "FMI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 42,
+			"section": "caps",
+			"trigger": "gcp",
+			"output": "GCP",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 43,
+			"section": "caps",
+			"trigger": "gdpr",
+			"output": "GDPR",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 44,
+			"section": "caps",
+			"trigger": "github",
+			"output": "GitHub",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 45,
+			"section": "caps",
+			"trigger": "google",
+			"output": "Google",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 46,
+			"section": "caps",
+			"trigger": "gps",
+			"output": "GPS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 47,
+			"section": "caps",
+			"trigger": "gpu",
+			"output": "GPU",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 48,
+			"section": "caps",
+			"trigger": "hammerspoon",
+			"output": "Hammerspoon",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 49,
+			"section": "caps",
+			"trigger": "hd",
+			"output": "HD",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 50,
+			"section": "caps",
+			"trigger": "ht",
+			"output": "HT",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 51,
+			"section": "caps",
+			"trigger": "ia",
+			"output": "IA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 52,
+			"section": "caps",
+			"trigger": "iaas",
+			"output": "IaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 53,
+			"section": "caps",
+			"trigger": "iban",
+			"output": "IBAN",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 54,
+			"section": "caps",
+			"trigger": "imf",
+			"output": "IMF",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 55,
+			"section": "caps",
+			"trigger": "insee",
+			"output": "Insee",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 56,
+			"section": "caps",
+			"trigger": "instagram",
+			"output": "Instagram",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 57,
+			"section": "caps",
+			"trigger": "intellij",
+			"output": "IntelliJ",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 58,
+			"section": "caps",
+			"trigger": "ip",
+			"output": "IP",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 59,
+			"section": "caps",
+			"trigger": "iptv",
+			"output": "IPTV",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 60,
+			"section": "caps",
+			"trigger": "json",
+			"output": "JSON",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 61,
+			"section": "caps",
+			"trigger": "ko",
+			"output": "KO",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 62,
+			"section": "caps",
+			"trigger": "kpi",
+			"output": "KPI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 63,
+			"section": "caps",
+			"trigger": "kpis",
+			"output": "KPIs",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 64,
+			"section": "caps",
+			"trigger": "latex",
+			"output": "LaTeX",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 65,
+			"section": "caps",
+			"trigger": "lightgbm",
+			"output": "LightGBM",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 66,
+			"section": "caps",
+			"trigger": "linux",
+			"output": "Linux",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 67,
+			"section": "caps",
+			"trigger": "llm",
+			"output": "LLM",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 68,
+			"section": "caps",
+			"trigger": "llms",
+			"output": "LLMs",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 69,
+			"section": "caps",
+			"trigger": "lora",
+			"output": "LoRA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 70,
+			"section": "caps",
+			"trigger": "lualatex",
+			"output": "LuaLaTeX",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 71,
+			"section": "caps",
+			"trigger": "macos",
+			"output": "macOS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 72,
+			"section": "caps",
+			"trigger": "maj",
+			"output": "MAJ",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 73,
+			"section": "caps",
+			"trigger": "majs",
+			"output": "MAJs",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 74,
+			"section": "caps",
+			"trigger": "mbti",
+			"output": "MBTI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 75,
+			"section": "caps",
+			"trigger": "mcp",
+			"output": "MCP",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 76,
+			"section": "caps",
+			"trigger": "ml",
+			"output": "ML",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 77,
+			"section": "caps",
+			"trigger": "mle",
+			"output": "MLE",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 78,
+			"section": "caps",
+			"trigger": "mlflow",
+			"output": "MLflow",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 79,
+			"section": "caps",
+			"trigger": "mlops",
+			"output": "MLOps",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 80,
+			"section": "caps",
+			"trigger": "nasa",
+			"output": "NASA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 81,
+			"section": "caps",
+			"trigger": "nato",
+			"output": "NATO",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 82,
+			"section": "caps",
+			"trigger": "nfc",
+			"output": "NFC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 83,
+			"section": "caps",
+			"trigger": "nft",
+			"output": "NFT",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 84,
+			"section": "caps",
+			"trigger": "nlp",
+			"output": "NLP",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 85,
+			"section": "caps",
+			"trigger": "ny",
+			"output": "NY",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 86,
+			"section": "caps",
+			"trigger": "ok",
+			"output": "OK",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 87,
+			"section": "caps",
+			"trigger": "onedrive",
+			"output": "OneDrive",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 88,
+			"section": "caps",
+			"trigger": "onenote",
+			"output": "OneNote",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 89,
+			"section": "caps",
+			"trigger": "onu",
+			"output": "ONU",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 90,
+			"section": "caps",
+			"trigger": "openshift",
+			"output": "OpenShift",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 91,
+			"section": "caps",
+			"trigger": "opentelemetry",
+			"output": "OpenTelemetry",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 92,
+			"section": "caps",
+			"trigger": "optimot",
+			"output": "Optimot",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 93,
+			"section": "caps",
+			"trigger": "otan",
+			"output": "OTAN",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 94,
+			"section": "caps",
+			"trigger": "outlook",
+			"output": "Outlook",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 95,
+			"section": "caps",
+			"trigger": "ovni",
+			"output": "OVNI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 96,
+			"section": "caps",
+			"trigger": "ovnis",
+			"output": "OVNIS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 97,
+			"section": "caps",
+			"trigger": "paas",
+			"output": "PaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 98,
+			"section": "caps",
+			"trigger": "pnl",
+			"output": "PNL",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 99,
+			"section": "caps",
+			"trigger": "poc",
+			"output": "POC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 100,
+			"section": "caps",
+			"trigger": "powerbi",
+			"output": "PowerBI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 101,
+			"section": "caps",
+			"trigger": "powerpoint",
+			"output": "PowerPoint",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 102,
+			"section": "caps",
+			"trigger": "pr",
+			"output": "PR",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 103,
+			"section": "caps",
+			"trigger": "qlora",
+			"output": "QLoRA",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 104,
+			"section": "caps",
+			"trigger": "r",
+			"output": "R",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 105,
+			"section": "caps",
+			"trigger": "raid",
+			"output": "RAID",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 106,
+			"section": "caps",
+			"trigger": "ram",
+			"output": "RAM",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 107,
+			"section": "caps",
+			"trigger": "rdc",
+			"output": "RDC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 108,
+			"section": "caps",
+			"trigger": "rgpd",
+			"output": "RGPD",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 109,
+			"section": "caps",
+			"trigger": "rh",
+			"output": "RH",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 110,
+			"section": "caps",
+			"trigger": "rib",
+			"output": "RIB",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 111,
+			"section": "caps",
+			"trigger": "saas",
+			"output": "SaaS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 112,
+			"section": "caps",
+			"trigger": "sas",
+			"output": "SAS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 113,
+			"section": "caps",
+			"trigger": "sharepoint",
+			"output": "SharePoint",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 114,
+			"section": "caps",
+			"trigger": "siret",
+			"output": "SIRET",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 115,
+			"section": "caps",
+			"trigger": "slm",
+			"output": "SLM",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 116,
+			"section": "caps",
+			"trigger": "sncf",
+			"output": "SNCF",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 117,
+			"section": "caps",
+			"trigger": "sql",
+			"output": "SQL",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 118,
+			"section": "caps",
+			"trigger": "ssd",
+			"output": "SSD",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 119,
+			"section": "caps",
+			"trigger": "ssh",
+			"output": "SSH",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 120,
+			"section": "caps",
+			"trigger": "ssl",
+			"output": "SSL",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 121,
+			"section": "caps",
+			"trigger": "swift",
+			"output": "SWIFT",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 122,
+			"section": "caps",
+			"trigger": "tiktok",
+			"output": "TikTok",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 123,
+			"section": "caps",
+			"trigger": "tldr",
+			"output": "TL;DR",
+			"is_word": true,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 124,
+			"section": "caps",
+			"trigger": "tls",
+			"output": "TLS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 125,
+			"section": "caps",
+			"trigger": "ttc",
+			"output": "TTC",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 126,
+			"section": "caps",
+			"trigger": "ttm",
+			"output": "TTM",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 127,
+			"section": "caps",
+			"trigger": "ui",
+			"output": "UI",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 128,
+			"section": "caps",
+			"trigger": "uno",
+			"output": "UNO",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 129,
+			"section": "caps",
+			"trigger": "url",
+			"output": "URL",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 130,
+			"section": "caps",
+			"trigger": "urss",
+			"output": "URSS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 131,
+			"section": "caps",
+			"trigger": "ux",
+			"output": "UX",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 132,
+			"section": "caps",
+			"trigger": "vendome",
+			"output": "Vendôme",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 133,
+			"section": "caps",
+			"trigger": "vpn",
+			"output": "VPN",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 134,
+			"section": "caps",
+			"trigger": "vps",
+			"output": "VPS",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 135,
+			"section": "caps",
+			"trigger": "vscode",
+			"output": "VSCode",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 136,
+			"section": "caps",
+			"trigger": "wikipedia",
+			"output": "Wikipedia",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 137,
+			"section": "caps",
+			"trigger": "wikipédia",
+			"output": "Wikipédia",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 138,
+			"section": "caps",
+			"trigger": "windows",
+			"output": "Windows",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 139,
+			"section": "caps",
+			"trigger": "xgboost",
+			"output": "XGBoost",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		},
+		{
+			"ordinal": 140,
+			"section": "caps",
+			"trigger": "youtube",
+			"output": "YouTube",
+			"is_word": true,
+			"auto_expand": false,
+			"is_case_sensitive": true,
+			"final_result": false
+		}
+	]
+}

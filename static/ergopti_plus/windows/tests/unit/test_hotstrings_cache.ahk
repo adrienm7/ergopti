@@ -181,3 +181,117 @@ TestHsCache_IndexChangeInvalidatesCache() {
 	}
 }
 Test("hotstrings cache: shared index moves invalidate persisted categories", TestHsCache_IndexChangeInvalidatesCache)
+
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 3/ Independent common autocorrection reference =======
+; ==============================================================
+; ==============================================================
+
+; This reference was captured before classification; neither the cache nor the
+; native registrar is allowed to manufacture its expected rules from the TOML.
+_HsCacheCommonReference() {
+	return JsonParse(FileRead(_HsCacheTestSharedDir()
+		. "\tests\corpus\hotstrings\common_autocorrection_entries.json", "UTF-8"))
+}
+
+_HsCacheCommonReferenceRows() {
+	global _SharedDir, HotstringGroupConfig
+	SavedShared := _SharedDir
+	SavedMetadata := HotstringGroupConfig
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		HotstringGroupConfig := Map()
+		Reference := _HsCacheCommonReference()
+		AssertEqual(140, Reference["entries"].Length)
+		AssertEqual("common", Reference["source"])
+		AssertEqual(10, Reference["source_priority"])
+		AssertEqual("caps", Reference["legacy_section"])
+		Rows := _HotstringsCacheBuildRows()
+		Key := "autocorrection.caps"
+		Assert(Rows.Has(Key), "classification must leave the historical preference identity live")
+		AssertEqual(140, Rows[Key].Length)
+		CommonSections := 0
+		for Name in Rows
+			if InStr(Name, "autocorrection.") == 1
+				CommonSections += 1
+		AssertEqual(1, CommonSections, "the editorial catalogue must not change native section selection")
+		for Index, Row in Reference["entries"] {
+			AssertEqual(Index, Row["ordinal"])
+			AssertEqual("caps", Row["section"])
+			Actual := Rows[Key][Index]
+			AssertEqual(Row["auto_expand"] ? "*" : "", Actual[1], Row["trigger"] . " flags")
+			Assert(Actual[2] == Row["trigger"], "trigger identity and source order remain exact")
+			Assert(Actual[3] == Row["output"], "replacement identity remains exact")
+			AssertEqual(Row["final_result"], Actual[4])
+			AssertEqual(false, Actual[5], "capitalization is never a repeat fallback")
+			AssertEqual(Row["is_case_sensitive"], Actual[6])
+			AssertEqual("", Actual[7], "no individual priority overrides the common tier")
+		}
+		Metadata := ParseTomlGroupConfig("autocorrection")
+		AssertEqual(Reference["meta"]["delay"], Metadata.Delay)
+		AssertEqual(Reference["meta"]["color"], Metadata.Color)
+		AssertEqual(Reference["meta"]["show_tooltip"], Metadata.ShowTooltip)
+		Order := ReadTomlSectionsOrder("autocorrection")
+		AssertEqual(1, Order.Length)
+		AssertEqual(Reference["meta"]["sections_order"][1], Order[1])
+	} finally {
+		_SharedDir := SavedShared
+		HotstringGroupConfig := SavedMetadata
+	}
+}
+Test("common autocorrection: cache preserves all 140 independent rules and their exact source order (common-autocorrection-reference)",
+	_HsCacheCommonReferenceRows)
+
+; Both real section-loading paths must agree with the independent capture. The
+; cache is installed in memory to avoid touching a live or shared TSV artifact.
+_HsCacheCommonReferenceNative(UseCache) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED,
+		_GENERATED_HOTSTRINGS, _HotstringsOverrides, HotstringGroupConfig]
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		Reference := _HsCacheCommonReference()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		_HS_CACHE_ROWS := _HotstringsCacheBuildRows()
+		_HS_CACHE_LOADED := true
+		_GENERATED_HOTSTRINGS := Map()
+		Key := "autocorrection.caps"
+		if UseCache
+			_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)
+		HSE_TestReset()
+		LoadHotstringsSection("autocorrection", "caps", { Enabled: true })
+		Assert(HSE_RegistryByGroup.Has(Key), "the real loader must publish the historical group")
+		Registered := HSE_RegistryByGroup[Key]
+		AssertEqual(140, Registered.Length, "every historical rule registers once")
+		for Index, Row in Reference["entries"] {
+			Spec := Registered[Index]
+			Assert(Spec.Trigger == Row["trigger"], "the native registration order remains historical")
+			Assert(Spec.Replacement == Row["output"], "the native replacement remains exact")
+			AssertEqual(Row["ordinal"], Spec.Seq, "equal-priority collisions keep their insertion precedence")
+			AssertEqual(Row["is_word"], Spec.IsWord)
+			AssertEqual(Row["auto_expand"], Spec.Auto)
+			AssertEqual(Row["final_result"], Spec.FinalResult)
+			AssertEqual(false, Spec.CaseSensitive, "literal registration retains case-folded matching")
+			AssertEqual(false, Spec.HasOwnProp("CaseConform") && Spec.CaseConform)
+			AssertEqual(Reference["source_priority"], Spec.Priority)
+			AssertEqual(Reference["meta"]["delay"], Spec.TimeActivationSeconds)
+		}
+	} finally {
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5]
+		HotstringGroupConfig := Saved[6]
+		HotstringsResolveBumpGen()
+	}
+}
+Test("common autocorrection: the real cached loader preserves all historical registrations (common-autocorrection-reference)",
+	_HsCacheCommonReferenceNative.Bind(true))
+Test("common autocorrection: the real TOML fallback preserves all historical registrations (common-autocorrection-reference)",
+	_HsCacheCommonReferenceNative.Bind(false))

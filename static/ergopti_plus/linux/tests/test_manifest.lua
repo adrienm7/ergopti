@@ -192,6 +192,7 @@ return {
 	"tests.unit.modules.hotstrings.test_category_submenu",
 	"tests.unit.modules.hotstrings.test_bulk_scope",
 	"tests.unit.modules.hotstrings.test_catalogue_last_known_good",
+	"tests.unit.modules.hotstrings.test_common_autocorrection_reference",
 	"tests.unit.modules.hotstrings.test_delay_resolver",
 	"tests.unit.modules.hotstrings.test_device_finder_selection",
 	"tests.unit.modules.hotstrings.test_dynamic_expansion_log_privacy",

@@ -726,12 +726,17 @@ exact-boolean regressions also pass the focused runner.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.
-- [ ] **104.** Split the common autocorrections file into meaningful, separately
-      selectable sections and replace its misleading submenu/section labels.
-      Classify the actual corrections first; preserve matching priority,
-      triggers, outputs and existing activation choices through the split.
-      Share the section catalogue and 21-locale names, with full-corpus
-      equivalence, per-section selection and cross-driver regression tests.
+- [~] **104.** Split common autocorrections into meaningful selectable sections.
+  An independent pre-split corpus now freezes all 140 rules, flags, metadata,
+  delays, common priority and historical order. The shared editorial catalogue
+  classifies 34 names, 95 abbreviations and 11 technical terms outside runtime
+  category discovery. Actual reader/registry/cache regressions compare the
+  complete legacy corpus on every driver; native Windows CI remains pending.
+  No source, section ID, label or activation choice changes in this slice.
+  The runtime split still needs conditional fan-out migration of config.toml
+  choices and the independent hotstrings_overrides.toml timing/presentation
+  overrides, preserved global order, 21-locale names and per-section E2E.
+  Never regenerate these historical expectations from the split source.
 
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
