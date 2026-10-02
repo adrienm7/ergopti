@@ -321,6 +321,14 @@
 			"type": "---"
 		},
 		{
+			"type": "check",
+			"id": "start_at_login",
+			"i18n": "menu.global.start_at_login",
+			"checked_when": [
+				"start_at_login_enabled"
+			]
+		},
+		{
 			"type": "command",
 			"id": "uninstall",
 			"i18n": "menu.global.uninstall",
@@ -413,14 +421,6 @@
 			"type": "command",
 			"id": "setup_wizard",
 			"i18n": "menu.global.setup_wizard"
-		},
-		{
-			"type": "check",
-			"id": "start_at_login",
-			"i18n": "menu.global.start_at_login",
-			"checked_when": [
-				"start_at_login_enabled"
-			]
 		},
 		{
 			"type": "check",

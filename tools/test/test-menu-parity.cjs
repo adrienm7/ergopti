@@ -625,6 +625,35 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	}
 }
 
+// Startup is an installation action on every driver, immediately above removal.
+// Pin its unique shared declaration so neither Configuration nor a native builder
+// can silently restore the previous placement.
+for (const platform of PLATFORMS) {
+	const about = project('about_menu', platform);
+	const startup = about[about.length - 2];
+	const uninstall = about[about.length - 1];
+	if (
+		startup?.id !== 'start_at_login' ||
+		startup.type !== 'check' ||
+		startup.i18n !== 'menu.global.start_at_login' ||
+		JSON.stringify(startup.checked_when) !== JSON.stringify(['start_at_login_enabled']) ||
+		uninstall?.id !== 'uninstall' ||
+		!isSeparator(about[about.length - 3])
+	) {
+		errors.push(
+			`${DRIVER_OF[platform]} must draw the native startup check immediately above Uninstall.`
+		);
+	}
+	const owners = MENU_KEYS.filter((key) =>
+		project(key, platform).some((row) => row.id === 'start_at_login')
+	);
+	if (owners.length !== 1 || owners[0] !== 'about_menu') {
+		errors.push(
+			`${DRIVER_OF[platform]} startup must appear once, in Updates: ${owners.join(', ') || '(absent)'}.`
+		);
+	}
+}
+
 // ==================================================
 // ==================================================
 // ======= 8/ Report ================================

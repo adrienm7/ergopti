@@ -606,13 +606,9 @@ function M.generate(ctx, menu_mods, actions)
 				["clean_unused_keys"]   = clean,
 				["config_folder"]       = actions.open_paths,
 				["setup_wizard"]        = actions.show_setup_wizard,
-				["start_at_login"]      = actions.start_at_login,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
-			cfg_ctx.state_getters.start_at_login_enabled = function()
-				return require("ui.menu.start_at_login").enabled()
-			end
 			-- « Ergopti uses Karabiner » and « Remove Ergopti from Karabiner »
 			-- need the remap owner; without it the renderer skips both rows.
 			if type(ctx.karabiner) == "table" then
@@ -660,7 +656,7 @@ function M.generate(ctx, menu_mods, actions)
 				Logger.warn(LOG, "About module missing — its row is not drawn.")
 				return {}
 			end
-			-- The actions carry the uninstall transaction, whose row closes it.
+			-- The actions carry startup and the uninstall transaction, whose row closes it.
 			local ok_a, about_item = pcall(menu_mods.about.build, ctx, actions)
 			if not ok_a then
 				Logger.error(LOG, "Error building the About submenu: %s.", tostring(about_item))

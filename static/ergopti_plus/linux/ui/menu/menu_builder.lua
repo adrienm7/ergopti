@@ -3573,12 +3573,6 @@ local function _build_configuration(ctx)
 		-- off, and that neutral state for the clear.
 		["scope_restore"] = function() return apply_global_scope("recommended") end,
 		["scope_clear"] = function() return apply_global_scope("clear") end,
-		["start_at_login"] = function()
-			if not require("ui.menu.start_at_login").toggle() then
-				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
-			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
 		["clean_unused_keys"] = function()
@@ -3607,9 +3601,6 @@ local function _build_configuration(ctx)
 
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters.start_at_login_enabled = function()
-		return require("ui.menu.start_at_login").enabled() == true
-	end
 	return {
 		label   = i18n_safe("menu.configuration.title"),
 		submenu = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx),
@@ -3866,12 +3857,18 @@ local function _uninstall_command(ctx)
 end
 
 --- Builds the about item: the updater block, Versions and its GitHub page, then
---- Uninstall after a separator. Uninstall sat at the bottom of Configuration
---- until 2026-09, where it read as one more setting.
+--- startup and Uninstall after a separator. Uninstall sat at the bottom of
+--- Configuration until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["start_at_login"] = function()
+			if not require("ui.menu.start_at_login").toggle() then
+				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 		["uninstall"] = _uninstall_command(ctx),
 		-- Opens the release notes. It used to log one line to a file the user
 		-- never sees and call that an About box — while ui/changelog/ was written,
@@ -3902,6 +3899,9 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	getters["start_at_login_enabled"] = function()
+		return require("ui.menu.start_at_login").enabled() == true
+	end
 	render_ctx.state_getters = getters
 
 	local rows = ManifestMenu
