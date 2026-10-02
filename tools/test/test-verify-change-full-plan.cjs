@@ -34,6 +34,18 @@ function plan(args) {
 }
 
 const failures = [];
+for (const file of [
+	'docs/ERGOPTIPLUS_TODO.md',
+	'tools/test/test-layouts-registry.cjs',
+	'static/ergopti/linux/xkb_generation/tests/test_keystroke_vectors.py'
+]) {
+	assert(
+		selectGates([file]).has('format'),
+		`${file}: scoped verification must run CI's actual formatter`
+	);
+}
+assert.equal(GATE_COMMANDS.format.npm, 'format:check');
+assert(!GATE_COMMANDS.format.coveredBy, 'the formatter self-tests do not check source formatting');
 for (const args of [['--all'], ['--all', '--diagnose']]) {
 	try {
 		const actual = plan(args);
@@ -77,12 +89,12 @@ assert.deepEqual(
 );
 assert.deepEqual(
 	[...selectGates(['docs/audits/performance/ahk/2026_09_13/probe/report.md']).keys()],
-	['report-style'],
+	['format', 'report-style'],
 	'a historical performance report must not rebuild every driver or run the complete JS suite'
 );
 assert.deepEqual(
 	[...selectGates(['docs/audits/performance/ahk/report.md', 'tools/test/probe.cjs']).keys()],
-	['js'],
+	['format', 'js'],
 	'tool changes must retain the full JS gate, which already covers report style'
 );
 const mixedAhk = selectGates([

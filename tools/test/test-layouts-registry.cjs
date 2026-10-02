@@ -449,8 +449,16 @@ check(
 		const ergopti = parseToml(
 			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti', 'manifest.toml'), 'utf8')
 		).extension;
-		assert.strictEqual(ergopti.id, 'ergopti', 'the display name must not rename saved extension ids');
-		assert.strictEqual(ergopti.name, 'Ergopti+', 'the bundled hotstrings extension includes the plus');
+		assert.strictEqual(
+			ergopti.id,
+			'ergopti',
+			'the display name must not rename saved extension ids'
+		);
+		assert.strictEqual(
+			ergopti.name,
+			'Ergopti+',
+			'the bundled hotstrings extension includes the plus'
+		);
 		assert.deepStrictEqual(
 			ergopti.magic_key,
 			{ key: 'KeyC' },

@@ -29,6 +29,13 @@ parents and paths before applying or dropping one.
 
 ### feedback-regression-tests
 
+Scoped verification runs `format:check` independently of the JS suite when a
+formatter-owned source changes. `test:format-gate` tests the formatter wrapper;
+it does not check the checkout's formatting. CI checks formatting before JS,
+so passing all JS checks alone cannot establish that this prerequisite passes.
+Action: use the verification planner and install the repository's Git hooks
+with `npm run prepare` in a fresh coding checkout.
+
 Every requested bug fix needs a regression test for its root cause. A source
 scan is appropriate only when behavior cannot be called directly.
 

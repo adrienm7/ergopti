@@ -111,12 +111,17 @@ class KeystrokeVectorReplay(unittest.TestCase):
 
     def test_windows_reset_seeds_are_real_dead_keys_on_linux(self):
         self.assertGreaterEqual(len(self.seeds), 5)
-        self.assertEqual({seed["layout"] for seed in self.seeds}, {"ergol", "ergopti", "ergopti_plus"})
+        self.assertEqual(
+            {seed["layout"] for seed in self.seeds}, {"ergol", "ergopti", "ergopti_plus"}
+        )
         for seed in self.seeds:
             with self.subTest(seed=seed):
                 symbol = self.key_keysym(seed["layout"], seed["press"])
-                self.assertIn(symbol, self.conversions[seed["layout"]].dead_triggers.values(),
-                              f"{seed}: {symbol} is not a dead-key trigger")
+                self.assertIn(
+                    symbol,
+                    self.conversions[seed["layout"]].dead_triggers.values(),
+                    f"{seed}: {symbol} is not a dead-key trigger",
+                )
 
     def test_every_vector_is_replayed_or_skipped_by_name(self):
         ids = {vector["id"] for vector in self.vectors}

@@ -651,20 +651,28 @@ branch has been removed; the run also covers the 21-locale privacy label.
       assignment removal/rebinding and editor invocation across drivers.
 
 - [~] **109.** The bundled hotstrings extension now displays "Ergopti+" from
-      its shared manifest; its registry index and package digests are regenerated.
-      Internal layout/extension identifiers stay unchanged. Existing localized
-      templates carry the shared display name in all 21 languages. Four macOS
-      tests and ten Linux discovery/routing/menu tests pass, including the actual
-      tray trees; Windows tests check the discovered name and actual menu provider.
-      The complete local gates pass. Finish after the native CI checkpoint passes.
+  its shared manifest; its registry index and package digests are regenerated.
+  Internal layout/extension identifiers stay unchanged. Existing localized
+  templates carry the shared display name in all 21 languages. Four macOS
+  tests and ten Linux discovery/routing/menu tests pass, including the actual
+  tray trees; Windows tests check the discovered name and actual menu provider.
+  The complete local gates pass. Native checkpoint 36947209412 caught an
+  incomplete Windows menu fixture; finish after its correction passes CI.
 
 - [~] **110.** Windows four-finger tap now recommends monitor-local Alt+Tab
-      from the shared feature manifest and its generated wizard catalogue.
-      Startup stays neutral and loading keeps a personal assignment. The JS
-      regression refused the old screenshot recommendation; native tests cover
-      wizard admission, actual local/global recommended-scope writes, saved
-      assignment loading and the catalogue callback activating an owned window.
-      Finish after the native CI checkpoint passes.
+  from the shared feature manifest and its generated wizard catalogue.
+  Startup stays neutral and loading keeps a personal assignment. The JS
+  regression refused the old screenshot recommendation; native tests cover
+  wizard admission, actual local/global recommended-scope writes, saved
+  assignment loading and the catalogue callback activating an owned window.
+  Finish after the native CI checkpoint passes.
+
+Scoped verification now executes the actual Prettier/Ruff `format:check`
+before suites, using the formatter owner's extension inventory. A regression
+rejects the formerly missing command, and a simulated formatter refusal makes
+the CLI fail. Checkpoint 36947209412 exposed three formatting misses that are
+corrected. The real formatting check, all 349 JS checks and both XKB Python
+suites pass locally; formatter self-tests alone cannot validate source files.
 
 The shared Shortcuts declaration separates modifier-shortcut groups from key
 combinations. Linux currently omits the combinations group, so the same boundary
@@ -725,8 +733,11 @@ keystroke corpus, replayed by the Windows reset cases and independently checked
 against the Linux conversion's actual dead-state triggers, including custom
 Ergo-L triggers. The portable regression rejected the old underscore seed;
 all five conversion/keystroke tests pass after correction. Thirteen native
-cases refused the wrong seed; one additional Windows failure still needs the
-next native run's evidence. The production identity repair remains unchanged.
+cases refused the wrong seed. Checkpoint 36947209412 passes all thirteen
+corrected cases and identifies the remaining old failure: the tooltip hotkey
+fixture still expects name-based arrow declarations. Update its independent
+physical identities while retaining consuming-hook and ordering assertions.
+The production identity repair remains unchanged.
 
 Windows and macOS now render each key-combination pair from the shared
 `key_combination_pair_menu` declaration. Native providers supply their supported
