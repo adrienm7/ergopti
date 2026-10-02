@@ -157,10 +157,12 @@ These are software implementations; final hardware verification remains below.
   explicitly. Windows executes native zero/nonzero exit probes against the
   actual workflow launch/receipt fragments. The strict manifest assertions
   remain intact; their CLI regression also checks escaped failure annotations.
-  Run 37024861931 refused a native exit probe before the suite started; probe
-  failures now expose their exact message as a GitHub annotation while retaining
-  the failing assertion. Full Windows packaging/install validation remains
-  pending until the native run confirms the launcher correction.
+  Runs 37024861931 and 37026041613 refused the contract/probe step before the
+  suite started. Every uncaught contract or fixture assertion now exposes its
+  exact stack as a GitHub annotation and retains exit code 1. A CLI mutation
+  removes the launcher's handle capture and proves both the refusal and its
+  annotation. Full Windows packaging/install validation remains pending until
+  the native run confirms the launcher correction.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
