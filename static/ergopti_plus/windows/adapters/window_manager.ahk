@@ -95,7 +95,7 @@ WMHandleExists(HWnd) {
 
 /** Creates an invisible real HWND whose controller can retain the shared browser. */
 WMBrowserWarmHost() {
-	Host := Gui("+ToolWindow")
+	Host := Gui_Create("+ToolWindow")
 	Control := Host.Add("Text", "x0 y0 w600 h400", "")
 	Host.Show("Hide w600 h400")
 	return {Hwnd: Control.Hwnd, Destroy: (*) => Host.Destroy()}
