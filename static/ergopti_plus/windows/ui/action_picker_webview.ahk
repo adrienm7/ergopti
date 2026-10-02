@@ -100,7 +100,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_OnConfirm := OnConfirm
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
-	g := Gui("+Resize +MinSize360x360", Title)
+	g := Gui_Create("+Resize +MinSize360x360", Title)
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

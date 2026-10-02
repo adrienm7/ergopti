@@ -119,6 +119,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/tray_bootstrap.ahk
 #Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
+#Include ../_generated/window_titles.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk

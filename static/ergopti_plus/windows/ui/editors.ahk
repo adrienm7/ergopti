@@ -557,7 +557,7 @@ PersonalInformationEditor(*) {
 		; multi-field dialog below remains as an automatic fallback.
 		if _PiEdWeb_TryOpen()
 				return
-		GuiToShow := Gui(, t("dialog.personal_info.title"))
+		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
 		UpdatedPersonalInformation := Map()
 		ReverseLetters := Map()
 		for k, v in PersonalInformationLetters
@@ -643,7 +643,7 @@ GPTLinkEditor(*) {
 		CurrentLink := ""
 		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
 				CurrentLink := Features["shortcuts"]["gpt"]["link"]
-		GuiToShow := Gui(, t("dialog.gpt_link.title"))
+		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

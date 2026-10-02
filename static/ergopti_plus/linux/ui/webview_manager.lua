@@ -34,9 +34,8 @@ local LOG = "ui.webview_manager"
 -- without taking the keyboard focus.
 local UNFOCUSED_APPS = { error_dialog = true }
 
--- Product name and separator of every window title (see M.window_title).
-local WINDOW_TITLE_PRODUCT = "Ergopti"
-local WINDOW_TITLE_SEPARATOR = " — "
+-- The generated shared policy owns branding for every native host.
+local WindowTitles = require("window_titles")
 
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
@@ -372,8 +371,7 @@ end
 --- @param label string|nil Brand-less title.
 --- @return string
 function M.window_title(label)
-	if type(label) ~= "string" or label == "" then return WINDOW_TITLE_PRODUCT end
-	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. label
+	return WindowTitles.compose(label)
 end
 
 --- Retitles an open window, e.g. after a live language switch. WebKitGTK does
@@ -614,38 +612,10 @@ end
 --- Builds a human-readable window title from the app directory name.
 --- @param app_name string The app directory name.
 --- @return string
+
 local function _app_title(app_name)
-	-- Windows named after the menu row that opens them, in the user's language,
-	-- as macOS and Windows already title them
-	local title_keys = {
-		config_cleanup          = "dialog.unused_keys.title",
-		error_dialog            = "common.error_title",
-		healthcheck             = "menu.debug.healthcheck",
-		update_check            = "update_check.window_title",
-	}
-	if title_keys[app_name] then
-		return require("infra.i18n").get(title_keys[app_name])
-	end
-	local titles = {
-		action_picker           = "Action Picker",
-		changelog               = "Releases",
-		download_window         = "Download",
-		hotstrings_config_window = "Hotstrings Config",
-		hotstring_editor        = "Hotstring Editor",
-		metrics_apps            = "Metrics — Apps",
-		metrics_typing          = "Metrics — Typing",
-		model_browser           = "Model Browser",
-		onboarding              = "Setup Wizard",
-		layout_manager          = "Keyboard Layouts",
-		paths_editor            = "Paths Editor",
-		personal_info_editor    = "Personal Info",
-		numeric_prompt          = "Valeur",
-		prompt_editor           = "Prompt Editor",
-		token_prompt            = "Token Settings",
-	}
-	return titles[app_name] or app_name:gsub("_", " "):gsub("(%a)([%w_]*)", function(a, b)
-		return (a:upper() .. b:gsub("_", " "))
-	end)
+	local key = assert(WindowTitles.key_for_app(app_name), "Unknown shared UI app: " .. tostring(app_name))
+	return require("infra.i18n").get(key)
 end
 M._app_title = _app_title
 

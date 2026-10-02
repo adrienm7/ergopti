@@ -10,7 +10,28 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const titles = require('../codegen/codegen-window-titles.cjs');
 const audit = path.resolve(__dirname, '../lint/audit-gui-titles.cjs');
+const repository = path.resolve(__dirname, '../..');
+const sharedManifest = JSON.parse(fs.readFileSync(path.join(repository, titles.SOURCE), 'utf8'));
+const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/data/locales');
+const localeNames = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
+assert.equal(localeNames.length, 21, 'every shipped locale participates in the title policy');
+for (const locale of localeNames) {
+	const strings = JSON.parse(fs.readFileSync(path.join(localeDirectory, locale), 'utf8'));
+	for (const [app, entry] of Object.entries(sharedManifest.apps)) {
+		assert.equal(
+			typeof strings[entry.title_key],
+			'string',
+			`${locale}: ${app} has its title translation`
+		);
+		assert.equal(
+			/^\s*Ergopti(?:Plus)?\b/.test(strings[entry.title_key]),
+			false,
+			`${locale}: ${app} passes a bare title to the shared policy`
+		);
+	}
+}
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-title-audit-'));
 const sourcePath = (platform) =>
 	`static/ergopti_plus/${platform}/ui/error_dialog/init.${platform === 'windows' ? 'ahk' : 'lua'}`;
@@ -20,6 +41,26 @@ function put(relative, content) {
 	fs.writeFileSync(target, content);
 }
 const cases = [
+	[
+		'windows',
+		'g := Gui("+Resize", t("common.error_title"))',
+		1,
+		'translated raw Gui bypass is blocking'
+	],
+	['windows', 'g := Gui("+Resize", DynamicTitle)', 1, 'dynamic raw Gui bypass is blocking'],
+	[
+		'windows',
+		'g := Gui("+Resize", "ErgoptiPlus — Tools")',
+		1,
+		'branded raw Gui still bypasses shared policy'
+	],
+	[
+		'windows',
+		'g := Gui("-Caption +AlwaysOnTop", "Overlay")',
+		0,
+		'captionless overlays retain native options'
+	],
+	['windows', 'return Gui(Options, WindowTitle(Name))', 0, 'native factory composes its caption'],
 	[
 		'windows',
 		'First() {\nTitle := "ErgoptiPlus — Tools"\n}\nSecond(Title) {\ng := Gui_Create("", Title)\n}',
@@ -81,7 +122,7 @@ const cases = [
 		'Linux localized composer'
 	],
 	['linux', 'window:set_title("Ergopti — Tools")', 0, 'native Gtk title already branded'],
-	['linux', 'window:set_title("Tools")', 0, 'native Gtk title missing brand'],
+	['linux', 'window:set_title("Tools")', 1, 'native Gtk title missing brand'],
 	[
 		'linux',
 		'--[[ manager.set_title(APP, "Ergopti — comment") ]]\nmanager.set_title(APP, i18n.get("common.error_title"))',
@@ -123,6 +164,62 @@ try {
 				'failure identifies the actual source site'
 			);
 	}
+	// Generate isolated artifacts from policies that change or remove branding.
+	// Never rewrite the committed generated files to test customization.
+	for (const policy of [
+		{ prefix: 'ErgoptiPlus', separator: ' — ' },
+		{ prefix: '', separator: ' — ' },
+		{ prefix: 'Other product', separator: ': ' },
+		{ prefix: 'Quoted "product" `name`', separator: '' },
+		{ prefix: 'Other ; product', separator: ' ; ' }
+	]) {
+		put(titles.SOURCE, JSON.stringify({ window_title: policy, apps: {} }));
+		titles.main(root);
+		const lua = fs.readFileSync(path.join(root, titles.LUA_OUTPUT), 'utf8');
+		const ahk = fs.readFileSync(path.join(root, titles.AHK_OUTPUT), 'utf8');
+		assert.ok(lua.includes('local PREFIX = ' + JSON.stringify(policy.prefix)));
+		assert.ok(ahk.startsWith('\uFEFF'), 'AHK generated titles retain their UTF-8 BOM');
+		assert.equal(/[\r]/.test(lua + ahk), false, 'both generated hosts retain LF');
+		assert.match(
+			lua,
+			/if PREFIX == "" then return label end/,
+			'an empty policy prefix leaves the translated label bare'
+		);
+		assert.match(
+			ahk,
+			/if Prefix == ""\n\t\treturn Label/,
+			'Windows removes its separator when the prefix is empty'
+		);
+		assert.ok(
+			ahk.includes(
+				'Prefix := "' +
+					policy.prefix.replaceAll('`', '``').replaceAll('"', '`"').replaceAll(';', '`;') +
+					'"'
+			)
+		);
+		assert.ok(
+			ahk.includes(
+				'Separator := "' +
+					policy.separator.replaceAll('`', '``').replaceAll('"', '`"').replaceAll(';', '`;') +
+					'"'
+			)
+		);
+	}
+	for (const policy of [
+		undefined,
+		{},
+		{ prefix: 1, separator: '' },
+		{ prefix: '', separator: '\n' },
+		{ prefix: '\u0001', separator: '' },
+		{ prefix: '', separator: '\t' },
+		{ prefix: '\uD800', separator: '' },
+		{ prefix: '', separator: '\uDC00' }
+	])
+		assert.throws(
+			() => titles.render(policy),
+			/window_title|one line/,
+			'invalid shared policies refuse generation'
+		);
 	console.log(`GUI title audit mutations: ${cases.length}/${cases.length} passed.`);
 } finally {
 	fs.rmSync(root, { recursive: true, force: true });

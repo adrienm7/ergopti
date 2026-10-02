@@ -30,9 +30,8 @@ local function now_ms()
 end
 local LOG = "ui_builder"
 
--- Product name and separator of every webview window title (see M.window_title).
-local WINDOW_TITLE_PRODUCT = "ErgoptiPlus"
-local WINDOW_TITLE_SEPARATOR = " — "
+-- The generated shared policy owns branding for every native host.
+local WindowTitles = require("window_titles")
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -594,8 +593,7 @@ end
 --- @param title string|nil Brand-less, already-translated title.
 --- @return string
 function M.window_title(title)
-	if type(title) ~= "string" or title == "" then return WINDOW_TITLE_PRODUCT end
-	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. title
+	return WindowTitles.compose(title)
 end
 
 --- Retitles an open webview, e.g. after a live language switch.

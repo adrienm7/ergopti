@@ -80,7 +80,7 @@ _PathsEdWeb_TryOpen() {
 	SessionEpoch := _PathsEdWeb_SessionEpoch
 	_PathsEdWeb_ResetDone := false
 
-	g := Gui("+Resize +MinSize560x200", t("menu.paths.window_title"))
+	g := Gui_Create("+Resize +MinSize560x200", t("menu.paths.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

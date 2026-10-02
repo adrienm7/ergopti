@@ -178,7 +178,7 @@ function auditSource(source, lua, locales) {
 				!['[', '.'].includes(expr[i + 1]?.value)
 			)
 				found.push(...alias(t.value, before, seen));
-			if (t.value === 'window_title' && expr[i + 1]?.value === '(')
+			if (['window_title', 'WindowTitle'].includes(t.value) && expr[i + 1]?.value === '(')
 				found.push({ value: 'ErgoptiPlus', composed: true });
 			if (['t', 'get'].includes(t.value) && expr[i + 1]?.value === '(') {
 				const call = argumentsAt(expr, i + 1);
@@ -201,6 +201,7 @@ function auditSource(source, lua, locales) {
 		if (ts[i - 1]?.value === 'function' || ts[i - 3]?.value === 'function') continue;
 		const wrapper = [
 			'Gui_Create',
+			'WindowTitle',
 			'window_title',
 			'set_window_title',
 			'set_title',
@@ -212,6 +213,25 @@ function auditSource(source, lua, locales) {
 		if (!call) continue;
 		if (ts[call.end + 1]?.value === '{' || call.args.some((a) => a.some((n) => n.value === ':=')))
 			continue;
+		if (name === 'Gui') {
+			const captionless = call.args[0]?.some(
+				(n) => n.string && /(?:^|\s)-Caption(?:\s|$)/i.test(n.value)
+			);
+			const composed = call.args[1]?.some(
+				(n, at, expr) => n.value === 'WindowTitle' && expr[at + 1]?.value === '('
+			);
+			if (captionless) continue;
+			if (!composed) {
+				findings.push({
+					line: t.line,
+					call: name,
+					reason: 'captioned Gui bypasses the shared title factory',
+					values: []
+				});
+				stats.checked++;
+				continue;
+			}
+		}
 		let expr,
 			brandedInput = wrapper;
 		if (name === 'show_webview') expr = inlineTitle(call.args[0]);
@@ -233,14 +253,9 @@ function auditSource(source, lua, locales) {
 			: resolved.filter((v) => !BRAND.test(v.value));
 		// Raw expressions composed by the title helper already have their prefix.
 		if (!brandedInput && resolved.some((v) => v.composed || BRAND.test(v.value))) continue;
-		const legacyRaw =
-			!brandedInput &&
-			expr.length === 1 &&
-			expr[0].string &&
-			(name === 'windowTitle' ||
-				(name === 'Gui' && call.args[0]?.length === 1 && call.args[0][0].string));
+
 		if (bad.length)
-			(brandedInput || legacyRaw ? findings : debt).push({
+			findings.push({
 				line: t.line,
 				call: name,
 				reason: brandedInput

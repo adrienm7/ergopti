@@ -40,7 +40,7 @@ const PRE_CONSENT_KEYS = [
 	'updater.tray_new_version_body',
 	'updater.title_update_available',
 	'updater.update_found_body',
-	'updater.update_dialog_title',
+	'updater.update_window_title',
 	'updater.update_dialog_header',
 	'updater.update_dialog_install',
 	'menu.about.update_now'

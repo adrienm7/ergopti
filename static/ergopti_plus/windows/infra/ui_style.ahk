@@ -355,7 +355,5 @@ Gui_Create(Options := "", Name := "") {
             throw ValueError("Gui_Create: a window is focused, never kept on top", -1, Options)
         Pos := ExStyle.Pos + ExStyle.Len
     }
-    Prefix := "ErgoptiPlus"
-    Title := (Name == "") ? Prefix : Prefix . " — " . Name
-    return Gui(Options, Title)
+    return Gui(Options, WindowTitle(Name))
 }
