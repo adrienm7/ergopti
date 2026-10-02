@@ -656,23 +656,16 @@ branch has been removed; the run also covers the 21-locale privacy label.
       deliberately and cover neutral/recommended scopes, menu placement,
       assignment removal/rebinding and editor invocation across drivers.
 
-- [~] **109.** The bundled hotstrings extension now displays "Ergopti+" from
-  its shared manifest; its registry index and package digests are regenerated.
-  Internal layout/extension identifiers stay unchanged. Existing localized
-  templates carry the shared display name in all 21 languages. Four macOS
-  tests and ten Linux discovery/routing/menu tests pass, including the actual
-  tray trees; Windows tests check the discovered name and actual menu provider.
-  The complete local gates pass. Native checkpoint 36947209412 caught an
-  incomplete Windows menu fixture. It now owns neutral category collections
-  and restores both assigned and unassigned globals; finish after CI passes.
-
-- [~] **110.** Windows four-finger tap now recommends monitor-local Alt+Tab
-  from the shared feature manifest and its generated wizard catalogue.
-  Startup stays neutral and loading keeps a personal assignment. The JS
-  regression refused the old screenshot recommendation; native tests cover
-  wizard admission, actual local/global recommended-scope writes, saved
-  assignment loading and the catalogue callback activating an owned window.
-  Finish after the native CI checkpoint passes.
+Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
+Windows/macOS/Linux pipeline, including package and installation lanes. It
+validates the shared "Ergopti+" extension name in the actual tray providers,
+Windows four-finger tap's monitor-local Alt+Tab recommendation and invocation,
+all thirteen pending-dead-state reset cases and the consuming arrow hooks.
+The Windows menu-name fixture owns neutral category collections and restores
+assigned or unassigned globals. The arrow fixture derives scan codes from the
+shared registry, retaining its action, criterion, consumption and order checks.
+The native checkpoint also passes CI's real formatting check. Its temporary
+branch is removed after validation.
 
 Scoped verification now executes the actual Prettier/Ruff `format:check`
 before suites, using the formatter owner's extension inventory. A regression
@@ -744,8 +737,8 @@ cases refused the wrong seed. Checkpoint 36947209412 passes all thirteen
 corrected cases and identifies the remaining old failure: the tooltip hotkey
 fixture still expected name-based arrow declarations. It now derives physical
 identities independently from the shared registry while retaining every
-consuming-hook, action, criterion and ordering assertion. Its native rerun is
-pending; the production identity repair remains unchanged.
+consuming-hook, action, criterion and ordering assertion. Its native rerun passes checkpoint 36949562328;
+the production identity repair remains unchanged.
 
 Windows and macOS now render each key-combination pair from the shared
 `key_combination_pair_menu` declaration. Native providers supply their supported
