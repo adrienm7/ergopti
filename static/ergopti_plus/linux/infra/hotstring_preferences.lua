@@ -349,17 +349,21 @@ end
 --- Makes a validated candidate document effective before its file is published.
 --- @param owner table The acquiring transaction.
 --- @param document table Decoded candidate.
+--- @param touched table|nil Explicit owned paths written by a narrower scope.
 --- @return boolean adopted
-function M.adopt(owner, document)
+function M.adopt(owner, document, touched)
 	if _scope_owner ~= owner then return false end
 	local ok, validated = pcall(function()
 		validate(document)
-		-- The scope wrote every owned leaf: one of the wrong type is its own
-		-- output, a real failure. An unusable parent it does not own (an
-		-- older build's `dynamic = true`) stays outdated configuration.
-		for path in pairs(_owned) do
+		-- A complete scope validates every owned leaf. A narrower owner proves
+		-- its own outputs without claiming unrelated outdated configuration.
+		assert(touched == nil or type(touched) == "table", "invalid hotstring preference selection")
+		for path, selected in pairs(touched or _owned) do
+			owned(path)
+			assert(touched == nil or selected == true, "invalid hotstring preference selection")
 			local _, outdated, detail = inspect(document, path)
 			assert(outdated ~= path, "hotstring preference has the wrong type: " .. path)
+			if touched then assert(outdated == nil, "hotstring preference crosses an unusable parent: " .. path) end
 			if outdated then ConfigOutdated.report(outdated, detail, Logger) end
 		end
 		return document

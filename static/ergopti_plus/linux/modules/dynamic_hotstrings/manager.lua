@@ -320,6 +320,15 @@ function M.is_enabled()
 	return _enabled
 end
 
+--- Commits the master and every canonical family through one runtime owner.
+--- @param state boolean Explicit requested posture.
+--- @param config table|nil Ordinary matcher owner used by prefix families.
+--- @return boolean committed
+--- @return string|nil detail
+function M.set_scope_enabled(state, config)
+	return require("infra.dynamic_hotstrings_scope").apply(state, M, config)
+end
+
 --- Enables/disables the module, persisting the canonical master leaf first.
 --- @param state boolean
 --- @return boolean True when the runtime reached the requested state.

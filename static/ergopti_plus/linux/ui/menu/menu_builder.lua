@@ -1289,14 +1289,6 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local sub = {
 				{
-					label   = i18n_safe("menu.hotstrings.category_enable"),
-					checked = on and true or false,
-					action  = function()
-						if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				},
-				{
 					label = i18n_safe("menu.shortcuts.edit_personal_info"),
 					action = function()
 						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
@@ -1315,28 +1307,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
 			if #families > 0 then
-				-- The one « all » checkbox the other drivers put at the top of this
-				-- submenu, where a « tout activer » / « tout désactiver » pair used to
-				-- be. It acts on the families only; the category gate above is
-				-- separate, and switching every family off leaving the category on is
-				-- the point — it is what lets the user switch families back on one at
-				-- a time.
-				local all_families_on = true
-				for _, family in ipairs(families) do
-					if family.section and not family.enabled then all_families_on = false end
-				end
-				sub[#sub + 1] = { separator = true }
-				sub[#sub + 1] = {
-					label    = i18n_safe("menu.hotstrings.enable_all_sections"),
-					checked  = all_families_on,
-					disabled = not on,
-					action   = function()
-						for _, family in ipairs(families) do
-							if family.section then dyn.set_rule_enabled(family.section, not all_families_on) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
 				sub[#sub + 1] = { separator = true }
 
 				for _, family in ipairs(families) do
@@ -1377,6 +1347,25 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
+			local function commit_scope(enabled)
+				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
+				if not called or committed ~= true then
+					Logger.error(LOG, "Dynamic hotstring scope refused (%s).", called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+			local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+				{ commands = {
+					hotstring_category_enable_all = function() return commit_scope(true) end,
+					hotstring_category_disable_all = function() return commit_scope(false) end,
+				} }, {
+					hotstring_category_file = function() return {} end,
+					hotstring_category_sections = function() return sub end,
+				})
+
 			rows[#rows + 1] = {
 				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
 				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
@@ -1384,7 +1373,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- rendered as the raw string.
 				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
 				checked = on,
-				items    = sub,
+				submenu = rendered,
 			}
 			return rows
 		end,

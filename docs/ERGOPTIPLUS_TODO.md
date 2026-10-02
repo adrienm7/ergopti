@@ -731,8 +731,8 @@ exact-boolean regressions also pass the focused runner.
   cases cover both targets, immediate/late refusal, exact recovery, unknown
   neighbours and concurrent ownership; full CI remains pending for this slice.
   Additional Windows personal-file views still need an identity and gate owner
-  shared by the live engine and previews. Linux dynamic publication needs one
-  acknowledged batch; macOS's personal-info placeholder still needs admission
+  shared by the live engine and previews. macOS's personal-info placeholder
+  still needs admission
   to its otherwise shared dynamic scope.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
@@ -743,6 +743,14 @@ exact-boolean regressions also pass the focused runner.
   All ten native cases retain their ownership, pause and refusal assertions;
   production still uses its curated boot order. The corrected native CI is
   pending. Shared dynamic row ordering remains a separate follow-up.
+  Linux Dynamic now consumes the same explicit command pair and shared bulk
+  planner. Its existing transaction commits the declared dynamic master and
+  seven manifest families as one conditional cohort under both real leases,
+  with exact backup, runtime acknowledgement and retained inverse on refusal.
+  Scoped adoption validates only owned leaves; unrelated outdated previews,
+  global master, pause, overrides, personal sources and unknown neighbours stay
+  preserved. The old menu failed eight meaningful cases; 57 affected cases
+  pass locally. Full three-OS validation remains pending for this slice.
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
