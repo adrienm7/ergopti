@@ -189,6 +189,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../ui/menu/menu_submenus.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
+; Native manifest-built menu rows use the same pure label owner as tray boot.
+#Include ../infra/manifest_descriptions.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
