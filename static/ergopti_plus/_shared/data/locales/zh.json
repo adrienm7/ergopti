@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "启用所有部分",
 	"menu.hotstrings.open_editor": "打开热字符串编辑器",
 	"menu.hotstrings.open_file": "打开文件…",
+	"menu.hotstrings.scope_enable_all": "全部启用",
+	"menu.hotstrings.scope_disable_all": "全部禁用",
 	"menu.hotstrings.params": "⚙️ 热字符串设置",
 	"menu.hotstrings.personal_header": "我的 hotstrings",
 	"menu.hotstrings.preview_bubbles": "预览气泡",

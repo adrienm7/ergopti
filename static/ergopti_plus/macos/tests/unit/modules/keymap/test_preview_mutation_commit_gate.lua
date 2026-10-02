@@ -216,7 +216,8 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 		helpers.assert_not_nil(source, "modules/keymap/init.lua must be locatable")
 		local writers = {
 			"add", "load_file", "load_toml", "disable_section", "enable_section",
-			"set_sections_enabled", "disable_group", "register_lua_group", "enable_group",
+			"set_sections_enabled", "set_groups_sections_enabled", "set_category_scope_enabled",
+			"apply_hotstring_preferences", "registry_transaction", "disable_group", "register_lua_group", "enable_group",
 			"sort_mappings", "set_repeat_feature_enabled", "set_terminator_enabled",
 			"set_terminators_enabled",
 			"remove_custom_terminator", "with_hotstring_delays",

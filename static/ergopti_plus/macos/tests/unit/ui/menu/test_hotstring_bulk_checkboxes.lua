@@ -1,20 +1,12 @@
 --- tests/unit/ui/menu/test_hotstring_bulk_checkboxes.lua
 
 --- ==============================================================================
---- MODULE: Regression — every hotstring bulk control is one checkbox
+--- MODULE: Regression — explicit categories and independent bulk selection
 --- DESCRIPTION:
---- A hotstring category submenu opens with its gate, then offers one control for
---- all of its sections; a language submenu, the personal submenu and the top of
---- the Hotstrings menu each offer one control for every section under them. Each
---- is a checkbox: one label, ticked from the state it governs, and a click that
---- switches everything to the other side.
----
---- WHY IT EXISTS: the gate alternated between « ✅ Activée (cliquer pour
---- désactiver) » and « ❌ Désactivée (cliquer pour activer) », and the sections
---- came with a « Tout activer » / « Tout désactiver » pair — two keys and two
---- rows for one control, and a state the user could only read from the words.
---- Built from the real providers over a keymap double, so the tick and the batch
---- the click sends are what is asserted, not the labels alone.
+--- Category commands set their requested posture through one atomic owner, keep
+--- the root engine stopped, and withhold UI publication after refused saves.
+--- Language, personal and whole-tree section controls retain their existing
+--- independent checkbox contracts until their own scoped migration.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -50,6 +42,10 @@ local function context(sections_on, group_on, files)
 			is_group_enabled = function() return group_on end,
 			get_sections = function() return sections_of() end,
 			is_section_enabled = function() return sections_on end,
+			set_category_scope_enabled = function(names, enabled, publish)
+				batches[#batches + 1] = { names = names, enabled = enabled }
+				return publish()
+			end,
 			set_groups_sections_enabled = function(changes, enabled)
 				batches[#batches + 1] = { changes = changes, enabled = enabled }
 				return true
@@ -97,31 +93,31 @@ end
 
 helpers.describe("hotstring bulk controls are one checkbox each", function()
 	for _, posture in ipairs({ true, false }) do
-		helpers.it("a category submenu opens with its gate, ticked " .. tostring(posture), function()
-			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-			local ctx = context(true, posture)
-			local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
-			local sub = rows[1] and rows[1].items
-			helpers.assert_true(type(sub) == "table", "the category must open a submenu")
-			helpers.assert_eq(sub[1].label, "menu.hotstrings.category_enable", "the gate is the first row")
-			helpers.assert_eq(sub[1].checked, posture, "the gate is a checkbox ticked from the group gate")
-			helpers.assert_eq(type(sub[1].action), "function", "the gate must be clickable")
-			assert_no_retired(rows, "the category submenu")
-		end)
-
-		helpers.it("a category offers one « all sections » checkbox, ticked " .. tostring(posture), function()
-			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-			local ctx, batches = context(posture, true)
-			local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
-			local all = row_labelled(rows[1].items, "menu.hotstrings.enable_all_sections")
-			helpers.assert_true(all ~= nil, "the category submenu must offer one control for all its sections")
-			helpers.assert_eq(all.checked, posture, "it is ticked exactly when every section is on")
-			all.action()
-			helpers.assert_eq(#batches, 1, "one click is one batch")
-			helpers.assert_eq(batches[1].enabled, not posture, "the click switches every section to the other side")
-			helpers.assert_eq(batches[1].changes[1].sections, { "one", "two" },
-				"every real section, and neither the separator nor the module placeholder")
-		end)
+		for _, enabled in ipairs({ true, false }) do
+			helpers.it("a category offers the explicit scope command " .. tostring(enabled)
+				.. " behind group gate " .. tostring(posture), function()
+				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local ctx, batches = context(not posture, posture)
+				ctx.state.keymap = false
+				local starts, saves, updates = 0, 0, 0
+				ctx.keymap.start = function() starts = starts + 1; return true end
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
+				local sub = rows[1] and rows[1].submenu
+				helpers.assert_true(type(sub) == "table", "the rendered category child must survive intact")
+				helpers.assert_eq(sub[1].title, "menu.hotstrings.scope_enable_all")
+				helpers.assert_eq(sub[2].title, "menu.hotstrings.scope_disable_all")
+				helpers.assert_nil(sub[1].checked, "an explicit command is not a state switch")
+				helpers.assert_nil(sub[2].checked, "both commands remain available in either posture")
+				sub[enabled and 1 or 2].fn()
+				helpers.assert_eq(#batches, 1, "one click is one category-owner transaction")
+				helpers.assert_eq(batches[1], { names = { "alpha" }, enabled = enabled })
+				helpers.assert_eq(ctx.state.hotstrings.alpha, enabled, "persist the selected category gate")
+				helpers.assert_eq({ saves, updates, starts }, { 1, 1, 0 })
+				helpers.assert_eq(ctx.state.keymap, false, "editing a category never starts the root engine")
+			end)
+		end
 
 		helpers.it("a language submenu opens with one checkbox, ticked " .. tostring(posture), function()
 			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
@@ -162,17 +158,63 @@ helpers.describe("hotstring bulk controls are one checkbox each", function()
 			"and only its own groups")
 	end)
 
-	helpers.it("a paused script greys every checkbox and gives it no click", function()
+	helpers.it("a paused script can choose its next category without starting capture", function()
 		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-		local ctx = context(true, true)
+		local ctx, batches = context(true, true)
 		ctx.paused = true
-		local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].items
-		local all = row_labelled(sub, "menu.hotstrings.enable_all_sections")
-		helpers.assert_eq(sub[1].disabled, true, "the gate is greyed while paused")
-		helpers.assert_nil(sub[1].action, "and cannot be clicked")
-		helpers.assert_eq(all.disabled, true, "the « all sections » checkbox is greyed while paused")
-		helpers.assert_nil(all.action, "and cannot be clicked")
-		helpers.assert_eq(all.checked, true, "the tick still says what is on")
+		ctx.state.keymap = false
+		local starts = 0
+		ctx.keymap.start = function() starts = starts + 1; return true end
+		local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+		helpers.assert_eq(type(sub[2].fn), "function", "selection is separate from input capture")
+		sub[2].fn()
+		helpers.assert_eq(batches[1].enabled, false)
+		helpers.assert_eq(starts, 0)
+		helpers.assert_eq(ctx.paused, true)
+		helpers.assert_eq(ctx.state.keymap, false)
+	end)
+
+	for _, enabled in ipairs({ true, false }) do
+		for _, refusal in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("a refused category save " .. refusal .. " restores posture " .. tostring(enabled), function()
+				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local ctx, batches = context(not enabled, not enabled)
+				ctx.state.hotstrings.alpha = not enabled
+				ctx.state.hotstrings.beta = true
+				ctx.state.keymap = false
+				local saves, updates = 0, 0
+				ctx.save_prefs = function()
+					saves = saves + 1
+					if refusal == "throw" then error("category save fixture refused") end
+					if refusal == "false" then return false end
+					return nil
+				end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+				sub[enabled and 1 or 2].fn()
+				helpers.assert_eq(#batches, 1, "the category owner received one requested mutation")
+				helpers.assert_eq(saves, 1)
+				helpers.assert_eq(updates, 0, "a refused save is never acknowledged by rebuilding the tray")
+				helpers.assert_eq(ctx.state.hotstrings, { alpha = not enabled, beta = true })
+				helpers.assert_eq(ctx.state.keymap, false)
+			end)
+		end
+	end
+
+	helpers.it("a refused tray refresh cannot undo an acknowledged category save", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx, batches = context(false, false)
+		ctx.state.hotstrings.alpha = false
+		local saved_choice, refreshes
+		ctx.save_prefs = function() saved_choice = ctx.state.hotstrings.alpha; return true end
+		ctx.updateMenu = function() refreshes = (refreshes or 0) + 1; error("tray refresh fixture refused") end
+		local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+		sub[1].fn()
+		helpers.assert_eq(#batches, 1)
+		helpers.assert_eq(saved_choice, true)
+		helpers.assert_eq(refreshes, 1)
+		helpers.assert_eq(ctx.state.hotstrings.alpha, true,
+			"a UI failure cannot make the public choice disagree with the committed file and registry")
 	end)
 
 	helpers.it("the personal submenu offers one « all sections » checkbox per group", function()

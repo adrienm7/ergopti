@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "सभी अनुभाग सक्षम करें",
 	"menu.hotstrings.open_editor": "hotstring संपादक खोलें",
 	"menu.hotstrings.open_file": "फाइल खोलें…",
+	"menu.hotstrings.scope_enable_all": "सभी सक्षम करें",
+	"menu.hotstrings.scope_disable_all": "सभी अक्षम करें",
 	"menu.hotstrings.params": "⚙️ Hotstring सेटिंग्स",
 	"menu.hotstrings.personal_header": "मेरे hotstrings",
 	"menu.hotstrings.preview_bubbles": "बबल का पूर्वावलोकन करें",

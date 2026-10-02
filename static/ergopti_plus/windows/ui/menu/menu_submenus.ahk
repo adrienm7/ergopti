@@ -34,15 +34,11 @@ InitSubMenus() {
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
-		; Rows first, in the order the user sees them, and the renderer draws them
-		; at the end. This block used to append the open-file item and the sections
-		; and THEN splice the category toggle and the two bulk actions on top with
-		; RegisterMenuItemInsert("1&"/"2&"/"3&") — three inserts by position to
-		; express « these three come first », which building the array in order says
-		; on its own.
+		; Native section data keeps the file's order; the shared declaration adds
+		; the explicit category commands and optional source-file row.
 		TomlPath := HotstringsBundledTomlPath(V1Cat)
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
-		Rows := _HS_CategoryHeadRows(V1Cat, V2Section, TomlPath)
+		Rows := []
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
 			; Build a map from the section-name part of the v2 path to its entry
@@ -98,8 +94,7 @@ InitSubMenus() {
 				}
 			}
 		}
-		SubMenu := Menu()
-		MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_" . V1Cat, Rows)
+		SubMenu := _HS_CategoryMenu(V1Cat, TomlPath, Rows)
 		SubMenus[V1Cat] := SubMenu
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,

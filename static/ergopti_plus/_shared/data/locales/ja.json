@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "すべてのセクションを有効にする",
 	"menu.hotstrings.open_editor": "ホットストリングエディターを開く",
 	"menu.hotstrings.open_file": "ファイルを開く…",
+	"menu.hotstrings.scope_enable_all": "すべて有効にする",
+	"menu.hotstrings.scope_disable_all": "すべて無効にする",
 	"menu.hotstrings.params": "⚙️ ホットストリング設定",
 	"menu.hotstrings.personal_header": "マイ hotstrings",
 	"menu.hotstrings.preview_bubbles": "プレビューバブル",

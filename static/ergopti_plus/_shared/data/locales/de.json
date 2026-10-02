@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Alle Abschnitte aktivieren",
 	"menu.hotstrings.open_editor": "Hotstring-Editor öffnen",
 	"menu.hotstrings.open_file": "Datei öffnen…",
+	"menu.hotstrings.scope_enable_all": "Alle aktivieren",
+	"menu.hotstrings.scope_disable_all": "Alle deaktivieren",
 	"menu.hotstrings.params": "⚙️ Hotstring-Einstellungen",
 	"menu.hotstrings.personal_header": "Meine hotstrings",
 	"menu.hotstrings.preview_bubbles": "Vorschau-Blasen",

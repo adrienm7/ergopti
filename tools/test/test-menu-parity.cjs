@@ -87,6 +87,8 @@ const OPENS_SUBMENU = {
 	metrics: 'metrics_menu',
 	keyboard_layout: 'layout_menu',
 	hotstrings: 'hotstrings_menu',
+	// Each standard category provider opens the shared explicit command head.
+	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	key_combinations: 'key_combinations_group',
@@ -547,7 +549,8 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // (script_control_group), the script chords the three drivers share.
 // hs 16 → 17: every ordered pair reads key_combination_pair_menu; only its
 // native slot picker data stays in the driver.
-const RENDERED_THROUGH_SHARED = { hs: 17, linux: 14 };
+// Explicit hotstring category commands and section lists now have one shared head.
+const RENDERED_THROUGH_SHARED = { hs: 18, linux: 15 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

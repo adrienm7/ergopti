@@ -1,15 +1,12 @@
 ﻿; ui/menu/menu_hotstring_switches.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Gate And « All Sections » Checkboxes
+; MODULE: Hotstring Scope Menu Bindings
 ; DESCRIPTION:
-; The two switches every hotstring scope offers: the category gate, and one
-; « all sections » checkbox where a « tout activer » / « tout désactiver » pair
-; used to be — two rows and two keys for one control, whose state the user could
-; only guess. Both are checkboxes with one label, ticked from the state they
-; govern. Row data only: the renderer draws them, and the batched writers in
-; infra/config_io.ahk do the work. Kept apart from the submenu builders so the
-; unit harness can build these rows over the live Features and gates.
+; Standard category submenus bind the shared explicit commands to the atomic
+; category owner. Language and whole-tree section controls retain their separate
+; checkbox contract. Native providers supply source files and section data;
+; the shared declaration and renderer own category row labels and ordering.
 ; ==============================================================================
 
 
@@ -71,34 +68,23 @@ _HS_AllSectionsRow(AllOn, Apply) {
 		"action",  (*) => Apply(!AllOn))
 }
 
-; The rows every hotstring category submenu opens with. THE ORDER BELOW IS THE
-; SHARED ONE, and the three drivers had three of them until 2026-08-07: this
-; driver put the bulk actions above « ouvrir le fichier », Linux put them below
-; it, and macOS had no category gate row at all.
-;
-;   1. the category gate — everything under it is inert while it is off
-;   2. « ouvrir le fichier », when the category has one
-;   3. ─────────
-;   4. the « all sections » checkbox
-;   5. ─────────
-;
-; The gate alternated « ✅ Activée (cliquer pour désactiver) » and « ❌ Désactivée
-; (cliquer pour activer) ». Its state also drives the parent menu checkmark
-; (IsCategoryGated), independent of how many sections are checked. V1Cat is
-; captured by value so each closure acts on its own category.
-_HS_CategoryHeadRows(V1Cat, V2Section, TomlPath) {
-	Rows := []
-	Rows.Push(Map(
-		"label",   t("menu.hotstrings.category_enable"),
-		"checked", IsCategoryGated(V1Cat) ? true : false,
-		"action",  ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
-	if FileExist(TomlPath)
-		Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
-	Rows.Push(Map("separator", true))
-	Rows.Push(_HS_AllSectionsRow(_HS_ScopeAllOn([V1Cat], _HS_SectionPaths(V2Section)),
-		((c) => (Bool) => ToggleCategoryAllSections(c, Bool))(V1Cat)))
-	Rows.Push(Map("separator", true))
-	return Rows
+/**
+ * Builds one category through the shared command and provider declaration.
+ * @param {String} V1Cat Native category id.
+ * @param {String} TomlPath The category's resolved bundled source.
+ * @param {Array} Sections Native section rows, in source order.
+ * @param {Func} Apply The journal-backed category transaction.
+ * @returns {Menu} The rendered category submenu.
+ */
+_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply) {
+	Commands := Map(
+		"hotstring_category_enable_all", (*) => Apply([V1Cat], true),
+		"hotstring_category_disable_all", (*) => Apply([V1Cat], false))
+	Providers := Map(
+		"hotstring_category_file", (*) => FileExist(TomlPath)
+			? [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath))] : [],
+		"hotstring_category_sections", (*) => Sections)
+	return MenuRenderer_Build("hotstring_category_menu", "Hotstrings", "", "", Providers, Commands)
 }
 
 ; The « all sections » checkbox that opens a language submenu, for every section

@@ -59,11 +59,11 @@ local function mutation_for(outcome, calls)
 end
 
 
---- Builds and clicks the reachable category-gate row under a submenu parent.
+--- Builds and clicks the reachable explicit category command under a submenu parent.
 --- @param outcome string
 --- @return table calls
 --- @return table state
-local function click_category_gate(outcome)
+local function click_category_scope(outcome)
 	local calls = {
 		mutations = 0,
 		saves = 0,
@@ -88,7 +88,13 @@ local function click_category_gate(outcome)
 			get_meta_description = function() return "Alpha" end,
 			get_sections = function() return { { name = "one", description = "One" } } end,
 			is_section_enabled = function() return true end,
-			disable_group = mutation_for(outcome, calls),
+			set_category_scope_enabled = function(names, enabled, publish)
+				calls.targets = names
+				calls.enabled = enabled
+				local result = mutation_for(outcome, calls)()
+				if result ~= true then return result end
+				return publish()
+			end,
 		},
 		save_prefs = function() calls.saves = calls.saves + 1; return true end,
 		notify_feature = function() calls.success_notices = calls.success_notices + 1 end,
@@ -96,21 +102,23 @@ local function click_category_gate(outcome)
 	}
 
 	local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
-	local gate = rows[1] and rows[1].items and rows[1].items[1]
-	helpers.assert_eq(type(gate and gate.action), "function",
-		"the category gate below the submenu parent must be user-reachable")
-	local ok, err = pcall(gate.action)
+	local command = rows[1] and rows[1].submenu and rows[1].submenu[2]
+	helpers.assert_eq(type(command and command.fn), "function",
+		"the explicit command below the submenu parent must be user-reachable")
+	local ok, err = pcall(command.fn)
 	package.loaded["infra.notifications"] = previous_notifications
 	package.loaded["ui.menu.keymap_lifecycle"] = nil
 	helpers.assert_true(ok, "a reachable menu callback must contain mutation throws: " .. tostring(err))
+	helpers.assert_eq(calls.targets, { "alpha" })
+	helpers.assert_eq(calls.enabled, false)
 	return calls, state
 end
 
 
 helpers.describe("hotstring menu mutations: publish only exact commitments", function()
-	helpers.it("rejects false, nil, and throw from the reachable category gate", function()
+	helpers.it("rejects false, nil, and throw from the reachable category scope command", function()
 		for _, outcome in ipairs(FAILURE_OUTCOMES) do
-			local calls, state = click_category_gate(outcome)
+			local calls, state = click_category_scope(outcome)
 			helpers.assert_eq(calls.mutations, 1, outcome .. " must attempt one registry mutation")
 			helpers.assert_eq(state.hotstrings.alpha, true,
 				outcome .. " must preserve the last committed menu state")
@@ -185,11 +193,11 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 		end
 	end)
 
-	helpers.it("publishes the reachable category gate after exact true", function()
-		local calls, state = click_category_gate("true")
+	helpers.it("publishes the reachable category scope command after exact true", function()
+		local calls, state = click_category_scope("true")
 		helpers.assert_eq(state.hotstrings.alpha, false)
 		helpers.assert_eq(calls.saves, 1)
-		helpers.assert_eq(calls.success_notices, 1)
+		helpers.assert_eq(calls.success_notices, 0, "the explicit command publishes one tray refresh")
 		helpers.assert_eq(calls.updates, 1)
 		helpers.assert_eq(calls.error_notices, 0)
 	end)

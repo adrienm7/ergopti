@@ -606,8 +606,20 @@ branch has been removed; the run also covers the 21-locale privacy label.
   acknowledgement inside the registry/settings rollback; Windows uses its
   existing lifecycle-fenced reload journal. Native-owner cases cover real
   settings/source bytes, unrelated choices and immediate/late publication
-  or writer refusal. The actual submenu migration remains pending; finish
-  the owner CI checkpoint before wiring all category views.
+  or writer refusal. The full native-owner checkpoint 36954011552 at
+  `7ad954b22` is green on all three OSes, including Windows unit/E2E,
+  packages and installation. Standard and language-category submenus now
+  consume `hotstring_category_menu`: two explicit commands, optional source
+  file, separator and native section data. Both commands remain available
+  behind a closed category or paused engine. Two new label keys have all
+  21 translations; source and native-menu tests reject duplicate switches,
+  inverted intent and duplicate rendering. macOS save-refusal tests retain
+  category state and withhold a success refresh; Windows native menu clicks
+  replay the real reload journal. Linux treats only exact true as an
+  acknowledgement and surfaces one localized, keyboard-released error dialog
+  on false/nil/throw; eight native-menu cases cover both requested postures.
+  Personal, dynamic and extension-file views
+  still need their own owner bindings before this item is complete.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.

@@ -4426,6 +4426,30 @@ id = "key_combination_rows_right"
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
+# Every category has explicit commands: neither command depends on its current
+# gate or section posture. Native owners commit the selected gate and sections
+# together while leaving the root engine, other categories and remapping alone.
+[[menu.hotstring_category_menu]]
+type = "command"
+id = "hotstring_category_enable_all"
+i18n = "menu.hotstrings.scope_enable_all"
+
+[[menu.hotstring_category_menu]]
+type = "command"
+id = "hotstring_category_disable_all"
+i18n = "menu.hotstrings.scope_disable_all"
+
+[[menu.hotstring_category_menu]]
+type = "list"
+id = "hotstring_category_file"
+
+[[menu.hotstring_category_menu]]
+type = "---"
+
+[[menu.hotstring_category_menu]]
+type = "list"
+id = "hotstring_category_sections"
+
 # The menu one pair of « Combinaisons de touches » opens on Windows, shown at
 # the pointer when its row is clicked: 182 pairs each carrying their slots and
 # a copy of the hold picker as submenus would be thousands of menu rows built

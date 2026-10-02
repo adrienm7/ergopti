@@ -155,3 +155,40 @@ _HSCS_InventoryOwnsOnlyHotstrings() {
 }
 Test("hotstring-category-owner: other tray namespaces never enter the selected inventory",
 	_HSCS_InventoryOwnsOnlyHotstrings)
+
+; The real Win32 command dispatch reaches the durable scope owner, including
+; pending handoff and restoration after native refusal.
+_HSCS_MenuOwner(Enabled) {
+	global _MenuDispatchCallbacks
+	_HSCS_WithSource(Check)
+	Check(Fixture) {
+		Receipt := 0, Refusal := 0
+		Launch(_Success, _Borrowed, Refused) {
+			Refusal := Refused
+			return true
+		}
+		Apply(Targets, Requested) {
+			Receipt := HotstringsCategoryScopeApply(Targets, Requested, Fixture.options)
+		}
+		Fixture.options["reload"] := Launch
+		Built := _HS_CategoryMenu("Rolls", "", [], Apply)
+		try {
+			AssertEqual(2, TrayMenuItemCount(Built), "empty providers leave exactly the two declared commands")
+			Position := Enabled ? 0 : 1
+			AssertEqual(t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all"),
+				_CTC_LabelAt(Built, Position))
+			Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+			Assert(_MenuDispatchCallbacks.Has(Id))
+			_MenuDispatchCallbacks[Id].Call()
+			AssertEqual("pending", Receipt["status"])
+			AssertEqual(Enabled, TOML_Read(Fixture.path, "category_enabled", "rolls", false))
+			AssertEqual(false, TOML_Read(Fixture.path, "category_enabled", "hotstrings", true))
+			Refusal.Call("native category menu reload refused")
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+		} finally _CTC_ReleaseMenu(Built)
+	}
+}
+for _HSCS_Enabled in [true, false]
+	Test("hotstring-category-menu-owner: native command " . _HSCS_Enabled . " commits through the journal",
+		_HSCS_MenuOwner.Bind(_HSCS_Enabled))

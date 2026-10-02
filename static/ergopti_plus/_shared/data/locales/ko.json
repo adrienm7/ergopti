@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "모든 섹션 활성화",
 	"menu.hotstrings.open_editor": "핫스트링 편집기 열기",
 	"menu.hotstrings.open_file": "파일 열기…",
+	"menu.hotstrings.scope_enable_all": "모두 활성화",
+	"menu.hotstrings.scope_disable_all": "모두 비활성화",
 	"menu.hotstrings.params": "⚙️ 핫스트링 설정",
 	"menu.hotstrings.personal_header": "내 hotstrings",
 	"menu.hotstrings.preview_bubbles": "미리보기 버블",

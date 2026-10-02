@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Включить все разделы",
 	"menu.hotstrings.open_editor": "Открыть редактор хотстрингов",
 	"menu.hotstrings.open_file": "Открыть файл…",
+	"menu.hotstrings.scope_enable_all": "Включить всё",
+	"menu.hotstrings.scope_disable_all": "Отключить всё",
 	"menu.hotstrings.params": "⚙️ Настройки хотстрингов",
 	"menu.hotstrings.personal_header": "Мои hotstrings",
 	"menu.hotstrings.preview_bubbles": "Пузырьки предпросмотра",

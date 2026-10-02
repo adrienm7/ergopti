@@ -105,14 +105,31 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		end
 	end)
 
-	helpers.it("every hotstring category still carries its sections", function()
-		local src = helpers.read_driver_unit("function M.build_groups")
-		helpers.assert_true(src ~= nil, "the hotstring category builder must be locatable")
-
-		helpers.assert_true(src:find("item.items = sec_menu", 1, true) ~= nil,
-			"the section list must be attached as `items`. Written as `menu` it is attached to a field "
-			.. "the renderer never reads, and every standard and Ergopti category renders as a bare "
-			.. "clickable row: no « ouvrir le fichier », no bulk actions, no section toggles, no warning")
+	helpers.it("every hotstring category carries its rendered sections and commands intact", function()
+		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx = {
+			hotfiles = { "alpha.toml" }, get_group_name = function() return "alpha" end,
+			state = { hotstrings = {}, sections_order_overrides = {} },
+			applyTriggerChar = function(value) return value end,
+			keymap = {
+				is_group_enabled = function() return true end,
+				is_section_enabled = function() return true end,
+				get_sections = function() return {
+					{ name = "one", description = "One", count = 1 },
+					{ name = "two", description = "Two", count = 3 },
+				} end,
+			},
+		}
+		local rows = Hotstrings.build_groups(ctx, nil, {})
+		local rendered = require("infra.manifest_menu").render_rows(rows, "category-dialect-proof")
+		helpers.assert_eq(#rendered, 1)
+		helpers.assert_true(rendered[1].menu == rows[1].submenu,
+			"an already-rendered child passes through without translating or rebuilding commands")
+		helpers.assert_eq(#rendered[1].menu, 5, "two commands, a separator and both native sections")
+		helpers.assert_eq(rendered[1].menu[4].title, "One (1)")
+		helpers.assert_eq(rendered[1].menu[5].title, "Two (3)")
+		helpers.assert_eq(type(rendered[1].menu[1].fn), "function")
+		helpers.assert_eq(type(rendered[1].menu[2].fn), "function")
 	end)
 
 	helpers.it("the extension tree emits rows in the dialect it also reads", function()

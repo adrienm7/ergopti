@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "تفعيل كل الأقسام",
 	"menu.hotstrings.open_editor": "فتح محرر السلاسل النصية",
 	"menu.hotstrings.open_file": "فتح ملف…",
+	"menu.hotstrings.scope_enable_all": "تفعيل الكل",
+	"menu.hotstrings.scope_disable_all": "تعطيل الكل",
 	"menu.hotstrings.params": "⚙️ إعدادات السلاسل النصية",
 	"menu.hotstrings.personal_header": "hotstrings الخاصة بي",
 	"menu.hotstrings.preview_bubbles": "فقاعات المعاينة",

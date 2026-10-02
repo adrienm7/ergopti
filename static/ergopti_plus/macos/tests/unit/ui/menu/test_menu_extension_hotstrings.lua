@@ -114,7 +114,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 		helpers.assert_eq(total, 14)
 		local labels = {}
 		for _, group in ipairs(Hotstrings.build_groups(ctx, nil, {})) do
-			for _, row in ipairs(group.items or {}) do labels[#labels + 1] = tostring(row.label) end
+			for _, row in ipairs(group.submenu or {}) do labels[#labels + 1] = tostring(row.title) end
 		end
 		local text = table.concat(labels, "|")
 		helpers.assert_true(text:find("Symbols (150)", 1, true) ~= nil, text)
