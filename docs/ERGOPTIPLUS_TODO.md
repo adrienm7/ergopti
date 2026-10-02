@@ -749,7 +749,12 @@ exact-boolean regressions also pass the focused runner.
   choices and the independent hotstrings_overrides.toml timing/presentation
   overrides, preserved global order, 21-locale names and per-section E2E.
   Never regenerate these historical expectations from the split source.
-
+  The Windows value-clone owner now preserves Map comparison modes and
+  independently owns typed TOML Boolean wrappers. Four registered native
+  regressions cover distinct quoted keys, nested mutation in both directions,
+  typed render/readback and an isolated generic clone without the TOML class.
+  Native Windows proof remains pending; unsupported opaque objects keep their
+  previous identity contract.
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples
