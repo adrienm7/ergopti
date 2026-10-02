@@ -180,6 +180,30 @@ _CMG_CopyPreservesInlineAncestor() {
 }
 Test("config migrate: conditional copies preserve occupied inline namespaces (config-migrate-copy-namespace)", _CMG_CopyPreservesInlineAncestor)
 
+_CMG_StampOnlyPreservesExactRecords() {
+	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	OldMeta := '[_meta] # metadata owner`nschema_version = 1.0 # retain this comment`nunknown = "keep"`n`n'
+	NewMeta := StrReplace(OldMeta, "= 1.0", "= 2")
+	Missing := '[_meta]`nunknown = "keep"`n`n'
+	Cases := [
+		{ Source: OldMeta . Input, Expected: NewMeta . Input },
+		{ Source: Missing . Input, Expected: '[_meta]`nschema_version = 2`nunknown = "keep"`n`n' . Input },
+		{ Source: Chr(0xFEFF) . StrReplace(OldMeta . Input, "`n", "`r`n"),
+			Expected: Chr(0xFEFF) . StrReplace(NewMeta . Input, "`n", "`r`n") },
+		{ Source: RTrim(OldMeta . Input, "`n"), Expected: RTrim(NewMeta . Input, "`n") },
+		{ Source: Input . "[_meta]", Expected: Input . "[_meta]`nschema_version = 2`n" }
+	]
+	for CaseInfo in Cases {
+		Plan := ConfigMigratePlan(CaseInfo.Source, Registry, "ahk")
+		AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+		AssertEqual(CaseInfo.Expected, Plan["candidate"], "only the metadata stamp may change")
+	}
+}
+Test("config migrate: stamp-only plans preserve comments, BOM, EOL and final rows (config-migrate-stamp-bytes)",
+	_CMG_StampOnlyPreservesExactRecords)
+
 ; The boot transaction on a real file: backup, publication or refusal.
 _CMG_CorpusBootTransactions() {
 	global _CMG_STAMP
