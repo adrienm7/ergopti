@@ -586,19 +586,28 @@ That native case passes non-release run 36935760620 at `21de5dcea`: the complete
 three-OS pipeline, including every installation variant, is green. Its temporary
 branch has been removed; the run also covers the 21-locale privacy label.
 
-- [ ] **102.** Simplify each Hotstrings category submenu to two commands,
-      "Enable all" and "Disable all", replacing the duplicate category and
-      whole-section activation controls. Declare the structure once in the
-      shared manifest and translate its labels into all 21 locales. Apply the
-      effective category/section changes through their persistence owners;
-      retain unrelated choices and fence refused writes/runtime publication.
-      Replay the same full-enable/full-disable behavior on every driver.
-      The macOS lifecycle helper now rejects the preference owner's returned
-      refusal as well as a thrown publication error. Three regressions first
-      showed false acknowledgements after false/nil/throwing writer results;
-      they replay the real save/rollback owner, preserved choices and runtime,
-      withheld cache updates and the visible failure notice. Void UI-only
-      callbacks remain valid. The actual submenu migration remains pending.
+- [~] **102.** Simplify each Hotstrings category submenu to two commands,
+  "Enable all" and "Disable all", replacing the duplicate category and
+  whole-section activation controls. Declare the structure once in the
+  shared manifest and translate its labels into all 21 locales. Apply the
+  effective category/section changes through their persistence owners;
+  retain unrelated choices and fence refused writes/runtime publication.
+  Replay the same full-enable/full-disable behavior on every driver.
+  The macOS lifecycle helper now rejects the preference owner's returned
+  refusal as well as a thrown publication error. Three regressions first
+  showed false acknowledgements after false/nil/throwing writer results;
+  they replay the real save/rollback owner, preserved choices and runtime,
+  withheld cache updates and the visible failure notice. Void UI-only
+  callbacks remain valid. Category bulk operations now share one Lua
+  planner and a Windows port with a 17-vector common corpus. Both commands
+  explicitly set the category and its actionable sections, preserving the
+  independent engine master and legacy Layout remapping. Linux commits
+  through its existing canonical-choice owner; macOS includes persistence
+  acknowledgement inside the registry/settings rollback; Windows uses its
+  existing lifecycle-fenced reload journal. Native-owner cases cover real
+  settings/source bytes, unrelated choices and immediate/late publication
+  or writer refusal. The actual submenu migration remains pending; finish
+  the owner CI checkpoint before wiring all category views.
 - [ ] **103.** Move the common "Distance reduction" hotstrings into the
       Ergopti+ extension: these bindings depend on the layout rather than being
       common to every user. Extensions own their hotstrings, shortcuts and

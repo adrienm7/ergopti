@@ -18,6 +18,7 @@ local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
 local Languages = require("hotstrings.languages")
+local BulkScope = require("hotstrings.bulk_scope")
 local LOG    = "keymap.registry"
 
 local _state = nil
@@ -250,18 +251,20 @@ local function restore_section_settings(previous)
 end
 
 --- Persists and applies section changes for one or more groups atomically.
---- Each change is `{ name = string, sections = string[], enable_group = bool }`.
+--- Each change is `{ name, sections, enable_group|nil, group_enabled|nil }`.
 --- Exact true means all settings and live groups reached their postcondition;
 --- every other outcome restores the previous settings and registry snapshot.
 --- @param changes table
 --- @param enabled boolean
+--- @param publish function|nil Exact persistence acknowledgement, inside rollback.
 --- @return boolean committed
-function M.set_groups_sections_enabled(changes, enabled)
+function M.set_groups_sections_enabled(changes, enabled, publish)
 	if not require_state("set_groups_sections_enabled") then return false end
 	if type(changes) ~= "table" or type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_groups_sections_enabled: changes table and boolean enabled are required.")
 		return false
 	end
+	if publish ~= nil and type(publish) ~= "function" then return false end
 	if #changes == 0 then return true end
 
 	local known_groups = Groups.list_groups()
@@ -269,7 +272,8 @@ function M.set_groups_sections_enabled(changes, enabled)
 	local seen_keys = {}
 	for _, change in ipairs(changes) do
 		if type(change) ~= "table" or type(change.name) ~= "string" or change.name == ""
-			or type(change.sections) ~= "table" or known_groups[change.name] == nil then
+			or type(change.sections) ~= "table" or known_groups[change.name] == nil
+			or (change.group_enabled ~= nil and type(change.group_enabled) ~= "boolean") then
 			Logger.error(LOG, "set_groups_sections_enabled: invalid or unknown group change.")
 			return false
 		end
@@ -308,13 +312,16 @@ function M.set_groups_sections_enabled(changes, enabled)
 
 		return Groups.transaction("set_groups_sections_enabled", function()
 			for _, change in ipairs(changes) do
-				if M.is_group_enabled(change.name) then
+				if change.group_enabled == false then
+					if M.disable_group(change.name) ~= true then return false end
+				elseif M.is_group_enabled(change.name) then
 					if M.disable_group(change.name) ~= true then return false end
 					if M.enable_group(change.name) ~= true then return false end
-				elseif change.enable_group == true then
+				elseif change.enable_group == true or change.group_enabled == true then
 					if M.enable_group(change.name) ~= true then return false end
 				end
 			end
+			if publish then return publish() == true end
 			return true
 		end)
 	end, debug.traceback)
@@ -325,6 +332,41 @@ function M.set_groups_sections_enabled(changes, enabled)
 		return false
 	end
 	return true
+end
+
+--- Sets selected category gates and all their hotstring sections together.
+--- The engine master is owned separately; callers do not start it here.
+--- @param targets table Dense category ids from the discovered registry.
+--- @param enabled boolean
+--- @param publish function|nil Persistence owner callback returning exact true.
+--- @return boolean committed
+function M.set_category_scope_enabled(targets, enabled, publish)
+	if not require_state("set_category_scope_enabled") then return false end
+	local inventory = {}
+	for id in pairs(Groups.list_groups()) do
+		inventory[id] = {}
+		for _, section in ipairs(M.get_sections(id) or {}) do
+			if section.name ~= "-" and not section.is_module_placeholder then
+				inventory[id][#inventory[id] + 1] = section.name
+			end
+		end
+	end
+	local plan, reason = BulkScope.plan(inventory, targets, enabled)
+	if not plan then
+		Logger.error(LOG, "Category selection refused: %s.", reason)
+		return false
+	end
+	local changes, by_id = {}, {}
+	for _, choice in ipairs(plan) do
+		if choice.section == nil then
+			local change = { name = choice.group, sections = {}, group_enabled = choice.enabled }
+			changes[#changes + 1], by_id[choice.group] = change, change
+		else
+			local sections = by_id[choice.group].sections
+			sections[#sections + 1] = choice.section
+		end
+	end
+	return M.set_groups_sections_enabled(changes, enabled, publish)
 end
 
 --- Replaces the derived section cache and group posture from canonical preferences.

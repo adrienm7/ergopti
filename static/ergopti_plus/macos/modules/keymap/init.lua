@@ -641,6 +641,7 @@ M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections
 -- Multi-group batch form used by whole-tree menu actions. One exact boolean
 -- commitment covers every setting and live registry rebuild in the click.
 M.set_groups_sections_enabled = preview_fenced_registry_mutation(Registry.set_groups_sections_enabled)
+M.set_category_scope_enabled = preview_fenced_registry_mutation(Registry.set_category_scope_enabled)
 M.apply_hotstring_preferences = preview_fenced_registry_mutation(Registry.apply_hotstring_preferences)
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
