@@ -2446,8 +2446,8 @@ local function load_modifier_chords(path)
 		Logger.warn(LOG, "Shared modifier chords JSON not found: %s", tostring(path))
 		return nil
 	end
-	local ok_json, data = pcall(hs.json.decode, raw)
-	if not ok_json or type(data) ~= "table" then
+	local data, decode_err = JsonCodec.decode(raw)
+	if decode_err ~= nil or type(data) ~= "table" then
 		Logger.warn(LOG, "Shared modifier chords JSON is invalid: %s", tostring(path))
 		return nil
 	end

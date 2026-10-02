@@ -12,6 +12,7 @@ local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local DeferredWork = require("infra.deferred_work")
+local JsonCodec = require("adapters.json_codec")
 local LOG = "console_window"
 
 --- Resolves the native console ratios from the shared geometry owner.
@@ -21,7 +22,8 @@ local function read_ratios()
 	local file = assert(io.open(path, "rb"))
 	local text = file:read("*a")
 	file:close()
-	local data = hs.json.decode(text)
+	local data, decode_err = JsonCodec.decode(text)
+	assert(decode_err == nil, "native console geometry JSON is invalid")
 	local ratios = type(data) == "table" and type(data.native_windows) == "table" and data.native_windows.console
 	assert(type(ratios) == "table", "native console geometry is missing")
 	for _, name in ipairs({ "width_ratio", "height_ratio" }) do

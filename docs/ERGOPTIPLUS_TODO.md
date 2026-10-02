@@ -268,14 +268,21 @@ These are software implementations; final hardware verification remains below.
       runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
       without needing the Karabiner driver.
 - [~] **41.** Remaining direct `hs.json.decode` calls (ratchet
-  `tests/meta/test_json_decode_through_codec.lua`, 14 calls in 12 files outside
-  the adapter). Locale, manifest menus, personal hotstrings, keylogger
+  `tests/meta/test_json_decode_through_codec.lua`, no calls outside the adapter).
+  Locale, manifest menus, personal hotstrings, keylogger
   aggregation, keymap priority and both shortcut readers now decode through
   `adapters/json_codec.lua`, which returns a tree. A menu regression preserves
   independent equal arrays, rows and nested options after mutation; it failed
   before the migration. The single-reader guard recognizes codec bindings
   and detects competing readers in one directory without lowering its limits.
-  Migrate the remaining readers and lower the baseline.
+  The remaining 14 calls in 12 files now use the codec as well: caret ingest,
+  gesture catalogues, AI defaults/catalogues, MLX configuration/readiness/session
+  handoffs, changelog responses and UI geometry. Callers check the decode error
+  tuple and preserve their previous refusal or required-file failure behaviour.
+  Caret and model-catalogue regressions preserve independent equal objects and
+  nested arrays after mutation, including the native decoder's original graph.
+  The direct-call baseline now contains only the adapter's own implementation.
+  Full three-OS validation of this slice is pending.
   Audit the other hs stubs for the same divergence from native behaviour.
 - [ ] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
       an old build's scalar where a table is now expected (`magickey = true` under

@@ -21,6 +21,7 @@ local Paths = require("infra.paths")
 local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 
 --- Monotonic milliseconds for webview open, load and close durations.
 --- @return number
@@ -388,8 +389,8 @@ local function load_apps_manifest()
 	end
 	local content = fh:read("*a")
 	fh:close()
-	local ok_j, data = pcall(hs.json.decode, content)
-	if not ok_j or type(data) ~= "table" or type(data.apps) ~= "table" then
+	local data, decode_err = JsonCodec.decode(content)
+	if decode_err ~= nil or type(data) ~= "table" or type(data.apps) ~= "table" then
 		Logger.error(LOG, "Failed to parse apps.manifest.json.")
 		return nil
 	end

@@ -23,6 +23,7 @@ local llm_mod   = require("modules.llm")
 local i18n      = require("infra.i18n")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 
 local LOG = "menu_llm.models"
 
@@ -40,8 +41,8 @@ local function load_models_presets()
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	local ok, data = pcall(hs.json.decode, raw)
-	if not ok or type(data) ~= "table" or #data == 0 then
+	local data, decode_err = JsonCodec.decode(raw)
+	if decode_err ~= nil or type(data) ~= "table" or #data == 0 then
 		error("[menu_llm.models] models.json invalid or empty: " .. path)
 	end
 	Logger.done(LOG, "Loaded models catalogue (%d providers) from %s.", #data, path)
