@@ -136,3 +136,22 @@ for _HSCS_Enabled in [true, false] {
 		_HSCS_ImmediateRefusal.Bind(_HSCS_Enabled))
 }
 Test("hotstring-category-owner: an unknown sibling never launches or writes", _HSCS_UnknownScope)
+
+_HSCS_InventoryOwnsOnlyHotstrings() {
+	Requested := []
+	Read(Prefix) {
+		Requested.Push(Prefix)
+		return ManifestFeaturesForSection(Prefix)
+	}
+	Inventory := _HotstringsCategoryScopeInventory(Map("Layout", "layout", "Shortcuts", "shortcuts",
+		"Gestures", "gestures", "Rolls", "hotstrings.rolls"), Read)
+	AssertEqual(1, Inventory.Count, "other tray scopes are not hotstring categories")
+	Assert(Inventory.Has("Rolls"))
+	Assert(Inventory["Rolls"].Length > 1, "the admitted category must expose its real sections")
+	AssertEqual(1, Requested.Length, "foreign namespaces are not even queried")
+	AssertEqual("hotstrings.rolls", Requested[1])
+	AssertFalse(HotstringsCategoryScopePlan(Inventory, ["Rolls", "Layout"], true, &Reason))
+	AssertEqual("unknown-category", Reason)
+}
+Test("hotstring-category-owner: other tray namespaces never enter the selected inventory",
+	_HSCS_InventoryOwnsOnlyHotstrings)
