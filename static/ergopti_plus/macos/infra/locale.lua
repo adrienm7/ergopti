@@ -4,7 +4,7 @@
 --- MODULE: Locale (macOS)
 --- DESCRIPTION:
 --- Thin wrapper around _shared/lua/locale/core.lua. Injects macOS-specific
---- dependencies (hs.json.decode, Paths.shared, Logger) and re-exports the
+--- dependencies (JsonCodec.decode, Paths.shared, Logger) and re-exports the
 --- shared surface. All locale logic lives in the shared module — this file
 --- only wires the platform layer.
 ---
@@ -17,6 +17,7 @@
 
 local M = {}
 
+local JsonCodec = require("adapters.json_codec")
 local Logger  = require("infra.logger")
 local Paths   = require("infra.paths")
 
@@ -27,7 +28,7 @@ local Core    = require("locale.core")
 
 -- Wire the shared module at require-time so callers never call init().
 Core.init({
-	json_decode = hs.json.decode,
+	json_decode = JsonCodec.decode,
 	resolve_locale_path = function(code)
 		local path = Paths.shared("data/locales/" .. code .. ".json")
 		if path and path ~= "" then

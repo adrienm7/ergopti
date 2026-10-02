@@ -74,3 +74,30 @@ helpers.describe("ManifestMenu.build: warns (does not silently skip) on a handle
 		end)
 	end)
 end)
+
+helpers.describe("ManifestMenu decoding returns independent values (json-shared-tables)", function()
+	helpers.it("equal menu arrays and nested objects can be edited independently (json-shared-tables)", function()
+		local document = [[
+{
+	"first": [{ "type": "action", "id": "same", "options": { "label": "original" } }],
+	"second": [{ "type": "action", "id": "same", "options": { "label": "original" } }]
+}
+]]
+		local first, second = fixture.with_manifest(document, nil, function(ManifestMenu)
+			local first = ManifestMenu.get_array("first")
+			local second = ManifestMenu.get_array("second")
+			first[1].options.label = "changed"
+			first[#first + 1] = { type = "action", id = "added" }
+			return first, second
+		end)
+
+		helpers.assert_true(not rawequal(first, second), "equal menu arrays must be distinct")
+		helpers.assert_true(not rawequal(first[1], second[1]), "equal menu rows must be distinct")
+		helpers.assert_true(not rawequal(first[1].options, second[1].options),
+			"equal nested options must be distinct")
+		helpers.assert_eq(first[1].options.label, "changed")
+		helpers.assert_eq(#first, 2)
+		helpers.assert_eq(second[1].options.label, "original", "editing one menu must leave its twin unchanged")
+		helpers.assert_eq(#second, 1, "appending to one menu must leave its twin unchanged")
+	end)
+end)
