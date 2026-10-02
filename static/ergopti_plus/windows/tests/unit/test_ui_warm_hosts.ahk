@@ -205,3 +205,20 @@ _UIWH_CacheInvalidation() {
 }
 Test("UI: document cache invalidation is bounded and propagates refusal (ui-warm-reopen)",
 	_UIWH_CacheInvalidation)
+
+_UIWH_BrowserCaption() {
+	SavedHidden := A_DetectHiddenWindows
+	Host := WMBrowserWarmHost()
+	try {
+		DetectHiddenWindows(true)
+		Parent := DllCall("GetParent", "Ptr", Host.Hwnd, "Ptr")
+		Assert(Parent > 0, "the retained controller belongs to a real native host")
+		AssertEqual(WindowTitle(""), WinGetTitle("ahk_id " . Parent), "the warm host uses the shared product title")
+		AssertEqual(0xC00000, WinGetStyle("ahk_id " . Parent) & 0xC00000, "controller geometry retains the native caption")
+		AssertFalse(DllCall("IsWindowVisible", "Ptr", Parent))
+	} finally {
+		Host.Destroy.Call()
+		DetectHiddenWindows(SavedHidden)
+	}
+}
+Test("UI: hidden browser host retains its caption and shared title (ui-warm-browser-title)", _UIWH_BrowserCaption)
