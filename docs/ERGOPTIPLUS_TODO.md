@@ -290,7 +290,15 @@ after native captions were captured through explicit UTF-8 receipts.
       Escape run the script actions out of the box (Linux: AltGr); opening the
       app starts no Python and shows no Rosetta notice; the MLX install works
       behind a company proxy; a rollback from the Versions window swaps the app
-      and keeps the previous one.
+      and keeps the previous one. Windows still needs a physical-device
+      reproduction check of the previously reported AZERTY + AHK Ergopti+
+      emulation to native Ergopti layout switch and its reverse: AltGr stays
+      usable without a manual reload, including same-window changes and
+      switches during held/deferred input ownership. Existing foreground,
+      polling and deferred-owner regressions passed complete non-release
+      checkpoints 36931498806 and 36940286440. This consolidates former item 99
+      under hardware acceptance; it does not establish physical acceptance or
+      a new runtime fault from the supplied unpublished snapshot.
 - [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
   branch on 2026-09-30; agents must not create `backup/*` branches again. The
   finished agent worktrees under `.claude/worktrees/` can be removed; the
@@ -618,14 +626,6 @@ is committed; one request is one commit with its regression test.
       key and output chosen by the user: any keyboard position and arbitrary
       character, including choosing no star at all. Integrate with item 97's
       shared user-owned shortcut model rather than another fixed-layout switch.
-- [ ] **99.** Windows: switching from AZERTY with AHK Ergopti+ emulation to the
-      native Ergopti Windows layout leaves AltGr unusable until reload. Follow
-      the foreground HKL and re-decide Kana/AltGr without restarting; cover both
-      directions, same-window changes and active/deferred owners in native CI.
-      Current foreground-following, polling and deferred-owner regressions pass
-      in run 36931498806. No additional fault is established from the supplied
-      snapshot's unpublished local revision; retain the report for a concrete
-      reproduction rather than adding an unproven runtime workaround.
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
       shutdown debt (watchers=0). Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
