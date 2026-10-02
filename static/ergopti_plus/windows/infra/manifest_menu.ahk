@@ -124,8 +124,13 @@ _MR_Get(Obj, Key, Default := "") {
 ;   macOS renderer takes the same shape, which is what lets a section rendered on
 ;   both drivers finally be compared.
 ;
+; An optional empty target keeps caller-owned references used by native repaint
+; callbacks while the shared declaration still owns command and separator order.
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "") {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset) {
+	if IsSet(TargetMenu) && (!(TargetMenu is Menu)
+			|| DllCall("GetMenuItemCount", "ptr", TargetMenu.Handle, "int") != 0)
+		throw Error("A manifest menu target must be an empty native menu.")
 	if (GroupBuilders == "") {
 		GroupBuilders := Map()
 	}
@@ -144,7 +149,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	}
 
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
-	Result     := Menu()
+	Result     := IsSet(TargetMenu) ? TargetMenu : Menu()
 	ItemCount  := 0      ; real items added so far
 	PendingSep := false  ; separator deferred until next real item
 

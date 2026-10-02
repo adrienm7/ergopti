@@ -648,8 +648,17 @@ exact-boolean regressions also pass the focused runner.
   and Unicode section names; native cases retain the engine master, sibling
   categories, private source and package contents across immediate/late
   refusal, and reject unknown or uninstalled content before writing.
-  Personal and dynamic views still need their own owner bindings before
-  this item is complete.
+  Personal menus now use the shared explicit commands on macOS and for the
+  primary Windows personal file; Linux's existing personal category rendering
+  is covered by four parity cases. macOS commits all selected personal/custom
+  gates and sections together, restoring prior and absent gates after a refused
+  canonical save without starting capture. Individual personal file submenus
+  select only their own group. Windows uses the conditional reload journal,
+  reads personal section inventory afresh under the lease, preserves native
+  repaint references and restores exact configuration bytes after immediate or
+  late replacement refusal. Full three-OS validation of this slice is pending.
+  Windows's additional personal-file views and the dynamic views still need
+  their own owner bindings before this item is complete.
   The Windows discovery boundary now filters its mixed legacy tray map to
   the Hotstrings namespace before requesting any feature metadata; a native
   case excludes Layout, Gestures and Shortcuts from both discovery and selection.

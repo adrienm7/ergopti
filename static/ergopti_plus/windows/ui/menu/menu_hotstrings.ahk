@@ -732,7 +732,9 @@ _HS_PersonalSectionsAllOn(TomlData) {
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
-_HS_PersonalRows() {
+_HS_PersonalRows(Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
 	global ScriptInformation, Features, _PersonalExtTree
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
@@ -804,10 +806,6 @@ _HS_PersonalRows() {
 			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalRows.Push(Map("separator", true))
-			; One « all sections » checkbox for the personal hotstrings.
-			PersonalRows.Push(_HS_AllSectionsRow(_HS_PersonalSectionsAllOn(TomlData),
-				(Bool) => HS_TogglePersonalAllSections(Bool)))
-			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
 					PersonalRows.Push(Map("separator", true))
@@ -825,7 +823,8 @@ _HS_PersonalRows() {
 				}
 			}
 		}
-		MenuRenderer_AppendRows(PersonalMenu, "hotstrings_menu", "hotstring_personal", PersonalRows)
+		_HS_CategoryMenu("Personal", "", PersonalRows,
+			(_Targets, Enabled) => HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0

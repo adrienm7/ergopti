@@ -959,7 +959,8 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
 			if PersonalPath == "" || !FSExists(PersonalPath)
 				throw Error("Personal hotstring configuration is unavailable.")
-			for Section in ReadPersonalToml()["sections_order"] {
+			; A menu preview must not freeze a later admitted scope inventory.
+			for Section in ReadPersonalToml(true)["sections_order"] {
 				if Section == "-"
 					continue
 				_ConfigSeedPersonalHotstring(Desired, Section)

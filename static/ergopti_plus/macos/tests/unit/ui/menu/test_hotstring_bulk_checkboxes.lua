@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Category commands set their requested posture through one atomic owner, keep
 --- the root engine stopped, and withhold UI publication after refused saves.
---- Language, personal and whole-tree section controls retain their existing
+--- Language and whole-tree section controls retain their existing
 --- independent checkbox contracts until their own scoped migration.
 --- ==============================================================================
 
@@ -60,17 +60,6 @@ local function context(sections_on, group_on, files)
 	return ctx, batches
 end
 
---- The row of `rows` labelled `key`.
---- @param rows table
---- @param key string
---- @return table|nil
-local function row_labelled(rows, key)
-	for _, row in ipairs(rows or {}) do
-		if row.label == key then return row end
-	end
-	return nil
-end
-
 --- Asserts that no row of `rows`, at any depth, still draws a retired label.
 --- @param rows table
 --- @param where string
@@ -78,20 +67,21 @@ local function assert_no_retired(rows, where)
 	local seen = 0
 	local function walk(list)
 		for _, row in ipairs(list or {}) do
-			if type(row.label) == "string" then
+			local label = row.label or row.title
+			if type(label) == "string" then
 				seen = seen + 1
 				for _, retired in ipairs(RETIRED) do
-					helpers.assert_true(row.label ~= retired, where .. " still draws the retired '" .. retired .. "' row")
+					helpers.assert_true(label ~= retired, where .. " still draws the retired '" .. retired .. "' row")
 				end
 			end
-			walk(row.items)
+			walk(row.items or row.menu)
 		end
 	end
 	walk(rows)
 	helpers.assert_true(seen > 0, where .. " drew no labelled row, so the absence proves nothing")
 end
 
-helpers.describe("hotstring bulk controls are one checkbox each", function()
+helpers.describe("hotstring scope commands and independent bulk checkboxes", function()
 	for _, posture in ipairs({ true, false }) do
 		for _, enabled in ipairs({ true, false }) do
 			helpers.it("a category offers the explicit scope command " .. tostring(enabled)
@@ -217,21 +207,77 @@ helpers.describe("hotstring bulk controls are one checkbox each", function()
 			"a UI failure cannot make the public choice disagree with the committed file and registry")
 	end)
 
-	helpers.it("the personal submenu offers one « all sections » checkbox per group", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, posture in ipairs({ true, false }) do
+			helpers.it("personal scope command " .. tostring(enabled) .. " behind gate " .. tostring(posture), function()
+				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local ctx, batches = context(not posture, posture, { "personal.toml" })
+				ctx.state.trigger_char = "★"
+				ctx.state.keymap = false
+				ctx.paused = true
+				ctx.hotstring_editor = { open = function() end }
+				local starts, saves, updates = 0, 0, 0
+				ctx.keymap.start = function() starts = starts + 1; return true end
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local built = custom.build_custom(ctx, { group_counts = {} })
+				local rows = built.submenu
+				helpers.assert_true(type(rows) == "table", "the personal menu must use the shared declaration")
+				helpers.assert_eq(rows[1].title, "menu.hotstrings.scope_enable_all")
+				helpers.assert_eq(rows[2].title, "menu.hotstrings.scope_disable_all")
+				helpers.assert_nil(rows[enabled and 1 or 2].checked)
+				assert_no_retired(rows, "the personal submenu")
+				helpers.assert_true(rows[enabled and 1 or 2].fn())
+				helpers.assert_eq(batches, { { names = { "personal", "custom" }, enabled = enabled } })
+				helpers.assert_eq({ saves, updates, starts }, { 1, 1, 0 })
+				helpers.assert_eq(ctx.state.hotstrings, { personal = enabled, custom = enabled })
+				helpers.assert_eq(ctx.state.keymap, false)
+				helpers.assert_eq(ctx.paused, true)
+			end)
+		end
+		for _, refusal in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("personal scope restores every prior gate after " .. refusal .. " save for " .. tostring(enabled), function()
+				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local ctx, batches = context(not enabled, not enabled, { "personal.toml", "personal_ext_work.toml" })
+				ctx.state.trigger_char = "★"
+				ctx.state.hotstrings = { personal = not enabled, custom = not enabled, unrelated = true }
+				ctx.hotstring_editor = { open = function() end }
+				local updates, saved = 0, nil
+				ctx.save_prefs = function()
+					saved = { ctx.state.hotstrings.personal, ctx.state.hotstrings.personal_ext_work, ctx.state.hotstrings.custom }
+					if refusal == "throw" then error("personal save fixture refused") end
+					if refusal == "false" then return false end
+				end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+				helpers.assert_true(type(rows) == "table", "personal scope commands must render")
+				helpers.assert_eq(rows[enabled and 1 or 2].fn(), false)
+				helpers.assert_eq(batches, { { names = { "personal", "personal_ext_work", "custom" }, enabled = enabled } })
+				helpers.assert_eq(saved, { enabled, enabled, enabled }, "one candidate reaches the canonical save")
+				helpers.assert_eq(updates, 0)
+				helpers.assert_eq(ctx.state.hotstrings, { personal = not enabled, custom = not enabled, unrelated = true },
+					"restore existing and absent gates after refusal")
+			end)
+		end
+	end
+	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
 		local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
-		local ctx, batches = context(true, true, { "personal.toml" })
+		local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
 		ctx.state.trigger_char = "★"
+		ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
 		ctx.hotstring_editor = { open = function() end }
-		local built = custom.build_custom(ctx, { group_counts = {} })
-		helpers.assert_eq(built.items[1].label, "menu.hotstrings.category_enable",
-			"the personal submenu opens with its gate")
-		helpers.assert_eq(built.items[1].checked, true, "ticked from the personal and custom gates")
-		local all = row_labelled(built.items, "menu.hotstrings.enable_all_sections")
-		helpers.assert_true(all ~= nil, "the personal sections must have one « all » checkbox")
-		helpers.assert_eq(all.checked, true, "every personal section is on")
-		all.action()
-		helpers.assert_eq(#batches, 1, "one click is one batch")
-		helpers.assert_eq(batches[1].enabled, false, "a ticked checkbox switches its sections off")
-		assert_no_retired(built.items, "the personal submenu")
+		local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+		local file
+		for _, row in ipairs(rows) do if row.title == "work" then file = row end end
+		helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
+		helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+		helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+		helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+		helpers.assert_eq(file.menu[4].title, "-")
+		helpers.assert_eq(file.menu[5].title, "one")
+		helpers.assert_eq(file.menu[1].fn(), true)
+		helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
+		helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
 	end)
+
 end)

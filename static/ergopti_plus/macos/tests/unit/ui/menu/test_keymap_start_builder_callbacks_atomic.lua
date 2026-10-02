@@ -115,24 +115,25 @@ local function custom_fixture(outcome, action_kind)
 			set_sections_enabled = keymap_mutation,
 		},
 		hotstring_editor = { open = function() end },
-		save_prefs = function() calls.saves = calls.saves + 1 end,
+		save_prefs = function() calls.saves = calls.saves + 1; return true end,
 		notify_feature = function() calls.notifications = calls.notifications + 1 end,
 		updateMenu = function() calls.updates = calls.updates + 1 end,
 		do_reload = function() calls.reloads = calls.reloads + 1 end,
 	}
 
+	ctx.keymap.set_category_scope_enabled = function(_names, _enabled, publish)
+		calls.keymap_mutations = calls.keymap_mutations + 1
+		return publish()
+	end
+
 	local built = Custom.build_custom(ctx, { group_counts = {} })
 	helpers.assert_type(built, "table", "the real custom builder must return a provider row")
+	helpers.assert_nil(built.action, "the personal parent row must carry no action")
 	local action
-	if action_kind == "top" then
-		-- The personal switch is the submenu's first row: the parent opens the
-		-- submenu, and a row that does so is never clicked.
-		helpers.assert_nil(built.action, "the personal parent row must carry no action")
-		action = built.items and built.items[1] and built.items[1].action
-	elseif action_kind == "bulk" then
-		action = find_action(built.items, "menu.hotstrings.enable_all_sections")
+	if action_kind == "section" then
+		action = find_action(built.submenu, "TARGET_CUSTOM_SECTION")
 	else
-		action = find_action(built.items, "TARGET_CUSTOM_SECTION")
+		action = built.submenu[action_kind == "top" and 1 or 2].fn
 	end
 	helpers.assert_type(action, "function",
 		"the real custom builder must expose its " .. action_kind .. " callback")
@@ -141,10 +142,11 @@ local function custom_fixture(outcome, action_kind)
 		action = action,
 		calls = calls,
 		state = state,
-		assert_state = function(label)
-			helpers.assert_eq(state.hotstrings.personal, group_enabled,
+		assert_state = function(label, expected)
+			if expected == nil then expected = group_enabled end
+			helpers.assert_eq(state.hotstrings.personal, expected,
 				label .. " must leave the personal-group state unchanged")
-			helpers.assert_eq(state.hotstrings.custom, group_enabled,
+			helpers.assert_eq(state.hotstrings.custom, expected,
 				label .. " must leave the custom-group state unchanged")
 		end,
 	}
@@ -241,13 +243,29 @@ local function layout_fixture(outcome)
 end
 
 
-helpers.describe("menu builder callbacks: refused keymap starts are atomic", function()
+helpers.describe("menu builder callbacks: capture and desired selection stay independent", function()
 	for _, action_kind in ipairs({ "top", "bulk", "section" }) do
-		helpers.it("keeps custom " .. action_kind .. " enable callbacks inert", function()
+		local title = action_kind == "section" and "keeps custom section enable callbacks inert"
+			or ("prepares custom " .. action_kind .. " scope without attempting capture")
+		helpers.it(title, function()
 			for _, outcome in ipairs(START_OUTCOMES) do
-				assert_refused_without_effects(
-					custom_fixture(outcome, action_kind),
-					"custom " .. action_kind .. " / " .. outcome)
+				local fixture = custom_fixture(outcome, action_kind)
+				local label = "custom " .. action_kind .. " / " .. outcome
+				if action_kind == "section" then
+					assert_refused_without_effects(fixture, label)
+				else
+					local ok, committed = pcall(fixture.action)
+					helpers.assert_true(ok, label .. " must select without invoking a refused capture start")
+					helpers.assert_eq(committed, true)
+					helpers.assert_eq(fixture.calls.starts, 0)
+					helpers.assert_eq(fixture.calls.keymap_mutations, 1)
+					helpers.assert_eq(fixture.calls.saves, 1)
+					helpers.assert_eq(fixture.calls.updates, 1)
+					helpers.assert_eq(fixture.calls.notifications, 0)
+					helpers.assert_eq(fixture.calls.reloads, 0)
+					helpers.assert_eq(fixture.state.keymap, false)
+					fixture.assert_state(label, action_kind == "top")
+				end
 			end
 		end)
 	end

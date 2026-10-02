@@ -94,7 +94,7 @@ const CATEGORY_REGIONS = [
 	{
 		driver: 'windows',
 		file: 'windows/ui/menu/menu_hotstring_switches.ahk',
-		from: '_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply) {',
+		from: '_HS_CategoryMenu(V1Cat, TomlPath, Sections,',
 		to: '\n}'
 	},
 	{
@@ -108,6 +108,40 @@ const CATEGORY_REGIONS = [
 		file: 'linux/ui/menu/menu_builder.lua',
 		from: 'local render_ctx = { commands = {\n\t\t\t["hotstring_category_enable_all"]',
 		to: '\n\t\treturn {'
+	}
+];
+
+// Personal data views consume the category declaration through their own
+// persistence owners. Linux already sends personal groups through group_row;
+// Windows additional personal files remain an explicit TODO outside this slice.
+const PERSONAL_REGIONS = [
+	{
+		driver: 'windows',
+		file: 'windows/ui/menu/menu_hotstrings.ahk',
+		from: '_HS_PersonalRows(Options := unset) {',
+		to: '\n\t\tPersonalActiveCount :=',
+		tokens: ['_HS_CategoryMenu(', 'HotstringsPersonalScopeApply(Enabled, Options)']
+	},
+	{
+		driver: 'macos',
+		file: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		from: 'function M.build_custom(',
+		to: '\nreturn M',
+		tokens: [
+			'"hotstring_category_menu"',
+			'"hotstring_category_enable_all"',
+			'"hotstring_category_disable_all"',
+			'M.category_scope_fn(ctx, names,',
+			'submenu = scope_menu(scope_names, {}, menu_items)',
+			'submenu = file_menu_for_group(gname, g_rows)'
+		]
+	},
+	{
+		driver: 'linux',
+		file: 'linux/ui/menu/menu_builder.lua',
+		from: '["hotstring_personal"] = function()',
+		to: '["hotstring_extensions"] = function()',
+		tokens: ['group_row(name)']
 	}
 ];
 
@@ -271,6 +305,24 @@ for (const region of CATEGORY_REGIONS) {
 	}
 }
 
+for (const region of PERSONAL_REGIONS) {
+	const text = slice(region.driver, region);
+	if (text === null) continue;
+	regions += 1;
+	for (const token of region.tokens) {
+		if (!text.includes(token))
+			errors.push(`${region.driver}: personal binding is missing ${token}`);
+	}
+	for (const token of [
+		'menu.hotstrings.category_enable',
+		ALL_SECTIONS_KEY,
+		byDriver.get(region.driver).call
+	]) {
+		if (text.includes(token))
+			errors.push(`${region.driver}: personal binding still builds the redundant ${token}`);
+	}
+}
+
 for (const region of LANGUAGE_REGIONS) {
 	const text = slice(region.driver, region);
 	if (text === null) continue;
@@ -285,6 +337,7 @@ for (const region of LANGUAGE_REGIONS) {
 const expected =
 	DRIVERS.reduce((n, d) => n + 1 + d.files.length, 0) +
 	CATEGORY_REGIONS.length +
+	PERSONAL_REGIONS.length +
 	LANGUAGE_REGIONS.length;
 if (regions < expected && errors.length === 0) {
 	errors.push(
