@@ -319,6 +319,52 @@ _HSCS_DefaultMenuTargetsAreIndependent() {
 }
 Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)
 
+; The headless runner deliberately omits tray_menu.ahk's auto-execute block.
+; Read its real literal declarations and use the actual feature-manifest owner:
+; no second curated order or hard-coded live feature map belongs in a fixture.
+_HSCS_TrayMapLiteral(Source, Name) {
+	if !RegExMatch(Source, "ms)^global " . Name . " := Map\((.*?)^\)", &Found)
+		throw Error("The tray boot owner has no Map declaration for " . Name . ".")
+	Values := JsonParse("[" . RegExReplace(Found[1], ",\s*$") . "]")
+	if !(Values is Array) || Mod(Values.Length, 2)
+		throw Error("The tray boot Map declaration has incomplete pairs: " . Name . ".")
+	Result := Map()
+	loop Values.Length // 2
+		Result[Values[2 * A_Index - 1]] := Values[2 * A_Index]
+	return Result
+}
+
+_HSCS_WithDynamicBootState(Body) {
+	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
+	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
+	HadKeys := IsSet(_LegacyDynamicHotstringsKeyMap), OldKeys := HadKeys ? _LegacyDynamicHotstringsKeyMap : 0
+	HadOrder := IsSet(_DYNAMIC_HOTSTRINGS_ORDER), OldOrder := HadOrder ? _DYNAMIC_HOTSTRINGS_ORDER : 0
+	try {
+		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
+		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap")
+		_LegacyDynamicHotstringsKeyMap := _HSCS_TrayMapLiteral(Source, "_LegacyDynamicHotstringsKeyMap")
+		if !RegExMatch(Source, "ms)^global _DYNAMIC_HOTSTRINGS_ORDER := (\[.*?\])", &Found)
+			throw Error("The tray boot owner has no dynamic hotstring order declaration.")
+		_DYNAMIC_HOTSTRINGS_ORDER := JsonParse(Found[1])
+		Assert(_DYNAMIC_HOTSTRINGS_ORDER is Array, "the real tray order must be an array")
+		for Id in _DYNAMIC_HOTSTRINGS_ORDER {
+			if Id == "-"
+				continue
+			Assert(_LegacyDynamicHotstringsKeyMap.Has(Id), "the boot order must name an owned dynamic family")
+			Assert(ManifestFindEntryByPath("hotstrings.dynamic." . _LegacyDynamicHotstringsKeyMap[Id]) is Map,
+				"the boot family must resolve through the real feature manifest")
+		}
+		Features := ManifestBuildFeaturesMap()
+		Body.Call()
+	} finally {
+		Features := HadFeatures ? OldFeatures : unset
+		_LegacyTopCategoryMap := HadTop ? OldTop : unset
+		_LegacyDynamicHotstringsKeyMap := HadKeys ? OldKeys : unset
+		_DYNAMIC_HOTSTRINGS_ORDER := HadOrder ? OldOrder : unset
+	}
+}
+
 ; Dynamic scopes have seven canonical families and no separate category gate.
 ; The native submenu reaches the same journal while the master or pause is off.
 _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
@@ -333,7 +379,8 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 			Source .= 'time_activation_seconds = 0.75`n'
 	}
 	Source .= '[hotstrings.dynamic.future_family]`nenabled = true`n[private]`ncredential = "retain-dynamic-fixture"`n'
-	SavedFeatures := Features, SavedCategories := CategoryEnabled, SavedLegacy := _LegacyTopCategoryMap
+	SavedFeatures := Features, SavedCategories := CategoryEnabled
+	SavedLegacy := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : unset
 	SavedSuspend := A_IsSuspended
 	State := MasterGateState(), SavedState := State.Clone()
 	Launch(Success, Borrowed, Refused) {
@@ -415,7 +462,8 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 			_CTC_ReleaseMenu(Built)
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
-		Features := SavedFeatures, CategoryEnabled := SavedCategories, _LegacyTopCategoryMap := SavedLegacy
+		Features := SavedFeatures, CategoryEnabled := SavedCategories
+		_LegacyTopCategoryMap := IsSet(SavedLegacy) ? SavedLegacy : unset
 		Suspend(SavedSuspend)
 		State.Clear()
 		for Key, Value in SavedState
@@ -427,9 +475,9 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 for _HSCS_Enabled in [true, false] {
 	for _HSCS_Outcome in ["immediate_refusal", "late_refusal", "committed"]
 		Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " keeps the master and handles " . _HSCS_Outcome,
-			_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, _HSCS_Outcome))
+			_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, _HSCS_Outcome)))
 	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " preserves pause across a late refusal",
-		_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, "late_refusal", true))
+		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, "late_refusal", true)))
 }
 
 _HSCS_DynamicInvalidPosture() {
@@ -457,4 +505,5 @@ _HSCS_DynamicMenuHead() {
 		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the state-dependent checkbox is retired")
 	} finally _CTC_ReleaseMenu(Built)
 }
-Test("hotstring dynamic submenu: explicit shared command head (hotstring-dynamic-menu-head)", _HSCS_DynamicMenuHead)
+Test("hotstring dynamic submenu: explicit shared command head (hotstring-dynamic-menu-head)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuHead))

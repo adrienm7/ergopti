@@ -190,6 +190,12 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 	if !IsSet(Options)
 		Options := Map()
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	; The tray module owns these declarations before it includes this builder.
+	; A direct caller must supply the same initialized boot model, never an
+	; invented order or a private copy of the manifest inventory.
+	if !IsSet(_LegacyDynamicHotstringsKeyMap) || !(_LegacyDynamicHotstringsKeyMap is Map)
+			|| !IsSet(_DYNAMIC_HOTSTRINGS_ORDER) || !(_DYNAMIC_HOTSTRINGS_ORDER is Array)
+		throw Error("Dynamic hotstring menu requires its initialized tray boot model.")
 	Rows := []
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
