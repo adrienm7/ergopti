@@ -893,6 +893,8 @@ _LoggerRequeue(Pending, PendingErr) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
+		if IsSet(HotPath_StopStatistics)
+			HotPath_StopStatistics()
 		; If the very last log call before shutdown was itself a suppressed
 		; duplicate, its streak's "N more identical lines" summary is still
 		; pending — the streak only ever gets flushed when a DIFFERENT line

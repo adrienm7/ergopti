@@ -180,6 +180,22 @@ KLWV_LocalesUrl() {
 ; ===========================================
 ; ===========================================
 
+/** Records UI stage resources separately; process CPU includes nested callbacks. */
+KLWV_OpenTimingMark(which, Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	MenuWait := BootProfile_MenuWaitMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Dashboard." . which . "." . Phase, Elapsed, 5)
+	try LoggerInfo("Keylogger", Format(
+		"Dashboard {1} stage '{2}': wall={3:.3f} ms, process_cpu={4} ms, native_menu_wait={5:.3f} ms.",
+		which, Phase, Elapsed, CpuText, Max(0, MenuWait - Timing.MenuWait)))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+	Timing.MenuWait := MenuWait
+}
+
 KLWV_Open(which, metrics_dir) {
 		global _SharedDir
 		if !(which == "typing" || which == "apps")
@@ -195,6 +211,7 @@ KLWV_Open(which, metrics_dir) {
 		KLWV.opening[which] := true
 		try {
 			Started := BootClockWallMs()
+			Timing := { Wall: Started, Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
 			try LoggerDebug("Keylogger", "KLWV_Open: dashboard={1} begin.", which)
 
 			if !KLWV_IsAvailable() {
@@ -267,6 +284,7 @@ KLWV_Open(which, metrics_dir) {
 
 			try LoggerInfo("Keylogger", "Dashboard {1} host shown in {2} ms (reused={3}).",
 					which, Round(BootClockWallMs() - Started, 2), Cached ? 1 : 0)
+			KLWV_OpenTimingMark(which, "host", Timing)
 			; Reuse only the native host. A fresh navigation below resets page state.
 			if Cached
 					udir := Cached["udir"]
@@ -280,6 +298,7 @@ KLWV_Open(which, metrics_dir) {
 					}
 			}
 			loader := _VendorDir . "\64bit\WebView2Loader.dll"
+			KLWV_OpenTimingMark(which, "profile", Timing)
 
 			; thqby's wrapper resolves WebView2 asynchronously through a
 			; Promise; we await it inline so the rest of the wiring runs
@@ -303,6 +322,7 @@ KLWV_Open(which, metrics_dir) {
 					return false
 			}
 			try LoggerDebug("Keylogger", "KLWV_Open: WebView2 controller created.")
+			KLWV_OpenTimingMark(which, "controller", Timing)
 			webview := controller.CoreWebView2
 
 			; Disable Edge UI surfaces we don't want bleeding through —
@@ -354,6 +374,7 @@ KLWV_Open(which, metrics_dir) {
 					return false
 			}
 			try LoggerDebug("Keylogger", "KLWV_Open: i18n seed prepared for locale={1}.", locale_code)
+			KLWV_OpenTimingMark(which, "bindings", Timing)
 
 			; Map the virtual host BEFORE navigating — the mapping must exist when the
 			; document is created or the https:// URL cannot resolve.
@@ -367,6 +388,7 @@ KLWV_Open(which, metrics_dir) {
 			}
 
 			asset := KLWV_AssetUrl(which) . "&epoch=" . Epoch
+			KLWV_OpenTimingMark(which, "mount", Timing)
 			try LoggerDebug("Keylogger", "KLWV_Open: navigating dashboard={1}.", which)
 			try {
 					webview.Navigate(asset)
@@ -403,10 +425,13 @@ KLWV_Open(which, metrics_dir) {
 			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
 			KLWV_ArmRebuildWatch(which, Epoch)
 			KLWV_FitWebView(which)
+			KLWV_OpenTimingMark(which, "navigate", Timing)
 			try LoggerInfo("Keylogger", "Dashboard {1} controller prepared in {2} ms (reused={3}).",
 					which, Round(BootClockWallMs() - Started, 2), Cached ? 1 : 0)
 			return true
 		} finally {
+				if IsSet(Started)
+						HotPath_RecordLatency("Dashboard." . which . ".total", BootClockWallMs() - Started, 5)
 				KLWV.opening.Delete(which)
 				if KLWV.close_during_open.Has(which)
 						KLWV.close_during_open.Delete(which)

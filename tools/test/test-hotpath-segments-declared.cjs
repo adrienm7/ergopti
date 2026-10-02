@@ -50,6 +50,15 @@ const INVENTORY = {
 		'the native atomic or paste send, distinguished from preparation and buffer commit',
 	'LLM.OnChar':
 		'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
+	'LLM.PrefixObservers':
+		'the deferred AI agent and prediction observers, separated from ordered prefix input admission',
+	'LLM.PrefixMirror':
+		'the synchronous bounded AI context edit before canonical hotstring admission',
+	'Prefix.FocusAdmission':
+		'the focused-control ownership check before accepting a physical character',
+	'Prefix.PreviewDecisions':
+		'the canonical engine decisions collected before tooltip metadata and GUI construction',
+	'Prefix.PreviewMetadata': 'the metadata attached to accepted preview decisions before rendering',
 	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
 	'KL.RoiPrune':
 		'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',

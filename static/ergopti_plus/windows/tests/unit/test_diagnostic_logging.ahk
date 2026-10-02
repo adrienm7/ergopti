@@ -150,7 +150,7 @@ _TDL_StagesPair() {
 	Text := _TDL_RingText()
 	Assert(InStr(Text, "[START] [BootProfile] Boot stage 'tdl stage'…"), Text)
 	Assert(RegExMatch(Text, "\[SUCCESS\] \[BootProfile\] Boot stage 'tdl stage' done in \d+ ms: 3 thing\(s\)\."), Text)
-	Assert(RegExMatch(Text, "Boot stage 'tdl stage' resources: wall=\d+\.\d+ ms, process_cpu=\d+\.\d+ ms\."),
+	Assert(RegExMatch(Text, "Boot stage 'tdl stage' resources: wall=\d+\.\d+ ms, process_cpu=\d+\.\d+ ms, native_menu_wait=\d+\.\d+ ms, wall_without_menu=\d+\.\d+ ms\."),
 		"precise stage timing and process CPU must survive INFO collapsing")
 	Assert(InStr(Text, "[WARNING] [BootProfile] Boot stage 'tdl aborted' did not complete"), Text)
 	AssertEqual("", BootProfile_OpenStageNames(), "both stages are closed")

@@ -493,6 +493,22 @@ _HC_NewWindow() {
 	return Gui_Create("+Resize +MinSize640x480", t("menu.debug.healthcheck"))
 }
 
+/** Attributes diagnostics opening without retaining snapshot or foreground contents. */
+_HC_OpenTimingMark(Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	MenuWait := BootProfile_MenuWaitMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Diagnostics." . Phase, Elapsed, 5)
+	try LoggerInfo("Healthcheck", Format(
+		"Diagnostics stage '{1}': wall={2:.3f} ms, process_cpu={3} ms, native_menu_wait={4:.3f} ms.",
+		Phase, Elapsed, CpuText, Max(0, MenuWait - Timing.MenuWait)))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+	Timing.MenuWait := MenuWait
+}
+
 ; Opens the diagnostics window, replacing any previous one.
 ; @param Mode {String} "report" opens it at the preview and the report button.
 HealthCheck_ShowWindow(Mode := "") {
@@ -514,6 +530,7 @@ HealthCheck_ShowWindow(Mode := "") {
 	try {
 		LoggerStart("Healthcheck", "Opening the diagnostics window…")
 		_HC_OpenStarted := _HealthCheck_NowMs()
+		Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
 		ReuseKey := _SharedDir . "`n" . Locale
 		Reuse := _HC_CanReuse(ReuseKey)
@@ -522,6 +539,7 @@ HealthCheck_ShowWindow(Mode := "") {
 		else
 			_HC_Close()
 		Snapshot := HealthCheck_Run()
+		_HC_OpenTimingMark("snapshot", Timing)
 
 		if Reuse {
 			G := _HC_Gui
@@ -543,16 +561,21 @@ HealthCheck_ShowWindow(Mode := "") {
 		_HC_Gui := G
 		LoggerInfo("Healthcheck", "Diagnostics host shown in {1} ms (reused={2}).",
 			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
+		_HC_OpenTimingMark("host", Timing)
 
 		UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 		if UseWV {
 			loader := _VendorDir . "\64bit\WebView2Loader.dll"
 			WVC := 0
 			try {
-				WVC := Reuse ? _HC_Controller : WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
+				Environment := WebView_SharedEnvironment(loader)
+				_HC_OpenTimingMark("environment", Timing)
+				WVC := Reuse ? _HC_Controller : WebView2.create(ContentCtl.Hwnd, , Environment)
+				_HC_OpenTimingMark("controller_create", Timing)
 				WVC.IsVisible := false
 				; Virtual-host subresources survive navigation, including same-size edits.
 				WebView_ClearDocumentCache(WVC.CoreWebView2)
+				_HC_OpenTimingMark("document_cache", Timing)
 				G.WVC := WVC
 			} catch as Err {
 				if Reuse
@@ -564,6 +587,7 @@ HealthCheck_ShowWindow(Mode := "") {
 				LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing structured native diagnostics.", Err.Message)
 			}
 
+			_HC_OpenTimingMark("controller", Timing)
 			if WVC {
 				_HC_Controller := WVC
 				_HC_WebView    := WVC.CoreWebView2
@@ -592,6 +616,7 @@ HealthCheck_ShowWindow(Mode := "") {
 				; The subscription is bound to this window's epoch, so a late message of
 				; a closed window cannot reach its replacement through the globals.
 				_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
+				_HC_OpenTimingMark("bindings", Timing)
 
 				; Map the virtual host BEFORE navigating.
 				try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
@@ -601,6 +626,7 @@ HealthCheck_ShowWindow(Mode := "") {
 					_HealthCheck_CloseGui(G, false)
 				LoggerInfo("Healthcheck", "Diagnostics controller prepared in {1} ms (reused={2}).",
 					Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
+				_HC_OpenTimingMark("navigate", Timing)
 
 				LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
 				return
@@ -609,8 +635,11 @@ HealthCheck_ShowWindow(Mode := "") {
 
 		ContentCtl.Visible := false
 		_HC_ShowNativeSnapshot(G, Snapshot)
+		_HC_OpenTimingMark("native_controls", Timing)
 		LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
 	} finally {
+		if IsSet(Timing)
+			HotPath_RecordLatency("Diagnostics.total", _HealthCheck_NowMs() - _HC_OpenStarted, 5)
 		_HC_Opening := false
 		if IsSet(_HC_PendingMode) {
 			PendingMode := _HC_PendingMode
