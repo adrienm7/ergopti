@@ -133,10 +133,13 @@ Test("LLM nav: the cycle chord is consumed while the owner routes a multi-slot p
 	_LTNC_ChordConsumedWhileTheOwnerCycles)
 
 _LTNC_ChordHotkeysSwallowTheKey() {
+	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
 	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
 	for Key in _LTNC_NavKeys() {
+		; Physical identity is independent of the production declaration.
+		Code := Registry["keys"]["Arrow" . Key]["ahk"]
 		Found := 0
-		for Variant in _LTAV_Variants(Src, Key) {
+		for Variant in _LTAV_Variants(Src, Code) {
 			if (Variant.HotIf != '#HotIf LLM_Menu_NavCycleChordIsOwned("' . Key . '")')
 				continue
 			Found++
@@ -145,7 +148,7 @@ _LTNC_ChordHotkeysSwallowTheKey() {
 			; The action cycles: a bare return swallowed the key without moving the
 			; marker once this hook ran first (llm-nav-cycle-windows).
 			Assert(RegExMatch(Variant.Body,
-					"^\*" . Key . '::\s*LLM_Menu_NavCycleChord\("' . Key . '"\)') > 0,
+					"^\*" . Code . '::\s*LLM_Menu_NavCycleChord\("' . Key . '"\)') > 0,
 				Key . ": the hotkey must cycle and consume the key, never pass it on: " . Variant.Body)
 		}
 		AssertEqual(1, Found, Key . " must have exactly one consuming hotkey")
