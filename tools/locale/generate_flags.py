@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# tools/generate_flags.py
+# tools/locale/generate_flags.py
 
 """
 ==============================================================================
@@ -22,8 +22,10 @@ FEATURES & RATIONALE:
 ==============================================================================
 """
 
+import argparse
 import math
 import os
+import struct
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -41,7 +43,7 @@ WIDTH = 32
 HEIGHT = 24
 
 # Output directory — relative to the repo root.
-OUT_DIR = Path(__file__).resolve().parents[1] / "static" / "img" / "flags"
+OUT_DIR = Path(__file__).resolve().parents[2] / "static" / "img" / "flags"
 
 # National color palette. Sourced from each country's official flag
 # specification when one exists; otherwise from Wikipedia's reference SVGs.
@@ -387,13 +389,44 @@ REGISTRY = {
 }
 
 
+def write_native_bitmap(image, path):
+    """Keep opaque alpha and top-down BGRA so Win32 scaling matches PNG decoding."""
+    pixels = image.convert("RGBA").tobytes("raw", "BGRA")
+    file_header = struct.pack("<2sIHHI", b"BM", 54 + len(pixels), 0, 0, 54)
+    bitmap_header = struct.pack(
+        "<IiiHHIIiiII", 40, WIDTH, -HEIGHT, 1, 32, 0, len(pixels), 0, 0, 0, 0
+    )
+    path.write_bytes(file_header + bitmap_header + pixels)
+
+
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generate shared flags and native Windows bitmaps."
+    )
+    parser.add_argument(
+        "--native-only",
+        action="store_true",
+        help="Convert existing authoritative PNGs without redrawing them.",
+    )
+    args = parser.parse_args()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for locale, builder in sorted(REGISTRY.items()):
-        img = builder()
-        out_path = OUT_DIR / f"{locale}.png"
-        img.save(out_path, "PNG", optimize=True)
-        print(f"  wrote {out_path.relative_to(OUT_DIR.parents[2])} ({img.size[0]}x{img.size[1]})")
+        png_path = OUT_DIR / f"{locale}.png"
+        if args.native_only:
+            with Image.open(png_path) as source:
+                if source.mode != "RGB" or source.size != (WIDTH, HEIGHT):
+                    raise ValueError(
+                        f"Native menu flags require opaque RGB {WIDTH}x{HEIGHT}: {png_path}"
+                    )
+                img = source.copy()
+        else:
+            img = builder()
+            img.save(png_path, "PNG", optimize=True)
+        # Windows loads an uncompressed bitmap without invoking the PNG codec
+        # per menu row. Preserve original dimensions for native DPI/aspect scaling.
+        bmp_path = OUT_DIR / f"{locale}.bmp"
+        write_native_bitmap(img, bmp_path)
+        print(f"  wrote {bmp_path.relative_to(OUT_DIR.parents[2])} ({img.size[0]}x{img.size[1]})")
     print(f"\n{len(REGISTRY)} flag(s) regenerated under {OUT_DIR}.")
 
 
