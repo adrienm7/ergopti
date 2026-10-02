@@ -254,8 +254,14 @@ check(
 	/set -euo pipefail/.test(testStep),
 	'the Swift test step must propagate failures through its log-capture pipeline'
 );
-const logVariable = /\b([A-Za-z_][A-Za-z0-9_]*)=["']?\$\(mktemp\)["']?/.exec(testStep)?.[1] || '';
-check(logVariable.length > 0, 'the Swift test step must allocate one transcript file with mktemp');
+const logVariable =
+	/\b([A-Za-z_][A-Za-z0-9_]*)="\$\(mktemp "\$RUNNER_TEMP\/swift-launcher-evidence\/xctest\.log\.XXXXXX"\)"/.exec(
+		testStep
+	)?.[1] || '';
+check(
+	logVariable.length > 0,
+	'the Swift test step must allocate its exact uploaded private transcript with mktemp'
+);
 check(
 	logVariable.length > 0 &&
 		new RegExp(`\\btee\\s+["']?\\$${escapeRegExp(logVariable)}\\b`).test(testStep),
@@ -271,6 +277,38 @@ check(
 check(
 	/::error::[^\n]*XCTest[^\n]*summary/.test(testStep) && /\bexit 1\b/.test(testStep),
 	'(macos-xctest-summary-required-2026-08-27) a missing XCTest summary must fail the job explicitly'
+);
+const nodeSetup = pipeline.step(
+	swiftJob,
+	'Prepare Node for native policy fixtures and XCTest evidence'
+);
+check(
+	/uses:\s*actions\/setup-node@v4/.test(nodeSetup) &&
+		/node-version-file:\s*'\.node-version'/.test(nodeSetup) &&
+		packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') <
+			packageStepNames.indexOf('Run Swift launcher tests'),
+	'native generated-policy probes and XCTest evidence require the repository-owned Node version before XCTest'
+);
+check(
+	testStep.includes('swift_pipeline_status=("${PIPESTATUS[@]}")') &&
+		/set \+e\s*\n\s*script -q/.test(testStep) &&
+		/swift_pipeline_status=\([^\n]+\)\s*\n\s*set -e\s*\n\s*node tools\/diagnostics\/swift_xctest_evidence\.cjs/.test(
+			testStep
+		) &&
+		testStep.includes('"${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}"') &&
+		!/trap[^\n]*rm[^\n]*xctest_log/.test(testStep),
+	'the XCTest evidence owner receives both real pipeline statuses before errexit, and retains the transcript on failure'
+);
+const transcriptUpload = pipeline.step(swiftJob, 'Upload Swift launcher failure transcript');
+check(
+	/uses:\s*actions\/upload-artifact@v4/.test(transcriptUpload) &&
+		pipeline.stepField(transcriptUpload, 'if') ===
+			"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}" &&
+		/path:\s*\$\{\{ runner\.temp \}\}\/swift-launcher-evidence/.test(transcriptUpload) &&
+		/if-no-files-found:\s*error/.test(transcriptUpload) &&
+		packageStepNames.indexOf('Upload Swift launcher failure transcript') >
+			packageStepNames.indexOf('Run Swift launcher tests'),
+	'a failed native XCTest step must upload the retained transcript and exact verdict'
 );
 check(
 	/\.testTarget\s*\(\s*name:\s*"ErgoptiPlusTests"/s.test(PACKAGE),

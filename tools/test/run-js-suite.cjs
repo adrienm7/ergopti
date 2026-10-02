@@ -961,6 +961,12 @@ const CHECKS = [
 		repro: 'npm run test:macos-swift-launcher-ci'
 	},
 	{
+		name: 'native Swift XCTest evidence preserves failures and original pipeline statuses',
+		cmd: 'node',
+		args: ['tools/test/test-swift-xctest-evidence.cjs'],
+		repro: 'npm run test:swift-xctest-evidence'
+	},
+	{
 		name: 'macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)',
 		cmd: 'node',
 		args: ['tools/test/run-macos-swift-launcher.cjs'],

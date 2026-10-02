@@ -181,6 +181,12 @@ const STEP_CONDITIONS = [
 		'Retain packaged application startup evidence',
 		'always() && inputs.release'
 	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Upload Swift launcher failure transcript',
+		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
+	],
 	[MACOS_BOX, 'package-macos', 'Install Sparkle signing tool', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Sign zip with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],

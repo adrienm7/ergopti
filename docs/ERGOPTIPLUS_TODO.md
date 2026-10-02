@@ -985,3 +985,10 @@ results are in [the handoff package](handovers/2026-09-28-ergoptiplus/README.md)
 Read its `VERIFICATION.md` and `VERIFICATION.json` for composite gate results.
 Paths under `D:/ewt/` in those files are historical; that directory no longer
 exists.
+The macOS Package lane now prepares the repository-pinned Node before
+Swift tests and retains their exact PTY transcript. A strict reporter preserves
+both native and capture failures, requires complete non-vacuous XCTest
+receipts, and annotates actual errors with an uploaded failure transcript.
+Private verification passed formatting and all 350 JS checks, including the
+actual reporter and pipeline wiring. Swift assertions remain unchanged; the
+preceding native failure is still unqualified until the next CI observation.
