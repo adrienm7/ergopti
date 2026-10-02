@@ -593,6 +593,12 @@ branch has been removed; the run also covers the 21-locale privacy label.
       effective category/section changes through their persistence owners;
       retain unrelated choices and fence refused writes/runtime publication.
       Replay the same full-enable/full-disable behavior on every driver.
+      The macOS lifecycle helper now rejects the preference owner's returned
+      refusal as well as a thrown publication error. Three regressions first
+      showed false acknowledgements after false/nil/throwing writer results;
+      they replay the real save/rollback owner, preserved choices and runtime,
+      withheld cache updates and the visible failure notice. Void UI-only
+      callbacks remain valid. The actual submenu migration remains pending.
 - [ ] **103.** Move the common "Distance reduction" hotstrings into the
       Ergopti+ extension: these bindings depend on the layout rather than being
       common to every user. Extensions own their hotstrings, shortcuts and
