@@ -140,20 +140,17 @@ const manifest = {
 	}
 };
 
-const appsContext = {
-	window: {},
-	manifestData: manifest,
-	currentSelectedDate: '2025-05-01',
-	currentPeriod: 'all',
-	currentWeekdayFilter: null,
-	currentCategoryFilter: null,
-	currentCountAwake: true,
-	parseDateKey: (date) => Date.parse(`${date}T12:00:00`),
-	formatDisplayDate: (date) => date,
-	getAppCategory: (_name, category) => ({ type: category || 'General', score: 0 })
-};
-const getAggregatedData = compileFunction(appsSource, 'getAggregatedData', appsContext);
-const appsResult = getAggregatedData();
+// Execute the page's real cache owner and helpers as well as the aggregation
+// entry point; extracting the wrapper alone would omit its lifecycle state.
+const appsContext = vm.createContext({ window: { ManifestData: manifest } });
+vm.runInContext(read('static/ergopti_plus/_shared/ui/host_bridge.js'), appsContext);
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
+vm.runInContext(appsSource, appsContext);
+vm.runInContext(
+	"currentSelectedDate = '2025-05-01'; currentPeriod = 'all'; currentCountAwake = true;",
+	appsContext
+);
+const appsResult = appsContext.getAggregatedData();
 assert.strictEqual(appsResult.rich.time.passive_locked_ms, 44);
 assert.strictEqual(appsResult.rich.time.passive_sleep_ms, 55);
 assert.strictEqual(appsResult.rich.time.awake_ms, 66);
