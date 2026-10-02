@@ -304,15 +304,24 @@ These are software implementations; final hardware verification remains below.
   The direct-call baseline now contains only the adapter's own implementation.
   Full three-OS validation of this slice is pending.
   Audit the other hs stubs for the same divergence from native behaviour.
-- [ ] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
-      an old build's scalar where a table is now expected (`magickey = true` under
-      `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
-      the batch cannot address the destination without ambiguous TOML keys » —
-      maintainer decision: may an ordinary save overwrite a value flagged outdated?
-      Hand-written dotted keys (`a.b = 1`) are read by the shared decoder as one key
-      named "a.b", so the app ignores them. Linux still refuses to save over a
-      `[[hotstrings.terminators]]` list (`terminator_settings.lua`) although the
-      writer now can.
+- [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  an old build's scalar where a table is now expected (`magickey = true` under
+  `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
+  the batch cannot address the destination without ambiguous TOML keys » —
+  maintainer decision: may an ordinary save overwrite a value flagged outdated?
+  Hand-written dotted keys (`a.b = 1`) are read by the shared decoder as one key
+  named "a.b", so the app ignores them.
+  Linux now delegates whole custom-delimiter lists to the shared TOML writer,
+  including `[[hotstrings.terminators]]` and quoted table-array headers. The
+  obsolete local refusal and its unsupported-format warning are removed.
+  Regressions cover additions, removals, sparse states, restart, unknown and
+  unusable records, nested fields, comments and byte-stable no-op writes; a
+  malformed destination and superseded source remain refused. An installed-
+  driver E2E scenario saves the list and verifies it at the next real daemon
+  start; that scenario failed against the original owner before passing with
+  the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
+  checks). Full three-OS validation of this slice is pending; the scalar
+  migration decision and dotted-key reader remain open.
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

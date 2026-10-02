@@ -221,10 +221,66 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 end)
 
 helpers.describe("word-delimiter settings: a [[hotstrings.terminators]] list", function()
-	-- Readable, but the shared writer cannot update array-of-tables elements:
-	-- every delimiter save refused over it with a writer error that named
-	-- neither the form nor the fix.
-	helpers.it("is read, names its inline form, and lets the states be saved around it", function()
+	for _, header in ipairs({ "[[hotstrings.terminators]]", '[["hotstrings"."terminators"]]' }) do
+		helpers.it("removes the complete custom list and its state from " .. header, function()
+			local stored = '[hotstrings]\nunknown = "kept"\n\n' .. header .. '\n'
+				.. 'key = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
+				.. '# keep this comment\n[hotstrings.terminator_states]\n"custom_¤" = false\n'
+				.. '\n[other]\nvalue = 42\n'
+			with_settings(stored, function(Settings, path, sandbox, Terminators)
+				helpers.assert_true(Settings.load())
+				helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+				helpers.assert_true(Settings.persist())
+				local bytes = sandbox.read_bytes(path)
+				local document = Codec.decode(bytes)
+				helpers.assert_nil(document.hotstrings.terminators)
+				helpers.assert_nil(document.hotstrings.terminator_states["custom_¤"])
+				helpers.assert_eq(document.hotstrings.unknown, "kept")
+				helpers.assert_eq(document.other.value, 42)
+				helpers.assert_true(bytes:find("# keep this comment", 1, true) ~= nil)
+				helpers.assert_true(Settings.load())
+				helpers.assert_eq(has_custom(Terminators, "custom_¤"), false)
+			end)
+		end)
+	end
+
+	helpers.it("updates the whole list while preserving unowned records, nested fields and comments", function()
+		local stored = '[hotstrings]\nunknown = "kept"\n\n[[hotstrings.terminators]]\n'
+			.. 'key = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\nfuture = "kept"\n'
+			.. '# keep this comment\n\n[[hotstrings.terminators]]\n'
+			.. 'key = "obsolete"\nchar = "ab"\nlabel = "bad"\nconsume = "wrong"\n'
+			.. '[hotstrings.terminators.metadata]\nnote = "kept"\n'
+			.. '\n[[other.items]]\nvalue = 42\n'
+		with_settings(stored, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
+			helpers.assert_true(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false))
+			helpers.assert_true(Settings.persist(), "the shared writer owns replacement of the whole list")
+			local bytes = sandbox.read_bytes(path)
+			local document = Codec.decode(bytes)
+			helpers.assert_eq(document.hotstrings.terminators, {
+				{ key = "custom_¤", char = "¤", label = "¤", consume = true, future = "kept" },
+				{ key = "obsolete", char = "ab", label = "bad", consume = "wrong", metadata = { note = "kept" } },
+				{ key = "custom_µ", char = "µ", label = "µ", consume = false },
+			})
+			helpers.assert_eq(document.hotstrings.unknown, "kept")
+			helpers.assert_eq(document.other.items, { { value = 42 } })
+			helpers.assert_true(bytes:find("# keep this comment", 1, true) ~= nil)
+			helpers.assert_true(Settings.persist())
+			helpers.assert_eq(sandbox.read_bytes(path), bytes, "an unchanged list is byte-stable")
+			helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+			helpers.assert_true(Settings.persist())
+			document = Codec.decode(sandbox.read_bytes(path))
+			helpers.assert_eq(#document.hotstrings.terminators, 2)
+			helpers.assert_eq(document.hotstrings.terminators[1].metadata.note, "kept")
+			helpers.assert_eq(document.hotstrings.terminators[2].key, "custom_µ")
+			helpers.assert_true(Settings.adopt_configuration({}))
+			helpers.assert_true(Settings.load())
+			helpers.assert_true(has_custom(Terminators, "custom_µ"), "the saved list survives restart")
+			helpers.assert_eq(has_custom(Terminators, "custom_¤"), false)
+		end)
+	end)
+
+	helpers.it("saves states and the list, but still refuses a malformed destination", function()
 		local stored = '[hotstrings]\nunknown = "kept"\n\n[[hotstrings.terminators]]\n'
 			.. 'key = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
 		with_settings(stored, function(Settings, path, sandbox, Terminators)
@@ -235,20 +291,20 @@ helpers.describe("word-delimiter settings: a [[hotstrings.terminators]] list", f
 			local passed, failure = pcall(function()
 				helpers.assert_true(Settings.load())
 				helpers.assert_true(has_custom(Terminators, "custom_¤"), "the list is read")
-				local named = false
-				for _, line in ipairs(warnings) do
-					if line:find(path, 1, true) and line:find("terminators = [{", 1, true) then named = true end
-				end
-				helpers.assert_true(named, "the load names the file and the inline form")
+				helpers.assert_eq(#warnings, 0, "a supported table-array spelling needs no refusal warning")
 				helpers.assert_true(Terminators.set_terminator_enabled("slash", true))
 				helpers.assert_true(Settings.persist(), "a state change is saved around the list")
 				helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).hotstrings.terminator_states.slash, true)
-				local before = sandbox.read_bytes(path)
 				helpers.assert_true(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false))
-				helpers.assert_eq(Settings.persist(), false, "a list change cannot be saved over its tables")
+				helpers.assert_true(Settings.persist(), "a whole-list change is saved over its tables")
+				helpers.assert_eq(#Codec.decode(sandbox.read_bytes(path)).hotstrings.terminators, 2)
+				helpers.assert_eq(#errors, 0)
+				local before = sandbox.read_bytes(path) .. "\n[other]\nvalue = {\n"
+				sandbox.write_bytes(path, before)
+				helpers.assert_true(Terminators.add_custom_terminator("custom_§", "§", "§", false))
+				helpers.assert_eq(Settings.persist(), false, "a malformed document is still refused")
 				helpers.assert_eq(sandbox.read_bytes(path), before)
-				helpers.assert_true(#errors > 0 and errors[#errors]:find("terminators = [{", 1, true) ~= nil,
-					"the refusal names the inline form")
+				helpers.assert_true(#errors > 0, "the refusal remains visible")
 			end)
 			Logger.warn, Logger.error = warn, fail
 			if not passed then error(failure, 0) end

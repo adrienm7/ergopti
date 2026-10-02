@@ -41,7 +41,6 @@ local ConfigOutdated = require("config_outdated")
 local Writer = require("toml_codec.writer")
 local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
-local RecordScanner = require("toml_codec.record_scanner")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 
@@ -56,10 +55,6 @@ local CUSTOM_DEFAULT = true
 
 -- The fields of one custom delimiter record, in the order they are compared.
 local RECORD_FIELDS = { "key", "char", "label", "consume" }
-
--- The form of the custom list the shared writer can update, shown to a user
--- whose file writes it as [[hotstrings.terminators]] tables instead.
-local INLINE_FORM = 'terminators = [{ key = "custom_x", char = "x", label = "x", consume = false }] under [hotstrings]'
 
 -- The catalogue's settings at the last read or write of config.toml; nil until
 -- the first read, when no save can know what the menu changed.
@@ -181,30 +176,6 @@ local function resolve(document, mark)
 	return keep_usable(states, custom, function(path, detail) ConfigOutdated.report(path, detail, Logger) end, mark)
 end
 
---- Whether a source writes the custom list as [[hotstrings.terminators]]
---- tables: readable, but the shared writer cannot address an array-of-tables
---- element, so no change to the list can be saved over it.
---- @param content string|nil Exact config.toml bytes.
---- @return boolean
-local function list_is_table_array(content)
-	local scanned = RecordScanner.scan_records(content or "", { quoted_headers = true })
-	for _, header in ipairs(scanned and scanned.headers or {}) do
-		local segments = header.segments
-		if header.array and type(segments) == "table" and #segments == 2
-			and segments[1] == CUSTOM_PATH[1] and segments[2] == CUSTOM_PATH[2] then
-			return true
-		end
-	end
-	return false
-end
-
---- Why the custom list cannot be saved in this file, for the user.
---- @return string
-local function table_array_detail()
-	return string.format("%s writes hotstrings.terminators as [[hotstrings.terminators]] tables, which "
-		.. "cannot be updated; write the list inline: %s", file(), INLINE_FORM)
-end
-
 --- Reads config.toml as it is now.
 --- @return table document
 --- @return table source Exact classified source for a conditional write.
@@ -279,10 +250,7 @@ end
 --- @return boolean loaded
 function M.load()
 	local called, settings = pcall(function()
-		local document, source = read()
-		if list_is_table_array(source.content) then
-			Logger.warn(LOG, "Your delimiters are read, but a change to them cannot be saved: %s.", table_array_detail())
-		end
+		local document = read()
 		return resolve(document)
 	end)
 	if not called then
@@ -476,12 +444,8 @@ function M.persist()
 		local document, source = read()
 		local operations = plan(document, current, _synced)
 		if #operations == 0 then return true end
-		for _, operation in ipairs(operations) do
-			if #operation.path == #CUSTOM_PATH and operation.path[1] == CUSTOM_PATH[1]
-				and operation.path[2] == CUSTOM_PATH[2] and list_is_table_array(source.content) then
-				return false, table_array_detail()
-			end
-		end
+		-- The shared writer replaces the complete list, including a table-array
+		-- spelling; it still rejects attempts to address an individual element.
 		local rows = LeafRows.prepare(source.content or "", operations)
 		local directory = file():match("^(.*)/[^/]+$")
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then

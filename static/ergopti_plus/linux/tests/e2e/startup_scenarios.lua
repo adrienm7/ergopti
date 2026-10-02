@@ -80,6 +80,8 @@ local function scenarios(driver)
 		{ name = "the neutral defaults start", seed = "/_generated/config_template.toml", steps = { "boot" } },
 		{ name = "the recommended preset imported from the menu starts", seed = "/_generated/config_template.toml",
 			steps = { "restore_recommended", "boot" }, recommended = true },
+		{ name = "a table-array delimiter list can be saved and read at the next start",
+			seed = "/tests/e2e/fixtures/terminators_array.toml", steps = { "delimiters_add", "delimiters_verify" } },
 	}
 	local cases = {}
 	local listing = io.popen("ls " .. q(driver .. CORPUS))
@@ -126,6 +128,12 @@ local function judge(output, action, wizard)
 	end
 	if not output:find("E2E_DONE " .. action, 1, true) then
 		problems[#problems + 1] = "the " .. action .. " child never finished: " .. output:sub(-400)
+	end
+	if action == "delimiters_add" and (facts.delimiter_added ~= "true" or facts.delimiter_committed ~= "true") then
+		problems[#problems + 1] = "the custom delimiter was not added and committed"
+	end
+	if (action == "delimiters_add" or action == "delimiters_verify") and facts.custom_list_verified ~= "true" then
+		problems[#problems + 1] = "the saved delimiters, unknown fields or comment did not survive"
 	end
 	return problems, facts
 end
