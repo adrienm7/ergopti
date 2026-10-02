@@ -202,7 +202,7 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 	Llm := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGuiLlm"))
 	NormalizedShow := RegExReplace(Show, "\s+", " ")
 	Assert(InStr(NormalizedShow,
-		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown)") > 0,
+		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown, PreparedContext)") > 0,
 		"the ordinary/owned presenter must give the common commit the exact rows and semantic tuple it reveals")
 	Assert(RegExMatch(Destack,
 		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan, 0, &PresentBreakdown\)") > 0,

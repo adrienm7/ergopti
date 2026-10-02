@@ -33,8 +33,8 @@ global _TooltipGeneration := 0
 global _TooltipTimerGeneration := 0
 
 ; Tooltip GUI creation and UIA positioning can take tens of milliseconds. The
-; prefix watcher calls TooltipShow on every character, so debounce render work
-; until typing is idle instead of running GDI/COM in the keyboard callback.
+; prefix watcher calls TooltipShow on every character, so coalesce render work
+; onto the next timer turn instead of running GDI/COM in the keyboard callback.
 ;
 ; The pending request is ONE immutable record. Publishing its fields separately
 ; allowed a re-entrant TooltipShow to splice Items from request B to the
@@ -43,7 +43,7 @@ global _TooltipTimerGeneration := 0
 ; callback that already detached its record still loses after B is requested.
 global _TooltipPendingRequest := 0
 global _TooltipRequestSerial := 0
-global TOOLTIP_RENDER_DEBOUNCE_MS := 75
+global TOOLTIP_RENDER_DEBOUNCE_MS := 1
 ; A due owner cannot erase a newer request while that request is preparing, but
 ; consuming the one-shot would leave the old surface immortal if preparation is
 ; later refused. Retry with the same immutable generation/surface owner.
@@ -72,15 +72,11 @@ global _TooltipPositionCache := false
 ; anchors remain uncached while this is set so the validated result can replace
 ; them on the next render instead of being hidden for the whole cache TTL.
 global _TooltipUiaProbePending := false
-; MUST exceed the combined debounce that gates the preview path
-; (_PREFIX_RENDER_DEBOUNCE_MS 150 + TOOLTIP_RENDER_DEBOUNCE_MS 75 = ~225 ms).
-; At 150 ms the cache was ALWAYS past its expiry by the time it was consulted, so
-; it never hit on the path it exists for: every preview render in a caret-less
-; app (Electron/UWP/Chromium — exactly where CaretGetPos fails and UIA is
-; slowest) paid a fresh out-of-proc UIA COM round-trip. Pinned by
-; test_audit_2026_07_20_batch4.ahk so a future debounce change cannot silently
-; make it dead again.
+; Position reuse is independent of preview scheduling. It never authorizes
+; provider dispatch or a current input capability; those require a live context.
 global TOOLTIP_POSITION_CACHE_MS := 600
+; Refresh below the receipt lifetime, at low priority and only during idle.
+global TOOLTIP_POSITION_WARM_PERIOD_MS := 300
 
 ; Minimum physical-input idle before the UIA position worker may run. The render
 ; debounce above is a COALESCING timer, not an idle gate: it decides when the
@@ -88,15 +84,8 @@ global TOOLTIP_POSITION_CACHE_MS := 600
 ; it defers still contends for one shared worker. Same reasoning as
 ; UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
 ;
-; MUST STAY BELOW the combined debounce that gates the preview path
-; (_PREFIX_RENDER_DEBOUNCE_MS 150 + TOOLTIP_RENDER_DEBOUNCE_MS 75 = ~225 ms).
-; The value copied from the selection poll was 250, but that poll has no debounce
-; in front of it while this probe does: a preview render cannot happen earlier
-; than 225 ms after the last character, so a 250 ms gate rejected EVERY preview.
-; Stage 2 of the position cascade — and with it the lazy timeout clamp — was
-; structurally unreachable on the only path it exists for, and every preview in a
-; caret-less app (Electron/Chromium/UWP) anchored at the bottom of the window
-; instead of under the caret. Pinned by test_tooltip_uia_gate_reachable.ahk.
+; The visible surface retains its own idle refinement obligation. Showing early
+; pixels therefore cannot make the UIA stage unreachable when typing stops.
 global TOOLTIP_UIA_IDLE_REQUIRED_MS := 200
 
 ; How long a process stays marked as not answering UIA usefully. Generous
@@ -223,7 +212,7 @@ _TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface,
 }
 
 _TooltipDeferredShowFn(ExpectedSerial) {
-	global _TooltipPendingRequest
+	global _TooltipPendingRequest, TOOLTIP_RENDER_DEBOUNCE_MS
 	Request := 0
 	; Snapshot one complete tuple atomically. Keep it globally visible until it
 	; either pixel-commits or fails: old surface timers/polls must see that a newer
@@ -238,18 +227,33 @@ _TooltipDeferredShowFn(ExpectedSerial) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	WaitingForPosition := false
 	try {
 		if A_IsSuspended
 			return
+		if _TooltipPreparePreviewPosition(Request) {
+			WaitingForPosition := true
+			return
+		}
+		PositionContext := Request.Position.HasOwnProp("Context")
+			? Request.Position.Context : 0
+		if !_TooltipPreparedPositionStillCurrent(PositionContext)
+			return
+		if Request.HasOwnProp("QueuedWallMs")
+			HotPath_RecordLatency("Tooltip.RenderQueue", BootClockWallMs() - Request.QueuedWallMs,
+				TOOLTIP_RENDER_DEBOUNCE_MS)
 		_TooltipShowNow(Request.Items, Request.DurationSec,
 			Request.ArmSafety, Request.OriginMs, Request.Serial,
-			Request.CommitFn)
+			Request.CommitFn, Request.Position.Anchor, PositionContext)
+	} catch as Err {
+		try LoggerError("Tooltip", "Deferred preview failed: {1}.", Err.Message)
+		TooltipHide("DeferredPreviewFail", true, unset, unset, Request.Serial)
 	} finally {
 		; Failure/refusal retires only this tuple. If B replaced A during a
 		; yield, A cannot erase B here.
 		PreviousCritical := Critical("On")
 		try {
-			if (IsObject(_TooltipPendingRequest)
+			if (!WaitingForPosition && IsObject(_TooltipPendingRequest)
 				and ObjPtr(_TooltipPendingRequest) == ObjPtr(Request))
 				_TooltipPendingRequest := 0
 		} finally {
@@ -536,6 +540,10 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 		; Everything after this read (debounce, Gui build, UIA resolve) consumes
 		; the row's canonical interval; the render must never re-anchor it.
 		OriginMs: A_TickCount,
+		QueuedWallMs: BootClockWallMs(),
+		; Only this continuation changes during positioning; request semantics stay
+		; immutable while the disposable provider is pending.
+		Position: { Done: false, Anchor: 0 },
 		Serial: 0,
 		TimerFn: 0
 	}
@@ -557,6 +565,7 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 		if !HasMethod(CommitFn, "Call") && LLM_TooltipOwnsSurface()
 			return false
 		OldRequest := _TooltipPendingRequest
+		_TooltipCancelPositionRefinement()
 		if (IsObject(OldRequest) and OldRequest.HasOwnProp("TimerFn")
 			and IsObject(OldRequest.TimerFn))
 			SetTimer(OldRequest.TimerFn, 0)
@@ -580,7 +589,7 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 ; promise an expansion the engine has already refused. An omitted origin falls
 ; back to present time; tick 0 is a valid request origin at counter rollover.
 _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
-		RequestSerial := -1, CommitFn := 0) {
+		RequestSerial := -1, CommitFn := 0, PreparedAnchor := 0, PreparedContext := 0) {
 	global _TooltipGeneration
 	EntryGeneration := _TooltipGeneration
 	OwnedPresentation := HasMethod(CommitFn, "Call")
@@ -712,7 +721,8 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
     ; AHK-34: the UIA COM call is the hottest blocking call on this path;
     ; wrap it so a slow resolve surfaces in HotPath slow-segment logs
     _hpResolve := HotPath_Now()
-    Pos := _TooltipResolvePosition()
+    IsPreview := Items.Length > 0 && Items[1].HasOwnProp("PreviewStartedWallMs")
+    Pos := IsObject(PreparedAnchor) ? PreparedAnchor : _TooltipResolvePosition(IsPreview)
     HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
     if (RenderGeneration != _TooltipGeneration
         or !_TooltipRequestOwnerMatches(
@@ -727,7 +737,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
         Presented := _TooltipPresentStack(Pos, Row, ArmSafety,
 			OwnedPresentation ? [] : Items,
 			RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan,
-			CommitFn, &PresentBreakdown)
+			CommitFn, &PresentBreakdown, PreparedContext)
 	} catch Error as PresentError {
 		if PresentError is TooltipNavOwnerRetryError
 				|| PresentError is TooltipLlmStaleRenderError
@@ -856,6 +866,7 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
                 and IsObject(_TooltipPendingRequest.TimerFn))
                 SetTimer(_TooltipPendingRequest.TimerFn, 0)
             _TooltipPendingRequest := 0
+			_TooltipCancelPositionRefinement()
             _TooltipRequestSerial += 1
             _TooltipGeneration += 1
             _TooltipTimerGeneration := _TooltipGeneration

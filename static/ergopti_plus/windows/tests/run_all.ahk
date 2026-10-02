@@ -250,6 +250,7 @@ global _DefaultLogsDir := _LogsDir
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
+#Include ../adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
 #Include ../infra/uninstall.ahk
 #Include ../infra/start_at_login.ahk
@@ -371,6 +372,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk
+#Include unit/test_tooltip_position_refinement.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_llm_tooltip_layout.ahk
