@@ -42,6 +42,12 @@ const INVENTORY = {
 	OnChar: 'the character event both the hotstring engine and the LLM bridge consume',
 	'HSE.FeedChar': 'the hotstring engine consuming one character',
 	'HSE.Dispatch': 'the hotstring engine deciding and firing an expansion',
+	'HSE.Preflight':
+		'resolving the frozen expansion and its live admission gates before output ownership',
+	'HSE.OutputHost':
+		'the fresh foreground identity and title probe before any expansion mutates input',
+	'HSE.NativeSend':
+		'the native atomic or paste send, distinguished from preparation and buffer commit',
 	'LLM.OnChar':
 		'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
 	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
@@ -56,6 +62,10 @@ const INVENTORY = {
 	'Tooltip.DequeuePresent':
 		'the same present from the destack rebuild, so a slow row expiry is not mistaken for a slow render',
 	'Tooltip.LlmPresent': 'presenting an LLM prediction preview',
+	'Tooltip.LlmBuild':
+		'measuring and building rich prediction controls before position resolution and presentation',
+	'LLM.Render':
+		'the rich tooltip call through its publication receipt; excludes preceding display-slot preparation and the generation chain',
 	'Tooltip.BorderPixelLoop':
 		'the per-pixel border draw, the one step that scales with tooltip size',
 	'Gesture.Invoke':

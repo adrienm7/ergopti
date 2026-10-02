@@ -98,6 +98,9 @@ _TPS_EveryStepCarriesItsOwnMark() {
 
 _TPS_BreakdownCapRetainsEveryMark() {
 	Body := _DriverFuncBody("_TooltipPresentStack")
+	Reveal := _DriverFuncBody("_TooltipRevealPreparedSurfaces")
+	Assert(Body != "" and Reveal != "", "present and native reveal owners must exist")
+	Body .= Reveal
 	MarkCount := 0
 	Pos := 1
 	while (Pos := InStr(Body, "HotPath_BreakdownMark(", true, Pos)) {

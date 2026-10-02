@@ -832,7 +832,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; route them to _HSE_DispatchRawCallback so the engine never auto-strips a
 		; trigger the callback may have left in place.
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
+				RawHostStarted := HotPath_Now()
 				RawHost := OutputHostResolve(true)
+				HotPath_LogIfSlow("HSE.OutputHost", RawHostStarted, "raw=true")
 				if !RawHost["Valid"]
 					return false
 				if _HSE_IsTerminalInputHost(RawHost["Exe"], RawHost["Title"])
@@ -851,6 +853,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; when its registry identity and exact input context still match. Preflight
 		; then rechecks the live time/case gates while reusing that shown value.
 		VisibleDecision := 0
+		PreflightStarted := HotPath_Now()
 		if IsSet(HotstringPrefixWatcherClaimVisibleDecision)
 				try VisibleDecision := HotstringPrefixWatcherClaimVisibleDecision(
 						Spec, EndChar, HSE_Buffer)
@@ -859,6 +862,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase)
 				: _HSE_PrepareDispatchDecision(
 						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped)
+		HotPath_LogIfSlow("HSE.Preflight", PreflightStarted, "")
 		if !IsObject(Prepared)
 				return false
 		IsConform := Prepared.IsConform
@@ -867,7 +871,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; Sender choice and terminal ownership must share one foreground receipt.
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
+		HostStarted := HotPath_Now()
 		OutputHost := OutputHostResolve(true)
+		HotPath_LogIfSlow("HSE.OutputHost", HostStarted, "raw=false")
 		if !OutputHost["Valid"]
 			return false
 
@@ -946,6 +952,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						EndCharEmitted := (EndChar != "" and !ForceConsumeEndChar
 								and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 						_NpCrit := Critical("On")
+						PasteStarted := HotPath_Now()
 						try {
 								; BackSpaceSeq is a control sequence, not emitted text. The actual
 								; last character is recorded explicitly below after the atomic paste.
@@ -954,6 +961,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						} finally {
 								Critical(_NpCrit)
 						}
+						HotPath_LogIfSlow("HSE.NativeSend", PasteStarted, "branch=paste")
 						if !Fired
 								return false
 						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
@@ -1041,6 +1049,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						; atomic burst is recorded and assertions can inspect it; in production
 						; _SendHook is unset and SendInput fires directly.
 						SendError := ""
+						AtomicStarted := HotPath_Now()
 						_AtCrit := Critical("On")
 						try {
 								; Nested so the burst runs inside _HSE_SendWithAltGrUp; it reads the
@@ -1059,6 +1068,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						} finally {
 								Critical(_AtCrit)
 						}
+						HotPath_LogIfSlow("HSE.NativeSend", AtomicStarted, "branch=atomic")
 						if !Fired {
 								if SendError != ""
 										try LoggerError("HSE", "Atomic expansion injection failed: {1}", SendError)

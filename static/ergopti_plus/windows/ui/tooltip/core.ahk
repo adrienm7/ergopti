@@ -747,9 +747,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
     ; Detail carries the per-sub-step attribution _TooltipPresentStack accumulated.
     ; Draining it above (rather than logging each step) is what makes the breakdown
     ; visible at all: every sub-step is below the profiler's 5 ms floor.
-    ; Counted here and nowhere else: this is the exact point at which pixels are
-    ; on screen, so it is the denominator every "Slow Tooltip.*" line needs.
-    _TooltipNoteRenderPresented()
+    ; The shared pixel commit counts ordinary, destack and rich LLM renders.
 }
 
 ; Hide all tooltip rows and the border overlay immediately.

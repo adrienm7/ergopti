@@ -1547,6 +1547,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 
 	G := 0
 	CandidateHandedOff := false
+	BuildStarted := HotPath_Now()
 	try {
 	slotCount := slots.Length
 	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
@@ -1666,6 +1667,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	; generation-fenced commit in _TooltipPresentStack.
 	Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
 	_TooltipPrepareContent(Row)
+	HotPath_LogIfSlow("Tooltip.LlmBuild", BuildStarted, "slots=" . slotCount)
 	CandidateSurface := _TooltipCreateDetachedSurface(Row, RenderGeneration)
 	; A newer show/hide can take ownership while this renderer performs GUI
 	; work. Dispose only this detached candidate; never consult active globals.
