@@ -250,8 +250,12 @@ _LDRP_RowRegisteredOnEveryLayout() {
 		"the swap must be registered on every layout, gated per press")
 	for _, Name in ["_DigitRowSwapIsLive", "_DigitRowSwapSend"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
-		AssertTrue(InStr(Body, "DigitRowSwapSymbol(Sc, GetForegroundKeyboardLayout())") > 0,
-			Name . " must read the swap on the foreground layout of the press")
+		AssertTrue(InStr(Body, "Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()") > 0,
+			Name . " must snapshot the native foreground layout of the press")
+		StrReplace(Body, "GetForegroundKeyboardLayout()", , , &Reads)
+		AssertEqual(1, Reads, Name . " must not splice two foreground windows into one decision")
+		AssertTrue(InStr(Body, "_DigitRowSwapResolution(Sc, Hkl)") > 0,
+			Name . " must resolve the effective row on that exact native snapshot")
 		AssertFalse(InStr(Body, "GetKeyName(") > 0,
 			Name . ": GetKeyName reads the script thread's own layout, never the foreground one")
 	}
@@ -270,3 +274,197 @@ _LDRP_RowRegisteredOnEveryLayout() {
 }
 Test("digit row: the swap and the layers' digit row are registered on every layout and decided per press (digit-row-live-2026-09-27)",
 	_LDRP_RowRegisteredOnEveryLayout)
+
+; Actual native HKLs plus the real registry source cross the callback boundary:
+; the capture stores the registered criterion and emission callback, not copies
+; of their conditions. Every assertion stays outside the intercepted callbacks.
+_LDRP_EffectiveRegistryRow() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, _DigitRowProfiles, _SendHook
+	global _Stub_RecordedSends, KLE_State, KEYLAYOUT_NEUTRAL_STATE
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(), _DigitRowProfiles, _SendHook]
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\number_row_levels.json", "UTF-8"))
+	AssertEqual(10, Corpus["digits"].Length, "the independent corpus must cover the complete number row")
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", true))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		Desired := State["features"]["layout"]
+		_KLT_Load("ergol")
+		_DigitRowProfiles := Map()
+		Layouts := []
+		for Native in Corpus["native"] {
+			Hkl := _LDRP_Layout(Native["klid"])
+			if !Hkl
+				continue
+			Layouts.Push({Hkl: Hkl, Expected: Native})
+			AssertFalse(DigitRowIsSwapped(Hkl),
+				"an already-direct registry row must never borrow " . Native["id"] . "'s native swap")
+		}
+		AssertTrue(Layouts.Length > 0, "at least one native source must be available")
+		if EnvGet("GITHUB_ACTIONS") == "true"
+			AssertEqual(2, Layouts.Length, "CI must compare both real AZERTY and QWERTY HKLs")
+		Capture := {Criterion: 0, Rows: Map()}
+		Foreground := {Hkl: Layouts[1].Hkl}
+		KLE_Registered := false
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, Options) => Capture.Rows[Name] := {Criterion: Capture.Criterion, Callback: Callback},
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0,
+			() => Foreground.Hkl)
+		_SendHook := _HOOK_RecordSend
+		loop 2 {
+			for Native in Layouts {
+				Foreground.Hkl := Native.Hkl
+				for Index, Sc in Corpus["scancodes"] {
+					Code := Integer("0x" . SubStr(Sc, 3))
+					Row := Capture.Rows["+" . Sc]
+					for Caps in [false, true] {
+						Levels := KeylayoutEmulation_NumberRowLevels(Code, Caps)
+						AssertEqual("text", Levels["plain"]["Kind"])
+						AssertEqual(Corpus["emulated"]["plain"][Index], Levels["plain"]["Text"])
+						AssertEqual(Corpus["emulated"]["shift"][Index], Levels["shift"]["Text"])
+						AssertEqual("", DigitRowSwapSymbol(Code, Native.Hkl, Caps),
+							"direct digits preserve the selected source's Shift level, including CapsLock")
+					}
+					AssertTrue(Row.Criterion.Call(), "the actual registered Shift variant must retain the key")
+					ResetHotstringRecorders()
+					Row.Callback.Call()
+					AssertEqual(1, _Stub_RecordedSends.Length, "the real callback must emit exactly once")
+					AssertEqual(Corpus["emulated"]["shift"][Index], _Stub_RecordedSends[1].args[1],
+						"the callback must emit the registry symbol, never the native HKL symbol")
+					Desired["ergopti_base"] := false
+					AssertEqual(Native.Expected["plain"][Index], _APRL_Text(Native.Hkl, Code, []),
+						"the native DLL must match the independently captured unshifted row")
+					AssertEqual(Native.Expected["shift"][Index], _APRL_Text(Native.Hkl, Code, [0x10]),
+						"the native DLL must match the independently captured shifted row")
+					AssertFalse(Row.Criterion.Call(), "AltGr alone does not claim a base/Shift key")
+					AssertEqual(Native.Expected["swapped"] ? Native.Expected["plain"][Index] : "",
+						DigitRowSwapSymbol(Code, Native.Hkl, false), "without base the native source owns the row")
+					Desired["ergopti_base"] := true
+					CategoryEnabled["Layout"] := false
+					AssertFalse(Row.Criterion.Call(), "a gated category must not retain the source")
+					AssertEqual(0, KeylayoutEmulation_NumberRowLevels(Code, false))
+					CategoryEnabled["Layout"] := true
+					LayerEnabled := true
+					AssertFalse(Row.Criterion.Call(), "navigation must keep its physical key ownership")
+					LayerEnabled := false
+					AssertTrue(Row.Criterion.Call(), "restoring the source must recover its registered Shift variant")
+				}
+			}
+		}
+		for Index, Sc in Corpus["scancodes"] {
+			AssertEqual(Corpus["emulated"]["altgr"][Index], KeylayoutEmulation_Press(Sc, false, false, true))
+			AssertEqual(Corpus["emulated"]["altgr_shift"][Index], KeylayoutEmulation_Press(Sc, true, false, true))
+		}
+		KeylayoutEmulation_Press("SC010", true, false, true)
+		Pending := KLE_State
+		AssertTrue(Pending !== KEYLAYOUT_NEUTRAL_STATE, "the real source must arm its circumflex state")
+		for Caps in [false, true] {
+			for Native in Layouts {
+				for Sc in Corpus["scancodes"] {
+					Code := Integer("0x" . SubStr(Sc, 3))
+					KeylayoutEmulation_NumberRowLevels(Code, Caps)
+					DigitRowSwapSymbol(Code, Native.Hkl, Caps)
+					AssertEqual(Pending, KLE_State, "level inspection must not consume or reset a pending dead key")
+				}
+			}
+		}
+		AssertEqual(Chr(0xB9), KeylayoutEmulation_Press("SC002", false, false, false),
+			"the next real press must still complete the original circumflex action")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_DigitRowProfiles := Saved[6]
+		_SendHook := Saved[7]
+	}
+}
+Test("digit row: registered registry Shift callbacks preserve ten effective levels over native HKL changes (digit-row-effective-source)",
+	_KLT_WithEmulation.Bind(_LDRP_EffectiveRegistryRow))
+
+; A swapped source level can be a dead-key action, not a printable symbol.
+; Inspection preserves both states, and the registered pending-key callback
+; must route its real press through that source's own action machine.
+_LDRP_TypedSourceSwap() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, _SendHook
+	global KLE_State, KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(), _SendHook]
+	try {
+		Features := Map("layout", Map("emulated_layout", "typed-row-fixture", "ergopti_base", true,
+			"ergopti_alt_gr", false, "ergopti_plus", false, "direct_access_digits", true))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		Modifiers := '<keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect>'
+			. '<keyMapSelect mapIndex="1"><modifier keys="anyShift caps?"/></keyMapSelect>'
+			. '<keyMapSelect mapIndex="2"><modifier keys="caps"/></keyMapSelect>'
+		Maps := '<keyMap index="0"><key code="18" action="row_dead"/><key code="12" action="letter"/></keyMap>'
+			. '<keyMap index="1"><key code="18" output="1"/></keyMap>'
+			. '<keyMap index="2"><key code="18" output="&#xA7;"/></keyMap>'
+		Actions := '<action id="row_dead"><when state="none" next="circumflex"/></action>'
+			. '<action id="letter"><when state="none" output="a"/><when state="circumflex" output="&#xE2;"/></action>'
+		Text := _KLT_Doc(_KLT_Layouts(), Modifiers, Maps, Actions)
+		Text := StrReplace(Text, "</keyboard>", '<terminators><when state="circumflex" output="^"/></terminators></keyboard>')
+		KeylayoutEmulation_Load("typed-row-fixture", Text, "ansi", LayoutRegistry_Keycodes())
+		Hkl := GetForegroundKeyboardLayout()
+		for Caps in [false, true] {
+			KLE_State := "circumflex"
+			Resolution := _DigitRowSwapResolution(0x02, Hkl, Caps)
+			AssertTrue(Resolution["swap"], "both effective levels put the digit behind Shift")
+			AssertEqual("emulated", Resolution["source"])
+			Descriptor := Resolution["descriptor"]
+			AssertEqual(Caps ? "text" : "dead", Descriptor["Kind"])
+			AssertEqual(Caps ? Chr(0xA7) : "^", Descriptor["Text"])
+			AssertEqual(Caps ? "" : "row_dead", Descriptor["Action"])
+			AssertEqual(Caps ? "" : "circumflex", Descriptor["State"])
+			AssertEqual("circumflex", KLE_State, "probing the selected level must preserve pending composition")
+		}
+		KLE_Registered := false
+		Capture := {Criterion: 0, Rows: Map()}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, Options) => Capture.Rows[Name] := {Criterion: Capture.Criterion, Callback: Callback},
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+		Row := Capture.Rows["+SC002"]
+		AssertTrue(Row.Criterion.Call(), "the pending-dead-key variant must own the already-armed sequence")
+		CapsBefore := GetKeyState("CapsLock", "T")
+		_SendHook := _HOOK_RecordSend
+		ResetHotstringRecorders()
+		; The callback must consume the same pending state which made its real
+		; registered criterion eligible, rather than silently switching owners.
+		Row.Callback.Call()
+		if CapsBefore {
+			AssertEqual(1, _Stub_RecordedSends.Length)
+			AssertEqual("^" . Chr(0xA7), _Stub_RecordedSends[1].args[1],
+				"the real emitter must finish its pending terminator and honor hardware CapsLock")
+			AssertEqual(KEYLAYOUT_NEUTRAL_STATE, KLE_State)
+		} else {
+			AssertEqual(1, _Stub_RecordedSends.Length)
+			AssertEqual("^", _Stub_RecordedSends[1].args[1],
+				"only the previous dead key's terminator is typed, never native HKL text")
+			AssertEqual("circumflex", KLE_State, "the repeated source action must retain its own dead state")
+			AssertEqual(Chr(0xE2), KeylayoutEmulation_Press("SC010", false, false, false),
+				"the next real key must still compose through the selected source")
+		}
+		AssertEqual(CapsBefore, GetKeyState("CapsLock", "T"), "source emission must never change hardware CapsLock")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_SendHook := Saved[6]
+	}
+}
+Test("digit row: typed source swaps preserve CapsLock and the real dead-key owner (digit-row-effective-source)",
+	_KLT_WithEmulation.Bind(_LDRP_TypedSourceSwap))

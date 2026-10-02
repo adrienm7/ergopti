@@ -792,17 +792,19 @@ exact-boolean regressions also pass the focused runner.
       scripts, paths/arguments with spaces and Unicode, process-start refusal,
       execution errors, lifecycle/cancellation and cross-consumer parity.
 
-- [ ] **107.** Make the number-row policy explicit: native behavior, digits
-      directly, or symbols directly. Enabling direct digits on QWERTY must keep
-      its already-direct digits rather than swap them; the inverse choice puts
-      QWERTY symbols on plain presses and digits on Shift. Migrate the existing
-      Windows `direct_access_digits` choice through its configuration owner,
-      preserving unowned settings. Derive the effective native/emulated levels
-      rather than assuming AZERTY, and cover 1–0, both Shift states, AZERTY,
-      QWERTY, emulation changes and live HKL transitions in native regressions.
-      Share the policy and behavior vectors wherever another driver supports
-      number-row remapping, documenting genuine platform limits.
-
+- [~] **107.** Make the number-row policy explicit: native behavior, digits
+  directly or symbols directly, with an acknowledged migration of the old
+  Windows Boolean and preserved unrelated settings. The current Boolean now
+  resolves actual desired KLE base descriptors before falling back to native
+  HKL probing. Already-direct Ergo-L over AZERTY retains Shift symbols; an
+  emulated swap emits through the existing KLE owner rather than flattening
+  actions/dead states to text. Inspection preserves Caps and pending state.
+  Independent ten-key vectors and captured registered criteria/callbacks cover
+  actual AZERTY/QWERTY HKLs, base/category/navigation changes, AltGr, Caps
+  descriptors and dead-key composition; native CI remains pending.
+  Remaining: the three-choice shared policy, persistent migration, translated
+  choices and corresponding owners on supported macOS/Linux paths, with genuine
+  platform limits documented. No enum or schema change occurs in this slice.
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
   macOS, Win/Super on Windows and Linux. It must work with every layout and
