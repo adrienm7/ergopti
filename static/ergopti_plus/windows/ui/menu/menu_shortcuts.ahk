@@ -67,13 +67,22 @@ _SC_Getters() {
 ; The « Combinaisons de touches » group: its own first-row switch (the
 ; KeyCombinations gate, independent of Shortcuts), then one submenu per first
 ; key listing the pairs it begins, all declared by key_combinations_group.
-_SC_KeyCombinationsSubmenu() {
-	Commands := Map("key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"))
+_SC_KeyCombinationsSubmenu(Options := unset) {
+	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
 	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
 	ListProviders := Map(
 		"key_combination_rows_left", () => KeyCombinationRows("left"),
 		"key_combination_rows_right", () => KeyCombinationRows("right"))
 	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
+}
+
+; Shared group commands use the combination owner, not the whole Shortcuts scope.
+_SC_KeyCombinationCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
+		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).

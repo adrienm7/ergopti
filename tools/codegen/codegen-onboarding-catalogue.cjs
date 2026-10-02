@@ -1312,7 +1312,9 @@ function buildCatalogue() {
 			throw new Error(`[onboarding.pages.${id}] is not in [onboarding] order`);
 	}
 	for (const id of order) validatePage(id, (manifest.onboarding.pages || {})[id], manifest, labels);
-	const scopes = Object.keys(manifest.scopes).filter((scope) => scope !== 'global');
+	// Nested menu scopes belong to their containing wizard page. The global
+	// composition names every root scope that needs its own question.
+	const scopes = manifest.scopes.global.includes;
 	for (const scope of scopes) {
 		if (!order.includes(scope))
 			throw new Error(`configuration scope ${scope} has no onboarding page`);

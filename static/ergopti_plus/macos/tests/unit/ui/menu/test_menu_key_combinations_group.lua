@@ -177,3 +177,34 @@ helpers.describe("key-combination pairs use the shared declaration", function()
 		end)
 	end
 end)
+
+helpers.describe("combination bulk commands use their own scope", function()
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("dispatches " .. mode .. " from the shared menu and refreshes only after settlement", function()
+			local observed = { combos = true, writes = {}, regenerations = 0, refreshes = 0 }
+			local remap = remap_double(observed)
+			remap.apply_scope = function(request, on_done)
+				observed.request, observed.terminal = request, on_done
+				return true
+			end
+			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local group = menu.build_key_combinations({ karabiner = remap,
+				updateMenu = function() observed.refreshes = observed.refreshes + 1 end })
+			local command = group[mode == "recommended" and 2 or 3]
+			helpers.assert_eq(command.title, mode == "recommended" and "common.restore_recommended" or "common.clear_to_system")
+			command.fn()
+			helpers.assert_eq(observed.request.scope, "key_combinations")
+			helpers.assert_eq(observed.request.mode, mode)
+			helpers.assert_true(observed.request.backup_path:find(".key_combinations-", 1, true) ~= nil)
+			helpers.assert_eq(observed.refreshes, 0)
+			observed.terminal(false, "activation-failed", 0)
+			helpers.assert_eq(observed.refreshes, 1, "a refused terminal refreshes the recovered posture")
+			command.fn()
+			helpers.assert_eq(observed.refreshes, 1, "the next acceptance still waits for its terminal")
+			observed.terminal(true, "ready", 1)
+			helpers.assert_eq(observed.refreshes, 2)
+			observed.terminal(true, "duplicate", 1)
+			helpers.assert_eq(observed.refreshes, 2, "duplicate terminals are ignored")
+		end)
+	end
+end)

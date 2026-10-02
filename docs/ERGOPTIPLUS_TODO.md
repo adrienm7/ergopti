@@ -485,7 +485,15 @@ is committed; one request is one commit with its regression test.
   2026-10-02: every ordered pair of the keys of `[tap_hold.catalog]`
   (key 1 then key 2 is not key 2 then key 1), each with « hold 1 + tap
   2 » and « hold 1 + hold 2 », listed by hand; the three former families
-  are the recommended pairs (`infra/key_combinations.ahk`). Remaining:
+  are the recommended pairs (`infra/key_combinations.ahk`). The shared
+  group now offers recommended/clear commands on Windows and macOS. Its
+  native owners preserve unrelated shortcuts and recover rejected reloads;
+  clear keeps the combination switch. Every Windows pair shows its action
+  directly, including an explicit disabled label, before opening the picker.
+  Restoring imports the three historical shared recommendations (AltGr +
+  left Alt: previous word; AltGr + CapsLock: next word; left Alt + CapsLock:
+  CapsWord). Linux still needs the combination engine tracked by item 93.
+  Native CI validation of this menu fix is pending. Remaining:
   (a) the chord slot (both keys within the simultaneity delay), with its
   symmetry, its delay and « copy tap to chord »: the first key of a chord
   must wait for the second, while every Windows tap-hold owner takes its

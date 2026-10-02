@@ -263,26 +263,28 @@ end
 -- Makes each scope backup path unique within the session.
 local _scope_generation = 0
 
---- Applies one tap_holds scope mode through the remap transaction, at once for
+--- Applies one remap scope mode through the native transaction, at once for
 --- both modes: the backup it writes first is the way back, so a clear asks no
 --- question either (the maintainer's rule of 2026-09-30).
---- The chords belong to the shortcuts scope and are not part of this request.
+--- Each scope belongs to its native remap owner and leaves other groups alone.
 --- @param karabiner table Remap facade.
 --- @param mode string "recommended" or "clear".
 --- @param update_menu function|nil Menu refresh callback.
+--- @param scope string|nil "tap_holds" by default, or "key_combinations".
 --- @return boolean accepted
-local function run_scope(karabiner, mode, update_menu)
+local function run_scope(karabiner, mode, update_menu, scope)
+	scope = scope or "tap_holds"
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. ".tap_holds-"
+	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
 	return run_bulk_menu_command(
 		karabiner,
 		"apply_scope",
-		"Applying the tap-hold scope (" .. mode .. ")…",
-		"Tap-hold scope " .. mode .. " applied.",
+		"Applying the " .. scope .. " scope (" .. mode .. ")…",
+		scope .. " scope " .. mode .. " applied.",
 		false,
 		update_menu,
-		{ scope = "tap_holds", mode = mode, backup_path = backup_path }
+		{ scope = scope, mode = mode, backup_path = backup_path }
 	)
 end
 
@@ -1203,6 +1205,12 @@ function M.build_key_combinations(ctx)
 	local commands = {
 		["key_combinations_toggle"] = function()
 			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
+		end,
+		["scope_restore"] = function()
+			return run_scope(karabiner, "recommended", update_menu, "key_combinations")
+		end,
+		["scope_clear"] = function()
+			return run_scope(karabiner, "clear", update_menu, "key_combinations")
 		end,
 		["combo_symmetric"] = function()
 			return toggle_combo_symmetric(karabiner, update_menu)
