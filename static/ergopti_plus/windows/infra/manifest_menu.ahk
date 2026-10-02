@@ -129,7 +129,7 @@ _MR_Get(Obj, Key, Default := "") {
 ; Returns the populated Menu object.
 MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset) {
 	if IsSet(TargetMenu) && (!(TargetMenu is Menu)
-			|| DllCall("GetMenuItemCount", "ptr", TargetMenu.Handle, "int") != 0)
+			|| TrayMenuItemCount(TargetMenu) != 0)
 		throw Error("A manifest menu target must be an empty native menu.")
 	if (GroupBuilders == "") {
 		GroupBuilders := Map()
@@ -149,7 +149,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	}
 
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
-	Result     := IsSet(TargetMenu) ? TargetMenu : Menu()
+	if IsSet(TargetMenu)
+		Result := TargetMenu
+	else
+		Result := Menu()
 	ItemCount  := 0      ; real items added so far
 	PendingSep := false  ; separator deferred until next real item
 

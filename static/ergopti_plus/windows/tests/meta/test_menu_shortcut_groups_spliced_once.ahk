@@ -123,7 +123,7 @@ Test("menu: initMenu() never mutates a SubMenus entry (menu-shortcut-groups-dupl
 _MSG_GroupsComeFromTheManifest() {
 	; The bug was a splice that could run more than once against a persistent Menu
 	; object. The groups now come from a manifest "list" entry, and
-	; MenuRenderer_Build creates a fresh Menu() on every call -- so the duplication
+	; MenuRenderer_Build creates a fresh Menu() by default -- so the duplication
 	; is not merely avoided, it has no place left to happen. This asserts that
 	; structural fact rather than the old "splice exactly once" arrangement, which
 	; would still be one careless call site away from the original bug.
@@ -142,12 +142,12 @@ _MSG_GroupsComeFromTheManifest() {
 	Assert(InStr(Body, "MenuRenderer_Build(") > 0,
 		"_BuildShortcutsSubmenu must build through the manifest renderer")
 
-	; The renderer must keep constructing a fresh Menu per call. If it ever started
+	; The renderer must keep constructing a fresh Menu by default. If it ever started
 	; caching and mutating one, every guarantee above would be void.
 	RendererBody := _DriverFuncBody("MenuRenderer_Build")
 	Assert(RendererBody != "", "MenuRenderer_Build() must exist in the driver source")
 	Assert(RegExMatch(RendererBody, "Result\s*:=\s*Menu\(\)"),
-		"MenuRenderer_Build must construct a fresh Menu on every call -- a cached menu mutated in "
+		"MenuRenderer_Build must construct a fresh Menu by default -- a cached menu mutated in "
 		. "place would duplicate rows exactly the way the old splice did")
 }
 Test("menu: the keyboard-shortcut groups come from the manifest, not a splice (menu-shortcut-groups-duplicated-on-updater-rebuild)",
