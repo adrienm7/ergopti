@@ -301,8 +301,10 @@ InstallHotstringHooks()
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
+; Contract tests must not launch a provider against the user's foreground app.
+; Worker behavior is covered separately with explicit owned-process fixtures.
 SFD_ConfigureUiaWorker(
-	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
+	(Context, Terminal) => false, () => false, UIASW_ContextMatches)
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
