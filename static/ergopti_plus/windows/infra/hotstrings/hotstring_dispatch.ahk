@@ -46,10 +46,14 @@ global _HSE_TerminalOwnerSerial := 0
 global _HSE_TerminalReplayPending := 0
 global _HSE_TerminalReplaying := false
 
-_HSE_IsTerminalInputHost(Exe, Title := "") {
+/** Known terminal executables need no cross-process caption to select pacing. */
+_HSE_OutputHostNeedsTitle(Exe) {
 		global HSE_TERMINAL_INPUT_EXES
-		NormalizedExe := StrLower(Trim(Exe))
-		if HSE_TERMINAL_INPUT_EXES.Has(NormalizedExe)
+		return !HSE_TERMINAL_INPUT_EXES.Has(StrLower(Trim(Exe)))
+}
+
+_HSE_IsTerminalInputHost(Exe, Title := "") {
+		if !_HSE_OutputHostNeedsTitle(Exe)
 				return true
 		; Covers an embedded terminal hosting the two known OpenTUI products without
 		; slowing every editor field in the parent IDE process.
@@ -833,7 +837,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; trigger the callback may have left in place.
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
 				RawHostStarted := HotPath_Now()
-				RawHost := OutputHostResolve(true)
+				RawHost := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 				HotPath_LogIfSlow("HSE.OutputHost", RawHostStarted, "raw=true")
 				if !RawHost["Valid"]
 					return false
@@ -872,7 +876,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
 		HostStarted := HotPath_Now()
-		OutputHost := OutputHostResolve(true)
+		OutputHost := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 		HotPath_LogIfSlow("HSE.OutputHost", HostStarted, "raw=false")
 		if !OutputHost["Valid"]
 			return false

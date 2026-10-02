@@ -148,6 +148,7 @@ _OutputHostNormalizeTitle(Result) {
 	)
 }
 
+/** Acquires a current receipt; a title predicate may skip an irrelevant caption. */
 OutputHostResolve(RequireTitle := false) {
 	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
 	global _OUTPUT_HOST_METADATA_PROBE, _OUTPUT_HOST_TITLE_PROBE
@@ -199,7 +200,16 @@ OutputHostResolve(RequireTitle := false) {
 
 	Title := ""
 	TitleTimedOut := false
-	if RequireTitle {
+	TitleRequired := RequireTitle
+	if HasMethod(RequireTitle, "Call") {
+		try TitleRequired := RequireTitle.Call(Candidate["Exe"])
+		catch {
+			return _OutputHostReject("title_policy_error", Hwnd, Pid)
+		}
+		if !(TitleRequired is Integer) || (TitleRequired != 0 && TitleRequired != 1)
+			return _OutputHostReject("title_policy_invalid", Hwnd, Pid)
+	}
+	if TitleRequired {
 		try RawTitle := HasMethod(_OUTPUT_HOST_TITLE_PROBE, "Call")
 			? _OUTPUT_HOST_TITLE_PROBE.Call(Hwnd, Pid)
 			: _OutputHostReadTitle(Hwnd, Pid)
