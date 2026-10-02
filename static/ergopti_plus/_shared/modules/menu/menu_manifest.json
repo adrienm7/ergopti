@@ -750,6 +750,29 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
 	],
+	"hotstring_category_menu": [
+		{
+			"type": "command",
+			"id": "hotstring_category_enable_all",
+			"i18n": "menu.hotstrings.scope_enable_all"
+		},
+		{
+			"type": "command",
+			"id": "hotstring_category_disable_all",
+			"i18n": "menu.hotstrings.scope_disable_all"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_category_file"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_category_sections"
+		}
+	],
 	"key_combination_pair_menu": [
 		{
 			"type": "command",

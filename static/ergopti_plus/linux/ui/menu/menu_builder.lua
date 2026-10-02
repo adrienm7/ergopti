@@ -738,35 +738,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local sub = {}
 
-		-- The gate first, because everything under it is inert while it is off. A
-		-- checkbox with one label: it alternated « ✅ Activée (cliquer pour
-		-- désactiver) » and « ❌ Désactivée (cliquer pour activer) ».
-		sub[#sub + 1] = {
-			label   = i18n_safe("menu.hotstrings.category_enable"),
-			checked = on and true or false,
-			action  = function()
-				if config.toggle_group then config.toggle_group(id) end
-			end,
-		}
-
-		if category and category.path then
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.open_file"),
-				action    = function()
-					if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
-				end,
-			}
-		end
-
 		local sections = category and category.sections_order or {}
 		if #sections > 0 then
-			sub[#sub + 1] = { separator = true }
-			-- One checkbox for every section, the key all three drivers use. Not
-			-- greyed while the category is off: enabling lifts the gate, so this is
-			-- one click from a switched-off category to a fully-on one, and the tick
-			-- counts the gate so that click is the enabling one.
-			sub[#sub + 1] = all_sections_row({ id })
-			sub[#sub + 1] = { separator = true }
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
@@ -798,6 +771,35 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 
+		local function commit_scope(enabled)
+			local called, committed = pcall(function()
+				return config.set_category_scope_enabled({ id }, enabled)
+			end)
+			if called and committed == true then return true end
+			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
+				called and "owner-not-committed" or "owner-error")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		local render_ctx = { commands = {
+			["hotstring_category_enable_all"] = function()
+				return commit_scope(true)
+			end,
+			["hotstring_category_disable_all"] = function()
+				return commit_scope(false)
+			end,
+		} }
+		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+			render_ctx, {
+				["hotstring_category_file"] = function()
+					if not category or not category.path then return {} end
+					return { { label = i18n_safe("menu.hotstrings.open_file"), action = function()
+						if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
+					end } }
+				end,
+				["hotstring_category_sections"] = function() return sub end,
+			})
+
 		return {
 			-- The ACTIVE count, not the file's total. A user reads this figure as
 			-- "what is firing right now" and checks a disable by watching it fall;
@@ -805,7 +807,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- every entry it would have had.
 			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
 			checked = on and true or false,
-			items    = sub,
+			submenu = rendered,
 		}
 	end
 

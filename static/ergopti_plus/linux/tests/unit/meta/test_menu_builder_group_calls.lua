@@ -31,13 +31,17 @@ local helpers = require("tests.helpers")
 -- ===================================================================
 
 helpers.describe("menu_builder: group toggles call hotstrings_config with the group name", function()
-	helpers.it("is_group_enabled and toggle_group receive the group name string, not the config table", function()
+	helpers.it("group reads and scope commands receive their documented arguments, not the config table", function()
 		local enabled_args = {}
-		local toggle_args = {}
+		local toggle_args, scope_args = {}, {}
 		local mock_config = {
 			get_groups = function() return { "code", "email" } end,
 			is_group_enabled = function(gn) enabled_args[#enabled_args + 1] = gn; return true end,
 			toggle_group = function(gn) toggle_args[#toggle_args + 1] = gn end,
+			set_category_scope_enabled = function(names, enabled)
+				scope_args[#scope_args + 1] = { names = names, enabled = enabled }
+				return true
+			end,
 			reload = function() end,
 		}
 
@@ -48,10 +52,8 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		helpers.assert_true(#enabled_args >= 1, "is_group_enabled should be called for each group")
 		helpers.assert_eq(enabled_args[1], "code", "is_group_enabled must receive the group name, not the config table")
 
-		-- Find the "code" category and invoke its gate toggle. A category is a
-		-- SUBMENU now, not a single row: its first child is the enable/disable
-		-- gate, and the rows under it are its sections. So the search descends to
-		-- the category, then takes the first callable row inside it.
+		-- The first callable child is the explicit enable command. A colon call
+		-- would put the config table in its array argument and lose the boolean.
 		local toggled = false
 		local function search(list)
 			for _, item in ipairs(list) do
@@ -73,7 +75,9 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		end
 		search(items)
 		helpers.assert_true(toggled, "the 'code' group item should be present with a toggle callback")
-		helpers.assert_eq(toggle_args[1], "code", "toggle_group must receive the group name, not the config table")
+		helpers.assert_eq(scope_args, { { names = { "code" }, enabled = true } },
+			"the scope owner receives only the selected ids and requested boolean, with no implicit self")
+		helpers.assert_eq(toggle_args, {}, "the category click does not also run the former independent gate")
 	end)
 end)
 

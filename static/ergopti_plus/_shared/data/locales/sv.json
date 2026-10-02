@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Aktivera alla avsnitt",
 	"menu.hotstrings.open_editor": "Öppna hotstring-redigerare",
 	"menu.hotstrings.open_file": "Öppna fil…",
+	"menu.hotstrings.scope_enable_all": "Aktivera alla",
+	"menu.hotstrings.scope_disable_all": "Inaktivera alla",
 	"menu.hotstrings.params": "⚙️ Hotstring-inställningar",
 	"menu.hotstrings.personal_header": "Mina hotstrings",
 	"menu.hotstrings.preview_bubbles": "Förhandsgranska bubblor",

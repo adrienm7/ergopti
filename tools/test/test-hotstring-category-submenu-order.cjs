@@ -4,44 +4,23 @@
  * ==============================================================================
  * MODULE: One Hotstring Category Submenu, One Order
  * DESCRIPTION:
- * Every hotstring category (Autocorrection, Rolls, SFB, distances, magic key)
- * opens a submenu with the same controls on all three drivers. Until 2026-08-07
- * they came in three different orders, and macOS was missing one of them:
- *
- *   Windows   gate, tout activer, tout désactiver, ouvrir le fichier, ─, sections
- *   Linux     gate, ouvrir le fichier, ─, tout activer, tout désactiver, ─, sections
- *   macOS     ouvrir le fichier, ─, tout activer, tout désactiver, ─, sections
- *
- * THE ORDER BELOW IS THE SHARED ONE — the gate first, since everything under it
- * is inert while it is off:
- *
- *   gate checkbox, ouvrir le fichier, ─, « toutes les sections » checkbox, ─, sections
- *
- * Both controls are checkboxes with one label each. The gate read « ✅ Activée
- * (cliquer pour désactiver) » / « ❌ Désactivée (cliquer pour activer) », and the
- * sections came with a « Tout activer » / « Tout désactiver » pair: two keys per
- * control, and a state readable only from the words. The same single checkbox
- * replaces the pair at the top of each language submenu, the personal and
- * dynamic submenus and the Hotstrings menu itself.
- *
- * WHY A SOURCE SCAN: the three builders are written in three languages and none
- * of them can be executed by the other two's test runner. What CAN be compared
- * is the order in which each builds the shared controls, and that no driver
- * source still names a retired key. Each driver's own suite tests the rows
- * behaviourally (test_hotstring_bulk_checkboxes on all three).
+ * Explicit category commands replace the former gate and all-sections switches.
+ * The manifest owns their order, the optional file row and the section provider.
+ * Native suites invoke both commands and verify the scoped transaction; this
+ * gate rejects independent driver heads and declaration drift. Language and
+ * whole-tree section checkboxes remain separate from these category commands.
  * ==============================================================================
  */
 
 'use strict';
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
-const GATE_KEY = 'menu.hotstrings.category_enable';
-const OPEN_FILE_KEY = 'menu.hotstrings.open_file';
 const ALL_SECTIONS_KEY = 'menu.hotstrings.enable_all_sections';
 
 // Label keys retired with the pairs and the alternating gate labels. A driver
@@ -109,25 +88,26 @@ const DRIVERS = [
 	}
 ];
 
-// Each driver's category-submenu builder, delimited by two literals unique to it.
+// Native category bindings consume the same menu key and supply its commands
+// and providers. Their data lists cannot reintroduce either old switch.
 const CATEGORY_REGIONS = [
 	{
 		driver: 'windows',
 		file: 'windows/ui/menu/menu_hotstring_switches.ahk',
-		from: '_HS_CategoryHeadRows(V1Cat, V2Section, TomlPath) {',
-		to: '\treturn Rows\n}'
+		from: '_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply) {',
+		to: '\n}'
 	},
 	{
 		driver: 'macos',
 		file: 'macos/ui/menu/menu_hotstrings.lua',
-		from: 'local sec_menu = {}',
-		to: 'item.items = sec_menu'
+		from: 'local render_ctx = { commands = {',
+		to: '\n\t\tend'
 	},
 	{
 		driver: 'linux',
 		file: 'linux/ui/menu/menu_builder.lua',
-		from: 'local function category_submenu(id)',
-		to: 'items    = sub,'
+		from: 'local render_ctx = { commands = {\n\t\t\t["hotstring_category_enable_all"]',
+		to: '\n\t\treturn {'
 	}
 ];
 
@@ -223,36 +203,71 @@ for (const d of DRIVERS) {
 	}
 }
 
+const expectedDeclaration = [
+	{
+		type: 'command',
+		id: 'hotstring_category_enable_all',
+		i18n: 'menu.hotstrings.scope_enable_all'
+	},
+	{
+		type: 'command',
+		id: 'hotstring_category_disable_all',
+		i18n: 'menu.hotstrings.scope_disable_all'
+	},
+	{ type: 'list', id: 'hotstring_category_file' },
+	{ type: '---' },
+	{ type: 'list', id: 'hotstring_category_sections' }
+];
+function validateDeclaration(rows) {
+	assert.deepEqual(rows, expectedDeclaration);
+}
+const manifest = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+);
+try {
+	validateDeclaration(manifest.hotstring_category_menu);
+	// Independent negative controls keep the oracle sensitive to the old toggle,
+	// a reordered command, a missing section list and a platform-only fork.
+	for (const mutate of [
+		(rows) => {
+			rows[0].type = 'check';
+		},
+		(rows) => {
+			[rows[0], rows[1]] = [rows[1], rows[0]];
+		},
+		(rows) => {
+			rows.pop();
+		},
+		(rows) => {
+			rows[0].platforms = ['ahk'];
+		}
+	]) {
+		const changed = structuredClone(expectedDeclaration);
+		mutate(changed);
+		assert.throws(() => validateDeclaration(changed));
+	}
+} catch (error) {
+	errors.push(`shared category declaration: ${error.message}`);
+}
+
 for (const region of CATEGORY_REGIONS) {
 	const text = slice(region.driver, region);
 	if (text === null) continue;
 	regions += 1;
-	const order = [GATE_KEY, OPEN_FILE_KEY, byDriver.get(region.driver).call];
-	const seen = [];
-	for (const token of order) {
-		const at = text.indexOf(token);
-		if (at >= 0) seen.push({ token, at });
+	for (const token of [
+		'"hotstring_category_menu"',
+		...expectedDeclaration.filter((r) => r.id).map((r) => r.id)
+	]) {
+		if (!text.includes(token))
+			errors.push(`${region.driver}: category binding is missing ${token}`);
 	}
-	for (const required of [GATE_KEY, byDriver.get(region.driver).call]) {
-		if (!seen.some((s) => s.token === required)) {
-			errors.push(
-				`${region.driver}: the category submenu never builds ${required}. Every driver shows this ` +
-					'control; one that does not is a capability the user of that OS has to discover elsewhere, ' +
-					'or does not have.'
-			);
-		}
-	}
-	const actual = [...seen]
-		.sort((a, b) => a.at - b.at)
-		.map((s) => s.token)
-		.join(' → ');
-	const wanted = seen.map((s) => s.token).join(' → ');
-	if (actual !== wanted) {
-		errors.push(
-			`${region.driver}: the category submenu is built in the order\n        ${actual}\n      and the shared ` +
-				`order is\n        ${wanted}\n      Three drivers with three orders for one submenu is what this ` +
-				'gate exists to end.'
-		);
+	for (const token of [
+		'menu.hotstrings.category_enable',
+		ALL_SECTIONS_KEY,
+		byDriver.get(region.driver).call
+	]) {
+		if (text.includes(token))
+			errors.push(`${region.driver}: category binding still builds the redundant ${token}`);
 	}
 }
 
@@ -284,7 +299,6 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] all three drivers build the hotstring category submenu in the same order ` +
-		`(gate → open file → all sections → sections), open each language with one checkbox, and name no ` +
-		`retired key (${regions} region(s) read).\x1b[0m`
+	`\x1b[32m[OK] all three drivers consume the shared category commands, file and section order, ` +
+		`retain language section controls, and name no retired key (${regions} region(s) read).\x1b[0m`
 );

@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Tüm bölümleri etkinleştir",
 	"menu.hotstrings.open_editor": "Kısaltma düzenleyicisini aç",
 	"menu.hotstrings.open_file": "Dosya aç…",
+	"menu.hotstrings.scope_enable_all": "Tümünü etkinleştir",
+	"menu.hotstrings.scope_disable_all": "Tümünü devre dışı bırak",
 	"menu.hotstrings.params": "⚙️ Kısaltma ayarları",
 	"menu.hotstrings.personal_header": "Hotstrings'lerim",
 	"menu.hotstrings.preview_bubbles": "Önizleme baloncukları",

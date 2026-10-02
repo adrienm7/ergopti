@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Włącz wszystkie sekcje",
 	"menu.hotstrings.open_editor": "Otwórz edytor hotstring'ów",
 	"menu.hotstrings.open_file": "Otwórz plik…",
+	"menu.hotstrings.scope_enable_all": "Włącz wszystko",
+	"menu.hotstrings.scope_disable_all": "Wyłącz wszystko",
 	"menu.hotstrings.params": "⚙️ Ustawienia hotstring'ów",
 	"menu.hotstrings.personal_header": "Moje hotstrings",
 	"menu.hotstrings.preview_bubbles": "Bąbelki podglądu",

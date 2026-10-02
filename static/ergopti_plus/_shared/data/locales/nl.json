@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Alle secties inschakelen",
 	"menu.hotstrings.open_editor": "Hotstring-editor openen",
 	"menu.hotstrings.open_file": "Bestand openen…",
+	"menu.hotstrings.scope_enable_all": "Alles inschakelen",
+	"menu.hotstrings.scope_disable_all": "Alles uitschakelen",
 	"menu.hotstrings.params": "⚙️ Hotstring-instellingen",
 	"menu.hotstrings.personal_header": "Mijn hotstrings",
 	"menu.hotstrings.preview_bubbles": "Voorbeeldballonnen",

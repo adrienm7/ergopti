@@ -47,7 +47,7 @@ local function fake_config(opts)
 		toggle_section = function(id, section)
 			log.sections[#log.sections + 1] = id .. "." .. section
 		end,
-		set_categories_sections = function(ids, on)
+		set_category_scope_enabled = function(ids, on)
 			log.bulk[#log.bulk + 1] = table.concat(ids, ",") .. "=" .. tostring(on)
 			return true
 		end,
@@ -150,14 +150,58 @@ end)
 
 helpers.describe("category submenu: its rows", function()
 
-	helpers.it("puts the gate first, and it toggles the category", function()
-		local config, log = fake_config({})
-		local row = rolls_row(config)
-		row.menu[1].fn()
-		helpers.assert_eq(log.toggled, { "rolls" },
-			"everything under the gate is inert while it is off, so it comes first "
-				.. "and it must act on the category the user opened")
-	end)
+	for _, enabled in ipairs({ true, false }) do
+		helpers.it("offers the explicit category scope command " .. tostring(enabled), function()
+			local config, log = fake_config({})
+			local row = rolls_row(config)
+			local i18n = require("infra.i18n")
+			helpers.assert_eq(row.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
+			helpers.assert_eq(row.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
+			helpers.assert_nil(row.menu[enabled and 1 or 2].checked)
+			row.menu[enabled and 1 or 2].fn()
+			helpers.assert_eq(log.bulk, { "rolls=" .. tostring(enabled) },
+				"one click selects only the category the user opened")
+			helpers.assert_eq(log.toggled, {}, "the previous gate toggle cannot run as a second mutation")
+		end)
+	end
+
+	for _, enabled in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("category command reports owner outcome " .. outcome .. " for " .. tostring(enabled), function()
+				local config = fake_config({})
+				local requested = {}
+				config.set_category_scope_enabled = function(ids, on)
+					requested[#requested + 1] = { ids = ids, enabled = on }
+					if outcome == "throw" then error("category owner fixture refused") end
+					if outcome == "nil" then return nil end
+					return outcome == "true"
+				end
+				local execute, modal = os.execute, require("ui.modal")
+				local run, asked, modals = modal.run, {}, 0
+				modal.run = function(callback) modals = modals + 1; return callback() end
+				local called, result = pcall(function()
+					local row = rolls_row(config)
+					os.execute = function(command)
+						if command:find("zenity", 1, true) then asked[#asked + 1] = command; return 0 end
+						return execute(command)
+					end
+					return row.menu[enabled and 1 or 2].fn()
+				end)
+				os.execute, modal.run = execute, run
+				helpers.assert_true(called, "a category click contains a throwing owner: " .. tostring(result))
+				helpers.assert_eq(requested, { { ids = { "rolls" }, enabled = enabled } })
+				helpers.assert_eq(result, outcome == "true", "only exact true acknowledges the owner")
+				local notices = outcome == "true" and 0 or 1
+				helpers.assert_eq(#asked, notices, "each refused transaction surfaces one visible failure")
+				helpers.assert_eq(modals, notices, "the failure dialog uses the keyboard-release boundary")
+				if notices > 0 then
+					helpers.assert_true(asked[1]:find("--error", 1, true) ~= nil)
+					helpers.assert_true(asked[1]:find("--text=" .. require("adapters.shell_runner").quote(
+						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
+				end
+			end)
+		end
+	end
 
 	helpers.it("offers the category's own file, at the path the loader resolved", function()
 		local config = fake_config({})
@@ -221,27 +265,6 @@ helpers.describe("category submenu: its rows", function()
 		end
 	end)
 
-	-- One checkbox since the « tout activer » / « tout désactiver » pair became
-	-- one control: ticked when every section is on, and a click flips them all.
-	for _, case in ipairs({
-		{ sections = {}, ticked = true, sent = "rolls=false" },
-		{ sections = { sx = false }, ticked = false, sent = "rolls=true" },
-	}) do
-		helpers.it("offers one « all sections » checkbox, ticked " .. tostring(case.ticked), function()
-			local i18n = require("infra.i18n")
-			local label = i18n.get("menu.hotstrings.enable_all_sections")
-			local config, log = fake_config({ sections_enabled = case.sections })
-			local row = rolls_row(config)
-			local found = {}
-			for _, item in ipairs(row.menu) do
-				if item.title == label then found[#found + 1] = item end
-			end
-			helpers.assert_eq(#found, 1, "a pack with thirty sections is unusable without one control for all")
-			helpers.assert_eq(found[1].checked, case.ticked, "the tick says whether every section is on")
-			found[1].fn()
-			helpers.assert_eq(log.bulk, { case.sent }, "one click, one write, to the other side")
-		end)
-	end
 
 end)
 
@@ -281,7 +304,7 @@ helpers.describe("category submenu: when the category is off", function()
 			"greying the gate too would make a disabled category impossible to "
 				.. "re-enable from the menu that disabled it")
 		row.menu[1].fn()
-		helpers.assert_eq(log.toggled, { "rolls" }, "and it must still act")
+		helpers.assert_eq(log.bulk, { "rolls=true" }, "and it must still act")
 	end)
 
 end)

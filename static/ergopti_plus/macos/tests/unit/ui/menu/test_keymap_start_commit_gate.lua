@@ -71,9 +71,9 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 
 	helpers.it("routes every menu-side keymap start through the shared gate", function()
 		local units = {
-			-- 5 since the language submenus: their « all sections » checkbox starts the
-			-- keymap too.
-			{ marker = "function M.all_sections_switch", expected = 5, label = "common hotstrings" },
+			-- Explicit category scope commands select desired choices without starting
+			-- input capture. The four remaining runtime-enabling routes keep the gate.
+			{ marker = "function M.all_sections_switch", expected = 4, label = "common hotstrings" },
 			{ marker = "function M.build_custom", expected = 3, label = "custom hotstrings" },
 			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },

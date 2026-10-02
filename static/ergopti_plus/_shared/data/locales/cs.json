@@ -1168,6 +1168,8 @@
 	"menu.hotstrings.enable_all_sections": "Povolit všechny sekce",
 	"menu.hotstrings.open_editor": "Otevřít editor hotstring",
 	"menu.hotstrings.open_file": "Otevřít soubor…",
+	"menu.hotstrings.scope_enable_all": "Zapnout vše",
+	"menu.hotstrings.scope_disable_all": "Vypnout vše",
 	"menu.hotstrings.params": "⚙️ Nastavení hotstring",
 	"menu.hotstrings.personal_header": "Moje hotstrings",
 	"menu.hotstrings.preview_bubbles": "Náhledové bubliny",

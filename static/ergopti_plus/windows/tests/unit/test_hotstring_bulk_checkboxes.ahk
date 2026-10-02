@@ -1,19 +1,11 @@
 ﻿; tests/unit/test_hotstring_bulk_checkboxes.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Bulk Controls Are Checkboxes
+; MODULE: Hotstring Scope Menu Commands And Independent Checkboxes
 ; DESCRIPTION:
-; A hotstring category submenu opens with its gate, then one control for all of
-; its sections; a language submenu opens with one control for every section of
-; its categories. Each is a checkbox: one label, ticked from the state it
-; governs, and a click that switches everything to the other side.
-;
-; ROOT CAUSE ENCODED: the gate alternated between « ✅ Activée (cliquer pour
-; désactiver) » and « ❌ Désactivée (cliquer pour activer) », and the sections
-; came with a « Tout activer » / « Tout désactiver » pair: two keys and two rows
-; for one control, and a state the user could only read from the words. The
-; rows are built by the real builders over the live Features and CategoryEnabled
-; maps, which each test restores.
+; Real Win32 category commands dispatch the explicit requested posture once,
+; regardless of existing gates and section choices. Language and whole-tree
+; section checkboxes retain their independent desired-state contract.
 ;
 ; Bulk selection edits desired section state independently of category masters.
 ; The checks below keep those masters closed while selecting every child and
@@ -164,21 +156,37 @@ _HBC_OneSectionOff(Paths) {
 ; ============================================
 ; ============================================
 
-; A category opens with its gate checkbox, then one « all sections » checkbox.
+; A category opens with two explicit commands, independent of its old posture.
 _HBC_CategoryHeadRows() {
 	for State in [true, false]
 		_HBC_WithRolls(State, true, _HBC_AssertCategoryHead.Bind(State))
 }
 
-; The head rows of Rolls, with its gate at State and every section on.
 _HBC_AssertCategoryHead(State) {
-	Rows := _HS_CategoryHeadRows("Rolls", "hotstrings.rolls", HotstringsBundledTomlPath("Rolls"))
-	AssertEqual(t("menu.hotstrings.category_enable"), Rows[1]["label"], "the gate is the first row")
-	AssertEqual(State, Rows[1]["checked"], "the gate is a checkbox ticked from the category gate")
-	All := _HBC_RowsLabelled(Rows, t("menu.hotstrings.enable_all_sections"))
-	AssertEqual(1, All.Length, "one control for every section of the category")
-	AssertTrue(All[1]["checked"], "section selection is independent of the category gate")
-	_HBC_AssertNoRetired(Rows, "the category submenu")
+	global _MenuDispatchCallbacks
+	Asked := []
+	Apply(Targets, Enabled) {
+		Asked.Push(Map("targets", Targets, "enabled", Enabled))
+	}
+	Built := _HS_CategoryMenu("Rolls", HotstringsBundledTomlPath("Rolls"),
+		[Map("label", "fixture-section", "action", (*) => 0)], Apply)
+	try {
+		for Position, Enabled in [true, false] {
+			Label := t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all")
+			AssertEqual(Label, _CTC_LabelAt(Built, Position - 1), "both commands have the shared order")
+			AssertFalse(_CTC_IsChecked(Built, Position - 1), "explicit commands carry no category checkbox")
+			Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position - 1, "uint")
+			Assert(_MenuDispatchCallbacks.Has(Id), "the native command must be registered")
+			_MenuDispatchCallbacks[Id].Call()
+			AssertEqual(Position, Asked.Length, "each native click dispatches one transaction")
+			AssertEqual(1, Asked[Position]["targets"].Length)
+			AssertEqual("Rolls", Asked[Position]["targets"][1])
+			AssertEqual(Enabled, Asked[Position]["enabled"], "the command never inverts the captured posture")
+		}
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")))
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")))
+		AssertEqual(1, _CTC_CountLabel(Built, "fixture-section"), "native section data still renders once")
+	} finally _CTC_ReleaseMenu(Built)
 }
 
 ; Each language opens with one « all sections » checkbox for all its categories.
@@ -297,7 +305,7 @@ Test("hotstring bulk: the « all sections » row is one checkbox (hotstring-bulk
 	_HBC_AllSectionsRowIsACheckbox)
 Test("hotstring bulk: « all on » reads every desired section (hotstring-bulk-checkboxes)",
 	_HBC_ScopeAllOnReadsEverySection)
-Test("hotstring bulk: a category opens with its gate and one « all » checkbox (hotstring-bulk-checkboxes)",
+Test("hotstring bulk: a category opens with two explicit scoped commands (hotstring-bulk-checkboxes)",
 	_HBC_CategoryHeadRows)
 Test("hotstring bulk: a language opens with one « all » checkbox (hotstring-bulk-checkboxes)",
 	_HBC_LanguageSwitchRowIsACheckbox)

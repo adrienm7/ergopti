@@ -1,17 +1,11 @@
 --- tests/unit/ui/test_hotstring_bulk_checkboxes.lua
 
 --- ==============================================================================
---- MODULE: Regression — every hotstring bulk control is one checkbox
+--- MODULE: Regression — explicit category commands and scope checkboxes
 --- DESCRIPTION:
---- The Hotstrings submenu, each category submenu and each language submenu offer
---- one « all sections » control, and a category opens with its gate. Each is a
---- checkbox: one label, ticked from the state it governs, and a click that
---- switches everything to the other side.
----
---- WHY IT EXISTS: the gate alternated between « ✅ Activée (cliquer pour
---- désactiver) » and « ❌ Désactivée (cliquer pour activer) », and the sections
---- came with a « Tout activer » / « Tout désactiver » pair — two keys and two
---- rows for one control, and a state the user could only read from the words.
+--- Standard categories dispatch the requested full-enable/full-disable posture
+--- through one owner. Language, dynamic and whole-tree controls retain their
+--- separate checkbox behavior until their scoped migration.
 --- The whole tray is built from the real builder over a recording config, so the
 --- tick and the write each click sends are what is asserted.
 --- ==============================================================================
@@ -26,7 +20,7 @@ local LANGUAGE_CATEGORY = "en_typos"
 --- @param sections_on boolean Every section tick.
 --- @return table config, table log
 local function fake_config(gates_on, sections_on)
-	local log = { set_categories_sections = {}, toggled = {} }
+	local log = { set_categories_sections = {}, scoped = {}, toggled = {} }
 	local categories = {}
 	for _, id in ipairs({ "autocorrection", "rolls", LANGUAGE_CATEGORY }) do
 		categories[id] = {
@@ -46,6 +40,10 @@ local function fake_config(gates_on, sections_on)
 		is_section_checked = function() return sections_on end,
 		active_count = function() return 0 end,
 		toggle_group = function(id) log.toggled[#log.toggled + 1] = id end,
+		set_category_scope_enabled = function(ids, on)
+			log.scoped[#log.scoped + 1] = { ids = ids, on = on }
+			return true
+		end,
 		set_categories_sections = function(ids, on)
 			local copy = {}
 			for _, id in ipairs(ids) do copy[#copy + 1] = id end
@@ -136,32 +134,23 @@ end
 
 helpers.describe("hotstring bulk controls are one checkbox each (linux)", function()
 	for _, posture in ipairs({ true, false }) do
-		helpers.it("bulk checkbox:a category opens with its gate as a checkbox, ticked " .. tostring(posture), function()
-			local config, log = fake_config(posture, true)
-			local menu = hotstrings_menu(config)
-			helpers.assert_true(menu ~= nil, "the Hotstrings submenu must exist")
-			local category = row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection")
-			helpers.assert_true(category ~= nil and type(category.menu) == "table", "the category must open a submenu")
-			local gate = category.menu[1]
-			helpers.assert_eq(gate.title, require("infra.i18n").get("menu.hotstrings.category_enable"),
-				"the gate is the first row, with one label")
-			helpers.assert_eq(gate.checked, posture, "ticked from the category gate")
-			gate.fn()
-			helpers.assert_eq(log.toggled[1], "autocorrection", "a click flips that category's gate")
-		end)
-
-		helpers.it("bulk checkbox:a category has one « all sections » checkbox, ticked " .. tostring(posture), function()
-			local config, log = fake_config(true, posture)
-			local menu = hotstrings_menu(config)
-			local category = row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection")
-			local all = row_for(category.menu, "menu.hotstrings.enable_all_sections")
-			helpers.assert_true(all ~= nil, "one control for every section of the category")
-			helpers.assert_eq(all.checked, posture, "ticked exactly when every section is on")
-			all.fn()
-			helpers.assert_eq(#log.set_categories_sections, 1, "one click is one write")
-			helpers.assert_eq(log.set_categories_sections[1].ids, { "autocorrection" }, "for that category alone")
-			helpers.assert_eq(log.set_categories_sections[1].on, not posture, "the click switches every section over")
-		end)
+		for _, enabled in ipairs({ true, false }) do
+			helpers.it("bulk checkbox: category command " .. tostring(enabled)
+				.. " with previous gate " .. tostring(posture), function()
+				local config, log = fake_config(posture, not posture)
+				local menu = hotstrings_menu(config)
+				local category = row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection")
+				helpers.assert_true(category ~= nil and type(category.menu) == "table")
+				local row = category.menu[enabled and 1 or 2]
+				helpers.assert_eq(row.title, require("infra.i18n").get(enabled
+					and "menu.hotstrings.scope_enable_all" or "menu.hotstrings.scope_disable_all"))
+				helpers.assert_nil(row.checked)
+				row.fn()
+				helpers.assert_eq(log.scoped, { { ids = { "autocorrection" }, on = enabled } })
+				helpers.assert_eq(log.set_categories_sections, {}, "one scope owner replaces both old mutations")
+				helpers.assert_eq(log.toggled, {})
+			end)
+		end
 
 		helpers.it("bulk checkbox:a language opens with one checkbox, ticked " .. tostring(posture), function()
 			local config, log = fake_config(posture, posture)
