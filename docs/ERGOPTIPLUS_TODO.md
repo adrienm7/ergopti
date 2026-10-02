@@ -310,8 +310,12 @@ These are software implementations; final hardware verification remains below.
   snapshot regressions failed before the fix, and a real learning/debounce
   regression prevents unflushed updates from appearing persisted. Focused
   cases passed, and the settings slice passed the complete three-OS pipeline
-  in non-release run 37039329959 at `ea5d64ef6`. The separate delayed-timer audit remains open: default-delay
-  restoration, chainable setDelay/running and self-rearming callback semantics.
+  in non-release run 37039329959 at `ea5d64ef6`. The delayed timer now keeps a configured default separately from
+  one-start overrides, provides native running/nextTrigger and chainable
+  setDelay receipts, and retains callback rearming. Five direct contract cases
+  failed before the fix and now pass; a real SyntheticInput listener retry
+  regression failed with one delivery before passing with two. Generic doAfter
+  semantics stay separate. Full verification remains pending for this slice.
   Audit other hs stubs for remaining divergences from native behaviour.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under

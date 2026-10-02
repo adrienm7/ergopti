@@ -60,6 +60,38 @@ end
 
 
 helpers.describe("synthetic action listener registration is transactional", function()
+	helpers.it("rearms its retained delayed dispatcher after one listener refusal", function()
+		package.loaded["tests.stubs.hs"] = nil
+		local hs_stub = require("tests.stubs.hs")
+		hs_stub.__reset()
+		_G.hs = hs_stub
+		package.loaded["hs"] = hs_stub
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["adapters.synthetic_input"] = nil
+		local synthetic = require("adapters.synthetic_input")
+		local attempts, observed = 0, {}
+		local registered = synthetic.register_action_listener("retry", function(token)
+			attempts = attempts + 1
+			observed[#observed + 1] = token
+			if attempts == 1 then error("one listener refusal") end
+		end, {})
+		local ok, err = xpcall(function()
+			helpers.assert_eq(registered, true)
+			local dispatcher = hs_stub.timer.__timers[3]
+			dispatcher:fire()
+			helpers.assert_eq(attempts, 1)
+			dispatcher:fire()
+			helpers.assert_eq(attempts, 2, "the same retained dispatcher must retry without later input")
+			helpers.assert_true(observed[1] == synthetic.current_action_epoch())
+			helpers.assert_true(observed[2] == observed[1], "the retry acknowledges the exact pending epoch")
+			dispatcher:fire()
+			helpers.assert_eq(attempts, 2, "an acknowledged listener is not repeated")
+		end, debug.traceback)
+		local removed = synthetic.unregister_action_listener("retry")
+		helpers.assert_eq(removed, true, "the fixture must release its exact registration")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("does not leak a capacity slot when dispatcher creation throws", function()
 		local SyntheticInput = load_with_third_timer_failure()
 		local failure = helpers.assert_throws(function()

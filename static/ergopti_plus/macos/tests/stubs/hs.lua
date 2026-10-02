@@ -149,20 +149,49 @@ M.timer = {
 	-- absoluteTime returns nanoseconds since an arbitrary epoch, matching macOS semantics
 	absoluteTime = function() return math.floor(os.clock() * 1e9) end,
 	usleep = function(_) end,
-	-- delayed is a one-shot timer that can be restarted/stopped by the caller
+	-- Native delayed timers retain a repeating timer whose next fire date is
+	-- moved on every start. Keep the inspectable registry entry separate from
+	-- the handle, whose running field must be a method rather than an arm bit.
 	delayed = {
 		new = function(delay, fn)
-			local t = make_timer(delay, fn, false)
-			t.running = false  -- delayed timers don't auto-run until setDelay/start
-			function t:setDelay(d) self.delay = d end
-			function t:start(next_delay)
-				if next_delay ~= nil then self.delay = next_delay end
-				self.running = true
+			local default_delay = delay
+			local entry = make_timer(delay, fn, false)
+			entry.running = false
+			local handle = {}
+			function handle:start(next_delay)
+				entry.delay = next_delay == nil and default_delay or next_delay
+				entry.running = true
 				return self
 			end
-			function t:stop()  self.running = false ; return self end
-			function t:running_() return self.running end
-			return t
+			function handle:stop()
+				entry.running = false
+				return self
+			end
+			function handle:nextTrigger()
+				-- Hammerspoon 1.1.1 filters even armed zero-delay countdowns and
+				-- overrides above the configured delay (extensions/timer/timer.lua).
+				if entry.running and entry.delay > 0 and entry.delay <= default_delay then
+					return entry.delay
+				end
+				return nil
+			end
+			function handle:running() return self:nextTrigger() ~= nil end
+			function handle:setDelay(next_delay)
+				local restart = self:running()
+				default_delay = next_delay
+				if restart then self:start() end
+				return self
+			end
+			function entry:fire()
+				if not self.running or not self.fn then return end
+				-- CFRunLoop honors a later fire date set from a repeating timer's
+				-- callback. Settle this delivery before invoking the callback so
+				-- its rearm survives; ordinary doAfter keeps its own native policy.
+				self.running = false
+				self.fired = self.fired + 1
+				self.fn()
+			end
+			return handle
 		end,
 	},
 	__timers = TIMERS,
