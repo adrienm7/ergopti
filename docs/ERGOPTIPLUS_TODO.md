@@ -657,7 +657,8 @@ branch has been removed; the run also covers the 21-locale privacy label.
   tests and ten Linux discovery/routing/menu tests pass, including the actual
   tray trees; Windows tests check the discovered name and actual menu provider.
   The complete local gates pass. Native checkpoint 36947209412 caught an
-  incomplete Windows menu fixture; finish after its correction passes CI.
+  incomplete Windows menu fixture. It now owns neutral category collections
+  and restores both assigned and unassigned globals; finish after CI passes.
 
 - [~] **110.** Windows four-finger tap now recommends monitor-local Alt+Tab
   from the shared feature manifest and its generated wizard catalogue.
