@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Native Menu Population
 ; DESCRIPTION:
-; Publish leaf pickers with a real first row, prewarm them one at a time, and
+; Publish leaf pickers with a real first row, prewarm them in small batches, and
 ; finish a requested picker before Windows paints it. Ownership follows HMENU
 ; reachability across root replacements; native callbacks keep their tokens.
 ; ==============================================================================
@@ -13,6 +13,10 @@
 global _MenuPopulationBuilding := false
 global _MenuPopulationPublished := false
 global MENU_POPULATION_TICK_MS := 10
+; A 384-choice native fixture took 17–23 ms in one critical section. Sixteen
+; rows keep ordinary batches near 1 ms while retaining synchronous before-paint
+; completion for navigation; this bounds work, not native-call wall time.
+global MENU_POPULATION_BATCH_ROWS := 16
 
 class MenuPopulationReentryError extends Error {
 }
@@ -57,15 +61,20 @@ class MenuPopulation {
 		_MR_NormalizeSeparators(MenuObj)
 		if Remainder.Length > 0
 			this.Pending[MenuObj.Handle] := { MenuObj: MenuObj, Rows: Remainder,
-				ListId: ListId, Depth: Depth, Busy: false, Failure: "" }
+				ListId: ListId, Depth: Depth, NextRow: 1, Busy: false, Failure: "" }
 		return MenuObj
 	}
 
-	/** Completes one leaf without replacing its seed's native command identity. */
-	Complete(Handle, Reason := "navigation", RenderFn := 0) {
+	/** Appends an owned prefix, or completes all remaining rows before paint. */
+	Complete(Handle, Reason := "navigation", RenderFn := 0, MaxRows := 0) {
+		if !(MaxRows is Integer) || MaxRows < 0
+			throw ValueError("Native population row limit must be a nonnegative integer")
 		PreviousCritical := Critical("On")
 		StartedAt := HotPath_Now()
 		OwnBusy := false
+		Appended := 0
+		Remaining := 0
+		Finished := false
 		try {
 			if !this.Pending.Has(Handle)
 				return false
@@ -76,16 +85,28 @@ class MenuPopulation {
 				throw Error("Native leaf population previously failed: " . Entry.Failure)
 			Entry.Busy := true
 			OwnBusy := true
-			; Only prepared leaf rows are appended here: no file discovery or tree
-			; construction or user callback invocation. Tray 0x404 requests wait;
+			LastRow := MaxRows ? Min(Entry.Rows.Length, Entry.NextRow + MaxRows - 1) : Entry.Rows.Length
+			Batch := []
+			loop LastRow - Entry.NextRow + 1
+				Batch.Push(Entry.Rows[Entry.NextRow + A_Index - 1])
+			; Only prepared rows are appended here: no file discovery or provider
+			; invocation. Leaf menus retain their own remaining rows. Tray requests wait;
 			; unexpected synchronous 0x117 reentry is refused before partial paint.
 			if HasMethod(RenderFn, "Call")
-				RenderFn.Call(Entry.MenuObj, Entry.Rows, Entry.ListId, Entry.Depth)
+				RenderFn.Call(Entry.MenuObj, Batch, Entry.ListId, Entry.Depth)
 			else
-				_MR_RenderRows(Entry.MenuObj, Entry.Rows, Entry.ListId, Entry.Depth, 0, true)
-			_MR_NormalizeSeparators(Entry.MenuObj)
-			this.Pending.Delete(Handle)
-			this.Completed += 1
+				_MR_RenderRows(Entry.MenuObj, Batch, Entry.ListId, Entry.Depth, 0, true)
+			Appended := Batch.Length
+			Entry.NextRow := LastRow + 1
+			Remaining := Entry.Rows.Length - LastRow
+			if Remaining == 0 {
+				; Normalize once, across every batch boundary. Intermediate trailing
+				; separators belong to the unpublished remainder, never a painted menu.
+				_MR_NormalizeSeparators(Entry.MenuObj)
+				this.Pending.Delete(Handle)
+				this.Completed += 1
+				Finished := true
+			}
 		} catch as Err {
 			if IsSet(Entry) && !(Err is MenuPopulationReentryError) {
 				Entry.Failure := Err.Message
@@ -98,10 +119,12 @@ class MenuPopulation {
 			if OwnBusy
 				Entry.Busy := false
 			Critical(PreviousCritical)
-			HotPath_LogIfSlow("Menu.populate_leaf", StartedAt, Reason)
+			HotPath_LogIfSlow("Menu.populate_leaf", StartedAt,
+				Format("{1}; rows={2}; remaining={3}", Reason, Appended, Remaining))
 		}
-		try LoggerDebug("MenuPopulation", "Leaf '{1}' completed for {2}; {3} pending.",
-			Entry.ListId, Reason, this.Pending.Count)
+		if Finished
+			try LoggerDebug("MenuPopulation", "Leaf '{1}' completed for {2}; {3} pending.",
+				Entry.ListId, Reason, this.Pending.Count)
 		if this.Pending.Count == 0
 			this.Stop(true)
 		return true
@@ -122,15 +145,15 @@ class MenuPopulation {
 		return true
 	}
 
-	/** Prepares one picker per timer, leaving input and tray requests interruptible. */
+	/** Appends one bounded row batch, then yields to input and tray requests. */
 	Pump(*) {
-		global MENU_POPULATION_TICK_MS
+		global MENU_POPULATION_TICK_MS, MENU_POPULATION_BATCH_ROWS
 		if A_IsSuspended {
 			this.Stop()
 			return
 		}
 		for Handle in this.Pending {
-			this.Complete(Handle, "background")
+			this.Complete(Handle, "background", 0, MENU_POPULATION_BATCH_ROWS)
 			if this.Pending.Count > 0 && HasMethod(this.Timer, "Call")
 				SetTimer(this.Timer, -MENU_POPULATION_TICK_MS)
 			return
