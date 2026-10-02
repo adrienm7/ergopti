@@ -1214,7 +1214,7 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 			_Updater_CloseGui(_Updater_PromptGui)
 		return
 	}
-	G := Gui("+Resize +MinSize720x420", t("updater.update_dialog_title"))
+	G := Gui_Create("+Resize +MinSize720x420", t("updater.update_window_title"))
 	_Updater_PromptGui := G
 	G.SetFont("s11 bold", "Segoe UI")
 	G.MarginX := 14

@@ -397,7 +397,7 @@ _HS_DelimAddCustom() {
 		WMPresentWindow(_HS_DelimAddGui)
 		return
 	}
-	G := Gui("", t("dialog.hotstrings.new_delimiter_title"))
+	G := Gui_Create("", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")

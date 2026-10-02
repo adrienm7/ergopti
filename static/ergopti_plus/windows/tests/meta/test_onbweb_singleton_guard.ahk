@@ -63,9 +63,9 @@ _ONBWSG_GuardRunsBeforeSecondGuiIsBuilt() {
 
 	IdxGuard  := InStr(Body, "_ob_gui != 0")
 	IdxReturn := InStr(Body, "return true", , IdxGuard)
-	IdxGuiNew := InStr(Body, "g := Gui(")
+	IdxGuiNew := InStr(Body, "g := Gui_Create(")
 	Assert(IdxGuard > 0 and IdxReturn > 0 and IdxGuiNew > 0 and IdxGuard < IdxGuiNew and IdxReturn < IdxGuiNew,
-		"_Onboarding_TryWeb must check '_ob_gui != 0' and return true BEFORE 'g := Gui(' builds a second window — checking after the new Gui is already created would still orphan the first one and overwrite _ob_gui out from under it (onbweb-singleton-guard)")
+		"_Onboarding_TryWeb must check '_ob_gui != 0' and return true BEFORE 'g := Gui_Create(' builds a second window — checking after the new Gui is already created would still orphan the first one and overwrite _ob_gui out from under it (onbweb-singleton-guard)")
 }
 
 Test("onbweb_singleton_guard: the singleton check runs before a second wizard Gui is built (onbweb-singleton-guard)",

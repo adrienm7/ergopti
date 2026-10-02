@@ -251,3 +251,121 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 }
 Test("windows: every singleton re-open presents through WMPresentWindow (ui-focus-not-topmost)",
 	_WMPW_EveryReopenPresentsThroughTheHelper)
+
+/**
+ * Checks the real native factories without starting embedded browser processes.
+ * Browser attachment does not own captions; both production openers call these.
+ */
+_WMPW_SharedWindowTitles() {
+	global _SharedDir
+	Source := JsonParse(FileRead(_SharedDir . "\ui\apps.manifest.json", "UTF-8"))
+	Policy := Source["window_title"]
+	AssertEqual(Policy["prefix"], WindowTitle(), "an unnamed native window uses the shared product name")
+	for Key in ["layout_manager.window_title", "layer_editor.window_title"] {
+		Label := t(Key)
+		Expected := Policy["prefix"] == "" ? Label : Policy["prefix"] . Policy["separator"] . Label
+		if Key == "layout_manager.window_title"
+			Window := _LayMgrWeb_NewWindow()
+		else {
+			Host := WebViewHost()
+			Host.Opts := Map("Title", Label)
+			Window := Host._NewWindow("900x620")
+		}
+		try AssertEqual(Expected, Window.Title, "the " . Key . " native factory owns the caption")
+		finally Window.Destroy()
+	}
+	Host := WebViewHost()
+	Host.Opts := Map()
+	Window := Host._NewWindow("320x200")
+	try AssertEqual(Policy["prefix"], Window.Title, "an unnamed WebView host never duplicates branding")
+	finally Window.Destroy()
+}
+Test("windows: layout and navigation windows use the shared caption policy (shared-window-titles)",
+	_WMPW_SharedWindowTitles)
+
+/**
+ * Runs an exact, tree-owned child and checks receipts after its callback returns.
+ * @param {string} Executable - The native executable to launch.
+ * @param {Array} Args - Structured child arguments.
+ * @returns {string} The successful child's captured stdout.
+ */
+_WMPW_TitlePolicyChild(Executable, Args) {
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	Handle := ShellRunner_SpawnTreeOwned(Executable, Args, OnDone)
+	try {
+		AssertTrue(Handle.start(), "the private title-policy child must start")
+		Started := A_TickCount
+		while !Receipt.Calls && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Receipt.Calls, "the private title-policy child must complete exactly once")
+		AssertEqual(0, Receipt.Code, "the generated policy must parse and execute: " . Receipt.Output . Receipt.Errors)
+		AssertEqual("", Receipt.Errors, "the generated policy must produce no native errors")
+		return Receipt.Output
+	} finally AssertTrue(Handle.terminate(), "the exact title-policy child must be fully retired")
+}
+
+/**
+ * Uses the actual Node generator and the actual AHK parser in private fixtures.
+ * Independent expected captions detect quote, comment and empty-prefix defects.
+ */
+_WMPW_GeneratedTitlePoliciesExecuteNatively() {
+	global _StaticDir
+	Root := A_Temp . "\ergopti_window_titles_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the native title-policy fixture must be privately owned")
+	DirCreate(Root)
+	Cases := [
+		{Prefix: "ErgoptiPlus", Separator: " — ", Expected: "ErgoptiPlus — Navigation layer"},
+		{Prefix: "", Separator: " — ", Expected: "Navigation layer"},
+		{Prefix: "Other product", Separator: ": ", Expected: "Other product: Navigation layer"},
+		{Prefix: 'Quoted "product" ``name``', Separator: "", Expected: 'Quoted "product" ``name``Navigation layer'},
+		{Prefix: "Other `; product", Separator: " `; ", Expected: "Other `; product `; Navigation layer"}
+	]
+	try {
+		Policies := "["
+		for Index, Spec in Cases {
+			if Index > 1
+				Policies .= ","
+			Policies .= '{"prefix":' . JsonStringLiteral(Spec.Prefix)
+				. ',"separator":' . JsonStringLiteral(Spec.Separator) . '}'
+		}
+		FileAppend(Policies . "]", Root . "\policies.json", "UTF-8-RAW")
+		Bootstrap := Root . "\generate.cjs"
+		FileAppend('const fs = require("node:fs"); const path = require("node:path");' . "`n"
+			. 'const root = process.argv[2]; const generator = require(process.argv[3]);' . "`n"
+			. 'const policies = require(path.join(root, "policies.json"));' . "`n"
+			. 'for (const [index, policy] of policies.entries()) {' . "`n"
+			. 'const target = path.join(root, String(index + 1)); const source = path.join(target, generator.SOURCE);' . "`n"
+			. 'fs.mkdirSync(path.dirname(source), {recursive:true});' . "`n"
+			. 'fs.writeFileSync(source, JSON.stringify({window_title:policy, apps:{}}));' . "`n"
+			. 'generator.main(target); } process.stdout.write(String(policies.length));' . "`n",
+			Bootstrap, "UTF-8-RAW")
+		Generator := _StaticDir . "\..\tools\codegen\codegen-window-titles.cjs"
+		AssertEqual("5", _WMPW_TitlePolicyChild("node.exe", [Bootstrap, Root, Generator]),
+			"the actual generator must emit every private policy")
+		for Index, Spec in Cases {
+			Artifact := Root . "\" . Index . "\static\ergopti_plus\windows\_generated\window_titles.ahk"
+			AssertTrue(FileExist(Artifact), "the actual generator owns the AHK artifact")
+			Harness := Root . "\policy_" . Index . ".ahk"
+			FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
+				. '#Include ' . Artifact . "`n"
+				. 'OnError(_WMPWPolicyError)' . "`n"
+				. 'FileAppend(WindowTitle(A_Args[1]), "*", "UTF-8-RAW")' . "`nExitApp(0)`n"
+				. '_WMPWPolicyError(Err, *) {' . "`n"
+				. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n",
+				Harness, "UTF-8")
+			AssertEqual(Spec.Expected, _WMPW_TitlePolicyChild(A_AhkPath,
+				["/ErrorStdOut", Harness, "Navigation layer"]),
+				"native AHK executes private title policy " . Index . " without data becoming source")
+		}
+	} finally DirDelete(Root, true)
+}
+Test("windows: generated title policies execute with empty, quoted and semicolon prefixes (shared-window-titles)",
+	_WMPW_GeneratedTitlePoliciesExecuteNatively)

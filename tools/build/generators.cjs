@@ -39,6 +39,13 @@
  */
 const GENERATORS = [
 	{
+		script: 'codegen/codegen-window-titles.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/window_titles.lua',
+			'static/ergopti_plus/windows/_generated/window_titles.ahk'
+		]
+	},
+	{
 		script: 'build/build-features-manifest.js',
 		outputs: [
 			'static/ergopti_plus/linux/_generated/config_template.toml',

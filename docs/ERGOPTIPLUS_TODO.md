@@ -751,14 +751,19 @@ exact-boolean regressions also pass the focused runner.
       deliberately and cover neutral/recommended scopes, menu placement,
       assignment removal/rebinding and editor invocation across drivers.
 
-- [ ] **109.** Give every application window the same "ErgoptiPlus — Title"
-      format, including the Windows navigation-layer editor and keyboard-layout
-      manager. Own the product prefix and separator in one shared policy so
-      changing or removing the prefix requires one edit. Route creation and
-      live retitling through it on Windows, macOS and Linux; keep translated
-      titles in the 21 locales free of duplicated branding. Cover native and
-      WebView paths, language changes, already branded inputs and an empty
-      prefix with regression and cross-driver parity tests.
+- [~] **109.** Give every application window the same "ErgoptiPlus — Title"
+  format. GUI/WebView titles now use one prefix/separator policy in
+  `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty
+  prefix removes branding. All captioned Windows GUI factories, including the
+  navigation-layer editor and keyboard-layout manager, and live retitles use
+  that owner. Shared app metadata selects brandless translated keys; Linux
+  native captions use them across every supported app and all 21 locales.
+  Native caption/retitle and private generated-policy regressions cover the
+  hosts; the CLI regression failed against the original translated raw-Gui
+  bypass before passing with its stronger audit. Full three-OS validation is
+  pending. Remaining: native message/input dialogs, native file pickers and
+  notifications, and Swift launcher-owned dialogs still have legacy branding
+  paths. Captionless overlays retain their separate native presentation owner.
 
 - [~] **110.** Move automatic startup from Configuration to Updates,
   immediately above Uninstall. The shared declaration and all three native

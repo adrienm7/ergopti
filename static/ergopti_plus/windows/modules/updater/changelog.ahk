@@ -476,9 +476,9 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	if !_Updater_RequestMayPublish(Request)
 		return
 
-	WinTitle := t("updater.title_changelog")
+	WinTitle := t("changelog_window.window_title")
 
-	G := Gui("+Resize +MinSize930x400", WinTitle)
+	G := Gui_Create("+Resize +MinSize930x400", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 8

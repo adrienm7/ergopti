@@ -478,6 +478,7 @@ if UIASW_IsWorkerInvocation()
 #Include ui/hotstrings_config_window/webview.ahk
 #Include ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
+#Include _generated/window_titles.ahk
 #Include infra/ui_style.ahk
 #Include ui/tooltip/init.ahk
 #Include infra/hotstrings/hotstring_prefix_watcher.ahk

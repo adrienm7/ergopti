@@ -310,6 +310,16 @@ class WebViewHost {
 				return {w: W, h: H, min_w: MW, min_h: MH}
 		}
 
+		/**
+		 * Creates the native host window before attaching the WebView controller.
+		 * @param {string} MinSize - The manifest's minimum window dimensions.
+		 * @returns {Gui} The window with a shared-policy caption.
+		 */
+		_NewWindow(MinSize) {
+				Title := this.Opts.Get("Title", "")
+				return Gui_Create("+Resize +MinSize" . MinSize, Title)
+		}
+
 		; --------------------------------------------------------------------------
 		; Internal: builds Gui, creates WebView2 controller, hardens settings,
 		; sets up the bridge, maps vhost, seeds i18n, navigates, and fills.
@@ -320,14 +330,13 @@ class WebViewHost {
 				this.Epoch += 1
 
 				Opts  := this.Opts
-				Title := Opts.Has("Title") ? Opts["Title"] : "ErgoptiPlus"
 				Geo   := this._Geometry()
 				Vhost := this._VhostName()
 				BackColor := Opts.Has("BackColor") ? Opts["BackColor"] : "0x1e1e1e"
 				MinSize   := Opts.Has("MinSize")   ? Opts["MinSize"]   : (Geo.min_w . "x" . Geo.min_h)
 
 				; ── Gui ──────────────────────────────────────────────────────────────
-				g := Gui("+Resize +MinSize" . MinSize, Title)
+				g := this._NewWindow(MinSize)
 				g.BackColor := BackColor
 				g.MarginX   := 0
 				g.MarginY   := 0

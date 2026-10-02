@@ -200,7 +200,7 @@ KLWV_Open(which, metrics_dir) {
 		; exists does it start a manifest-only build.
 
 		title := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("metrics_apps.window_title")
-		g := Gui("+Resize +MinSize800x600", title)
+		g := Gui_Create("+Resize +MinSize800x600", title)
 		g.MarginX := 0
 		g.MarginY := 0
 

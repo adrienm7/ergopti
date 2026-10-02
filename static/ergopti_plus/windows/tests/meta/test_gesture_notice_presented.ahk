@@ -25,7 +25,7 @@ _MetaGestureNoticePresented() {
 	OpenPos := InStr(Body, 'if State["windows"].Has(Group) {')
 	PresentPos := InStr(Body, 'WMPresentWindow(State["windows"][Group])', , Max(OpenPos, 1))
 	ReturnPos := InStr(Body, "return true", , Max(PresentPos, 1))
-	BuildPos := InStr(Body, "Gui(")
+	BuildPos := InStr(Body, "Gui_Create(")
 	Assert(OpenPos > 0 && PresentPos > OpenPos && ReturnPos > PresentPos && BuildPos > ReturnPos,
 		"a notice requested again while open must be presented before the early return")
 

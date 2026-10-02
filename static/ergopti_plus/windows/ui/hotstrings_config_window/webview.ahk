@@ -108,7 +108,7 @@ _HCWWeb_TryOpen() {
 	_HCW_BuildCategoryList()
 	_HCW_BuildGroupList()
 
-	g := Gui("+Resize +MinSize560x320", t("hs_config.window_title"))
+	g := Gui_Create("+Resize +MinSize560x320", t("hs_config.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

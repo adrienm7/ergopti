@@ -151,7 +151,7 @@ _Onboarding_TryWeb() {
 		return false
 	}
 	; The title follows the wizard's language, as the page's own title does.
-	g := Gui("+Resize +MinSize" . Geo.min_w . "x" . Geo.min_h, _Onboarding_Translate(_ob_locale, "onboarding.welcome.title"))
+	g := Gui_Create("+Resize +MinSize" . Geo.min_w . "x" . Geo.min_h, _Onboarding_Translate(_ob_locale, "onboarding.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
@@ -446,9 +446,9 @@ _OnbWeb_PreviewLocale(Code) {
 	; propagate to the AHK Gui title bar, so the previewed locale's title is set
 	; here directly. _Onboarding_Translate resolves the key without disturbing the
 	; running script's active locale (it returns the key itself on failure).
-	title := _Onboarding_Translate(Code, "onboarding.welcome.title")
-	if (title != "" && title != "onboarding.welcome.title" && IsSet(_ob_gui) && _ob_gui)
-		try _ob_gui.Title := title
+	title := _Onboarding_Translate(Code, "onboarding.window_title")
+	if (title != "" && title != "onboarding.window_title" && IsSet(_ob_gui) && _ob_gui)
+		try _ob_gui.Title := WindowTitle(title)
 }
 
 ; Opens the native folder picker and feeds the chosen path back to the page.

@@ -401,6 +401,14 @@ _LayMgrWeb_Available() {
 }
 
 /**
+ * Creates the native layout window before attaching its WebView controller.
+ * @returns {Gui} The window with the shared-policy translated caption.
+ */
+_LayMgrWeb_NewWindow() {
+	return Gui_Create("+Resize +MinSize560x400", t("layout_manager.window_title"))
+}
+
+/**
  * Opens the layout manager, or focuses it when it is already open.
  * @returns {boolean} Whether the window is shown.
  */
@@ -421,7 +429,7 @@ LayoutManager_Open(*) {
 	_LayMgrWeb_SessionEpoch += 1
 	SessionEpoch := _LayMgrWeb_SessionEpoch
 	_LayMgrWeb_ResetDone := false
-	g := Gui("+Resize +MinSize560x400", t("layout_manager.window_title"))
+	g := _LayMgrWeb_NewWindow()
 	g.BackColor := "0x1e1e1e"
 	g.MarginX := 0
 	g.MarginY := 0
