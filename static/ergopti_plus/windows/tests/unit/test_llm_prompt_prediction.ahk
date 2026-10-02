@@ -137,6 +137,9 @@ _LPP_Run(Menu, Buffer, Body) {
 	}
 	Calls := []
 	Lines := []
+	; Notices are inspected synchronously; retire their next-turn display before
+	; the fixture relinquishes its fake engine and foreground boundaries.
+	PreviousCritical := Critical("On")
 	try {
 		_LLM_Menu := Menu
 		_LLM_Engine := _LPP_Engine(Saved.Engine)
@@ -159,6 +162,7 @@ _LPP_Run(Menu, Buffer, Body) {
 		_LLM_Bridge_Buffer := Saved.Buffer
 		_LLM_Engine := Saved.Engine
 		_LLM_Menu := Saved.Menu
+		Critical(PreviousCritical)
 	}
 }
 
