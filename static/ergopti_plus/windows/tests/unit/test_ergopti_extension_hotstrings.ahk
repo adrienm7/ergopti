@@ -260,12 +260,12 @@ _EHX_DistanceReferenceLoadsNatively() {
 	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
 	Check(Packs) {
 		global HSE_RegistryByGroup, _SharedDir
-		CorpusPath := _SharedDir . "tests\corpus\hotstrings\distance_reduction_entries.json"
+		CorpusPath := _SharedDir . "\tests\corpus\hotstrings\distance_reduction_entries.json"
 		Reference := JsonParse(FileRead(CorpusPath, "UTF-8"))
 		AssertEqual(101, Reference["entries"].Length)
 		AssertEqual(101, CountTomlHotstrings("distancesreduction"))
 		AssertEqual("ergopti", _HotstringBoundSources["distancesreduction"]["extension"])
-		Assert(!FileExist(_SharedDir . "modules\hotstrings\distancesreduction.toml"),
+		Assert(!FileExist(_SharedDir . "\modules\hotstrings\distancesreduction.toml"),
 			"the common folder must not duplicate the extension's file")
 		HSE_TestReset()
 		try {
@@ -307,10 +307,10 @@ _EHX_DistanceChoicesSurviveReload(GroupEnabled) {
 		Directory := _LCT_TempDir()
 		try {
 			ConfigPath := Directory . "config.toml"
-			Assert(TOML_BatchWrite(ConfigPath, [
+			Assert(TOML_BatchWrite(ConfigPath, _ConfigPrepareTypedUpdates([
 				ManifestSparseOperation("category_enabled.distances_reduction", GroupEnabled),
 				ManifestSparseOperation("hotstrings.distances_reduction.qu.enabled", true),
-				ManifestSparseOperation("hotstrings.distances_reduction.comma_j.enabled", false)]))
+				ManifestSparseOperation("hotstrings.distances_reduction.comma_j.enabled", false)])))
 			Before := FSReadUtf8Exact(ConfigPath)
 			Roots := HotstringExtensions_Roots(Directory, Directory . "missing-bundled", _LCT_RegistryDir())
 			loop 2 {

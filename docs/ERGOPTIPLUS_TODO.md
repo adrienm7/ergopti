@@ -651,7 +651,11 @@ exact-boolean regressions also pass the focused runner.
   unchanged opt-in defaults. Local validation passes all 349 JS checks,
   12,846 macOS unit tests, 4,600 Linux unit tests and 97/142 macOS/Linux E2E
   scenarios. Full native Windows and three-OS CI validation
-  is still required before closing this item.
+  is still required before closing this item. The first CI run exposed a
+  stale Windows cache catalogue; it now reads the shared category order
+  and invalidates its persisted cache when the index changes. Native
+  reference fixtures use the real path and typed Boolean writer. The
+  complete three-OS rerun must pass before this item can close.
 - [ ] **104.** Split the common autocorrections file into meaningful, separately
       selectable sections and replace its misleading submenu/section labels.
       Classify the actual corrections first; preserve matching priority,

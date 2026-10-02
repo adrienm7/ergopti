@@ -119,7 +119,7 @@ TestHsCache_TsvRoundTripIsLossless() {
 		"round-trip must preserve every section (" . Back.Count . " vs " . Rows.Count . ")")
 	; Deep-check a section survived byte-for-byte: its outputs carry a trailing
 	; space and non-ASCII letters.
-	Key := "distancesreduction.comma_far_letters"
+	Key := "magickey.text_expansion_symbols"
 	Assert(Back.Has(Key), "round-trip must keep " . Key)
 	Orig := Rows[Key]
 	RT := Back[Key]
@@ -154,3 +154,30 @@ Test("hotstrings cache: .tsv write/read round-trip is lossless", TestHsCache_Tsv
 Test("hotstrings cache: escape/unescape handles tab, CR, LF and backslash", TestHsCache_EscapeUnescapeHandlesSpecials)
 Test("hotstrings cache: priority domain rejects a corrupt row",
 	TestHsCache_PriorityDomainRejectsCorruptRow)
+
+; Category moves change the index even when all surviving TOMLs are older.
+TestHsCache_IndexChangeInvalidatesCache() {
+	global _SharedDir
+	Saved := _SharedDir
+	Directory := _LCT_TempDir()
+	try {
+		_SharedDir := Directory
+		DirCreate(Directory . "\modules\hotstrings")
+		IndexPath := Directory . "\modules\hotstrings\_index.toml"
+		FileAppend('[menu]`ncategories_order = ["autocorrection", "magickey"]`n', IndexPath, "UTF-8")
+		TsvPath := Directory . "\cache.tsv"
+		FileAppend("old cache", TsvPath, "UTF-8")
+		FileSetTime("20000102000000", TsvPath, "M")
+		FileSetTime("20000103000000", IndexPath, "M")
+		Assert(!_HotstringsCacheIsFresh(TsvPath), "a changed shared index must invalidate an existing cache")
+		Common := HotstringsCommonCategories()
+		AssertEqual(2, Common.Length)
+		AssertEqual("autocorrection", Common[1])
+		AssertEqual("magickey", Common[2])
+	} finally {
+		_SharedDir := Saved
+		HotstringsCommonCategories()
+		DirDelete(Directory, true)
+	}
+}
+Test("hotstrings cache: shared index moves invalidate persisted categories", TestHsCache_IndexChangeInvalidatesCache)
