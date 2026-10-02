@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver vectors of one line of the AI prediction tooltip: the prefix in front of it for each indentation, and the pieces of its text with their role (typed = already in the document, corrected = changed by the model, next = the continuation). The reference is _shared/lua/tooltip/llm_line.lua, read by macOS and Linux; Windows ports it in ui/tooltip/llm.ahk. Windows has one font weight, so it replays text and role, not bold.",
+	"description": "Cross-driver vectors of one line of the AI prediction tooltip: the prefix in front of it for each indentation, and the pieces of its text with their role (typed = already in the document, corrected = changed by the model, next = the continuation). The reference is _shared/lua/tooltip/llm_line.lua, read by macOS and Linux; Windows ports it in ui/tooltip/llm.ahk. Every driver replays text, role and selected/unselected bold emphasis.",
 	"mark": "> ",
 	"align": "|",
 	"prefixes": [

@@ -1443,7 +1443,8 @@ _LLM_Engine_DisplaySlot(Text, Ctx) {
 		Text: Text,
 		Chunks: Display["chunks"],
 		NextWords: Display["nw"],
-		HasCorrections: Display["has_corrections"]
+		HasCorrections: Display["has_corrections"],
+		DisableBold: Display.Get("disable_bold", false)
 	}
 }
 

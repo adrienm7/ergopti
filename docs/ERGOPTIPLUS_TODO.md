@@ -564,9 +564,15 @@ is committed; one request is one commit with its regression test.
   Windows 11 on 2026-10-01 (grey typed, green corrected, orange next,
   indentation 0, +2, -1 and -3). Remaining: look at the Linux GTK panel
   and the macOS canvas on real machines (the suites cover the rows, not
-  the pixels); Windows draws the corrections of an unselected line in
-  the regular weight, where the Lua drivers use bold (its text measure
-  has one weight).
+  the pixels). Windows now retains the shared suppression/emphasis receipt
+  through parsing and prediction execution, paints corrected/next segments in
+  the declared weight and measures each actual font before placing the panel.
+  Its native GDI cache owns separate family/height/weight identities and
+  preserves deletion debt. Shared corpus assertions now require the Windows
+  bold result; native HFONT/Text-control regressions cover real font weights,
+  widths and painted geometry. Focused portable checks passed; full integration
+  and native Windows CI remain pending. The Mac/Linux visual acceptance remains
+  under this item.
 - [~] **91.** Windows: « Combinaisons de touches » as on macOS. Done on
   2026-10-02: every ordered pair of the keys of `[tap_hold.catalog]`
   (key 1 then key 2 is not key 2 then key 1), each with « hold 1 + tap

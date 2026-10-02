@@ -937,22 +937,22 @@ _TooltipBuildGui(Items) {
 		}
 }
 
-; Cache of measurement HFONTs keyed by device-pixel height. The tooltip only
-; ever measures one font name at a couple of sizes, so creating + destroying a
+; Cache of measurement HFONTs keyed by family, device-pixel height and weight.
+; The tooltip measures regular and bold at a couple of sizes; creating a
 ; GDI font on every call (twice per render) is pure waste. The handles live for
 ; the process — a tiny, bounded GDI cache.
 global _TooltipMeasureFontCache := Map()
 
 ; Measure ``Text`` at a given font size. Delegates to _TooltipMeasureTextSize.
-_TooltipMeasureText(Text) {
+_TooltipMeasureText(Text, Bold := false) {
 		global _TOOLTIP_FONT_SIZE
-		return _TooltipMeasureTextSize(Text, _TOOLTIP_FONT_SIZE)
+		return _TooltipMeasureTextSize(Text, _TOOLTIP_FONT_SIZE, , , Bold)
 }
 
 ; Measure ``Text`` width and height in pixels using a transient GDI font
 ; at the specified FontSize. Returns { W, H } in layout units (logical pixels).
 _TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
-		FontCache := 0) {
+		FontCache := 0, Bold := false) {
 		global _TOOLTIP_FONT_NAME, _TooltipMeasureFontCache
 
 		Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
@@ -975,7 +975,7 @@ _TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
 						DPI := 96
 				HeightPx := -Round(FontSize * DPI / 72)
 				HFont := _TooltipMeasureAcquireCachedFont(HeightPx,
-						_TOOLTIP_FONT_NAME, FontCache, Native)
+						_TOOLTIP_FONT_NAME, FontCache, Native, Bold)
 				if !HFont
 						return Fallback
 
