@@ -70,6 +70,15 @@ if (ahkIndex >= 0) {
 				);
 			}
 		}
+	} catch (error) {
+		if (process.env.GITHUB_ACTIONS === 'true') {
+			const message = error.message
+				.replaceAll('%', '%25')
+				.replaceAll('\r', '%0D')
+				.replaceAll('\n', '%0A');
+			console.error(`::error::AHK native exit probe failed: ${message}`);
+		}
+		throw error;
 	} finally {
 		fs.rmSync(probeRoot, { recursive: true, force: true });
 	}
