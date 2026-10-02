@@ -74,6 +74,8 @@ const INVENTORY = {
 		'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
 	'Config.TomlBuild':
 		'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
+	'Menu.populate_leaf':
+		'prepared native leaf registration before popup paint or in one-shot background work, so menu construction stalls are attributed separately from startup',
 	'Updater.Poll':
 		'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
 	'Webview.Eval':

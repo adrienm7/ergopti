@@ -18,6 +18,8 @@
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
 
+#Include menu_population.ahk
+
 
 
 
@@ -322,8 +324,11 @@ _MR_ReportDriverDialect(Row, ListId) {
 ; the user cannot identify and cannot report.
 ;
 ; Returns the number of items added.
-_MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
+_MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, RequireTracking := false) {
 	global MR_MAX_LIST_DEPTH
+	global _MenuPopulationBuilding
+	if !IsSet(PopulationOwner)
+		PopulationOwner := _MenuPopulationBuilding
 
 	if (Depth > MR_MAX_LIST_DEPTH) {
 		try LoggerError("MenuRenderer", "List '{1}' nests deeper than {2} level(s) — truncated.", ListId, MR_MAX_LIST_DEPTH)
@@ -360,9 +365,13 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 		Label := StrReplace(Label, "&", "&&")
 
 		if (Row.Has("items") and Row["items"] is Array) {
-			SubMenu := Menu()
-			_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1)
-			_MR_NormalizeSeparators(SubMenu)
+			if PopulationOwner is MenuPopulation && MenuPopulation_IsLeaf(Row["items"]) {
+				SubMenu := PopulationOwner.Create(Row["items"], ListId, Depth + 1)
+			} else {
+				SubMenu := Menu()
+				_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1, PopulationOwner)
+				_MR_NormalizeSeparators(SubMenu)
+			}
 			TargetMenu.Add(Label, SubMenu)
 		} else if (Row.Has("submenu") and Row["submenu"] is Menu) {
 			; A submenu this driver has ALREADY built as a native Menu.
@@ -379,11 +388,15 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			; here instead of rendering an empty submenu.
 			TargetMenu.Add(Label, Row["submenu"])
 		} else if (Row.Has("action") and Row["action"] is Func and !Greyed) {
-			RegisterMenuItem(TargetMenu, Label, Row["action"])
+			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"])
+			if RequireTracking && Tracked != 1
+				throw Error("Native leaf command registration was refused")
 		} else {
 			; A row with neither a submenu nor an action is a label; AHK needs a
 			; callback regardless, so it gets an inert one and is disabled below
-			RegisterMenuItem(TargetMenu, Label, (*) => "")
+			Tracked := RegisterMenuItem(TargetMenu, Label, (*) => "")
+			if RequireTracking && Tracked != 1
+				throw Error("Native leaf label registration was refused")
 		}
 
 		; An optional per-row icon. Win32 menus can carry one and hs.menubar rows
