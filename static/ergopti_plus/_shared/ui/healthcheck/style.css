@@ -69,9 +69,35 @@ body {
 }
 
 .toolbar .buttons {
+	display: grid;
+	gap: 6px;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.toolbar-left,
+.toolbar-center,
+.toolbar-right {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
+}
+
+.toolbar-center {
+	justify-content: center;
+}
+
+.toolbar-right {
+	justify-content: flex-end;
+}
+
+@media (max-width: 800px) {
+	.toolbar .buttons {
+		grid-template-columns: 1fr 1fr;
+	}
+	.toolbar-center {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
 }
 
 button {
@@ -94,12 +120,6 @@ button.primary {
 	background: var(--accent);
 	border-color: var(--accent);
 	color: var(--accent-text);
-}
-
-/* Collecting again stands apart on the right. The window's own close button
-   closes it, so the toolbar repeats none. */
-#btn-refresh {
-	margin-left: auto;
 }
 
 .toolbar .details {
