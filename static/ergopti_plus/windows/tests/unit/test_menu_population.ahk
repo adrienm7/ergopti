@@ -267,3 +267,89 @@ _MP_RefusedPublication() {
 }
 Test("menu population: refused root publication preserves the live pending owner (menu-leaf-perf-2026-10-02)",
 	_MP_RefusedPublication)
+
+_MP_LargeRows() {
+	Rows := []
+	loop 65 {
+		if A_Index == 18 {
+			Rows.Push(Map("separator", true))
+			Rows.Push(Map("separator", true))
+		}
+		Rows.Push(Map("label", "Choice " . A_Index, "checked", A_Index == 2,
+			"disabled", A_Index == 65, "action", (*) => 0))
+	}
+	Rows.Push(Map("separator", true))
+	return Rows
+}
+
+_MP_BackgroundYieldThenNavigate() {
+	global _MenuDispatchTokens
+	Owner := MenuPopulation()
+	Leaf := Owner.Create(_MP_LargeRows(), "yield", 1)
+	SeedId := _MenuItemIdAtPosition(Leaf, 0)
+	SeedToken := _MenuDispatchTokens[SeedId]
+	Owner.Pump()
+	AssertTrue(Owner.Pending.Has(Leaf.Handle), "large pickers must yield to input between background batches")
+	AssertEqual(17, _MenuItemCount(Leaf), "a background batch appends at most sixteen prepared rows")
+	AssertEqual(0, Owner.Completed, "partial preparation never claims a completed leaf")
+	Owner.Pump()
+	AssertTrue(Owner.Pending.Has(Leaf.Handle))
+	AssertTrue(Owner.Complete(Leaf.Handle), "navigation must finish the remaining choices before paint")
+	AssertEqual(0, Owner.Pending.Count)
+	AssertEqual(66, _MenuItemCount(Leaf), "separator normalization spans batch boundaries")
+	AssertEqual(SeedId, _MenuItemIdAtPosition(Leaf, 0))
+	AssertEqual(SeedToken, _MenuDispatchTokens[SeedId])
+	AssertEqual("Choice 18", _MP_ReadLabel(Leaf, 18))
+	AssertEqual("Choice 65", _MP_ReadLabel(Leaf, 65))
+	AssertTrue(TrayMenuIsSeparatorAt(Leaf, 17))
+	AssertEqual(1, Owner.Completed)
+	AssertFalse(Owner.Complete(Leaf.Handle), "navigation cannot replay an already appended batch")
+}
+Test("menu population: large background leaves yield and navigation finishes once (menu-batch-perf-2026-10-02)",
+	_MP_BackgroundYieldThenNavigate)
+
+_MP_PartialBatchTransfer() {
+	global _MenuPopulationBuilding, _MenuPopulationPublished
+	SavedBuild := _MenuPopulationBuilding
+	SavedPublished := _MenuPopulationPublished
+	Old := MenuPopulation()
+	Next := MenuPopulation()
+	Leaf := Old.Create(_MP_LargeRows(), "transfer", 1)
+	Root := Menu()
+	Root.Add("retained", Leaf)
+	try {
+		Old.Pump()
+		AssertTrue(Old.Pending.Has(Leaf.Handle))
+		_MenuPopulationPublished := Old
+		_MenuPopulationBuilding := Next
+		MenuPopulation_Publish(Root)
+		AssertEqual(0, Old.Pending.Count)
+		AssertTrue(Next.Complete(Leaf.Handle))
+		AssertEqual(66, _MenuItemCount(Leaf), "publication transfers the cursor without replaying a prepared prefix")
+		AssertEqual("Choice 17", _MP_ReadLabel(Leaf, 16))
+		AssertEqual("Choice 18", _MP_ReadLabel(Leaf, 18))
+	} finally {
+		Old.Stop()
+		Next.Stop()
+		_MenuPopulationBuilding := SavedBuild
+		_MenuPopulationPublished := SavedPublished
+	}
+}
+Test("menu population: root projections preserve a partially prepared leaf cursor (menu-batch-perf-2026-10-02)",
+	_MP_PartialBatchTransfer)
+
+_MP_PartialBatchFailure() {
+	Owner := MenuPopulation()
+	Leaf := Owner.Create(_MP_LargeRows(), "batch_failure", 1)
+	Owner.Pump()
+	AssertTrue(Owner.Pending.Has(Leaf.Handle))
+	AssertThrows(ObjBindMethod(Owner, "Complete", Leaf.Handle, "test", _MP_FailureRender, 16))
+	AssertTrue(Owner.Failed)
+	AssertEqual(0, Owner.Completed)
+	Count := _MenuItemCount(Leaf)
+	AssertThrows(ObjBindMethod(Owner, "Complete", Leaf.Handle))
+	AssertEqual(Count, _MenuItemCount(Leaf), "a failed later batch never replays the prefix or the failing append")
+	AssertFalse(Owner.Start())
+}
+Test("menu population: partial batch failures retain ownership without replay (menu-batch-perf-2026-10-02)",
+	_MP_PartialBatchFailure)
