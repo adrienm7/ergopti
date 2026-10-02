@@ -306,8 +306,9 @@ _LLS_PaintedControlGeometry(Control, Text) {
 }
 
 _LLS_DrawMeasuresTheActualPaintedWeight() {
-	global _SharedDir, _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
+	global _SharedDir, _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, UI_LLM_UNSEL_GRAY_HEX
 	SavedFamily := _TOOLTIP_FONT_NAME, SavedSize := _TOOLTIP_FONT_SIZE
+	SavedGray := UI_LLM_UNSEL_GRAY_HEX
 	G := Gui("-Caption +ToolWindow")
 	Slot := { Text: "", Chunks: [{ type: "equal", text: "Regular typed reference " },
 		{ type: "insert", text: "Bold correction WWWMMMM" }],
@@ -329,6 +330,7 @@ _LLS_DrawMeasuresTheActualPaintedWeight() {
 			"the native fixture requires the shared positive point size")
 		_TOOLTIP_FONT_NAME := Family
 		_TOOLTIP_FONT_SIZE := Integer(PointSize)
+		UI_LLM_UNSEL_GRAY_HEX := LTrim(Constants["llm_colors"]["unsel_gray_hex"], "#")
 		BodyWidth := _LLM_TooltipDrawSegments(G, 0, 0, 40, Segments, false)
 		FinalWidth := _LLM_TooltipDrawText(G, BodyWidth, 0, 40, "808080",
 			_TOOLTIP_FONT_SIZE, Texts[4], "norm")
@@ -353,6 +355,7 @@ _LLS_DrawMeasuresTheActualPaintedWeight() {
 		finally {
 			_TOOLTIP_FONT_NAME := SavedFamily
 			_TOOLTIP_FONT_SIZE := SavedSize
+			UI_LLM_UNSEL_GRAY_HEX := SavedGray
 		}
 	}
 }
