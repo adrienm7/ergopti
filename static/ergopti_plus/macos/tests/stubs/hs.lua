@@ -33,10 +33,77 @@ local NATIVE_OS_EXECUTE = os.execute
 
 local SETTINGS_STORE = {}
 
+--- Converts valid acyclic settings values at the native ownership boundary.
+--- Hammerspoon 1.1.1's settings binding snapshots through toNSObjectAtIndex
+--- on set and calls pushNSObject on every get. LuaSkin allocates a fresh
+--- equality cache for each push, so equal arrays or objects alias inside a
+--- read, while separate reads and the persisted snapshot stay independent.
+--- Cyclic and unsupported fixture values fail loudly here: their native
+--- conversion/error policy is outside this stub's supported contract.
+--- @param value any Valid acyclic settings value.
+--- @param native_read boolean Whether to model LuaSkin's per-read equality cache.
+--- @return any graph
+local function settings_value_graph(value, native_read)
+	local active, copied, canonical, interned = {}, {}, {}, {}
+	local function value_key(candidate)
+		local kind = type(candidate)
+		if kind == "table" then return canonical[candidate] end
+		if kind == "number" then
+			local integer = math.tointeger(candidate)
+			return "n" .. (integer and tostring(integer) or string.format("%.17g", candidate))
+		end
+		if kind == "string" then return "s" .. string.format("%q", candidate) end
+		return kind:sub(1, 1) .. tostring(candidate)
+	end
+	local copy
+	copy = function(candidate)
+		local kind = type(candidate)
+		if kind ~= "table" then
+			assert(kind == "nil" or kind == "string" or kind == "number" or kind == "boolean",
+				"settings stub only supports ordinary acyclic settings values")
+			return candidate
+		end
+		assert(not active[candidate], "settings stub does not model cyclic native conversions")
+		if copied[candidate] then return copied[candidate] end
+		active[candidate] = true
+		local graph, count, maximum = {}, 0, 0
+		for key, child in pairs(candidate) do
+			graph[copy(key)] = copy(child)
+			count = count + 1
+			if type(key) == "number" and math.type(key) == "integer" and key > maximum then
+				maximum = key
+			end
+		end
+		active[candidate] = nil
+		if native_read then
+			local parts = {}
+			if maximum == count then
+				for index = 1, count do parts[index] = value_key(graph[index]) end
+			else
+				for key, child in pairs(graph) do
+					parts[#parts + 1] = value_key(key) .. "=" .. value_key(child)
+				end
+				table.sort(parts)
+			end
+			local identity = (maximum == count and "a[" or "o{") .. table.concat(parts, ",")
+				.. (maximum == count and "]" or "}")
+			canonical[graph] = identity
+			if interned[identity] then graph = interned[identity] else interned[identity] = graph end
+		end
+		copied[candidate] = graph
+		return graph
+	end
+	return copy(value)
+end
+
 M.settings = {
-	get = function(key) return SETTINGS_STORE[key] end,
-	set = function(key, value) SETTINGS_STORE[key] = value end,
-	clear = function(key) SETTINGS_STORE[key] = nil end,
+	get = function(key) return settings_value_graph(SETTINGS_STORE[key], true) end,
+	set = function(key, value) SETTINGS_STORE[key] = settings_value_graph(value, false) end,
+	clear = function(key)
+		local existed = SETTINGS_STORE[key] ~= nil
+		SETTINGS_STORE[key] = nil
+		return existed
+	end,
 	__store = SETTINGS_STORE,
 }
 
