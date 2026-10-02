@@ -1136,7 +1136,7 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 			_Updater_SurfaceFailure("updater.channel_switch_blocked_download",
 				"An update download is already in progress.", NotifyFn)
 		else
-			MsgBox(t("updater.channel_switch_blocked_download"), t("updater.title_update"), "Icon!")
+			Ui_MsgBox(t("updater.channel_switch_blocked_download"), t("updater.window_title"), "Icon!")
 		return false
 	}
 	; Acquire machine-wide configuration admission before cadence retirement or

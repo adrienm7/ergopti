@@ -157,13 +157,13 @@ _HS_PromptDefaultDelay() {
 	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
 	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
 	CurMs     := Round((HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY) * 1000)
-	IB := InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
+	IB := Ui_InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
 	if (IB.Result != "OK") {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
 	if !RegExMatch(Val, "^\d+$") {
-		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
 	return _HS_CommitDelayOverride("_global", (Val + 0) / 1000)
@@ -192,13 +192,13 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	R     := HotstringsResolve(Cat, "")
 	Sec   := R.HasOverride ? R.Delay : ((DefaultSec != "") ? DefaultSec : R.Delay)
 	CurMs := Round(Sec * 1000)
-	IB := InputBox(t("menu.hotstrings.delay_prompt"), t(I18nKey), "w340 h140", CurMs)
+	IB := Ui_InputBox(t("menu.hotstrings.delay_prompt"), t(I18nKey), "w340 h140", CurMs)
 	if (IB.Result != "OK") {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
 	if !RegExMatch(Val, "^\d+$") {
-		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
 	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
@@ -441,7 +441,7 @@ _HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
 _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 	Ch := EditCtrl.Value
 	if (StrLen(Ch) != 1) {
-		MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
+		Ui_MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
 		return
 	}
 	Result.Char    := Ch
@@ -452,7 +452,7 @@ _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 
 ; Confirm then remove a custom delimiter character (and its consume flag if set).
 _HS_DelimRemoveCustom(Char) {
-	Res := MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
+	Res := Ui_MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
 	if (Res != "Yes") {
 		return
 	}

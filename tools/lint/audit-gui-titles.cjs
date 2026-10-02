@@ -137,11 +137,51 @@ function walk(dir, extension, out = []) {
 	return out;
 }
 
-function auditSource(source, lua, locales) {
+/** Identify native function ownership independently of dialog call arguments. */
+function functionRanges(ts) {
+	const ranges = [];
+	for (let i = 0; i < ts.length - 1; i++) {
+		if (ts[i].string || !/^[A-Za-z_]\w*$/.test(ts[i].value) || ts[i + 1].value !== '(') continue;
+		if (['if', 'while', 'for', 'switch', 'catch'].includes(ts[i].value.toLowerCase())) continue;
+		const previous = ts[i - 1];
+		if (
+			previous &&
+			(['if', 'while', 'return', 'try', '.', ':', '=', '!', '?'].includes(
+				previous.value.toLowerCase()
+			) ||
+				(previous.line === ts[i].line && !['{', '}'].includes(previous.value)))
+		)
+			continue;
+		const call = argumentsAt(ts, i + 1);
+		if (!call || ts[call.end + 1]?.value !== '{') continue;
+		let depth = 1;
+		for (let end = call.end + 2; end < ts.length; end++) {
+			if (!ts[end].string && ts[end].value === '{') depth++;
+			if (!ts[end].string && ts[end].value === '}') depth--;
+			if (depth === 0) {
+				ranges.push({ name: ts[i].value, start: call.end + 1, end });
+				break;
+			}
+		}
+	}
+	return ranges;
+}
+
+// These seven last-resort startup modals precede the runtime dialog owner.
+// Both function ownership and exact counts are bounded until their own migration.
+const EARLY_DIALOGS = {
+	'windows/infra/bundle.ahk': { owner: 'Bundle_Init', count: 6 },
+	'windows/infra/error_net.ahk': { owner: 'ErgoptiGlobalErrorHandler', count: 1 }
+};
+
+function auditSource(source, lua, locales, relative = '') {
 	const ts = tokens(source, lua),
 		findings = [],
 		debt = [],
 		stats = { checked: 0, dynamic: 0 };
+	const scopes = lua ? [] : functionRanges(ts);
+	const early = EARLY_DIALOGS[relative];
+	let earlyCalls = 0;
 	// Only simple same-line assignments are followed. Parameters, table paths,
 	// callback results and cross-function argument flow are deliberately unresolved.
 	function alias(name, before, seen) {
@@ -201,18 +241,62 @@ function auditSource(source, lua, locales) {
 		if (ts[i - 1]?.value === 'function' || ts[i - 3]?.value === 'function') continue;
 		const wrapper = [
 			'Gui_Create',
+			'Ui_MsgBox',
+			'Ui_InputBox',
 			'WindowTitle',
 			'window_title',
 			'set_window_title',
 			'set_title',
 			'show_webview'
 		].includes(name);
-		const raw = ['Gui', 'windowTitle'].includes(name);
+		const nativeDialog = !lua && ['MsgBox', 'InputBox'].includes(name);
+		const raw = ['Gui', 'windowTitle'].includes(name) || nativeDialog;
 		if (!wrapper && !raw) continue;
 		const call = argumentsAt(ts, i + 1);
 		if (!call) continue;
-		if (ts[call.end + 1]?.value === '{' || call.args.some((a) => a.some((n) => n.value === ':=')))
+		const dialogWrapper = ['Ui_MsgBox', 'Ui_InputBox'].includes(name);
+		const definition = scopes.some((s) => s.start === call.end + 1 && s.name === name);
+		if (
+			(nativeDialog || dialogWrapper ? definition : ts[call.end + 1]?.value === '{') ||
+			(!nativeDialog &&
+				!['Ui_MsgBox', 'Ui_InputBox'].includes(name) &&
+				call.args.some((a) => a.some((n) => n.value === ':=')))
+		)
 			continue;
+		if (nativeDialog) {
+			const scope = scopes
+				.filter((s) => s.start < i && i < s.end)
+				.sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+			if (early && name === 'MsgBox' && scope?.name === early.owner) {
+				earlyCalls++;
+				debt.push({
+					line: t.line,
+					reason: 'pre-bootstrap native caption migration remains pending'
+				});
+				continue;
+			}
+			const caption = call.args[1];
+			const composed =
+				caption?.length === 4 &&
+				caption[0].value === 'WindowTitle' &&
+				caption[1].value === '(' &&
+				caption[2].value === 'Title' &&
+				caption[3].value === ')';
+			if (
+				relative !== 'windows/infra/native_dialogs.ahk' ||
+				scope?.name !== 'Ui_' + name ||
+				!composed
+			) {
+				findings.push({
+					line: t.line,
+					call: name,
+					reason: 'native dialog bypasses its shared-caption owner',
+					values: []
+				});
+			}
+			stats.checked++;
+			continue;
+		}
 		if (name === 'Gui') {
 			const captionless = call.args[0]?.some(
 				(n) => n.string && /(?:^|\s)-Caption(?:\s|$)/i.test(n.value)
@@ -240,7 +324,18 @@ function auditSource(source, lua, locales) {
 			brandedInput = false;
 		} else
 			expr =
-				call.args[['Gui_Create', 'Gui', 'set_window_title', 'set_title'].includes(name) ? 1 : 0];
+				call.args[
+					[
+						'Gui_Create',
+						'Gui',
+						'Ui_MsgBox',
+						'Ui_InputBox',
+						'set_window_title',
+						'set_title'
+					].includes(name)
+						? 1
+						: 0
+				];
 		if (!expr) continue;
 		const resolved = values(expr, i);
 		stats.checked++;
@@ -264,6 +359,13 @@ function auditSource(source, lua, locales) {
 				values: bad
 			});
 	}
+	if (early && earlyCalls !== early.count)
+		findings.push({
+			line: 1,
+			call: 'MsgBox',
+			reason: `bounded pre-bootstrap dialog count changed: expected ${early.count}, found ${earlyCalls}`,
+			values: []
+		});
 	return { findings, debt, ...stats };
 }
 
@@ -286,13 +388,21 @@ function main(root = ROOT) {
 	]) {
 		const files = walk(path.join(root, 'static/ergopti_plus', platform), extension);
 		for (const file of files) {
-			const result = auditSource(fs.readFileSync(file, 'utf8'), extension === '.lua', locales);
+			const relative = path
+				.relative(path.join(root, 'static/ergopti_plus'), file)
+				.replaceAll('\\', '/');
+			const result = auditSource(
+				fs.readFileSync(file, 'utf8'),
+				extension === '.lua',
+				locales,
+				relative
+			);
 			checked += result.checked;
 			dynamic += result.dynamic;
 			for (const item of result.debt) {
 				rawDebt++;
 				console.log(
-					`[DEBT] ${path.relative(root, file).replaceAll('\\', '/')}:${item.line}: possible unbranded raw title; manual review required.`
+					`[DEBT] ${path.relative(root, file).replaceAll('\\', '/')}:${item.line}: ${item.reason || 'possible unbranded raw title; manual review required'}.`
 				);
 			}
 			for (const finding of result.findings) {

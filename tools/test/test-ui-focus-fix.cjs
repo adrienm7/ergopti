@@ -544,7 +544,7 @@ function detect(driver, src) {
 				}
 			}
 		}
-		for (const m of src.matchAll(/\bMsgBox\s*\(/g)) {
+		for (const m of src.matchAll(/\b(?:Ui_)?MsgBox\s*\(/g)) {
 			const call = callArgs(src, m.index + m[0].length - 1, '`');
 			if (call && call.args.length >= 3 && literalCarries(call.args[2], WIN_MSGBOX_TOPMOST_BITS)) {
 				found.push({
@@ -723,6 +723,8 @@ const FIXTURES = [
 		'win.topmost'
 	],
 	['windows', 'MsgBox("Text", "Title", "Iconi 262144")', 'win.msgboxTopmost'],
+	['windows', 'Ui_MsgBox("Text", "Title", "Iconi 262144")', 'win.msgboxTopmost'],
+	['windows', 'Ui_MsgBox(Msg,\n\tTitle, 0x1000 | 0x30)', 'win.msgboxTopmost'],
 	['windows', 'MsgBox(Msg,\n\tTitle, 0x1000 | 0x30)', 'win.msgboxTopmost'],
 	['windows', 'MsgBox "Text", "Title", "4096"', 'win.msgboxTopmost'],
 	['windows', 'MsgBox("x", "y", 0x41030)', 'win.msgboxTopmost'],
@@ -780,6 +782,7 @@ const CLEAN_FIXTURES = [
 		'DllCall("User32\\SetWindowPos", "Ptr", H, "Ptr", -2, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 3)'
 	],
 	['windows', 'MsgBox(Msg, Title, "Iconi T2")'],
+	['windows', 'Ui_MsgBox(Msg, Title, "Iconi T2")'],
 	['windows', 'MsgBox(Msg, Title, "YesNo Icon? 0x2000")'],
 	['windows', 'MsgBox(Format("{1}", 4096), Title, "Iconi")'],
 	['powershell', '[void][Windows.Forms.MessageBox]::Show($FailureText, $FailureTitle)'],

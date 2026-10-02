@@ -479,6 +479,7 @@ if UIASW_IsWorkerInvocation()
 #Include ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
+#Include infra/native_dialogs.ahk
 #Include infra/ui_style.ahk
 #Include ui/tooltip/init.ahk
 #Include infra/hotstrings/hotstring_prefix_watcher.ahk
@@ -815,7 +816,7 @@ EnsureUserConfigsExist()
 ; Map and every downstream Features["llm"]["enabled"] access throws a
 ; cryptic "Item has no value" error. Fail loudly here instead.
 if !ManifestEnsureLoaded() {
-	MsgBox(t("startup.manifest_missing"), t("startup.manifest_title"), "OK Iconx")
+	Ui_MsgBox(t("startup.manifest_missing"), t("startup.manifest_window_title"), "OK Iconx")
 	ExitApp(1)
 }
 global Features := ManifestBuildFeaturesMap()

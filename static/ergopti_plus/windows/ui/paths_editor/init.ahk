@@ -264,7 +264,7 @@ _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 	} catch ValueError as Err {
 		; Nothing is written and the editor stays open for another folder.
 		try LoggerError("PathsEditor", "Refused the logs folder: {1}.", Err.Message)
-		try MsgBox(t("paths_editor.save_failed"),
+		try Ui_MsgBox(t("paths_editor.save_failed"),
 			t("paths_editor.save_failed_title"), "Iconx")
 		return false
 	}
@@ -300,7 +300,7 @@ _PathsFile_Write(N, LogsDir := 0) {
 	N := ConfigTransitionNormalizeConfigDir(N)
 	if !(N is String) {
 		try LoggerError("PathsEditor", "Refused an invalid or relative configuration directory.")
-		try MsgBox(t("paths_editor.save_failed"),
+		try Ui_MsgBox(t("paths_editor.save_failed"),
 			t("paths_editor.save_failed_title"), "Iconx")
 		return false
 	}
@@ -308,7 +308,7 @@ _PathsFile_Write(N, LogsDir := 0) {
 		[_PathsFile])
 	if !ConfigTransitionResultIs(AcquireResult, "bundle_acquired") {
 		ConfigTransitionLogFailure("PathsEditor", AcquireResult)
-		try MsgBox(t("paths_editor.save_failed"),
+		try Ui_MsgBox(t("paths_editor.save_failed"),
 			t("paths_editor.save_failed_title"), "Iconx")
 		return false
 	}
@@ -334,7 +334,7 @@ _PathsFile_Write(N, LogsDir := 0) {
 					&& (CommitResult["barrier_retained"] is Integer)
 					&& CommitResult["barrier_retained"] == 1
 				ReleaseBundle := false
-			try MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
+			try Ui_MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
 			return false
 		}
 		try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
@@ -368,7 +368,7 @@ _PathsFile_RollbackRefusedReload(OwnerBundle) {
 		return false
 	ConfigTransitionLogFailure("PathsEditorRollback", RollbackResult)
 	Retained := ConfigTransitionRetainBarrier(OwnerBundle)
-	try MsgBox(t("paths_editor.save_failed"),
+	try Ui_MsgBox(t("paths_editor.save_failed"),
 		t("paths_editor.save_failed_title"), "Iconx")
 	return Retained
 }

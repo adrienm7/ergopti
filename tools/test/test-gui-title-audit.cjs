@@ -41,6 +41,128 @@ function put(relative, content) {
 	fs.writeFileSync(target, content);
 }
 const cases = [
+	['windows', 'MsgBox("Body", "Tools")', 1, 'raw message box has no caption owner'],
+	[
+		'windows',
+		'MsgBox("Body", "ErgoptiPlus — Tools")',
+		1,
+		'prebranded message box still bypasses policy'
+	],
+	[
+		'windows',
+		'MsgBox("Body", DynamicTitle, "YesNo")',
+		1,
+		'dynamic message box cannot bypass policy'
+	],
+	[
+		'windows',
+		'MsgBox(Body := "Body", DynamicTitle, "YesNo")',
+		1,
+		'argument assignment cannot disguise a raw native call as a definition'
+	],
+	[
+		'windows',
+		'if MsgBox("Body", "Tools", "YesNo") {\nreturn\n}',
+		1,
+		'conditional raw call is not a function declaration'
+	],
+	[
+		'windows',
+		'InputBox("Body", "Tools", "Password", "Secret")',
+		1,
+		'raw native input bypass is blocking'
+	],
+	[
+		'windows',
+		'Ui_MsgBox("ErgoptiPlus appears in this body", "Tools", "Icon!")',
+		0,
+		'only caption arguments are branded'
+	],
+	[
+		'windows',
+		'Ui_MsgBox("Body", "ErgoptiPlus — Tools")',
+		1,
+		'message caption cannot be branded twice'
+	],
+	[
+		'windows',
+		'if Ui_MsgBox("Body", "ErgoptiPlus — Tools", "YesNo") {\nreturn\n}',
+		1,
+		'conditional wrapper caption is still checked'
+	],
+	[
+		'windows',
+		'Ui_InputBox("Body", t("editor.personal_info.window_title"))',
+		1,
+		'one translated prebranded input caption is blocking'
+	],
+	[
+		'windows',
+		'Title := "ErgoptiPlus — Tools"\nUi_InputBox("Body", Title)',
+		1,
+		'input caption aliases cannot bypass double-prefix guard'
+	],
+	[
+		'windows',
+		'Ui_MsgBox("Body")\nUi_InputBox("Body", "")',
+		0,
+		'empty captions belong to shared product policy'
+	],
+	[
+		'windows',
+		'Ui_MsgBox(Text := "", Title := "", Options := "") {\nreturn MsgBox(Text, WindowTitle(Title), Options)\n}',
+		0,
+		'actual native message delegate owns its caption',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nreturn InputBox(Prompt, WindowTitle(Title), Options, Default)\n}',
+		0,
+		'actual native input delegate owns its caption',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_MsgBox(Text, Title, Options) {\nreturn MsgBox(Text, Title, Options)\n}',
+		1,
+		'central delegate itself cannot drop policy',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Other(Text, Title, Options) {\nreturn MsgBox(Text, WindowTitle(Title), Options)\n}',
+		1,
+		'other function in owner file cannot bypass central delegate',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_MsgBox(Text, Title, Options) {\nreturn MsgBox(Text, WindowTitle(Title), Options)\n}',
+		1,
+		'copying a delegate to another file cannot create another caption owner'
+	],
+	[
+		'windows',
+		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(6) + '}',
+		0,
+		'six bounded bundle startup dialogs remain explicitly pending',
+		'static/ergopti_plus/windows/infra/bundle.ahk'
+	],
+	[
+		'windows',
+		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(7) + '}',
+		1,
+		'early-bootstrap exception cannot grow',
+		'static/ergopti_plus/windows/infra/bundle.ahk'
+	],
+	[
+		'windows',
+		'Other() {\nMsgBox("Fatal", "ErgoptiPlus")\n}',
+		1,
+		'early-bootstrap path cannot authorize another owner',
+		'static/ergopti_plus/windows/infra/error_net.ahk'
+	],
 	[
 		'windows',
 		'g := Gui("+Resize", t("common.error_title"))',
@@ -147,9 +269,12 @@ try {
 			'editor.personal_info.window_title': 'ErgoptiPlus — Informations personnelles'
 		})
 	);
-	for (const [platform, source, expected, label] of cases) {
+	for (const [platform, source, expected, label, override] of cases) {
+		for (const relative of ['infra/native_dialogs.ahk', 'infra/bundle.ahk', 'infra/error_net.ahk'])
+			fs.rmSync(path.join(root, 'static/ergopti_plus/windows', relative), { force: true });
 		for (const other of ['windows', 'macos', 'linux'])
-			put(sourcePath(other), other === platform ? source : '');
+			put(sourcePath(other), other === platform && !override ? source : '');
+		if (override) put(override, source);
 		const result = spawnSync(
 			process.execPath,
 			[path.join(root, 'tools/lint/audit-gui-titles.cjs')],
@@ -160,7 +285,9 @@ try {
 		if (expected)
 			assert.match(
 				result.stderr,
-				/error_dialog\/init\.(ahk|lua):\d+/,
+				new RegExp(
+					(override || sourcePath(platform)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\d+'
+				),
 				'failure identifies the actual source site'
 			);
 	}

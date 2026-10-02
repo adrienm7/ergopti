@@ -850,19 +850,29 @@ exact-boolean regressions also pass the focused runner.
   bare captions in all 21 locales and live retitling of the retained progress
   panel. Actual AppKit tests and seven private generated/compiled policy cases
   cover empty, custom, quoted, interpolation-looking and Unicode prefixes;
-  native Swift CI remains pending. Remaining: native message/input dialogs,
-  native file pickers and notifications still have legacy branding paths. Captionless overlays retain their separate native presentation owner.
-
-Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
-Windows/macOS/Linux pipeline, including package and installation lanes. It
-validates the shared "Ergopti+" extension name in the actual tray providers,
-Windows four-finger tap's monitor-local Alt+Tab recommendation and invocation,
-all thirteen pending-dead-state reset cases and the consuming arrow hooks.
-The Windows menu-name fixture owns neutral category collections and restores
-assigned or unassigned globals. The arrow fixture derives scan codes from the
-shared registry, retaining its action, criterion, consumption and order checks.
-The native checkpoint also passes CI's real formatting check. Its temporary
-branch is removed after validation.
+  native Swift CI remains pending. Captionless overlays retain their separate
+  native presentation owner.
+  Ninety-one post-bootstrap Windows message/input calls now compose actual
+  native captions through one delegate; bodies, options, defaults and results
+  retain their native semantics. Bare startup/uninstall captions have all 21
+  translations. The production-wide owner audit has 43 mutation cases and
+  exactly seven bounded bootstrap exclusions; focus, no-confirm and fixable
+  error audits recognize the delegate with independent regressions. Five
+  generated-policy native probes cover real captions/bodies, timeout, password,
+  default-button and cancellation receipts. Focused JS checks passed after the
+  old audit accepted a caption bypass; actual AHK and full CI remain pending.
+  Remaining native caption paths include the seven pre-bootstrap dialogs,
+  file pickers, notifications and genuine macOS/Linux dialog title APIs.
+  Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
+  Windows/macOS/Linux pipeline, including package and installation lanes. It
+  validates the shared "Ergopti+" extension name in the actual tray providers,
+  Windows four-finger tap's monitor-local Alt+Tab recommendation and invocation,
+  all thirteen pending-dead-state reset cases and the consuming arrow hooks.
+  The Windows menu-name fixture owns neutral category collections and restores
+  assigned or unassigned globals. The arrow fixture derives scan codes from the
+  shared registry, retaining its action, criterion, consumption and order checks.
+  The native checkpoint also passes CI's real formatting check. Its temporary
+  branch is removed after validation.
 
 Scoped verification now executes the actual Prettier/Ruff `format:check`
 before suites, using the formatter owner's extension inventory. A regression

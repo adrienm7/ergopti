@@ -560,7 +560,7 @@ GestureTeleportMouse() {
 				Monitors.Push({Left: Left, Top: Top, Right: Right, Bottom: Bottom})
 		}
 		if (Count < 2) {
-				MsgBox(t("shortcuts.no_other_monitor"))
+				Ui_MsgBox(t("shortcuts.no_other_monitor"))
 				return
 		}
 		MouseGetPos(&CurX, &CurY)

@@ -417,7 +417,7 @@ _LLM_Agent_OnSelection(Generation, Backend, Text) {
 ; The native text dialog of the command action.
 ; @returns {Map} Map("ok", Boolean, "value", String).
 _LLM_Agent_NativePrompt(Title, Text, Default) {
-	Result := InputBox(Text, Title, "w560 h160", Default)
+	Result := Ui_InputBox(Text, Title, "w560 h160", Default)
 	return Map("ok", Result.Result == "OK", "value", Result.Value)
 }
 

@@ -54,7 +54,7 @@ const DRIVERS = [
 const QUESTION_CALLS = {
 	'.lua':
 		/\b(?:block_alert|blockAlert|ask_yes_no|confirm_clear)\s*\(|\.confirm\s*\(|zenity --question/,
-	'.ahk': /\.Ask\s*\(|\bMsgBox\s*\((?=[^\n]*(?:YesNo|OKCancel|RetryCancel|"\s*[1-6]\b))/,
+	'.ahk': /\.Ask\s*\(|\b(?:Ui_)?MsgBox\s*\((?=[^\n]*(?:YesNo|OKCancel|RetryCancel|"\s*[1-6]\b))/,
 	'.js': /\b(?:window\.)?confirm\s*\(|\bshowConfirm\s*\(|\brunConfirm\s*\(/
 };
 
@@ -233,8 +233,18 @@ function stripJsComments(source) {
 	const ahkRestore =
 		'Restore(Mode) {\n\tif MsgBox(t("common.restore_recommended"), "", "YesNo") != "Yes"\n\t\treturn\n}\n';
 	assert.equal(shape(ahkRestore, '.ahk').length, 2, 'an AHK question before a restore is caught');
+	assert.equal(
+		shape(ahkRestore.replace('MsgBox(', 'Ui_MsgBox('), '.ahk').length,
+		2,
+		'a branded native question before a restore is still caught'
+	);
 	const ahkNotice = 'Report(Mode) {\n\tMsgBox(t("dialog.failed"), "", "Iconx")\n}\n';
 	assert.deepEqual(shape(ahkNotice, '.ahk'), [], 'an error notice is not a question');
+	assert.deepEqual(
+		shape(ahkNotice.replace('MsgBox(', 'Ui_MsgBox('), '.ahk'),
+		[],
+		'a branded error notice still is not a question'
+	);
 	const jsRestore = 'function restoreRecommended() {\n\tif (!confirm(text)) return;\n}\n';
 	assert.equal(shape(jsRestore, '.js').length, 1, 'a page question before a restore is caught');
 	errors.length = 0;

@@ -495,7 +495,7 @@ function messagesOf(file) {
 		}
 	} else {
 		// MsgBox(Text, Title, Options): the Options name the buttons.
-		for (const match of code.matchAll(/\bMsgBox\s*\(/g)) {
+		for (const match of code.matchAll(/\b(?:Ui_)?MsgBox\s*\(/g)) {
 			const text = callArguments(code, match.index + match[0].length - 1);
 			if (text === null) continue;
 			const options = splitArguments(text)[2] || '';
@@ -570,6 +570,21 @@ function selfCheck() {
 	];
 	if (JSON.stringify(verdicts) !== JSON.stringify(expected)) {
 		throw new Error(`self-check: expected ${expected.join(' ')}, got ${verdicts.join(' ')}`);
+	}
+	for (const owner of ['MsgBox', 'Ui_MsgBox']) {
+		const windows = messagesOf({
+			rel: 'windows/ui/fixture.ahk',
+			content:
+				`${owner}(t("llm.local_model.missing_body"), "Model", "YesNo")\n` +
+				`${owner}(t("llm.unreachable.body"), "Model", "Icon!")`
+		});
+		const observed = windows.map(
+			(d) => `${d.surface}:${[...d.keys].some(isFixableKey)}:${d.action}`
+		);
+		if (JSON.stringify(observed) !== JSON.stringify(['dialog:true:true', 'dialog:true:false']))
+			throw new Error(
+				`self-check: ${owner} must preserve both offered actions and missing-action refusals`
+			);
 	}
 }
 

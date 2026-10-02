@@ -101,7 +101,7 @@ ToggleStartAtLogin(*) {
 		return true
 	} catch as Err {
 		LoggerError("Startup", "Startup setting could not be changed: {1}.", Err.Message)
-		MsgBox(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
+		Ui_MsgBox(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
 		return false
 	}
 }
