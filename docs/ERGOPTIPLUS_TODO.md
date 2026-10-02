@@ -149,33 +149,20 @@ These are software implementations; final hardware verification remains below.
   encoding (1740 files), gen:check (40 outputs of 23 generators); full CI
   without release: run 36697666039 (CI #633). The maintainer's manual test
   results remain.
-  The personal-menu native assertions reached 7713/7713 in runs 37019308363
-  and 37019563500, but their native unit step still failed. Run 37022297730
-  exposed no execution-manifest annotation; that does not establish which
-  receipt failed because PowerShell can decorate native stderr. Both asynchronous AHK launchers now retain their process handle
-  before polling and join before reading ExitCode, refusing a missing receipt
-  explicitly. Windows executes native zero/nonzero exit probes against the
-  actual workflow launch/receipt fragments. The strict manifest assertions
-  remain intact; their CLI regression also checks escaped failure annotations.
-  Runs 37024861931 and 37026041613 refused the contract/probe step before the
-  suite started. Every uncaught contract or fixture assertion now exposes its
-  exact stack as a GitHub annotation and retains exit code 1. A CLI mutation
-  removes the launcher's handle capture and proves both the refusal and its
-  annotation. Hosted workflow commands now use stdout, preserving their leading
-  delimiter through PowerShell; local diagnostics still use stderr. The CLI
-  regressions require the commands on stdout and keep all failing exit checks,
-  including a large annotation drained before exit. The native timing probe
-  also consumes the exact runtime selected by CI; it previously searched only
-  Program Files while CI installs into C:/AutoHotkey.
-  Run 37028949327 exposed the actual native failure: all 7713 assertions
-  passed, then AHK exited with STATUS_HEAP_CORRUPTION (0xC0000374). Personal
-  menu fixtures cleared only their parent; detached default-section submenus
-  retained capturing dispatcher callbacks until interpreter teardown. Fixture
-  cleanup now releases the owned descendants first. A native regression keeps
-  foreign detached registrations intact and demonstrates the root-only leak;
-  CI also runs the five personal-menu cases in their own process and requires
-  complete timings plus a clean native exit. Full three-OS validation, Windows
-  packaging and installation remain pending for this correction.
+  Non-release checkpoint
+  [37033032620](https://github.com/adrienm7/ergopti/actions/runs/37033032620)
+  at `6275cac35` passes the complete Windows/macOS/Linux pipeline, including
+  native units, E2E, packaging, installation and launch; Release / Publish is
+  skipped. Personal-menu fixtures now release their owned submenu trees before
+  AHK interpreter teardown. The five targeted owner/lifecycle cases require a
+  clean native exit, while foreign detached dispatcher registrations stay live.
+  Both asynchronous launchers retain their process handle, join before reading
+  ExitCode and refuse a missing receipt. Strict execution identities and timings
+  remain blocking. Hosted diagnostics use stdout through PowerShell, and native
+  timing probes consume the runtime actually selected by CI.
+  The isolated LLM runners now own separate canonical result paths and strict
+  manifests so their small suites cannot replace the main suite's later
+  annotation. This receipt-isolation follow-up awaits its full native CI.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
@@ -309,7 +296,8 @@ These are software implementations; final hardware verification remains below.
   Caret and model-catalogue regressions preserve independent equal objects and
   nested arrays after mutation, including the native decoder's original graph.
   The direct-call baseline now contains only the adapter's own implementation.
-  Full three-OS validation of this slice is pending.
+  The complete three-OS pipeline, including packaging and installation,
+  passed checkpoint 37033032620 at `6275cac35` with release skipped.
   Audit the other hs stubs for the same divergence from native behaviour.
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
@@ -327,7 +315,8 @@ These are software implementations; final hardware verification remains below.
   driver E2E scenario saves the list and verifies it at the next real daemon
   start; that scenario failed against the original owner before passing with
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
-  checks). Full three-OS validation of this slice is pending; the scalar
+  checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
+  E2E, packaging and installation gates with release skipped. The scalar
   migration decision and dotted-key reader remain open.
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -345,20 +334,6 @@ These are software implementations; final hardware verification remains below.
       activation a way to tell Hammerspoon (for example a sentinel key the
       activation rule emits, like the script-control ones) so every CapsWord is
       cancelled.
-- [~] **45.** v0.0.0-dev.150 was published without ErgoptiPlus-linux-noarch.rpm:
-  `gh release create` listed the file and exited 0, but GitHub kept 12 of 13
-  assets, and published releases are immutable. Create the release as a draft,
-  verify every expected asset by name (re-upload a missing one), then publish;
-  fail the job if one is still missing.
-  The workflow now creates a draft and passes the exact uploaded file list to
-  one publication owner. It validates GitHub's actual names, sizes and upload
-  states, repairs only missing or incomplete receipts at most twice, and
-  publishes only after every draft receipt matches. Final published state is
-  read back too. The actual workflow regression failed before the change;
-  fault cases cover a silently lost RPM, incomplete receipts, permanent loss,
-  invalid metadata, lookup/upload refusal and unacknowledged publication.
-  Existing tag/channel/resume guards remain intact. Full three-OS validation
-  without release is pending; no release is published by these tests.
 - [ ] **46.** The AI agent and screen reading on Windows and Linux still send a
       local model Ollama may not have pulled (default qwen2.5:7b, vision
       qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags, names
@@ -448,10 +423,6 @@ integrated, then publish one grouped release.
 - [ ] **63.** Layer actions: add screen brightness up and down (asked as an
       example for the wheel slots), with its key, action and label on the three
       drivers and 21 locales.
-- [ ] **64.** Greyed menu rows: the rollback work added `disabled_when` +
-      `disabled_i18n` (Uninstall greyed on a source run) next to the menu
-      work's `unavailable = "grey"`; render both through one greyed-row path
-      and label format, with one schema rule for the reason key.
 
 ## Maintainer requests on 2026-10-01
 
@@ -713,7 +684,9 @@ exact-boolean regressions also pass the focused runner.
   and a default-menu freshness guard. Rendering now reads item counts through
   the tray adapter and keeps an explicit fresh default path, with native
   regressions proving independent default menus and refusal of populated targets.
-  Full three-OS validation of this slice is pending.
+  Full three-OS checkpoint 37033032620 at `6275cac35` passed native unit,
+  E2E, packaging, installation and launch gates with release skipped, after
+  correcting owned submenu teardown in the Windows fixtures.
   Windows's additional personal-file views and the dynamic views still need
   their own owner bindings before this item is complete.
   The Windows discovery boundary now filters its mixed legacy tray map to
@@ -769,6 +742,20 @@ exact-boolean regressions also pass the focused runner.
       the chosen physical magic-key source, migrate any owned legacy setting
       deliberately and cover neutral/recommended scopes, menu placement,
       assignment removal/rebinding and editor invocation across drivers.
+
+- [ ] **109.** Give every application window the same "ErgoptiPlus — Title"
+      format, including the Windows navigation-layer editor and keyboard-layout
+      manager. Own the product prefix and separator in one shared policy so
+      changing or removing the prefix requires one edit. Route creation and
+      live retitling through it on Windows, macOS and Linux; keep translated
+      titles in the 21 locales free of duplicated branding. Cover native and
+      WebView paths, language changes, already branded inputs and an empty
+      prefix with regression and cross-driver parity tests.
+
+- [ ] **110.** Move the automatic-start switch from Configuration to Updates,
+      immediately above Uninstall. Declare the placement once in the shared
+      menu manifest, preserve the existing native startup persistence owners,
+      and verify order, state and command dispatch on Windows, macOS and Linux.
 
 Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
 Windows/macOS/Linux pipeline, including package and installation lanes. It
@@ -865,11 +852,11 @@ menu's disabled flag in native CI. Item 91's remaining engine issues stay open.
 
 ## Time estimate
 
-Budgetary estimate: 20–35 hours of effective work for all remaining product and
-verification tasks, with uncertainty around native input and multi-file
-transactions. The earlier six-hour estimate was too optimistic. The immediate
-integration/handoff comes first; do not spend the remaining weekly quota on new
-features while leaving uncommitted work or external-only specifications.
+Order-of-magnitude estimate: 40–70 agent-days for the current remaining
+product and verification scope. Item 31 alone records 30–40 agent-days plus
+real-Mac acceptance. Parallel work can reduce elapsed implementation time;
+shared integration, native CI and genuine hardware acceptance still constrain
+completion. This is a budget range, not a fixed delivery date.
 
 ## Current local evidence
 

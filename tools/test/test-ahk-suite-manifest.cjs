@@ -44,6 +44,26 @@ for (const [job, name] of [
 	processReceipts.push({ name, start: start[0].replace(/\$fstream =$/, ''), finish: finish[0] });
 }
 
+// Isolated runners must not overwrite the main suite's canonical TAP receipt.
+const isolatedScript = pipeline
+	.runOf(pipeline.step(pipeline.job('test-ahk'), 'Run isolated AHK LLM suites'))
+	.join('\n');
+assert.match(
+	isolatedScript,
+	/\$env:ERGOPTI_AHK_RESULTS_FILE = Join-Path \$env:RUNNER_TEMP "windows-ahk-isolated-\$name\.txt"/,
+	'isolated runners must own distinct canonical result paths'
+);
+assert.ok(
+	isolatedScript.indexOf('$env:ERGOPTI_AHK_RESULTS_FILE =') <
+		isolatedScript.indexOf('$proc = Start-Process'),
+	'assign the isolated receipt before starting each native child'
+);
+assert.match(
+	isolatedScript,
+	/validate-ahk-suite-manifest\.cjs[\s\S]*--input \$env:ERGOPTI_AHK_RESULTS_FILE/,
+	'isolated native exits also require complete execution receipts'
+);
+
 const ahkIndex = process.argv.indexOf('--ahk');
 if (ahkIndex >= 0) {
 	assert.equal(process.platform, 'win32', 'native exit receipt probes require Windows');
@@ -320,31 +340,44 @@ try {
 const contractFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-contract-'));
 try {
 	const preload = path.join(contractFixture, 'broken-workflow.cjs');
-	fs.writeFileSync(
-		preload,
+	for (const [removed, expected] of [
+		['$null = $proc.Handle', 'retain the native handle'],
 		[
-			"const fs = require('node:fs');",
-			"const path = require('node:path');",
-			'const read = fs.readFileSync;',
-			'fs.readFileSync = function(file, ...args) {',
-			'  const result = read.call(this, file, ...args);',
-			"  if (path.basename(String(file)) === 'ci-windows.yml' && typeof result === 'string') {",
-			"    return result.replace('$null = $proc.Handle', '# missing native handle');",
-			'  }',
-			'  return result;',
-			'};'
-		].join('\n')
-	);
-	const failedContract = spawnSync(process.execPath, ['--require', preload, __filename], {
-		encoding: 'utf8',
-		env: { ...process.env, GITHUB_ACTIONS: 'true' },
-		timeout: 30000
-	});
-	assert.equal(failedContract.status, 1, 'a native source contract must still fail the gate');
-	assert.match(
-		failedContract.stdout,
-		/^::error::AHK suite contract failed:.*retain the native handle/m
-	);
+			'$env:ERGOPTI_AHK_RESULTS_FILE = Join-Path',
+			'isolated runners must own distinct canonical result paths'
+		]
+	]) {
+		fs.writeFileSync(
+			preload,
+			[
+				"const fs = require('node:fs');",
+				"const path = require('node:path');",
+				'const read = fs.readFileSync;',
+				'fs.readFileSync = function(file, ...args) {',
+				'  const result = read.call(this, file, ...args);',
+				"  if (path.basename(String(file)) === 'ci-windows.yml' && typeof result === 'string') {",
+				`    return result.replace(${JSON.stringify(removed)}, '# missing native receipt owner');`,
+				'  }',
+				'  return result;',
+				'};'
+			].join('\n')
+		);
+		const failedContract = spawnSync(process.execPath, ['--require', preload, __filename], {
+			encoding: 'utf8',
+			env: { ...process.env, GITHUB_ACTIONS: 'true' },
+			timeout: 30000
+		});
+		assert.equal(failedContract.status, 1, 'a native source contract must still fail the gate');
+		assert.ok(
+			failedContract.stdout
+				.split('\n')
+				.some(
+					(line) =>
+						line.startsWith('::error::AHK suite contract failed:') && line.includes(expected)
+				),
+			'failed native ownership contract exposes its exact annotation'
+		);
+	}
 } finally {
 	fs.rmSync(contractFixture, { recursive: true, force: true });
 }
