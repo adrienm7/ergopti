@@ -30,6 +30,12 @@ local SCOPED_B = "ergopti_capsword_" .. TOKEN_B
 local function fresh_harness(options)
 	options = options or {}
 	package.loaded["platform.remap.watchers"] = nil
+	-- The control owner needs only its deferred diagnostic port in these native
+	-- watcher doubles; callbacks never post synthetic keyboard input here.
+	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["adapters.synthetic_input"] = {
+		defer_after_callback = function(_label, callback) callback(); return true end,
+	}
 	package.loaded["adapters.shell_runner"] = nil
 	-- TaskLifecycle captures `hs` at require time, so each harness must bind a
 	-- fresh instance to the task constructor below rather than its predecessor.
@@ -53,6 +59,7 @@ local function fresh_harness(options)
 		logged_warnings = {},
 		revision = options.revision or 0,
 		pending_activation = options.pending_activation == true,
+		observations = {}, current_token = TOKEN_A, lease_active = true,
 	}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_module, format_string, ...)
@@ -91,6 +98,13 @@ local function fresh_harness(options)
 	}
 	package.loaded["platform.remap.ke_variables"] = {
 		capsword_revision = function() return h.revision end,
+		observe_capsword_state = function(value, token)
+			if not h.lease_active or token ~= h.current_token then return false, h.revision end
+			h.observations[#h.observations + 1] = { value = value, token = token }
+			h.revision = h.revision + 1
+			h.pending_activation = value == 1
+			return true, h.revision
+		end,
 		supersede_capsword_activation = function(callback)
 			if options.supersede_throws then error("injected supersede failure") end
 			if not h.pending_activation then return false, h.revision end
@@ -206,6 +220,12 @@ local function fresh_harness(options)
 		},
 	}
 
+	h.sentinels = require("modules.keymap.control_sentinels")
+	local register_listener = h.sentinels.set_listener
+	h.sentinels.set_listener = function(name, callback)
+		if callback then h.signal_listener = callback end
+		return register_listener(name, callback)
+	end
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", hs_overrides)
 	h.watcher = h.watchers.start_gesture_watcher(h.gestures, TOKEN_A)
 	return h
@@ -250,6 +270,55 @@ end
 -- ======= 2/ One Read, One Writer =========
 -- =========================================
 -- =========================================
+
+helpers.describe("CapsWord native activation reaches the pointer owner", function()
+	helpers.it("clears a Karabiner activation only after the exact writer acknowledges", function()
+		local h = fresh_harness()
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		helpers.assert_eq(h.observations, { { value = 1, token = TOKEN_A } })
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 0, "known Karabiner activation never calls the unsupported read option")
+		helpers.assert_eq(#h.writers, 1)
+		helpers.assert_eq(h.capslock, {}, "LED belongs to the acknowledged clear, not queued intent")
+		local clear = h.writers[1]
+		clear.callback(true, nil, clear.revision)
+		helpers.assert_eq(h.capslock, { false })
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+	end)
+
+	helpers.it("rejects bare, unrelated, retired-listener and foreign-lease activation signals", function()
+		local h = fresh_harness()
+		h.sentinels.claim_key(90, true, {})
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true })
+		h.sentinels.claim_key(90, true, { shift = true })
+		helpers.assert_eq(#h.observations, 0)
+		local old_listener = h.signal_listener
+		h.current_token = TOKEN_B
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		helpers.assert_eq(#h.observations, 0)
+		h.current_token = TOKEN_A
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+		old_listener("capsword_activated")
+		helpers.assert_eq(#h.observations, 0, "a stopped callback remains inert even when its original token returns")
+		helpers.assert_eq(#h.writers, 0)
+	end)
+
+	helpers.it("does not clear the LED for an old writer after a newer native activation", function()
+		local h = fresh_harness()
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		pointer(h)
+		local old_clear = h.writers[1]
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		old_clear.callback(true, nil, old_clear.revision)
+		helpers.assert_eq(h.capslock, {})
+		h.clock = h.clock + 1
+		pointer(h)
+		local current_clear = h.writers[2]
+		current_clear.callback(true, nil, current_clear.revision)
+		helpers.assert_eq(h.capslock, { false })
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+	end)
+end)
 
 helpers.describe("watchers CapsWord uses one exact serialized writer", function()
 	helpers.it("CapsWord watcher: queries the scoped variable read-only and clears through ke_variables", function()

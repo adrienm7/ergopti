@@ -411,14 +411,23 @@ unknown user data remain protected; native Windows qualification is pending.
   from a Tap-Hold menu row while the rules are pending
   (`karabiner-legacy-cleanup`); untested on a real Mac. Still to do: find why
   the proof fails from the backed-up file.
-- [ ] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
-      activated it (AltGr + CapsLock): the watcher probed the variable with
-      `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit
-      2), so it only ever worked for a CapsWord this driver activated; since dev.150
-      it stops probing after that refusal (`capsword-probe-unsupported`). Give the
-      activation a way to tell Hammerspoon (for example a sentinel key the
-      activation rule emits, like the script-control ones) so every CapsWord is
-      cancelled.
+- [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
+  activated it (AltGr + CapsLock): the watcher probed the variable with
+  `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit
+  2), so it only ever worked for a CapsWord this driver activated; since dev.150
+  it stops probing after that refusal (`capsword-probe-unsupported`). Give the
+  activation a way to tell Hammerspoon (for example a sentinel key the
+  activation rule emits, like the script-control ones) so every CapsWord is
+  cancelled.
+  macOS generated remaps now publish owned Caps Word activation/clear signals
+  consumed by one shared policy and the existing sentinel port. Layout-only
+  watchers do not acquire that owner; real gesture startup acquires it lazily.
+  Refused native variable writes recover only the same revision/token state.
+  Independent old graph generation explains every intended preset digest
+  change; application-visible typed output retains its existing assertions.
+  Registered macOS tests pass 12908 cases, and private eager-acquisition and
+  consumer-refusal mutations are rejected. Native macOS qualification and
+  manual hardware acceptance remain pending.
 - [ ] **46.** The AI agent and screen reading on Windows and Linux still send a
       local model Ollama may not have pulled (default qwen2.5:7b, vision
       qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags, names

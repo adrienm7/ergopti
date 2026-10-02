@@ -28,7 +28,7 @@ local M = {}
 local Keycodes       = require("keycodes")
 local Logger         = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
-local ControlSignals = require("platform.remap.control_signals")
+local ControlSignals = require("keymap.control_signals")
 
 local LOG = "keymap.control_sentinels"
 
@@ -37,6 +37,8 @@ M.NAV_LAYER_ENTERED = "nav_layer_entered"
 --- Signal published when Karabiner leaves the navigation layer (F19 sentinel).
 M.NAV_LAYER_EXITED = "nav_layer_exited"
 M.ONE_SHOT_SHIFT = "one_shot_shift"
+M.CAPSWORD_ACTIVATED = "capsword_activated"
+M.CAPSWORD_DEACTIVATED = "capsword_deactivated"
 
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
 -- that activates the navigation layer and appends F19 to every one that turns
@@ -110,9 +112,9 @@ end
 function M.claim_key(keycode, is_down, flags)
 	local signal = SIGNAL_BY_KEYCODE[keycode]
 	if signal == nil then return false end
-	-- Only F20 carries the one-shot tag; the exit sentinel may come with whatever
-	-- modifiers the hand still holds when the layer key is released.
-	if signal == M.NAV_LAYER_ENTERED and ControlSignals.is_one_shot(flags) then signal = M.ONE_SHOT_SHIFT end
+	-- F20 carries the exact control tags; F19 remains the navigation exit even
+	-- while the user's hand still holds tagged modifiers.
+	if signal == M.NAV_LAYER_ENTERED then signal = ControlSignals.decode(flags) or signal end
 	if is_down then publish(signal) end
 	return true
 end

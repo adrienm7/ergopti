@@ -850,6 +850,49 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 		end
 	end)
 
+	helpers.it("a rejected activation cannot claim a later personal CapsLock clear", function()
+		local bridge, ctx = fresh_bridge({ start_results = { false } })
+		helpers.assert_eq(bridge.set("capsword", 1), false)
+		local failed_revision = bridge.capsword_revision()
+		helpers.assert_eq(bridge.supersede_capsword_activation(), false,
+			"a refused local activation never owns the user's existing CapsLock state")
+		helpers.assert_eq(bridge.capsword_revision(), failed_revision, "refusal must not rewind revisions")
+		helpers.assert_eq(#ctx.tasks, 1, "no clear writer follows the rejected activation")
+	end)
+
+	helpers.it("clears a completed local CapsWord activation without an unsupported CLI read", function()
+		local bridge, ctx = fresh_bridge()
+		helpers.assert_true(bridge.set("capsword", 1))
+		ctx.apply(1)
+		local superseded = bridge.supersede_capsword_activation()
+		helpers.assert_true(superseded, "settled local activation remains known until deactivation")
+		helpers.assert_eq(task_values(ctx, 2)[scoped_name("capsword")], 0)
+	end)
+
+	helpers.it("records exact-token Karabiner edges without launching a writer and fences stale LED revisions", function()
+		local bridge, ctx = fresh_bridge()
+		bridge.capsword_revision()
+		local accepted, revision = bridge.observe_capsword_state(1, TOKEN)
+		helpers.assert_true(accepted)
+		helpers.assert_eq(#ctx.tasks, 0, "the native signal is an observation, never a second activation write")
+		helpers.assert_true(bridge.supersede_capsword_activation())
+		local clear_revision = bridge.capsword_revision()
+		helpers.assert_true(clear_revision > revision)
+		helpers.assert_true(bridge.observe_capsword_state(1, TOKEN))
+		helpers.assert_true(bridge.capsword_revision() > clear_revision,
+			"a newer Karabiner activation invalidates an older LED completion")
+		ctx.apply(1)
+		helpers.assert_true(bridge.supersede_capsword_activation(), "a later external activation outranks an older clear")
+		helpers.assert_eq(#ctx.tasks, 2)
+		helpers.assert_true(bridge.observe_capsword_state(0, TOKEN))
+		helpers.assert_eq(bridge.supersede_capsword_activation(), false)
+		ctx.current_token = TOKEN_B
+		helpers.assert_eq(bridge.observe_capsword_state(1, TOKEN), false, "old watcher cannot adopt a newer token")
+		ctx.current_token = TOKEN
+		ctx.lease_phase = "paused"
+		helpers.assert_eq(bridge.observe_capsword_state(1, TOKEN), false, "paused graphs never authorize activation")
+	end)
+
 	helpers.it("supersedes a local in-flight CapsWord activation through the shared writer", function()
 		local bridge, ctx = fresh_bridge()
 

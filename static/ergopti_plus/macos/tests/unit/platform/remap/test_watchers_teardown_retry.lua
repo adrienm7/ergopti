@@ -24,6 +24,12 @@ local function fresh_harness()
 	package.loaded["tests.stubs.hs"] = nil
 	local keycode_map = require("tests.stubs.hs").keycodes.map
 	package.loaded["platform.remap.watchers"] = nil
+	-- The control owner needs only its deferred diagnostic port in these native
+	-- watcher doubles; callbacks never post synthetic keyboard input here.
+	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["adapters.synthetic_input"] = {
+		defer_after_callback = function(_label, callback) callback(); return true end,
+	}
 	-- The broker captures `local hs = hs` at require-time. Reload it only after
 	-- load_with_stubs installs this harness's setter-only keycodes API.
 	package.loaded["adapters.input_source_broker"] = nil
