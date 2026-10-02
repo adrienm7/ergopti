@@ -93,12 +93,21 @@ TrayMenuSetMenu(Items) {
 
 ; Sets the tooltip shown when the user hovers over the tray icon.
 ; @param Text {String} Tooltip text (Windows clips at ~127 characters).
+; @returns {Boolean} Whether the native tooltip assignment succeeded.
 TrayMenuSetTooltip(Text) {
 	try {
 		A_IconTip := Text
+		return true
 	} catch as Err {
 		try LoggerWarn("TrayMenu", "TrayMenuSetTooltip failed: {1}.", Err.Message)
+		return false
 	}
+}
+
+; Returns the exact tooltip currently owned by the native tray icon.
+; @returns {String} Current tooltip text, including an empty title.
+TrayMenuGetTooltip() {
+	return A_IconTip
 }
 
 ; Returns how many rows a native menu holds, separators included.

@@ -501,12 +501,15 @@ is committed; one request is one commit with its regression test.
       each. One commit per menu, the baseline lowered in the same commit.
       The update rows greyed on a local version (2026-10-01) were added as
       provider rows and join the About slice.
-- [ ] **84.** Windows: while the navigation layer is held the driver turns
-      CapsLock on as the layer's indicator (`UpdateCapsLockLED`), so every
-      key the layer does not bind types in capitals. With an empty layer
-      the hold read as Shift (item 83). Keep an indicator that does not
-      change what an unbound key types, and check what macOS and Linux type
-      for a key their layer does not bind.
+- [~] **84.** Navigation must not change what an unbound key types.
+  Windows now limits physical CapsLock to CapsWord and genuine hardware intent.
+  Its translated layer indicator borrows the tray tooltip and restores the
+  exact previous text through the existing native adapter; refusal retains
+  retryable cleanup without preventing layer release or suspend. The indicator
+  is visible on tray hover. Native Windows regressions execute the actual writer
+  across eight mode combinations and restore the machine toggle; macOS and
+  Linux regressions preserve native routing for unbound keys. Full three-OS
+  validation remains pending for this slice.
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
   ported by Windows, pinned by
