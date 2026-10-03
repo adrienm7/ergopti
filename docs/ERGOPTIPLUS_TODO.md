@@ -676,6 +676,14 @@ unchanged; the bound callback still runs against the actual native menu. Local
 encoding and JavaScript gates do not qualify its native behavior. Windows replay
 and the complete three-OS checkpoint remain pending.
 
+Checkpoint [37096024096](https://github.com/adrienm7/ergopti/actions/runs/37096024096)
+failed both new Windows Debug cases before their severity assertions: the native
+runner deliberately omits the boot lifecycle owner, leaving its four unrelated
+command references undefined. The severity fixture now supplies fail-loud
+callback identities and proves menu construction does not invoke them. The
+independent four-state matrix, shared ordering, native captions and refused
+writer assertions remain intact; actual Windows replay is still pending.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
