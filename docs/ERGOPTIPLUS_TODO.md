@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-02. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
+Updated: 2026-10-03. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
 ahead of it without a release (CI cancelled on purpose).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
@@ -186,6 +186,13 @@ These are software implementations; final hardware verification remains below.
   pending editor, model or remap slices. The committed delay policy and its
   independent vectors remain intact. This merge retains the original native
   failure assertions and requires a new complete non-release checkpoint.
+
+Packaged macOS window observations now bind exact live application PIDs
+before reading properties. After an acknowledged Quit, they attest process
+absence without opening a global Accessibility query. Refused UI inspection
+remains explicitly unavailable and cannot qualify window behavior; the five
+application criteria, native timer assertions and primary/cleanup errors
+remain strict. Fifty Python regressions pass; native CI remains pending.
 
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
