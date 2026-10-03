@@ -390,6 +390,8 @@ TODO16 remains partial. The real native Reload preflight imports its observer by
 
 A separate bounded Cocoa calibration now compares the current Ref out-slot with an explicit object holder through real NSJSONSerialization NSError\*\* calls using inert malformed UTF-8 JSON. It records strict NSError identity, code 3840, NSCocoaErrorDomain and a native nullable-descriptor projection independently of the original raw scalar facts and AppleEvent verdict. The default sender, mandatory transport/feature gates and existing deadlines are unchanged. Portable generated-source regressions pass; actual Cocoa calibration and the unresolved packaged AppleEvent transport still require native macOS CI.
 
+TODO 16 remains partial: the compiled-startup admission C# fixture now normalizes its actual own executable through checked native GetLongPathNameW, matching the pinned AHK receipt producer. A native controlled short-alias child requires independent open-file volume/index equality and an exact long-path receipt before admission; foreign same-basename files, invalid paths and unknown modes remain refused. The validator, workflow and cleanup authority are unchanged. Portable admission and producer mutation checks pass; native Windows execution of the corrected positive and all seven negative scenarios, followed by the real compiled installer launch, remains pending. Historical native failure on run 37142330761 is preserved.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
