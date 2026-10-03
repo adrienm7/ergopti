@@ -529,16 +529,23 @@ function M.build_custom(ctx, counts)
 
 	-- =====================
 	-- Assemble menu items
+	local function editor_ready()
+		if ctx.paused == true or type(ctx.hotstring_editor) ~= "table"
+			or type(ctx.hotstring_editor.open) ~= "function"
+			or type(ctx.script_control) ~= "table"
+			or type(ctx.script_control.is_paused) ~= "function" then return false end
+		local ok, current = pcall(ctx.script_control.is_paused)
+		return ok and current == false
+	end
+	local function open_editor()
+		return DeferredWork.after(0, function()
+			if editor_ready() then pcall(ctx.hotstring_editor.open) end
+		end, "menu_hotstrings_custom.open_editor")
+	end
+	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+		{ personal_hotstring_open_editor = open_editor },
+		{ personal_hotstring_editor_ready = editor_ready })
 	local menu_items = {
-		{
-			label    = i18n.get("menu.hotstrings.open_editor"),
-			disabled = paused or nil,
-			action       = not paused and function()
-				DeferredWork.after(0,
-					function() pcall(ctx.hotstring_editor.open) end,
-					"menu_hotstrings_custom.open_editor")
-			end or nil,
-		},
 		{
 			label    = i18n.get("menu.hotstrings.open_file"),
 			disabled = paused or nil,
@@ -563,6 +570,7 @@ function M.build_custom(ctx, counts)
 			disabled = paused or nil,
 		},
 	}
+	if editor_row then table.insert(menu_items, 1, editor_row) end
 	-- An unsupported legacy chord retains its acknowledged owner and editing
 	-- surface until the ordinary-slot migration can prove a replacement.
 	if state.custom_editor_shortcut ~= nil then

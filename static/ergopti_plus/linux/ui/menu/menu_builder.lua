@@ -1425,21 +1425,16 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
 			local rows = {}
-			-- The editor comes first, and until 2026-08-05 it was not here at all:
-			-- `_shared/ui/hotstring_editor/` shipped with this driver, its bridge was
-			-- complete and tested, and no code path anywhere opened it. A Linux user
-			-- could not create, edit or delete a single personal hotstring — the row
-			-- expanded to the same generic category submenu every pack gets.
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.hotstrings.open_editor"),
-				action    = function()
-					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstring editor.")
-						return
-					end
-					ctx.webview.show("hotstring_editor")
-				end,
-			}
+			local function editor_ready()
+				if ctx.paused == true or type(ctx.is_paused) ~= "function"
+					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
+				local ok, current = pcall(ctx.is_paused)
+				return ok and current == false
+			end
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
+				{ personal_hotstring_editor_ready = editor_ready })
+			if editor_row then rows[#rows + 1] = editor_row end
 
 			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
 			if ok_editor and type(Editor.get_pref) == "function" then

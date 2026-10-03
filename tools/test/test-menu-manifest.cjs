@@ -732,7 +732,10 @@ function checkInfoBarControl() {
 	assert.equal(definition[1].i18n, corpus.row.i18n);
 	assert.deepEqual(definition[1].checked_when, ['llm_info_bar_enabled']);
 	assert.deepEqual(definition[1].disabled_when, ['llm_info_bar_ready']);
-	assert.deepEqual(definition[2], { type: 'list', id: 'llm_display_remaining' });
+	assert.deepEqual(definition[2], {
+		type: 'list',
+		id: 'llm_display_remaining'
+	});
 	for (const [file, first, last] of [
 		[
 			'windows/ui/menu/menu_llm/menu_settings.ahk',
@@ -784,7 +787,10 @@ function checkAutoTemperatureControl() {
 	assert.deepEqual(corpus.states, [false, true]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
 	assert.equal(definition.length, 2);
-	assert.deepEqual(definition[0], { type: 'list', id: 'llm_generation_values' });
+	assert.deepEqual(definition[0], {
+		type: 'list',
+		id: 'llm_generation_values'
+	});
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
 	assert.equal(definition[1].i18n, corpus.row.i18n);
@@ -1232,3 +1238,51 @@ function checkNumericChoiceSchema() {
 }
 
 checkNumericChoiceSchema();
+
+// The personal editor command is shared even while the native input master is off.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(manifest.personal_hotstring_commands, [
+		{
+			type: 'command',
+			id: 'personal_hotstring_open_editor',
+			i18n: 'menu.hotstrings.open_editor',
+			disabled_when: ['personal_hotstring_editor_ready']
+		}
+	]);
+	const vectors = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_editor_command.json'), 'utf8')
+	).vectors;
+	assert.equal(
+		vectors.length,
+		7,
+		'the independent corpus covers live, stale and refused native owners'
+	);
+	assert(vectors.some((v) => v.enabled && v.calls === 1));
+	assert(vectors.some((v) => v.enabled && v.calls === 0));
+	assert(vectors.some((v) => !v.enabled && v.calls === 0));
+	for (const [file, site] of [
+		[
+			'windows/ui/menu/menu_hotstrings.ahk',
+			'PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))'
+		],
+		[
+			'macos/ui/menu/menu_hotstrings_custom.lua',
+			'ManifestMenu.command_row("personal_hotstring_commands"'
+		],
+		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert(source.includes(site), `${file}: the actual personal provider consumes the declaration`);
+		assert(
+			!/label\s*=\s*i18n(?:_safe|\.get)\("menu\.hotstrings\.open_editor"\)|Map\("label",\s*t\("menu\.hotstrings\.open_editor"\)/.test(
+				source
+			),
+			`${file}: the canonical row owns its label`
+		);
+	}
+	console.log(
+		'Personal editor command: one shared declaration, three actual providers and seven independent owner states.'
+	);
+}

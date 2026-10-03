@@ -1737,6 +1737,16 @@
 			"reason_key": "platform_reason.only_linux_rereads_its_catalogue"
 		}
 	],
+	"personal_hotstring_commands": [
+		{
+			"type": "command",
+			"id": "personal_hotstring_open_editor",
+			"i18n": "menu.hotstrings.open_editor",
+			"disabled_when": [
+				"personal_hotstring_editor_ready"
+			]
+		}
+	],
 	"word_expanders_menu": [
 		{
 			"type": "command",
