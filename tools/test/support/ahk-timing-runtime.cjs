@@ -61,13 +61,23 @@ module.exports = function checkNativeTimings(runtimePath) {
 			1,
 			`the deliberate callback failure must be reported: ${result.stdout}\n${result.stderr}`
 		);
-		assert.match(result.stdout, /# 2 passed, 1 failed\./);
+		assert.match(result.stdout, /# 4 passed, 3 failed\./);
+		assert.match(
+			result.stdout,
+			/not ok 4 - isolation fixture throwing Critical.*intentional Critical fixture failure/
+		);
+		assert.match(result.stdout, /^ok 5 - isolation fixture timer after exception\r?$/m);
+		assert.match(
+			result.stdout,
+			/not ok 6 - isolation fixture returned Critical.*Test LEAKED Critical/
+		);
+		assert.match(result.stdout, /^ok 7 - isolation fixture timer after return\r?$/m);
 		const durations = [...result.stdout.matchAll(/^# duration_ms (\d+) (\d+(?:\.\d+)?)\r?$/gm)].map(
 			(match) => ({ index: Number(match[1]), ms: Number(match[2]) })
 		);
 		assert.deepEqual(
 			durations.map((row) => row.index),
-			[1, 2, 3],
+			[1, 2, 3, 4, 5, 6, 7],
 			'every completed callback, including a failure, must emit its measured duration'
 		);
 		assert.ok(durations.every((row) => Number.isFinite(row.ms) && row.ms >= 0));
@@ -75,8 +85,8 @@ module.exports = function checkNativeTimings(runtimePath) {
 		assert.ok(durations[2].ms >= 20, 'the throwing callback must retain its time before failure');
 		const manifest = validateAhkSuiteManifest(fs.readFileSync(resultsFile, 'utf8'));
 		assert.equal(manifest.complete, true, manifest.errors.join('\n'));
-		assert.equal(manifest.timed_count, 3);
-		assert.equal(manifest.failed, 1);
+		assert.equal(manifest.timed_count, 7);
+		assert.equal(manifest.failed, 3);
 		assert.deepEqual(
 			manifest.executed.map((row) => row.duration_ms),
 			durations.map((row) => row.ms),
