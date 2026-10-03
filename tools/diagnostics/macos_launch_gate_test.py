@@ -259,6 +259,9 @@ class VerdictTests(unittest.TestCase):
                     mock.patch.object(
                         owner, "control_pid", return_value={"diagnostic": "only"}
                     ) as pid_control,
+                    mock.patch.object(
+                        owner, "control_pid_no_prompt", create=True, return_value={"status": -1744}
+                    ) as no_prompt,
                     mock.patch.object(owner, "observe", side_effect=observe_native),
                     mock.patch.object(owner, "restore"),
                     mock.patch.object(gate, "processes", side_effect=processes) as resolver,
@@ -277,11 +280,37 @@ class VerdictTests(unittest.TestCase):
                 self.assertEqual(report["native_descriptor_constructor"], {"constructed": "only"})
                 pid_control.assert_called_once_with(42, resolver)
                 self.assertEqual(report["native_pid_transport_control"], {"diagnostic": "only"})
+                no_prompt.assert_called_once_with(42, resolver)
+                self.assertEqual(report["native_pid_no_prompt_control"], {"status": -1744})
                 self.assertEqual(len(report["failures"]), 2)
                 self.assertIn("control refused", report["failures"][0])
                 self.assertIn("primary refusal", report["failures"][1])
                 self.assertNotIn("unrelated secret", str(report["native_probe_diagnostics"]))
                 self.assertEqual(report["quit_seconds"], 0.5)
+
+    def test_primary_control_error_is_printed_even_when_native_samples_exist(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            gate.print_native_probe_diagnostics(
+                {
+                    "native_probe_diagnostics": [
+                        {
+                            "command": 3,
+                            "phase": "pid_no_prompt",
+                            "observations": "native frame",
+                            "primary_error": "Native status -1743\n::error::foreign annotation",
+                        }
+                    ]
+                }
+            )
+        self.assertEqual(
+            stdout.getvalue().splitlines(),
+            [
+                "native probe command3 (pid_no_prompt): primary error: Native status -1743",
+                "native probe command3 (pid_no_prompt): primary error: ::error::foreign annotation",
+                "native probe command3 (pid_no_prompt): native frame",
+            ],
+        )
 
     def test_successful_feature_proofs_cannot_hide_native_control_refusal(self):
         from hs_karabiner_config_probe_test import receipt, EXECUTABLE, NONCE, DOMAIN

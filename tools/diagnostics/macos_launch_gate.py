@@ -605,6 +605,10 @@ def collect(output, state, home, executables):
 def print_native_probe_diagnostics(report):
     """Keep owned native ancestry readable beyond GitHub's annotation limit."""
     for receipt in report.get("native_probe_diagnostics", []):
+        for line in receipt.get("primary_error", "").splitlines():
+            print(
+                f"native probe command{receipt['command']} ({receipt['phase']}): primary error: {line}"
+            )
         for line in receipt["observations"].splitlines():
             # Prefix every line so a sampled symbol or refusal cannot be parsed
             # as a GitHub workflow command. The native owner bounds and redacts
@@ -716,11 +720,7 @@ def run(app, output, scenario, seed_tag):
                 except Exception as error:
                     detail = native_probe.pid_control_error_diagnostic(error)
                     observation["native_descriptor_constructor_error"] = detail
-                    if not any(
-                        receipt["phase"] == "constructor"
-                        for receipt in native_probe.diagnostic_receipts
-                    ):
-                        native_probe.retain_diagnostics([detail], phase="constructor")
+                    native_probe.retain_primary_error(error, "constructor")
                 try:
                     observation["native_pid_transport_control"] = native_probe.control_pid(
                         child_pids[0], processes
@@ -730,11 +730,16 @@ def run(app, output, scenario, seed_tag):
                     # proof. Retained scripting-child debt refuses its dispatch.
                     detail = native_probe.pid_control_error_diagnostic(error)
                     observation["native_pid_transport_control_error"] = detail
-                    if not any(
-                        receipt["phase"] == "pid_control"
-                        for receipt in native_probe.diagnostic_receipts
-                    ):
-                        native_probe.retain_diagnostics([detail], phase="pid_control")
+                    native_probe.retain_primary_error(error, "pid_control")
+                try:
+                    observation["native_pid_no_prompt_control"] = (
+                        native_probe.control_pid_no_prompt(child_pids[0], processes)
+                    )
+                except Exception as error:
+                    observation["native_pid_no_prompt_control_error"] = (
+                        native_probe.pid_control_error_diagnostic(error)
+                    )
+                    native_probe.retain_primary_error(error, "pid_no_prompt")
                 # The control never replaces the original feature proof. Attempt
                 # it independently even after refusal; retained transport debt
                 # may itself refuse this call, which is a second honest failure.
@@ -818,6 +823,11 @@ def run(app, output, scenario, seed_tag):
         if observation.get("native_pid_transport_control_error"):
             report["native_pid_transport_control_error"] = observation[
                 "native_pid_transport_control_error"
+            ]
+        report["native_pid_no_prompt_control"] = observation.get("native_pid_no_prompt_control")
+        if observation.get("native_pid_no_prompt_control_error"):
+            report["native_pid_no_prompt_control_error"] = observation[
+                "native_pid_no_prompt_control_error"
             ]
         if observation.get("native_transport_control_error"):
             report["native_transport_control_error"] = observation["native_transport_control_error"]

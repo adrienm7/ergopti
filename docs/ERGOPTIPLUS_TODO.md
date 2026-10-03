@@ -248,6 +248,21 @@ The selected portable gate passes 353 JS checks and 97 diagnostic lifecycle
 cases. These results do not qualify native Foundation construction; the real
 packaged macOS scenarios must supply that receipt. Item 16 remains partial.
 
+Six native clean/Karabiner scenario executions now qualify actual kernel-PID,
+event and Unicode descriptor construction. Their original bundle-path and
+exact-PID sends still time out; this does not establish a permission or deadlock
+cause. A separate exact-PID no-prompt diagnostic now retains strict terminal
+OSStatus, NSError domain, direct reply, nonce and live identity through the
+same event constructor and owned sender. Only send-origin errors -1744/-1743
+in NSOSStatusErrorDomain identify consent-required/denied; other errors remain
+unclassified refusals. Original controls, ten-second production deadlines,
+child retirement and feature admission remain required. Bounded primary errors
+stay visible beside native samples. Portable regressions also prove that only
+the first sleeping timeout fixture gets 50 ms; its real retry keeps ten seconds.
+The original timeout, reaping and retry assertions remain intact. All 104 unique
+portable tests and selected JavaScript checks pass; native no-prompt outcomes
+and the original timer/Karabiner feature measurements still require CI.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
