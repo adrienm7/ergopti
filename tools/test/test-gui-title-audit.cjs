@@ -210,10 +210,14 @@ function assertNativePolicyFamilyIsolation(source) {
 		5,
 		'each native family retains all five independent policy variants'
 	);
-	assert.ok(
-		body('_NDT_CheckFilePickerPolicy').includes('"Owned files (*.txt)") > 0'),
-		'the independent file case retains the exact native filter predicate'
-	);
+	for (const receipt of [
+		'AssertEqual("Owned files|All Files (*.*)|",',
+		'AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",'
+	])
+		assert.ok(
+			body('_NDT_CheckFilePickerPolicy').includes(receipt),
+			'the independent file case retains exact native friendly labels and selection'
+		);
 	assert.ok(
 		body('_NDT_CheckFolderPickerPolicy').includes('"retired", FileRead('),
 		'the independent folder case retains actual HWND retirement assertions'
@@ -224,6 +228,21 @@ const nativePolicySource = fs.readFileSync(
 	'utf8'
 );
 assertNativePolicyFamilyIsolation(nativePolicySource);
+for (const original of [
+	'AssertEqual("Owned files|All Files (*.*)|",',
+	'AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",'
+]) {
+	const mutant = nativePolicySource.replace(
+		original,
+		original.replace('Owned files', 'Wrong label')
+	);
+	assert.notEqual(mutant, nativePolicySource, 'each label mutation changes its actual assertion');
+	assert.throws(
+		() => assertNativePolicyFamilyIsolation(mutant),
+		assert.AssertionError,
+		'exact observed friendly labels and selected file type remain independently enforced'
+	);
+}
 /** Guards statement separators separately from escaped child string contents. */
 function assertNativeProbeStatementSeparators(source) {
 	const body = source.match(/^_NDT_FilePickerProbeSource\([^\n]*\) \{\n([\s\S]*?)^\}/m);
@@ -323,6 +342,25 @@ function assertNativeFileFilterBehavior(source) {
 		'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")'
 	])
 		assert.ok(observer.includes(invariant), `the separate native client retains ${invariant}`);
+	for (const phase of [
+		'entry',
+		'com',
+		'shell-items',
+		'uia-provider',
+		'restricted-txt',
+		'restricted-bin',
+		'all-files',
+		'restored',
+		'complete'
+	])
+		assert.ok(
+			observer.includes(`_NFO_Phase("${phase}", ObserverPhaseStarted)`),
+			`the owned observer retains its exact ${phase} progress receipt`
+		);
+	assert.ok(
+		observer.includes('ObserverPhaseFile.Write(ObserverPhaseToken . "|elapsed_ms="'),
+		'phase receipts contain only fixed stage tokens and elapsed milliseconds'
+	);
 	assert.equal(
 		observer.includes('InStr('),
 		false,
@@ -338,6 +376,7 @@ function assertNativeFileFilterBehavior(source) {
 		'DllCall("GetDlgCtrlID", "Ptr", PickerViewCandidate, "Int") == 1121',
 		'DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerShellView)',
 		'PickerObserverHandle := ComObject("WScript.Shell").Exec(PickerObserverCommand)',
+		'SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128)',
 		'PickerObserverHandle.StdOut.ReadAll()',
 		'PickerObserverHandle.StdErr.ReadAll()',
 		'if PickerObserverErrors != ""',
@@ -381,6 +420,18 @@ const nativeBehaviorMutations = [
 	),
 	nativePolicySource.replace('ObserverProcess == DllCall("GetCurrentProcessId", "UInt")', 'false'),
 	nativePolicySource.replace('if Index != 5', 'if Index != 1'),
+	nativePolicySource.replace(
+		'_NFO_Phase("uia-provider", ObserverPhaseStarted)',
+		'_NFO_Phase("skipped", ObserverPhaseStarted)'
+	),
+	nativePolicySource.replace(
+		'SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128)',
+		'"phase skipped"'
+	),
+	nativePolicySource.replace(
+		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000',
+		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 10000'
+	),
 	nativePolicySource.replace('if PickerObserverErrors != ""', 'if false'),
 	nativePolicySource.replace('PickerObserverHandle.Terminate()', 'PickerObserverHandle.Status'),
 	nativePolicySource.replace(
@@ -422,7 +473,10 @@ const nativePolicyMutations = [
 		'if Ownership.CanRetire\n\t\t\tDirDelete(Root, true)',
 		'if true\n\t\t\tDirDelete(Root, true)'
 	),
-	nativePolicySource.replace('"Owned files (*.txt)") > 0', '"Owned files (*.txt)") >= 0')
+	nativePolicySource.replace(
+		'AssertEqual("Owned files|All Files (*.*)|",',
+		'AssertEqual("Wrong files|All Files (*.*)|",'
+	)
 ];
 for (const mutant of nativePolicyMutations) {
 	assert.notEqual(

@@ -1614,6 +1614,8 @@ with the independently fixed controlled-BIN-visible reason. Local source guards
 reject eight mutations; selected JavaScript, formatting and encoding gates pass.
 Actual UIA behavior and the native negative control still require Windows CI.
 
+Windows IFileDialog displays the supplied friendly name separately from its wildcard pattern. The title regression now requires the complete independently observed friendly-name list and exact selected native file-type receipt. Checkpoint 37104220317 executed the stronger registered five-policy acceptance/cancellation family and its genuine no-filter mutation successfully: real TXT visibility, BIN exclusion, All Files selection and restored filtering remain mandatory. A later checkpoint 37104842079 exceeded the existing owned UIA-client bound; the next receipt adds only nine fixed progress tokens and elapsed milliseconds to that same refusal. All process/window ownership, actual output/status, physical retirement and 500/4,000/5,000/15,000 ms bounds remain unchanged. The corrected composed assertions and diagnostics pass 353 JS checks, 1,802 AHK BOM/LF files and independent rejection mutations. Native candidate stability and complete three-OS qualification remain pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
