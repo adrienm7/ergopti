@@ -417,6 +417,40 @@ _THTO_ReplayedSecondMatchRunsExactlyOnce() {
 Test("terminal transaction: posted suffix re-enters matching in order exactly once (ahk-001)",
 	_THTO_ReplayedSecondMatchRunsExactlyOnce)
 
+/** Prepared raw insertion is literal text, including its posted suffix. */
+_THTO_RawLiteralTail() {
+	global HSE_Buffer, _PrefixBuffer, _THTO_NativeState, _THTO_Runner, _THTO_Payloads
+	_THTO_Reset()
+	HSE_Buffer := "Abx"
+	_PrefixBuffer := HSE_Buffer
+	Window := Gui()
+	EditControl := Window.AddEdit(, "Abxq")
+	Window.Show("Hide")
+	SendMessage(0x00B1, 4, 4, EditControl)
+	try {
+		Callback := (EndChar, PrepareOnly := false) =>
+			{Prepared: PrepareOnly, Ok: true, Bs: 2, Ins: "R"}
+		Spec := {RawCallback: true, Callback: Callback, Trigger: "bx",
+			Category: "fixture", Section: "fixture", IsPrivate: false}
+		Host := Map("Valid", true, "Hwnd", 701, "Pid", 7001,
+			"Exe", "WindowsTerminal.exe", "Title", "Terminal")
+		Owner := _HSE_DispatchTerminalRawCallback(Spec, "", Host, _THTO_Schedule, _THTO_Emit)
+		AssertTrue(Owner is Map)
+		Owner["ReplayVisibleFn"] := _THTO_ReplayVisibleChar.Bind(_THTO_NativeState)
+		_THTO_AppendPostedChar(Owner, "q")
+		AssertTrue(_THTO_Runner.Call())
+		ControlSend(_THTO_Payloads[1], EditControl)
+		Sleep(30)
+		AssertEqual("ARq", EditControl.Value, "the Send mode marker must not become literal output")
+		AssertEqual(EditControl.Value, HSE_Buffer)
+	} finally {
+		Window.Destroy()
+		_THTO_Reset()
+	}
+}
+Test("terminal raw callback preserves a literal posted suffix (raw-literal-tail)",
+	_THTO_RawLiteralTail)
+
 _THTO_PostedCallbackChunksKeepExactBoundaries() {
 	global _THTO_Runner, _THTO_NativeState
 	_THTO_Reset()
@@ -456,7 +490,7 @@ _THTO_RawCallbackPreparesWithoutDirectSend() {
 	; Same queued-before-admission seam as the normal replacement path.
 	_THTO_AppendPostedChar(Result, "q")
 	AssertTrue(_THTO_Runner.Call())
-	AssertEqual("{BackSpace}{BackSpace}{BackSpace}{BackSpace}{Text}…{Text}q", _THTO_Payloads[1])
+	AssertEqual("{BackSpace}{BackSpace}{BackSpace}{BackSpace}{Text}…q", _THTO_Payloads[1])
 	AssertEqual("a…q", HSE_Buffer)
 }
 Test("terminal raw callbacks use the same paced owner (ahk2-07)",

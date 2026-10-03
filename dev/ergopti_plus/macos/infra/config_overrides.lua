@@ -11,7 +11,7 @@
 --- 2. Shared Schema: [script] owns driver settings and [features] owns dotted
 ---    feature keys, matching the AutoHotkey driver.
 --- 3. Canonical Parser: the shared TOML codec owns strings, comments, and
----    continuations. This module only projects the two flat sections it owns,
+---    continuations. Shared projection owns scalar settings and source paths,
 ---    so text inside a multiline value can never become executable settings.
 --- 4. Fail Closed: incomplete reads, close failures, and invalid TOML publish
 ---    no partial override state.
@@ -21,6 +21,7 @@ local M = {}
 local Logger    = require("infra.logger")
 local Storage   = require("adapters.storage")
 local TomlCodec = require("infra.toml.codec")
+local Projection = require("config_override_projection")
 local LOG       = "config_overrides"
 
 
@@ -76,37 +77,15 @@ local function read_committed(path)
 	return content, nil
 end
 
-local function is_scalar(value)
-	local value_type = type(value)
-	return value_type == "string" or value_type == "number" or value_type == "boolean"
-end
-
---- The sections this loader owns, in application order.
-local OWNED_SECTIONS = { "script", "features" }
-
---- Walks the override candidates of a decoded config.toml. The loader and the
---- unused-key cleanup both call this, so a key the cleanup offers to remove is
---- exactly one the loader ignores.
---- @param decoded table Decoded config.toml.
---- @param visit function visit(section_name, key, value, accepted).
-local function each_override(decoded, visit)
-	for _, section_name in ipairs(OWNED_SECTIONS) do
-		local values = decoded[section_name]
-		if type(values) == "table" then
-			for key, value in pairs(values) do
-				visit(section_name, key, value, type(key) == "string" and is_scalar(value))
-			end
-		end
-	end
-end
-
---- Marks every [script] / [features] key the loader applies.
+--- Marks each original source path the legacy setting projection consumes.
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
 function M.mark_config_reads(decoded, mark)
-	each_override(decoded, function(section_name, key, _value, accepted)
-		if accepted then mark(section_name, key) end
-	end)
+	local rows = Projection.prepare(decoded)
+	if not rows then return end
+	for _, row in ipairs(rows) do
+		if row.accepted then mark(row.section, table.unpack(row.path)) end
+	end
 end
 
 --- Reads file_path and applies scalar [script] / [features] values.
@@ -131,12 +110,19 @@ function M.apply(file_path)
 		return 0
 	end
 
+	local candidates, projection_error = Projection.prepare(decoded)
+	if not candidates then
+		Logger.error(LOG, "config.toml override identities are ambiguous; no overrides were applied: %s.", projection_error)
+		return 0
+	end
+
 	Logger.start(LOG, "Applying user overrides from '%s'…", file_path)
 	local applied = 0
-	each_override(decoded, function(section_name, key, value, accepted)
+	for _, row in ipairs(candidates) do
+		local section_name, key, value, accepted = row.section, row.key, row.value, row.accepted
 		if not accepted then
 			Logger.warn(LOG, "Ignoring non-scalar override in [%s].", section_name)
-			return
+			goto continue_override
 		end
 		local setting_key = key
 		if section_name == "script" then
@@ -153,7 +139,8 @@ function M.apply(file_path)
 			Logger.error(LOG, "Override [%s].%s could not be persisted.",
 				section_name, key)
 		end
-	end)
+		::continue_override::
+	end
 	Logger.success(LOG, "User overrides applied (%d value(s)).", applied)
 	return applied
 end

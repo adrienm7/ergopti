@@ -32,8 +32,8 @@
 ;    so orphan files from the previous version cannot accumulate, and disk
 ;    usage stays bounded at ~one bundle worth (~10-20 MB) instead of growing
 ;    linearly with every release.
-; 3. Version-aware skip: a marker file under the bundle dir holds the build
-;    version string; if it matches BUNDLE_VERSION the extraction is skipped,
+; 3. Build-aware skip: a marker under the bundle dir holds the version and
+;    source commit; if both match the compiled build the extraction is skipped,
 ;    so the .exe boots without paying the ~250ms unzip cost on every launch.
 ; 4. No-op in dev mode: when A_IsCompiled is false, the module is a passive
 ;    no-op and ``_BundleDir`` is left empty — the dev workflow stays identical.
@@ -81,6 +81,12 @@ global BUNDLE_CHANNEL := "__BUNDLE_CHANNEL__"
 ; in compiled mode. Exposed as a global so every module can read it.
 global _BundleDir := ""
 
+; CNG constants must be initialized before the first compiled asset check.
+; Bootstrap errors use OutputDebug because the central logger is not ready yet.
+#Include ../adapters/crypto.ahk
+#Include ../adapters/file_system.ahk
+#Include *i ../build/bundle_inventory.ahk
+
 
 
 ; ==========================================
@@ -119,7 +125,7 @@ _Bundle_ResolveDir() {
 	return LocalAppData . "\Ergopti\bundle"
 }
 
-; Reads the marker file's first line; returns "" if the file is missing or
+; Reads the complete build marker; returns "" if the file is missing or
 ; empty. Failure is silent because a missing marker simply means "extract".
 _Bundle_ReadMarker(BundleDir) {
 	MarkerPath := BundleDir . "\.bundle-version"
@@ -130,7 +136,14 @@ _Bundle_ReadMarker(BundleDir) {
 	return Trim(Content, " `t`r`n")
 }
 
-; Writes the marker file with the current BUNDLE_VERSION. Failure is logged
+; Serialize the version and commit together: development builds commonly share
+; one version while carrying different runtime assets.
+; @return {String} Identity persisted only after extraction has verified.
+_Bundle_BuildMarker() {
+	return BUNDLE_VERSION . "`n" . BUNDLE_COMMIT
+}
+
+; Writes the marker file with the current build identity. Failure is logged
 ; via OutputDebug because the logger has not been initialised yet at the
 ; point Bundle_Init() runs.
 _Bundle_WriteMarker(BundleDir) {
@@ -139,7 +152,7 @@ _Bundle_WriteMarker(BundleDir) {
 		FileDelete(MarkerPath)
 	}
 	try {
-		FileAppend(BUNDLE_VERSION, MarkerPath, "UTF-8")
+		FileAppend(_Bundle_BuildMarker(), MarkerPath, "UTF-8")
 	} catch as Err {
 		OutputDebug("[bundle] WriteMarker failed: " . Err.Message)
 		return false
@@ -147,14 +160,51 @@ _Bundle_WriteMarker(BundleDir) {
 	return FileExist(MarkerPath)
 }
 
-_Bundle_VerifyStaging(StagingDir) {
-	return DirExist(StagingDir) and DirExist(StagingDir . "\static")
+; The compiled inventory comes from the same selected bytes as the embedded ZIP.
+; Additional runtime caches are allowed; every shipped asset remains immutable.
+_Bundle_VerifyStaging(StagingDir, Inventory := unset) {
+	if !DirExist(StagingDir)
+		return false
+	try {
+		if !IsSet(Inventory) {
+			if !IsSet(_Bundle_CompiledAssetInventory)
+				return false
+			Inventory := _Bundle_CompiledAssetInventory()
+		}
+		if !(Inventory is Array) or Inventory.Length == 0
+			return false
+		Seen := Map()
+		for Row in Inventory {
+			if !(Row is Array) or Row.Length != 3
+				return false
+			if !(Row[1] is String) or Row[1] == ""
+					or RegExMatch(Row[1], "[\\:`r`n]|^/|(^|/)\.{1,2}(/|$)|//")
+					or !(Row[2] is Integer) or Row[2] < 0
+					or !(Row[3] is String) or !RegExMatch(Row[3], "^[0-9a-f]{64}$")
+				return false
+			Key := StrLower(Row[1])
+			if Seen.Has(Key)
+				return false
+			Seen[Key] := true
+			Bytes := FSReadBytesStrict(StagingDir . "\" . StrReplace(Row[1], "/", "\"))
+			if Bytes.Size != Row[2] or _CryptoSha256Cng(Bytes) != Row[3]
+				return false
+		}
+		return true
+	} catch as Err {
+		OutputDebug("[bundle] Asset verification failed: " . Err.Message)
+		return false
+	}
 }
 
-_Bundle_LiveTreeCanSkip(BundleDir, ExistingVersion) {
-	if (ExistingVersion == "" or ExistingVersion != BUNDLE_VERSION)
+_Bundle_LiveTreeCanSkip(BundleDir, ExistingMarker, Inventory := unset) {
+	; A placeholder cannot distinguish two local compiles. Extraction still
+	; works, but only a stamped identity can justify reusing existing assets.
+	if (BUNDLE_VERSION == "__BUNDLE_VERSION__" or BUNDLE_COMMIT == "__BUNDLE_COMMIT__"
+		or BUNDLE_VERSION == "" or BUNDLE_COMMIT == ""
+		or ExistingMarker != _Bundle_BuildMarker())
 		return false
-	return _Bundle_VerifyStaging(BundleDir)
+	return _Bundle_VerifyStaging(BundleDir, Inventory?)
 }
 
 ; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
@@ -230,7 +280,7 @@ Bundle_Init() {
 		OutputDebug("[bundle] Marker matches '" . BUNDLE_VERSION . "' — skipping extraction.")
 		return
 	}
-	if (Existing != "" and Existing == BUNDLE_VERSION)
+	if (Existing != "" and Existing == _Bundle_BuildMarker())
 		OutputDebug("[bundle] Marker matches but the live tree failed verification — rebuilding.")
 
 	; Extract into a sibling staging directory. The live bundle remains intact

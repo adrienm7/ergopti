@@ -214,6 +214,32 @@ _required_dependency_package() {
 	local pkg_mgr="$1"
 	local capability="$2"
 	case "${pkg_mgr}:${capability}" in
+		# BEGIN GENERATED LINUX NATIVE PACKAGES
+		apt:libxkbcommon.so.0) echo "libxkbcommon0" ;;
+		apt:libxkbcommon-x11.so.0) echo "libxkbcommon-x11-0" ;;
+		apt:libX11.so.6) echo "libx11-6" ;;
+		apt:libX11-xcb.so.1) echo "libx11-xcb1" ;;
+		dnf:libxkbcommon.so.0) echo "libxkbcommon" ;;
+		dnf:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+		dnf:libX11.so.6) echo "libX11" ;;
+		dnf:libX11-xcb.so.1) echo "libX11-xcb" ;;
+		zypper:libxkbcommon.so.0) echo "libxkbcommon0" ;;
+		zypper:libxkbcommon-x11.so.0) echo "libxkbcommon-x11-0" ;;
+		zypper:libX11.so.6) echo "libX11-6" ;;
+		zypper:libX11-xcb.so.1) echo "libX11-xcb1" ;;
+		pacman:libxkbcommon.so.0) echo "libxkbcommon" ;;
+		pacman:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+		pacman:libX11.so.6) echo "libx11" ;;
+		pacman:libX11-xcb.so.1) echo "libx11" ;;
+		xbps:libxkbcommon.so.0) echo "libxkbcommon" ;;
+		xbps:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+		xbps:libX11.so.6) echo "libX11" ;;
+		xbps:libX11-xcb.so.1) echo "libX11" ;;
+		apk:libxkbcommon.so.0) echo "libxkbcommon" ;;
+		apk:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+		apk:libX11.so.6) echo "libx11" ;;
+		apk:libX11-xcb.so.1) echo "libx11" ;;
+		# END GENERATED LINUX NATIVE PACKAGES
 		apt:luajit) echo "luajit" ;;
 		dnf:luajit) echo "luajit" ;;
 		zypper:luajit) echo "luajit" ;;
@@ -371,6 +397,12 @@ _check_or_install xkbcli
 # Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
 # optional desktop convenience makes the privacy filter fail closed forever.
 _check_or_install_library libatspi.so.0
+# BEGIN GENERATED LINUX NATIVE CAPABILITIES
+_check_or_install_library libxkbcommon.so.0
+_check_or_install_library libxkbcommon-x11.so.0
+_check_or_install_library libX11.so.6
+_check_or_install_library libX11-xcb.so.1
+# END GENERATED LINUX NATIVE CAPABILITIES
 
 # The desktop half: the tray icon and the windows it opens. Best effort rather
 # than fatal, because a headless machine or a server needs neither and must

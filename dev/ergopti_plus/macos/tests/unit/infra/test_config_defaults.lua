@@ -33,11 +33,11 @@ helpers.describe("neutral configuration contract", function()
 	helpers.it("keeps structured assignments whose neutral sentinel is false", function()
 		local defaults = require("config_defaults").new(require("_generated.features_manifest"))
 		local binding = { mods = { "ctrl" }, key = "space" }
-		local operation = defaults.operation("metrics.shortcut", binding)
+		local operation = defaults.operation("shortcuts.keys.cmd_star", binding)
 		helpers.assert_eq(operation.value, binding)
 		binding.key = "return"
 		helpers.assert_eq(operation.value.key, "space")
-		helpers.assert_eq(defaults.operation("metrics.shortcut", false).delete, true)
+		helpers.assert_eq(defaults.operation("shortcuts.keys.cmd_star", false).delete, true)
 	end)
 
 	helpers.it("projects a detached neutral document for applying deleted preferences", function()

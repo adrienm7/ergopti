@@ -338,6 +338,34 @@ local function load_fixture(options)
 end
 
 helpers.describe("HS-012 dependency bootstrap native ownership", function()
+	for _, mode in ipairs({ "false", "nil", "throw", "pending" }) do
+		helpers.it("keeps readonly provisioning admission closed until failed native acquisition cleanup " .. mode, function()
+			local fixture = load_fixture({ start_mode = "false", terminate_mode = mode })
+			helpers.assert_eq(fixture.checker.provisioning_idle(), true)
+			helpers.assert_eq(fixture.checker.check_and_install_deps(), false)
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			local task = fixture.tasks[1]
+			local stops = task.terminate_calls
+			helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+			helpers.assert_eq(task.terminate_calls, stops, "a readonly query cannot manufacture terminal acknowledgement")
+			task:complete(143, "", "exact native completion")
+			helpers.assert_eq(fixture.checker.provisioning_idle(), true)
+			helpers.assert_eq(fixture.daemon_calls, 0)
+		end)
+	end
+
+	helpers.it("keeps provisioning admission closed over retained initial timer cleanup", function()
+		local fixture = load_fixture({ timer_start_mode = "false", timer_stop_mode = "false" })
+		helpers.assert_eq(fixture.checker.schedule_initial_check(), false)
+		helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+		helpers.assert_eq(fixture.owner.pause(), false)
+		helpers.assert_eq(fixture.checker.provisioning_idle(), false)
+		fixture.timer_stop_mode = "true"
+		helpers.assert_eq(fixture.owner.pause(), true)
+		helpers.assert_eq(fixture.checker.provisioning_idle(), true)
+		helpers.assert_eq(#fixture.tasks, 0)
+	end)
+
 	helpers.it("registers actual checker admission with real ScriptControl", function()
 		local fixture = load_fixture({ real_script_control = true })
 		helpers.assert_true(fixture.control.pause_all())

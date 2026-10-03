@@ -280,3 +280,48 @@ _LNR_CancelledPromptsStaySilent() {
 }
 Test("[ahk-022] cancelled LLM prompts remain silent",
 	_LNR_CancelledPromptsStaySilent)
+
+_LNR_DisplayIndentCatalogueOwnsItsReader() {
+	global _LLM_Menu, LLM_MENU_INDENT_OPTIONS
+	AssertTrue(IsSet(LLM_MENU_INDENT_OPTIONS),
+		"the definitions-only display include must initialize its own catalogue")
+	Policy := _LNR_Ranges()["pred_indent"]
+	ExpectedCount := Policy["max"] - Policy["min"] + 1
+	AssertEqual(ExpectedCount, LLM_MENU_INDENT_OPTIONS.Length,
+		"the catalogue covers every accepted indentation value exactly once")
+	for Index, Value in LLM_MENU_INDENT_OPTIONS
+		AssertEqual(Policy["min"] + Index - 1, Value,
+			"indent choices remain ordered and complete")
+
+	SavedMenu := _LLM_Menu
+	try {
+		_LLM_Menu := LLM_Menu_DeepClone(SavedMenu)
+		_LLM_Menu["n_predictions"] := 3
+		for Selected in [Policy["min"], 0, Policy["max"]] {
+			_LLM_Menu["pred_indent"] := Selected
+			IndentRows := []
+			Groups := 0
+			for Row in _LLM_Menu_DisplayRows() {
+				if Row.Has("items") && Row["label"] == t("menu.llm.indent_label") {
+					IndentRows := Row["items"]
+					Groups += 1
+				}
+			}
+			AssertEqual(1, Groups, "the actual display provider keeps one indent picker")
+			AssertEqual(ExpectedCount, IndentRows.Length)
+			Checked := 0
+			for Index, Row in IndentRows {
+				Value := Policy["min"] + Index - 1
+				AssertEqual(Value == Selected, Row["checked"],
+					"only the selected negative, neutral or positive choice is checked")
+				if Row["checked"]
+					Checked += 1
+				AssertTrue(IsObject(Row["action"]),
+					"every rendered indent choice retains its existing command")
+			}
+			AssertEqual(1, Checked)
+		}
+	} finally _LLM_Menu := SavedMenu
+}
+Test("LLM display: the native reader owns the complete checked indent catalogue "
+	. "(llm-indent-include-owner)", _LNR_DisplayIndentCatalogueOwnsItsReader)

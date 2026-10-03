@@ -92,9 +92,10 @@ end
 --- @param content string Full source of a test file.
 --- @return boolean|nil True when a dangling install remains (nil = no install).
 local function has_dangling_install(content)
-	-- helpers.with_fresh_modules restores every module its list names after
-	-- each case, so a file that lists adapters.shell_runner there restores it.
-	if content:find("helpers.with_fresh_modules", 1, true)
+	-- Both scope owners delegate cache restoration to with_fresh_modules;
+	-- with_stub_scope additionally restores native API doubles on exceptions.
+	if (content:find("helpers.with_fresh_modules", 1, true)
+			or content:find("helpers.with_stub_scope", 1, true))
 			and content:find('[{,]%s*"adapters%.shell_runner"%s*[,}]') then
 		return false
 	end
@@ -161,5 +162,11 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 			.. '\nhelpers.with_fresh_modules(OWNED, body)'
 		helpers.assert_true(has_dangling_install(scoped) == false,
 			"an install inside a with_fresh_modules scope that owns the module must pass")
+		local native_scoped = scoped:gsub("helpers.with_fresh_modules", "helpers.with_stub_scope")
+		helpers.assert_true(has_dangling_install(native_scoped) == false,
+			"the native stub scope restores its explicit shell-runner ownership")
+		local unowned_scope = native_scoped:gsub('"adapters.shell_runner"', '"infra.logger"', 1)
+		helpers.assert_true(has_dangling_install(unowned_scope),
+			"a scope that does not own shell_runner cannot excuse its dangling install")
 	end)
 end)

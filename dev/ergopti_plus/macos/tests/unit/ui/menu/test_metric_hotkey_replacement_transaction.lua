@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 --- Builds a menu and captures the real shortcut application callbacks.
 --- @return table fixture Runtime state and registrar controls.
-local function load_fixture()
+local function load_fixture(legacy)
 	local noop = function() end
 	local dynamic_menu_callback = nil
 	local captured_context = nil
+	local extras = nil
 	local next_handle = 0
 	local bindings = {}
 	local bind_refused = false
@@ -57,6 +58,8 @@ local function load_fixture()
 	package.loaded["infra.ui_restore"] = {}
 
 	local state = {
+		metrics_shortcut = legacy,
+		apps_time_shortcut = legacy,
 		trigger_char = "★",
 		hotstrings = { common = true },
 		terminator_states = {},
@@ -168,7 +171,7 @@ local function load_fixture()
 		is_paused = function() return false end,
 		set_on_pause_change = noop,
 		set_shortcut_action = noop,
-		set_extras = noop,
+		set_extras = function(value) extras = value end,
 		list_shortcuts = function() return {} end,
 	}
 	package.loaded["modules.dynamic_hotstrings"] = {}
@@ -186,6 +189,7 @@ local function load_fixture()
 
 	return {
 		bindings = bindings,
+		extras = extras,
 		allow_unbind = function(handle) unbind_refusals[handle] = nil end,
 		context = captured_context,
 		refuse_bind = function(refused) bind_refused = refused == true end,
@@ -194,177 +198,38 @@ local function load_fixture()
 	}
 end
 
-local function only_handle(bindings)
-	local found = nil
-	for handle in pairs(bindings) do
-		if found ~= nil then return nil end
-		found = handle
+helpers.describe("retired Metrics shortcuts have no native owner", function()
+	for _, legacy in ipairs({ false, "unsupported", { mods = { "ctrl" }, key = "m" } }) do
+		helpers.it("does not acquire a dedicated Metrics binding from " .. type(legacy) .. " data", function()
+			local fixture = load_fixture(legacy)
+			helpers.assert_nil(fixture.context.apply_metrics_shortcut)
+			helpers.assert_nil(fixture.context.apply_apps_time_shortcut)
+			helpers.assert_nil(next(fixture.bindings), "no historical dedicated field reaches the registrar")
+			helpers.assert_eq(fixture.state.metrics_shortcut, legacy, "unowned source intent is never rewritten")
+		end)
 	end
-	return found
-end
-
-
-
-
-
--- =========================================
--- =========================================
--- ======= 2/ Replacement Transactions ====
--- =========================================
--- =========================================
-
-helpers.describe("menu metric hotkeys replace exact native owners transactionally", function()
-	helpers.it("keeps the metrics shortcut acknowledged when old-owner release is refused", function()
-		local fixture = load_fixture()
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "ctrl" }, "m", false), true)
-		local previous = only_handle(fixture.bindings)
-		helpers.assert_not_nil(previous)
-		fixture.refuse_unbind(previous)
-
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "alt" }, "n", false), false,
-			"a refused old-owner release must reject the replacement")
-		helpers.assert_eq(fixture.state.metrics_shortcut.key, "m",
-			"rejected replacement state must not be published")
-		helpers.assert_eq(only_handle(fixture.bindings), previous,
-			"the candidate must be rolled back instead of leaking beside the prior owner")
-		helpers.assert_eq(fixture.bindings[previous].enabled, true,
-			"the registrar-fenced prior owner must be re-enabled after rollback")
-	end)
-
-	helpers.it("keeps the application-time shortcut live when candidate bind is refused", function()
-		local fixture = load_fixture()
-		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "ctrl" }, "a", false), true)
-		local previous = only_handle(fixture.bindings)
-		helpers.assert_not_nil(previous)
-		fixture.refuse_bind(true)
-
-		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "alt" }, "b", false), false,
-			"candidate refusal must reject the replacement")
-		helpers.assert_eq(fixture.state.apps_time_shortcut.key, "a",
-			"the acknowledged preference must remain unchanged")
-		helpers.assert_eq(only_handle(fixture.bindings), previous)
-		helpers.assert_eq(fixture.bindings[previous].enabled, true,
-			"candidate acquisition must precede retirement of the live owner")
-	end)
-
-	helpers.it("retries the exact candidate when replacement rollback is refused", function()
-		local fixture = load_fixture()
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "ctrl" }, "m", false), true)
-		local previous = only_handle(fixture.bindings)
-		fixture.refuse_unbind(previous)
-		fixture.refuse_unbind("hotkey#2")
-
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "alt" }, "n", false), false)
-		helpers.assert_not_nil(fixture.bindings["hotkey#2"],
-			"a refused candidate rollback must retain that exact facade")
-		helpers.assert_eq(fixture.bindings["hotkey#2"].enabled, false,
-			"the retained candidate must remain delivery-fenced")
-
-		fixture.allow_unbind("hotkey#2")
-		fixture.allow_unbind(previous)
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "alt" }, "n", false), true,
-			"the next attempt must settle retained cleanup before replacing again")
-		helpers.assert_nil(fixture.bindings["hotkey#2"])
-		helpers.assert_nil(fixture.bindings[previous])
-		helpers.assert_eq(fixture.state.metrics_shortcut.key, "n")
-	end)
 end)
 
-
-
-
-
--- ========================================
--- ========================================
--- ======= 3/ Dashboard Close Owner =======
--- ========================================
--- ========================================
-
-helpers.describe("menu metric shortcuts preserve dashboard close ownership", function()
-	helpers.it("routes both shortcut closes through their dashboard transaction", function()
-		local fixture = load_fixture()
-		local direct_deletes = 0
-		local typing_closes = 0
-		local apps_closes = 0
-		local typing_owner = {
-			delete = function()
-				direct_deletes = direct_deletes + 1
-				return false
-			end,
-		}
-		local apps_owner = {
-			delete = function()
-				direct_deletes = direct_deletes + 1
-				return false
-			end,
-		}
-		local typing = {
-			_wv = typing_owner,
-			close = function()
-				typing_closes = typing_closes + 1
-				return false
-			end,
-		}
-		local apps = {
-			_wv = apps_owner,
-			close = function()
-				apps_closes = apps_closes + 1
-				return false
-			end,
-		}
-		package.loaded["ui.metrics_typing"] = typing
-		package.loaded["ui.metrics_typing.init"] = nil
-		package.loaded["ui.metrics_apps"] = apps
-		package.loaded["ui.metrics_apps.init"] = nil
-		-- Both dashboards are the focused window: the toggle closes them.
-		package.loaded["ui.ui_builder"] = { is_window_focused = function() return true end }
-
-		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "ctrl" }, "m", false), true)
-		local metrics_handle = only_handle(fixture.bindings)
-		helpers.assert_not_nil(metrics_handle)
-		fixture.bindings[metrics_handle].callback()
-
-		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "ctrl" }, "a", false), true)
-		local apps_binding = nil
-		for _, binding in pairs(fixture.bindings) do
-			if binding.chord == "ctrl+a" then apps_binding = binding end
+helpers.describe("ordinary Metrics actions preserve dashboard ownership", function()
+	for _, kind in ipairs({ "typing", "apps" }) do
+		for _, result in ipairs({ "false", "nil", "throw", "true" }) do
+			helpers.it("dispatches " .. kind .. " to its dashboard owner after " .. result, function()
+				local fixture = load_fixture()
+				local calls, direct_deletes = 0, 0
+				local native = { delete = function() direct_deletes = direct_deletes + 1 end }
+				local dashboard = { _wv = native, show = function()
+					calls = calls + 1
+					if result == "throw" then error("synthetic dashboard refusal") end
+					if result == "nil" then return nil end
+					return result == "true"
+				end }
+				package.loaded["ui.metrics_" .. kind] = dashboard
+				fixture.extras["open_metrics_" .. kind]()
+				helpers.assert_eq(calls, 1, "the ordinary action delegates exactly once")
+				helpers.assert_eq(direct_deletes, 0, "the action never bypasses the module's owner")
+				helpers.assert_eq(dashboard._wv, native, "delivery does not discard the exact native owner")
+				helpers.assert_nil(next(fixture.bindings), "actions install no dedicated shortcut")
+			end)
 		end
-		helpers.assert_not_nil(apps_binding)
-		apps_binding.callback()
-
-		helpers.assert_eq(typing_closes, 1,
-			"the typing-dashboard shortcut must delegate to its close transaction")
-		helpers.assert_eq(apps_closes, 1,
-			"the apps-dashboard shortcut must delegate to its close transaction")
-		helpers.assert_eq(direct_deletes, 0,
-			"the menu must never bypass module-owned native cleanup")
-		helpers.assert_eq(typing._wv, typing_owner,
-			"a refused typing close must retain its exact owner")
-		helpers.assert_eq(apps._wv, apps_owner,
-			"a refused apps close must retain its exact owner")
-	end)
-end)
-
-helpers.describe("menu metric shortcuts present a covered dashboard (ui-focus-not-topmost)", function()
-	helpers.it("brings a covered dashboard back instead of closing it (ui-focus-not-topmost)", function()
-		local fixture = load_fixture()
-		local closes, shows = 0, 0
-		local apps = {
-			_wv = {},
-			close = function() closes = closes + 1; return true end,
-			show = function() shows = shows + 1; return true end,
-		}
-		package.loaded["ui.metrics_apps"] = apps
-		package.loaded["ui.metrics_apps.init"] = nil
-		-- The dashboard is open but another app's window is in front of it.
-		package.loaded["ui.ui_builder"] = { is_window_focused = function() return false end }
-
-		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "ctrl" }, "a", false), true)
-		local handle = only_handle(fixture.bindings)
-		helpers.assert_not_nil(handle)
-		fixture.bindings[handle].callback()
-
-		helpers.assert_eq(closes, 0, "a covered dashboard must not be closed by its shortcut")
-		helpers.assert_eq(shows, 1, "a covered dashboard must be presented through its open path")
-	end)
+	end
 end)

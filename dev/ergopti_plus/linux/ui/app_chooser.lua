@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 
 --- Where the system installs its desktop entries.
 M.APPLICATIONS_DIR = "/usr/share/applications/"
@@ -43,6 +44,7 @@ function M.pick(shell, title)
 		or type(shell.exec_line) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
+	title = WindowTitles.compose(title)
 	local command
 	if shell.has_command("zenity") then
 		command = "zenity --file-selection --title=" .. shell.quote(title)

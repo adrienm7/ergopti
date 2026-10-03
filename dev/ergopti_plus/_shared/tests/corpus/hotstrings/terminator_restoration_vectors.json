@@ -1,0 +1,92 @@
+[
+	{
+		"id": "restore_shipped_preserve_active_and_inactive_custom",
+		"current_word": " /¤😀😃",
+		"current_consumed": "/¤🔒",
+		"expected_word": " \t\r\n★,;.!?:¤😀😃",
+		"expected_consumed": "★¤🔒",
+		"states": {
+			"space": true,
+			"slash": true,
+			"star": false,
+			"custom_currency": true,
+			"custom_lock": false,
+			"retired_future": false
+		},
+		"custom": [
+			{
+				"key": "custom_currency",
+				"char": "¤",
+				"label": "Personal currency",
+				"consume": true,
+				"future": "kept"
+			},
+			{
+				"key": "custom_lock",
+				"char": "🔒",
+				"label": "Personal lock",
+				"consume": true
+			}
+		],
+		"expected_personal": {
+			"custom_currency": true,
+			"custom_lock": false,
+			"retired_future": false
+		}
+	},
+	{
+		"id": "duplicates_and_shared_surrogates_preserve_exact_sequence",
+		"current_word": "!😀😃😀¤¤",
+		"current_consumed": "!😃😀😃",
+		"expected_word": " \t\r\n★,;.!?:😀😃😀¤¤",
+		"expected_consumed": "★😃😀😃",
+		"states": {
+			"space": false,
+			"slash": true,
+			"custom_emoji": true
+		},
+		"custom": [
+			{
+				"key": "custom_emoji",
+				"char": "😀",
+				"label": "Emoji",
+				"consume": true
+			}
+		],
+		"expected_personal": {
+			"custom_emoji": true
+		}
+	},
+	{
+		"id": "consume_only_personal_stays_disabled",
+		"current_word": "/",
+		"current_consumed": "/¤",
+		"expected_word": " \t\r\n★,;.!?:",
+		"expected_consumed": "★¤",
+		"states": {
+			"slash": true,
+			"custom_currency": false
+		},
+		"custom": [
+			{
+				"key": "custom_currency",
+				"char": "¤",
+				"label": "Currency",
+				"consume": true
+			}
+		],
+		"expected_personal": {
+			"custom_currency": false
+		}
+	},
+	{
+		"id": "empty_override_inherits_shipped_defaults",
+		"current_word": "",
+		"current_consumed": "",
+		"expected_word": " \t\r\n★,;.!?:",
+		"expected_consumed": "★",
+		"states": {},
+		"custom": [],
+		"expected_personal": {}
+	}
+]

@@ -11,7 +11,7 @@
 ; grammar only rejects the neutral modifier names, so a metrics or keyboard
 ; shortcut such as "ralt" or "ctrl+rctrl" reached Hotkey() through the shared
 ; registrar; only the LLM trigger refused them. The registrar now refuses them
-; for every client, and the metrics prompt tells the user why
+; for every ordinary client
 ; (registrar-modifier-key-2026-09-25).
 ; ==============================================================================
 
@@ -47,8 +47,8 @@ Test("hotkey registrar: a modifier key named as the chord key is refused (regist
 
 _HRMK_EveryClientRefusesAModifierKey() {
 	global _HRMK_NativeCalls
-	AssertEqual("", MS_ToAhkSyntax("ralt"), "a metrics shortcut on RAlt must be refused")
-	AssertEqual("", MS_ToAhkSyntax("ctrl+rctrl"), "a metrics chord ending in RCtrl must be refused")
+	AssertEqual("", HotkeyRegistrarNativeSpec([], "ralt"), "an ordinary shortcut on RAlt must be refused")
+	AssertEqual("", HotkeyRegistrarNativeSpec(["ctrl"], "rctrl"), "an ordinary chord ending in RCtrl must be refused")
 	AssertEqual("", LLM_Menu_ShortcutToAhk("ctrl+lalt"), "the LLM trigger must keep refusing it")
 	_HRMK_NativeCalls := []
 	Handle := _HotkeyRegistrarBindOwned("ralt", (*) => 0, "test", _HRMK_Hotkey)
@@ -57,34 +57,3 @@ _HRMK_EveryClientRefusesAModifierKey() {
 }
 Test("hotkey registrar: every client refuses a modifier key (registrar-modifier-key-2026-09-25)",
 	_HRMK_EveryClientRefusesAModifierKey)
-
-_HRMK_MetricsPromptExplainsTheRefusal() {
-	AssertEqual(Format(t("metrics.shortcut_modifier_key"), "ralt"), MS_ModifierKeyRefusal("ctrl+ralt"),
-		"the metrics prompt must tell the user that a modifier key cannot be the shortcut's key")
-	AssertEqual("", MS_ModifierKeyRefusal("ctrl+alt+m"), "an ordinary shortcut has no refusal")
-	AssertEqual("", MS_ModifierKeyRefusal(""), "clearing the shortcut has no refusal")
-	AssertEqual("", MS_ModifierKeyRefusal("crtl+m"), "a malformed chord keeps its own generic path")
-}
-Test("hotkey registrar: the metrics prompt explains a modifier-key refusal (registrar-modifier-key-2026-09-25)",
-	_HRMK_MetricsPromptExplainsTheRefusal)
-
-; The refusal is shown whether or not a tap-hold is configured on the key, so
-; no locale may give a tap-hold as its reason.
-_HRMK_RefusalBlamesNoTapHold() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	SplitPath(WindowsDir, , &Root)
-	Checked := 0
-	Loop Files, Root . "\_shared\data\locales\*.json" {
-		Raw := FileRead(A_LoopFileFullPath, "UTF-8")
-		Assert(RegExMatch(Raw, '"metrics\.shortcut_modifier_key":\s*"((?:[^"\\]|\\.)*)"', &Entry),
-			A_LoopFileName . " must carry metrics.shortcut_modifier_key")
-		Assert(InStr(Entry[1], "{1}") > 0, A_LoopFileName . " must name the refused key")
-		for _, Term in ["tap-hold", "タップホールド", "탭-홀드", "点按-按住"]
-			AssertEqual(0, InStr(Entry[1], Term),
-				A_LoopFileName . ": the refusal must not blame a tap-hold the key may not have")
-		Checked++
-	}
-	AssertEqual(21, Checked, "every locale must be checked")
-}
-Test("hotkey registrar: the modifier-key refusal blames no tap-hold (registrar-modifier-key-2026-09-25)",
-	_HRMK_RefusalBlamesNoTapHold)

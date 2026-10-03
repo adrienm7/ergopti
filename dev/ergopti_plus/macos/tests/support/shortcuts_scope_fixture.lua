@@ -58,13 +58,31 @@ local function run_fixture(body, source)
 	hs.hotkey.bind = function() return handle("binding") end
 	package.loaded["adapters.hotkey_registrar"] = {
 		bind = function(chord, callback)
-			local native = handle("keyboard")
-			if native then native.chord, native.callback = chord, callback; controls.keyboard_handles[#controls.keyboard_handles + 1] = native end
+			-- Both producers share the same port. Attribute the native refusal to
+			-- its actual owner, independently of key names and acquisition order.
+			local kind, level = nil, 2
+			while kind == nil do
+				local frame = debug.getinfo(level, "S")
+				assert(frame, "scope fixture encountered an unknown hotkey producer")
+				if frame.source:match("[/\\]modules[/\\]shortcuts[/\\]bindings%.lua$") then kind = "binding" end
+				if frame.source:match("[/\\]modules[/\\]shortcuts[/\\]keyboard_shortcuts%.lua$") then kind = "keyboard" end
+				level = level + 1
+			end
+			local native = handle(kind)
+			if native then
+				native.chord, native.callback = chord, callback
+				if kind == "keyboard" then controls.keyboard_handles[#controls.keyboard_handles + 1] = native end
+			end
 			return native
 		end,
 		unbind = function(native) return native:delete() end,
 		setEnabled = function(native, enabled) native.enabled = enabled; return true end,
 		set_delivery_guard = function() return true end,
+		replace_physical_claims = function(owner, rows)
+			controls.physical_claims = controls.physical_claims or {}
+			controls.physical_claims[owner] = rows
+			return true
+		end,
 	}
 	local facades = { text = {}, apps = {}, system = {} }
 	for _, record in ipairs({ { "text", "text" }, { "apps", "apps" }, { "system", "mouse" }, { "system", "pixel" } }) do

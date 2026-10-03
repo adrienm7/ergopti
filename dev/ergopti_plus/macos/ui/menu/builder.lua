@@ -674,24 +674,16 @@ function M.generate(ctx, menu_mods, actions)
 		["debug"]           = function()
 			-- The manifest declares every row of this submenu and the shared
 			-- renderer places them; this file supplies only what each one does.
-			local active_level_name = "INFO"
-			local log_level_items = {}
-			for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
-				local is_active = (Logger.current_level == Logger.LEVELS[lvl])
-				if is_active then active_level_name = lvl end
-				local lvl_capture = lvl
-				-- Provider rows: these are the `items` of the log-level list row below.
-				table.insert(log_level_items, {
-					label   = Labels.log_level_emoji(lvl) .. " " .. lvl,
-					checked = is_active,
-					action  = function() actions.set_log_level(lvl_capture) end,
-				})
+			local active_level_name
+			for level, severity in pairs(Logger.LEVELS) do
+				if Logger.current_level == severity then active_level_name = level; break end
 			end
 			local healthcheck = require("ui.healthcheck")
 			local dbg_ctx = {}
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
+				["log_level"]      = actions.set_log_level,
 				["open_logs"]      = actions.open_logs,
 				["open_today_log"] = actions.open_today_log,
 				["open_error_log"] = actions.open_error_log,
@@ -702,21 +694,11 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
+			dbg_ctx.state_getters["script.log_level"] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end
-			-- The picker's own row carries the level currently set, which is why it
-			-- is a `list` and not a `command`: a declaration cannot spell a label
-			-- that changes with the state behind it.
-			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {
-				["log_level"] = function()
-					return { {
-						label = i18n.get("menu.debug.log_level") .. " : "
-							.. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name,
-						items = log_level_items,
-					} }
-				end,
-			}) or {}
+			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {}) or {}
 			return { { label = i18n.get("menu.debug.title"), submenu = debug_items } }
 		end,
 	}

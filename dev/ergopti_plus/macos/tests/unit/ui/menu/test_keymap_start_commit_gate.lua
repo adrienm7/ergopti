@@ -82,7 +82,7 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 			-- The menu root (ui/menu/init.lua): the global « Tout activer » was retired
 			-- on every driver; the Hotstrings scope owner it constructs starts the
 			-- engine when « restore recommended » switches hotstrings.enabled on.
-			{ marker = "local function bind_managed_hotkey", expected = 1, label = "menu root" },
+			{ marker = "local function safe_require", expected = 1, label = "menu root" },
 		}
 		for _, unit in ipairs(units) do
 			local source, err = helpers.read_driver_unit(unit.marker)

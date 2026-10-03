@@ -86,14 +86,16 @@ _HSE_EndCharBeats(Cand, Best, BestIsEndChar) {
 ; exact entry before priority/sequence arbitration, as the shared Lua engine does.
 ; The pure dispatch policy supplies eligibility without resolving replacements or
 ; calling user callbacks. Buf ends at the trigger body for both match paths.
-_HSE_CaseConformAllows(Buf, Spec) {
+_HSE_CaseConformAllows(Buf, Spec, ObservedLength := 0) {
 		if !Spec.HasOwnProp("CaseConform") or !Spec.CaseConform
 				return true
-		if StrLen(Buf) < Spec.Length
+		MatchedLength := ObservedLength ? ObservedLength : Spec.Length
+		if StrLen(Buf) < MatchedLength
 				return false
-		Typed := SubStr(Buf, -Spec.Length)
+		Typed := SubStr(Buf, -MatchedLength)
+		Canonical := SubStr(Spec.Trigger, 1, MatchedLength)
 		DoFire := true
-		_HSE_ConformReplacement("", Typed, Spec.Trigger,
+		_HSE_ConformReplacement("", Typed, Canonical,
 				Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar, &DoFire)
 		return DoFire
 }
@@ -337,10 +339,8 @@ _HSE_ConsiderEndSpecs(Specs, EffBody, JustTypedChar, &BestMatch, &BestEndChar) {
 ;   - EndChar = F20 (magic key): HSE_StarPrefixSetCI["ia"] has F20 entry →
 ;     suppression is TRUE → end-char match yields to the star trigger "ia★". ✓
 ;
-; Implementation: O(1) double lookup — first check prefix exists, then check
-; whether EndChar is among the recorded continuation characters. The
-; HSE_StarPrefixSetCI/CS maps now store prefix → Map(nextChar → true) so the
-; next-char membership test is also O(1).
+; Prefix and continuation lookups remain bounded; their candidates retain the
+; word/case policy needed to prove the longer trigger is still completable.
 _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
 		; Arbitration follows the STAR candidate's sensitivity, not the end
@@ -350,12 +350,26 @@ _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 		; is not evidence of what is present in the buffer.
 		TypedTrigger := SubStr(BodyBuf, -Spec.Length)
 		LowerTrigger := StrLower(TypedTrigger)
-		if (HSE_StarPrefixSetCI.Has(LowerTrigger)
-				&& HSE_StarPrefixSetCI[LowerTrigger].Has(StrLower(EndChar))) {
+		if _HSE_EligibleStarPrefix(HSE_StarPrefixSetCI, LowerTrigger,
+				StrLower(EndChar), BodyBuf, EndChar, Spec.Length) {
 				return true
 		}
-		return HSE_StarPrefixSetCS.Has(TypedTrigger)
-				&& HSE_StarPrefixSetCS[TypedTrigger].Has(EndChar)
+		return _HSE_EligibleStarPrefix(HSE_StarPrefixSetCS, TypedTrigger,
+				EndChar, BodyBuf, EndChar, Spec.Length)
+}
+
+; A registered continuation is insufficient when its word scope or conform case
+; already rejects the observed prefix. Do not invoke callbacks while incomplete.
+_HSE_EligibleStarPrefix(Index, Prefix, NextChar, BodyBuf, EndChar, BodyLength) {
+		if !Index.Has(Prefix) or !Index[Prefix].Has(NextChar)
+				return false
+		for _, StarSpec in Index[Prefix][NextChar] {
+				if _HSE_WordBoundaryAllows(BodyBuf, StarSpec, BodyLength)
+						and _HSE_CaseConformAllows(BodyBuf . EndChar, StarSpec,
+								BodyLength + StrLen(EndChar))
+						return true
+		}
+		return false
 }
 
 ; Populate HSE_StarPrefixSetCI and HSE_StarPrefixSetCS with all strict prefixes
@@ -394,7 +408,9 @@ _HSE_IndexStarPrefixes(Spec) {
 				if !Set.Has(Prefix) {
 						Set[Prefix] := Map()
 				}
-				Set[Prefix][NextChar] := true
+				if !Set[Prefix].Has(NextChar)
+						Set[Prefix][NextChar] := []
+				Set[Prefix][NextChar].Push(Spec)
 		}
 }
 
@@ -470,8 +486,9 @@ _HSE_RebuildStarTriggerIndex() {
 ; must be either absent (start of buffer — falls back to the
 ; HSE_StartIsWordBoundary flag) or a word terminator. ``Spec.InWord``
 ; (the AHK ``?`` flag) bypasses the check entirely.
-_HSE_WordBoundaryAllows(Buf, Spec) {
+_HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 		global HSE_StartIsWordBoundary
+		MatchedLength := ObservedLength ? ObservedLength : Spec.Length
 		; HSE_WORD_BOUNDARIES, not HSE_WORD_TERMINATORS. A quote does not terminate
 		; a trigger body but it does open a word, and the preview anchors on exactly
 		; this set — gating on the narrower terminator set is what made a quote-opened
@@ -485,7 +502,7 @@ _HSE_WordBoundaryAllows(Buf, Spec) {
 				; the repeat is meaningless and the user likely intended a text-expansion.
 				if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat) {
 						; Trigger is "x★": body char sits at BeforeLen, its predecessor at BeforeLen-1.
-						BeforeLen := StrLen(Buf) - Spec.Length
+						BeforeLen := StrLen(Buf) - MatchedLength
 						if (BeforeLen < 1) {
 								return false
 						}
@@ -500,7 +517,7 @@ _HSE_WordBoundaryAllows(Buf, Spec) {
 				}
 				return true
 		}
-		BeforeLen := StrLen(Buf) - Spec.Length
+		BeforeLen := StrLen(Buf) - MatchedLength
 		if (BeforeLen >= 1) {
 				BeforeChar := SubStr(Buf, BeforeLen, 1)
 				return InStr(Boundaries, BeforeChar) > 0
@@ -517,8 +534,21 @@ _HSE_WordBoundaryAllows(Buf, Spec) {
 ; the matcher reject every word boundary. Deriving costs one short concatenation
 ; and makes divergence structurally impossible.
 _HSE_WordBoundarySet() {
-		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES
-		return HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES, HSE_Terminators
+		Boundaries := HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+		; Before catalogue initialization the bare engine has only its own parser
+		; delimiters. Once owned, derive from the live slot rather than copying ★.
+		if IsSet(HSE_Terminators) {
+				for Entry in HSE_Terminators.all() {
+						if Entry["key"] != "star"
+								continue
+						for Char in Entry["chars"]
+								if Ord(Char) > 127
+										Boundaries := StrReplace(Boundaries, Char)
+						break
+				}
+		}
+		return Boundaries
 }
 
 

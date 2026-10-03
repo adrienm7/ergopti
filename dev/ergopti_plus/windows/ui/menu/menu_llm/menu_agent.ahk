@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; The tray's top-level "AI agent" submenu (manifest agent_menu): the agent's
 ; mode, the backend and model of System 1 and of System 2, and the
-; applications the automatic mode ignores. Every row is a manifest `dynamic`
-; slot whose rows are handed to the renderer as data.
+; applications the automatic mode ignores. The fixed modes use the shared
+; choice renderer; native providers supply the backend and application rows.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The backend lists are the local server, then every provider of
@@ -37,15 +37,12 @@
  */
 LLM_Agent_MenuBuild() {
 	return MenuRenderer_Build("agent_menu", "Agent", Map(
-		"agent_mode", _LLM_Agent_MenuModeSlot,
 		"agent_system1", _LLM_Agent_MenuSystemSlot.Bind("agent_system1"),
 		"agent_system2", _LLM_Agent_MenuSystemSlot.Bind("agent_system2"),
-		"agent_disabled_apps", _LLM_Agent_MenuAppsSlot))
-}
-
-; Dynamic slot agent_mode: its row and the three modes.
-_LLM_Agent_MenuModeSlot(Target, CategoryName) {
-	MenuRenderer_AppendRows(Target, "agent_menu", "agent_mode", [_LLM_Agent_ModeRow()])
+		"agent_disabled_apps", _LLM_Agent_MenuAppsSlot), "", Map(),
+		Map("agent_mode", _LLM_Agent_MenuSetMode),
+		Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),
+			"agent_mode_ready", () => true))
 }
 
 ; Dynamic slot agent_system1 or agent_system2: its row and its backends.
@@ -67,25 +64,6 @@ _LLM_Agent_MenuAppsSlot(Target, CategoryName) {
 ; ======= 2/ Row Data =======
 ; ===========================
 ; ===========================
-
-/**
- * The mode row: "Mode: <current>", then off, on action and automatic, the
- * current one checked.
- * @returns {Map} A row with its items.
- */
-_LLM_Agent_ModeRow() {
-	global LLM_AGENT_MODES
-	Current := LLM_Agent_Setting("agent_mode")
-	Items := []
-	for Mode in LLM_AGENT_MODES
-		Items.Push(Map(
-			"label", t("menu.agent.mode_" . Mode),
-			"checked", Mode == Current,
-			"action", _LLM_Agent_MenuSetMode.Bind(Mode)))
-	return Map(
-		"label", StrReplace(t("menu.agent.mode_title"), "{1}", t("menu.agent.mode_" . Current)),
-		"items", Items)
-}
 
 /**
  * The row of System 1 or System 2: its current backend, then "Off", the local

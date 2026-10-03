@@ -202,8 +202,8 @@ global HSE_StarSpecs := []
 ; Two maps: CI for case-insensitive triggers (lowercased keys), CS for
 ; case-sensitive triggers (exact-cased keys). Populated atomically in
 ; HSE_Register alongside HSE_StarSpecs; reset in HSE_RegistryClear.
-global HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
-global HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
+global HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → candidate specs), CI
+global HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → candidate specs), CS
 
 ; Star triggers indexed by FULL trigger string, for an O(buffer-suffix) match
 ; in HSE_FindMatchAtEnd instead of an O(all-star-triggers) bucket scan. Every
@@ -404,7 +404,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 								Group := Meta["group"]
 						if Meta.Has("group_order")
 								GroupOrder := Meta["group_order"]
-						if (Group == "default" and Meta.Has("Category") and Meta.Has("Section")
+						if (!Meta.Has("group") and Meta.Has("Category") and Meta.Has("Section")
 								and Meta["Category"] != "" and Meta["Section"] != "")
 								Group := Meta["Category"] . "." . Meta["Section"]
 				} else {
@@ -412,7 +412,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 								Group := Meta.group
 						if Meta.HasOwnProp("group_order")
 								GroupOrder := Meta.group_order
-						if (Group == "default" and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
+						if (!Meta.HasOwnProp("group") and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
 								and Meta.Category != "" and Meta.Section != "")
 								Group := Meta.Category . "." . Meta.Section
 				}

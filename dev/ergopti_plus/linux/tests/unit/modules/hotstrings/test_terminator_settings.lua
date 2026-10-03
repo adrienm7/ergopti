@@ -220,6 +220,296 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 	end)
 end)
 
+--- Independent stored-list vectors distinguish the admitted record from its
+--- unusable neighbors, including an otherwise valid duplicate of the same key.
+local DUPLICATE_RECORDS = {
+	{
+		name = "valid before invalid",
+		owned = 1,
+		rejected = 2,
+		records = {
+			{ key = "custom_¤", char = "¤", label = "first", consume = true, metadata = { note = "admitted" } },
+			{ key = "custom_¤", char = "ab", label = "invalid", consume = false, metadata = { note = "unusable" } },
+		},
+	},
+	{
+		name = "invalid before valid",
+		owned = 2,
+		rejected = 1,
+		records = {
+			{ key = "custom_¤", char = "ab", label = "invalid", consume = false, metadata = { note = "unusable" } },
+			{ key = "custom_¤", char = "¤", label = "first", consume = true, metadata = { note = "admitted" } },
+		},
+	},
+	{
+		name = "two valid definitions",
+		owned = 1,
+		rejected = 2,
+		records = {
+			{ key = "custom_¤", char = "¤", label = "first", consume = true, metadata = { note = "admitted" } },
+			{ key = "custom_¤", char = "§", label = "duplicate", consume = false, metadata = { note = "unusable" } },
+		},
+	},
+	{
+		name = "identical definitions with distinct metadata",
+		owned = 1,
+		rejected = 2,
+		records = {
+			{ key = "custom_¤", char = "¤", label = "first", consume = true, metadata = { note = "admitted" } },
+			{ key = "custom_¤", char = "¤", label = "first", consume = true, metadata = { note = "unusable" } },
+		},
+	},
+}
+
+helpers.describe("word-delimiter settings: duplicate-record ownership", function()
+	for _, vector in ipairs(DUPLICATE_RECORDS) do
+		local source = Codec.encode({ hotstrings = {
+			unknown = "kept",
+			terminators = vector.records,
+			terminator_states = { ["custom_¤"] = false, retired = true },
+		}, other = { items = { { value = 42 } } } }) .. "\n# keep the duplicate-record comment\n"
+
+		helpers.it("adds and removes only the admitted record: " .. vector.name, function()
+			with_settings(source, function(Settings, path, sandbox, Terminators)
+				helpers.assert_true(Settings.load())
+				helpers.assert_eq(Settings.snapshot().custom, {
+					{ key = "custom_¤", char = "¤", label = "first", consume = true },
+				}, "an unusable neighbor never becomes the runtime owner")
+				local reports = require("config_outdated").collect_reports(function()
+					Settings.mark_config_reads(Codec.decode(source), function() end)
+				end)
+				helpers.assert_true(reports["hotstrings.terminators." .. vector.rejected] ~= nil)
+				helpers.assert_nil(reports["hotstrings.terminators." .. vector.owned])
+				helpers.assert_true(Terminators.add_custom_terminator("custom_±", "±", "added", false))
+				helpers.assert_true(Settings.persist())
+				local added = Codec.decode(sandbox.read_bytes(path))
+				helpers.assert_eq(added.hotstrings.terminators, {
+					vector.records[1], vector.records[2],
+					{ key = "custom_±", char = "±", label = "added", consume = false },
+				}, "Add retains both physical records, their order and unknown nested metadata")
+				helpers.assert_eq(added.hotstrings.terminator_states["custom_¤"], false)
+				helpers.assert_eq(added.hotstrings.terminator_states.retired, true)
+				helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+				helpers.assert_true(Settings.persist())
+				local bytes = sandbox.read_bytes(path)
+				local removed = Codec.decode(bytes)
+				helpers.assert_eq(removed.hotstrings.terminators, {
+					vector.records[vector.rejected],
+					{ key = "custom_±", char = "±", label = "added", consume = false },
+				}, "Delete cannot claim the unusable same-key record left for explicit cleanup")
+				helpers.assert_nil(removed.hotstrings.terminator_states["custom_¤"])
+				helpers.assert_eq(removed.hotstrings.terminator_states.retired, true)
+				helpers.assert_eq(removed.hotstrings.unknown, "kept")
+				helpers.assert_eq(removed.other.items, { { value = 42 } })
+				helpers.assert_true(bytes:find("# keep the duplicate-record comment", 1, true) ~= nil)
+				helpers.assert_true(Settings.persist())
+				helpers.assert_eq(sandbox.read_bytes(path), bytes, "no pending change rewrites preserved records")
+			end)
+		end)
+
+		helpers.it("removes only its admitted occurrence after writer retry: " .. vector.name, function()
+			with_settings(source, function(Settings, path, sandbox, Terminators)
+				local Writer = require("toml_codec.writer")
+				local original, writes = Writer.batch_write, 0
+				local called, failure = pcall(function()
+					helpers.assert_true(Settings.load())
+					helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+					Writer.batch_write = function(target, rows, files, expected)
+						writes = writes + 1
+						sandbox.write_bytes(target, source .. "# deletion source changed\n")
+						return original(target, rows, files, expected)
+					end
+					helpers.assert_eq(Settings.persist(), false)
+					helpers.assert_eq(writes, 1, "the actual source fence rejected the proposed Delete")
+					helpers.assert_eq(sandbox.read_bytes(path), source .. "# deletion source changed\n")
+					Writer.batch_write = original
+					helpers.assert_true(Settings.persist(), "refusal never acknowledges the pending removal")
+					local bytes = sandbox.read_bytes(path)
+					local document = Codec.decode(bytes)
+					helpers.assert_eq(document.hotstrings.terminators, { vector.records[vector.rejected] },
+						"only the admitted stored occurrence is removed, even when its fields match a duplicate")
+					helpers.assert_nil(document.hotstrings.terminator_states["custom_¤"])
+					helpers.assert_eq(document.hotstrings.terminator_states.retired, true)
+					helpers.assert_eq(document.hotstrings.unknown, "kept")
+					helpers.assert_eq(document.other.items, { { value = 42 } })
+					helpers.assert_true(bytes:find("# deletion source changed", 1, true) ~= nil)
+					helpers.assert_true(Settings.persist())
+					helpers.assert_eq(sandbox.read_bytes(path), bytes)
+				end)
+				Writer.batch_write = original
+				if not called then error(failure, 0) end
+			end)
+		end)
+
+		helpers.it("retains the pending Add across lease and real writer refusal: " .. vector.name, function()
+			with_settings(source, function(Settings, path, sandbox, Terminators)
+				local Preferences = require("infra.hotstring_preferences")
+				local Writer = require("toml_codec.writer")
+				local original, owner, observations = Writer.batch_write, {}, {}
+				local called, failure = pcall(function()
+					helpers.assert_true(Settings.load())
+					helpers.assert_true(Terminators.add_custom_terminator("custom_±", "±", "added", false))
+					helpers.assert_true(Preferences.acquire(owner))
+					Writer.batch_write = function(target, rows, files, expected)
+						observations[#observations + 1] = { target = target, rows = rows, expected = expected }
+						sandbox.write_bytes(target, source .. "# external edit\n")
+						return original(target, rows, files, expected)
+					end
+					helpers.assert_eq(Settings.persist(), false, "the real preference lease prevents publication")
+					helpers.assert_eq(#observations, 0, "a held owner cannot even enter the writer")
+					helpers.assert_eq(sandbox.read_bytes(path), source)
+					helpers.assert_true(Preferences.release(owner))
+					helpers.assert_eq(Settings.persist(), false, "the actual writer rejects its changed source")
+					helpers.assert_eq(#observations, 1)
+					helpers.assert_eq(observations[1].target, path)
+					helpers.assert_eq(observations[1].expected.content, source)
+					helpers.assert_eq(sandbox.read_bytes(path), source .. "# external edit\n")
+					helpers.assert_true(has_custom(Terminators, "custom_±"), "the refused delta remains pending")
+					Writer.batch_write = original
+					helpers.assert_true(Settings.persist(), "retry uses the freshly read real source")
+					local bytes = sandbox.read_bytes(path)
+					helpers.assert_eq(Codec.decode(bytes).hotstrings.terminators, {
+						vector.records[1], vector.records[2],
+						{ key = "custom_±", char = "±", label = "added", consume = false },
+					})
+					helpers.assert_true(bytes:find("# external edit", 1, true) ~= nil)
+					helpers.assert_true(Settings.load())
+					helpers.assert_eq(#Settings.snapshot().custom, 2, "restart admits only the first usable duplicate")
+				end)
+				Writer.batch_write = original
+				if Preferences.is_acquired() then assert(Preferences.release(owner)) end
+				if not called then error(failure, 0) end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("word-delimiter settings: pending records must survive the real reader", function()
+	local source = '[hotstrings]\nunknown = "kept"\n'
+		.. 'terminators = [{ key = "custom_¤", char = "¤", label = "first", consume = true }, '
+		.. '{ key = "custom_¤", char = "§", label = "duplicate", consume = false, metadata = { note = "unowned" } }]\n'
+		.. '# keep the surviving record comment\n[hotstrings.terminator_states]\n"custom_¤" = false\nretired = true\n'
+		.. '[other]\nvalue = 42\n'
+	local cleaned = '[hotstrings]\nunknown = "kept"\n'
+		.. '# keep the surviving record comment\n[hotstrings.terminator_states]\nretired = true\n'
+		.. '[other]\nvalue = 42\n# explicit external cleanup\n'
+	for _, vector in ipairs({
+		{ name = "same key with different fields", key = "custom_¤", char = "±" },
+		{ name = "different key with the same character", key = "custom_±", char = "§" },
+	}) do
+		helpers.it("refuses a hidden Add after Delete without reload: " .. vector.name, function()
+			with_settings(source, function(Settings, path, sandbox, Terminators)
+				local Writer = require("toml_codec.writer")
+				local original, observations, change_source = Writer.batch_write, {}, false
+				local wanted = { key = vector.key, char = vector.char, label = "replacement", consume = true }
+				local called, failure = pcall(function()
+					helpers.assert_true(Settings.load())
+					helpers.assert_true(Terminators.remove_custom_terminator("custom_¤"))
+					helpers.assert_true(Settings.persist())
+					local deleted = sandbox.read_bytes(path)
+					local document = Codec.decode(deleted)
+					helpers.assert_eq(document.hotstrings.terminators, {
+						{ key = "custom_¤", char = "§", label = "duplicate", consume = false,
+							metadata = { note = "unowned" } },
+					}, "Delete retains the unowned occurrence for explicit cleanup")
+					helpers.assert_nil(document.hotstrings.terminator_states["custom_¤"])
+					helpers.assert_true(deleted:find("# keep the surviving record comment", 1, true) ~= nil)
+					local before = Settings.snapshot()
+					Writer.batch_write = function(target, rows, files, expected)
+						observations[#observations + 1] = { target = target, expected = expected.content }
+						if change_source then
+							sandbox.write_bytes(target, cleaned .. "# source changed before publication\n")
+						end
+						return original(target, rows, files, expected)
+					end
+					helpers.assert_true(Terminators.add_custom_terminator(wanted.key, wanted.char, wanted.label, wanted.consume))
+					for _ = 1, 2 do
+						helpers.assert_eq(Settings.persist(), false, "a hidden pending record cannot be acknowledged")
+						helpers.assert_eq(#observations, 0, "semantic refusal precedes any writer entry")
+						helpers.assert_eq(sandbox.read_bytes(path), deleted, "no hidden Add changes preserved bytes")
+						helpers.assert_eq(Settings.snapshot().custom, { wanted }, "refusal leaves the exact delta pending")
+					end
+					helpers.assert_true(Settings.restore_configuration(before), "the acknowledged runtime rollback remains usable")
+					helpers.assert_eq(Settings.snapshot(), before)
+					helpers.assert_true(Settings.persist())
+					helpers.assert_eq(#observations, 0)
+					helpers.assert_eq(sandbox.read_bytes(path), deleted)
+					helpers.assert_true(Terminators.add_custom_terminator(wanted.key, wanted.char, wanted.label, wanted.consume))
+					helpers.assert_eq(Settings.persist(), false)
+					helpers.assert_eq(#observations, 0)
+					-- Explicit external cleanup removes the ambiguity; the owner still
+					-- requires the real writer's fresh source acknowledgement.
+					sandbox.write_bytes(path, cleaned)
+					change_source = true
+					helpers.assert_eq(Settings.persist(), false, "an admissible retry still obeys the actual source fence")
+					helpers.assert_eq(observations, { { target = path, expected = cleaned } })
+					helpers.assert_eq(sandbox.read_bytes(path), cleaned .. "# source changed before publication\n")
+					helpers.assert_eq(Settings.snapshot().custom, { wanted })
+					change_source = false
+					helpers.assert_true(Settings.persist(), "the unacknowledged Add retries against the fresh cleaned source")
+					helpers.assert_eq(observations, {
+						{ target = path, expected = cleaned },
+						{ target = path, expected = cleaned .. "# source changed before publication\n" },
+					})
+					local bytes = sandbox.read_bytes(path)
+					local added = Codec.decode(bytes)
+					helpers.assert_eq(added.hotstrings.terminators, { wanted })
+					helpers.assert_eq(added.hotstrings.unknown, "kept")
+					helpers.assert_eq(added.hotstrings.terminator_states.retired, true)
+					helpers.assert_eq(added.other.value, 42)
+					helpers.assert_true(bytes:find("# keep the surviving record comment", 1, true) ~= nil)
+					helpers.assert_true(bytes:find("# explicit external cleanup", 1, true) ~= nil)
+					helpers.assert_true(bytes:find("# source changed before publication", 1, true) ~= nil)
+					helpers.assert_true(Settings.persist())
+					helpers.assert_eq(#observations, 2, "successful retry acknowledges only the real durable candidate")
+					helpers.assert_eq(sandbox.read_bytes(path), bytes)
+					helpers.assert_true(Settings.load())
+					helpers.assert_eq(Settings.snapshot().custom, { wanted }, "the exact new record survives a real reload")
+				end)
+				Writer.batch_write = original
+				if not called then error(failure, 0) end
+			end)
+		end)
+	end
+
+	helpers.it("refuses a changed record hidden by an externally added character owner", function()
+		local initial = '[hotstrings]\nterminators = [{ key = "custom_¤", char = "¤", label = "first", consume = true }]\n'
+		local edited = '[hotstrings]\nterminators = [{ key = "custom_§", char = "§", label = "foreign", consume = false, '
+			.. 'metadata = { note = "unowned" } }, { key = "custom_¤", char = "¤", label = "first", consume = true }]\n'
+			.. '# preserve the external character owner\n'
+		with_settings(initial, function(Settings, path, sandbox, Terminators)
+			local Writer = require("toml_codec.writer")
+			local original, writes = Writer.batch_write, 0
+			local called, failure = pcall(function()
+				helpers.assert_true(Settings.load())
+				sandbox.write_bytes(path, edited)
+				helpers.assert_true(Terminators.add_custom_terminator("custom_¤", "§", "replacement", true))
+				Writer.batch_write = function(...)
+					writes = writes + 1
+					return original(...)
+				end
+				for _ = 1, 2 do
+					helpers.assert_eq(Settings.persist(), false, "a changed record also needs real reader admission")
+					helpers.assert_eq(writes, 0)
+					helpers.assert_eq(sandbox.read_bytes(path), edited)
+				end
+				helpers.assert_eq(Settings.snapshot().custom, {
+					{ key = "custom_¤", char = "§", label = "replacement", consume = true },
+				})
+				sandbox.write_bytes(path, initial)
+				helpers.assert_true(Settings.persist(), "explicit cleanup permits the pending changed record")
+				helpers.assert_eq(writes, 1)
+				helpers.assert_true(Settings.load())
+				helpers.assert_eq(Settings.snapshot().custom, {
+					{ key = "custom_¤", char = "§", label = "replacement", consume = true },
+				})
+			end)
+			Writer.batch_write = original
+			if not called then error(failure, 0) end
+		end)
+	end)
+end)
+
 helpers.describe("word-delimiter settings: a [[hotstrings.terminators]] list", function()
 	for _, header in ipairs({ "[[hotstrings.terminators]]", '[["hotstrings"."terminators"]]' }) do
 		helpers.it("removes the complete custom list and its state from " .. header, function()
@@ -389,6 +679,171 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.terminators",
 					"the cleanup would delete the usable delimiter with the unusable one")
 			end
+		end)
+	end)
+end)
+
+
+--- Builds the actual tray provider over its existing acknowledged settings owner.
+--- @param Settings table Native persistent delimiter owner.
+--- @param paused boolean Initial pause posture.
+--- @param reordered boolean Whether the shared section is reversed.
+--- @return table controls, table context, table observations
+local function menu_controls(Settings, paused, reordered)
+	local paths = require("infra.paths")
+	local i18n = require("infra.i18n")
+	local original = package.loaded["infra.manifest_menu"]
+	local observations = { writes = 0, redraws = 0 }
+	local renderer = assert(require("menu.renderer").new({
+		platform = "linux",
+		manifest_path = function() return paths.shared("modules/menu/menu_manifest.json") end,
+		json_decode = function(raw)
+			local value = assert(require("json").decode(raw))
+			if reordered then
+				local rows = value.word_expanders_menu
+				rows[1], rows[3] = rows[3], rows[1]
+			end
+			return value
+		end,
+		i18n = i18n,
+		logger = require("logger.shim"),
+	}))
+	package.loaded["infra.manifest_menu"] = setmetatable({
+		build = function(section, ...)
+			local rows = renderer.build(section, ...)
+			if section == "word_expanders_menu" then observations.controls = rows end
+			return rows
+		end,
+	}, { __index = renderer })
+	local ctx = {
+		paused = paused,
+		config = {
+			get_groups = function() return {} end,
+			get_categories = function() return {} end,
+			language_packs = function() return {} end,
+			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
+			get_global_delay = function() return 0.75 end,
+			has_global_delay_override = function() return false end,
+		},
+		on_persist_terminators = function()
+			observations.writes = observations.writes + 1
+			return Settings.persist()
+		end,
+		on_menu_changed = function() observations.redraws = observations.redraws + 1 end,
+		on_toggle_pause = function() end,
+		on_quit = function() end,
+	}
+	ctx.is_paused = function() return ctx.paused end
+	local passed, rows = pcall(function() return helpers.load_module("ui.menu.menu_builder").build(ctx) end)
+	package.loaded["infra.manifest_menu"] = original
+	if not passed then error(rows, 0) end
+	local function find(items)
+		for _, row in ipairs(items or {}) do
+			if row.title == i18n.get("menu.hotstrings.word_expanders") then return row.menu end
+			local found = find(row.menu)
+			if found then return found end
+		end
+	end
+	for _, row in ipairs(rows) do
+		if row.title == i18n.get("menu.hotstrings.title") then
+			observations.hotstrings_disabled = row.disabled
+			observations.hotstrings_submenu = row.menu
+		end
+	end
+	return assert(find(rows) or observations.controls, "the actual word-expander menu must be built"), ctx, observations
+end
+
+--- Reads the independent fixed-command and delimiter-state expectations.
+--- @return table corpus
+local function controls_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("word-expander native menu controls use shared declarations", function()
+	local stored = SOURCE .. '\n[hotstrings.terminator_states]\nspace = false\nslash = true\n'
+	local modes = { "enable_all", "disable_all", "restore" }
+
+	helpers.it("replays all three native callbacks through actual durable writes and restart (shared-word-expander-controls)", function()
+		local expected = controls_corpus()
+		for position, mode in ipairs(modes) do
+			with_settings(stored, function(Settings, path, sandbox, Terminators)
+				helpers.assert_true(Settings.load())
+				helpers.assert_true(Terminators.add_custom_terminator("custom_x", "x", "x", true))
+				helpers.assert_true(Terminators.set_terminator_enabled("custom_x", false))
+				helpers.assert_true(Settings.persist())
+				local controls, _, observed = menu_controls(Settings, false, false)
+				for index, row in ipairs(expected.rows) do
+					helpers.assert_eq(controls[index].title, require("infra.i18n").get(row.i18n))
+					helpers.assert_type(controls[index].fn, "function")
+				end
+				helpers.assert_eq(controls[4].title, "-")
+				helpers.assert_eq(controls[position].fn(), true)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 1)
+				local values = expected.delimiter_states[mode]
+				for key, enabled in pairs(values) do
+					helpers.assert_eq(Terminators.is_terminator_enabled(key), enabled)
+				end
+				local document = Codec.decode(sandbox.read_bytes(path))
+				helpers.assert_eq(document.hotstrings.unknown, "kept")
+				helpers.assert_eq(document.other.value, 42)
+				helpers.assert_eq(document.hotstrings.terminators[1].consume, true)
+				helpers.assert_true(Settings.adopt_configuration({}))
+				helpers.assert_true(Settings.load())
+				for key, enabled in pairs(values) do
+					helpers.assert_eq(Terminators.is_terminator_enabled(key), enabled, "native restart/" .. mode)
+				end
+			end)
+		end
+	end)
+
+	helpers.it("follows shared command reordering and retains actual lease refusal (shared-word-expander-controls)", function()
+		with_settings(stored, function(Settings, path, sandbox, Terminators)
+			local expected = controls_corpus()
+			helpers.assert_true(Settings.load())
+			local controls, _, observed = menu_controls(Settings, false, true)
+			local labels = {}
+			for _, row in ipairs(expected.rows) do labels[row.id] = row.i18n end
+			for position, id in ipairs(expected.reordered_ids) do
+				helpers.assert_eq(controls[position].title, require("infra.i18n").get(labels[id]))
+			end
+			local owner = {}
+			local preferences = require("infra.hotstring_preferences")
+			helpers.assert_true(preferences.acquire(owner))
+			local passed, failure = pcall(function()
+				helpers.assert_eq(controls[1].fn(), false)
+				helpers.assert_eq(Terminators.is_terminator_enabled("space"), false)
+				helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
+				helpers.assert_eq(sandbox.read_bytes(path), stored)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 0)
+			end)
+			helpers.assert_true(preferences.release(owner))
+			if not passed then error(failure, 0) end
+		end)
+	end)
+
+	helpers.it("retains the paused menu posture and refuses stale callbacks before mutation (shared-word-expander-controls)", function()
+		with_settings(stored, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
+			local controls, ctx, observed = menu_controls(Settings, false, false)
+			ctx.paused = true
+			local receipts = {}
+			for position = 1, 3 do receipts[position] = controls[position].fn() end
+			helpers.assert_eq(observed.writes, 0, "paused callbacks cannot reach the writer")
+			helpers.assert_eq(observed.redraws, 0)
+			helpers.assert_eq(Terminators.is_terminator_enabled("space"), false)
+			helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
+			helpers.assert_eq(sandbox.read_bytes(path), stored)
+			for position = 1, 3 do helpers.assert_eq(receipts[position], false) end
+			local grey, _, grey_observed = menu_controls(Settings, true, false)
+			helpers.assert_eq(grey_observed.hotstrings_disabled, true)
+			helpers.assert_nil(grey_observed.hotstrings_submenu, "paused native roots strip every feature action")
+			for position = 1, 3 do helpers.assert_eq(grey[position].disabled, true) end
+			helpers.assert_eq(grey_observed.writes, 0)
 		end)
 	end)
 end)

@@ -45,6 +45,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include local_model_offer.ahk
 
 
 
@@ -521,6 +522,11 @@ _LLM_Agent_OnActionsFail(Flow, Failure := "") {
 	}
 	LoggerWarn("LLM", "AI agent #{1} failed: the System 2 request failed ({2}).",
 		Flow["generation"], _LLM_Vision_FailureReason(Failure))
+	if LLM_LocalModelIsMissing(Failure) {
+		_LLM_Agent_HideOwnTooltip(Flow)
+		LLM_LocalModelOffer(Failure, Flow["auto"], _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"]))
+		return
+	}
 	_LLM_Agent_Notify(Flow, "llm.agent.failed")
 }
 
@@ -770,7 +776,7 @@ LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
  * @param {Func} OnTriage Called with the triage Map, or "" when there is none.
  * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
  */
-LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage) {
+LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Generation := -1) {
 	global LLM_AGENT_JEV_STATE
 	Config := LLM_Agent_Config()
 	if _LLM_Agent_IsJev(Backend)
@@ -781,7 +787,7 @@ LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage) {
 		"user", Sentence,
 		"max_tokens", Config["system1"]["max_tokens"])
 	return _LLM_Agent_Chat(Backend, Payload, _LLM_Agent_OnSystem1Answer.Bind(Config, OnTriage),
-		_LLM_Agent_OnSystem1Fail.Bind(OnTriage), false)
+		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation), false)
 }
 
 ; System 1 answered: hand its triage on.
@@ -807,7 +813,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage) {
 	if !(Target is Map)
 		return false
 	Questions := LLM_Agent_JevQuestions(Config)
-	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage)
+	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, -1)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
 			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
@@ -840,7 +846,12 @@ _LLM_Agent_OnBackboardJev(Config, OnTriage, Response, Usage := "") {
 }
 
 ; The System 1 request failed: there is no triage.
-_LLM_Agent_OnSystem1Fail(OnTriage, Failure := "") {
+_LLM_Agent_OnSystem1Fail(OnTriage, Generation, Failure := "") {
+	global _LLM_Agent_Generation
+	if Generation >= 0 && (Generation != _LLM_Agent_Generation || A_IsSuspended)
+		return
+	if LLM_LocalModelIsMissing(Failure) && Generation >= 0 && LLM_Agent_WatchesTyping()
+		LLM_LocalModelOffer(Failure, true, _LLM_Agent_RenderIsCurrent.Bind(Generation))
 	LoggerWarn("LLM", "AI agent: the System 1 request failed ({1}).", _LLM_Vision_FailureReason(Failure))
 	OnTriage.Call("")
 }
@@ -888,7 +899,7 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		"context", Ctx, "sentence", Sentence)
 	LoggerInfo("LLM", "AI agent #{1}: triage of {2} character(s) by System 1 '{3}'.", Generation,
 		StrLen(Sentence), System1["backend"])
-	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow)) {
+	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Generation) {
 		LoggerWarn("LLM", "AI agent #{1}: System 1 '{2}' has no API entry with a key.", Generation,
 			System1["backend"])
 		return false

@@ -1074,7 +1074,37 @@ Test("curl owner: native launch returns the exact child handle atomically (AHK-0
 	_RemoteOwnedLaunch_RetainsCreatedProcessHandle)
 
 
+; This deliberately unowned synthetic process can never settle. Keep its debt
+; local to the fixture: later strict enable receipts require the real global
+; ledger to settle. Critical preserves any already-armed predecessor timer while
+; the fixture temporarily owns the ledger; finally restores it even on assertion.
+_RemoteAdoptionFailure_WithSyntheticDebt(Body) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	try {
+		_LLM_CurlCleanupDebt := Map()
+		_LLM_CurlCleanupDebtCounter := 0
+		_LLM_CurlCleanupRetryTimer := 0
+		LLM_CURL_CLEANUP_RETRY_MS := 60000
+		Body.Call()
+	} finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+		LLM_CURL_CLEANUP_RETRY_MS := OldDelay
+		Critical(PreviousCritical)
+	}
+}
+
 _RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
 	State := _RemoteCancelPublication_NewState()
 	Port := _RemoteCancelPublication_CurlPort(State,
 		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
@@ -1083,9 +1113,68 @@ _RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {
 		"release without an exact retained process handle must report failure")
 	AssertEqual(0, State["terminates"],
 		"release must not fall back to terminating a recyclable numeric PID")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"refused release must retain exactly its synthetic cleanup record")
+	DebtId := Owner["cleanup_debt_id"]
+	Record := _LLM_CurlCleanupDebt[DebtId]
+	AssertEqual(ObjPtr(Owner), ObjPtr(Record["owner"]),
+		"debt must retain the exact refusing owner rather than its numeric PID")
+	AssertTrue(HasMethod(_LLM_CurlCleanupRetryTimer, "Call"),
+		"refusal must arm its owned cleanup retry")
+	; Consume the armed one-shot before manually replaying its callback. Otherwise
+	; retry replaces the timer field and would strand the original native timer.
+	SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+	AssertFalse(LLM_CurlRetryCleanupDebt(),
+		"retry cannot invent a native handle for this deliberately invalid owner")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"refusal must remain owned until the synthetic fixture is withdrawn")
+	AssertEqual(ObjPtr(Record), ObjPtr(_LLM_CurlCleanupDebt[DebtId]),
+		"retry must keep the same cleanup record")
+	AssertFalse(Owner["released"], "fixture isolation is not native settlement")
+	AssertEqual(0, State["opens"], "retry must never reopen a recyclable PID")
+	AssertEqual(0, State["terminates"], "retry must never terminate by PID")
+	AssertEqual(0, State["closes"], "retry must not close a fabricated handle")
 }
 Test("curl owner: release without exact handle cannot report success (curl-adoption-failure)",
-	_RemoteAdoptionFailure_ReleaseCannotClaimSuccess)
+	_RemoteAdoptionFailure_WithSyntheticDebt.Bind(
+		_RemoteAdoptionFailure_ReleaseCannotClaimSuccess))
+
+
+_RemoteAdoptionFailure_ThrowAfterRefusal() {
+	_RemoteAdoptionFailure_ReleaseCannotClaimSuccess()
+	throw Error("synthetic debt fixture interruption")
+}
+
+_RemoteAdoptionFailure_IsolationRestoresAfterThrow() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCount := OldDebt.Count
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	OldCritical := A_IsCritical
+	Failure := ""
+	try _RemoteAdoptionFailure_WithSyntheticDebt(_RemoteAdoptionFailure_ThrowAfterRefusal)
+	catch as Err
+		Failure := Err.Message
+	AssertEqual("synthetic debt fixture interruption", Failure,
+		"the isolation fixture must propagate the original failure")
+	AssertEqual(ObjPtr(OldDebt), ObjPtr(_LLM_CurlCleanupDebt),
+		"interrupted fixture must restore the exact predecessor cleanup ledger")
+	AssertEqual(OldCount, _LLM_CurlCleanupDebt.Count,
+		"synthetic refusal must not leak into genuine predecessor debt")
+	AssertEqual(OldCounter, _LLM_CurlCleanupDebtCounter,
+		"interrupted fixture must restore predecessor debt identity allocation")
+	AssertEqual(OldTimer, _LLM_CurlCleanupRetryTimer,
+		"interrupted fixture must preserve the exact already-armed retry owner")
+	AssertEqual(OldDelay, LLM_CURL_CLEANUP_RETRY_MS,
+		"interrupted fixture must restore the predecessor retry policy")
+	AssertEqual(OldCritical, A_IsCritical,
+		"interrupted fixture must restore native thread admission")
+}
+Test("curl owner: synthetic debt fixture restores predecessor ownership after interruption (curl-adoption-failure)",
+	_RemoteAdoptionFailure_IsolationRestoresAfterThrow)
 
 
 class _RemoteCancelPublicationHttp {

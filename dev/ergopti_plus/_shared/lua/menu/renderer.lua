@@ -442,6 +442,82 @@ function M.new(deps)
 		return nil
 	end
 
+	--- Builds provider data from the same choice declaration used by ordinary rows.
+	--- @param item table Published choice metadata.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param commands table Existing native mutation owners.
+	--- @param getters table Existing native state readers.
+	--- @return table|nil row
+	local function choice_row_data(item, manifest_key, commands, getters)
+		local row_id   = type(item.id) == "string" and item.id or ""
+		local i18n_key = type(item.i18n) == "string" and item.i18n or ""
+		local path     = type(item.path) == "string" and item.path or ""
+		local cmd_id   = type(item.command) == "string" and item.command or row_id
+		local fn       = commands[cmd_id]
+		local choices  = type(item.choices) == "table" and item.choices or {}
+
+		if row_id == "" or i18n_key == "" or path == "" or #choices == 0 then
+			Logger.error(LOG, "'choice' item in '%s' needs id, i18n, path and choices — skipped.", manifest_key)
+			return nil
+		end
+		if type(fn) ~= "function" then
+			Logger.error(LOG, "No command '%s' registered for the '%s.%s' choice — skipped.",
+				tostring(cmd_id), manifest_key, row_id)
+			return nil
+		end
+
+		local current = nil
+		if type(getters[path]) == "function" then
+			current = getters[path]()
+		else
+			-- Fails open like checked_when: no value is ticked rather than a
+			-- guessed one, and the drift is loud.
+			Logger.error(LOG, "No getter for the '%s' value of choice '%s.%s' — nothing is ticked.",
+				path, manifest_key, row_id)
+		end
+
+		local sub = {}
+		local current_label = nil
+		for _, choice in ipairs(choices) do
+			local value = choice.value
+			local label = choice.label or i18n.get(choice.i18n)
+			if current == value then
+				current_label = choice.current_i18n and i18n.get(choice.current_i18n) or label
+			end
+			sub[#sub + 1] = {
+				label   = label,
+				checked = current == value,
+				action  = function() return fn(value) end,
+			}
+		end
+		local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
+		-- Caption interpolation is declared alongside the shared choice, so
+		-- native consumers provide no competing mode-label policy.
+		if item.show_current_choice == true then
+			title = title:gsub(item.current_choice_placeholder or "{1}", function() return current_label or tostring(current or "") end)
+		end
+		return {
+			label = title, items = sub,
+			disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
+		}
+	end
+
+	--- Supplies one declared choice as provider data, without a private row policy.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param row_id string Declared choice identity.
+	--- @param commands table Existing native mutation owners.
+	--- @param getters table Existing native state readers.
+	--- @return table|nil row
+	function R.choice_row(manifest_key, row_id, commands, getters)
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.type == "choice" and item.id == row_id and is_for_platform(item) then
+				return choice_row_data(item, manifest_key, commands or {}, getters or {})
+			end
+		end
+		Logger.error(LOG, "Missing declared choice '%s.%s' — provider row refused.", manifest_key, row_id)
+		return nil
+	end
+
 	--- Builds a menu items table from a manifest menu definition array.
 	---
 	--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
@@ -738,60 +814,14 @@ function M.new(deps)
 				item_count = item_count + 1
 
 			elseif t == "choice" then
-				-- One setting with a fixed set of values: ONE row whose submenu lists
-				-- the values, the current one ticked. The values and their labels are
-				-- the enum feature's (`path`), projected into the row by
-				-- build-menu-manifest.js, so a value added to the feature appears here
-				-- without a driver change. The driver supplies the current value
-				-- (state_getters[path]) and what choosing a value does
-				-- (commands[id](value)).
-				--
-				-- It exists because the macOS menubar icon was two sibling rows, one
-				-- per variant, stored outside config.toml: a choice between values
-				-- drawn as two unrelated actions.
-				local row_id   = type(item.id) == "string" and item.id or ""
-				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
-				local path     = type(item.path) == "string" and item.path or ""
-				local cmd_id   = type(item.command) == "string" and item.command or row_id
-				local fn       = commands[cmd_id]
-				local choices  = type(item.choices) == "table" and item.choices or {}
-
-				if row_id == "" or i18n_key == "" or path == "" or #choices == 0 then
-					Logger.error(LOG, "'choice' item in '%s' needs id, i18n, path and choices — skipped.", manifest_key)
-					goto continue
+				local row = choice_row_data(item, manifest_key, commands, getters)
+				if not row then goto continue end
+				local rendered = render_rows({ row }, item.id, 1)
+				if #rendered > 0 then
+					flush_sep()
+					table.insert(result, rendered[1])
+					item_count = item_count + 1
 				end
-				if type(fn) ~= "function" then
-					Logger.error(LOG, "No command '%s' registered for the '%s.%s' choice — skipped.",
-						tostring(cmd_id), manifest_key, row_id)
-					goto continue
-				end
-
-				local current = nil
-				if type(getters[path]) == "function" then
-					current = getters[path]()
-				else
-					-- Fails open like checked_when: no value is ticked rather than a
-					-- guessed one, and the drift is loud.
-					Logger.error(LOG, "No getter for the '%s' value of choice '%s.%s' — nothing is ticked.",
-						path, manifest_key, row_id)
-				end
-
-				local sub = {}
-				for _, choice in ipairs(choices) do
-					local value = choice.value
-					sub[#sub + 1] = {
-						title   = i18n.get(choice.i18n),
-						checked = current == value,
-						fn      = function() return fn(value) end,
-					}
-				end
-				flush_sep()
-				table.insert(result, {
-					title    = i18n.get(i18n_key),
-					menu     = sub,
-					disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
-				})
-				item_count = item_count + 1
 
 			elseif t == "dynamic" then
 				local dyn_id = type(item.id) == "string" and item.id or ""
@@ -834,6 +864,40 @@ function M.new(deps)
 	--- @return table
 	function R.get_array(key)
 		return get_menu_def(key)
+	end
+
+
+	--- Returns independently owned Dynamic family child records in manifest order.
+	--- Callers select their native section alias and supply only live state.
+	--- @return table[] families
+	function R.get_dynamic_hotstring_families()
+		local root = get_manifest_root()
+		local node = root and root.dynamic_hotstring_families
+		local rows = type(node) == "table" and node.rows
+		if type(rows) ~= "table" or #rows == 0 then
+			error("Dynamic hotstring families require their shared menu declaration", 2)
+		end
+		local out, seen = {}, {}
+		for _, row in ipairs(rows) do
+			if type(row) ~= "table" then error("Dynamic hotstring family must be a record", 2) end
+			local copy = require("toml_codec.leaf_rows").clone_value(row)
+			if row.separator == true then
+				if row.id ~= nil then error("Dynamic separator cannot also be a family", 2) end
+			else
+				for _, key in ipairs({ "id", "section", "i18n", "legacy_key" }) do
+					if type(row[key]) ~= "string" or row[key] == "" then
+						error("Dynamic hotstring family requires " .. key, 2)
+					end
+				end
+				if seen[row.id] then error("Duplicate Dynamic hotstring family: " .. row.id, 2) end
+				seen[row.id] = true
+				if row.linux_section ~= nil and (type(row.linux_section) ~= "string" or row.linux_section == "") then
+					error("Dynamic hotstring Linux section must be a nonempty string", 2)
+				end
+			end
+			out[#out + 1] = copy
+		end
+		return out
 	end
 
 

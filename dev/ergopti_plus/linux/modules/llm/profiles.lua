@@ -56,14 +56,17 @@ local _base_url = nil
 --- Persists one profile value before its in-memory counterpart is published.
 --- @param key string
 --- @param value any
+--- @param expected_source table|nil Captured exact preference source.
 --- @return boolean
-local function persist(key, value)
+local function persist(key, value, expected_source)
 	local ok, storage = pcall(require, "infra.llm_preferences")
 	if not ok or not storage or type(storage.set) ~= "function" then
 		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
 		return false
 	end
-	if not storage.set(key, value) then
+	local committed = expected_source and storage.set_many({ [key] = value }, expected_source)
+		or (expected_source == nil and storage.set(key, value))
+	if committed ~= true then
 		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", key)
 		return false
 	end
@@ -205,9 +208,11 @@ function M.is_enabled()
 	return _enabled
 end
 
---- Enables the LLM feature and persists.
-function M.enable()
-	if not persist("llm.enabled", true) then return false end
+--- Enables the LLM feature only after its existing writer acknowledges.
+--- @param expected_source table|nil Exact source used by an enable admission.
+--- @return boolean
+function M.enable(expected_source)
+	if not persist("llm.enabled", true, expected_source) then return false end
 	_enabled = true
 	Logger.info(LOG, "LLM enabled.")
 	return true

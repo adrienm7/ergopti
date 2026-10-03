@@ -281,6 +281,8 @@ LayoutRemapSignature(Hkl, Port := 0) {
 ; @returns {Boolean}
 LayoutRemapNeedsReload(Hkl, Port := 0) {
 	global _LAYOUT_REMAP_HKL
+	if !(Port is Map) && MagicEditorNeedsLayoutReload(Hkl)
+		return true
 	return LayoutRemapSignature(Hkl, Port) != LayoutRemapSignature(_LAYOUT_REMAP_HKL, Port)
 }
 

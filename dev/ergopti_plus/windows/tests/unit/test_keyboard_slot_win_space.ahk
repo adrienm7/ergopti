@@ -14,7 +14,7 @@
 ; and the menu label the slot shows. The default binding itself lives in
 ; infra/feature_state.ahk, which the suite does not load; the JS gate
 ; test-keyboard-slot-recommended-bindings.cjs pins it to the manifest.
-; The editor recommendation follows the same owner: existing assignments win,
+; Explicit editor assignments follow the same owner: existing assignments win,
 ; an explicit removal persists, and the action can move to another chord.
 ; ==============================================================================
 
@@ -108,15 +108,15 @@ _KSWS_EditorSlotAssignmentsRemainUserOwned() {
 		RunKeyboardShortcutAction("win_b")
 		AssertEqual(1, EditorCalls, "the editor action dispatches through its ordinary slot")
 
-		Assert(SetKeyboardShortcutAction("win_d", ManifestRecommendedFor("shortcuts.keyboard.win_d")),
-			"explicitly assigning the shared recommendation must use the existing durable owner")
+		Assert(SetKeyboardShortcutAction("win_d", "open_hotstrings_editor"),
+			"explicitly assigning the editor must use the existing durable owner")
 		AssertEqual("open_hotstrings_editor", TOML_ParseFreshFile(Path)["shortcuts.keyboard"]["win_d"])
 		AssertEqual(1, _KSWS_EditorSlotRowsCount("win_d"),
 			"the editor assignment is shown once in the ordinary Win shortcuts group")
 		RunKeyboardShortcutAction("win_d")
-		AssertEqual(2, EditorCalls, "an explicit recommendation invokes the same catalogue action")
+		AssertEqual(2, EditorCalls, "an explicit assignment invokes the same catalogue action")
 
-		Assert(SetKeyboardShortcutAction("win_d", "none"), "the user can remove the recommended assignment")
+		Assert(SetKeyboardShortcutAction("win_d", "none"), "the user can remove the personal assignment")
 		KeyboardShortcutAssignments := Map()
 		_IniCache := TOML_ParseFreshFile(Path)
 		ReadKeyboardShortcutsConfig()
@@ -156,5 +156,5 @@ _KSWS_EditorSlotAssignmentsRemainUserOwned() {
 		try FileDelete(Path)
 	}
 }
-Test("Keyboard slots: editor recommendations can be removed and rebound without replacing user actions (hotstrings-editor-ordinary-slot)",
+Test("Keyboard slots: personal editor assignments can be removed and rebound without replacing user actions (hotstrings-editor-ordinary-slot)",
 	_KSWS_EditorSlotAssignmentsRemainUserOwned)

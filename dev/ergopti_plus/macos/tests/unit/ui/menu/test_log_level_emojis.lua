@@ -94,3 +94,142 @@ helpers.describe("Menu — log level emojis", function()
 		Logger.current_level = old_level
 	end)
 end)
+
+--- Reads the independent four-state presentation captured before migration.
+--- @return table corpus
+local function log_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/log_level_rows.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+--- Builds the actual Debug row with its real logger threshold.
+--- @param value string Severity name.
+--- @param setter function Existing native assignment owner.
+--- @return table row
+local function log_row(value, setter)
+	local logger = require("infra.logger")
+	logger.set_level(value)
+	local rows = helpers.load_with_stubs("ui.menu.builder").generate({}, {}, { set_log_level = setter })
+	local label = require("infra.i18n").get("menu.debug.log_level")
+	for _, top in ipairs(rows) do
+		for _, row in ipairs(top.menu or {}) do
+			if row.title and row.title:find(label, 1, true) == 1 then return row end
+		end
+	end
+	error("the declared Debug log-level parent is missing")
+end
+
+helpers.describe("macOS shared Debug log choices", function()
+	for _, state in ipairs(log_corpus().states) do
+		helpers.it("replays the independent four-state matrix for " .. state.selected, function()
+			local logger, observed = require("infra.logger"), {}
+			local previous = logger.current_level
+			local ok, detail = pcall(function()
+				local row = log_row(state.selected, function(value) observed[#observed + 1] = value; return true end)
+				helpers.assert_eq(#row.menu, 4)
+				for index, level in ipairs(log_corpus().levels) do
+					helpers.assert_eq(row.menu[index].title, level.label)
+					helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
+					if level.value == state.selected then
+						helpers.assert_eq(row.title, require("infra.i18n").get("menu.debug.log_level") .. " : " .. level.label)
+					end
+					helpers.assert_eq(row.menu[index].fn(), true)
+				end
+				helpers.assert_eq(observed, { "DEBUG", "INFO", "WARNING", "ERROR" })
+			end)
+			logger.current_level = previous
+			if not ok then error(detail, 0) end
+		end)
+	end
+
+	helpers.it("follows the actual shared order without treating refusal as success", function()
+		local renderer, logger = require("infra.manifest_menu"), require("infra.logger")
+		local declaration
+		for _, row in ipairs(renderer.get_root().debug_menu) do if row.id == "log_level" then declaration = row end end
+		local previous, threshold = declaration.choices, logger.current_level
+		local expected, labels, requested = log_corpus(), {}, nil
+		for _, level in ipairs(expected.levels) do labels[level.value] = level.label end
+		declaration.choices = {}
+		for _, value in ipairs(expected.reordered_values) do
+			declaration.choices[#declaration.choices + 1] = { value = value, label = labels[value] }
+		end
+		local ok, detail = pcall(function()
+			local row = log_row("INFO", function(value) requested = value; return false end)
+			for index, value in ipairs(expected.reordered_values) do helpers.assert_eq(row.menu[index].title, labels[value]) end
+			helpers.assert_eq(row.menu[1].fn(), false)
+			helpers.assert_eq(requested, "ERROR")
+			helpers.assert_eq(logger.current_level, logger.LEVELS.INFO)
+		end)
+		declaration.choices, logger.current_level = previous, threshold
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+--- Exercises the action captured from the real ui.menu.start over isolated settings.
+--- @param receipt string Settings receipt mode.
+local function check_log_commit(receipt)
+	local saved = {}
+	for key, value in pairs(package.loaded) do saved[key] = value end
+	local saved_hs = _G.hs
+	local storage_owner, previous_storage_set
+	local ok, detail = pcall(function()
+		local fixture = require("tests.support.menu_boot_fixture").boot()
+		local actions = fixture.global_actions()
+		local logger, storage = require("infra.logger"), require("adapters.storage")
+		storage_owner, previous_storage_set = storage, storage.set
+		local threshold, writes, published, rebuilt = "INFO", 0, 0, 0
+		local stored_key, stored_value, detached_threshold
+		local bytes = 'log_level = "INFO"\nfuture = 42\n'
+		local before = bytes
+		logger.set_level = function(value) threshold = value; published = published + 1 end
+		storage.set = function(key, value)
+			writes = writes + 1
+			stored_key, stored_value, detached_threshold = key, value, threshold
+			if receipt == "throw" then error("settings unavailable") end
+			if receipt == "false" then return false end
+			if receipt == "nil" then return nil end
+			bytes = 'log_level = "ERROR"\nfuture = 42\n'
+			return true
+		end
+		local builder = package.loaded["ui.menu.builder"]
+		builder.generate = function() rebuilt = rebuilt + 1; return {} end
+		-- Prime the cached tree before this click: a refused owner must keep it.
+		fixture.menu_provider()
+		rebuilt = 0
+		local result = actions.set_log_level("ERROR")
+		local observed = { result = result, threshold = threshold, writes = writes,
+			published = published, bytes = bytes }
+		fixture.menu_provider()
+		helpers.assert_eq(observed.writes, 1)
+		helpers.assert_eq(stored_key, "log_level")
+		helpers.assert_eq(stored_value, "ERROR")
+		helpers.assert_eq(detached_threshold, "INFO", "candidate threshold stays detached during durable I/O")
+		if receipt == "true" then
+			helpers.assert_eq(observed.result, true)
+			helpers.assert_eq(observed.threshold, "ERROR")
+			helpers.assert_eq(observed.published, 1)
+			helpers.assert_eq(observed.bytes, 'log_level = "ERROR"\nfuture = 42\n')
+			helpers.assert_eq(rebuilt, 1, "an acknowledged choice invalidates the cached tree")
+		else
+			helpers.assert_eq(observed.result, false)
+			helpers.assert_eq(observed.threshold, "INFO")
+			helpers.assert_eq(observed.published, 0)
+			helpers.assert_eq(observed.bytes, before)
+			helpers.assert_eq(rebuilt, 0, "a refused choice preserves the cached tree")
+		end
+	end)
+	if storage_owner then storage_owner.set = previous_storage_set end
+	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
+	for key, value in pairs(saved) do package.loaded[key] = value end
+	_G.hs = saved_hs
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("macOS actual Debug settings owner", function()
+	for _, receipt in ipairs(log_corpus().refusals) do
+		helpers.it("preserves threshold and cached UI on settings " .. receipt, function() check_log_commit(receipt) end)
+	end
+	helpers.it("publishes the threshold and invalidates UI only after acknowledged settings", function() check_log_commit("true") end)
+end)

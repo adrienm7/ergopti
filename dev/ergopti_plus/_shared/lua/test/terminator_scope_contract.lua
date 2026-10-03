@@ -37,6 +37,34 @@ return function(helpers, select_leaves)
 			helpers.assert_eq(document.hotstrings.unknown, "kept")
 		end)
 
+		helpers.it("replays independent personal preservation vectors without taking ownership", function()
+			local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
+				:match("^(.*)/lua/test/[^/]+$")
+			local path = assert(shared, "the shared tree encloses this contract")
+				.. "/tests/corpus/hotstrings/terminator_restoration_vectors.json"
+			local handle = assert(io.open(path, "rb"))
+			local content = handle:read("*a")
+			handle:close()
+			local vectors = assert(require("json").decode(content))
+			helpers.assert_eq(#vectors, 4, "all independent preservation vectors execute")
+			for _, vector in ipairs(vectors) do
+				local states = {}
+				for key, value in pairs(vector.states) do states[key] = value end
+				local expected_custom = assert(require("json").decode(require("json").encode(vector.custom)))
+				local document = { hotstrings = {
+					terminator_states = states, terminators = vector.custom, unknown = "kept",
+				} }
+				for _, leaf in ipairs(select_leaves(document)) do states[leaf[3]] = nil end
+				helpers.assert_eq(states, vector.expected_personal, vector.id)
+				helpers.assert_eq(document.hotstrings.terminators, expected_custom, vector.id)
+				helpers.assert_eq(document.hotstrings.unknown, "kept", vector.id)
+				local defaults = Scope.defaults()
+				helpers.assert_eq(defaults.space, true, vector.id)
+				helpers.assert_eq(defaults.slash, false, vector.id)
+				helpers.assert_eq(defaults.star, true, vector.id)
+			end
+		end)
+
 		helpers.it("leaves absent, malformed and personal-only state tables to their owners", function()
 			for _, document in ipairs({ {}, { hotstrings = false }, { hotstrings = {} },
 				{ hotstrings = { terminator_states = false } },

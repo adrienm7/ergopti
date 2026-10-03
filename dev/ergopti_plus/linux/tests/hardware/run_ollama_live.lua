@@ -8,14 +8,15 @@
 ---   1. the installed-model list the menu shows (/api/tags);
 ---   2. a model download through the model browser's path (/api/pull), which
 ---      had never worked on Linux;
----   3. predictions from the engine, streamed, parsed and offered, as typing
+---   3. model presence before inference, including a genuinely absent tag;
+---   4. predictions from the engine, streamed, parsed and offered, as typing
 ---      would ask for them;
----   4. the remote-API backend and its "Test" probe, pointed at Ollama's own
+---   5. the remote-API backend and its "Test" probe, pointed at Ollama's own
 ---      OpenAI-compatible endpoint, which speaks the dialect Cerebras does.
 ---
 --- Usage (from the driver root, with lua-luv installed and Ollama serving):
 ---   luajit tests/hardware/run_ollama_live.lua <model-tag>
---- Exit 0 = all four verified; 1 = a failure; 2 = no environment.
+--- Exit 0 = all five verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
 
 local MODEL = arg[1]
@@ -109,13 +110,60 @@ check(pulled == true, "Ollama confirms the model through /api/pull")
 
 
 
+
+-- ===========================================
+-- ===========================================
+-- ======= 3/ Model presence admission =======
+-- ===========================================
+-- ===========================================
+
+print("=== 3/ local model admission before inference ===")
+local Ollama = require("modules.llm.api_ollama")
+local Http = require("adapters.http_client")
+local native_post = Http.postStream
+local inference_posts = 0
+Http.postStream = function(...)
+	inference_posts = inference_posts + 1
+	return native_post(...)
+end
+local verified, verify_err, verified_done = nil, nil, 0
+Ollama.chat(Profiles.get_base_url(), MODEL, { { role = "user", content = "Say ready." } },
+	{ stream = false, max_tokens = 24, verify_local_model = true }, nil, function(text, err)
+		verified, verify_err = text, err
+		verified_done = verified_done + 1
+	end)
+check(run_until(120, function() return verified ~= nil end), "the acknowledged-model request settles asynchronously")
+check(verify_err == nil and type(verified) == "string" and verified ~= "", "the installed model actually answers")
+check(verified_done == 1, "the installed-model request completes exactly once")
+check(inference_posts == 1, "only the acknowledged model reaches the inference transport")
+local MISSING_MODEL = "ergopti-test-missing-model:never-pulled"
+local missing_listed = false
+for _, name in ipairs(models) do if name == MISSING_MODEL then missing_listed = true end end
+check(not missing_listed, "the missing-model fixture is independently absent from the native listing")
+local missing_err, missing_done = nil, 0
+Ollama.chat(Profiles.get_base_url(), MISSING_MODEL, { { role = "user", content = "private request" } },
+	{ verify_local_model = true }, nil, function(_, err)
+		missing_err = err
+		missing_done = missing_done + 1
+	end)
+check(run_until(10, function() return missing_done > 0 end), "the absent-model preflight completes asynchronously")
+check(missing_done == 1, "the absent-model request completes exactly once")
+check(type(missing_err) == "table" and missing_err.reason == "model_missing"
+	and missing_err.model == MISSING_MODEL, "the native tags receipt names the missing model")
+check(inference_posts == 1, "an absent model never transmits the private inference body")
+Http.postStream = native_post
+
+
+
+
+
 -- =========================================
 -- =========================================
--- ======= 3/ Predictions ==================
+-- ======= 4/ Predictions ==================
 -- =========================================
 -- =========================================
 
-print("=== 3/ predictions from the engine ===")
+print("=== 4/ predictions from the engine ===")
 local offered, final = {}, nil
 local Engine = require("modules.llm.prediction_engine")
 Engine.init({
@@ -143,11 +191,11 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 4/ The remote backend ===========
+-- ======= 5/ The remote backend ===========
 -- =========================================
 -- =========================================
 
-print("=== 4/ the remote-API backend on Ollama's OpenAI endpoint ===")
+print("=== 5/ the remote-API backend on Ollama's OpenAI endpoint ===")
 local Remote = require("modules.llm.api_remote")
 local entry = {
 	id = "ollama-openai", provider = "openai_compat", label = "Ollama (OpenAI)",

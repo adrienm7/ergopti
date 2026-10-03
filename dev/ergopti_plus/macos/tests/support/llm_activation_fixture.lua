@@ -9,6 +9,9 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
+	"adapters.http_client",
+	"ui.menu.menu_llm.ollama_enable_probe",
+	"llm.enable_admission",
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
@@ -78,6 +81,8 @@ local function build_fixture(backend, save_results, options)
 	options = options or {}
 	local noop = function() end
 	local calls = {
+		version_requests = {},
+		service_repairs = 0,
 		bootstrap = 0,
 		requirements = 0,
 		notifications = 0,
@@ -312,13 +317,14 @@ local function build_fixture(backend, save_results, options)
 				return strict_result(options.profile_constructor_mode,
 					"profile constructor")
 			end
-			return { get_menu_item = function() return {} end }
+			return { scope_idle = function() return true end, get_menu_item = function() return {} end }
 		end,
 	}
 	package.loaded["ui.menu.menu_llm.settings_manager"] = {
 		new = function()
 			calls.settings_constructed = (calls.settings_constructed or 0) + 1
 			return {
+				scope_idle = function() return options.scope_blocked ~= true end,
 				build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
 			}
@@ -328,6 +334,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.streaming_panel"] = { build = function() return {} end }
 	package.loaded["ui.menu.menu_llm.warmup_controller"] = { warmup = noop }
 	package.loaded["ui.menu.menu_llm.backend_panel"] = {
+		scope_idle = function() return true end,
 		is_apple_silicon = function() return false end,
 		build = function() return "backend", {} end,
 	}
@@ -352,6 +359,7 @@ local function build_fixture(backend, save_results, options)
 				local settle_recovery_debts = function() return true end
 				calls.switcher_settlement = settle_recovery_debts
 				return {
+					scope_idle = function() return true end,
 					switch_model = noop,
 					disable_model = noop,
 					set_llm_profile = noop,
@@ -373,7 +381,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.startup_controller"] = {
 		new = function(ctx)
 			calls.startup_ctx = ctx
-			return noop
+			return noop, function() return true end
 		end,
 	}
 	package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
@@ -428,12 +436,21 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["modules.llm.ollama_deps_checker"] = {
 		-- An installed Ollama is reused, so enabling offers no download unless
 		-- a case sets ollama_installed = false.
+		provisioning_idle = function() return options.provisioning_debt ~= true end,
 		runtime_available = function() return options.ollama_installed ~= false end,
 		is_task_running = function() return false end,
 		install_for_selection = function(callback)
 			calls.ollama_installs = calls.ollama_installs + 1
 			calls.bootstrap_callback = callback
-			return true
+			if options.ollama_bootstrap_throw then
+				calls.ollama_bootstrap_outcome = "throw"
+				error("Ollama installation exploded")
+			end
+			local receipt = options.ollama_bootstrap_return
+			if receipt == "nil" then receipt = nil elseif receipt == nil then receipt = true end
+			calls.ollama_bootstrap_outcome = type(receipt)
+			calls.ollama_bootstrap_receipt = receipt
+			return receipt
 		end,
 		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
@@ -562,6 +579,57 @@ local function build_fixture(backend, save_results, options)
 			end,
 		}
 	end
+
+	package.loaded["modules.llm"].configuration_idle = function() return true end
+	package.loaded["adapters.http_client"] = {
+		new = function()
+			local active = false
+			local observers = {}
+			return {
+				get = function(url, _, callback)
+					calls.version_requests[#calls.version_requests + 1] = url
+					active = true
+					calls.version_callback = function(result)
+						active = false
+						callback(result)
+						local pending = observers
+						observers = {}
+						for _, observer in ipairs(pending) do observer() end
+					end
+					if options.version_deferred ~= true then
+						calls.version_callback((options.version_receipts and options.version_receipts[#calls.version_requests])
+							or options.version_receipt or {
+							ok = options.ollama_installed ~= false,
+							status = options.ollama_installed == false and 0 or 200,
+							body = '{"version":"fixture-version"}',
+						})
+					end
+					return strict_result(options.version_dispatch_mode, "version dispatch")
+				end,
+				cancel = function()
+					if strict_result(options.version_cancel_mode, "version cancel") ~= true then return false end
+					active = false
+					return true
+				end,
+				onSettled = function(observer)
+					if active then observers[#observers + 1] = observer else observer() end
+					return true
+				end,
+			}
+		end,
+	}
+	local service = package.loaded["modules.llm.api_ollama"] or {}
+	service.startup_idle = function() return options.startup_debt ~= true end
+	service.ensure_running = function(context)
+		calls.service_repairs = calls.service_repairs + 1
+		calls.service_authorized = context.is_authorized
+		calls.service_callback = context.on_settled
+		if options.service_deferred ~= true then
+			context.on_settled(options.service_receipt ~= false)
+		end
+		return strict_result(options.service_dispatch_mode, "service repair dispatch")
+	end
+	package.loaded["modules.llm.api_ollama"] = service
 
 	package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
 	package.loaded["ui.menu.menu_llm"] = nil

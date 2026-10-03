@@ -1054,6 +1054,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		global CategoryEnabled
 		global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
 		global UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
+		global _IniCache, KEYBOARD_SHORTCUT_DEFAULTS
 		Updates := []
 		HasFeatureCandidate := IsSet(FeaturesSource)
 		FeatureState := HasFeatureCandidate ? FeaturesSource
@@ -1086,10 +1087,9 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				for Slot, Action in ScriptShortcutAssignments
 						Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: Action })
 		}
-		if IsSet(KeyboardShortcutAssignments) {
-				for Slot, Action in KeyboardShortcutAssignments
-						Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
-		}
+		if IsSet(KeyboardShortcutAssignments)
+				CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments,
+						_IniCache.Get("shortcuts.keyboard", Map()), KEYBOARD_SHORTCUT_DEFAULTS)
 		if IsSet(GestureAssignments) {
 				for Slot, Action in GestureAssignments
 						Updates.Push({ Section: "gestures", Key: Slot, Value: Action })
@@ -1098,8 +1098,6 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
 		Updates.Push({ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
-		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
 		Updates.Push({ Section: "metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
 		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
 		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
@@ -1773,6 +1771,21 @@ _KeyboardSlotChord(SlotId) {
 		return Formatted["ok"] ? Formatted["label"] : ""
 }
 
+/**
+ * Collects keyboard settings without materializing implicit neutral defaults.
+ * @param {Array} Updates Existing acknowledged writer's speculative rows.
+ * @param {Map} Assignments Resolved runtime assignments.
+ * @param {Map} Stored Actual raw keyboard records, preserving explicit none.
+ * @param {Map} Defaults Actual manifest-derived initial assignments.
+ */
+CollectKeyboardShortcutUpdates(Updates, Assignments, Stored, Defaults) {
+	for Slot, Action in Assignments {
+		if Action == "none" && Defaults.Get(Slot, "none") == "none" && !Stored.Has(Slot)
+			continue
+		Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
+	}
+}
+
 ReadKeyboardShortcutsConfig() {
 		global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
 		for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
@@ -1822,6 +1835,7 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
 		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
 				"keyboard", "shortcuts.keyboard", SlotId, ActionName)
 				return false
+		MagicEditorConfigurationChanged()
 		return ReloadPreservingSuspend()
 }
 
@@ -1830,6 +1844,8 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 }
 
 _FormatSlotLabel(SlotId) {
+		if SlotId == MagicEditorSlot()["id"]
+				return MagicEditorSlotLabel()
 		static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
 		; Only the two NAMED keys are translatable — ".", "," and "²" are the glyphs
 		; themselves. The map holds i18n KEYS, never labels: a static initialised with
@@ -1856,6 +1872,7 @@ _FormatSlotLabel(SlotId) {
 ; the translated labels: a static initialised with t() would freeze the language
 ; at first call, and the menu is rebuilt on a language switch expecting the new one
 global KEYBOARD_SLOT_GROUPS := [
+		Map("prefix", "magic_", "group_key", "menu.shortcuts.group_contextual", "add_key", "menu.shortcuts.add_contextual"),
 		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
 		Map("prefix", "ctrl_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
 		Map("prefix", "ctrl_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
@@ -1879,6 +1896,10 @@ KeyboardSlotRows() {
 		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
 				Items := []
+				if Prefix == "magic_" {
+						Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", MagicEditorSlotRows()))
+						continue
+				}
 				for Slot, Action in KeyboardShortcutAssignments {
 						if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
 								continue

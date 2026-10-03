@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 local ParameterLabel = require("action_parameter_label")
 
 local Logger = require("logger.shim")
@@ -138,7 +139,7 @@ end
 --- @param title string|nil Already-localised window title.
 local function show_error(message, title)
 	local command = "zenity --error"
-		.. (title and (" --title=" .. shell_quote(title)) or "")
+		.. " --title=" .. shell_quote(WindowTitles.compose(title == nil and i18n_safe("common.error_title") or title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
@@ -151,7 +152,7 @@ end
 --- @param title string Already-localised window title.
 --- @param message string Already-localised text.
 local function show_info(title, message)
-	local command = "zenity --info --title=" .. shell_quote(title)
+	local command = "zenity --info --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the outcome is still recorded where a user can find it.
@@ -294,7 +295,7 @@ end
 local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
 	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
 	-- module-level succeeded() above normalises both spellings.
-	local command = "zenity --question --title=" .. shell_quote(title)
+	local command = "zenity --question --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(text)
 		.. " --ok-label=" .. shell_quote(ok_label)
 		.. " --cancel-label=" .. shell_quote(cancel_label)
@@ -420,6 +421,44 @@ local function _build_layouts(ctx)
 		return ctx.webview.show("layout_manager")
 	end
 
+	-- The manifest owns this switch and its position before the physical picker.
+	-- The canonical choice owner also owns the runtime publication and redraw.
+	render_ctx.feature_rows = {}
+	for key, value in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[key] = value end
+	local replace_path = "hotstrings.magic_key.replace"
+	for _, declaration in ipairs(ManifestMenu and ManifestMenu.get_array("layout_menu") or {}) do
+		if declaration.type == "feature" and declaration.path == replace_path then
+			render_ctx.feature_rows[replace_path] = function()
+				local config = ctx.config
+				if type(config) ~= "table" or type(config.is_group_enabled) ~= "function"
+					or type(config.is_section_checked) ~= "function" or type(config.toggle_section) ~= "function" then
+					Logger.error(LOG, "No canonical magic replacement choice owner in the layout menu.")
+					return nil
+				end
+				local function admitted()
+					return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+						and config.is_group_enabled("magickey") == true
+				end
+				local enabled = admitted()
+				return {
+					label = i18n_safe(declaration.i18n),
+					checked = config.is_section_checked("magickey", "replace") == true,
+					disabled = not enabled,
+					action = enabled and function()
+						if not admitted() then return false end
+						local ok, committed = pcall(config.toggle_section, "magickey", "replace")
+						if not ok or committed ~= true then
+							Logger.error(LOG, "Magic replacement choice was not committed: %s.", tostring(committed))
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							return false
+						end
+						return true
+					end or nil,
+				}
+			end
+		end
+	end
+
 	local providers = {
 		-- The custom layout picker: the registry layouts the layout manager
 		-- installed, the one this session activated checked; choosing one makes
@@ -517,6 +556,7 @@ local function _build_layouts(ctx)
 			t = i18n_safe,
 			current = Source.get(),
 			key_text = Source.key_text,
+			reason = Source.choice_reason,
 			choose = function(value)
 				local ok, reason = Source.set(value)
 				if not ok then
@@ -994,6 +1034,10 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
+			local function word_expanders_ready()
+				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+			end
+
 			--- Captures enough catalogue state to undo a persistence failure.
 			--- @return table
 			local function snapshot()
@@ -1066,40 +1110,31 @@ local function _manifest_hotstring_rows(ctx, config)
 			--- @return function
 			local function set_all(on)
 				return function()
+					if not word_expanders_ready() then return false end
 					local saved = snapshot()
 					local changes = {}
 					for _, key in ipairs(all_keys()) do
 						changes[key] = on
 					end
-					if Terminators.set_terminators_enabled(changes) then commit(saved) end
+					if Terminators.set_terminators_enabled(changes) ~= true then return false end
+					return commit(saved)
 				end
 			end
 
 			local sub = {}
 
-			-- The bulk rows first. A user turning delimiters off does it wholesale —
-			-- the point of the feature is "expand only on the key I chose" — and
-			-- clicking through twenty rows to get there is not an interface.
-			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.check_all"),   action = set_all(true) }
-			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.uncheck_all"), action = set_all(false) }
-			-- The way back. Both other drivers put it beside the two bulk rows, and
-			-- without it a user who clicked "Tout décocher" had no route to the
-			-- shipped set short of editing storage by hand — 15 of the 25 catalogue
-			-- delimiters ship disabled, so "check all" is not that route either.
-			sub[#sub + 1] = {
-				label = i18n_safe("common.restore_recommended"),
-				action    = function()
-					local saved = snapshot()
-					local changes = {}
-					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
-						if def.key and not def.custom then
-							changes[def.key] = def.default_enabled ~= false
-						end
+			local function reset_terminators()
+				if not word_expanders_ready() then return false end
+				local saved = snapshot()
+				local changes = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and not def.custom then
+						changes[def.key] = def.default_enabled ~= false
 					end
-					if Terminators.set_terminators_enabled(changes) then commit(saved) end
-				end,
-			}
-			sub[#sub + 1] = { separator = true }
+				end
+				if Terminators.set_terminators_enabled(changes) ~= true then return false end
+				return commit(saved)
+			end
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.type == "separator" then
@@ -1184,7 +1219,17 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 			}
 
-			return { { label = i18n_safe("menu.hotstrings.word_expanders"), items = sub } }
+			local exp_ctx = {
+				commands = {
+					["word_expanders_enable_all"] = set_all(true),
+					["word_expanders_disable_all"] = set_all(false),
+					["word_expanders_restore"] = reset_terminators,
+				},
+				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
+			}
+			local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
+				exp_ctx, { ["word_expander_entries"] = function() return sub end })
+			return { { label = i18n_safe("menu.hotstrings.word_expanders"), submenu = rendered_expanders } }
 		end,
 		["magic_key_config"] = function()
 			local rows = {}
@@ -1838,9 +1883,9 @@ local function _build_llm(ctx)
 			items = delay_choices,
 		}
 		rows[#rows + 1] = { separator = true }
+		local leading_rows = rows
+		rows = {}
 		for _, setting in ipairs({
-			{ name = "instant_on_word_end", key = "menu.llm.instant_on_word_end" },
-			{ name = "after_hotstring", key = "menu.llm.after_hotstring" },
 			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
 			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
 		}) do
@@ -1854,9 +1899,34 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		local function ready()
+			return llm.is_enabled() == true and ctx.paused ~= true
+				and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+		end
+		local function toggle(name)
+			if not ready() then return false end
+			if TriggerSettings.toggle(name) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local trigger_ctx = {
+			commands = {
+				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
+				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
+			},
+			state_getters = {
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
+				["llm_trigger_ready"] = ready,
+			},
+		}
+		rows = ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, trigger_ctx, {
+			["llm_trigger_leading"] = function() return leading_rows end,
+			["llm_trigger_remaining"] = function() return rows end,
+		})
 		append_rendered_row(target, {
 			label = i18n_safe("menu.llm.trigger_menu_title"),
-			items = rows,
+			submenu = rows,
 			disabled = not enabled or nil,
 		}, "llm_trigger")
 	end
@@ -2055,11 +2125,16 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_display"] = function(target)
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
+		local DisplayPolicy = require("llm.display_policy")
+		local ProfileSettings = require("modules.llm.profile_settings")
+		local function show_all_ready()
+			return DisplayPolicy.ready(ProfileSettings.get("num_predictions"),
+				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
+		end
 		local rows = {}
 		for _, setting in ipairs({
-			{ name = "show_info_bar", key = "menu.llm.show_info_bar" },
 			{ name = "streaming", key = "menu.llm.show_streaming" },
-			{ name = "streaming_multi", key = "menu.llm.show_all_at_once" },
 		}) do
 			local current = DisplaySettings.get(setting.name)
 			rows[#rows + 1] = {
@@ -2071,6 +2146,8 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		local streaming_rows = rows
+		rows = {}
 		local indent = DisplaySettings.get("pred_indent") or 0
 		local indent_rows = {}
 		for _, value in ipairs(DisplaySettings.indent_values()) do
@@ -2090,9 +2167,36 @@ local function _build_llm(ctx)
 			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
 			items = indent_rows,
 		}
+		local info_bar = DisplaySettings.get("show_info_bar")
+		local display_ctx = {
+			commands = {
+				["llm_show_all"] = function()
+					if not show_all_ready() then return false end
+					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+				["llm_info_bar"] = function()
+					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
+				["llm_show_all_ready"] = show_all_ready,
+				["llm_info_bar_enabled"] = function() return info_bar end,
+				["llm_info_bar_ready"] = function() return true end,
+			},
+		}
+		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
+			["llm_display_leading"] = function() return {} end,
+			["llm_display_remaining"] = function() return streaming_rows end,
+			["llm_display_trailing"] = function() return rows end,
+		})
 		append_rendered_row(target, {
 			label = i18n_safe("menu.llm.display_menu_title"),
-			items = rows,
+			submenu = display_rows,
 			disabled = not enabled or nil,
 		}, "llm_display")
 	end
@@ -2224,7 +2328,13 @@ local function _build_llm(ctx)
 	-- declared the last two as features for as long as it has existed and this
 	-- driver read them from the canonical defaults with no way to change either —
 	-- constants wearing the shape of settings.
-	providers["llm_generation"] = function()
+	dynamic_handlers["llm_generation"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — generation controls cannot read their current count: %s.",
+				tostring(ProfileSettings))
+			return
+		end
 		local ok_settings, Settings = pcall(require, "modules.llm.settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM settings unavailable — the generation rows cannot be built.")
@@ -2287,16 +2397,31 @@ local function _build_llm(ctx)
 				items = choices,
 			}
 		end
-		local auto_raise = Settings.get("auto_raise_temp")
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.auto_raise_temp"),
-			checked = auto_raise == true,
-			action = function()
-				Settings.set("auto_raise_temp", not auto_raise)
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
+		--- Reads current group, pause and prediction-count facts before delivery.
+		--- @return boolean ready
+		local function ready()
+			local count = ProfileSettings.get("num_predictions")
+			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+				and type(count) == "number" and count >= 2
+		end
+		local generation_ctx = {
+			commands = {
+				["llm_auto_raise_temperature"] = function()
+					if not ready() then return false end
+					if Settings.set("auto_raise_temp", not Settings.get("auto_raise_temp")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_auto_raise_enabled"] = function() return Settings.get("auto_raise_temp") end,
+				["llm_auto_raise_ready"] = ready,
+			},
 		}
-		return rows
+		local generation_rows = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+			["llm_generation_values"] = function() return rows end,
+		})
+		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
 	end
 
 	-- The category switch, the submenu's first row: appindicator binds item.fn
@@ -2313,7 +2438,7 @@ local function _build_llm(ctx)
 		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
-		if llm.toggle then llm.toggle() end
+		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	llm_ctx.state_getters = {}
@@ -2915,7 +3040,14 @@ local function _build_shortcuts(ctx)
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
-				local slot_label = Keyboard.get_slot_label(slot)
+				local reason
+				if slot == require("shortcuts.magic_editor").SLOT_ID then
+					local gate = ctx.input_capture_gate
+					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
+						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
+				end
+				local slot_label = Keyboard.get_slot_label(slot, reason)
 				local choices = slot_binding_rows(slot_label, bound, Keyboard.binding_id(slot),
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
@@ -3648,31 +3780,39 @@ end
 --- @param up table The updater module.
 --- @return table row A provider row with its items.
 local function _channel_picker(ctx, up)
-	local channel = up.get_channel()
-	local rows = {}
-	for _, id in ipairs(up.CHANNELS.ids()) do
-		rows[#rows + 1] = {
-			label   = i18n_safe(up.CHANNELS.channel(id).menu_label_key),
-			checked = channel == id,
-			action  = function()
-				if not up.set_channel(id) then return end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				-- An open Versions page follows, so its banner never offers the
-				-- channel the user just chose here.
-				local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
-				if ok_bridge then
-					Changelog.push_subscribed_channel(id)
-				else
-					Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
-				end
-			end,
-		}
-	end
-	return {
-		label = _fill(i18n_safe("menu.about.channel_menu"), "{channel}",
-			i18n_safe(up.CHANNELS.channel(channel).label_key)),
-		items = rows,
-	}
+	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+		update_channel = function(id)
+			if not up.set_channel(id) then return end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			-- An open Versions page follows only an acknowledged subscription.
+			local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
+			if ok_bridge then
+				Changelog.push_subscribed_channel(id)
+			else
+				Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
+			end
+		end,
+	}, { ["updater.channel"] = function() return up.get_channel() end })
+end
+
+--- Supplies the registered cadence choice to the existing updater owner.
+--- @param ctx table Menu context.
+--- @param up table Native updater owner.
+--- @return table row Shared choice provider data.
+local function _frequency_picker(ctx, up)
+	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+		update_check_interval = function(seconds)
+			if up.set_check_interval(seconds) ~= true then return false end
+			up.stop_background_checks()
+			up.start_background_checks()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["updater.check_interval_seconds"] = function()
+			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
+		end,
+	})
 end
 
 --- The updater block of the About submenu, as provider DATA: the version, the
@@ -3707,9 +3847,7 @@ local function _about_update_rows(ctx)
 	-- frequency row are still drawn, greyed with the reason: left out, nobody
 	-- could tell whether the automatic update exists.
 	local source_run = Installation.is_source_run()
-	local _, current_code = Schedule.snap_interval(up.get_check_interval(), up.TIMING)
-	local frequency_label = i18n_safe("menu.about.frequency_menu") .. ": "
-		.. i18n_safe("menu.about.frequency." .. current_code)
+	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
 	out[#out + 1] = source_run and {
@@ -3786,33 +3924,14 @@ local function _about_update_rows(ctx)
 
 
 	if source_run then
-		out[#out + 1] = {
-			label = frequency_label,
-			disabled = true,
-			disabled_reason_key = "menu.about.source_run_reason",
-		}
+		frequency_row.items = nil
+		frequency_row.disabled = true
+		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		out[#out + 1] = frequency_row
 		return out
 	end
 
-	-- The tick and the parent label name the preset in force; a live value
-	-- outside the presets reads as its nearest preset, the one a restart loads.
-	local frequency_rows = {}
-	for _, preset in ipairs(up.INTERVAL_PRESETS) do
-		frequency_rows[#frequency_rows + 1] = {
-			label   = i18n_safe("menu.about.frequency." .. preset.code),
-			checked = preset.code == current_code,
-			action  = function()
-				up.set_check_interval(preset.seconds)
-				up.stop_background_checks()
-				up.start_background_checks()
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		}
-	end
-	out[#out + 1] = {
-		label = frequency_label,
-		items = frequency_rows,
-	}
+	out[#out + 1] = frequency_row
 	return out
 end
 
@@ -3942,14 +4061,6 @@ local function _build_quit(ctx)
 	}
 end
 
---- Builds the debug submenu.
---- The log levels the debug submenu offers, in increasing severity.
----
---- Not translated: DEBUG / INFO / WARNING / ERROR are the tokens the logger
---- itself prints and the user greps for, so a localised menu label would name
---- something that appears nowhere in the file it filters.
-local DEBUG_LOG_LEVELS = { "DEBUG", "INFO", "WARNING", "ERROR" }
-
 --- Builds the debug submenu from the shared manifest.
 ---
 --- WHAT THIS REPLACED. Three rows written out by hand, while the manifest
@@ -3982,28 +4093,10 @@ local function _build_debug(ctx)
 		end
 	end
 
-	-- Bracketed key on purpose: it is what makes the id greppable, and the
-	-- coverage gate that pairs every declared `list` with a provider resolves
-	-- them by exactly that spelling.
-	local providers = {
-		["log_level"] = function()
-			local rows = {}
-			for _, level in ipairs(DEBUG_LOG_LEVELS) do
-				rows[#rows + 1] = {
-					label   = level,
-					checked = ctx.log_level == level,
-					action = function()
-						if type(ctx.on_set_log_level) == "function" then ctx.on_set_log_level(level) end
-					end,
-				}
-			end
-			return { { label = i18n_safe("menu.debug.log_level"), items = rows } }
-		end,
-	}
-
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["log_level"]      = ctx.on_set_log_level,
 		["open_logs"]      = call_ctx("on_open_logs"),
 		["open_today_log"] = call_ctx("on_open_today_log"),
 		["open_error_log"] = call_ctx("on_open_error_log"),
@@ -4016,11 +4109,12 @@ local function _build_debug(ctx)
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["script.log_level"] = function() return ctx.log_level end
 	render_ctx.state_getters["error_dialog_enabled"] = function()
 		return require("ui.error_dialog.bridge").is_enabled()
 	end
 
-	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)
+	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, {})
 	return { label = i18n_safe("menu.debug.title"), submenu = rows }
 end
 

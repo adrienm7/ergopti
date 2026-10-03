@@ -395,6 +395,118 @@ TestTapHold_UnknownFieldIsOutdated() {
 Test("TapHoldLoader: an unknown field is warned and ignored, its key kept (config-outdated-tap-hold)",
 	TestTapHold_UnknownFieldIsOutdated)
 
+
+_TH_OutdatedFileWarningVectors() {
+	global _SharedDir
+	Vectors := JsonParse(FSReadUtf8Exact(_SharedDir .
+		"\tests\corpus\config_outdated\file_warning_vectors.json"))
+	AssertEqual(12, Vectors.Length, "every independent warning observation executes")
+	Lines := []
+	Warn := (Message, Args*) => Lines.Push(Format(Message, Args*))
+	for Vector in Vectors {
+		First := ConfigOutdatedReportInFile(Vector["file"], Vector["path"], Vector["detail"], Warn)
+		AssertEqual(Vector["first"], First, Vector["id"])
+		AssertEqual(Vector["reports"], Lines.Length, Vector["id"])
+		if First
+			AssertEqual(Format("Outdated entry '{1}' in '{2}' ignored ({3}); the config cleanup only covers "
+				. "config.toml, so fix or delete it in that file.",
+				Vector["path"], Vector["file"], Vector["detail"]), Lines[Lines.Length], Vector["id"])
+	}
+	AssertEqual(7, Lines.Length, "interleaved reads retain the process-lifetime identities")
+}
+Test("TapHoldLoader: independent file warnings retain process-lifetime identities",
+	_TH_OutdatedFileWarningVectors)
+
+
+_TH_OutdatedCallbackObservation(Events, FilePath, EntryPath, Detail, Message, Args*) {
+	Events["critical"] := A_IsCritical
+	Events["calls"] += 1
+	Events["message"] := Format(Message, Args*)
+	Events["again"] := ConfigOutdatedReportInFile(FilePath, EntryPath, Detail,
+		(*) => Events["calls"] += 1)
+	Events["after_reentry"] := A_IsCritical
+}
+
+_TH_OutdatedCallbackDoesNotOwnCritical() {
+	Before := A_IsCritical
+	try {
+		for Mode in ["Off", "On"] {
+			Critical(Mode)
+			CallerCritical := A_IsCritical
+			Events := Map("calls", 0, "critical", -1, "after_reentry", -1, "again", -1, "message", "")
+			FilePath := A_ScriptDir . "\outdated-callback-" . Mode . ".toml"
+			EntryPath := "tap_hold.keys.tab.future_callback"
+			Detail := "the catalogue does not own this field"
+			Warn := _TH_OutdatedCallbackObservation.Bind(Events, FilePath, EntryPath, Detail)
+			First := ConfigOutdatedReportInFile(FilePath, EntryPath, Detail, Warn)
+			After := A_IsCritical
+			AssertTrue(First, "the first callback report is admitted")
+			AssertFalse(Events["again"], "reentry already sees the claimed report")
+			AssertEqual(1, Events["calls"], "the warning callback runs once even if it reenters")
+			AssertEqual(CallerCritical, Events["critical"], "the callback inherits its caller's Critical state")
+			AssertEqual(CallerCritical, Events["after_reentry"], "the duplicate path restores Critical too")
+			AssertEqual(CallerCritical, After, "reporting leaves no Critical owner after its callback")
+			AssertTrue(InStr(Events["message"], EntryPath, true) > 0, "the callback observes its entry")
+		}
+	} finally Critical(Before)
+}
+Test("TapHoldLoader: shared warning callbacks preserve Critical and process-lifetime reentry",
+	_TH_OutdatedCallbackDoesNotOwnCritical)
+
+_TH_OutdatedFieldsWarnOnceAcrossActualReads() {
+	global _TomlFileCache, _LOGGER_REPEAT_ENABLED
+	Captured := [], PreviousRepeat := _LOGGER_REPEAT_ENABLED
+	; Timed logger suppression must not stand in for the persisted-entry policy.
+	_LOGGER_REPEAT_ENABLED := false
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _TH_Write("[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n"
+			. "retired_once_field = 1`r`n"
+			. 'future_once_array = ["none", "experimental"]' . "`r`n"
+			. 'future_once_table = { label = "kept", enabled = false }' . "`r`n")
+		Stored := FileRead(Path, "RAW")
+		loop 3 {
+			if _TomlFileCache.Has(Path)
+				_TomlFileCache.Delete(Path)
+			TH := LoadTapHoldToml(Path)
+			AssertTrue(TapHoldIsActive(TH, "tab"), "every actual read keeps the valid key")
+			AssertEqual("alt_tab_monitor", TapHoldTapAction(TH, "tab"))
+			for Key in ["retired_once_field", "future_once_array", "future_once_table"]
+				AssertFalse(TH["keys"]["tab"].Has(Key), "obsolete fields never become native bindings")
+			LoggerWarn("TapHoldLoader", "Interleaved file-read fixture warning {1}.", A_Index)
+		}
+		Counts := Map("retired_once_field", 0, "future_once_array", 0, "future_once_table", 0)
+		Errors := 0
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+			for Key in Counts {
+				if InStr(Line, "[WARNING]", true) && InStr(Line, "." . Key, true) {
+					Counts[Key] += 1
+					AssertTrue(InStr(Line, Path, true) > 0, "the warning names its actual persisted file")
+					AssertTrue(InStr(Line, "tap_hold.keys.tab", true) > 0, "the warning names its entry")
+				}
+			}
+		}
+		AssertEqual(0, Errors, "unknown values remain warnings even when arrays or inline tables")
+		for Key, Count in Counts
+			AssertEqual(1, Count, "three real reads must warn once for " . Key)
+		After := FileRead(Path, "RAW")
+		AssertEqual(Stored.Size, After.Size, "obsolete values and their byte layout remain stored")
+		loop Stored.Size
+			AssertEqual(NumGet(Stored, A_Index - 1, "UChar"), NumGet(After, A_Index - 1, "UChar"),
+				"unowned byte " . A_Index . " is preserved")
+	} finally {
+		_LOGGER_REPEAT_ENABLED := PreviousRepeat
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: repeated real reads warn once and preserve future values byte-for-byte",
+	_TH_OutdatedFieldsWarnOnceAcrossActualReads)
+
 TestTapHold_InheritDefaultsFalse() {
 	Path := _TH_Write(
 		"[tap_hold]`r`n"

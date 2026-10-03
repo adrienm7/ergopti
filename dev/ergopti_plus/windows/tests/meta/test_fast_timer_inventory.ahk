@@ -68,6 +68,7 @@ _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
+		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
 		"FocusTimerFn",                 "50",    ; generation-bound focus snapshot, title deadline <= 5 ms
 		"_LLM_PointerWatch_MoveFn",     "50",    ; only armed while a prediction is on screen
 		"WPMWidget_MouseWatch",         "50",    ; only armed while the WPM widget is visible
@@ -170,6 +171,18 @@ _FTI_MultilineOneShotKeepsItsSign() {
 ; @param Expr {String} The period expression as written.
 ; @returns {String} Milliseconds as text, or "" when unresolved.
 _FTI_ResolvePeriod(Src, Expr) {
+	global _SharedDir
+	; This exact native getter exposes one owned field of the shared brightness
+	; policy. Arbitrary local Maps and other shared fields remain unresolved.
+	if Expr == 'ScreenBrightnessData()["worker_poll_ms"]' {
+		Policy := JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+		if !(Policy is Map)
+			throw ValueError("Invalid shared brightness timer policy.")
+		Period := Policy.Get("worker_poll_ms", 0)
+		if !(Period is Integer) || Period <= 0
+			throw ValueError("Invalid shared brightness poll period.")
+		return String(Period)
+	}
 	if RegExMatch(Expr, "^\d+$")
 		return Expr
 	if !RegExMatch(Expr, "^(?:[_A-Za-z][_A-Za-z0-9]*\.)?([_A-Za-z][_A-Za-z0-9]*)$", &Name)
@@ -256,3 +269,16 @@ Test("meta timers: the timer inventory has no stale entries",
 	_FTI_InventoryHasNoStaleEntries)
 Test("meta timers: multiline one-shot periods retain their negative sign",
 	_FTI_MultilineOneShotKeepsItsSign)
+
+_FTI_BrightnessPeriodReadsTheSharedPolicy() {
+	AssertEqual("50", _FTI_Inventory()["ScreenBrightnessPoll"],
+		"the native worker/debt poll has an independently reviewed 50 ms budget")
+	AssertEqual("50", _FTI_ResolvePeriod("", 'ScreenBrightnessData()["worker_poll_ms"]'),
+		"the explicit shared getter resolves the actual canonical period")
+	AssertEqual("", _FTI_ResolvePeriod("", 'Data["worker_poll_ms"]'),
+		"an arbitrary local map must not acquire the canonical period")
+	AssertEqual("", _FTI_ResolvePeriod("", 'ScreenBrightnessData()["foreign_poll_ms"]'),
+		"an unrelated shared field must remain unreadable")
+}
+Test("meta timers: brightness poll resolves only its explicit canonical shared period",
+	_FTI_BrightnessPeriodReadsTheSharedPolicy)

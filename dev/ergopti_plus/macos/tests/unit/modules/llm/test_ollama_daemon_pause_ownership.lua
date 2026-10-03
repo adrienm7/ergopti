@@ -224,6 +224,45 @@ local function load_fixture()
 end
 
 helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
+	helpers.it("reports startup admission only after exact native publication or cleanup", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.api.startup_idle(), true)
+		helpers.assert_eq(#fixture.shell.tasks, 0, "the admission query must be read-only")
+		helpers.assert_true(fixture.api.ensure_running())
+		helpers.assert_eq(fixture.api.startup_idle(), false)
+		fixture.shell.tasks[1].complete()
+		helpers.assert_eq(fixture.api.startup_idle(), false)
+		fixture.scheduler.handles[1].fire()
+		helpers.assert_eq(fixture.api.startup_idle(), true,
+			"an acknowledged published daemon permits readonly admission without terminating it")
+		helpers.assert_eq(fixture.shell.tasks[2].terminate_calls, 0)
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("keeps readonly startup admission closed after failed acquisition and terminate " .. mode, function()
+			local fixture = load_fixture()
+			fixture.shell.start_modes.kill = "false"
+			fixture.shell.terminate_mode = mode
+			local settlements = {}
+			helpers.assert_eq(fixture.api.ensure_running({
+				is_authorized = function() return true end,
+				on_settled = function(committed, reason) settlements[#settlements + 1] = { committed, reason } end,
+			}), false)
+			helpers.assert_eq(#settlements, 1)
+			helpers.assert_eq(settlements[1][1], false,
+				"a terminal refusal does not itself acknowledge native cleanup")
+			helpers.assert_eq(fixture.api.startup_idle(), false)
+			local calls = fixture.shell.tasks[1].terminate_calls
+			helpers.assert_eq(fixture.api.startup_idle(), false)
+			helpers.assert_eq(fixture.shell.tasks[1].terminate_calls, calls,
+				"readonly admission must not retry or mutate the owned native task")
+			fixture.shell.tasks[1].complete()
+			helpers.assert_eq(fixture.api.startup_idle(), true)
+			helpers.assert_eq(#settlements, 1)
+			helpers.assert_eq(#fixture.shell.tasks, 1)
+		end)
+	end
+
 	helpers.it("keeps kill-task start owned until a reentrant PAUSE can retry", function()
 		local fixture = load_fixture()
 		fixture.shell.kill_start_hook = function()

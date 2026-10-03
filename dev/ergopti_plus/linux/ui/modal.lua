@@ -13,11 +13,12 @@ local M = {}
 
 --- Runs a blocking dialog with the keyboard handed to the desktop.
 --- @param fn function The dialog; its results are returned.
+--- @param opts table|nil Optional native restoration observer, forwarded intact.
 --- @return any
-function M.run(fn)
+function M.run(fn, opts)
 	local ok, hook = pcall(require, "adapters.keyboard_hook")
 	if ok and type(hook) == "table" and type(hook.while_released) == "function" then
-		return hook.while_released(fn)
+		return hook.while_released(fn, opts)
 	end
 	return fn()
 end

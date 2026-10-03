@@ -187,27 +187,32 @@ helpers.describe("LLM Activation Preference Gate", function()
 	end
 
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
-		helpers.it("requires exact Ollama dependency settlement after " .. mode, function()
-			local options = {}
-			if mode == "throw" then
-				options.ollama_bootstrap_throw = true
-			elseif mode == "false" then
-				options.ollama_bootstrap_return = false
-			else
-				options.ollama_bootstrap_return = "nil"
-			end
-			with_activation("ollama", { true, true }, options, function(action, state, calls)
-
-				helpers.assert_eq(action(), false)
-				helpers.assert_eq(calls.bootstrap, 1)
+		helpers.it("requires exact explicitly requested Ollama installation settlement after " .. mode, function()
+			local selected = false
+			local options = {
+				ollama_installed = false,
+				offer_pick = function(dialog)
+					if selected then return nil end
+					selected = true
+					for index, label in ipairs(dialog.choices) do
+						if label:find("llm.unreachable.install", 1, true) == 1 then return index end
+					end
+				end,
+			}
+			if mode == "throw" then options.ollama_bootstrap_throw = true
+			elseif mode == "false" then options.ollama_bootstrap_return = false
+			else options.ollama_bootstrap_return = "nil" end
+			with_activation("ollama", {}, options, function(action, state, calls)
+				action()
+				helpers.assert_eq(calls.ollama_installs, 1)
 				if mode == "false" then
 					helpers.assert_eq(calls.ollama_bootstrap_outcome, "boolean")
 					helpers.assert_eq(calls.ollama_bootstrap_receipt, false)
-				else
-					helpers.assert_eq(calls.ollama_bootstrap_outcome, mode)
-				end
+				else helpers.assert_eq(calls.ollama_bootstrap_outcome, mode) end
 				helpers.assert_eq(state.llm_enabled, false)
-				helpers.assert_eq(calls.saves, 2)
+				helpers.assert_eq(calls.saves, 0,
+					"explicit repair cannot publish an enabled candidate before native acknowledgement and fresh HTTP")
+				helpers.assert_eq(calls.service_repairs, 0)
 				helpers.assert_eq(calls.requirements, 0)
 				helpers.assert_eq(calls.notifications, 0)
 			end)

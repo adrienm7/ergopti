@@ -87,6 +87,13 @@
 			]
 		},
 		"macos": {
+			"shortcut_groups": [
+				{ "prefix": "hs_ctrl_shift_", "modifiers": ["ctrl", "shift"] },
+				{ "prefix": "cmd_shift_", "modifiers": ["cmd", "shift"] },
+				{ "prefix": "hs_ctrl_", "modifiers": ["ctrl"] },
+				{ "prefix": "hs_option_", "modifiers": ["option"] },
+				{ "prefix": "cmd_", "modifiers": ["cmd"] }
+			],
 			"modifiers": [
 				{ "id": "cmd", "label": "Cmd", "hammerspoon": "cmd", "karabiner": "left_command" },
 				{ "id": "ctrl", "label": "Ctrl", "hammerspoon": "ctrl", "karabiner": "left_control" },

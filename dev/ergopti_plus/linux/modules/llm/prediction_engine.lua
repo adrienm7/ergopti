@@ -39,6 +39,8 @@ local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local VisionRequest = require("modules.llm.vision_request")
+local LocalModelOffer = require("modules.llm.local_model_offer")
+local LocalModelPolicy = require("llm.local_model_policy")
 local Translation = require("modules.llm.translation")
 local AgentSettings = require("modules.llm.agent_settings")
 local AgentConnectors = require("modules.llm.agent_connectors")
@@ -70,6 +72,8 @@ local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
 local _max_tokens = nil
 local _scope_owner = nil
+local _enable_admission = nil
+local _enable_generation = 0
 local _request_epoch = 0
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
@@ -128,6 +132,8 @@ local _timezone = AgentSettings.timezone
 -- never triaged again (a ring of the last AGENT_TRIAGED_MEMORY).
 local _agent_timer = nil
 local _agent_generation = 0
+local _model_consent_owner = nil
+local _modal_resync_owner = nil
 local _agent_triage = nil
 local _agent_triaged = {}
 -- The application the user last typed in, for the menu's exclusion row
@@ -426,10 +432,27 @@ local function schedule(context, output_context, delay_ms, reason, live)
 	return true
 end
 
+local function advance_request_epoch(resync_owner)
+	_request_epoch = _request_epoch + 1
+	local owner = _model_consent_owner
+	if not owner then return end
+	if owner == resync_owner and owner == _modal_resync_owner and not owner.reset_claimed then
+		owner.reset_claimed = true
+		owner.epoch = _request_epoch
+		owner.vision_generation = _vision_generation
+		owner.agent_generation = _agent_generation
+		owner.tone_generation = _tone_generation
+	else
+		_model_consent_owner = nil
+	end
+end
+
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil
 function M.init(opts)
 	if _scope_owner then return false end
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+	_enable_generation = _enable_generation + 1
 	local options = type(opts) == "table" and opts or {}
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
@@ -467,7 +490,7 @@ function M.init(opts)
 	_clock_ms = type(options.clock_ms) == "function" and options.clock_ms or Monotonic.now_ms
 	_last_request_ms = {}
 	_pending_trigger = nil
-	_request_epoch = _request_epoch + 1
+	advance_request_epoch()
 	_predicting = false
 	clear_offer()
 
@@ -674,7 +697,7 @@ function M.predict(context, output_context, override)
 	}
 	_offer_notified = false
 	_predicting = true
-	_request_epoch = _request_epoch + 1
+	advance_request_epoch()
 	local epoch = _request_epoch
 	show_candidates({}, meta)
 	Logger.info(LOG, "Sending %sprediction request (backend=%s, model=%s, profile=%s, count=%d, context=%d chars).",
@@ -774,7 +797,7 @@ function M.predict(context, output_context, override)
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if not is_batch and request_index < requested then
 				-- Shown now: the next variant may wait for the backend's interval.
-				if #candidates > 0 then publish() end
+				if #candidates > 0 and DisplaySettings.get("streaming_multi") == true then publish() end
 				dispatch()
 				return
 			end
@@ -988,6 +1011,8 @@ end
 --- Told by the daemon after every pause transition: a pause turns live mode off.
 --- @param paused boolean
 function M.on_pause_change(paused)
+	_enable_generation = _enable_generation + 1
+	if _enable_admission then _enable_admission.cancel() end
 	if paused then M.stop_live("Ergopti+ paused", false) end
 end
 
@@ -1175,6 +1200,7 @@ function M.shift_tone(direction, cycle)
 	local focus = current_focus()
 	local request_opts = {
 		stream = false,
+		verify_local_model = verify_local_model == true,
 		temperature = Settings.get("temperature"),
 		max_tokens = Rewrite.max_tokens(plan.source),
 		line_mode = true,
@@ -1279,7 +1305,7 @@ local function open_offer(action, label, model, focus)
 	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus }
 	_offer_notified = false
 	_predicting = true
-	_request_epoch = _request_epoch + 1
+	advance_request_epoch()
 	show_candidates({}, meta)
 	return _request_epoch, meta
 end
@@ -1318,14 +1344,53 @@ end
 --- The request options of an offer's one-off request: chat mode, no streaming.
 --- @param max_tokens integer
 --- @return table
-local function offer_request_opts(max_tokens)
+local function offer_request_opts(max_tokens, verify_local_model)
 	return {
 		stream = false,
+		verify_local_model = verify_local_model == true,
 		temperature = Settings.get("temperature"),
 		max_tokens = max_tokens,
 		-- Multi-line answers: the single-line stops would cut them.
 		line_mode = false,
 	}
+end
+
+local function offer_missing_model(failure, require_enabled)
+	if not LocalModelPolicy.is_missing(failure) then return false end
+	local owner = {
+		epoch = _request_epoch, vision_generation = _vision_generation,
+		agent_generation = _agent_generation, tone_generation = _tone_generation,
+		base_url = failure.base_url, reset_claimed = false,
+	}
+	_model_consent_owner = owner
+	local function current()
+		return _model_consent_owner == owner and _scope_owner == nil and not _is_paused()
+			and (not require_enabled or _enabled)
+			and owner.epoch == _request_epoch and owner.vision_generation == _vision_generation
+			and owner.agent_generation == _agent_generation and owner.tone_generation == _tone_generation
+			and owner.base_url == M.get_base_url()
+	end
+	local function observer(stage, receipt)
+		if stage == "before" then
+			if type(receipt) == "table" and receipt.ok == true and current() then
+				_modal_resync_owner = owner
+			else
+				_modal_resync_owner = nil
+				_model_consent_owner = nil
+			end
+		elseif stage == "after" then
+			_modal_resync_owner = nil
+			if type(receipt) ~= "table" or receipt.ok ~= true or not current() then _model_consent_owner = nil end
+		elseif stage == "refused" then
+			_modal_resync_owner = nil
+			_model_consent_owner = nil
+		end
+	end
+	local ok, handled = pcall(LocalModelOffer.handle, failure, { current = current, modal_observer = observer })
+	_modal_resync_owner = nil
+	if _model_consent_owner == owner then _model_consent_owner = nil end
+	if not ok then Logger.warn(LOG, "Missing-model offer failed: %s.", tostring(handled)) end
+	return ok and handled == true
 end
 
 --- Asks the AI menu's text backend for each answer of the screen action's list
@@ -1379,13 +1444,20 @@ local function request_screen_answers(spec, screen)
 			{ role = "user", content = Vision.answer_user_text(screen) },
 		}
 		_inflight_backend = backend
-		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens), nil, function(full_text, err)
+		backend.chat(target, model, messages, offer_request_opts(config.answer_max_tokens, true), nil, function(full_text, err)
 			if _scope_owner then return end
 			if epoch ~= _request_epoch then
 				Logger.info(LOG, "Screen answer '%s' ignored: a newer action or an edit superseded it.", answer.id)
 				return
 			end
 			if err then
+				if not _is_paused() and _enabled and LocalModelPolicy.is_missing(err) then
+					_predicting, _inflight_backend = false, nil
+					meta.loading = false
+					clear_offer()
+					offer_missing_model(err, true)
+					return
+				end
 				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, tostring(err))
 			else
 				local text = Vision.extract(Parser.strip_thinking(full_text or ""), config.answer_tag)
@@ -1424,6 +1496,7 @@ local function finish_screen_read(flow, spec, text, err)
 	if err then
 		Logger.warn(LOG, "Vision request failed: %s", tostring(err))
 		clear_offer()
+		if not _is_paused() and _enabled and offer_missing_model(err, true) then return end
 		show_notice(VISION_READ_FAILED_KEY, "read_failed")
 		return
 	end
@@ -1774,7 +1847,7 @@ local function system1_transport(chat, config, sentence, ctx, on_done)
 		{ role = "system", content = Agent.system1_prompt(config, ctx) },
 		{ role = "user", content = sentence },
 	}
-	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens), nil,
+	chat.module.chat(chat.target, chat.model, messages, offer_request_opts(config.system1.max_tokens, true), nil,
 		function(full_text, err)
 			if err then on_done(nil, err) return end
 			on_done(Agent.parse_system1(config, Parser.strip_thinking(full_text or "")), nil)
@@ -1791,7 +1864,7 @@ local function send_system2(chat, payload, on_done)
 	chat.module.chat(chat.target, chat.model, {
 		{ role = "system", content = payload.system },
 		{ role = "user", content = payload.user },
-	}, offer_request_opts(payload.max_tokens), nil, on_done)
+	}, offer_request_opts(payload.max_tokens, true), nil, on_done)
 end
 
 --- The System 2 transport of an offer the user asked for: its backend is the
@@ -1926,6 +1999,8 @@ local function finish_agent(epoch, meta, config, tools, full_text, err)
 	end
 	if err then
 		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+		clear_offer()
+		if offer_missing_model(err, false) then return end
 		return fail(AGENT_KEYS.failed, "failed")
 	end
 	local actions, rejected = read_actions(config, tools, full_text)
@@ -2209,6 +2284,7 @@ local function auto_system2(generation, sentence, opts)
 			end
 			_agent_triage = nil
 			if err then
+				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
 				Logger.warn(LOG, "Agent request failed: %s", tostring(err))
 				return
 			end
@@ -2284,6 +2360,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 			end
 			_agent_triage = nil
 			if err then
+				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
 				Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
 				return
 			end
@@ -2335,7 +2412,7 @@ end
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring
 --- buffer alone. For edits the caller has already applied to that buffer:
 --- Backspace and Escape update it precisely, and a reset here undid the edit.
-function M.withdraw()
+function M.withdraw(resync_owner)
 	if _scope_owner then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	-- Backspace, Escape, a desync or a blocked capture: the selection a tone
@@ -2343,18 +2420,21 @@ function M.withdraw()
 	M.drop_tone("withdrawn")
 	M.drop_vision("withdrawn")
 	M.drop_agent_triage("withdrawn")
-	M.dismiss()
+	M.dismiss(resync_owner)
 end
+
 
 --- Cancels pending/in-flight work and discards the current engine buffer.
 function M.cancel()
 	if _scope_owner then return false end
-	M.withdraw()
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+	M.withdraw(_modal_resync_owner)
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 end
 
 --- Dismisses in-flight and visible suggestions without changing the buffer.
-function M.dismiss()
+function M.dismiss(resync_owner)
 	if _scope_owner then return false end
 	-- An automatic suggestion on screen that goes without acceptance (Escape,
 	-- typing over it) raises its intent's threshold in that application.
@@ -2362,13 +2442,14 @@ function M.dismiss()
 	if agent and agent.auto and #_suggestions > 0 then
 		AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, false)
 	end
-	_request_epoch = _request_epoch + 1
+	advance_request_epoch(resync_owner)
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	if _predicting and _inflight_backend then _inflight_backend.cancel() end
 	_inflight_backend = nil
 	_predicting = false
 	clear_offer()
 end
+
 
 --- Accepts one displayed prediction after the daemon commits its physical edit.
 --- @param index integer
@@ -2537,20 +2618,51 @@ end
 
 function M.is_enabled() return _enabled end
 
-function M.enable()
+--- Requests a fresh local receipt before the existing consent owner publishes.
+--- API activation does not depend on a local Ollama installation or server.
+--- @param on_changed function|nil Menu refresh after acknowledged publication.
+--- @return boolean dispatched
+function M.enable(on_changed)
 	if _scope_owner then return false end
-	local profiles = get_profiles()
-	if not profiles or type(profiles.enable) ~= "function" or profiles.enable() ~= true then
-		Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
-		return false
+	if _enabled then return true end
+	if _enable_admission and _enable_admission.pending() then return false end
+	local Preferences = require("infra.llm_preferences")
+	local function snapshot()
+		local values, source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+		local backend = M.get_backend()
+		return {
+			backend = backend, model = values["llm.models.ollama"], origin = M.get_base_url(),
+			generation = Preferences.generation() + _enable_generation, source = source,
+			enabled = values["llm.enabled"], paused = _is_paused(),
+			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values["llm.enabled"]
+				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"]),
+		}
 	end
-	_enabled = true
-	Logger.info(LOG, "Prediction engine enabled.")
-	return true
+	_enable_admission = require("modules.llm.enable_admission").new({
+		snapshot = snapshot,
+		commit = function(source)
+			local profiles = get_profiles()
+			if not profiles or type(profiles.enable) ~= "function" or profiles.enable(source) ~= true then
+				Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
+				return false
+			end
+			_enabled = true
+			Logger.info(LOG, "Prediction engine enabled after current admission.")
+			return true
+		end,
+		reject = function(origin)
+			local _, retry = require("ui.llm_enable_refusal").show(origin)
+			return retry == true and "retry" or nil
+		end,
+		changed = on_changed,
+	})
+	return _enable_admission.enable()
 end
 
 function M.disable()
 	if _scope_owner then return false end
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local profiles = get_profiles()
 	if not profiles or type(profiles.disable) ~= "function" or profiles.disable() ~= true then
 		Logger.error(LOG, "Prediction engine disable was not persisted - keeping the current state.")
@@ -2563,9 +2675,9 @@ function M.disable()
 	return true
 end
 
-function M.toggle()
-	if _enabled then return M.disable() end
-	return M.enable()
+function M.toggle(on_changed)
+	if _enabled or (_enable_admission and _enable_admission.pending()) then return M.disable() end
+	return M.enable(on_changed)
 end
 
 function M.is_predicting() return _predicting or _pending_trigger ~= nil end
@@ -2615,6 +2727,8 @@ end
 function M.set_backend(kind)
 	if _scope_owner then return false end
 	if not BACKENDS[kind] then return false end
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.dismiss()
 	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
@@ -2677,6 +2791,8 @@ function M.get_current_model()
 end
 
 function M.set_model(model_name)
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local profiles = get_profiles()
 	return profiles and type(profiles.set_model) == "function" and profiles.set_model(model_name) == true or false
 end
@@ -2748,6 +2864,7 @@ function M.is_auto_inject() return false end
 function M.acquire_configuration(owner)
 	if _scope_owner or type(owner) ~= "table" then return false end
 	_scope_owner = owner
+	_enable_generation = _enable_generation + 1
 	return true
 end
 
@@ -2767,6 +2884,7 @@ end
 --- @return boolean quiescent
 function M.quiesce_configuration(owner)
 	if _scope_owner ~= owner then return false end
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then
 		if _scheduler.cancel(_pending_trigger) ~= true then return false end
 		_pending_trigger = nil
@@ -2788,7 +2906,7 @@ function M.quiesce_configuration(owner)
 	if #backends ~= 2 then return false end
 	for _, backend in ipairs(backends) do if backend.cancel() ~= true then return false end end
 	_inflight_backend = nil
-	_request_epoch = _request_epoch + 1
+	advance_request_epoch()
 	_predicting = false
 	if _overlay and _overlay.hide() ~= true then return false end
 	_suggestions, _suggestion_context, _offer_notified = {}, nil, false
@@ -2800,7 +2918,8 @@ end
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
 	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
-		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage then return nil end
+		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
+		or (_enable_admission and _enable_admission.pending()) then return nil end
 	return { enabled = _enabled }
 end
 

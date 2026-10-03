@@ -1139,6 +1139,18 @@ function M.is_missing() return _bootstrap_state == "missing" end
 --- found executable's fast path) is running; a new caller joins it.
 function M.is_task_running() return _task_running == true end
 
+--- Reports exact provisioning admission without acquiring or cancelling owners.
+--- A healthy success-window hide is independent UI work; refused cleanup remains debt.
+--- @return boolean idle
+function M.provisioning_idle()
+	if _task_running == true or _task_owner ~= nil or next(_active_tasks) ~= nil then return false end
+	for slot, owner in pairs(_owned_timers) do
+		if slot ~= "hide" or owner.cancel_requested == true or owner.acquisition_valid ~= true
+			or owner.acquiring == true then return false end
+	end
+	return true
+end
+
 --- Reports whether an Ollama executable exists, with stat-only probes.
 --- @return boolean available
 function M.runtime_available()

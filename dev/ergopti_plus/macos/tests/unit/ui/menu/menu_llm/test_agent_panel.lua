@@ -101,6 +101,7 @@ local function with_panel(state, scenario)
 		end)
 		local settings_mgr = {
 			apply_setting_transaction = function(options)
+				if world.refuse_write then return false end
 				world.applied[#world.applied + 1] = options
 				state[options.key] = options.value
 				return true
@@ -138,7 +139,69 @@ local function base_state()
 	return { llm_agent_system1 = "", llm_agent_system2 = "cerebras", llm_agent_mode = "action", llm_agent_disabled_apps = {} }
 end
 
+--- Reads the independent three-mode menu matrix, never generated from the manifest.
+local function mode_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	local corpus, err = require("adapters.json_codec").decode(raw)
+	helpers.assert_not_nil(corpus, tostring(err))
+	helpers.assert_eq(#corpus.modes, 3)
+	helpers.assert_eq(#corpus.states, 3)
+	return corpus
+end
+
 helpers.describe("AI agent menu (macOS)", function()
+	for _, vector in ipairs(mode_corpus().states) do
+		helpers.it("replays the independent mode menu matrix for " .. vector.selected, function()
+			local state = base_state()
+			state.llm_agent_mode = vector.selected
+			state.llm_agent_system1 = "cerebras"
+			with_panel(state, function(build, world)
+				local row = build().submenu[1]
+				local corpus = mode_corpus()
+				helpers.assert_eq(row.disabled == true, false, "a live durable owner keeps the actual mode row available")
+				helpers.assert_eq(#row.menu, 3)
+				for index, expected in ipairs(corpus.modes) do
+					local actual = row.menu[index]
+					helpers.assert_eq(actual.title, world.i18n.get(expected.label_key))
+					helpers.assert_eq(actual.checked == true, vector.checked[index])
+					if expected.value == vector.selected then
+						helpers.assert_eq(row.title, world.i18n.format("menu.agent.mode_title", actual.title))
+					end
+				end
+			end)
+		end)
+	end
+
+	helpers.it("uses reordered shared choices and preserves the durable owner's refusal", function()
+		with_panel(base_state(), function(build, world)
+			local manifest = require("infra.manifest_menu").get_root()
+			local mode = manifest.agent_menu[1]
+			local previous = mode.choices
+			local corpus = mode_corpus()
+			local keys = {}
+			for _, expected in ipairs(corpus.modes) do keys[expected.value] = expected.label_key end
+			mode.choices = {}
+			for _, value in ipairs(corpus.reordered_values) do
+				mode.choices[#mode.choices + 1] = { value = value, i18n = keys[value] }
+			end
+			local ok, err = pcall(function()
+				local row = build().submenu[1]
+				for index, value in ipairs(corpus.reordered_values) do
+					helpers.assert_eq(row.menu[index].title, world.i18n.get(keys[value]), "the declaration owns every choice")
+				end
+				world.refuse_write = true
+				helpers.assert_eq(row.menu[2].fn(), false, "the actual setting transaction refuses")
+				helpers.assert_eq(#world.applied, 0, "nothing is published")
+				helpers.assert_eq(build().submenu[1].title, "Mode: On action (gesture or shortcut)")
+				helpers.assert_eq(world.menu_updates, 0, "no successful redraw is claimed")
+			end)
+			mode.choices = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("draws the manifest's rows: mode, System 1, System 2, excluded applications", function()
 		with_panel(base_state(), function(build)
 			local item = build()

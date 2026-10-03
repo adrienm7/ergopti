@@ -1,0 +1,392 @@
+{
+	"schema_version": 1,
+	"description": "Independent TOML dotted assignment identities and refusal vectors; expectations are hand-authored, checked against Python tomllib rather than derived from the production decoder.",
+	"documents": [
+		{
+			"name": "root bare dotted assignment",
+			"source": "a.b = 1\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": 1
+				}
+			}
+		},
+		{
+			"name": "siblings share one semantic owner",
+			"source": "a.b=1\na.c=false\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": 1,
+					"c": false
+				}
+			}
+		},
+		{
+			"name": "root literal and nested dots coexist",
+			"source": "\"a.b\"=1\na.b=2\n",
+			"valid": true,
+			"expected": {
+				"a.b": 1,
+				"a": {
+					"b": 2
+				}
+			}
+		},
+		{
+			"name": "section relative dotted assignment",
+			"source": "[settings]\nai.enabled=true\nai.model=\"001\"\n",
+			"valid": true,
+			"expected": {
+				"settings": {
+					"ai": {
+						"enabled": true,
+						"model": "001"
+					}
+				}
+			}
+		},
+		{
+			"name": "array of table owner generations",
+			"source": "[[profiles]]\nshortcut.key=\"x\"\n[[profiles]]\nshortcut.key=\"y\"\n",
+			"valid": true,
+			"expected": {
+				"profiles": [
+					{
+						"shortcut": {
+							"key": "x"
+						}
+					},
+					{
+						"shortcut": {
+							"key": "y"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "multiline dotted array",
+			"source": "a.b = [\n 1,\n 2,\n]\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": [1, 2]
+				}
+			}
+		},
+		{
+			"name": "multiline dotted string",
+			"source": "a.b = \"\"\"first\nsecond\"\"\"\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": "first\nsecond"
+				}
+			}
+		},
+		{
+			"name": "quoted Unicode assignment",
+			"source": "\"é\".\"ключ\"=true\n",
+			"valid": true,
+			"expected": {
+				"é": {
+					"ключ": true
+				}
+			}
+		},
+		{
+			"name": "root quoted escaped path",
+			"source": "a.\"b\\u002ec\".d=2\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b.c": {
+						"d": 2
+					}
+				}
+			}
+		},
+		{
+			"name": "inline dotted values inside array",
+			"source": "items=[{a.b=1,a.c=false}]\n",
+			"valid": true,
+			"expected": {
+				"items": [
+					{
+						"a": {
+							"b": 1,
+							"c": false
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "dotted namespace child header",
+			"source": "a.b=1\n[a.c]\nv=2\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": 1,
+					"c": {
+						"v": 2
+					}
+				}
+			}
+		},
+		{
+			"name": "implicit header parent admits new dotted child",
+			"source": "[a.b.c]\nx=1\n[a]\nb.d=2\n",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": {
+						"c": {
+							"x": 1
+						},
+						"d": 2
+					}
+				}
+			}
+		},
+		{
+			"name": "semantic duplicate assignment refuses",
+			"source": "a.b=1\na.\"b\"=2\n",
+			"valid": false
+		},
+		{
+			"name": "scalar assignment parent refuses",
+			"source": "a=1\na.b=2\n",
+			"valid": false
+		},
+		{
+			"name": "array assignment parent refuses",
+			"source": "a=[]\na.b=2\n",
+			"valid": false
+		},
+		{
+			"name": "inline empty assignment parent refuses",
+			"source": "a={}\na.b=2\n",
+			"valid": false
+		},
+		{
+			"name": "dotted namespace replacement refuses",
+			"source": "a.b=1\na=2\n",
+			"valid": false
+		},
+		{
+			"name": "dotted namespace header redefinition refuses",
+			"source": "a.b=1\n[a]\nc=2\n",
+			"valid": false
+		},
+		{
+			"name": "explicit table namespace cannot be extended by dotted key",
+			"source": "[a.b]\nx=1\n[a]\nb.y=2\n",
+			"valid": false
+		},
+		{
+			"name": "explicit nested header cannot be redefined through dotted key",
+			"source": "[a.b.c]\nx=1\n[a]\nb.c.y=2\n",
+			"valid": false
+		},
+		{
+			"name": "duplicate dotted keys across multiline values refuses",
+			"source": "a.b=[\n1\n]\na.b=2\n",
+			"valid": false
+		},
+		{
+			"name": "malformed dotted key refuses",
+			"source": "a..b=1\n",
+			"valid": false
+		},
+		{
+			"name": "malformed quoted key suffix refuses",
+			"source": "a.\"x\"tail=1\n",
+			"valid": false
+		}
+	],
+	"inline": [
+		{
+			"name": "bare nested key",
+			"source": "{a.b = 1}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": 1
+				}
+			}
+		},
+		{
+			"name": "sibling dotted members preserve types",
+			"source": "{a.flag = false, a.count = 0, a.text = \"001\"}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"flag": false,
+					"count": 0,
+					"text": "001"
+				}
+			},
+			"types": [
+				{
+					"path": ["a", "flag"],
+					"kind": "boolean"
+				},
+				{
+					"path": ["a", "count"],
+					"kind": "integer"
+				},
+				{
+					"path": ["a", "text"],
+					"kind": "string"
+				}
+			]
+		},
+		{
+			"name": "quoted dot stays literal",
+			"source": "{\"a.b\" = 1, a.b = 2}",
+			"valid": true,
+			"expected": {
+				"a.b": 1,
+				"a": {
+					"b": 2
+				}
+			}
+		},
+		{
+			"name": "literal dot stays literal",
+			"source": "{'a.b' = 1, a.b = 2}",
+			"valid": true,
+			"expected": {
+				"a.b": 1,
+				"a": {
+					"b": 2
+				}
+			}
+		},
+		{
+			"name": "mixed quoted path",
+			"source": "{a.\"b.c\".d = \"x\"}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b.c": {
+						"d": "x"
+					}
+				}
+			}
+		},
+		{
+			"name": "quoted Unicode path",
+			"source": "{\"é\".\"ключ\" = true}",
+			"valid": true,
+			"expected": {
+				"é": {
+					"ключ": true
+				}
+			},
+			"types": [
+				{
+					"path": ["é", "ключ"],
+					"kind": "boolean"
+				}
+			]
+		},
+		{
+			"name": "empty quoted segment",
+			"source": "{a.\"\" = false}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"": false
+				}
+			},
+			"types": [
+				{
+					"path": ["a", ""],
+					"kind": "boolean"
+				}
+			]
+		},
+		{
+			"name": "escaped dot segment",
+			"source": "{a.\"b\\u002ec\" = 2}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b.c": 2
+				}
+			}
+		},
+		{
+			"name": "spaced dotted path",
+			"source": "{a . b = 2}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"b": 2
+				}
+			}
+		},
+		{
+			"name": "closed child value",
+			"source": "{a.child = {v = false, text = \"001\"}}",
+			"valid": true,
+			"expected": {
+				"a": {
+					"child": {
+						"v": false,
+						"text": "001"
+					}
+				}
+			},
+			"types": [
+				{
+					"path": ["a", "child", "v"],
+					"kind": "boolean"
+				},
+				{
+					"path": ["a", "child", "text"],
+					"kind": "string"
+				}
+			]
+		},
+		{
+			"name": "duplicate dotted alias",
+			"source": "{a.b=1,a.\"b\"=2}",
+			"valid": false
+		},
+		{
+			"name": "scalar parent refuses",
+			"source": "{a=1,a.b=2}",
+			"valid": false
+		},
+		{
+			"name": "array parent refuses",
+			"source": "{a=[],a.b=2}",
+			"valid": false
+		},
+		{
+			"name": "closed empty inline parent refuses",
+			"source": "{a={},a.b=2}",
+			"valid": false
+		},
+		{
+			"name": "dotted parent replacement refuses",
+			"source": "{a.b=1,a=2}",
+			"valid": false
+		},
+		{
+			"name": "empty bare path segment refuses",
+			"source": "{a..b=1}",
+			"valid": false
+		},
+		{
+			"name": "trailing dot refuses",
+			"source": "{a.=1}",
+			"valid": false
+		}
+	]
+}

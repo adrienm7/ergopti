@@ -104,7 +104,10 @@ end
 --- @return string source
 local function migrated_old_build_file()
 	local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
-	local plan = Migrate.plan(old_build_file(), registry, "hs")
+	local catalogue = dofile(helpers.shared("../macos/_generated/action_catalogue.lua"))
+	local context, detail = Migrate.load_context(helpers.shared("modules/actions/modifier_chords.json"), catalogue)
+	helpers.assert_true(context ~= nil, detail)
+	local plan = Migrate.plan(old_build_file(), registry, "hs", context)
 	helpers.assert_eq(plan.outcome, "migrated", plan.detail)
 	return plan.candidate
 end
@@ -155,16 +158,24 @@ helpers.describe("the Hotstrings switch saves over existing key spellings (toml-
 			1, true) ~= nil, "the list keeps its spelling")
 	end)
 
-	helpers.it("clears a metrics shortcut the app saved as a [metrics.shortcut] table", function()
-		local ok, disk = save_after("", function(state) state.metrics_shortcut = { mods = { "cmd" }, key = "m" } end)
+	helpers.it("preserves retired Metrics bindings as unknown source data through a full save", function()
+		local legacy = '# retained legacy dashboard bindings\n[metrics]\n'
+			.. 'shortcut = { mods = ["cmd"], key = "m", future = { keep = 9 } } # retained typing\n'
+			.. 'apps_shortcut = "unsupported historical value" # retained apps\n'
+		local ok, disk = save_after(legacy, function(state)
+			state.keylogger_enabled = false
+			state.metrics_shortcut, state.apps_time_shortcut = false, false
+		end)
 		helpers.assert_eq(ok, true)
-		helpers.assert_true(disk:find("[metrics.shortcut]", 1, true) ~= nil, "the app writes the shortcut as a table")
-		local cleared, after = save_after(disk, function(state) state.metrics_shortcut = false end)
-		helpers.assert_eq(cleared, true)
-		helpers.assert_eq((Codec.decode(after).metrics or {}).shortcut, nil)
-		helpers.assert_true(after:find("[metrics.shortcut]", 1, true) == nil, "the cleared table leaves no header")
-		local switched = save_after(after, switch_on)
-		helpers.assert_eq(switched, true)
+		local checked = 0
+		for line in legacy:gmatch("[^\n]+") do
+			checked = checked + 1
+			helpers.assert_true(disk:find(line .. "\n", 1, true) ~= nil,
+				"an ordinary save owns neither retired binding nor its source comment: " .. line)
+		end
+		helpers.assert_eq(checked, 4, "all four independently written legacy lines are checked")
+		helpers.assert_eq(Codec.decode(disk).metrics.shortcut.future.keep, 9)
+		helpers.assert_eq(Codec.decode(disk).metrics.apps_shortcut, "unsupported historical value")
 	end)
 
 	helpers.it("keeps outdated entries when a table is reset, header or inline", function()

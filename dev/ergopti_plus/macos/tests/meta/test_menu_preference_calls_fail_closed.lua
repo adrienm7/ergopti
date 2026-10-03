@@ -11,57 +11,77 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("menu preference call sites fail closed", function()
-	helpers.it("guards every save_prefs call with exact success", function()
-		-- Every file that names the writer, not only those spelling a direct call:
-		-- a file whose only writes are xpcall(ctx.save_prefs, ...) has no
-		-- "save_prefs(" and would otherwise leave the scan unseen.
-		local source = helpers.read_driver_source("save_prefs")
-		helpers.assert_type(source, "string")
-		source = source:gsub("%-%-%[%[.-%]%]", ""):gsub("%-%-[^\n]*", "")
+--- Checks every remaining persistence call and its exact refusal predicate.
+--- @param source string Complete driver source containing save_prefs.
+local function assert_guards(source)
+	helpers.assert_type(source, "string")
+	source = source:gsub("%-%-%[%[.-%]%]", ""):gsub("%-%-[^\n]*", "")
 
-		local calls, guarded = 0, 0
-		local unguarded = {}
-		local lines = {}
-		for line in source:gmatch("[^\n]+") do lines[#lines + 1] = line end
-		for index, line in ipairs(lines) do
-			if line:match("x?pcall%s*%(%s*[%w_%.]*save_prefs") then
-				calls = calls + 1
-				local status_name, result_name = line:match(
-					"local%s+([%w_]+)%s*,%s*([%w_]+)%s*=%s*x?pcall%s*%(%s*[%w_%.]*save_prefs")
-				local guard = lines[index + 1] or ""
-				if status_name and result_name
-					and (guard:match("if%s+not%s+" .. status_name .. "%s+or%s+"
-						.. result_name .. "%s*~=%s*true%s+then")
-						or guard:match("if%s+" .. status_name .. "%s+and%s+"
-							.. result_name .. "%s*==%s*true%s+then")) then
-					guarded = guarded + 1
-				else
-					unguarded[#unguarded + 1] = line .. " || " .. guard
-				end
-			elseif line:match("[%w_%.]*save_prefs%s*%(%s*%)")
-				and not line:match("local%s+function%s+save_prefs")
-				and not line:match("return%s+transactional_save_prefs") then
-				calls = calls + 1
-				if line:match("save_prefs%s*%(%s*%)%s*~=%s*true%s+then") then
-					guarded = guarded + 1
-				elseif line:match("local%s+[%w_]+%s*=%s*[%w_%.]*save_prefs%s*%(%s*%)%s*==%s*true") then
-					guarded = guarded + 1
-				else
-					unguarded[#unguarded + 1] = line
-				end
+	local calls, guarded = 0, 0
+	local unguarded = {}
+	local lines = {}
+	for line in source:gmatch("[^\n]+") do lines[#lines + 1] = line end
+	for index, line in ipairs(lines) do
+		if line:match("x?pcall%s*%(%s*[%w_%.]*save_prefs") then
+			calls = calls + 1
+			local status_name, result_name = line:match(
+				"local%s+([%w_]+)%s*,%s*([%w_]+)%s*=%s*x?pcall%s*%(%s*[%w_%.]*save_prefs")
+			local guard = lines[index + 1] or ""
+			if status_name and result_name
+				and (guard:match("if%s+not%s+" .. status_name .. "%s+or%s+"
+					.. result_name .. "%s*~=%s*true%s+then")
+					or guard:match("if%s+" .. status_name .. "%s+and%s+"
+						.. result_name .. "%s*==%s*true%s+then")) then
+				guarded = guarded + 1
+			else
+				unguarded[#unguarded + 1] = line .. " || " .. guard
+			end
+		elseif line:match("[%w_%.]*save_prefs%s*%(%s*%)")
+			and not line:match("local%s+function%s+save_prefs")
+			and not line:match("return%s+transactional_save_prefs") then
+			calls = calls + 1
+			if line:match("save_prefs%s*%(%s*%)%s*~=%s*true%s+then") then
+				guarded = guarded + 1
+			elseif line:match("local%s+[%w_]+%s*=%s*[%w_%.]*save_prefs%s*%(%s*%)%s*==%s*true") then
+				guarded = guarded + 1
+			else
+				unguarded[#unguarded + 1] = line
 			end
 		end
+	end
 
-		-- Transactional helpers consolidated several formerly direct writes. Keep a
-		-- conservative floor high enough to reject token samples while tracking the
-		-- current direct-call class rather than its pre-refactor cardinality.
-		helpers.assert_true(calls >= 59,
-			"the class scan must enumerate the consolidated sibling set, not a token sample (found "
-				.. calls .. ")")
-		helpers.assert_eq(guarded, calls,
-			"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
-				.. table.concat(unguarded, " | "))
+	-- The reviewed pre-retirement census had 59 calls. Exactly the one call in
+	-- apply_metrics_shortcut and the one in apply_apps_time_shortcut left with
+	-- those dedicated owners. All 57 remaining call sites and strict predicates
+	-- stay in this complete scan; a missing call is now a failure, not new slack.
+	helpers.assert_eq(calls, 57,
+		"the reviewed post-retirement census must enumerate every remaining save call")
+	helpers.assert_eq(guarded, calls,
+		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
+			.. table.concat(unguarded, " | "))
+end
+
+helpers.describe("menu preference call sites fail closed", function()
+	helpers.it("guards every save_prefs call with exact success", function()
+		assert_guards(helpers.read_driver_source("save_prefs"))
+	end)
+
+	helpers.it("rejects a missing remaining save call instead of accepting a sampled census", function()
+		local source = helpers.read_driver_source("save_prefs")
+		local changed, count = source:gsub("if save_prefs%(%) ~= true then", "if true then", 1)
+		helpers.assert_eq(count, 1, "the negative control removes one real guarded call")
+		local ok, err = pcall(assert_guards, changed)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("reviewed post-retirement census", 1, true) ~= nil)
+	end)
+
+	helpers.it("rejects weakening one remaining refusal predicate", function()
+		local source = helpers.read_driver_source("save_prefs")
+		local changed, count = source:gsub("if save_prefs%(%) ~= true then", "if save_prefs() then", 1)
+		helpers.assert_eq(count, 1, "the negative control weakens one real predicate")
+		local ok, err = pcall(assert_guards, changed)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("every menu preference writer", 1, true) ~= nil)
 	end)
 
 	helpers.it("restores core backend identity before keymap warmup setters", function()

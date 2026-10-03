@@ -1303,6 +1303,70 @@ TestHSE_CrossSensitivityStarArbitration() {
 Test("HSE cross-sensitivity end/star arbitration follows the star candidate",
     TestHSE_CrossSensitivityStarArbitration)
 
+TestHSE_StarPrefixRequiresEligibleContinuation() {
+    Cases := [
+        { Flags: "*", Typed: "xfoo", Boundary: true, Conform: false, Shadow: false },
+        { Flags: "*?", Typed: "xfoo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: false, Conform: false, Shadow: false },
+        { Flags: "*", Typed: "x'foo", Boundary: false, Conform: false, Shadow: true },
+        { Flags: "*?", Typed: "fOo", Boundary: true, Conform: true, Shadow: false },
+        { Flags: "*?", Typed: "Foo", Boundary: true, Conform: true, Shadow: true },
+        { Flags: "*?", Typed: "FOO", Boundary: true, Conform: true, Shadow: true }
+    ]
+    for Index, Vector in Cases {
+        HSE_TestReset()
+        try {
+            HSE_FeedReset(Vector.Boundary)
+            HSE_Register("?", "foo", () => 0)
+            HSE_Register(Vector.Flags, "foo bar", () => 0,
+                Map("CaseConform", Vector.Conform))
+            for Char in StrSplit(Vector.Typed)
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            if Vector.Shadow {
+                AssertEqual("", Match, "case " . Index . ": an eligible longer star still reserves its prefix")
+            } else {
+                AssertTrue(IsObject(Match), "case " . Index . ": an impossible star must not silence the end trigger")
+                AssertEqual("foo", Match.Trigger, "case " . Index . ": the valid end trigger wins")
+            }
+        } finally {
+            HSE_TestReset()
+        }
+    }
+}
+Test("HSE star prefix checks word scope and conform case (star-prefix-eligibility)",
+    TestHSE_StarPrefixRequiresEligibleContinuation)
+
+TestHSE_StarPrefixEligibilitySurvivesGroupToggles() {
+    HSE_TestReset()
+    try {
+        HSE_Register("?", "foo", () => 0)
+        Restricted := HSE_Register("*", "foo bar", () => 0, Map("group", "restricted"))
+        InWord := HSE_Register("*?", "foo baz", () => 0, Map("group", "inword"))
+        AssertEqual("restricted", Restricted.Group, "the restricted candidate is in its own group")
+        AssertEqual("inword", InWord.Group, "the in-word candidate is independently toggleable")
+        for Enabled in [true, false, true] {
+            if Enabled
+                HSE_EnableGroup("inword")
+            else
+                HSE_DisableGroup("inword")
+            HSE_FeedReset(true)
+            for Char in StrSplit("xfoo")
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            AssertEqual(!Enabled, IsObject(Match),
+                "any eligible continuation may suppress; a disabled or word-scoped one cannot")
+            if IsObject(Match)
+                AssertEqual("foo", Match.Trigger, "the end trigger remains live across index rebuilds")
+        }
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE star prefix retains candidate eligibility across group toggles (star-prefix-eligibility)",
+    TestHSE_StarPrefixEligibilitySurvivesGroupToggles)
+
 
 
 
@@ -1605,3 +1669,166 @@ TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking() {
 }
 Test("HSE: conform admission preserves clean casing, registry precedence and identity masking",
     TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking)
+
+
+; Explicit ownership is distinct from the fallback group name. In particular,
+; source provenance must not let a bundled section claim a registration whose
+; caller deliberately retains the default owner.
+_TestHSE_ExplicitGroupAuthority(UseMap, HasGroup, GroupName, Category, Section, Expected) {
+    global HSE_RegistryByGroup, HSE_SeqCounter
+    HSE_TestReset()
+    try {
+        Meta := UseMap ? Map("Category", Category, "Section", Section, "Replacement", "owned")
+            : { Category: Category, Section: Section, Replacement: "owned" }
+        if HasGroup {
+            if UseMap
+                Meta["group"] := GroupName
+            else
+                Meta.group := GroupName
+        }
+        Spec := HSE_Register("*", "qz", (*) => "", Meta)
+        AssertEqual(Expected, Spec.Group, "the explicit native owner wins independently of source provenance")
+        AssertEqual(Category, Spec.Category, "ownership never rewrites the supplied category")
+        AssertEqual(Section, Spec.Section, "ownership never rewrites the supplied section")
+        AssertEqual(0, Spec.GroupOrder, "provenance does not invent a load-order rank")
+        AssertEqual(1, HSE_SeqCounter, "one registration allocates exactly one insertion sequence")
+        AssertTrue(HSE_RegistryByGroup.Has(Expected), "the owning native group is indexed")
+        AssertEqual(1, HSE_RegistryByGroup.Count, "no derived or duplicate owner is indexed")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "the native group retains the exact registered object")
+
+        Foreign := Expected == "rolls.hc" ? "default" : "rolls.hc"
+        HSE_DisableGroup(Foreign)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Found := HSE_FeedChar("z")
+        AssertTrue(IsObject(Found), "a foreign section gate cannot steal this native registration")
+        AssertEqual("qz", Found.Trigger)
+
+        HSE_DisableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        AssertEqual("", HSE_FeedChar("z"), "only its actual owner silences the registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "disabling retains the exact owned specification")
+        HSE_EnableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Restored := HSE_FeedChar("z")
+        AssertTrue(IsObject(Restored), "the owning native gate restores the registration")
+        AssertEqual("qz", Restored.Trigger)
+        AssertEqual(1, HSE_RegistryByGroup[Expected].Length, "re-enabling never duplicates a registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec)
+        AssertEqual(1, HSE_SeqCounter, "toggle publication never allocates another insertion sequence")
+    } finally {
+        HSE_TestReset()
+    }
+}
+
+Test("HSE explicit default Map owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(true, true, "default", "rolls", "hc", "default"))
+Test("HSE explicit default object owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(false, true, "default", "rolls", "hc", "default"))
+
+_TestHSE_GroupAuthorityGoldens(UseMap) {
+    ; Independent goldens preserve named, future and legacy-empty explicit
+    ; groups, and the old derivation only when no explicit owner was supplied.
+    for AuthorityRecord in [
+        { Present: true, Name: "custom_group", Category: "rolls", Section: "hc", Expected: "custom_group" },
+        { Present: true, Name: "future: Équipe / source", Category: "rolls", Section: "hc", Expected: "future: Équipe / source" },
+        { Present: true, Name: "", Category: "rolls", Section: "hc", Expected: "" },
+        { Present: false, Name: "", Category: "rolls", Section: "hc", Expected: "rolls.hc" },
+        { Present: false, Name: "", Category: "", Section: "", Expected: "default" }
+    ]
+        _TestHSE_ExplicitGroupAuthority(UseMap, AuthorityRecord.Present, AuthorityRecord.Name,
+            AuthorityRecord.Category, AuthorityRecord.Section, AuthorityRecord.Expected)
+}
+Test("HSE Map group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(true))
+Test("HSE object group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(false))
+
+
+TestHSE_MagicCompletionDoesNotOpenWord() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, HSE_Terminators
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+    SavedWords := HSE_WORD_TERMINATORS
+    SavedConsumed := HSE_CONSUMED_DELIMITERS
+    SavedCapacity := HSE_MAX_BUFFER_LEN
+    SavedCatalogue := HSE_Terminators
+    Magic := ""
+    for Entry in HSE_Terminators.all()
+        if Entry["key"] == "star"
+            Magic := Entry["chars"][1]
+    Assert(Magic != "", "the shipped catalogue must own a magic completion slot")
+    try {
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        for Flags in ["*", ""] {
+            HSE_TestReset()
+            HSE_Register(Flags, "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Magic . "the")
+                Match := HSE_FeedChar(Char)
+            if Flags == ""
+                Match := HSE_FeedChar(" ")
+            AssertEqual("", Match, "magic-completion-word-boundary: the selector is word text")
+        }
+        AssertEqual(Magic . "the", _PrefixWordTail(Magic . "the"),
+            "preview must not offer a suffix the matcher refuses")
+        HSE_TestReset()
+        HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+        AssertEqual("", HSE_PreviewNextDecision(Magic . "th", "e"),
+            "the real preview decision must reject the same suffix")
+        for Boundary in [" ", ".", "-", "'", Chr(0x2019), Chr(0xA0), Chr(0x202F)] {
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters() . Boundary
+            HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters() . " "
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Boundary . "the")
+                Match := HSE_FeedChar(Char)
+            Assert(IsObject(Match), "configured punctuation, whitespace and quotes still open words")
+        }
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        HSE_TestReset()
+        HSE_Register("", "foo", (*) => 0, { Replacement: "BAR" })
+        for Char in StrSplit("foo" . Magic)
+            Match := HSE_FeedChar(Char)
+        Assert(IsObject(Match), "magic must remain an end-character selector")
+        Effect := HSE_ApplyExpansion(Match, "BAR", Magic)
+        AssertEqual("BAR", HSE_Buffer, "the selector is consumed after completion")
+        AssertFalse(Effect.KnownBoundaryAfter)
+        HSE_TestReset()
+        HSE_Register("*", "foo", (*) => 0, { Replacement: Magic })
+        for Char in StrSplit("foo")
+            Match := HSE_FeedChar(Char)
+        Effect := HSE_ApplyExpansion(Match, Magic)
+        AssertFalse(Effect.KnownBoundaryAfter, "inserted magic text cannot invent a boundary")
+        HSE_MAX_BUFFER_LEN := 3
+        HSE_Buffer := Magic . "the"
+        HSE_StartIsWordBoundary := true
+        _HSE_TrimBufferToCapacity()
+        AssertEqual("the", HSE_Buffer)
+        AssertFalse(HSE_StartIsWordBoundary, "eviction must retain the real preceding word character")
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_Terminators := Terminators()
+        for SlotChar in ["§", "-"] {
+            HSE_Terminators.updateMagicKey(SlotChar)
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(SlotChar . "the")
+                Match := HSE_FeedChar(Char)
+            if SlotChar == "-"
+                Assert(IsObject(Match), "an ASCII magic slot keeps its punctuation role")
+            else
+                AssertEqual("", Match, "a renamed Unicode slot retains completion-only semantics")
+        }
+    } finally {
+        HSE_Terminators := SavedCatalogue
+        HSE_WORD_TERMINATORS := SavedWords
+        HSE_CONSUMED_DELIMITERS := SavedConsumed
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_TestReset()
+    }
+}
+Test("HSE magic-completion-word-boundary: completion and word opening have separate roles",
+    TestHSE_MagicCompletionDoesNotOpenWord)

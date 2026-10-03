@@ -20,21 +20,11 @@
 ;     on the command line (e.g. "AutoHotkey.exe run_e2e.ahk 1").
 ;
 ; CORPUS:
-; Five scenarios are derived from the shared cross-driver corpus at
-; static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json (the same
-; source the AHK unit meta-tests use). The vectors are reproduced inline
-; here (as constants) so the harness is self-contained and does not require
-; a JSON parser at E2E time.
-;
-; FIVE OF THIRTY-FOUR, and the ratio matters more than the five. The macOS and
-; Linux e2e runners replay the WHOLE corpus by reading the file; this one
-; replays a hand-copied subset. So the cross-driver contract on this driver is
-; carried by the UNIT meta-test (tests/meta/test_corpus_hotstrings.ahk), which
-; does parse the real file and walks every vector — this harness is a smoke test
-; of the injection path, not the contract. Two consequences worth knowing before
-; trusting a green run here: a vector added to the corpus is not exercised end to
-; end on Windows, and the inline copies can drift from the file they were taken
-; from without anything noticing.
+; Every shared vector is replayed through the production registration factories,
+; matching, dispatch and intercepted native sender. A virtual document applies
+; the actual emitted deletions and text, proving retained context and casing.
+; Explicit terminator consumption selects the end-character path, matching the
+; macOS and Linux corpus consumers. The sender is the sole substituted boundary.
 ;
 ; USAGE (headless CI):
 ;   AutoHotkey64.exe run_e2e.ahk
@@ -59,6 +49,7 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../test_stubs.ahk
 
 ; Production engine dependencies (same order as run_all.ahk).
+#Include ../../infra/json.ahk
 #Include ../../infra/app_state.ahk
 #Include ../../_generated/window_titles.ahk
 #Include ../../infra/native_dialogs.ahk
@@ -71,6 +62,13 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../../infra/text_utils.ahk
 #Include ../../infra/hotstrings/hotstring_engine.ahk
 #Include ../../infra/hotstrings/hotstring_engine_main.ahk
+; Project the same shipped terminator catalogue that production boot loads.
+; The bare engine's parser defaults omit the configurable magic terminator.
+#Include ../../_generated/terminators.ahk
+#Include ../../infra/hotstrings/hotstrings_catalogue.ahk
+global HSE_Terminators := Terminators()
+global HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; Every expansion is sent through the tap-hold owner, which lifts an AltGr a
 ; tap-hold holds around the output (_HSE_SendWithAltGrUp). Without these files
 ; the call failed, the dispatch logged it and sent nothing, so the harness saw
@@ -101,72 +99,12 @@ global E2E_REAL_GUI := (A_Args.Length >= 1 and A_Args[1] == "1")
 global E2E_MAGIC_KEY := Chr(0x2605)  ; ★ U+2605
 
 
-; Corpus scenario definitions — inline transcription of the 5 E2E vectors
-; from static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json.
-; Each entry is a Map with keys: id, trigger, replacement, is_word, is_cs,
-; buffer, terminator, expect_match, expect_replacement, expect_bs_count.
-global E2E_SCENARIOS := [
-    Map(
-        "id",                 "simple_expansion",
-        "trigger",            "btw",
-        "replacement",        "by the way",
-        "is_word",            false,
-        "is_cs",              false,
-        "buffer",             "btw",
-        "terminator",         " ",
-        "expect_match",       true,
-        "expect_replacement", "by the way",
-        "expect_bs_count",    4
-    ),
-    Map(
-        "id",                 "no_match_unrelated_buffer",
-        "trigger",            "btw",
-        "replacement",        "by the way",
-        "is_word",            false,
-        "is_cs",              false,
-        "buffer",             "hello",
-        "terminator",         " ",
-        "expect_match",       false,
-        "expect_replacement", "",
-        "expect_bs_count",    0
-    ),
-    Map(
-        "id",                 "word_boundary_mid_word_blocked",
-        "trigger",            "the",
-        "replacement",        "THE",
-        "is_word",            true,
-        "is_cs",              false,
-        "buffer",             "othe",
-        "terminator",         " ",
-        "expect_match",       false,
-        "expect_replacement", "",
-        "expect_bs_count",    0
-    ),
-    Map(
-        "id",                 "word_boundary_start_of_buffer",
-        "trigger",            "the",
-        "replacement",        "THE",
-        "is_word",            true,
-        "is_cs",              false,
-        "buffer",             "the",
-        "terminator",         " ",
-        "expect_match",       true,
-        "expect_replacement", "THE",
-        "expect_bs_count",    4
-    ),
-    Map(
-        "id",                 "case_sensitive_no_match",
-        "trigger",            "BTW",
-        "replacement",        "by the way",
-        "is_word",            false,
-        "is_cs",              true,
-        "buffer",             "btw",
-        "terminator",         " ",
-        "expect_match",       false,
-        "expect_replacement", "",
-        "expect_bs_count",    0
-    )
-]
+; Load the canonical corpus; missing/empty data must fail instead of skipping.
+global E2E_SCENARIOS := JsonParse(FileRead(A_ScriptDir
+    . "\..\..\..\_shared\tests\corpus\hotstrings\vectors.json", "UTF-8"))["vectors"]
+if !(E2E_SCENARIOS is Array) or E2E_SCENARIOS.Length == 0
+    throw Error("The shared hotstring corpus contains no E2E vectors.")
+
 
 
 
@@ -178,103 +116,86 @@ global E2E_SCENARIOS := [
 ; =====================================================
 ; =====================================================
 
-; Resets the engine and stubs, registers a single trigger, feeds the buffer
-; char-by-char then the terminator, and returns a result Map with keys:
-;   matched         (bool)   — whether HSE dispatched an expansion
-;   replacement     (string) — the replacement text sent (empty if no match)
-;   backspace_count (int)    — number of backspace strokes sent
+; Drive real registration and dispatch while applying captured sends to a virtual
+; document. Native input hooks and the OS sender are outside this headless tier.
 E2E_RunScenarioPure(Scenario) {
-    ; Fresh state for each scenario.
+    global _HotstringRegistrar, HSE_CONSUMED_DELIMITERS
+    SavedRegistrar := _HotstringRegistrar
+    SavedConsumed := HSE_CONSUMED_DELIMITERS
     HSE_RegistryClear()
     HSE_HardReset()
     HSE_FeedReset(true)
     HSE_Suppress(false)
     ResetHotstringRecorders()
     SimulateRegularApp()
-
-    Trigger  := Scenario["trigger"]
-    Repl     := Scenario["replacement"]
-    IsWord   := Scenario["is_word"]
-    IsCS     := Scenario["is_cs"]
-    InputBuffer := Scenario["buffer"]
-    Term        := Scenario["terminator"]
-
-    ; Build HSE flags from the scenario options.
-    Flags := ""
-    if IsWord {
-        ; is_word = word-boundary required = default (no "?" flag).
-        ; No "?" means word boundary IS enforced — do not append anything.
-    } else {
-        ; No word-boundary restriction.
-        Flags .= "?"
-    }
-    if IsCS {
+    Trigger := Scenario["trigger"]
+    InputBuffer := Scenario.Get("buffer", "")
+    Term := Scenario.Get("terminator", " ")
+    AssertTrue(StrLen(Term) <= 1, "the corpus terminator must describe one physical character")
+    Flags := Scenario.Get("is_word", false) ? "" : "?"
+    ; An explicit consumption policy describes the END path; STAR would fire
+    ; before that future character exists. Both Lua E2E consumers do the same.
+    if Scenario.Get("auto_expand", false) and !Scenario.Has("terminator_consumed")
+        Flags .= "*"
+    if Scenario.Get("is_case_sensitive_strict", false)
         Flags .= "C"
-    }
-
-    ; Register the trigger. Meta carries Replacement so HSE_DispatchMatch
-    ; performs the full BackSpace+Replacement burst via the send hook.
-    HSE_Register(Flags, Trigger, 0, Map("Replacement", Repl, "OnlyText", true))
-
-    ; Feed each character of the buffer into the engine.
-    Loop StrLen(InputBuffer) {
-        Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
-        if (Match != "") {
-            HSE_DispatchMatch(Match, HSE_LastEndChar)
+    HSE_CONSUMED_DELIMITERS := Scenario.Get("terminator_consumed", false) ? Term : ""
+    Document := ""
+    DispatchCount := 0
+    LogicalBackspaces := 0
+    NextSend := 1
+    try {
+        ; The production factory publishes to HSE directly; the optional
+        ; registration recorder is unnecessary. Native output remains intercepted.
+        _HotstringRegistrar := 0
+        HSE_RegisterFromTomlFlags(Scenario.Get("is_case_sensitive", false),
+            Flags, Trigger, Scenario["replacement"],
+            Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON))
+        for Char in StrSplit(InputBuffer . Term) {
+            Document .= Char
+            Match := HSE_FeedChar(Char)
+            if !IsObject(Match)
+                continue
+            EndChar := HSE_LastEndChar
+            AssertTrue(HSE_DispatchMatch(Match, EndChar), "an admitted match must actually dispatch")
+            DispatchCount += 1
+            EmittedBackspaces := _E2E_ApplyRecordedEdit(&Document, &NextSend)
+            ; Windows deletes an already visible end character and replays it
+            ; when retained. The shared count excludes only that physical replay.
+            ReplayedEnd := EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)
+            LogicalBackspaces += EmittedBackspaces - (ReplayedEnd ? StrLen(EndChar) : 0)
         }
+        return Map("matched", DispatchCount > 0, "document", Document,
+            "backspace_count", LogicalBackspaces, "dispatch_count", DispatchCount)
+    } finally {
+        _HotstringRegistrar := SavedRegistrar
+        HSE_CONSUMED_DELIMITERS := SavedConsumed
+        HSE_RegistryClear()
+        HSE_HardReset()
     }
-
-    ; Feed the terminator — this is what triggers the match check.
-    Match := HSE_FeedChar(Term)
-    if (Match != "") {
-        HSE_DispatchMatch(Match, HSE_LastEndChar)
-    }
-
-    ; Analyse what the send hook captured.
-    Sends := _Stub_RecordedSends
-    Matched     := false
-    Replacement := ""
-    BSCount     := 0
-
-    for Entry in Sends {
-        Args := Entry.args
-        if (Args.Length >= 1) {
-            Payload := Args[1]
-            ; Atomic format: "{BackSpace N}{Text}replacement endchar" or
-            ; "{BackSpace N}replacement endchar" — produced by SendInput after
-            ; the atomic-burst refactor (f7d69826c).
-            if RegExMatch(Payload, "^\{BackSpace (\d+)\}(.*)", &M) {
-                BSCount  := Integer(M[1])
-                Matched  := true
-                Rest     := M[2]
-                ; Strip optional {Text} prefix injected for OnlyText=true entries.
-                Rest     := RegExReplace(Rest, "^\{Text\}", "")
-                ; The replacement is everything except the trailing end-char (1 char).
-                ; If Rest is empty the expansion had no replacement text.
-                if (StrLen(Rest) > 1) {
-                    Replacement := SubStr(Rest, 1, StrLen(Rest) - 1)
-                } else if (StrLen(Rest) == 1) {
-                    ; Only one char: it is the end-char, no replacement text.
-                    Replacement := ""
-                }
-            ; Legacy two-send format: backspace-only entry followed by replacement.
-            } else if RegExMatch(Payload, "^\{BackSpace (\d+)\}$", &M) {
-                BSCount := Integer(M[1])
-                Matched := true
-            } else if Matched and Payload != "" {
-                if (Replacement == "") {
-                    Replacement := Payload
-                }
-            }
-        }
-    }
-
-    return Map(
-        "matched",         Matched,
-        "replacement",     Replacement,
-        "backspace_count", BSCount
-    )
 }
+
+; Decode the actual atomic edit, never the registry's desired replacement.
+_E2E_ApplyRecordedEdit(&Document, &NextSend) {
+    global _Stub_RecordedSends
+    Deleted := 0
+    Applied := 0
+    while NextSend <= _Stub_RecordedSends.Length {
+        Entry := _Stub_RecordedSends[NextSend++]
+        AssertTrue(Entry.args.Length > 0, "a captured native send must carry its payload")
+        Payload := Entry.args[1]
+        AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+            "the intercepted sender must emit a recognized atomic text edit: " . Payload)
+        Count := Integer(Edit[1])
+        AssertTrue(Count <= StrLen(Document), "an expansion must never delete before the virtual document starts")
+        Document := SubStr(Document, 1, StrLen(Document) - Count) . Edit[2]
+        Deleted += Count
+        Applied += 1
+    }
+    AssertTrue(Applied > 0, "successful dispatch must produce actual native output")
+    return Deleted
+}
+
 
 
 
@@ -332,15 +253,22 @@ E2E_RunScenarioGui(Trigger, Terminator) {
 ; Named helper used by the loop below — receives the scenario Map directly
 ; so each Test() callback is bound to a specific scenario via .Bind().
 _E2E_RunPureTest(Sc) {
-    Result      := E2E_RunScenarioPure(Sc)
-    ExpectMatch := Sc["expect_match"]
-    ExpectRepl  := Sc["expect_replacement"]
-    ExpectBS    := Sc["expect_bs_count"]
-    if ExpectMatch {
-        AssertEqual(ExpectRepl, Result["replacement"])
-        AssertEqual(ExpectBS,   Result["backspace_count"])
+    Result := E2E_RunScenarioPure(Sc)
+    Expected := Sc["expected"]
+    InputBuffer := Sc.Get("buffer", "")
+    Term := Sc.Get("terminator", " ")
+    AssertEqual(Expected["matched"], Result["matched"], "dispatch verdict must match the shared vector")
+    if Expected["matched"] {
+        AssertEqual(1, Result["dispatch_count"], "a single-trigger vector must dispatch exactly once")
+        Prefix := SubStr(InputBuffer, 1, StrLen(InputBuffer) - StrLen(Sc["trigger"]))
+        RetainedEnd := Sc.Get("terminator_consumed", false) ? "" : Term
+        AssertEqual(Prefix . Expected["replacement"] . RetainedEnd, Result["document"],
+            "actual emitted edits must preserve context and produce the exact replacement")
+        AssertEqual(Expected["backspace_count"], Result["backspace_count"],
+            "the real edit must replace the logical number of typed characters")
     } else {
-        AssertEqual(false, Result["matched"])
+        AssertEqual(0, Result["dispatch_count"], "a rejected mapping must emit no expansion")
+        AssertEqual(InputBuffer . Term, Result["document"], "a non-match must leave physical input unchanged")
     }
 }
 

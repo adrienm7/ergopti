@@ -59,6 +59,11 @@ local _capture = nil
 --- @param value string A candidate code or the automatic value.
 --- @return boolean committed
 function M.choose(ctx, value)
+	local reason = Source.choice_reason(value)
+	if reason ~= nil then
+		Notifications.notify(i18n.get("dialog.magic_key_source.title"), i18n.get(reason), "warning")
+		return false
+	end
 	local previous = ctx.state.magic_key_source
 	ctx.state.magic_key_source = value
 	if type(ctx.save_prefs) ~= "function" or ctx.save_prefs() ~= true then
@@ -184,6 +189,7 @@ function M.rows(ctx)
 	return Shared.menu_rows(resolver, {
 		t = i18n.get,
 		current = Source.get(),
+		reason = Source.choice_reason,
 		key_text = function(code) return key_text(resolver.native(code)) end,
 		choose = function(value) M.choose(ctx, value) end,
 		capture = ctx.paused ~= true and function() M.capture(ctx) end or nil,

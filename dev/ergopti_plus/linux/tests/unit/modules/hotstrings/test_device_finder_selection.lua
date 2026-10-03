@@ -346,3 +346,20 @@ helpers.describe("device_finder: a path must be able to produce key events", fun
 	end)
 
 end)
+
+helpers.describe("device finder: acknowledged physical editor origins", function()
+	helpers.it("(magic-editor-origin) keeps capability distinct from actual kernel hardware identity", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local devices = {
+			{ name = "USB Keyboard", sysfs = "/devices/pci0000:00/usb1/input/input1", ev_mask = 2, handlers = { "event1" } },
+			{ name = "Upstream remap", sysfs = "/devices/virtual/input/input2", ev_mask = 2, handlers = { "event2" } },
+			{ name = "Unknown keyboard", sysfs = "", ev_mask = 2, handlers = { "event3" } },
+		}
+		helpers.assert_true(Finder.is_key_device("/dev/input/event2", devices), "explicit virtual devices retain existing input capability behavior")
+		local origins = Finder.physical_sources({ "/dev/input/event1", "/dev/input/event2", "/dev/input/event3", "/dev/input/event4" }, devices)
+		helpers.assert_true(origins[1].physical)
+		helpers.assert_eq(origins[2].physical, false, "an upstream output does not prove its original physical key")
+		helpers.assert_eq(origins[3].physical, false, "missing sysfs identity is not positive hardware evidence")
+		helpers.assert_eq(origins[4].physical, false, "a retired device cannot qualify an old physical source")
+	end)
+end)

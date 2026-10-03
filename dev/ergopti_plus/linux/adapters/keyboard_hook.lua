@@ -124,6 +124,9 @@ local _release_forwarded_sources
 -- The tap-hold engine (platform/remap/tap_hold_engine), set by the daemon. It rewrites
 -- the grabbed stream before anything else reads it, and _on_tap runs the tap
 -- actions it hands back that are not a plain key.
+local _physical_sources = {}
+local _origin_generation, _origin_signature = 0, nil
+local _origin_ready = false
 local _remapper = nil
 local _on_tap = nil
 local _release_remapped
@@ -335,12 +338,13 @@ end
 --- from the application: the application's own Compose never saw it, so the
 --- next key must read here as it types there, not composed with it.
 local function _cancel_capture_compose()
-	if _test_capture_event then return end
+	if _test_capture_event then return true end
 	local ok, err = XkbCapture.cancel_compose()
 	if not ok then
 		_xkb_failed("XKB Compose could not be cancelled after a consumed key (%s) — the next key may read composed.",
 			tostring(err))
 	end
+	return ok == true
 end
 
 --- The role a physical key has in the ACTIVE layout, asked of XKB before its
@@ -579,6 +583,32 @@ local function _event_clock_now_ms()
 	return _clock_event_ms + math.max(0, since_read)
 end
 
+--- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
+--- @param receipt any Consumer result.
+--- @return function|nil callback Exact callback owned by this physical press.
+local function consumed_repeat_callback(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or receipt.consume ~= true
+		or type(receipt.repeat_callback) ~= "function" then return nil end
+	for key in pairs(receipt) do
+		if key ~= "consume" and key ~= "repeat_callback" then return nil end
+	end
+	return receipt.repeat_callback
+end
+
+--- Detaches the native event identity and its already-published origin epoch.
+--- @param ev table Decoded evdev event.
+--- @param source string Owned device path.
+--- @param identity string|nil Native layout identity.
+--- @param char string|nil Native layout character.
+--- @return table detail Consumer event.
+local function consumption_detail(ev, source, identity, char)
+	return { key = identity or char, char = char, code = ev.code,
+		physical = ev.remapped ~= true and _physical_sources[source] == true,
+		origin_generation = _origin_ready and _origin_generation or nil,
+		value = ev.value, mods = M.held_modifiers(), shift_side = M.held_shift_side(),
+	}
+end
+
 local function _dispatch_event(ev, source)
 	-- Intercept mode grabbed the device, so nothing reaches the application
 	-- except through here: put the raw event back BEFORE doing anything else.
@@ -720,7 +750,20 @@ local function _dispatch_event(ev, source)
 		else
 			-- XKB read each auto-repeat of the consumed press too, a dead key's
 			-- included, and the application saw none of them.
-			_cancel_capture_compose()
+			local compose_cancelled = _cancel_capture_compose()
+			local repeat_callback = _consumed_down[consumed_key]
+			if ev.value == InputEvent.VALUE_REPEAT and type(repeat_callback) == "function" then
+				local called, acknowledged = false, false
+				if compose_cancelled then
+					called, acknowledged = _call_callback("consumed-key repeat callback",
+						repeat_callback, consumption_detail(ev, source, identity, char))
+				end
+				if not called or acknowledged ~= true then
+					-- A refusal retires this press; later repeats cannot revive it,
+					-- and its suppressed down still owns the eventual release.
+					_consumed_down[consumed_key] = true
+				end
+			end
 		end
 		return
 	end
@@ -729,24 +772,23 @@ local function _dispatch_event(ev, source)
 	-- the source stream. XKB and modifier state are current before the decision;
 	-- raw pass-through and semantic callbacks happen only if it declines.
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
-		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume, {
-			key = identity or char,
-			char = char,
-			code = ev.code,
-			value = ev.value,
-			mods = M.held_modifiers(),
-			shift_side = M.held_shift_side(),
-		})
+		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume,
+			consumption_detail(ev, source, identity, char))
+		local repeat_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
 			_forward_raw(ev, source)
 			return
-		elseif consume == true then
-			_consumed_down[consumed_key] = true
+		elseif consume == true or repeat_callback ~= nil then
+			_consumed_down[consumed_key] = repeat_callback or true
 			-- A dead key consumed here (a tap key or the physical magic key on
 			-- a French ^ or a US-international ') would otherwise stay pending.
-			_cancel_capture_compose()
+			if not _cancel_capture_compose() then
+				-- Its first output is already consumed; a refused retirement
+				-- cannot leave optional repeats alive for this held press.
+				_consumed_down[consumed_key] = true
+			end
 			return
 		end
 	end
@@ -1171,6 +1213,27 @@ function M.caps_lock_on()
 	return nil, "no keyboard is open"
 end
 
+--- Rechecks the existing capture owner's kernel origin without a new watcher.
+--- @return table receipt Physical-source generation and admission.
+function M.physical_source_receipt()
+	local ok, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local sources = ok and type(Finder.physical_sources) == "function" and Finder.physical_sources(_devices) or {}
+	local ready = _running and _intercept and #_devices > 0 and #sources == #_devices
+	local signature, physical = { tostring(ready) }, {}
+	for _, source in ipairs(sources) do
+		physical[source.path] = source.physical == true
+		ready = ready and source.physical == true
+		for _, value in ipairs({ source.path, source.sysfs, source.name, tostring(source.physical) }) do
+			signature[#signature + 1] = #value .. ":" .. value
+		end
+	end
+	local encoded = table.concat(signature, ";")
+	if _origin_signature ~= encoded then _origin_signature, _origin_generation = encoded, _origin_generation + 1 end
+	_physical_sources = physical
+	_origin_ready = ready == true
+	return { generation = _origin_generation, ready = ready == true }
+end
+
 --- Resolves every device the daemon should be reading right now.
 --- @return table keyboards, table pointers
 local function _best_devices()
@@ -1302,6 +1365,7 @@ local function _acquire(paths, force_path)
 	_devices = {}
 	for index, path in ipairs(paths) do _devices[index] = path end
 	_device = _devices[1]
+	M.physical_source_receipt()
 	return true
 end
 
@@ -1397,6 +1461,9 @@ function M.check_device()
 		or not _all_keyboards_open(keyboards) or _pinned_missing
 	local pointers_changed = not same_paths(pointers, _pointer_devices)
 		or not _all_pointers_open(pointers)
+	-- Refresh origin admission through this existing watchdog, including an
+	-- unchanged path whose kernel descriptor became synthetic or unknown.
+	M.physical_source_receipt()
 	if not keyboards_changed and not pointers_changed then return end
 	if not keyboards_changed then
 		_acquire_pointers(pointers)
@@ -1416,12 +1483,39 @@ function M.check_device()
 	local acquired, acquire_err = _acquire(keyboards, force_path)
 	if acquired then
 		_seed_caps_lock(_devices[1])
+		-- A source/capture change retires every old repeat callback, but the
+		-- application still never saw its consumed down. Keep that debt only
+		-- on committed source/key owners until an actual release arrives.
+		local sources, suppressed, physical, snapshots = {}, {}, {}, {}
+		for _, path in ipairs(_devices) do sources[path] = true end
+		for key, down in pairs(_physical_down) do
+			if _consumed_down[key] and sources[down.source] then
+				local snapshot = snapshots[down.source]
+				if snapshot == nil then
+					local keys, query_err = EvdevReader.pressed_keys(keyboard_slot(down.source), KEY_MAX)
+					snapshot = { keys = keys }
+					snapshots[down.source] = snapshot
+					if keys == nil then
+						Logger.warn(LOG, "Suppressed-key state unavailable on recovered source %s — "
+							.. "retaining consumed presses until release (%s).", down.source, tostring(query_err))
+					end
+				end
+				-- The kernel can prove a release whose event was lost while the
+				-- descriptor was closed. An unavailable query proves no release.
+				if snapshot.keys == nil or snapshot.keys[down.code] == true then
+					suppressed[key], physical[key] = true, down
+				end
+			end
+		end
 		_reset_modifier_state()
-		_physical_down = {}
+		_consumed_down, _physical_down = suppressed, physical
 		_sync_dropped = {}
 		_acquire_pointers(pointers)
 		_running = true
 		_reacquiring = false
+		-- A cold reacquisition published before it was running. A warm one
+		-- already published ready through _acquire and needs no second scan.
+		if not _origin_ready then M.physical_source_receipt() end
 		Logger.success(LOG, "Re-acquired %d keyboard source(s) (intercept=%s).",
 			#keyboards, tostring(_intercept))
 	else
@@ -1608,6 +1702,9 @@ function M.start(opts)
 	_ticks_since_check = 0
 	_reported_missing = false
 	_running = true
+	-- Acquisition proved the device before it was running. Publish admission
+	-- at the completed lifecycle boundary so the first press can own repeats.
+	M.physical_source_receipt()
 	Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
 		#_devices, #_pointer_devices, _layout, tostring(_intercept))
 end
@@ -1723,8 +1820,14 @@ end
 --- then (the Enter that closed it) are treated as consumed, so neither reaches
 --- the hotstring buffer nor the application a second time.
 --- @param fn function The modal; its results are returned.
+--- @param opts table|nil { observer(stage, receipt) } brackets acknowledged native restoration.
 --- @return any
-function M.while_released(fn)
+function M.while_released(fn, opts)
+	local observer = type(opts) == "table" and opts.observer or nil
+	local function observe(stage, receipt)
+		if type(observer) ~= "function" then return true end
+		return _call_callback("modal restoration observer", observer, stage, receipt)
+	end
 	if not _running or not _intercept then return fn() end
 	local paths = {}
 	for index, path in ipairs(_devices) do paths[index] = path end
@@ -1732,6 +1835,7 @@ function M.while_released(fn)
 	local released, release_err = _release_forwarded_sources(paths)
 	if not released then
 		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
+		observe("refused", { ok = false, reason = "release_failed" })
 		return fn()
 	end
 	for _, path in ipairs(paths) do EvdevReader.ungrab(keyboard_slot(path)) end
@@ -1748,6 +1852,7 @@ function M.while_released(fn)
 		_pending_events[slot] = nil
 		if not EvdevReader.grab(slot) then
 			M.emergency_stop("could not take the keyboard back after a dialog: " .. path)
+			observe("refused", { ok = false, reason = "regrab_failed" })
 			return (table.unpack or unpack)(results, 1, results.n)
 		end
 		local held = EvdevReader.pressed_keys(slot, KEY_MAX)
@@ -1755,10 +1860,16 @@ function M.while_released(fn)
 		local synced, sync_err = _resynchronise(path)
 		if not synced then
 			M.emergency_stop("could not resynchronise after a dialog: " .. tostring(sync_err))
+			observe("refused", { ok = false, reason = "resynchronisation_failed" })
 			return (table.unpack or unpack)(results, 1, results.n)
 		end
 	end
-	if _on_desync then _call_callback("input-desync callback", _on_desync) end
+	if not observe("before", { ok = true }) then
+		observe("refused", { ok = false, reason = "observer_failed" })
+		return (table.unpack or unpack)(results, 1, results.n)
+	end
+	local desynced = not _on_desync or _call_callback("input-desync callback", _on_desync)
+	observe("after", { ok = desynced and _running and err == nil })
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
 	if err then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)
@@ -1893,6 +2004,7 @@ function M._test_drive(events, callbacks, intercept)
 
 	local test_path = "/dev/input/test"
 	_devices = { test_path }
+	_physical_sources = { [test_path] = cb.physicalSource ~= false }
 	_device = test_path
 	local slot = keyboard_slot(test_path)
 	EvdevReader.open(test_path, slot)
@@ -1913,6 +2025,7 @@ function M._test_drive(events, callbacks, intercept)
 	_remap_source_of = {}
 	_running = false
 	_devices = {}
+	_physical_sources = {}
 	_device = nil
 	_test_capture_event = nil
 	_sync_dropped = {}

@@ -43,13 +43,6 @@ local ProviderUses = require("modules.llm.provider_uses")
 
 local LOG = "menu_llm.agent_panel"
 
--- The mode choices, in menu order, with their labels
-local MODES = {
-	{ id = "off", key = "menu.agent.mode_off" },
-	{ id = "action", key = "menu.agent.mode_action" },
-	{ id = "auto", key = "menu.agent.mode_auto" },
-}
-
 -- The two systems: their setting, runtime setter and title key
 local SYSTEMS = {
 	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1", title = "menu.agent.system1",
@@ -177,34 +170,21 @@ local function apply(ctx, key, value, setter)
 	return committed
 end
 
---- Rows of the mode submenu.
+--- Applies a shared mode choice through its native prerequisite and durable owner.
 --- @param ctx table Panel context.
---- @return table rows
-local function mode_rows(ctx)
-	local current = ctx.state.llm_agent_mode
-	local current_label = i18n.get("menu.agent.mode_off")
-	local items = {}
-	for _, mode in ipairs(MODES) do
-		if mode.id == current then current_label = i18n.get(mode.key) end
-		local id = mode.id
-		items[#items + 1] = {
-			label = i18n.get(mode.key),
-			checked = id == current,
-			action = function()
-				local Runner = require("modules.llm.agent_runner")
-				if id == "auto" and not Runner.is_configured(ctx.state.llm_agent_system1) then
-					Logger.info(LOG, "Automatic mode refused from the menu: System 1 is not chosen.")
-					local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
-					if ok_tooltip and type(tooltip.show) == "function" then
-						pcall(tooltip.show, i18n.get("llm.agent.no_system1"), true, true)
-					end
-					return false
-				end
-				return apply(ctx, "llm_agent_mode", id, "set_llm_agent_mode")
-			end,
-		}
+--- @param id string Mode from the shared enum feature.
+--- @return boolean committed
+local function set_mode(ctx, id)
+	local Runner = require("modules.llm.agent_runner")
+	if id == "auto" and not Runner.is_configured(ctx.state.llm_agent_system1) then
+		Logger.info(LOG, "Automatic mode refused from the menu: System 1 is not chosen.")
+		local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+		if ok_tooltip and type(tooltip.show) == "function" then
+			pcall(tooltip.show, i18n.get("llm.agent.no_system1"), true, true)
+		end
+		return false
 	end
-	return { { label = i18n.format("menu.agent.mode_title", current_label), items = items } }
+	return apply(ctx, "llm_agent_mode", id, "set_llm_agent_mode")
 end
 
 --- Asks for the model of a System and stores "<backend>" or "<backend>|<model>".
@@ -392,11 +372,16 @@ function M.build(ctx)
 		end
 	end
 	local submenu = ManifestMenu.build("agent_menu", "AI agent", {
-		agent_mode = dynamic("agent_mode", function() return mode_rows(ctx) end),
 		agent_system1 = dynamic("agent_system1", function() return system_rows(ctx, SYSTEMS.agent_system1) end),
 		agent_system2 = dynamic("agent_system2", function() return system_rows(ctx, SYSTEMS.agent_system2) end),
 		agent_disabled_apps = dynamic("agent_disabled_apps", function() return disabled_apps_rows(ctx) end),
-	}, nil, ctx) or {}
+	}, nil, {
+		commands = { agent_mode = function(id) return set_mode(ctx, id) end },
+		state_getters = {
+			["llm.agent_mode"] = function() return ctx.state.llm_agent_mode end,
+			agent_mode_ready = function() return type(ctx.settings_mgr) == "table" and type(ctx.settings_mgr.apply_setting_transaction) == "function" end,
+		},
+	}) or {}
 	return { label = i18n.get("menu.agent.title"), submenu = submenu }
 end
 

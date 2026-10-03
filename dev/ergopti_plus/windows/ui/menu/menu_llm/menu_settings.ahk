@@ -78,15 +78,36 @@ _LLM_Menu_NRows() {
  * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
-LLM_Menu_BuildTriggerMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_trigger", (*) => _LLM_Menu_TriggerRows())
+LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
+	global _LLM_Menu
+	if !IsSet(InstantCommand)
+		InstantCommand := LLM_Menu_OnInstantToggle
+	if !IsSet(AfterCommand)
+		AfterCommand := (*) => LLM_Menu_ToggleBool("after_hotstring")
+	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
+		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
+			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
+		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
+			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call()),
+		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu["instant_on_word_end"],
+			"llm_after_hotstring_enabled", (*) => _LLM_Menu["after_hotstring"],
+			"llm_trigger_ready", _LLM_Menu_TriggerReady))
+}
+
+/**
+ * Reads the live trigger menu admission without coupling it to variant count.
+ * @returns {Boolean} Whether a native setting command may be delivered.
+ */
+_LLM_Menu_TriggerReady(*) {
+	global _LLM_Menu
+	return _LLM_Menu["enabled"] && !A_IsSuspended
 }
 
 /**
  * Row data for the trigger submenu.
- * @returns {Array} Debounce, the four toggles, the app picker.
+ * @returns {Array} Native debounce, privacy filters and the app picker.
  */
-_LLM_Menu_TriggerRows() {
+_LLM_Menu_TriggerRows(Position := "all") {
 	global _LLM_Menu
 	Rows := []
 
@@ -102,17 +123,8 @@ _LLM_Menu_TriggerRows() {
 
 	Rows.Push(Map("separator", true))
 
-	; Instant on word end
-	Rows.Push(Map(
-		"label",   t("menu.llm.instant_on_word_end"),
-		"checked", _LLM_Menu["instant_on_word_end"],
-		"action",  LLM_Menu_OnInstantToggle))
-
-	; After hotstring (suggest after a hotstring expansion finishes)
-	Rows.Push(Map(
-		"label",   t("menu.llm.after_hotstring"),
-		"checked", _LLM_Menu["after_hotstring"],
-		"action",  (*) => LLM_Menu_ToggleBool("after_hotstring")))
+	LeadingRows := Rows
+	Rows := []
 
 	Rows.Push(Map("separator", true))
 
@@ -136,7 +148,13 @@ _LLM_Menu_TriggerRows() {
 			: t("menu.llm.exclude_from_ai"),
 		"action", (*) => LLM_Menu_OpenAppPicker()))
 
-	return Rows
+	if Position == "leading"
+		return LeadingRows
+	if Position == "remaining"
+		return Rows
+	for Row in Rows
+		LeadingRows.Push(Row)
+	return LeadingRows
 }
 
 /**
@@ -196,16 +214,36 @@ _LLM_Menu_MakeLiveModeHandler(ProfileId) {
 /**
  * Builds the generation settings submenu.
  * All numeric values use InputBox dialogs (same UX as HS settings_manager).
+ * @param {Func} AutoCommand Optional acknowledged command owner for native tests.
+ * @param {Func} ValuesProvider Optional unrelated numeric provider for native tests.
  * @returns {Menu} Populated generation submenu.
  */
-LLM_Menu_BuildGenerationMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_generation_settings", (*) => _LLM_Menu_GenerationRows())
+LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
+	global _LLM_Menu
+	if !IsSet(AutoCommand)
+		AutoCommand := (*) => LLM_Menu_ToggleBool("auto_raise_temp")
+	if !IsSet(ValuesProvider)
+		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
+	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
+		Map("llm_generation_values", ValuesProvider),
+		Map("llm_auto_raise_temperature", (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
+		Map("llm_auto_raise_enabled", (*) => _LLM_Menu["auto_raise_temp"],
+			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
+}
+
+/**
+ * Reads the current prediction count before showing or delivering the check.
+ * @returns {Boolean} Whether several predictions are currently requested.
+ */
+_LLM_Menu_AutoRaiseReady() {
+	global _LLM_Menu
+	return _LLM_Menu["n_predictions"] >= 2
 }
 
 /**
  * Row data for the generation submenu.
  * @returns {Array} The suggestion count, the four numeric prompts with their
- *     reset rows, plus the two toggles.
+ *     reset rows, plus the existing navigation reset toggle.
  */
 _LLM_Menu_GenerationRows() {
 	global _LLM_Menu
@@ -279,13 +317,6 @@ _LLM_Menu_GenerationRows() {
 		_temp_default,
 		(*) => _LLM_AssignAndRebuild("temperature", _temp_default))
 
-	; Auto-raise temperature — only meaningful when several predictions are drawn
-	Rows.Push(Map(
-		"label",    t("menu.llm.auto_raise_temp"),
-		"checked",  _LLM_Menu["auto_raise_temp"],
-		"disabled", (_LLM_Menu["n_predictions"] <= 1),
-		"action",   (*) => LLM_Menu_ToggleBool("auto_raise_temp")))
-
 	return Rows
 }
 
@@ -299,29 +330,59 @@ _LLM_Menu_GenerationRows() {
 ; ==================================
 ; ==================================
 
+; This initializer belongs beside the display rows so both the resident entry
+; and the definitions-only native harness initialize the same catalogue.
+; Indent level options for multi-prediction display. Range mirrors the HS
+; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
+; build_indent_menu): negative values produce a leading deletion of N chars so
+; the prediction lines up at column-N relative to the original cursor, while
+; positive values insert N spaces before each line. Built lazily at startup
+; so the integer array stays a single source of truth.
+global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
+_LLMMenuBuildIndentRange() {
+    out := []
+    Loop 15 {
+        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
+    }
+    return out
+}
+
 /**
  * Builds the display settings submenu.
  * Mirrors HS display_menu: info bar, streaming, show-all-at-once, indent.
+ * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_display", (*) => _LLM_Menu_DisplayRows())
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset) {
+	global _LLM_Menu
+	if !IsSet(InfoCommand)
+		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
+	if !IsSet(ShowAllCommand)
+		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
+	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
+		Map("llm_display_leading", (*) => [],
+			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
+			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
+		Map("llm_info_bar", InfoCommand, "llm_show_all", (*) =>
+			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
+		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
+			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
+			"llm_show_all_ready", _LLM_Menu_ShowAllReady))
 }
 
 /**
  * Row data for the display submenu, including the nested indent picker.
- * @returns {Array} The four toggles and the indent-level submenu.
+ * @returns {Array} Native display settings after the shared Info Bar check.
  */
-_LLM_Menu_DisplayRows() {
+_LLM_Menu_ShowAllReady() {
+	global _LLM_Menu
+	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"] || A_IsSuspended ? true : false)
+}
+
+_LLM_Menu_DisplayRows(Position := "all") {
 	global _LLM_Menu
 	Rows := []
 	n := _LLM_Menu["n_predictions"]
-
-	; Info bar (shows model name and latency in the tooltip)
-	Rows.Push(Map(
-		"label",   t("menu.llm.show_info_bar"),
-		"checked", _LLM_Menu["show_info_bar"],
-		"action",  (*) => LLM_Menu_ToggleBool("show_info_bar")))
 
 	; Inline auto-type — when on, the prediction is typed directly into
 	; the active app instead of showing in a tooltip (Copilot-style). The
@@ -343,12 +404,8 @@ _LLM_Menu_DisplayRows() {
 "disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
 		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
 
-	; Show all predictions at once
-	Rows.Push(Map(
-		"label",    t("menu.llm.show_all_at_once"),
-		"checked",  _LLM_Menu["show_all_at_once"],
-		"disabled", (n < 2),
-		"action",   (*) => LLM_Menu_ToggleBool("show_all_at_once")))
+	LeadingRows := Rows
+	Rows := []
 
 	Rows.Push(Map("separator", true))
 
@@ -384,7 +441,13 @@ _LLM_Menu_DisplayRows() {
 		(*) => _LLM_AssignAndRebuild("pred_indent",
 			_LLM_DefaultFor("llm_pred_indent", 0)))
 
-	return Rows
+	if Position == "remaining"
+		return LeadingRows
+	if Position == "trailing"
+		return Rows
+	for Row in Rows
+		LeadingRows.Push(Row)
+	return LeadingRows
 }
 
 

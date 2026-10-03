@@ -28,12 +28,12 @@ local RELOADED = {
 	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
 	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
 	"modules.llm.api_remote", "modules.llm.agent_settings", "modules.llm.agent_connectors",
-	"modules.llm.agent_learning",
+	"modules.llm.agent_learning", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
 }
 -- The boundaries a scenario scripts
 local FAKED = {
 	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama",
+	"modules.llm.profiles", "modules.llm.api_ollama", "adapters.shell_runner",
 }
 
 -- The preferences every scenario starts from: the menu's predictions go to the
@@ -63,10 +63,11 @@ function M.run(opts, body)
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local world = {
-			posts = {}, notices = {}, typed = {}, shown = nil, reads = 0, runs = {}, written = {}, removed = {},
+			posts = {}, probes = {}, model_offers = {}, model_installs = {}, notices = {}, typed = {}, shown = nil, reads = 0, runs = {}, written = {}, removed = {},
 			selection = opts.selection, command = opts.command, dialogs = {}, paused = opts.paused == true,
 			tools = opts.tools or { "Envoyer la facture" }, preferences = preferences, buffer = "",
 			window = opts.window or { app = "Mail", title = "Re: devis" }, secure = false, preview = false,
+			base_url = "http://127.0.0.1:11434",
 		}
 		package.loaded["adapters.secure_field_detector"] = {
 			isSecureField = function() return world.secure end,
@@ -74,6 +75,15 @@ function M.run(opts, body)
 			isUrlBar = function() return false end,
 		}
 		package.loaded["adapters.http_client"] = {
+			get = function(url, headers, options, callback)
+				world.probes[#world.probes + 1] = { url = url, options = options, callback = callback }
+				return true
+			end,
+			postStream = function(url, headers, request_body, options, on_chunk, callback)
+				world.posts[#world.posts + 1] = { url = url, headers = headers, body = Json.decode(request_body),
+					on_chunk = on_chunk, callback = callback }
+				return true
+			end,
 			post = function(url, headers, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, headers = headers, body = Json.decode(request_body),
 					callback = callback }
@@ -96,12 +106,40 @@ function M.run(opts, body)
 			init = function() end,
 			is_enabled = function() return ai_on end,
 			get_current_model = function() return "ollama-model" end,
-			get_base_url = function() return "http://127.0.0.1:11434" end,
+			get_base_url = function() return world.base_url end,
 		}
-		package.loaded["modules.llm.api_ollama"] = {
-			chat = function() error("the scenario runs through the API") end,
-			cancel = function() return true end,
-		}
+		if opts.local_backend then
+			package.loaded["modules.llm.api_ollama"] = nil
+		else
+			package.loaded["modules.llm.api_ollama"] = {
+				chat = function() error("the scenario runs through the API") end,
+				cancel = function() return true end,
+			}
+		end
+		require("modules.llm.local_model_offer")._reset_for_test({
+			confirm = not opts.native_model_dialog and function(title, text, offer_opts)
+				if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world, offer_opts) end
+				world.model_offers[#world.model_offers + 1] = { title = title, text = text }
+				return opts.download_choice == true
+			end or nil,
+			install = function(base_url, model, callback)
+				world.model_installs[#world.model_installs + 1] = { base_url = base_url, model = model, callback = callback }
+				return true
+			end,
+			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
+		})
+
+		if opts.native_model_dialog then
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function(command) return command == "zenity" end,
+				quote = function(value) return "'" .. value:gsub("'", "'\"'\"'") .. "'" end,
+				exec_checked = function(command)
+					world.model_offers[#world.model_offers + 1] = { command = command }
+					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
+					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1"
+				end,
+			}
+		end
 
 		local scheduler = Fakes.timer_scheduler()
 		world.scheduler = scheduler
@@ -186,6 +224,11 @@ function M.run(opts, body)
 		--- The remote server answers request `index` with `text`.
 		function world.respond(index, text)
 			local post = assert(world.posts[index], "no request " .. index .. " was sent")
+			if post.on_chunk then
+				post.on_chunk(Json.encode({ message = { content = text }, done = true }) .. "\n")
+				post.callback({ ok = true, status = 200 })
+				return
+			end
 			post.callback({ ok = true, status = 200,
 				body = Json.encode({ choices = { { message = { role = "assistant", content = text } } } }) })
 		end

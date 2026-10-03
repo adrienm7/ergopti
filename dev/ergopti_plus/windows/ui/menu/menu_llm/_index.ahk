@@ -54,23 +54,8 @@
 
 ; Title is resolved at call-time via a function — never at load-time —
 ; so the active language is already set when the menu is built or rebuilt.
-; The suggestion count choices live beside their only reader, in
-; menu_settings.ahk (LLM_MENU_N_OPTIONS).
-
-; Indent level options for multi-prediction display. Range mirrors the HS
-; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
-; build_indent_menu): negative values produce a leading deletion of N chars so
-; the prediction lines up at column-N relative to the original cursor, while
-; positive values insert N spaces before each line. Built lazily at startup
-; so the integer array stays a single source of truth.
-global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
-_LLMMenuBuildIndentRange() {
-    out := []
-    Loop 15 {
-        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
-    }
-    return out
-}
+; Suggestion-count and indentation choices live beside their readers in
+; menu_settings.ahk (LLM_MENU_N_OPTIONS and LLM_MENU_INDENT_OPTIONS).
 
 ; Physical-idle ceiling for the background Ollama health tick. Past it the tick
 ; early-returns instead of spawning a curl.exe child every 10 s — 6 processes a
@@ -252,7 +237,8 @@ LLM_Menu_ApplySharedDefaults() {
 			_LLM_Menu[tray_key] := NormalizedPort
 			continue
 		}
-		_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
+		_LLM_Menu[tray_key] := (shared_key == "llm_streaming_multi")
+			? LLM_DisplayShowAll(LLM_Defaults[shared_key]) : LLM_Defaults[shared_key]
 	}
 }
 LLM_Menu_ApplySharedDefaults()
@@ -301,5 +287,6 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include hotkey_identity.ahk
 #Include menu_settings.ahk
 #Include menu_agent.ahk
+#Include enable_admission.ahk
 #Include actions.ahk
 #Include tab_accept.ahk

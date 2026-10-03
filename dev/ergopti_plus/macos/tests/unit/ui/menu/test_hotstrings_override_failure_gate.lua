@@ -23,7 +23,8 @@ helpers.describe("hotstring category delay is fail-closed", function()
 			default_for = function() return "★" end,
 		}
 		package.loaded["infra.manifest_menu"] = {
-			build = function(_, _, _, _, _, providers)
+			build = function(section, _, _, _, _, providers)
+				if section == "word_expanders_menu" then return providers.word_expander_entries() end
 				return providers.delays_colors()
 			end,
 		}

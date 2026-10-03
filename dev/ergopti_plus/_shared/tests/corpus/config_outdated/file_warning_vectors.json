@@ -1,0 +1,98 @@
+[
+	{
+		"id": "first entry",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": true,
+		"reports": 1
+	},
+	{
+		"id": "same entry again",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": false,
+		"reports": 1
+	},
+	{
+		"id": "another entry",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.future_array",
+		"detail": "retired",
+		"first": true,
+		"reports": 2
+	},
+	{
+		"id": "interleaved repeated entry",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": false,
+		"reports": 2
+	},
+	{
+		"id": "another file",
+		"file": "/cfg/other.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": true,
+		"reports": 3
+	},
+	{
+		"id": "case sensitive path",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.Retired_field",
+		"detail": "retired",
+		"first": true,
+		"reports": 4
+	},
+	{
+		"id": "changed reason",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "another stale value",
+		"first": true,
+		"reports": 5
+	},
+	{
+		"id": "original reason still reported",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": false,
+		"reports": 5
+	},
+	{
+		"id": "Unicode and quoted rendered path",
+		"file": "/cfg/é😀.toml",
+		"path": "tap_hold.keys.tab.\"future.field\"",
+		"detail": "future binding",
+		"first": true,
+		"reports": 6
+	},
+	{
+		"id": "Unicode repeated",
+		"file": "/cfg/é😀.toml",
+		"path": "tap_hold.keys.tab.\"future.field\"",
+		"detail": "future binding",
+		"first": false,
+		"reports": 6
+	},
+	{
+		"id": "exact file spelling",
+		"file": "/cfg/Tap_hold.toml",
+		"path": "tap_hold.keys.tab.retired_field",
+		"detail": "retired",
+		"first": true,
+		"reports": 7
+	},
+	{
+		"id": "first second entry remains reported",
+		"file": "/cfg/tap_hold.toml",
+		"path": "tap_hold.keys.tab.future_array",
+		"detail": "retired",
+		"first": false,
+		"reports": 7
+	}
+]

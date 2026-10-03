@@ -1,0 +1,7 @@
+[case]
+description = "A non-string explicit ordinary choice is preserved with its legacy owner."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

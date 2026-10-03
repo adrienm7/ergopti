@@ -249,14 +249,17 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		helpers.assert_true(named, "the ignored id must be named in a warning")
 	end)
 
-	helpers.it("clears the entry when the binding is removed", function()
+	helpers.it("preserves an explicitly native chord after its action is removed", function()
 		local shortcuts, storage = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
-		shortcuts.set_action("ctrl_j", "none")
-		local has = storage.has("shortcuts.keyboard.ctrl_j")
+		local ok, err = pcall(function()
+			helpers.assert_true(shortcuts.set_action("ctrl_j", "none"))
+			helpers.assert_eq(storage.get("shortcuts.keyboard.ctrl_j"), "none", "explicit native behavior keeps its durable ownership")
+			shortcuts._reset()
+			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "none", "restart never rebinds the removed action")
+			helpers.assert_eq(shortcuts.dispatch(chord("j", { ctrl = true })), false, "the explicitly native chord dispatches no action")
+		end)
 		drop_config()
-		helpers.assert_true(not has,
-			"an unbound slot must leave nothing behind, or the next start binds a "
-				.. "chord the user has already removed")
+		helpers.assert_true(ok, tostring(err))
 	end)
 
 	helpers.it("keeps the active binding when persistence fails", function()
@@ -269,7 +272,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		local stored = storage.get("shortcuts.keyboard.ctrl_j")
 		drop_config()
 		helpers.assert_eq(rebound, false, "a failed write must not report a new binding")
-		helpers.assert_eq(removed, false, "a failed delete must not report an unbound slot")
+		helpers.assert_eq(removed, false, "a failed explicit None write must not report an unbound slot")
 		helpers.assert_eq(active, "select_line", "the live chord must keep its durable action")
 		helpers.assert_eq(stored, "select_line", "the durable action must remain untouched")
 	end)
@@ -528,4 +531,212 @@ helpers.describe("Keyboard configuration admission", function()
 			if not ok then error(err, 0) end
 		end)
 	end
+end)
+
+helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", function()
+	local function with_editor(initial, body, writes_fail)
+		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
+		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+		local saved_builder = package.loaded["ui.menu.menu_builder"]
+		local gestures = require("modules.gestures.manager")
+		local saved_execute = gestures.execute_action
+		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
+			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
+			queue = {}, fired = {} }
+		package.loaded["modules.hotstrings.magic_key_source"] = {
+			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
+			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
+		}
+		package.loaded["modules.hotstrings.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
+		local ok, err = pcall(function()
+			local shortcuts, config = load_over_config(initial, writes_fail)
+			state.options = {
+				defer = function(callback) state.queue[#state.queue + 1] = callback return true end,
+				admission = function() return { master = state.master, paused = state.paused, inhibited = state.inhibited } end,
+			}
+			state.detail = { key = "j", code = 36, physical = true, mods = { meta = true } }
+			body(shortcuts, config, state)
+		end)
+		gestures.execute_action = saved_execute
+		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
+		package.loaded["modules.hotstrings.magic_key"] = saved_magic
+		package.loaded["ui.menu.menu_builder"] = saved_builder
+		drop_config()
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("(magic-editor-broker) routes the manifest default through the ordinary executor and stable editable slot", function()
+		with_editor(nil, function(shortcuts, config, state)
+			helpers.assert_eq(shortcuts.get_action("magic_editor"), "open_hotstrings_editor")
+			helpers.assert_eq(shortcuts.available_slots("contextual"), { "magic_editor" })
+			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" })
+			helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + ★")
+			helpers.assert_true(shortcuts.consume(state.detail, state.options))
+			helpers.assert_eq(#state.fired, 0, "native capture queues ordinary actions outside the hook")
+			state.queue[1]()
+			helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__magic_editor" } })
+			helpers.assert_eq(#config.keys(), 0, "a conditional default never seeds personal assignments")
+			helpers.assert_true(shortcuts.set_action("magic_editor", "none"))
+			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "none", "clearing a default remains explicit across restart")
+			shortcuts._reset()
+			helpers.assert_eq(shortcuts.get_action("magic_editor"), "none")
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" }, "a cleared conditional slot remains editable")
+			helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+			helpers.assert_true(shortcuts.consume(state.detail, state.options))
+			state.queue[2]()
+			helpers.assert_eq(state.fired[2], { "enter", "keyboard__magic_editor" }, "reassignment uses the same ordinary action catalogue")
+		end)
+	end)
+
+
+	helpers.it("(magic-editor-broker) exposes the ordinary contextual action and durable clearing in the tray", function()
+		with_editor(nil, function(shortcuts, config, state)
+			local changed = 0
+			local builder = helpers.load_module("ui.menu.menu_builder")
+			local i18n = require("infra.i18n")
+			local function contextual(items)
+				for _, row in ipairs(items or {}) do
+					if row.title == i18n.get("menu.shortcuts.group_contextual") then return row end
+					local found = contextual(row.menu)
+					if found then return found end
+				end
+			end
+			local function build()
+				return builder.build({ shortcuts = setmetatable({ is_enabled = function() return false end },
+					{ __index = require("modules.shortcuts.manager") }), on_quit = function() end,
+					on_menu_changed = function() changed = changed + 1 end })
+			end
+			local group = contextual(build())
+			helpers.assert_type(group, "table", "the stable logical slot must be visible through the ordinary menu provider")
+			helpers.assert_eq(#group.menu, 1)
+			helpers.assert_eq(group.menu[1].title, "Super + ★ (" .. i18n.get("menu.shortcuts.keyboard.magic_editor_reason.shortcuts_disabled") .. ") → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
+			helpers.assert_type(group.menu[1].menu[1].fn, "function", "the ordinary action picker offers reassignment")
+			helpers.assert_eq(group.menu[1].menu[2].title, i18n.get("dialog.action_picker.disabled"))
+			group.menu[1].menu[2].fn()
+			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "none")
+			helpers.assert_eq(changed, 1, "a committed removal rebuilds the menu")
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			local cleared = contextual(build())
+			helpers.assert_eq(#cleared.menu, 1, "clearing retains the editable stable slot")
+			helpers.assert_type(cleared.menu[1].menu[1].fn, "function")
+		end)
+	end)
+
+	helpers.it("(magic-editor-broker) follows ★ to ù and semicolon by physical proof on arbitrary layouts", function()
+		with_editor(nil, function(shortcuts, config, state)
+			local scenarios = {
+				{ text = "★", code = "KeyJ", native = 36 },
+				{ text = "ù", code = "Quote", native = 40 },
+				{ text = ";", code = "Semicolon", native = 39 },
+			}
+			for index, scenario in ipairs(scenarios) do
+				state.trigger, state.generation = scenario.text, index
+				state.rows = { { code = scenario.code, native_code = scenario.native, identity = "evdev:" .. scenario.native,
+					text = scenario.text, native_text = scenario.text, direct = true, dead = false } }
+				local detail = { key = "deliberately unrelated", code = scenario.native, physical = true, mods = { meta = true } }
+				helpers.assert_true(shortcuts.consume(detail, state.options), "matching is physical and does not guess from a symbolic key")
+				state.queue[index]()
+				helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + " .. scenario.text)
+			end
+			helpers.assert_eq(#state.fired, 3)
+			helpers.assert_eq(#config.keys(), 0, "following the effective source does not overwrite personal settings")
+		end)
+	end)
+
+	helpers.it("(magic-editor-broker) leaves modified, remapped, dead, ambiguous and unproved input native", function()
+		with_editor(nil, function(shortcuts, _, state)
+			for _, modifier in ipairs({ "ctrl", "shift", "alt", "altgr" }) do
+				local detail = { key = "j", code = 36, physical = true, mods = { meta = true, [modifier] = true } }
+				helpers.assert_eq(shortcuts.consume(detail, state.options), false, "the source must not require " .. modifier)
+			end
+			state.detail.physical = false
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false, "tap-hold output is not the original physical source")
+			state.detail.physical = true
+			state.detail.code = 46
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false, "there is no historical physical-C fallback")
+			state.detail.code = 36
+			state.rows[1].direct = false
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			state.rows[1].direct, state.rows[1].dead = true, true
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			state.rows[1].dead = false
+			state.rows[2] = { code = "KeyC", native_code = 46, identity = "evdev:46", text = "★", native_text = "★", direct = true, dead = false }
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false, "two actual bare sources require an explicit source choice")
+			state.rows = {}
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			helpers.assert_eq(#state.queue, 0)
+		end)
+	end)
+
+	helpers.it("(magic-editor-broker) preserves newly selected physical None across restart", function()
+		with_editor(nil, function(shortcuts, config, state)
+			helpers.assert_true(shortcuts.set_action("super_j", "none"))
+			helpers.assert_eq(config.get("shortcuts.keyboard.super_j"), "none")
+			shortcuts._reset()
+			helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
+			helpers.assert_eq(#state.queue, 0, "personal native intent never silently invokes the recommendation")
+		end)
+	end)
+
+	for _, action in ipairs({ "select_line", "none" }) do
+		helpers.it("(magic-editor-broker) preserves explicit personal physical claims including " .. action, function()
+			with_editor({ ["shortcuts.keyboard.super_j"] = action }, function(shortcuts, config, state)
+				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+				local consumed = shortcuts.consume(state.detail, state.options)
+				helpers.assert_eq(consumed, action ~= "none")
+				if consumed then
+					state.queue[1]()
+					helpers.assert_eq(state.fired, { { action, "keyboard__super_j" } })
+				else helpers.assert_eq(#state.queue, 0) end
+				helpers.assert_eq(config.get("shortcuts.keyboard.super_j"), action)
+				local token = {}
+				helpers.assert_true(shortcuts.acquire_configuration(token))
+				local snapshot = shortcuts.configuration_snapshot(token)
+				helpers.assert_eq(snapshot.explicit_assignments.super_j, action)
+				helpers.assert_true(shortcuts.apply_configuration(token, shortcuts.configuration_candidate({}, true)))
+				helpers.assert_true(shortcuts.apply_configuration(token, snapshot))
+				helpers.assert_true(shortcuts.release_configuration(token))
+				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment",
+					"compensation restores provenance, including a personal none absent from live assignments")
+			end)
+		end)
+	end
+
+	for _, gate in ipairs({ "master", "paused", "inhibited", "source", "rebind", "owner" }) do
+		helpers.it("(magic-editor-broker) cancels queued delivery when live " .. gate .. " changes", function()
+			with_editor(nil, function(shortcuts, _, state)
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				if gate == "master" then state.master = false
+				elseif gate == "paused" then state.paused = true
+				elseif gate == "inhibited" then state.inhibited = true
+				elseif gate == "source" then state.generation = 2
+				elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+				else
+					local token = {}
+					helpers.assert_true(shortcuts.acquire_configuration(token))
+					helpers.assert_true(shortcuts.release_configuration(token))
+				end
+				state.queue[1]()
+				helpers.assert_eq(state.fired, {}, "already captured actions must not escape a changed native receipt or gate")
+				if gate == "master" or gate == "paused" or gate == "inhibited" then
+					helpers.assert_eq(shortcuts.consume(state.detail, state.options), false, "the same live gate also closes new capture")
+				end
+			end)
+		end)
+	end
+
+	helpers.it("(magic-editor-broker) retains the acknowledged action and provenance after persistence refusal", function()
+		with_editor({ ["shortcuts.keyboard.magic_editor"] = "enter" }, function(shortcuts, config, state)
+			helpers.assert_eq(shortcuts.set_action("magic_editor", "none"), false)
+			helpers.assert_eq(shortcuts.set_action("magic_editor", "select_line"), false)
+			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "enter")
+			helpers.assert_eq(shortcuts.get_action("magic_editor"), "enter")
+			helpers.assert_true(shortcuts.consume(state.detail, state.options))
+			state.queue[1]()
+			helpers.assert_eq(state.fired, { { "enter", "keyboard__magic_editor" } })
+		end, true)
+	end)
 end)

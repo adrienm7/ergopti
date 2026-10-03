@@ -1,0 +1,4 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = "false"
+keep = "neighbor" # unchanged

@@ -66,13 +66,7 @@ local function with_subject(store, scenario)
 
 	local subject
 	local ok, err = xpcall(function()
-		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			json = {
-				decode = function()
-					return { keys = { { id = "a", label = "A" }, { id = "space", label = "Space" } } }
-				end,
-			},
-		})
+		subject = require("modules.shortcuts.keyboard_shortcuts")
 		scenario(subject, observed)
 	end, debug.traceback)
 
@@ -120,8 +114,8 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "llm_generate_prediction")
 			helpers.assert_eq(subject.set_action("hs_ctrl_space", "none"), true)
 		end)
-		helpers.assert_eq(store["hs_ctrl_space"], nil,
-			"clearing an existing assignment must persist the neutral choice")
+		helpers.assert_eq(store["hs_ctrl_space"], "none",
+			"choosing None persists explicit personal intent across reload")
 		local restarted = with_subject(store, function(subject)
 			helpers.assert_eq(subject.start(), true)
 			helpers.assert_eq(subject.get_action("hs_ctrl_space"), "none")

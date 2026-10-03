@@ -386,8 +386,9 @@ _KLT_IndependentLayersCase() {
 		Capture := {Criterion: 0, Rows: Map()}
 		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
 			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
-			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
-		for Name in ["SC010", "+SC010", "^SC010", "!SC010", "#SC010", "SC002", "+SC002"]
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => Capture.Rows["#" . Scan] := Criterion)
+		for Name in ["SC010", "+SC010", "^SC010", "#SC010", "!SC010", "#SC010", "SC002", "+SC002"]
 			AssertFalse(Capture.Rows[Name].Call(), Name . " must stay with the native Windows layout")
 		Azerty := _APRL_Layout("0000040C")
 		Assert(Azerty != 0, "the AZERTY preservation proof requires the installed French layout")
@@ -570,7 +571,8 @@ _KLT_MagicKeyYieldCase() {
 		Capture := { Criterion: 0, Rows: Map() }
 		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
 			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
-			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => Capture.Rows["#" . Scan] := Criterion)
 		ScriptInformation["MagicKeySourceScan"] := "SC02E"
 		ScriptInformation["MagicKeySourceOverridesEmulation"] := false
 		AssertTrue(Capture.Rows["SC02E"].Call(), "Ergo-L declares no magic key: its '-' stays on that key")
@@ -613,15 +615,23 @@ _KLT_RegistrationCase() {
 		Table := LayoutRegistry_Keycodes()
 		Keys := Table["keys"].Length
 		Assert(Keys >= 48, "the shared keycode table must list the whole typing area")
+		BrokerRows := []
 		Count := KeylayoutEmulation_Register(Table, (Name, *) => Names.Push(Name),
-			(Args*) => HotIfCalls.Push(Args.Length))
+			(Args*) => HotIfCalls.Push(Args.Length), 0,
+			(Scan, Callback, Criterion) => (Names.Push("#" . Scan),
+				BrokerRows.Push(Map("scan", Scan, "callback", Callback, "criterion", Criterion))))
 		; plain + Shift per key, six chords per key but the space bar, one AltGr
 		; combination per key, one passthrough per dead-key reset key.
 		Expected := Keys * 2 + (Keys - 1) * 6 + Keys + KLE_DEAD_RESET_KEYS.Length
 		AssertEqual(Expected, Count)
 		AssertEqual(Expected, Names.Length)
+		AssertEqual(Keys - 1, BrokerRows.Length, "every Win typing chord joins the physical broker exactly once")
+		for Row in BrokerRows {
+			AssertTrue(HasMethod(Row["callback"], "Call"), "the real layout callback is retained")
+			AssertTrue(Row["criterion"] == _KLE_ShortcutCriterion, "the real native admission is retained")
+		}
 		Joined := " " . _KLT_Join(Names, " ") . " "
-		for Name in ["SC010", "+SC010", "^SC010", "!+SC056", "#+SC029", "SC138 & SC010", "SC039", "+SC039",
+		for Name in ["SC010", "+SC010", "^SC010", "#SC010", "!+SC056", "#+SC029", "SC138 & SC010", "SC039", "+SC039",
 			"SC138 & SC039", "~SC00E"]
 			Assert(InStr(Joined, " " . Name . " "), Name . " must be registered")
 		for Name in ["^SC039", "#SC039", "!SC039"]
@@ -733,7 +743,8 @@ _KLT_ResetKeyCase(Code) {
 		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
 			(Name, Callback, Options) => Capture.Rows[Name] := Map("callback", Callback,
 				"criterion", Capture.Criterion, "options", Options),
-			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => Capture.Rows["#" . Scan] := Criterion)
 		Name := "~" . Record["ahk"]
 		AssertTrue(Capture.Rows.Has(Name), Code . ": the computed reset must share its scan-code identity")
 		AssertFalse(Capture.Rows.Has("~" . Record["ahk_send"]), Code . ": no shadowed name twin")

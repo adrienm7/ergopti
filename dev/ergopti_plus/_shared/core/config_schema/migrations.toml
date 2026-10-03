@@ -30,6 +30,15 @@
 #       At least one target field is required; copying to the same path is a no-op.
 #       An explicit ancestor value or descendant table also occupies a target:
 #       copying there is a no-op and leaves both namespaces untouched.
+#   { op = "move_chord_action", section, key, to_section, action,
+#     conditional_key, disabled_action, platform = "macos" }
+#       Handoffs only exact legacy mods/key values represented by the injected
+#       modifier catalogue's ordinary shortcut groups, or an explicit false.
+#       Missing destinations receive the action and contextual disabled action.
+#       Existing recognized action choices win. Unknown values, metadata,
+#       actions or occupied namespaces retain every source byte and its owner.
+#       Historical [section.key] mods/key tables use the same exact contract.
+#       All destinations must be represented before any source is removed.
 #   { op = "move_section", section, to_section }
 #       Moves a section and every section below it. Same conflict rule.
 #   { op = "merge_into", section, to_section }
@@ -54,7 +63,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 8
+current_version = 9
 unstamped_version = 2
 
 
@@ -243,4 +252,13 @@ ops = [
 	{ op = "rename", section = "shortcuts.script_control", key = "return_key", to_key = "script_altgr_enter" },
 	{ op = "rename", section = "shortcuts.script_control", key = "backspace", to_key = "script_altgr_backspace" },
 	{ op = "rename", section = "shortcuts.script_control", key = "escape", to_key = "script_altgr_escape" },
+]
+
+[steps.v8_to_v9]
+from = 8
+to = 9
+drivers = ["hs"]
+reason = "Representable legacy hotstring editor shortcuts become ordinary actions; explicit custom or disabled choices disable the contextual recommendation."
+ops = [
+	{ op = "move_chord_action", section = "hotstrings.editor", key = "shortcut", to_section = "shortcuts.keyboard", action = "open_hotstrings_editor", conditional_key = "magic_editor", disabled_action = "none", platform = "macos" },
 ]

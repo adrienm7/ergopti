@@ -23,6 +23,8 @@ local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
+local Hotkeys     = require("adapters.hotkey_registrar")
+local Chord       = require("chord")
 
 local LOG = "shortcuts.bindings"
 
@@ -46,6 +48,10 @@ local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
 local hotkey_defs   = {}   -- Factory functions that create and return a hotkey object
 local hotkey_labels = {}   -- User-facing French label for each shortcut
+-- Native built-in factories keep their established object contracts. Their
+-- claims live until that exact object acknowledges release, including debt.
+local native_physical_claims = {}
+local native_claim_cleanup = {}
 
 -- Shortcuts explicitly disabled via M.disable() survive a stop/start cycle so
 -- that a resume after focus loss cannot silently re-enable a hotkey the caller
@@ -237,11 +243,30 @@ end
 --- @return table The hs.hotkey object.
 local function bind_log(mods, key, fn)
 	local label = make_label(mods, key)
-	return hs.hotkey.bind(mods, key, function()
+	local claim_owner = SHORTCUT_ACTION_PARENT .. ":" .. label
+	if Hotkeys.replace_physical_claims(claim_owner, {
+		{ chord = Chord.format(mods, key), action = "explicit", binding_id = claim_owner },
+	}) ~= true then
+		native_claim_cleanup[claim_owner] = true
+		return nil
+	end
+	-- Preserve the existing native factory, including Ctrl+CapsLock. The generic
+	-- registrar still rejects modifier keys for ordinary/source acquisitions;
+	-- recording an existing owner's claim does not assert hardware delivery.
+	local ok, native = pcall(hs.hotkey.bind, mods, key, function()
 		if delivery_enabled ~= true then return end
 		log_shortcut(label, get_frontmost_app_name())
 		fn()
 	end)
+	if not ok or native == nil or (type(native) ~= "table" and type(native) ~= "userdata") then
+		if Hotkeys.replace_physical_claims(claim_owner, {}) ~= true then
+			native_claim_cleanup[claim_owner] = true
+		end
+		if not ok then error(native, 0) end
+		return nil
+	end
+	native_physical_claims[native] = claim_owner
+	return native
 end
 
 
@@ -469,6 +494,11 @@ local function release_hotkey_identity(name, owner)
 		released = ok and ((exact_result_required and result == true)
 			or (not exact_result_required and result ~= false))
 	end
+	if released and native_physical_claims[owner] then
+		local claim_owner = native_physical_claims[owner]
+		released = Hotkeys.replace_physical_claims(claim_owner, {}) == true
+		if released then native_physical_claims[owner] = nil end
+	end
 	return released
 end
 
@@ -479,6 +509,11 @@ end
 --- @return boolean settled True only when every native owner was released.
 local function release_hotkeys()
 	local settled = true
+	for claim_owner in pairs(native_claim_cleanup) do
+		if Hotkeys.replace_physical_claims(claim_owner, {}) == true then
+			native_claim_cleanup[claim_owner] = nil
+		else settled = false end
+	end
 	local names = {}
 	for name in pairs(hotkeys) do names[#names + 1] = name end
 	for _, name in ipairs(names) do
@@ -740,7 +775,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 		finish_attempt()
 		return false
 	end
-	if next(hotkeys) ~= nil and release_hotkeys() ~= true then
+	if (next(hotkeys) ~= nil or next(native_claim_cleanup) ~= nil) and release_hotkeys() ~= true then
 		Logger.error(LOG, "Shortcuts bindings cannot start while native cleanup is pending.")
 		finish_attempt()
 		return false
@@ -832,7 +867,7 @@ function M.stop()
 	delivery_enabled = false
 	invalidate_lifecycle()
 	start_attempt = nil
-	if not started and next(hotkeys) == nil and not awake_cleanup_pending
+	if not started and next(hotkeys) == nil and next(native_claim_cleanup) == nil and not awake_cleanup_pending
 		and not rebind_recovery_intent
 		and native_acquisition_depth == 0
 		and not children_have_pause_debt() then
@@ -1035,6 +1070,7 @@ function M.is_started() return started end
 --- @return boolean pending
 function M.has_pause_debt()
 	return native_acquisition_depth ~= 0
+		or next(native_claim_cleanup) ~= nil
 		or rebind_recovery_intent == true
 		or (started ~= true and next(hotkeys) ~= nil)
 		or children_have_pause_debt()
@@ -1054,8 +1090,8 @@ function M.enable(name)
 		Logger.error(LOG, "M.enable(): name must be a string.")
 		return false
 	end
-	if start_attempt ~= nil then
-		Logger.error(LOG, "M.enable(): a start transaction is acquiring native hotkeys.")
+	if start_attempt ~= nil or next(native_claim_cleanup) ~= nil then
+		Logger.error(LOG, "M.enable(): a start transaction or claim cleanup is pending.")
 		return false
 	end
 	local def = hotkey_defs[name]
@@ -1117,18 +1153,7 @@ function M.disable(name)
 		Logger.debug(LOG, "Hotkey '%s' not active — nothing to disable.", name)
 		return true
 	end
-	local released = false
-	if type(h.delete) == "function" then
-		local ok, result = xpcall(function() return h:delete() end, debug.traceback)
-		local exact_result_required = EXACT_RELEASE_IDS[name] == true
-		released = ok and ((exact_result_required and result == true)
-			or (not exact_result_required and result ~= false))
-	elseif type(h.disable) == "function" then
-		local ok, result = xpcall(function() return h:disable() end, debug.traceback)
-		local exact_result_required = EXACT_RELEASE_IDS[name] == true
-		released = ok and ((exact_result_required and result == true)
-			or (not exact_result_required and result ~= false))
-	end
+	local released = release_hotkey_identity(name, h)
 	if not released then
 		Logger.error(LOG, "Hotkey '%s' disable refused; exact handle retained.", name)
 		return false

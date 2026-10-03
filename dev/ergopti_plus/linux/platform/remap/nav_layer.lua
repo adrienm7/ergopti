@@ -16,6 +16,8 @@ local Toml = require("toml_codec")
 local Files = require("keymap.layer_editor")
 local Outdated = require("config_outdated")
 
+local Brightness = require("brightness_actions").load()
+
 local MODIFIER_KEYS = { ctrl = "ControlLeft", alt = "AltLeft", shift = "ShiftLeft", meta = "MetaLeft" }
 
 -- Shared loader codes that reject the layer file as a whole.
@@ -43,6 +45,8 @@ function M.compile(bindings, registry)
 		local code = key_code(registry, source)
 		if resolved.kind == "none" then
 			layer[code] = { mods = {}, keys = {} }
+		elseif resolved.kind == "call" and Brightness.actions[resolved.handler] then
+			layer[code] = { mods = {}, keys = { Brightness.actions[resolved.handler].linux_code } }
 		elseif resolved.kind == "keystroke" then
 			local chords = {}
 			for _, chord in ipairs(resolved.chords) do

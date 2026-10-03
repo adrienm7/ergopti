@@ -11,6 +11,8 @@ local ConfigOutdated = require("config_outdated")
 local LOG = "infra.llm_preferences"
 local _scope_owner = nil
 local _detached = nil
+local _generation = 0
+local _observed_source = nil
 
 --- Admits ordinary writes only outside the retained terminal transaction.
 --- @return boolean admitted
@@ -22,6 +24,7 @@ function M.admit() return _scope_owner == nil end
 function M.acquire(owner)
 	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
 	_scope_owner = owner
+	_generation = _generation + 1
 	return true
 end
 
@@ -43,6 +46,11 @@ end
 local function validate(definition, value)
 	if value == nil then return end
 	local kind = definition.type
+	if kind == "enum" then
+		local fits, detail = ConfigOutdated.manifest_value_fits(definition, value, "linux")
+		assert(fits, "invalid AI preference enum: " .. definition.path .. " (" .. tostring(detail) .. ")")
+		return
+	end
 	assert(type(value) == (kind == "array" and "table" or kind), "invalid AI preference type: " .. definition.path)
 	if kind == "number" then
 		assert(value == value and value ~= math.huge and value ~= -math.huge, "AI preferences require finite numbers")
@@ -94,9 +102,20 @@ local function read()
 	assert(status == "ok" or status == "absent", "AI configuration is unreadable: " .. tostring(detail))
 	local document = Codec.decode(bytes or "")
 	assert(type(document) == "table", "AI configuration contains malformed TOML")
-	return document, { status = status, content = bytes }
+	local source = { status = status, content = bytes }
+	if not _observed_source or _observed_source.status ~= status or _observed_source.content ~= bytes then
+		_generation = _generation + 1
+		_observed_source = source
+	end
+	return document, source
 end
 
+--- The exact source's acknowledged revision, including observed external edits.
+--- @return integer
+function M.generation()
+	read()
+	return _generation
+end
 
 --- Reads one override; the caller resolves absence through its manifest owner.
 --- @param path string Declared preference path.
@@ -166,6 +185,7 @@ function M.set_many(values, expected_source)
 		Logger.error(LOG, "AI preferences were not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
+	_generation = _generation + 1
 	return true
 end
 

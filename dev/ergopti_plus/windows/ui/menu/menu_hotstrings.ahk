@@ -255,7 +255,7 @@ _HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
 ; The three drivers each rebuilt this submenu with the same logic and their own
 ; row API; the manifest declares it `type = "list"` now and each one answers with
 ; the same {label, action, checked, items} shape.
-_HS_WordExpanderRows() {
+_HS_WordExpanderRows(Commands := unset) {
 	global HSE_Terminators
 	Current      := HotstringsGetWordDelimiters()
 	Consumed     := HotstringsGetConsumedDelimiters()
@@ -263,15 +263,6 @@ _HS_WordExpanderRows() {
 	BuiltinChars := HSE_TerminatorBuiltinChars()
 
 	Rows := []
-
-	; ── Bulk actions ─────────────────────────────────────────────────────────
-	; A user turning delimiters off does it wholesale — the point of the feature
-	; is "expand only on the key I chose" — and the reset is the way back, since
-	; most of the catalogue ships disabled and "check all" is not that route.
-	Rows.Push(Map("label", t("menu.hotstrings.check_all"),   "action", (*) => _HS_DelimSetAll(true)))
-	Rows.Push(Map("label", t("menu.hotstrings.uncheck_all"), "action", (*) => _HS_DelimSetAll(false)))
-	Rows.Push(Map("label", t("common.restore_recommended"), "action", (*) => _HS_DelimReset()))
-	Rows.Push(Map("separator", true))
 
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
@@ -313,7 +304,28 @@ _HS_WordExpanderRows() {
 
 	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))
 
-	return [Map("label", t("menu.hotstrings.word_expanders"), "items", Rows)]
+	if !IsSet(Commands) {
+		Commands := Map(
+			"word_expanders_enable_all", (*) => _HS_DelimSetAll(true),
+			"word_expanders_disable_all", (*) => _HS_DelimSetAll(false),
+			"word_expanders_restore", (*) => _HS_DelimReset())
+	}
+	Ready := (*) => !A_IsSuspended
+	GuardedCommands := Map()
+	for Id, Command in Commands
+		GuardedCommands[Id] := _HS_WordExpanderCommand.Bind(Command, Ready)
+	Submenu := MenuRenderer_Build("word_expanders_menu", "HotstringsParams", Map(), Map(),
+		Map("word_expander_entries", (*) => Rows), GuardedCommands,
+		Map("word_expanders_ready", Ready))
+	return [Map("label", t("menu.hotstrings.word_expanders"), "submenu", Submenu)]
+}
+
+; A native menu can outlive the pause state under which it was rendered. The
+; same current-readiness owner draws the row and admits its delayed delivery.
+_HS_WordExpanderCommand(Command, Ready, *) {
+	if !Ready.Call()
+		return false
+	return Command.Call()
 }
 
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
@@ -337,13 +349,10 @@ _HS_DelimSetAll(Enable, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
-; Reset all delimiters to the built-in defaults.
+; Restore shipped defaults without deleting personal word or consumed markers.
 _HS_DelimReset(WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
-	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
-		Consumed: CurrentConsumed
-	}
+	BuildFn := (CurrentWord, CurrentConsumed) =>
+		HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed)
 	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 

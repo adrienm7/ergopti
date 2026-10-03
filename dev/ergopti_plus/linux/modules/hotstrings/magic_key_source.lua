@@ -44,6 +44,7 @@ local FileSystem  = require("adapters.file_system")
 local Json        = require("json")
 local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
+local InputEvent  = require("infra.input_event")
 local Shared      = require("keymap.magic_key_source")
 
 local LOG = "magic_key_source"
@@ -58,6 +59,20 @@ local CAPTURE_TIMEOUT_MS = Timings.ms("ui", "magic_key_capture_timeout_ms")
 -- Built on first use: the registry is 37 KB of JSON nobody needs while the
 -- automatic value is in effect and no menu asks for the candidates.
 local _resolver = nil
+local _registry = nil
+local _editor_signature = nil
+local _editor_generation = 0
+
+local function registry()
+	if _registry then return _registry end
+	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local text = path and FileSystem.read(path)
+	if type(text) ~= "string" then error("the physical-key registry is unreadable: " .. tostring(path)) end
+	local decoded = Json.decode(text)
+	assert(type(decoded) == "table" and type(decoded.keys) == "table", "the physical-key registry is malformed")
+	_registry = decoded
+	return decoded
+end
 
 -- The evdev code in effect and the preference generation it was derived from.
 local _code = nil
@@ -86,14 +101,9 @@ local _untypable_reported = nil
 --- @return table resolver
 function M.resolver()
 	if _resolver then return _resolver end
-	local path = Paths.shared("data/keycodes/physical_keys.json")
-	local text = path and FileSystem.read(path)
-	if type(text) ~= "string" then
-		error("the physical-key registry is unreadable: " .. tostring(path))
-	end
 	_resolver = Shared.new({
 		entry    = Manifest.find_entry_by_path(M.PATH),
-		registry = Json.decode(text),
+		registry = registry(),
 		field    = "evdev",
 	})
 	return _resolver
@@ -122,6 +132,20 @@ function M.evdev_code()
 	return _code
 end
 
+--- The refusal reason for a source reserved by a configured tap assignment.
+--- @param value string Candidate or automatic value.
+--- @return string|nil reason_key
+function M.choice_reason(value)
+	local resolver = M.resolver()
+	if value == resolver.automatic then return nil end
+	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
+	local TapKeys = require("modules.shortcuts.tap_keys")
+	if Shared.tap_conflict(resolver, value, TapKeys.keys(), "linux", TapKeys.get_action) then
+		return Shared.TAP_CONFLICT_REASON
+	end
+	return nil
+end
+
 --- Stores a new value; the next press follows it, nothing is re-registered.
 --- A key is refused while the layout cannot type the magic key with key
 --- presses: it would keep typing its own character, and say nothing.
@@ -134,6 +158,11 @@ function M.set(value)
 	if value ~= resolver.automatic and not resolver.is_candidate(value) then
 		Logger.warn(LOG, "Refused physical magic key '%s': no candidate key has that code.", tostring(value))
 		return false, "dialog.magic_key_source.not_a_candidate"
+	end
+	local conflict = M.choice_reason(value)
+	if conflict ~= nil then
+		Logger.warn(LOG, "Refused physical magic key '%s': a configured tap action owns its key.", tostring(value))
+		return false, conflict
 	end
 	if value ~= resolver.automatic and _deps.can_type(_deps.magic_key()) ~= true then
 		Logger.warn(LOG, "Refused physical magic key '%s': the layout cannot type the magic key '%s' with key presses.",
@@ -154,6 +183,71 @@ end
 function M.key_text(code)
 	if _deps == nil then return nil end
 	return _deps.key_text(M.resolver().native(code))
+end
+
+--- Registry identities admitted by the shared conditional shortcut policy.
+--- @return table known_codes KeyboardEvent.code -> true.
+function M.known_codes()
+	local known = {}
+	for code in pairs(registry().keys) do known[code] = true end
+	return known
+end
+
+--- Proves actual plain sources without selecting one or discarding ambiguity.
+--- @return table source Epoch, status and detached native candidates.
+function M.editor_source()
+	local Capture = require("adapters.xkb_capture")
+	local xkb_generation, why = Capture.source_generation()
+	local magic = _deps and _deps.magic_key() or require("modules.hotstrings.magic_key").get()
+	local value, candidates, native_codes, codes, seen = M.get(), {}, {}, {}, {}
+	for code, record in pairs(registry().keys) do
+		if type(record.evdev) == "number" then
+			if not codes[record.evdev] or code < codes[record.evdev] then codes[record.evdev] = code end
+			if not seen[record.evdev] then native_codes[#native_codes + 1] = record.evdev; seen[record.evdev] = true end
+		end
+	end
+	table.sort(native_codes)
+	local origin = _deps and _deps.input_source_receipt and _deps.input_source_receipt() or nil
+	local rows = xkb_generation and (origin == nil or origin.ready == true) and Capture.direct_sources(native_codes) or nil
+	local configured = M.evdev_code()
+	local plan = _deps and _deps.typing_plan and _deps.typing_plan(magic) or nil
+	local typable = false
+	-- Qualify the injector's actual plan against the current native group.
+	-- Its cached inverse table alone cannot prove a remap after a group switch.
+	for _, row in ipairs(rows or {}) do
+		if type(plan) == "table" and row.code == plan.keycode and row.text == magic and not row.dead
+			and type(plan.mods) == "table" and type(row.mods) == "table" and #plan.mods == #row.mods then
+			local same = true
+			for index, mod in ipairs(plan.mods) do if row.mods[index] ~= mod then same = false end end
+			if same then typable = true end
+		end
+	end
+	local remapped = configured ~= nil and _deps ~= nil and _deps.is_active() == true
+		and _deps.can_capture() == true and _deps.replace_on() == true and _deps.can_type(magic) == true and typable
+	if rows then
+		for _, row in ipairs(rows) do
+			-- A proven chosen replacement owns the effective source. Automatic or
+			-- ineffective settings retain every actual native candidate instead.
+			if not remapped or row.code == configured then
+				local mapped = remapped and row.code == configured and row.plain == true
+				local admitted = _deps == nil or _deps.direct_source_admitted == nil
+					or _deps.direct_source_admitted(row.code, remapped and row.code == configured) == true
+				candidates[#candidates + 1] = { code = codes[row.code], native_code = row.code,
+					identity = "evdev:" .. row.code, text = mapped and magic or row.text, native_text = row.text,
+					direct = admitted and (mapped or row.direct == true),
+					dead = not mapped and row.dead == true }
+			end
+		end
+	end
+	-- A single epoch covers source preferences, native group and remap/tap proof.
+	local signature = Json.encode({ preference = Preferences.generation(), native = xkb_generation,
+		value = value, trigger = magic, remapped = remapped, origin = origin, candidates = candidates })
+	if signature ~= _editor_signature then
+		_editor_signature = signature
+		_editor_generation = _editor_generation + 1
+	end
+	return { generation = _editor_generation, status = rows and "ready" or "unavailable",
+		reason = rows and nil or (origin and origin.ready ~= true and "physical-origin-unqualified") or why or "direct-source-unavailable", candidates = candidates }
 end
 
 
@@ -181,13 +275,28 @@ end
 ---   can_capture   fn() -> boolean  The hook owns the keyboard (grab), so a
 ---                                  captured key never reaches an application.
 ---   key_text      fn(evdev) -> string|nil  What the XKB layout types there.
----   defer         fn(fn, delay_ms) -> boolean  Runs work after the hook returns. }
+---   defer         fn(fn, delay_ms) -> boolean  Runs work after the hook returns.
+---   input_source_receipt fn() -> { generation, ready } Optional native evdev
+---                                  origin acknowledgement.
+---   typing_plan   fn(text) -> { keycode, mods }|nil Optional injector plan
+---                                  qualified against the actual native group.
+---   direct_source_admitted fn(evdev, remapped) -> boolean Optional native
+---                                  tap-hold/remap ownership admission. }
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
 	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
 		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
+	end
+	if deps.input_source_receipt ~= nil and type(deps.input_source_receipt) ~= "function" then
+		error("magic_key_source.init needs a callable input source receipt", 2)
+	end
+	if deps.typing_plan ~= nil and type(deps.typing_plan) ~= "function" then
+		error("magic_key_source.init needs a callable typing plan", 2)
+	end
+	if deps.direct_source_admitted ~= nil and type(deps.direct_source_admitted) ~= "function" then
+		error("magic_key_source.init needs a callable direct source admission", 2)
 	end
 	Logger.start(LOG, "Initializing…")
 	_deps = deps
@@ -251,10 +360,44 @@ local function settle(live, evdev)
 	live.handlers.on_chosen(value)
 end
 
+--- Retains an acknowledged magic press without rescanning the native device origin.
+--- @param detail table Native physical key and published origin generation.
+--- @param code number Chosen native key.
+--- @param magic string Character already typed and dispatched.
+--- @return function|nil callback Only qualified presses may own repeats.
+local function repeat_callback_for(detail, code, magic)
+	if detail.physical ~= true or detail.value ~= InputEvent.VALUE_DOWN
+		or type(detail.origin_generation) ~= "number" or detail.origin_generation <= 0
+		or detail.origin_generation % 1 ~= 0 then return nil end
+	local Capture = require("adapters.xkb_capture")
+	local source_generation = Capture.source_generation()
+	if type(source_generation) ~= "number" or source_generation <= 0 or source_generation % 1 ~= 0 then return nil end
+	local preference_generation, origin_generation = Preferences.generation(), detail.origin_generation
+	return function(repeat_detail)
+		if type(repeat_detail) ~= "table" or repeat_detail.value ~= InputEvent.VALUE_REPEAT
+			or repeat_detail.physical ~= true or repeat_detail.code ~= code
+			or repeat_detail.origin_generation ~= origin_generation
+			or type(repeat_detail.mods) ~= "table" or not Shared.unmodified(repeat_detail.mods) or _capture ~= nil
+			or Preferences.generation() ~= preference_generation or M.evdev_code() ~= code
+			or _deps.magic_key() ~= magic or _deps.is_active() ~= true or _deps.replace_on() ~= true
+			or Capture.source_generation() ~= source_generation or _deps.can_type(magic) ~= true
+			or (_deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true) then return false end
+		local called, typed = pcall(_deps.type_text, magic)
+		if not called or typed ~= true then
+			Logger.error(LOG, "The repeated magic key was not typed — the held press remains suppressed.")
+			return false
+		end
+		_deps.end_selection()
+		_deps.dispatch_char(magic, code)
+		return true
+	end
+end
+
 --- Decides one grabbed key press from the keyboard hook's consumption callback.
 --- @param detail table { code, mods, char } as the hook reports a key-down.
 --- @return boolean consumed True when the key was captured or the magic key
 ---   was typed in its place.
+--- @return function|nil repeat_callback Optional owner of this acknowledged physical press.
 function M.on_key(detail)
 	if _deps == nil or type(detail) ~= "table" then return false end
 	if _capture ~= nil then
@@ -270,6 +413,7 @@ function M.on_key(detail)
 	if code == nil or detail.code ~= code then return false end
 	if not Shared.unmodified(detail.mods) then return false end
 	if _deps.is_active() ~= true or _deps.replace_on() ~= true then return false end
+	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then return false end
 	local magic = _deps.magic_key()
 	if type(magic) ~= "string" or magic == "" then return false end
 	if _deps.can_type(magic) ~= true then
@@ -282,6 +426,9 @@ function M.on_key(detail)
 		return false
 	end
 	_untypable_reported = nil
+	-- Acquire optional repeat provenance before typing: a broken owner must not
+	-- turn already-typed text into an unconsumed physical press.
+	local repeat_callback = repeat_callback_for(detail, code, magic)
 	local called, typed = pcall(_deps.type_text, magic)
 	if not called or typed ~= true then
 		Logger.error(LOG, "The magic key could not be typed (%s) — the key types its own character.",
@@ -290,13 +437,16 @@ function M.on_key(detail)
 	end
 	_deps.end_selection()
 	_deps.dispatch_char(magic, detail.code)
-	return true
+	return true, repeat_callback
 end
 
 --- Forgets the collaborators, the resolver and any capture (test seam).
 function M._reset_for_test()
 	_deps = nil
 	_resolver = nil
+	_registry = nil
+	_editor_signature = nil
+	_editor_generation = _editor_generation + 1
 	_capture = nil
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil

@@ -1,0 +1,7 @@
+[case]
+description = "An explicit descendant namespace preserves its type and the legacy owner."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

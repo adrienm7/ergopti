@@ -45,6 +45,8 @@ for tree in "${trees[@]}"; do
 	esac
 	find "$source" -type f -exec sha256sum -- {} + | while read -r digest file; do
 		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Payload filename cannot be represented safely.' >&2; exit 1; }
+		# GNU checksum output marks binary inputs with '*'; it is not a path byte.
+		file="${file#\*}"
 		relative="$prefix/${file#"$source/"}"
 		case "$relative" in
 			*$'\n'*|*$'\t'*|*\\*) echo 'Payload filename cannot be represented safely.' >&2; exit 1 ;;

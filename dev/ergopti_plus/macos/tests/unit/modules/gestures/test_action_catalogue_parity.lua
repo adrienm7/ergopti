@@ -27,7 +27,20 @@ local _ = helpers.load_with_stubs("infra.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
-local Gestures = helpers.load_with_stubs("modules.gestures")
+local Assignable = require("actions.assignable")
+local original_build = Assignable.build
+local build_observations = {}
+Assignable.build = function(catalogue, modifiers, platform)
+	build_observations[#build_observations + 1] = {
+		catalogue = catalogue, modifiers = modifiers, platform = platform,
+	}
+	return original_build(catalogue, modifiers, platform)
+end
+local boot_ok, Gestures = xpcall(function()
+	return helpers.load_with_stubs("modules.gestures")
+end, debug.traceback)
+Assignable.build = original_build
+if not boot_ok then error(Gestures, 0) end
 local Actions = require("modules.gestures.actions")
 local Catalogue = require("_generated.action_catalogue")
 -- The harness injects an i18n stub that echoes keys, and the actions module
@@ -66,6 +79,17 @@ end
 -- =====================================================
 
 helpers.describe("action catalogue parity (macOS)", function()
+	helpers.it("uses the same pure assignability owner as boot migration", function()
+		helpers.assert_eq(#build_observations, 1, "the real native action loader consumes the shared owner once")
+		local observed = build_observations[1]
+		helpers.assert_true(observed.catalogue == Catalogue, "the actual generated action catalogue is injected")
+		helpers.assert_eq(observed.platform, "macos")
+		helpers.assert_eq(observed.modifiers.keys[40].id, "comma", "the actual complete physical key catalogue is injected")
+		helpers.assert_true(Actions.is_assignable("cmd_ctrl_option_shift_comma"), "the real native caller offers the complete modifier matrix")
+		helpers.assert_eq(Actions.is_assignable("future_action"), false, "unknown ids remain unassignable")
+		helpers.assert_eq(Actions.is_assignable("alt_d"), false, "native aliases remain distinct from ordinary action identities")
+	end)
+
 	helpers.it("lists every single action it can run and nothing else (action-catalogue-parity)", function()
 		local listed = listed_sg_ids()
 		helpers.assert_true(#listed >= 600,

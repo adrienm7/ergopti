@@ -2084,9 +2084,20 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		defer { try? FileManager.default.removeItem(at: home) }
 		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let callbackEntered = DispatchSemaphore(value: 0)
+		let releaseCallback = DispatchSemaphore(value: 0)
+		defer { releaseCallback.signal() }
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			acknowledgementWriter: { data, path, directory in
+				let published = writeGuardianFileAtomically(
+					data: data, path: path, directory: directory
+				)
+				callbackEntered.signal()
+				_ = releaseCallback.wait(timeout: .now() + 5)
+				return published
+			},
 			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
@@ -2097,6 +2108,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
+		XCTAssertEqual(callbackEntered.wait(timeout: .now() + 2), .success)
 		XCTAssertTrue(registration.guardianStillPresent())
 		XCTAssertTrue(registration.beginLiveTransport())
 
@@ -2106,7 +2118,17 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			registration.guardianStillPresent(),
 			"unlocking the activation gate must retain its exact-generation identity descriptor"
 		)
+		weak var runtimeLifetime = runtime
 		runtime = nil
+		XCTAssertNotNil(runtimeLifetime,
+			"the blocked production callback must retain the exact singleton owner")
+		XCTAssertTrue(registration.guardianStillPresent(),
+			"dropping the caller reference must not misreport a still-retained guardian")
+		releaseCallback.signal()
+		XCTAssertTrue(waitForGuardianRuntimeRelease(
+			{ runtimeLifetime }, paths: paths, timeout: 2
+		), "presence loss must follow actual observer and singleton release")
+		XCTAssertNil(runtimeLifetime)
 		XCTAssertFalse(
 			registration.guardianStillPresent(),
 			"the retained descriptor must still detect loss of the exact singleton owner"
@@ -2137,7 +2159,12 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertTrue(registration.arm())
 		XCTAssertTrue(registration.beginLiveTransport())
+		weak var priorLifetime = priorRuntime
 		priorRuntime = nil
+		XCTAssertTrue(waitForGuardianRuntimeRelease(
+			{ priorLifetime }, paths: paths, timeout: 2
+		), "dropping the caller's reference must acknowledge actual observer and singleton release")
+		XCTAssertNil(priorLifetime)
 
 		let singletonProbeEntered = DispatchSemaphore(value: 0)
 		let releaseSingletonProbe = DispatchSemaphore(value: 0)
@@ -2181,6 +2208,80 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(activeState?.state, .active)
 		XCTAssertEqual(activeState?.generation, guardianGeneration)
 		registration.cancelBeforeActivation()
+	}
+
+	/// A real vnode callback may retain the prior owner after the caller drops it.
+	func testRetainedGuardianCallbackRefusesReplacementUntilActualOwnerRelease() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+			"ergopti-guardian-retained-callback-\(UUID().uuidString)",
+			isDirectory: true
+		)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let callbackEntered = DispatchSemaphore(value: 0)
+		let releaseCallback = DispatchSemaphore(value: 0)
+		defer { releaseCallback.signal() }
+		let priorGeneration = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		var priorRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			acknowledgementWriter: { data, path, directory in
+				let published = writeGuardianFileAtomically(
+					data: data, path: path, directory: directory
+				)
+				callbackEntered.signal()
+				_ = releaseCallback.wait(timeout: .now() + 5)
+				return published
+			},
+			terminateProcess: failUnexpectedGuardianTermination,
+			generation: priorGeneration
+		)
+		XCTAssertTrue(priorRuntime?.startObservingForTesting() == true)
+		let registration = LeaseGuardianRegistration(
+			identity: makeIdentity(), paths: paths, activationAuthorized: { true }
+		)
+		defer { registration.cancelBeforeActivation() }
+		XCTAssertTrue(registration.arm(), "the callback must publish the actual durable acknowledgement")
+		XCTAssertEqual(callbackEntered.wait(timeout: .now() + 2), .success)
+		XCTAssertTrue(registration.beginLiveTransport())
+		weak var priorLifetime = priorRuntime
+		priorRuntime = nil
+		XCTAssertNotNil(priorLifetime,
+			"the blocked production observer callback must still retain singleton ownership")
+		XCTAssertTrue(registration.guardianStillPresent())
+		var premature: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
+			generation: guardianGeneration
+		)
+		XCTAssertFalse(premature?.startObservingForTesting() == true,
+			"a genuinely retained prior singleton must refuse a replacement")
+		premature = nil
+		let retainedData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(retainedData)?.generation, priorGeneration)
+		releaseCallback.signal()
+		XCTAssertTrue(waitForGuardianRuntimeRelease(
+			{ priorLifetime }, paths: paths, timeout: 2
+		))
+		XCTAssertNil(priorLifetime)
+		XCTAssertFalse(registration.guardianStillPresent())
+		registration.endLiveTransport()
+		var replacement: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: paths,
+			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
+			generation: guardianGeneration
+		)
+		XCTAssertTrue(replacement?.startObservingForTesting() == true)
+		let replacementData = try Data(contentsOf: URL(fileURLWithPath: paths.singletonLock))
+		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(replacementData)?.generation, guardianGeneration)
+		registration.cancelBeforeActivation()
+		weak var replacementLifetime = replacement
+		replacement = nil
+		XCTAssertTrue(waitForGuardianRuntimeRelease(
+			{ replacementLifetime }, paths: paths, timeout: 2
+		), "the fixture must release its replacement singleton before removing its private home")
 	}
 
 	/// Drain publication must wait for an already-authorized activation boundary.
@@ -5667,6 +5768,25 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			usleep(kSiblingProgressPollMicroseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return siblingProgressSize(sibling) > startingSize
+	}
+
+	/// A nil caller variable does not prove an asynchronous observer released EX.
+	private func waitForGuardianRuntimeRelease(
+		_ runtime: () -> RemapLeaseGuardianRuntime?,
+		paths: LeaseGuardianPaths,
+		timeout: TimeInterval
+	) -> Bool {
+		let descriptor = Darwin.open(paths.singletonLock, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+		guard descriptor >= 0 else { return false }
+		defer { Darwin.close(descriptor) }
+		let deadline = ProcessInfo.processInfo.systemUptime + timeout
+		repeat {
+			if runtime() == nil, ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0 {
+				return ergoptiFlock(descriptor, LOCK_UN) == 0
+			}
+			usleep(kSiblingProgressPollMicroseconds)
+		} while ProcessInfo.processInfo.systemUptime < deadline
+		return false
 	}
 
 	/// Checks one test-owned PID without transferring it to production code.
