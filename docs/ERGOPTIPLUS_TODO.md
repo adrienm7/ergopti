@@ -890,6 +890,14 @@ and before responses publish. Held old credentials and independent address/key
 changes are refused; this does not assert fresh private-file reads or physical
 HTTP retirement.
 
+The Linux private API-entry owner now captures its actual classified disk
+source and rechecks it before private staging and immediately before rename.
+Observed external replacements, absent-to-created drift, failed reads and
+reentrant publications are refused while cached list/selection mutations roll
+back. Independent physical-file regressions retain all existing credential,
+foreign-row and 0600 assertions. This synchronous source fence does not claim
+a cross-process kernel compare/exchange or complete automatic discovery.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
