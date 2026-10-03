@@ -5,7 +5,7 @@
  * MODULE: AHK v2.0 Parse-Breaker Guard
  * DESCRIPTION:
  * Static gate that scans every windows/ AutoHotkey file (excluding vendor/) for
- * two syntax antipatterns that PARSE-FAIL under `#Requires AutoHotkey v2.0` and
+ * syntax antipatterns that PARSE-FAIL under `#Requires AutoHotkey v2.0` and
  * therefore abort the ENTIRE test suite at load — silently disabling every AHK
  * test with no failing assertion to point at.
  *
@@ -38,6 +38,11 @@
  *    variable (`for Case in Cases`), which AHK rejects at load with a modal
  *    dialog. The loop form was written again in a test on 2026-09-30, and the
  *    gate then checked only the first two positions.
+ *
+ * 8. a captured catch variable followed by a statement on the SAME line
+ *    (`catch as Err Failure := Err.Message`). AHK treats the trailing text as
+ *    a class declaration and aborts every included test with `Invalid class`.
+ *    Put the statement on its own line or inside braces.
  *
  * FEATURES & RATIONALE:
  * - Cross-platform: runs in the JS validation layer (npm run test:js) so a parse
@@ -114,6 +119,39 @@ function stripAhkStringsAndComment(line) {
 		out += char;
 	}
 	return out;
+}
+
+/**
+ * Finds the native parse breaker where a captured catch also carries a statement.
+ * @param {string} line One source line; quoted text and comments are not code.
+ * @returns {boolean} Whether AHK rejects the same-line captured catch at load.
+ */
+function inlineCapturedCatch(line) {
+	const code = stripAhkStringsAndComment(line);
+	return /^\s*(?:}\s*)?catch\s+(?:[\w.]+\s*(?:,\s*[\w.]+\s*)*)?as\s+\w+\s+(?!\{)\S/i.test(code);
+}
+
+// The first vector is the exact line which stopped native run_all before any
+// selected personal-menu case. Legal catch bodies and literal text stay valid.
+for (const [line, rejected] of [
+	['\t\t\t\tcatch as Err Failure := Err.Message', true],
+	['} catch TypeError as Err Failure := Err.Message', true],
+	['catch ValueError, TypeError as Err Failure := Err.Message', true],
+	['catch as Err', false],
+	['\tFailure := Err.Message', false],
+	['catch as Err {', false],
+	['catch as Err { Failure := Err.Message }', false],
+	['} catch TypeError as Err {', false],
+	['catch ValueError, TypeError as Err', false],
+	['; catch as Err Failure := Err.Message', false],
+	['catch as Err ; Failure := Err.Message', false],
+	['Message := "catch as Err Failure := Err.Message"', false],
+	["Message := 'catch as Err Failure := Err.Message'", false]
+]) {
+	if (inlineCapturedCatch(line) !== rejected) {
+		console.error('The captured-catch guard misclassified a native syntax control: ' + line);
+		process.exit(1);
+	}
 }
 
 // Words AHK v2 refuses as identifiers. The list is deliberately the control-flow
@@ -263,6 +301,12 @@ for (const file of files) {
 			errors.push(
 				`${rel}:${i + 1}: three or more consecutive double-quotes — AHK v1 quote escaping; ` +
 					'in v2 a literal quote is `" (backtick-quote).'
+			);
+		}
+		if (inlineCapturedCatch(line)) {
+			errors.push(
+				`${rel}:${i + 1}: a captured catch variable is followed by a statement on the same line — ` +
+					'AHK v2 aborts parsing with `Invalid class`. Move the statement to its own line or use braces.'
 			);
 		}
 		const executable = stripAhkStringsAndComment(line);
