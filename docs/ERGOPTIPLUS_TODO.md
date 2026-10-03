@@ -394,6 +394,8 @@ TODO 16 remains partial: the compiled-startup admission C# fixture now normalize
 
 The supplemental packaged AppleEvent decoder now uses the NSError object holder qualified by actual Cocoa calibration, and projects nullable descriptors only after native bridge provenance and exact nil acknowledgement. Raw callable bridge types remain separate closed facts. The original unscoped/PID sender bodies, constructor, send options and 8-second native / 10-second outer deadlines remain unchanged. The 96 Python regressions include exact generated-source Foundation-port replay, strict malformed/class/type/provenance refusals, and mandatory server-witness admission. Native qualification of the corrected sender and complete packaged launch remains pending; calibration does not acknowledge transport or readiness.
 
+Partial native qualification: the Windows indentation fixture now retains closed Boolean collector, borrowed-writer and notification observations in its unchanged writer-count assertion. This diagnostic delegates to the actual production owners without changing persistence, admission, native deadlines or expected values. The pre-write refusal remains unclassified until actual Windows CI produces those observations.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

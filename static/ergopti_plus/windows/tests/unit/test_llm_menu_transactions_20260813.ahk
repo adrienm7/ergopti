@@ -1688,11 +1688,79 @@ _LMT_IndentCorpus() {
 
 ; The production writer still owns its lease/source fence; only the terminal
 ; native write is injected for refusal cases, like the other setting fixtures.
-_LMT_IndentCommit(Value, Expected, WriterFn := 0) {
+_LMT_IndentCommit(Value, Expected, WriterFn := 0, Seen := 0) {
+	if !(Seen is Map)
+		return LLM_Menu_CommitMutation("the native indentation regression",
+			(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", Value),
+			_LMT_Apply, (Path, Updates) => _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn),
+			_LMT_Notify, _LMT_Acquire, _LMT_Settle)
 	return LLM_Menu_CommitMutation("the native indentation regression",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", Value),
-		_LMT_Apply, (Path, Updates) => _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn),
-		_LMT_Notify, _LMT_Acquire, _LMT_Settle)
+		_LMT_Apply, _LMT_IndentObserveWrite.Bind(Seen, Expected, WriterFn),
+		_LMT_IndentObserveNotify.Bind(Seen), _LMT_Acquire, _LMT_Settle,
+		_LMT_IndentObserveCollect.Bind(Seen))
+}
+
+_LMT_IndentObservedCommit(WriterFn, Seen, Value, Expected) {
+	return _LMT_IndentCommit(Value, Expected, WriterFn, Seen)
+}
+
+; Observers delegate to the unchanged full collector and borrowed writer. Closed
+; stage facts distinguish a pre-writer refusal without printing source or errors.
+_LMT_IndentObserveCollect(Seen, CandidateFeatures, CandidateMenu) {
+	Seen["collector_entered"] := true
+	try {
+		Updates := _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
+		Seen["collector_returned"] := true
+		Seen["collector_array"] := Updates is Array
+		return Updates
+	} catch as Err {
+		Seen["collector_threw"] := true
+		throw Err
+	}
+}
+
+_LMT_IndentObserveWrite(Seen, Expected, WriterFn, Path, Updates) {
+	Seen["borrowed_writer_entered"] := true
+	Current := _LLM_Menu_IndentSnapshot()
+	Seen["snapshot_blocked"] := Current["blocked"]
+	Seen["source_matches"] := _LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+	Seen["intent_admitted"] := LLM_DisplayIndentIntent(Expected, Current,
+		Expected["indentation"], LLM_MENU_INDENT_OPTIONS)["admitted"]
+	Owned := 0
+	for Update in Updates {
+		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+			Owned += 1
+	}
+	Seen["single_owned_leaf"] := Owned == 1
+	try {
+		Result := _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn)
+		Seen["borrowed_writer_returned"] := true
+		Seen["borrowed_writer_ack"] := (Result is Integer) && Result == 1
+		return Result
+	} catch as Err {
+		Seen["borrowed_writer_threw"] := true
+		throw Err
+	}
+}
+
+_LMT_IndentObserveNotify(Seen, Message, Options) {
+	Seen["notified"] := true
+	return _LMT_Notify(Message, Options)
+}
+
+; Values outside the fixed Boolean observation contract are never interpolated.
+_LMT_IndentObservation(Seen) {
+	Summary := ""
+	for Field in ["collector_entered", "collector_returned", "collector_array", "collector_threw",
+			"borrowed_writer_entered", "snapshot_blocked", "source_matches", "intent_admitted",
+			"single_owned_leaf", "borrowed_writer_returned", "borrowed_writer_ack",
+			"borrowed_writer_threw", "notified"] {
+		Value := Seen.Get(Field, "")
+		Summary .= (Summary == "" ? "" : ";") . Field . "="
+			. ((Value is Integer) && (Value == 0 || Value == 1) ? Value : "unobserved")
+	}
+	return Summary
 }
 
 _LMT_IndentChild(Built) {
@@ -1758,7 +1826,7 @@ _LMT_IndentNativeOwners() {
 				FileAppend(Initial, Path, "UTF-8-RAW")
 				Seen := Map("calls", 0)
 				Writer := _LMT_IndentWriteMode.Bind(Mode, Seen)
-				Command := (Value, Expected) => _LMT_IndentCommit(Value, Expected, Writer)
+				Command := _LMT_IndentObservedCommit.Bind(Writer, Seen)
 				Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, (*) => false, Command)
 				try {
 					Child := _LMT_IndentChild(Built)
@@ -1774,7 +1842,7 @@ _LMT_IndentNativeOwners() {
 					Callback := _MenuDispatchCallbacks[Id]
 					_LMT_ApplyCalls := 0
 					AssertEqual(Mode == "ack", Callback.Call())
-					AssertEqual(1, Seen["calls"])
+					AssertEqual(1, Seen["calls"], "closed native stages: " . _LMT_IndentObservation(Seen))
 					AssertEqual(1, Seen["updates"].Length, "the native choice may own only one leaf")
 					AssertEqual("llm.display", Seen["updates"][1].Section)
 					AssertEqual("pred_indent", Seen["updates"][1].Key)
@@ -1940,3 +2008,17 @@ _LMT_IndentCanonicalTypes() {
 	}
 }
 Test("LLM display: native indentation source requires real scalar types without numeric string coercion", _LMT_IndentCanonicalTypes)
+
+
+_LMT_IndentObservationIsClosed() {
+	Seen := Map("collector_entered", true, "source_matches", false,
+		"collector_threw", "private-error-marker", "unknown_future_stage", "private-future-marker")
+	Summary := _LMT_IndentObservation(Seen)
+	Assert(InStr(Summary, "collector_entered=1") > 0)
+	Assert(InStr(Summary, "source_matches=0") > 0)
+	Assert(InStr(Summary, "collector_threw=unobserved") > 0)
+	AssertFalse(InStr(Summary, "private-error-marker"))
+	AssertFalse(InStr(Summary, "private-future-marker"))
+	AssertFalse(InStr(Summary, "unknown_future_stage"))
+}
+Test("LLM display: indentation owner diagnostics retain only closed stage facts", _LMT_IndentObservationIsClosed)
