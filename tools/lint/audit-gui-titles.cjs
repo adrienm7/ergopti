@@ -235,23 +235,27 @@ function auditSource(source, lua, locales, relative = '') {
 			'Ui_MsgBox',
 			'Ui_InputBox',
 			'Ui_FileSelect',
+			'Ui_DirSelect',
 			'WindowTitle',
 			'window_title',
 			'set_window_title',
 			'set_title',
 			'show_webview'
 		].includes(name);
-		const nativeDialog = !lua && ['MsgBox', 'InputBox', 'FileSelect'].includes(name);
+		const nativeDialog =
+			!lua && ['MsgBox', 'InputBox', 'FileSelect', 'DirSelect', '_Ui_FolderSelect'].includes(name);
 		const raw = ['Gui', 'windowTitle'].includes(name) || nativeDialog;
 		if (!wrapper && !raw) continue;
 		const call = argumentsAt(ts, i + 1);
 		if (!call) continue;
-		const dialogWrapper = ['Ui_MsgBox', 'Ui_InputBox', 'Ui_FileSelect'].includes(name);
+		const dialogWrapper = ['Ui_MsgBox', 'Ui_InputBox', 'Ui_FileSelect', 'Ui_DirSelect'].includes(
+			name
+		);
 		const definition = scopes.some((s) => s.start === call.end + 1 && s.name === name);
 		if (
 			(nativeDialog || dialogWrapper ? definition : ts[call.end + 1]?.value === '{') ||
 			(!nativeDialog &&
-				!['Ui_MsgBox', 'Ui_InputBox', 'Ui_FileSelect'].includes(name) &&
+				!['Ui_MsgBox', 'Ui_InputBox', 'Ui_FileSelect', 'Ui_DirSelect'].includes(name) &&
 				call.args.some((a) => a.some((n) => n.value === ':=')))
 		)
 			continue;
@@ -259,7 +263,7 @@ function auditSource(source, lua, locales, relative = '') {
 			const scope = scopes
 				.filter((s) => s.start < i && i < s.end)
 				.sort((a, b) => a.end - a.start - (b.end - b.start))[0];
-			const caption = call.args[name === 'FileSelect' ? 2 : 1];
+			const caption = call.args[name === '_Ui_FolderSelect' ? 3 : name === 'FileSelect' ? 2 : 1];
 			const composed =
 				caption?.length === 4 &&
 				caption[0].value === 'WindowTitle' &&
@@ -268,7 +272,8 @@ function auditSource(source, lua, locales, relative = '') {
 				caption[3].value === ')';
 			if (
 				relative !== 'windows/infra/native_dialogs.ahk' ||
-				scope?.name !== 'Ui_' + name ||
+				scope?.name !== (name === '_Ui_FolderSelect' ? 'Ui_DirSelect' : 'Ui_' + name) ||
+				name === 'DirSelect' ||
 				!composed
 			) {
 				findings.push({
@@ -302,7 +307,8 @@ function auditSource(source, lua, locales, relative = '') {
 		}
 		let expr,
 			brandedInput = wrapper;
-		if (name === 'Ui_FileSelect') expr = call.args[2];
+		if (name === 'Ui_DirSelect') expr = call.args[3];
+		else if (name === 'Ui_FileSelect') expr = call.args[2];
 		else if (name === 'show_webview') expr = inlineTitle(call.args[0]);
 		else if (name === 'set_title' && call.args.length === 1) {
 			expr = call.args[0];

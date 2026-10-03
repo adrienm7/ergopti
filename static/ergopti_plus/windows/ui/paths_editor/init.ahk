@@ -204,7 +204,7 @@ _PathsEdWeb_Browse(Target := "config") {
 	if A_IsSuspended
 		return false
 	StartDir := StrReplace(Trim(Target == "logs" ? LoggerLogsDir() : _ConfigDir), "/", "\")
-	Picked := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
+	Picked := Ui_DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
 	if (Picked == "")
 		return
 	Fwd := StrReplace(Picked, "\", "/")

@@ -330,6 +330,70 @@ const cases = [
 		'--[[ manager.set_title(APP, "Ergopti — comment") ]]\nmanager.set_title(APP, i18n.get("common.error_title"))',
 		0,
 		'Lua long comments'
+	],
+	[
+		'windows',
+		'DirSelect("*initial", 3, "Select configuration folder")',
+		1,
+		'folder native body text cannot establish caption ownership'
+	],
+	[
+		'windows',
+		'DirSelect("*initial", 3, "ErgoptiPlus \u2014 Select configuration folder")',
+		1,
+		'branding the explanatory body cannot establish native chrome'
+	],
+	[
+		'windows',
+		'Ui_DirSelect("*initial", 3, "ErgoptiPlus \u2014 explanatory body", "Configuration folder", 0)',
+		0,
+		'folder body remains independent from the shared native caption'
+	],
+	[
+		'windows',
+		'Ui_DirSelect("*initial", 3, "Select folder", "ErgoptiPlus \u2014 Configuration folder", 0)',
+		1,
+		'folder caption must be brandless before composition'
+	],
+	[
+		'windows',
+		'Ui_DirSelect("*initial", 3, "Select folder", t("editor.personal_info.window_title"), 0)',
+		1,
+		'translated folder captions cannot carry a stale brand'
+	],
+	[
+		'windows',
+		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn _Ui_FolderSelect(RootDir, Options, Prompt, WindowTitle(Title), OwnerHwnd)\n}',
+		0,
+		'folder wrapper owns exactly the fourth caption argument',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn _Ui_FolderSelect(RootDir, Options, WindowTitle(Prompt), Title, OwnerHwnd)\n}',
+		1,
+		'composing the folder body cannot substitute for caption policy',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {\nreturn DirSelect(RootDir, Options, WindowTitle(Title))\n}',
+		1,
+		'the builtin folder dialog does not expose a chrome caption argument',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Other(Title) {\nreturn _Ui_FolderSelect("", 3, "Select folder", WindowTitle(Title), 0)\n}',
+		1,
+		'a differently owned native folder call cannot bypass the caption wrapper',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_DirSelect("*initial", 3, "Select folder", WindowTitle("Configuration folder"), 0)',
+		1,
+		'folder captions compose only once'
 	]
 ];
 try {
