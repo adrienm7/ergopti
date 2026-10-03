@@ -307,33 +307,129 @@ _LAG_SystemRows() {
 }
 Test("LLM agent: the System 1 and System 2 submenus list, check and store backends and models", _LAG_SystemRows)
 
+; Snapshot the real native choice, retaining its owned tree until assertions finish.
+_LAG_NativeModeRow(Owned) {
+	global _MenuDispatchCallbacks
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", 0, "ptr")
+	Assert(Handle != 0, "the first declared agent row opens its mode choices")
+	Sub := MenuFromHandle(Handle)
+	Items := []
+	loop TrayMenuItemCount(Sub) {
+		Position := A_Index - 1
+		Id := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id), "each native mode uses the actual dispatcher")
+		Items.Push(Map("label", _CTC_LabelAt(Sub, Position),
+			"checked", _CTC_IsChecked(Sub, Position), "action", _MenuDispatchCallbacks[Id]))
+	}
+	State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+	Assert(State != 0xFFFFFFFF, "the actual mode parent has native flags")
+	return Map("label", _CTC_LabelAt(Built, 0), "items", Items, "disabled", ((State & 0xFF) & 0x3) != 0)
+}
+
+; Read the independently captured three-mode menu matrix.
+_LAG_ModeMenuCorpus() {
+	global SharedDir
+	Path := SharedDir . "\tests\corpus\menus\agent_mode_rows.json"
+	Assert(FileExist(Path), "the shared independent mode-menu corpus must exist")
+	return JsonParse(FileRead(Path, "UTF-8"))
+}
+
+_LAG_ModeMenuGolden() {
+	Corpus := _LAG_ModeMenuCorpus()
+	AssertEqual(3, Corpus["modes"].Length, "the independent catalogue contains three modes")
+	AssertEqual(3, Corpus["states"].Length, "all three native states must be exercised")
+	for State in Corpus["states"] {
+		_LAG_Run(_LAG_Menu(State["selected"], "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+		_Body(Fx, Lines, Sent) {
+			global _LLM_Menu
+			Owned := []
+			try {
+				Row := _LAG_NativeModeRow(Owned)
+				AssertEqual(3, Row["items"].Length, "all three independent choices are present")
+				AssertFalse(Row["disabled"], "the native parent stays available with its actual command owner")
+				for Index, Expected in Corpus["modes"] {
+					Actual := Row["items"][Index]
+					AssertEqual(t(Expected["label_key"]), Actual["label"], "mode order and label")
+					AssertEqual(State["checked"][Index], Actual["checked"], "one exact native check")
+					if Expected["value"] == State["selected"]
+						AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", Actual["label"]), Row["label"])
+				}
+			} finally {
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+			}
+		}
+	}
+}
+Test("LLM agent: actual native mode choices replay the independent three-state menu matrix", _LAG_ModeMenuGolden)
+
+_LAG_ModeMenuSharedDeclaration() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn
+		Corpus := _LAG_ModeMenuCorpus()
+		Mode := _MR_GetManifestRoot()["agent_menu"][1]
+		Previous := Mode.Get("choices", "")
+		Keys := Map(), Owned := []
+		for Expected in Corpus["modes"]
+			Keys[Expected["value"]] := Expected["label_key"]
+		Mode["choices"] := []
+		for Value in Corpus["reordered_values"]
+			Mode["choices"].Push(Map("value", Value, "i18n", Keys[Value]))
+		try {
+			Row := _LAG_NativeModeRow(Owned)
+			for Index, Value in Corpus["reordered_values"]
+				AssertEqual(t(Keys[Value]), Row["items"][Index]["label"], "the declaration owns actual native order")
+			_LLM_Agent_CommitFn := (*) => false
+			AssertFalse(Row["items"][2]["action"].Call(), "the actual transaction refuses Off")
+			AssertEqual("action", _LLM_Menu["agent_mode"], "runtime state remains unchanged")
+			AssertEqual(0, Fx.Commits.Length, "no write is acknowledged")
+			AssertEqual(0, Fx.Rebuilds, "a refused native choice never redraws as success")
+		} finally {
+			Mode["choices"] := Previous
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared mode declaration controls native rows without bypassing refusal", _LAG_ModeMenuSharedDeclaration)
+
 _LAG_ModeRow() {
 	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		global _LLM_Menu
-		Row := _LLM_Agent_ModeRow()
-		AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", t("menu.agent.mode_action")), Row["label"],
-			"the current mode")
-		AssertEqual(3, Row["items"].Length, "three modes")
-		AssertTrue(Row["items"][2]["checked"] && !Row["items"][1]["checked"] && !Row["items"][3]["checked"],
-			"the current one checked")
-		Row["items"][3]["action"].Call()
-		AssertEqual("action", _LLM_Menu["agent_mode"], "auto is refused without System 1")
-		AssertEqual(t("llm.agent.no_system1"), _LPP_PendingNotice(), "with its notice")
-		AssertEqual(0, Fx.Commits.Length, "and nothing is stored")
-		_LLM_Menu["agent_system1"] := "cerebras"
-		AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns the automatic mode on")
-		AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
-		AssertEqual(t("llm.agent.auto_on"), _LPP_PendingNotice(), "with its notice")
-		AssertTrue(LLM_Agent_ToggleAuto(), "then back")
-		AssertEqual("action", _LLM_Menu["agent_mode"], "to on action")
-		AssertEqual(t("llm.agent.auto_off"), _LPP_PendingNotice(), "with its notice")
-		_LLM_Agent_ModeRow()["items"][1]["action"].Call()
-		AssertEqual("off", _LLM_Menu["agent_mode"], "the off row turns the agent off")
-		AssertTrue(LLM_Agent_ToggleAuto(), "from off the toggle goes to auto")
-		AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
-		Row := _LLM_Agent_AppsRow()
-		AssertEqual(StrReplace(t("menu.agent.disabled_apps"), "{1}", 0), Row["label"], "no excluded application")
+		Owned := []
+		try {
+			Row := _LAG_NativeModeRow(Owned)
+			AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", t("menu.agent.mode_action")), Row["label"],
+				"the current mode")
+			AssertEqual(3, Row["items"].Length, "three modes")
+			AssertTrue(Row["items"][2]["checked"] && !Row["items"][1]["checked"] && !Row["items"][3]["checked"],
+				"the current one checked")
+			Row["items"][3]["action"].Call()
+			AssertEqual("action", _LLM_Menu["agent_mode"], "auto is refused without System 1")
+			AssertEqual(t("llm.agent.no_system1"), _LPP_PendingNotice(), "with its notice")
+			AssertEqual(0, Fx.Commits.Length, "and nothing is stored")
+			AssertEqual(0, Fx.Rebuilds, "a refused automatic mode never redraws as success")
+			_LLM_Menu["agent_system1"] := "cerebras"
+			AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns the automatic mode on")
+			AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
+			AssertEqual(t("llm.agent.auto_on"), _LPP_PendingNotice(), "with its notice")
+			AssertTrue(LLM_Agent_ToggleAuto(), "then back")
+			AssertEqual("action", _LLM_Menu["agent_mode"], "to on action")
+			AssertEqual(t("llm.agent.auto_off"), _LPP_PendingNotice(), "with its notice")
+			_LAG_NativeModeRow(Owned)["items"][1]["action"].Call()
+			AssertEqual("off", _LLM_Menu["agent_mode"], "the off row turns the agent off")
+			AssertTrue(LLM_Agent_ToggleAuto(), "from off the toggle goes to auto")
+			AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
+			Row := _LLM_Agent_AppsRow()
+			AssertEqual(StrReplace(t("menu.agent.disabled_apps"), "{1}", 0), Row["label"], "no excluded application")
+		} finally {
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
 	}
 }
 Test("LLM agent: the mode submenu and the toggle refuse auto without System 1", _LAG_ModeRow)

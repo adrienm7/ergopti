@@ -27,9 +27,6 @@ local AgentSettings = require("modules.llm.agent_settings")
 
 local LOG = "ui.menu.agent_rows"
 
--- The label key of each mode, in menu order
-local MODE_KEYS = { off = "menu.agent.mode_off", action = "menu.agent.mode_action", auto = "menu.agent.mode_auto" }
-
 --- A translated string, or its key when the catalogue cannot answer.
 --- @param key string
 --- @return string
@@ -233,22 +230,6 @@ function M.build(ctx, dialogs)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	local handlers = {}
-	handlers["agent_mode"] = function(target)
-		local mode = AgentSettings.get_mode()
-		local rows = {}
-		for _, id in ipairs(AgentSettings.MODES) do
-			rows[#rows + 1] = {
-				label = tr(MODE_KEYS[id]),
-				checked = mode == id,
-				disabled = (not llm or type(llm.set_agent_mode) ~= "function") or nil,
-				action = function()
-					if llm.set_agent_mode(id) then changed() end
-				end,
-			}
-		end
-		append(target, { label = fill(tr("menu.agent.mode_title"), { tr(MODE_KEYS[mode]) }), items = rows },
-			"agent_mode")
-	end
 	for _, system in ipairs({ "system1", "system2" }) do
 		handlers["agent_" .. system] = function(target)
 			local current, rows = system_rows(system, dialogs, changed)
@@ -261,7 +242,21 @@ function M.build(ctx, dialogs)
 		append(target, { label = fill(tr("menu.agent.disabled_apps"), { count }), items = rows },
 			"agent_disabled_apps")
 	end
-	return { label = tr("menu.agent.title"), submenu = ManifestMenu.build("agent_menu", "Agent", handlers, nil, ctx, {}) }
+	local menu_ctx = {
+		commands = {
+			agent_mode = function(id)
+				if not llm or type(llm.set_agent_mode) ~= "function" then return false end
+				local committed = llm.set_agent_mode(id) == true
+				if committed then changed() end
+				return committed
+			end,
+		},
+		state_getters = {
+			["llm.agent_mode"] = AgentSettings.get_mode,
+			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
+		},
+	}
+	return { label = tr("menu.agent.title"), submenu = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) }
 end
 
 return M

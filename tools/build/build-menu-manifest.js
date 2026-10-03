@@ -124,8 +124,11 @@ function validateGreyedRows(menu) {
  * A choice row is one setting with a fixed set of values, drawn as one row with
  * the values beneath it. The values belong to the feature (its `enum_values`),
  * so the row never lists them itself: each becomes `{ value, i18n }`, labelled
- * by the key `<row i18n>.<value>`. A row whose path is not an enum feature, that
- * lists its choices by hand, or that is shown on a platform the feature does not
+ * by the key `<row i18n>.<value>`, or by an explicit `choice_label_prefix` for
+ * established label keys. `show_current_choice` lets the shared renderer fill
+ * {1} in the parent caption from the selected leaf's translated label.
+ * A row whose path is not an enum feature, that lists its choices by hand, or
+ * that is shown on a platform the feature does not
  * declare fails the build instead of drawing a row no driver can store.
  * @param {object} menu The parsed [menu] tables, completed in place.
  * @param {string} raw The manifest source, for the feature entries.
@@ -160,7 +163,18 @@ function projectChoices(menu, raw) {
 					throw new Error(`${where} is shown on ${platform}, where "${row.path}" does not exist`);
 				}
 			}
-			row.choices = feature.enum_values.map((value) => ({ value, i18n: `${row.i18n}.${value}` }));
+			const prefix = row.choice_label_prefix;
+			if (prefix !== undefined && (typeof prefix !== 'string' || prefix === ''))
+				throw new Error(`${where}: choice_label_prefix must be a non-empty locale-key prefix`);
+			if (row.show_current_choice !== undefined && typeof row.show_current_choice !== 'boolean')
+				throw new Error(`${where}: show_current_choice must be a boolean`);
+			row.choices = feature.enum_values.map((value) => ({
+				value,
+				i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}`
+			}));
+			// The compiler consumes this source metadata; native readers use only
+			// the projected labels and must not carry a competing prefix policy.
+			delete row.choice_label_prefix;
 		}
 	}
 }

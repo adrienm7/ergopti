@@ -192,4 +192,108 @@ function main() {
 	);
 }
 
+/**
+ * Runs the actual menu generator in an owned fixture. Fixed choice data belongs
+ * to its enum feature; projection and malformed metadata are independently
+ * checked before a driver renders that data.
+ */
+function checkChoiceProjection() {
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const os = require('node:os');
+	const path = require('node:path');
+	const { spawnSync } = require('node:child_process');
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-menu-choice-'));
+	try {
+		for (const relativePath of ['tools/build/build-menu-manifest.js', 'tools/lib/paths.cjs']) {
+			const target = path.join(fixture, relativePath);
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.copyFileSync(path.join(REPO_ROOT, relativePath), target);
+		}
+		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
+		fs.mkdirSync(path.join(fixture, 'node_modules'), { recursive: true });
+		fs.cpSync(
+			path.join(REPO_ROOT, 'node_modules/smol-toml'),
+			path.join(fixture, 'node_modules/smol-toml'),
+			{ recursive: true }
+		);
+		const manifest = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+		);
+		const output = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
+		);
+		fs.mkdirSync(path.dirname(manifest), { recursive: true });
+		fs.mkdirSync(path.dirname(output), { recursive: true });
+		const original = readFileSync(MANIFEST_PATH, 'utf8');
+		const execute = (source) => {
+			fs.writeFileSync(manifest, source);
+			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
+				cwd: fixture,
+				encoding: 'utf8'
+			});
+		};
+		let result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		let menu = JSON.parse(fs.readFileSync(output, 'utf8'));
+		assert.equal(menu.agent_menu[0].type, 'choice');
+		assert.equal(menu.agent_menu[0].show_current_choice, true);
+		assert.equal(
+			Object.hasOwn(menu.agent_menu[0], 'choice_label_prefix'),
+			false,
+			'compiler metadata is consumed before runtime publication'
+		);
+		assert.deepEqual(menu.agent_menu[0].choices, [
+			{ value: 'off', i18n: 'menu.agent.mode_off' },
+			{ value: 'action', i18n: 'menu.agent.mode_action' },
+			{ value: 'auto', i18n: 'menu.agent.mode_auto' }
+		]);
+		const reordered = original.replace(
+			'enum_values = ["off", "action", "auto"]',
+			'enum_values = ["auto", "off", "action"]'
+		);
+		assert.notEqual(reordered, original, 'the actual feature source must be changed');
+		result = execute(reordered);
+		assert.equal(result.status, 0, result.stderr);
+		menu = JSON.parse(fs.readFileSync(output, 'utf8'));
+		assert.deepEqual(
+			menu.agent_menu[0].choices.map((choice) => choice.value),
+			['auto', 'off', 'action']
+		);
+		const acknowledged = fs.readFileSync(output);
+		for (const [oldValue, invalidValue, reason] of [
+			[
+				'choice_label_prefix = "menu.agent.mode_"',
+				'choice_label_prefix = ""',
+				'choice_label_prefix'
+			],
+			[
+				'choice_label_prefix = "menu.agent.mode_"',
+				'choice_label_prefix = false',
+				'choice_label_prefix'
+			],
+			['show_current_choice = true', 'show_current_choice = "true"', 'show_current_choice']
+		]) {
+			const invalid = original.replace(oldValue, invalidValue);
+			assert.notEqual(invalid, original, 'malformed metadata must affect the actual declaration');
+			result = execute(invalid);
+			assert.notEqual(result.status, 0, 'malformed choice metadata must refuse publication');
+			assert.match(result.stderr, new RegExp(reason));
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledged,
+				'a refusal preserves the last acknowledged manifest'
+			);
+		}
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+	console.log(
+		'menu choice projection: actual enum order, legacy label keys and 3 malformed receipts qualified.'
+	);
+}
+
 main();
+checkChoiceProjection();

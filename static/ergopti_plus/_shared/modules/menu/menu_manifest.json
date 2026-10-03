@@ -340,9 +340,28 @@
 	],
 	"agent_menu": [
 		{
-			"type": "dynamic",
+			"type": "choice",
 			"id": "agent_mode",
-			"i18n": "menu.agent.mode_title"
+			"path": "llm.agent_mode",
+			"i18n": "menu.agent.mode_title",
+			"show_current_choice": true,
+			"disabled_when": [
+				"agent_mode_ready"
+			],
+			"choices": [
+				{
+					"value": "off",
+					"i18n": "menu.agent.mode_off"
+				},
+				{
+					"value": "action",
+					"i18n": "menu.agent.mode_action"
+				},
+				{
+					"value": "auto",
+					"i18n": "menu.agent.mode_auto"
+				}
+			]
 		},
 		{
 			"type": "---"

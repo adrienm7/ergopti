@@ -306,7 +306,7 @@ M.features = {
 		path = "llm.agent_system2", id = "agent_system2", section = "llm", default = "", type = "string", description_key = "menu.agent.system2_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
-		path = "llm.agent_mode", id = "agent_mode", section = "llm", default = "off", type = "string", description_key = "menu.agent.mode_title", platforms = { "ahk", "hs", "linux" }, recommended = "off", input_altering = false,
+		path = "llm.agent_mode", id = "agent_mode", section = "llm", default = "off", type = "enum", description_key = "menu.agent.mode_title", platforms = { "ahk", "hs", "linux" }, recommended = "off", input_altering = false, enum_values = { "off", "action", "auto" },
 	},
 	{
 		path = "llm.agent_disabled_apps", id = "agent_disabled_apps", section = "llm", default = {  }, type = "array", description_key = "menu.agent.disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,

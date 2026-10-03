@@ -611,6 +611,18 @@ integrated, then publish one grouped release.
       existing rows during the migration (proposal in the menu-first-group
       report: most hide; greyed: Linux edit_shortcuts, Linux key
       combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+
+The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
+enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
+shared renderers own its labels, order, checked state and selected-value
+caption; native ports supply only the current value and existing durable
+setter. Automatic-mode prerequisites and refusal rollback remain intact.
+An independent three-mode corpus drives each native menu regression, including
+shared-choice reordering and refused writes. Native menu-row counts fall from
+Windows 110 to 109 and macOS 195 to 194; Linux stays at 121. Items 54 and 81
+remain partial while the other native/provider rows still exist. Windows
+native unit/E2E, packaging and installation validation is pending CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -694,6 +706,8 @@ is committed; one request is one commit with its regression test.
       each. One commit per menu, the baseline lowered in the same commit.
       The update rows greyed on a local version (2026-10-01) were added as
       provider rows and join the About slice.
+      The fixed agent Mode choices now use the shared declaration and renderers; see item 54 for the regression and remaining native-row scope.
+
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
   ported by Windows, pinned by

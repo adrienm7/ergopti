@@ -1146,7 +1146,9 @@ id = "agent_mode"
 default = "off"
 recommended = "off"
 input_altering = false
-type = "string"
+type = "enum"
+enum_values = ["off", "action", "auto"]
+platforms = ["ahk", "hs", "linux"]
 description_key = "menu.agent.mode_title"
 
 # Applications where the automatic mode never looks at what is typed.
@@ -3951,13 +3953,17 @@ disabled_reason_key = "menu.about.source_run_reason"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the
-# applications the automatic mode ignores. Every row is `dynamic`: the backend
-# lists come from api_providers.json and the stored API entries, and the
-# application picker is each driver's own.
+# applications the automatic mode ignores. The fixed modes belong to the enum
+# feature and its shared choice renderer. The backend lists and application
+# picker remain dynamic: they depend on stored API entries and native apps.
 [[menu.agent_menu]]
-type = "dynamic"
+type = "choice"
 id = "agent_mode"
+path = "llm.agent_mode"
 i18n = "menu.agent.mode_title"
+choice_label_prefix = "menu.agent.mode_"
+show_current_choice = true
+disabled_when = ["agent_mode_ready"]
 
 [[menu.agent_menu]]
 type = "---"
