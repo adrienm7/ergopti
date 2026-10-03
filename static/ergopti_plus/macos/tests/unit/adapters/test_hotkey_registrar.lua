@@ -356,3 +356,80 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 			"an unreadable lifecycle state must deny the action rather than guess active")
 	end)
 end)
+
+helpers.describe("hotkey_registrar: native factory claims", function()
+	helpers.it("suspends an existing conditional for late explicit acquisition and restores it after the last claim", function()
+		local adapter, native = fresh()
+		local token = assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local hotkey = native.hotkey._bound[1]
+		local rows = {{chord="Ctrl+A", action="explicit", binding_id="native-built-in"}}
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", rows), true)
+		helpers.assert_eq(hotkey.enabled, false)
+		helpers.assert_eq(adapter.replace_physical_claims("personal", rows), true)
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {}), true)
+		helpers.assert_eq(hotkey.enabled, false, "foreign explicit claims retain suspension")
+		helpers.assert_eq(adapter.replace_physical_claims("personal", {}), true)
+		helpers.assert_eq(hotkey.enabled, true)
+		helpers.assert_eq(adapter.unbind(token), true)
+	end)
+
+	helpers.it("refuses native suspension and preserves old claims and activation on rollback", function()
+		local adapter, native = fresh()
+		assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local hotkey = native.hotkey._bound[1]
+		local disable = hotkey.disable
+		hotkey.disable = function(self) self.enabled = false; return nil end
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {{chord="Ctrl+A", action="explicit"}}), false)
+		helpers.assert_nil(next(adapter.physical_claims()))
+		helpers.assert_eq(hotkey.enabled, true)
+		hotkey.disable = disable
+	end)
+
+	helpers.it("retains claim and exact conditional debt when native restoration refuses", function()
+		local adapter, native = fresh()
+		assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local hotkey = native.hotkey._bound[1]
+		local rows = {{chord="Ctrl+A", action="explicit"}}
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", rows), true)
+		local enable = hotkey.enable
+		hotkey.enable = function() return nil end
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {}), false)
+		helpers.assert_true(next(adapter.physical_claims()) ~= nil)
+		helpers.assert_eq(hotkey.enabled, false)
+		hotkey.enable = enable
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {}), true)
+		helpers.assert_eq(hotkey.enabled, true)
+	end)
+	helpers.it("does not resume a conditional explicitly disabled while a claim owns its suspension", function()
+		local adapter, native = fresh()
+		local token = assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local rows = {{chord="Ctrl+A", action="explicit"}}
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", rows), true)
+		helpers.assert_eq(adapter.setEnabled(token, false), true)
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {}), true)
+		helpers.assert_eq(native.hotkey._bound[1].enabled, false)
+	end)
+
+	helpers.it("compensates a false native suspension receipt without publishing a new claim", function()
+		local adapter, native = fresh()
+		assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local hotkey = native.hotkey._bound[1]
+		hotkey.disable = function(self) self.enabled=false; return false end
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {{chord="Ctrl+A", action="explicit"}}), false)
+		helpers.assert_nil(next(adapter.physical_claims()))
+		helpers.assert_eq(hotkey.enabled, true)
+	end)
+	helpers.it("does not resurrect a revoked conditional whose exact native delete is still pending", function()
+		local adapter, native = fresh()
+		local token = assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))
+		local hotkey = native.hotkey._bound[1]
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {{chord="Ctrl+A", action="explicit"}}), true)
+		local release = hotkey.delete
+		hotkey.delete = function() error("native delete refused") end
+		helpers.assert_eq(adapter.unbind(token), false)
+		helpers.assert_eq(adapter.replace_physical_claims("built-in", {}), true)
+		helpers.assert_eq(hotkey.enabled, false)
+		hotkey.delete = release
+		helpers.assert_eq(adapter.unbind(token), true)
+	end)
+end)

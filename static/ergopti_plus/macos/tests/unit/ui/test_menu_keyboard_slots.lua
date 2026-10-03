@@ -64,6 +64,29 @@ local function make_ctx()
 	return ctx, updates
 end
 
+--- Separates physical Add flows from the fixed contextual editor row.
+--- @param shortcuts table Real shortcut facade.
+--- @return table groups
+local function physical_groups(shortcuts)
+	local groups = {}
+	for _, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
+		if not group.fixed then groups[#groups + 1] = group end
+	end
+	return groups
+end
+
+--- Finds the corresponding physical rows without depending on contextual placement.
+--- @param rows table Complete group rows.
+--- @param shortcuts table Real shortcut facade.
+--- @return table physical
+local function physical_rows(rows, shortcuts)
+	local physical = {}
+	for index, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
+		if not group.fixed then physical[#physical + 1] = rows[index] end
+	end
+	return physical
+end
+
 --- Loads the UI module together with a recording ActionPicker.
 --- The picker is replaced rather than stubbed at the hs layer because these
 --- cases are about WHAT is offered and what is done with the answer, not about
@@ -120,6 +143,25 @@ helpers.describe("menu_keyboard_slots: provided rows", function()
 		end
 	end)
 
+	it("keeps the fixed contextual row editable after an explicit none choice", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx = make_ctx()
+		helpers.assert_eq(shortcuts.set_keyboard_action("magic_editor", "none"), true)
+		local groups = shortcuts.get_keyboard_slot_groups()
+		local rows = ui.provide_rows(ctx, nil)
+		local contextual
+		for index, group in ipairs(groups) do
+			if group.prefix == "contextual" then contextual = rows[index] end
+		end
+		helpers.assert_not_nil(contextual)
+		helpers.assert_eq(#contextual.items, 1, "one fixed logical slot needs no redundant Add flow")
+		local row = contextual.items[1]
+		helpers.assert_true(row.label:find("Label:none", 1, true) ~= nil)
+		helpers.assert_nil(row.disabled, "source proof does not disable ordinary action editing")
+		row.action()
+		helpers.assert_eq(picker.opened[#picker.opened].opts.current, "none")
+	end)
+
 	it("hands over DATA, never hs.menubar rows", function()
 		-- A provider returning { title = …, fn = … } would be building menu rows
 		-- outside the renderer, which is exactly what the list type exists to stop.
@@ -135,14 +177,14 @@ helpers.describe("menu_keyboard_slots: provided rows", function()
 		end
 	end)
 
-	it("offers an add row in every group even when nothing is bound", function()
+	it("offers creation or fixed-row editing when no physical binding is active", function()
 		local ui = fresh()
 		local ctx = make_ctx()
 		for _, row in ipairs(ui.provide_rows(ctx, nil)) do
 			helpers.assert_true(#row.items >= 1,
-				"a group with no assignments must still offer a way to create one")
+				"each group must retain its ordinary assignment editor")
 			local last = row.items[#row.items]
-			helpers.assert_eq(type(last.action), "function", "the add row must be actionable")
+			helpers.assert_eq(type(last.action), "function", "the group editor must be actionable")
 		end
 	end)
 
@@ -171,12 +213,12 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 	it("offers the free slots of the group, and only those", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local taken = group.prefix .. FIRST_KEY
 		helpers.assert_true(shortcuts.set_keyboard_action(taken, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
-		rows[1].items[#rows[1].items].action()
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 
 		helpers.assert_eq(#picker.opened, 1, "the add row must open the slot picker")
 		local offered = {}
@@ -192,11 +234,11 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 	it("chains the action picker and persists what was chosen", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, updates = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[2]
+		local group = physical_groups(shortcuts)[2]
 		local slot = group.prefix .. "j"
 
 		local rows = ui.provide_rows(ctx, nil)
-		rows[2].items[#rows[2].items].action()
+		physical_rows(rows, shortcuts)[2].items[#physical_rows(rows, shortcuts)[2].items].action()
 		picker.opened[1].confirm(slot)
 
 		helpers.assert_eq(#picker.opened, 2, "picking a slot must then ask what it should do")
@@ -217,7 +259,7 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 		for _ in pairs(shortcuts.get_keyboard_assignments()) do before = before + 1 end
 
 		local rows = ui.provide_rows(ctx, nil)
-		rows[1].items[#rows[1].items].action()
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 		picker.opened[1].confirm(nil)
 
 		helpers.assert_eq(#picker.opened, 1, "a dismissed slot picker must not chain to the action picker")
@@ -240,13 +282,13 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 	it("lists an assigned slot with its action label", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "m"
 		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
 		local found = nil
-		for _, inner in ipairs(rows[1].items) do
+		for _, inner in ipairs(physical_rows(rows, shortcuts)[1].items) do
 			if inner.label:find("Label:lookup", 1, true) then found = inner end
 		end
 		helpers.assert_true(found ~= nil,
@@ -258,12 +300,12 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 	it("opens the action picker on the slot's current action", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "m"
 		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
-		rows[1].items[1].action()
+		physical_rows(rows, shortcuts)[1].items[1].action()
 
 		helpers.assert_eq(picker.opened[1].opts.current, "lookup",
 			"the picker must open on what the slot holds, not on 'none'")
@@ -274,19 +316,19 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 	it("removes the binding when 'none' is chosen", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "m"
 		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
-		rows[1].items[1].action()
+		physical_rows(rows, shortcuts)[1].items[1].action()
 		picker.opened[1].confirm("none")
 
 		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none",
 			"choosing the disabled row must clear the slot, not bind an action called 'none'")
-		helpers.assert_nil(persisted[slot], "the neutral assignment must be sparsely deleted")
+		helpers.assert_eq(persisted[slot], "none", "choosing None must preserve explicit personal intent")
 		local still_listed = false
-		for _, inner in ipairs(ui.provide_rows(ctx, nil)[1].items) do
+		for _, inner in ipairs(physical_rows(ui.provide_rows(ctx, nil), shortcuts)[1].items) do
 			if inner.label:find(shortcuts.get_keyboard_slot_label(slot), 1, true) then still_listed = true end
 		end
 		helpers.assert_eq(still_listed, false, "and the row must disappear from the group")
@@ -295,14 +337,14 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 	it("does not refresh the menu when the shortcut transaction refuses", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, updates = make_ctx()
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "m"
 		local original_set = shortcuts.set_keyboard_action
 		shortcuts.set_keyboard_action = function() return false end
 
 		local ok, err = xpcall(function()
 			local rows = ui.provide_rows(ctx, nil)
-			rows[1].items[#rows[1].items].action()
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 			picker.opened[1].confirm(slot)
 			picker.opened[2].confirm("lookup")
 			helpers.assert_eq(updates.count, 0,
@@ -317,7 +359,7 @@ end)
 it("menu_keyboard_slots: conditional publication refusal keeps the old choice", function()
 	local ui, shortcuts, picker, persisted = fresh()
 	local ctx, updates = make_ctx()
-	local group = shortcuts.get_keyboard_slot_groups()[1]
+	local group = physical_groups(shortcuts)[1]
 	local slot = group.prefix .. "j"
 	local files = package.loaded["adapters.file_system"]
 	local writes = 0
@@ -326,7 +368,7 @@ it("menu_keyboard_slots: conditional publication refusal keeps the old choice", 
 		return false, "injected conditional refusal"
 	end
 	local rows = ui.provide_rows(ctx, nil)
-	rows[1].items[#rows[1].items].action()
+	physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 	picker.opened[1].confirm(slot)
 	picker.opened[2].confirm("select_line")
 	helpers.assert_eq(writes, 1, "the real writer must attempt one conditional publication")
@@ -401,12 +443,12 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function(_title, _prompt, _prior, confirm) return confirm, "(" end
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "w"
 
 		local ok, err = xpcall(function()
 			local rows = ui.provide_rows(ctx, nil)
-			rows[1].items[#rows[1].items].action()
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 			picker.opened[1].confirm(slot)
 			picker.opened[2].confirm("wrap_selection")
 			helpers.assert_eq(#stored, 1, "the pair must be asked for and stored")
@@ -431,12 +473,12 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 		local dialog = package.loaded["infra.dialog_util"]
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function() error("the value the picker's editor collected must not be asked again") end
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "w"
 
 		local ok, err = xpcall(function()
 			local rows = ui.provide_rows(ctx, nil)
-			rows[1].items[#rows[1].items].action()
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 			picker.opened[1].confirm(slot)
 			local opts = picker.opened[2].opts
 			helpers.assert_eq(opts.send_vocabulary, ctx.gestures.send_vocabulary(),
@@ -513,12 +555,12 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function() return "cancel", nil end
-		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "w"
 
 		local ok, err = xpcall(function()
 			local rows = ui.provide_rows(ctx, nil)
-			rows[1].items[#rows[1].items].action()
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 			picker.opened[1].confirm(slot)
 			picker.opened[2].confirm("wrap_selection")
 			helpers.assert_eq(#stored, 0)

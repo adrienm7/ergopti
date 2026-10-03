@@ -124,6 +124,8 @@ local _release_forwarded_sources
 -- The tap-hold engine (platform/remap/tap_hold_engine), set by the daemon. It rewrites
 -- the grabbed stream before anything else reads it, and _on_tap runs the tap
 -- actions it hands back that are not a plain key.
+local _physical_sources = {}
+local _origin_generation, _origin_signature = 0, nil
 local _remapper = nil
 local _on_tap = nil
 local _release_remapped
@@ -733,6 +735,7 @@ local function _dispatch_event(ev, source)
 			key = identity or char,
 			char = char,
 			code = ev.code,
+			physical = ev.remapped ~= true and _physical_sources[source] == true,
 			value = ev.value,
 			mods = M.held_modifiers(),
 			shift_side = M.held_shift_side(),
@@ -1171,6 +1174,26 @@ function M.caps_lock_on()
 	return nil, "no keyboard is open"
 end
 
+--- Rechecks the existing capture owner's kernel origin without a new watcher.
+--- @return table receipt Physical-source generation and admission.
+function M.physical_source_receipt()
+	local ok, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local sources = ok and type(Finder.physical_sources) == "function" and Finder.physical_sources(_devices) or {}
+	local ready = _running and _intercept and #_devices > 0 and #sources == #_devices
+	local signature, physical = { tostring(ready) }, {}
+	for _, source in ipairs(sources) do
+		physical[source.path] = source.physical == true
+		ready = ready and source.physical == true
+		for _, value in ipairs({ source.path, source.sysfs, source.name, tostring(source.physical) }) do
+			signature[#signature + 1] = #value .. ":" .. value
+		end
+	end
+	local encoded = table.concat(signature, ";")
+	if _origin_signature ~= encoded then _origin_signature, _origin_generation = encoded, _origin_generation + 1 end
+	_physical_sources = physical
+	return { generation = _origin_generation, ready = ready == true }
+end
+
 --- Resolves every device the daemon should be reading right now.
 --- @return table keyboards, table pointers
 local function _best_devices()
@@ -1302,6 +1325,7 @@ local function _acquire(paths, force_path)
 	_devices = {}
 	for index, path in ipairs(paths) do _devices[index] = path end
 	_device = _devices[1]
+	M.physical_source_receipt()
 	return true
 end
 
@@ -1397,6 +1421,9 @@ function M.check_device()
 		or not _all_keyboards_open(keyboards) or _pinned_missing
 	local pointers_changed = not same_paths(pointers, _pointer_devices)
 		or not _all_pointers_open(pointers)
+	-- Refresh origin admission through this existing watchdog, including an
+	-- unchanged path whose kernel descriptor became synthetic or unknown.
+	M.physical_source_receipt()
 	if not keyboards_changed and not pointers_changed then return end
 	if not keyboards_changed then
 		_acquire_pointers(pointers)
@@ -1893,6 +1920,7 @@ function M._test_drive(events, callbacks, intercept)
 
 	local test_path = "/dev/input/test"
 	_devices = { test_path }
+	_physical_sources = { [test_path] = cb.physicalSource ~= false }
 	_device = test_path
 	local slot = keyboard_slot(test_path)
 	EvdevReader.open(test_path, slot)
@@ -1913,6 +1941,7 @@ function M._test_drive(events, callbacks, intercept)
 	_remap_source_of = {}
 	_running = false
 	_devices = {}
+	_physical_sources = {}
 	_device = nil
 	_test_capture_event = nil
 	_sync_dropped = {}

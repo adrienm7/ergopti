@@ -1,0 +1,7 @@
+[case]
+description = "An unknown action keeps the complete legacy source and performs no partial disable write."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

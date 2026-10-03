@@ -156,6 +156,7 @@ Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
 
+# BEGIN GENERATED LINUX NATIVE REQUIREMENTS
 Requires:       luajit >= 2.1
 Requires:       xclip
 Requires:       libnotify
@@ -170,6 +171,10 @@ Requires:       libayatana-appindicator-gtk3
 Requires:       zenity
 Requires:       shadow-utils
 Requires:       util-linux
+Requires:       libxkbcommon-x11
+Requires:       libX11
+Requires:       libX11-xcb
+# END GENERATED LINUX NATIVE REQUIREMENTS
 Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl

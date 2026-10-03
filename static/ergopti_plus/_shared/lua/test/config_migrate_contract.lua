@@ -126,6 +126,16 @@ local function read_corpus_file(path)
 	return decoded, content
 end
 
+--- Actual generated macOS identities and shared physical aliases, injected
+--- explicitly into every interpreter replay, including the Linux suite.
+local function migration_context()
+	local root = shared_root()
+	local catalogue = dofile(root .. "/../macos/_generated/action_catalogue.lua")
+	local context, detail = Engine.load_context(root .. "/modules/actions/modifier_chords.json", catalogue)
+	if not context then error("migration context rejected: " .. tostring(detail)) end
+	return context
+end
+
 --- A validated registry from TOML text, for scenarios independent of the
 --- shipped one.
 local function registry_from(text)
@@ -220,7 +230,8 @@ local function register_corpus(h, driver)
 					h.assert_true(registry ~= nil, "the case registry must load: " .. tostring(registry_err))
 
 					local _, input = read_corpus_file(dir .. "/input.toml")
-					local plan = Engine.plan(input, registry, driver)
+					local context = migration_context()
+					local plan = Engine.plan(input, registry, driver, context)
 					h.assert_eq(plan.outcome, spec.outcome, "outcome (" .. tostring(plan.detail) .. ")")
 					if spec.outcome ~= "migrated" then
 						h.assert_nil(plan.candidate, "a refused or current file has no candidate")
@@ -241,8 +252,14 @@ local function register_corpus(h, driver)
 						end
 					end
 
+					if spec.preserve_source == true then
+						local stripped, count = plan.candidate:gsub("%[_meta%]\nschema_version = 2\n\n", "", 1)
+						h.assert_eq(count, 1, "only the schema stamp is added to unsupported handoffs")
+						h.assert_eq(stripped, input, "every source and occupied destination byte survives")
+					end
+
 					local replay = Engine.apply_steps(Engine.model_from_source(plan.candidate), registry,
-						driver, spec.from_version)
+						driver, spec.from_version, context)
 					h.assert_eq(Engine.plain(replay), Engine.plain(migrated),
 						"replaying the steps on their own output must change nothing")
 				end)
@@ -535,6 +552,143 @@ local function register_copy_ownership(h, driver)
 	end)
 end
 
+local function register_chord_handoff(h, driver)
+	h.describe("config chord action ownership (" .. driver .. ")", function()
+		h.it("builds real assignability without changing ordered native catalogue data", function()
+			local context = migration_context()
+			local actions = context.assignable_actions
+			h.assert_true(actions.none == true, "NONE is an actual offered action")
+			h.assert_true(actions.open_hotstrings_editor == true, "the editor is an actual offered action")
+			h.assert_true(actions.cmd_ctrl_option_shift_comma == true, "the canonical modifier subset matrix is complete")
+			h.assert_nil(actions.future_action, "unknown strings are not assignable")
+			h.assert_nil(actions.alt_d, "native aliases are not persisted action identities")
+			h.assert_nil(actions._modifier_chords_placeholder, "picker metadata is not an action")
+			local catalogue = dofile(shared_root() .. "/../macos/_generated/action_catalogue.lua")
+			local before = require("toml_codec.leaf_rows").clone_value(catalogue)
+			require("actions.assignable").build(catalogue, context.modifier_chords, "macos")
+			h.assert_eq(catalogue, before, "array order, labels and generated native fields are untouched")
+		end)
+
+		h.it("backs up exact legacy data before publishing the represented chord handoff", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/op_move_chord_ctrl_letter"
+			local _, source = read_corpus_file(dir .. "/input.toml")
+			local _, wanted = read_corpus_file(dir .. "/expected.toml")
+			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
+			with_config(source, function(path)
+				local result = Engine.run({ path = path, driver = driver, registry = registry,
+					stamp = STAMP, context = migration_context() })
+				h.assert_eq(result.status, "migrated", tostring(result.detail))
+				h.assert_eq(read_bytes(result.backup), source, "backup precedes source cleanup")
+				h.assert_eq(Engine.plain(assert(Engine.model_from_source(read_bytes(path)))),
+					Engine.plain(assert(Engine.model_from_source(wanted))), "publication carries the exact expected choices")
+			end)
+		end)
+
+		h.it("retains exact inline ancestor namespaces without a partial handoff", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/op_move_chord_scalar_ancestor"
+			local _, source = read_corpus_file(dir .. "/inline_ancestor.toml")
+			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
+			local plan = Engine.plan(source, registry, driver, migration_context())
+			h.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+			local without_stamp, count = plan.candidate:gsub("%[_meta%]\nschema_version = 2\n\n", "", 1)
+			h.assert_eq(count, 1)
+			h.assert_eq(without_stamp, source, "both complete inline records and comments remain byte exact")
+		end)
+
+		h.it("refused handoff publication preserves the legacy file and prevents future writes", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/op_move_chord_ctrl_letter"
+			local _, source = read_corpus_file(dir .. "/input.toml")
+			with_config(source, function(path)
+				local result = Engine.run({ path = path, driver = driver,
+					registry = assert(Engine.load_registry(dir .. "/migrations.toml")), stamp = STAMP,
+					context = migration_context(), publish = function() return false, "native lease refused" end })
+				h.assert_eq(result.status, "failed")
+				h.assert_true(result.read_only, "the old native owner remains backed by an unwritable source")
+				h.assert_eq(read_bytes(path), source, "no cleanup or conditional choice reaches the file")
+			end)
+		end)
+
+		h.it("missing catalogue data uses the existing read-only boot refusal", function()
+			local context, detail = Engine.load_context("", {})
+			h.assert_nil(context)
+			h.assert_true(type(detail) == "string")
+			local bad, bad_detail = Engine.load_context("unreadable-catalogue.json", {}, { read = function() return nil end })
+			h.assert_nil(bad)
+			local source = '[hotstrings.editor]\nshortcut = false\n'
+			with_config(source, function(path)
+				local result = Engine.boot({ path = path, driver = driver,
+					registry = assert(Engine.load_registry(shared_root() .. "/tests/corpus/config_migrations/op_move_chord_false/migrations.toml")),
+					context_error = bad_detail, stamp = STAMP })
+				h.assert_eq(result.status, "failed")
+				h.assert_true(result.read_only)
+				h.assert_eq(read_bytes(path), source, "missing context never deletes the legacy owner")
+			end)
+		end)
+		h.it("rejects actual malformed and scalar JSON without publishing a legacy handoff", function()
+			for _, raw in ipairs({ "{ malformed", "false", '{"keys": [], "platforms": {"macos": false}}' }) do
+				with_config(raw, function(catalogue_path)
+					local context, detail = Engine.load_context(catalogue_path,
+						dofile(shared_root() .. "/../macos/_generated/action_catalogue.lua"))
+					h.assert_nil(context, "malformed or untyped catalogue data cannot authorize cleanup")
+					h.assert_true(type(detail) == "string", "the failure reaches boot's refusal path")
+					h.assert_eq(read_bytes(catalogue_path), raw, "validation never changes its data source")
+				end)
+			end
+		end)
+
+		h.it("an absent engine context cannot consume the explicit legacy disable record", function()
+			local source = '[hotstrings.editor]\nshortcut = false\n'
+			with_config(source, function(path)
+				local result = Engine.boot({ path = path, driver = driver,
+					registry = assert(Engine.load_registry(shared_root() .. "/tests/corpus/config_migrations/op_move_chord_false/migrations.toml")),
+					stamp = STAMP })
+				h.assert_eq(result.status, "failed")
+				h.assert_true(result.read_only)
+				h.assert_eq(read_bytes(path), source, "the old native owner survives context refusal")
+			end)
+		end)
+
+		h.it("missing assignability owner becomes a context refusal receipt before boot", function()
+			local previous_loaded = package.loaded["actions.assignable"]
+			local previous_preload = package.preload["actions.assignable"]
+			package.loaded["actions.assignable"] = nil
+			package.preload["actions.assignable"] = function() error("fixture missing assignability owner") end
+			local ok, context, detail = pcall(function()
+				return Engine.load_context(shared_root() .. "/modules/actions/modifier_chords.json",
+					dofile(shared_root() .. "/../macos/_generated/action_catalogue.lua"))
+			end)
+			package.loaded["actions.assignable"] = previous_loaded
+			package.preload["actions.assignable"] = previous_preload
+			h.assert_true(ok, "module acquisition errors must not escape the pre-boot seam")
+			h.assert_nil(context)
+			h.assert_true(type(detail) == "string" and detail:find("fixture missing assignability owner", 1, true) ~= nil)
+		end)
+
+		h.it("a decoder exception becomes a receipt and leaves the legacy file read-only", function()
+			local previous_json = package.loaded["json"]
+			package.loaded["json"] = { decode_lossless = function() error("fixture decoder exception") end }
+			local ok, context, detail = pcall(function()
+				return Engine.load_context(shared_root() .. "/modules/actions/modifier_chords.json",
+					dofile(shared_root() .. "/../macos/_generated/action_catalogue.lua"))
+			end)
+			package.loaded["json"] = previous_json
+			h.assert_true(ok, "decode errors must not escape the pre-boot seam")
+			h.assert_nil(context)
+			h.assert_true(type(detail) == "string" and detail:find("fixture decoder exception", 1, true) ~= nil)
+			local source = '[hotstrings.editor]\nshortcut = false\n'
+			with_config(source, function(path)
+				local result = Engine.boot({ path = path, driver = driver,
+					registry = assert(Engine.load_registry(shared_root() .. "/tests/corpus/config_migrations/op_move_chord_false/migrations.toml")),
+					context_error = detail, stamp = STAMP })
+				h.assert_eq(result.status, "failed")
+				h.assert_true(result.read_only)
+				h.assert_eq(read_bytes(path), source, "decoder failure cannot clean the legacy source")
+			end)
+		end)
+
+	end)
+end
+
 --- Registers the whole contract for one driver.
 --- @param h table Driver test helpers (describe, it, assert_*).
 --- @param opts table `{ driver = "hs" | "linux" }`.
@@ -545,6 +699,7 @@ function M.register(h, opts)
 	register_corpus(h, opts.driver)
 	register_registry(h, opts.driver)
 	register_copy_ownership(h, opts.driver)
+	register_chord_handoff(h, opts.driver)
 	register_boot(h, opts.driver)
 end
 

@@ -603,7 +603,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 		for _, segment in ipairs(segments) do
 			if segment:find(".", 1, true) then manifest_path = nil; break end
 		end
-		if defaults and manifest_path and not u.delete and defaults.has_default(manifest_path) then
+		local intent_ok, intentional = pcall(require("shortcuts.assignment").is_intentional, u)
+		if not intent_ok then return reject_row(index, tostring(intentional)) end
+		if defaults and manifest_path and not u.delete and not intentional and defaults.has_default(manifest_path) then
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
 		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete }

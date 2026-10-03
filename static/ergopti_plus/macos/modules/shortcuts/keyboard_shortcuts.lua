@@ -34,6 +34,9 @@ local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
+local MagicPolicy = require("shortcuts.magic_editor")
+local Assignment = require("shortcuts.assignment")
+local i18n = require("infra.i18n")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -58,6 +61,11 @@ local _lifecycle_paused = false
 local _lifecycle_epoch = 0
 local _start_attempt = nil
 local _native_acquisition_depth = 0
+local _explicit_actions = {}
+local _physical_assignments = {}
+local _magic_context = nil
+local _magic_owner = nil
+local _configuration_generation = 0
 
 local function invalidate_lifecycle()
 	_lifecycle_epoch = _lifecycle_epoch + 1
@@ -87,34 +95,15 @@ local MOD_SYMBOLS = {
 	alt        = "⌥",
 }
 
--- Slot prefix → canonical modifier list.
--- Stored as an ordered array (longest prefix first) so slot_to_chord()
--- and slot_label() use ipairs() and never mistake "cmd_shift_x" for "cmd_x"
--- due to non-deterministic pairs() iteration.
-local SLOT_MODS = {
-	{ "hs_ctrl_shift_",  {"ctrl", "shift"} },
-	{ "cmd_shift_",      {"cmd",  "shift"} },
-	{ "hs_ctrl_",        {"ctrl"} },
-	{ "hs_option_",      {"alt"} },
-	{ "cmd_",            {"cmd"} },
-}
-
--- Special key suffix → canonical key name. The registrar translates these to
--- whatever the OS calls them; "enter" is spelled "return" here because that is
--- the name the key has, not because Hammerspoon happens to want it.
-local SPECIAL_KEYS = {
-	space  = "space",
-	enter  = "return",
-	period = ".",
-	comma  = ",",
-}
+-- Resolved from the shared modifier catalogue after its first acknowledged read.
+local SLOT_MODS = nil
+local SPECIAL_KEYS = nil
 
 -- The groups the menu offers, in display order, each with the i18n keys for its
--- submenu title and its "add a binding" row. The prefixes are the SLOT_MODS
--- prefixes: a group whose prefix is not in SLOT_MODS would render rows that
--- resolve to no chord, which is why test_keyboard_slot_groups.lua ties the two
--- together rather than trusting them to stay in step.
+-- submenu title and its "add a binding" row. Physical groups use SLOT_MODS;
+-- the contextual group owns one logical slot whose numeric source is measured.
 M.SLOT_GROUPS = {
+	{ prefix = "contextual", fixed = true, group_key = "menu.shortcuts.group_contextual", add_key = "menu.shortcuts.add_contextual" },
 	{ prefix = "hs_option_",     group_key = "menu.shortcuts.alt_group",       add_key = "menu.shortcuts.alt_add" },
 	{ prefix = "hs_ctrl_",       group_key = "menu.shortcuts.ctrl_group",      add_key = "menu.shortcuts.ctrl_add" },
 	{ prefix = "hs_ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
@@ -173,9 +162,31 @@ local function catalogue_keys()
 			_catalogue = false
 			return nil
 		end
+		local platform = assert(decoded.platforms and decoded.platforms.macos,
+			"keyboard modifier catalogue lacks macOS metadata")
+		assert(type(platform.shortcut_groups) == "table" and type(platform.modifiers) == "table",
+			"keyboard modifier catalogue lacks ordinary shortcut groups")
+		local aliases, groups, keys = {}, {}, {}
+		for _, modifier in ipairs(platform.modifiers) do
+			aliases[modifier.id] = assert(modifier.hammerspoon, "native modifier alias unavailable")
+		end
+		for _, group in ipairs(platform.shortcut_groups) do
+			local mods = {}
+			for _, modifier in ipairs(group.modifiers) do
+				mods[#mods + 1] = assert(aliases[modifier], "ordinary modifier is not owned")
+			end
+			groups[#groups + 1] = { group.prefix, mods }
+		end
+		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
+		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded
 	end
 	return _catalogue.keys
+end
+
+local function slot_mods()
+	assert(catalogue_keys(), "keyboard modifier catalogue unavailable")
+	return SLOT_MODS
 end
 
 --- Reads the canonical source without migrating or consulting legacy storage.
@@ -193,8 +204,8 @@ end
 --- @return table index Set of canonical slot IDs.
 local function owned_slots()
 	local keys = assert(catalogue_keys(), "keyboard key catalogue unavailable")
-	local index = {}
-	for _, group in ipairs(SLOT_MODS) do
+	local index = { [MagicPolicy.SLOT_ID] = true }
+	for _, group in ipairs(slot_mods()) do
 		for _, key in ipairs(keys) do index[group[1] .. key.id] = true end
 	end
 	return index
@@ -226,14 +237,18 @@ local function walk_assignments(decoded, consume, candidate)
 end
 
 --- Loads a complete canonical candidate before replacing desired assignments.
-local function load_assignments(candidate)
+local function load_assignments(candidate, raw_claims)
 	local decoded = candidate
 	if decoded == nil then decoded = read_config() end
 	assert(type(decoded) == "table", "keyboard candidate must be a table")
 	local loaded = manifest_defaults()
+	local explicit = {}
+	local physical = {}
 	walk_assignments(decoded, function(slot, action)
+		physical[slot] = action
 		if type(action) == "string" and action_catalogue().is_assignable(action) then
 			loaded[slot] = action
+			explicit[slot] = action
 		else
 			assert(candidate == nil, "keyboard candidate contains an invalid action")
 			-- Outdated configuration: the slot keeps its manifest action, and
@@ -244,7 +259,17 @@ local function load_assignments(candidate)
 				detail or ("action '" .. tostring(action) .. "' no longer exists"), Logger)
 		end
 	end, candidate ~= nil)
-	_actions, _loaded = loaded, true
+	if raw_claims ~= nil then
+		assert(type(raw_claims) == "table", "keyboard raw claims must be a table")
+		local known = owned_slots()
+		for slot, claimed in pairs(raw_claims) do
+			assert(known[slot] and claimed == true, "keyboard raw claim is not owned")
+			if physical[slot] == nil then physical[slot] = false end
+		end
+	end
+	_actions, _explicit_actions, _loaded = loaded, explicit, true
+	_physical_assignments = physical
+	_configuration_generation = _configuration_generation + 1
 end
 
 local function ensure_loaded()
@@ -299,7 +324,7 @@ end
 --- @param slot_id string e.g. "cmd_a", "hs_ctrl_0", "hs_option_space".
 --- @return string|nil chord Canonical chord, e.g. "Cmd+A".
 local function slot_to_chord(slot_id)
-	for _, entry in ipairs(SLOT_MODS) do
+	for _, entry in ipairs(slot_mods()) do
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
@@ -314,7 +339,13 @@ end
 --- @param slot_id string
 --- @return string
 local function slot_label(slot_id)
-	for _, entry in ipairs(SLOT_MODS) do
+	if slot_id == MagicPolicy.SLOT_ID then
+		local label = i18n.get("menu.shortcuts.keyboard.magic_editor")
+		local reason = _magic_owner and _magic_owner.reason()
+		if reason then return label .. " (" .. i18n.get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
+		return label
+	end
+	for _, entry in ipairs(slot_mods()) do
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
@@ -327,6 +358,45 @@ local function slot_label(slot_id)
 		end
 	end
 	return slot_id
+end
+
+local function refresh_claims(assignments)
+	if _magic_context == nil then return true end
+	local rows = {}
+	for slot, action in pairs(assignments or _physical_assignments) do
+		if slot ~= MagicPolicy.SLOT_ID then
+			local chord = slot_to_chord(slot)
+			if chord then rows[#rows + 1] = {
+				chord = chord, action = action, binding_id = BINDING_PREFIX .. slot,
+			} end
+		end
+	end
+	return Registrar.replace_physical_claims(LOG, rows)
+end
+
+local function start_magic(action)
+	if _magic_context == nil then return true end
+	if _magic_owner == nil then _magic_owner = require("modules.shortcuts.magic_editor") end
+	local epoch = _lifecycle_epoch
+	local context = {}
+	for key, value in pairs(_magic_context) do context[key] = value end
+	context.assignment_unavailable = action == nil and _physical_assignments[MagicPolicy.SLOT_ID] ~= nil
+	return _magic_owner.start({
+		action = action,
+		configuration_generation = _configuration_generation,
+		context = context,
+		is_action = action_catalogue().is_assignable,
+		is_current = function()
+			return _lifecycle_epoch == epoch and _lifecycle_paused ~= true
+				and (_started and _delivery_enabled or _start_attempt ~= nil)
+		end,
+		execute = function(action_id, binding)
+			if _editing or _started ~= true or _delivery_enabled ~= true or _lifecycle_paused == true then return false end
+			local ok, handled = Logger.callback(LOG, "Conditional configurable shortcut",
+				action_catalogue().execute_single, action_id, binding)
+			return ok and handled == true
+		end,
+	})
 end
 
 
@@ -461,6 +531,18 @@ function M.get_assignments()
 	return _actions
 end
 
+--- Captures raw owned intent separately from resolved neutral defaults.
+--- Invalid raw choices retain a claim without becoming executable actions.
+--- @return table assignments Detached valid explicit actions.
+--- @return table claims Detached physical-presence identities.
+function M.get_configuration_intent()
+	ensure_loaded()
+	local assignments, claims = {}, {}
+	for slot, action in pairs(_explicit_actions) do assignments[slot] = action end
+	for slot in pairs(_physical_assignments) do claims[slot] = true end
+	return assignments, claims
+end
+
 --- Returns the current action id for a given slot.
 --- @param slot_id string
 --- @return string action_id or "none".
@@ -480,8 +562,9 @@ end
 --- @param slot_id string
 --- @return table|nil mods, string|nil key Nil when the slot has no known prefix.
 function M.get_slot_chord(slot_id)
+	if slot_id == MagicPolicy.SLOT_ID then return { "ctrl" }, nil end
 	if type(slot_id) ~= "string" then return nil, nil end
-	for _, entry in ipairs(SLOT_MODS) do
+	for _, entry in ipairs(slot_mods()) do
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
@@ -498,8 +581,11 @@ end
 --- @param prefix string One of M.SLOT_GROUPS' prefixes.
 --- @return table
 function M.available_slots(prefix)
+	if prefix == "contextual" then
+		return { { id = MagicPolicy.SLOT_ID, label = slot_label(MagicPolicy.SLOT_ID) } }
+	end
 	local known = false
-	for _, entry in ipairs(SLOT_MODS) do
+	for _, entry in ipairs(slot_mods()) do
 		if entry[1] == prefix then known = true; break end
 	end
 	if not known then
@@ -522,6 +608,10 @@ end
 --- @return table Array of { id, label, action } for assigned slots only.
 function M.assigned_slots(prefix)
 	ensure_loaded()
+	if prefix == "contextual" then
+		return { { id = MagicPolicy.SLOT_ID, label = slot_label(MagicPolicy.SLOT_ID),
+			action = _actions[MagicPolicy.SLOT_ID] or "none" } }
+	end
 	local out = {}
 	for _, slot in ipairs(M.available_slots(prefix)) do
 		local action = _actions[slot.id]
@@ -559,19 +649,40 @@ local function set_action(slot_id, action_id)
 	ensure_loaded()
 	local old_action = _actions[slot_id] or "none"
 	local _, source = read_config()
-	local rows = Preferences.prepare_shortcut_updates(source,
-		{ Manifest.sparse_operation(KEYBOARD_SECTION .. "." .. slot_id, action_id) }, { "keyboard" })
+	local operation = Assignment.operation(slot_id, action_id, function(id)
+		return owned_slots()[id] == true
+	end, action_catalogue().is_assignable)
+	local rows = Preferences.prepare_shortcut_updates(source, { operation }, { "keyboard" })
 
 	local native_transition = nil
-	if _started and old_action == "none" and action_id ~= "none" then
+	local conditional = slot_id == MagicPolicy.SLOT_ID
+	if _started and not conditional and old_action == "none" and action_id ~= "none" then
 		if bind_slot(slot_id, action_id) ~= true then return false end
 		native_transition = "enabled"
-	elseif _started and old_action ~= "none" and action_id == "none" then
+	elseif _started and not conditional and old_action ~= "none" and action_id == "none" then
 		if set_slot_enabled(slot_id, false) ~= true then return false end
 		native_transition = "disabled"
 	end
 
-	if Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
+	local candidate_explicit = operation.delete ~= true and action_id or nil
+	local previous_physical = _physical_assignments[slot_id]
+	_physical_assignments[slot_id] = candidate_explicit
+	_configuration_generation = _configuration_generation + 1
+	local candidate_magic = _explicit_actions[MagicPolicy.SLOT_ID]
+	if conditional then candidate_magic = candidate_explicit end
+	local function restore_conditional()
+		_physical_assignments[slot_id] = previous_physical
+		_configuration_generation = _configuration_generation + 1
+		refresh_claims()
+		if _started and start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) ~= true then
+			Logger.error(LOG, "Conditional shortcut publication rollback has native cleanup debt.")
+		end
+	end
+	local conditional_admitted = refresh_claims() == true
+		and (not _started or start_magic(candidate_magic) == true)
+	if not conditional_admitted
+		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
+		restore_conditional()
 		if native_transition == "enabled" then
 			if set_slot_enabled(slot_id, false) ~= true then
 				Logger.error(LOG,
@@ -589,6 +700,7 @@ local function set_action(slot_id, action_id)
 	end
 
 	_actions[slot_id] = action_id
+	_explicit_actions[slot_id] = candidate_explicit
 	Logger.debug(LOG, "Slot '%s' → '%s' persisted.", slot_id, action_id)
 
 	return true
@@ -609,12 +721,14 @@ end
 
 --- Stages exact native intent while the input owner is quiescent. No file is published.
 --- @param decoded table Complete candidate configuration.
+--- @param raw_claims table|nil Detached owned physical-presence snapshot.
 --- @return boolean committed
-function M.apply_configuration(decoded)
+function M.apply_configuration(decoded, raw_claims)
 	if type(decoded) ~= "table" or _editing or _started or _start_attempt ~= nil
 		or _native_acquisition_depth ~= 0 or next(_hotkeys) ~= nil then return false end
+	if _magic_owner and _magic_owner.stop() ~= true then return false end
 	_editing = true
-	local called, detail = xpcall(load_assignments, debug.traceback, decoded)
+	local called, detail = xpcall(load_assignments, debug.traceback, decoded, raw_claims)
 	_editing = false
 	if not called then Logger.error(LOG, "Keyboard candidate was refused: %s.", tostring(detail)) end
 	return called
@@ -626,10 +740,35 @@ function M.is_started()
 	return _started and _delivery_enabled
 end
 
+--- Supplies live editor-source gates without owning a second UI hotkey.
+--- @param context table Native trigger, physical replacement and lifecycle readers.
+--- @return boolean applied
+function M.configure_magic_editor(context)
+	if type(context) ~= "table" then return false end
+	for _, key in ipairs({ "trigger", "magic_source", "replace_active", "paused", "inhibited" }) do
+		if type(context[key]) ~= "function" then return false end
+	end
+	_magic_context = context
+	_configuration_generation = _configuration_generation + 1
+	if refresh_claims() ~= true then return false end
+	if _started then return start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) end
+	return true
+end
+
+--- Retargets the contextual owner after an acknowledged effective-source edit.
+--- A stopped category remains stopped; no setting or native owner is invented.
+--- @return boolean accepted
+function M.refresh_magic_editor()
+	if not _started or _magic_context == nil then return true end
+	_configuration_generation = _configuration_generation + 1
+	return start_magic(_explicit_actions[MagicPolicy.SLOT_ID])
+end
+
 --- Starts the keyboard shortcuts module and owns every configured binding.
 --- @param candidate table|nil Validated transaction source; nil reads the canonical file.
+--- @param raw_claims table|nil Detached owned physical-presence snapshot.
 --- @return boolean committed True only when every required slot was bound.
-function M.start(candidate)
+function M.start(candidate, raw_claims)
 	if candidate ~= nil and type(candidate) ~= "table" then return false end
 	if _editing then return false end
 	if _started and candidate ~= nil then return false end
@@ -651,7 +790,7 @@ function M.start(candidate)
 	_start_attempt = attempt
 	_delivery_enabled = false
 	Logger.start(LOG, "Starting keyboard shortcuts…")
-	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback, candidate)
+	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback, candidate, raw_claims)
 	if not assignments_ok then
 		Logger.error(LOG, "Keyboard shortcut assignments could not be loaded: %s.",
 			tostring(assignments_err))
@@ -662,8 +801,9 @@ function M.start(candidate)
 		M.stop()
 		return false
 	end
+	if refresh_claims() ~= true then M.stop(); return false end
 	for slot, action in pairs(_actions) do
-		if action ~= "none" and bind_slot(slot, action) ~= true then
+		if slot ~= MagicPolicy.SLOT_ID and action ~= "none" and bind_slot(slot, action) ~= true then
 			Logger.error(LOG, "Keyboard shortcuts startup rolled back after slot '%s'.", slot)
 			M.stop()
 			return false
@@ -675,6 +815,7 @@ function M.start(candidate)
 			return false
 		end
 	end
+	if start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) ~= true then M.stop(); return false end
 	if not start_is_current(attempt) then
 		M.stop()
 		return false
@@ -694,7 +835,8 @@ function M.stop()
 	_delivery_enabled = false
 	invalidate_lifecycle()
 	_start_attempt = nil
-	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 then
+	local conditional_settled = _magic_owner == nil or _magic_owner.stop() == true
+	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 and conditional_settled then
 		Logger.debug(LOG, "stop() called before start() — nothing to stop.")
 		return true
 	end
@@ -706,7 +848,7 @@ function M.stop()
 	for _, slot in ipairs(slots) do
 		if unbind_slot(slot) ~= true then settled = false end
 	end
-	if _native_acquisition_depth ~= 0 or not settled then
+	if _native_acquisition_depth ~= 0 or not settled or not conditional_settled then
 		Logger.error(LOG, "Keyboard shortcuts stop is incomplete and remains retryable.")
 		return false
 	end
@@ -724,10 +866,10 @@ function M.pause()
 end
 
 --- Releases the local PAUSE fence and starts one guarded replacement set.
-function M.resume_after_pause(candidate)
+function M.resume_after_pause(candidate, raw_claims)
 	_lifecycle_paused = false
 	invalidate_lifecycle()
-	return M.start(candidate)
+	return M.start(candidate, raw_claims)
 end
 
 --- Releases only the local PAUSE fence.  The aggregate Shortcuts owner calls

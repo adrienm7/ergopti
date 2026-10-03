@@ -72,8 +72,11 @@ local function wire(Source, state, end_selection)
 		end_selection = end_selection or function() calls.ended = calls.ended + 1 end,
 		is_active = function() return state.active end,
 		replace_on = function() return state.replace end,
-		magic_key = function() return "★" end,
-		can_type = function(text) return text == "★" and state.typable ~= false end,
+		magic_key = function() return state.magic or "★" end,
+		can_type = function(text) return text == (state.magic or "★") and state.typable ~= false end,
+		typing_plan = function() return state.plan end,
+		input_source_receipt = function() return state.origin or { generation = 1, ready = true } end,
+		direct_source_admitted = function(code) return state.blocked_code ~= code end,
 		type_text = function(text)
 			calls.typed[#calls.typed + 1] = text
 			return state.typed_ok
@@ -347,6 +350,118 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 			helpers.assert_eq(row.title, prefix .. "j   (KeyJ)")
 			helpers.assert_eq(row.menu[1].title, I18n.get("menu.layout.magic_key_source.capture"))
 			helpers.assert_type(row.menu[1].fn, "function", "a grabbing daemon captures a key")
+		end)
+	end)
+end)
+
+helpers.describe("magic key source: physical editor evidence", function()
+	local function with_native(state, body)
+		local previous = package.loaded["adapters.xkb_capture"]
+		package.loaded["adapters.xkb_capture"] = {
+			source_generation = function() return state.generation end,
+			direct_sources = function(codes)
+				state.probed = codes
+				return state.rows
+			end,
+		}
+		local ok, err = pcall(body)
+		package.loaded["adapters.xkb_capture"] = previous
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("(magic-editor-source) follows live native groups and magic characters without changing personal preferences", function()
+		with_source(nil, function(Source, Preferences)
+			local state = { active = true, replace = true, typed_ok = true, magic = "ù" }
+			wire(Source, state)
+			local native = { generation = 10, rows = {
+				{ code = 40, text = "ù", plain = true, direct = true, dead = false, mods = {} },
+				{ code = 39, text = ";", plain = true, direct = true, dead = false, mods = {} },
+			} }
+			with_native(native, function()
+				local first = Source.editor_source()
+				helpers.assert_eq(first.status, "ready")
+				helpers.assert_eq(#first.candidates, 2)
+				helpers.assert_eq(first.candidates[1].code, "Quote")
+				helpers.assert_eq(first.candidates[1].identity, "evdev:40")
+				helpers.assert_true(first.candidates[1].direct)
+				helpers.assert_eq(Source.editor_source().generation, first.generation, "unchanged native evidence has a stable epoch")
+				local preference = Preferences.generation()
+				state.magic = ";"
+				local changed = Source.editor_source()
+				helpers.assert_true(changed.generation > first.generation, "a live magic character retargets its conditional shortcut")
+				helpers.assert_eq(Preferences.generation(), preference, "retargeting writes no preference or personal chord")
+				helpers.assert_eq(Source.get(), "auto")
+				native.generation = 11
+				helpers.assert_true(Source.editor_source().generation > changed.generation, "group changes invalidate queued native deliveries")
+				first.candidates[1].text = "corrupted"
+				helpers.assert_eq(Source.editor_source().candidates[1].text, "ù", "receipts do not alias mutable native evidence")
+			end)
+		end)
+	end)
+
+	helpers.it("(magic-editor-source) qualifies a configured remap against the injector plan in the actual group", function()
+		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
+			local state = { active = true, replace = true, typed_ok = true, magic = "ù", plan = { keycode = 40, mods = {} } }
+			wire(Source, state)
+			local native = { generation = 20, rows = {
+				{ code = KEY_J, text = "j", plain = true, direct = true, dead = false, mods = {} },
+				{ code = 40, text = "ù", plain = true, direct = true, dead = false, mods = {} },
+			} }
+			with_native(native, function()
+				local first = Source.editor_source()
+				helpers.assert_eq(#first.candidates, 1, "a proven chosen replacement owns its physical source despite another native magic glyph")
+				helpers.assert_eq(first.candidates[1].text, "ù", "the plain configured key types the actual live magic character")
+				helpers.assert_eq(first.candidates[1].native_text, "j", "ordinary personal Super+J retains its physical claim")
+				helpers.assert_eq(first.candidates[1].native_code, KEY_J)
+				state.replace = false
+				helpers.assert_eq(#Source.editor_source().candidates, 2, "an ineffective source setting falls back to every native candidate")
+				state.replace, state.active = true, false
+				helpers.assert_eq(#Source.editor_source().candidates, 2, "a paused replacement owner cannot claim its configured source")
+				state.active = true
+				native.rows[2].text, native.generation = "'", 21
+				local switched = Source.editor_source()
+				helpers.assert_eq(switched.candidates[1].text, "j", "a stale injection plan cannot prove a remap in another group")
+				helpers.assert_true(switched.generation > first.generation)
+			end)
+		end)
+	end)
+
+	helpers.it("(magic-editor-source) preserves duplicate, dead and higher-level evidence and refuses tap-hold ownership", function()
+		with_source(nil, function(Source)
+			local state = { active = true, replace = true, typed_ok = true, blocked_code = KEY_J }
+			wire(Source, state)
+			with_native({ generation = 30, rows = {
+				{ code = KEY_J, text = "★", plain = true, direct = true, dead = false, mods = {} },
+				{ code = KEY_C, text = "★", plain = true, direct = true, dead = false, mods = {} },
+				{ code = 26, text = "^", plain = true, direct = false, dead = true, mods = {} },
+				{ code = 40, text = "★", plain = false, direct = false, dead = false, mods = { "altgr" } },
+			} }, function()
+				local evidence = Source.editor_source()
+				helpers.assert_eq(#evidence.candidates, 4, "the native owner must never reduce evidence through first-match inversion")
+				helpers.assert_eq(evidence.candidates[1].direct, false, "an admitted native glyph does not bypass a tap-hold owner")
+				helpers.assert_true(evidence.candidates[2].direct)
+				helpers.assert_true(evidence.candidates[3].dead)
+				helpers.assert_eq(evidence.candidates[4].direct, false)
+				state.blocked_code = nil
+				helpers.assert_true(Source.editor_source().generation > evidence.generation, "runtime tap admission changes cancel old deliveries")
+				state.origin = { generation = 2, ready = false }
+				local unqualified = Source.editor_source()
+				helpers.assert_eq(unqualified.status, "unavailable", "pinned upstream/unknown origins cannot qualify a physical recommendation")
+				helpers.assert_eq(unqualified.reason, "physical-origin-unqualified")
+				helpers.assert_true(unqualified.generation > evidence.generation)
+			end)
+		end)
+	end)
+
+	helpers.it("(magic-editor-source) never invents a fallback physical C when native proof is unavailable", function()
+		with_source(nil, function(Source)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			with_native({ generation = nil, rows = nil }, function()
+				local evidence = Source.editor_source()
+				helpers.assert_eq(evidence.status, "unavailable")
+				helpers.assert_eq(evidence.candidates, {})
+				helpers.assert_nil(Source.evdev_code(), "automatic source remains automatic on every layout")
+			end)
 		end)
 	end)
 end)

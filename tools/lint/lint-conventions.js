@@ -669,7 +669,9 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
-	join(REPO_ROOT, 'static/ergopti_plus/windows/ui')
+	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	// Portable AHK policy is audited with its native consumers.
+	join(REPO_ROOT, 'static/ergopti_plus/_shared/modules')
 ];
 const ahkTestDirs = [join(REPO_ROOT, 'static/ergopti_plus/windows/tests')];
 const ahkAll = [

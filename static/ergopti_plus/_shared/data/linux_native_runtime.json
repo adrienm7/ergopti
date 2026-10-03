@@ -1,0 +1,101 @@
+{
+	"version": 1,
+	"description": "Native runtime libraries used by LuaJIT FFI; build headers and Xvfb are validation-only dependencies.",
+	"libraries": {
+		"xkbcommon": {
+			"soname": "libxkbcommon.so.0",
+			"packages": {
+				"apt": "libxkbcommon0",
+				"dnf": "libxkbcommon",
+				"zypper": "libxkbcommon0",
+				"pacman": "libxkbcommon",
+				"xbps": "libxkbcommon",
+				"apk": "libxkbcommon"
+			},
+			"nix_package": "libxkbcommon"
+		},
+		"xkbcommon_x11": {
+			"soname": "libxkbcommon-x11.so.0",
+			"packages": {
+				"apt": "libxkbcommon-x11-0",
+				"dnf": "libxkbcommon-x11",
+				"zypper": "libxkbcommon-x11-0",
+				"pacman": "libxkbcommon-x11",
+				"xbps": "libxkbcommon-x11",
+				"apk": "libxkbcommon-x11"
+			},
+			"nix_package": "libxkbcommon"
+		},
+		"x11": {
+			"soname": "libX11.so.6",
+			"packages": {
+				"apt": "libx11-6",
+				"dnf": "libX11",
+				"zypper": "libX11-6",
+				"pacman": "libx11",
+				"xbps": "libX11",
+				"apk": "libx11"
+			},
+			"nix_package": "xorg.libX11"
+		},
+		"x11_xcb": {
+			"soname": "libX11-xcb.so.1",
+			"packages": {
+				"apt": "libx11-xcb1",
+				"dnf": "libX11-xcb",
+				"zypper": "libX11-xcb1",
+				"pacman": "libx11",
+				"xbps": "libX11",
+				"apk": "libx11"
+			},
+			"nix_package": "xorg.libX11"
+		}
+	},
+	"package_requirements": {
+		"deb": [
+			"luajit (>= 2.1)",
+			"xclip",
+			"libnotify-bin",
+			"curl",
+			"libxkbcommon0",
+			"libxkbcommon-tools",
+			"at-spi2-core",
+			"pkexec",
+			"kmod",
+			"udev",
+			"libayatana-appindicator3-1",
+			"zenity",
+			"login",
+			"passwd",
+			"util-linux",
+			"lua-lgi",
+			"gir1.2-webkit2-4.1"
+		],
+		"rpm": [
+			"luajit >= 2.1",
+			"xclip",
+			"libnotify",
+			"curl",
+			"libxkbcommon",
+			"libxkbcommon-utils",
+			"at-spi2-core",
+			"polkit",
+			"kmod",
+			"systemd-udev",
+			"libayatana-appindicator-gtk3",
+			"zenity",
+			"shadow-utils",
+			"util-linux"
+		],
+		"arch": ["luajit", "xclip", "libnotify", "curl", "libxkbcommon", "at-spi2-core"],
+		"nix_library_path": ["libayatana-appindicator", "gtk3", "glib", "libxkbcommon", "at-spi2-core"]
+	},
+	"package_sources": {
+		"apt": "https://packages.debian.org/stable/libxkbcommon-x11-0",
+		"dnf": "https://src.fedoraproject.org/rpms/libxkbcommon/blob/rawhide/f/libxkbcommon.spec",
+		"zypper": "https://src.opensuse.org/rpm/libxkbcommon/src/branch/factory/libxkbcommon.spec",
+		"pacman": "https://gitlab.archlinux.org/archlinux/packaging/packages/libxkbcommon/-/blob/main/PKGBUILD",
+		"xbps": "https://github.com/void-linux/void-packages/blob/master/srcpkgs/libxkbcommon/template",
+		"apk": "https://github.com/alpinelinux/aports/blob/master/main/libxkbcommon/APKBUILD"
+	}
+}

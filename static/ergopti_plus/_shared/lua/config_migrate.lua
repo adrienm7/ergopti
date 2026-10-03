@@ -74,6 +74,7 @@ local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops
 local OPS = {
 	rename        = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
 	copy_if_absent = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
+	move_chord_action = { required = { "section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform" }, optional = {} },
 	move_section  = { required = { "section", "to_section" }, optional = {} },
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
@@ -203,13 +204,20 @@ local function validate_op(op)
 			return false, "'" .. field .. "' must be a dotted path of bare segments"
 		end
 	end
-	for _, field in ipairs({ "key", "to_key" }) do
+	for _, field in ipairs({ "key", "to_key", "conditional_key" }) do
 		if op[field] ~= nil and not is_bare_key(op[field]) then
 			return false, "'" .. field .. "' must be one bare segment"
 		end
 	end
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
+	end
+	if op.op == "move_chord_action" then
+		if op.platform ~= "macos" then return false, "move_chord_action requires platform macos" end
+		for _, field in ipairs({ "action", "disabled_action" }) do
+			if not is_bare_key(op[field]) then return false, "'" .. field .. "' must be an action id" end
+		end
+		if op.section == op.to_section then return false, "move_chord_action must change section" end
 	end
 	if op.op == "map_value" then
 		if not is_array(op.map) or #op.map == 0 then return false, "map_value needs a non-empty map" end
@@ -352,18 +360,21 @@ function M.model_from_source(source)
 	if not decoded_ok or type(decoded) ~= "table" then return nil, "the file is not valid TOML" end
 	local scan, scan_err = Records.scan_records(source)
 	if not scan then return nil, scan_err end
-	local sections = {}
+	local sections, opaque_sections = {}, {}
 	for _, header in ipairs(scan.headers) do
 		if header.section and not header.array and sections[header.section] == nil then
 			sections[header.section] = {}
 		end
+		if header.array and header.segments then opaque_sections[table.concat(header.segments, ".")] = true end
 	end
 	for _, record in ipairs(scan.records) do
 		if record.addressable then
 			sections[record.section][record.key] = { value = value_at(decoded, record.path), record = record }
+		elseif record.header and record.header.segments then
+			opaque_sections[table.concat(record.header.segments, ".")] = true
 		end
 	end
-	return { sections = sections }, scan
+	return { sections = sections, opaque_sections = opaque_sections }, scan
 end
 
 --- A copy of the model sharing its entry objects.
@@ -374,7 +385,7 @@ local function clone_model(model)
 		for key, entry in pairs(entries) do copy[key] = entry end
 		sections[name] = copy
 	end
-	return { sections = sections }
+	return { sections = sections, opaque_sections = model.opaque_sections }
 end
 
 --- `{ [section] = { [key] = value } }` without sections holding no key: an
@@ -468,6 +479,80 @@ function APPLY.copy_if_absent(sections, op)
 	target[to_key] = { value = LeafRows.clone_value(entry.value), record = entry.record }
 end
 
+--- Resolve physical aliases exclusively through the injected canonical catalogue.
+local function chord_action_slot(value, catalogue, platform_name)
+	if type(value) ~= "table" or type(value.key) ~= "string" or not is_array(value.mods) then return nil end
+	for field in pairs(value) do if field ~= "mods" and field ~= "key" then return nil end end
+	local platform = catalogue.platforms[platform_name]
+	local aliases, wanted = {}, {}
+	for _, modifier in ipairs(platform.modifiers) do
+		aliases[modifier.id] = modifier.id
+		aliases[modifier.hammerspoon] = modifier.id
+	end
+	for _, modifier in ipairs(value.mods) do
+		if type(modifier) ~= "string" then return nil end
+		local id = aliases[modifier:lower()]
+		if id == nil or wanted[id] then return nil end
+		wanted[id] = true
+	end
+	local key_id
+	for _, key in ipairs(catalogue.keys) do
+		local candidate = value.key:lower()
+		if candidate == key.id or candidate == (key.chord_key or key.id)
+			or candidate == (key.macos_key or key.id) then key_id = key.id; break end
+	end
+	if key_id == nil then return nil end
+	for _, group in ipairs(platform.shortcut_groups) do
+		local matched = #group.modifiers == #value.mods
+		for _, modifier in ipairs(group.modifiers) do if not wanted[modifier] then matched = false end end
+		if matched then return group.prefix .. key_id end
+	end
+	return nil
+end
+
+--- Every destination must already be a recognized action or have a free namespace.
+--- Resolve all choices before writing any of them, so unsupported values retain
+--- their source record and its native owner unchanged.
+function APPLY.move_chord_action(sections, op, context, model)
+	local source = sections[op.section]
+	local child_path = op.section .. "." .. op.key
+	local child = sections[child_path]
+	local value, child_source
+	if source and source[op.key] then value = source[op.key].value
+	elseif child then
+		if #sections_at_or_below(sections, child_path) ~= 1 then return end
+		for path in pairs(model and model.opaque_sections or {}) do
+			if path == child_path or path:sub(1, #child_path + 1) == child_path .. "." then return end
+		end
+		value, child_source = {}, true
+		for key, entry in pairs(child) do value[key] = entry.value end
+	else return end
+	local catalogue = context and context.modifier_chords
+	local actions = context and context.assignable_actions
+	local platform = catalogue and catalogue.platforms and catalogue.platforms[op.platform]
+	if type(catalogue) ~= "table" or type(catalogue.keys) ~= "table" or type(platform) ~= "table"
+		or type(platform.modifiers) ~= "table" or type(platform.shortcut_groups) ~= "table"
+		or type(actions) ~= "table" then error("config_migrate: missing chord action context", 2) end
+	if actions[op.action] ~= true or actions[op.disabled_action] ~= true then
+		error("config_migrate: migration action is absent from the action catalogue", 2)
+	end
+	local slot = value ~= false and chord_action_slot(value, catalogue, op.platform) or nil
+	if value ~= false and slot == nil then return end
+	if slot == op.conditional_key then return end
+	local target = sections[op.to_section]
+	local function represented(key)
+		local entry = target and target[key]
+		if entry ~= nil then return type(entry.value) == "string" and actions[entry.value] == true end
+		return copy_destination_absent(sections, op.to_section, key)
+	end
+	if not represented(op.conditional_key) or (slot and not represented(slot)) then return end
+	if target == nil then target = {}; sections[op.to_section] = target end
+	if slot and target[slot] == nil then target[slot] = { value = op.action } end
+	if target[op.conditional_key] == nil then target[op.conditional_key] = { value = op.disabled_action } end
+	if child_source then sections[child_path] = nil
+	else source[op.key] = nil; drop_if_empty(sections, op.section) end
+end
+
 function APPLY.move_section(sections, op)
 	for _, name in ipairs(sections_at_or_below(sections, op.section)) do
 		local target = op.to_section .. name:sub(#op.section + 1)
@@ -540,11 +625,11 @@ end
 --- @param driver string "ahk" | "hs" | "linux"
 --- @param from_version number
 --- @return table model
-function M.apply_steps(model, registry, driver, from_version)
+function M.apply_steps(model, registry, driver, from_version, context)
 	if not M.DRIVERS[driver] then error("config_migrate: unknown driver '" .. tostring(driver) .. "'", 2) end
 	for _, step in ipairs(registry.steps) do
 		if step.from >= from_version and step.drivers[driver] then
-			for _, op in ipairs(step.ops) do APPLY[op.op](model.sections, op) end
+			for _, op in ipairs(step.ops) do APPLY[op.op](model.sections, op, context, model) end
 		end
 	end
 	if model.sections[M.META_SECTION] == nil then model.sections[M.META_SECTION] = {} end
@@ -692,12 +777,12 @@ end
 --- @param driver string "ahk" | "hs" | "linux"
 --- @return table plan `{ outcome, version, candidate?, detail? }`; outcome is
 ---   "current", "migrated", "newer", "invalid", "unsupported" or "failed".
-function M.plan(source, registry, driver)
+function M.plan(source, registry, driver, context)
 	local before, scan = M.model_from_source(source)
 	if not before then return { outcome = "failed", detail = scan } end
 	local outcome, version = M.classify(before, registry)
 	if outcome ~= "migrate" then return { outcome = outcome, version = version } end
-	local after = M.apply_steps(clone_model(before), registry, driver, version)
+	local after = M.apply_steps(clone_model(before), registry, driver, version, context)
 	local candidate, render_err = render(source, scan, before, after)
 	if not candidate then return { outcome = "failed", version = version, detail = render_err } end
 	local reread = M.model_from_source(candidate)
@@ -706,6 +791,30 @@ function M.plan(source, registry, driver)
 			detail = "the rewritten file would not read back as the migrated configuration" }
 	end
 	return { outcome = "migrated", version = version, candidate = candidate, model = after }
+end
+
+--- Load migration identities explicitly before config-dependent native modules.
+--- Missing data is reported to boot's existing read-only refusal owner.
+function M.load_context(path, action_catalogue, file_adapter)
+	local acquired, context, detail = pcall(function()
+		if type(path) ~= "string" or path == "" then return nil, "no modifier catalogue path" end
+		local ok, content, status = pcall(TomlWriter.read_classified, path, file_adapter)
+		if not ok or status ~= "ok" or type(content) ~= "string" then
+			return nil, "the modifier catalogue could not be read"
+		end
+		local decoded, detail = require("json").decode_lossless(content)
+		local platform = type(decoded) == "table" and type(decoded.platforms) == "table" and decoded.platforms.macos
+		if detail ~= nil or type(decoded) ~= "table" or type(decoded.keys) ~= "table"
+			or type(platform) ~= "table" or type(platform.modifiers) ~= "table"
+			or type(platform.shortcut_groups) ~= "table" then
+			return nil, "the modifier catalogue is invalid"
+		end
+		local built, actions = pcall(require("actions.assignable").build, action_catalogue, decoded, "macos")
+		if not built then return nil, "the action catalogue is invalid: " .. tostring(actions) end
+		return { modifier_chords = decoded, assignable_actions = actions }
+	end)
+	if not acquired then return nil, "migration context acquisition raised: " .. tostring(context) end
+	return context, detail
 end
 
 
@@ -774,6 +883,7 @@ function M.run(opts)
 	local registry, registry_err = opts.registry, nil
 	if registry == nil then registry, registry_err = M.load_registry(opts.registry_path, opts.file_adapter) end
 	if not registry then return refuse("failed", registry_err) end
+	if opts.context_error ~= nil then return refuse("failed", opts.context_error) end
 	result.to = registry.current
 
 	-- The file is writable this session: whatever creates it again stamps it.
@@ -796,7 +906,7 @@ function M.run(opts)
 		return refuse("failed", "the file could not be read (" .. tostring(detail or status) .. ")")
 	end
 
-	local plan = M.plan(source, registry, opts.driver)
+	local plan = M.plan(source, registry, opts.driver, opts.context)
 	result.from = plan.version
 	if plan.outcome == "current" then
 		log.success(LOG, "'%s' is at schema v%s; nothing to migrate.", path, version_text(registry.current))

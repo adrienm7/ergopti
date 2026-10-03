@@ -501,7 +501,8 @@ _KLE_PendingDeadKeyCriterion(*) {
  * @returns {Integer} Number of hotkeys registered.
  * @throws {Error} On a second registration.
  */
-KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0) {
+KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
+		BrokerFn := MagicEditorRecordLayoutFallback) {
 	global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
 	global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
 	if KLE_Registered
@@ -525,7 +526,10 @@ KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, 
 			HotIfFn.Call(_KLE_ShortcutCriterion)
 			for Prefix in KLE_SHORTCUT_PREFIXES {
 				Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
-				HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
+				if Prefix == "#"
+					BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), _KLE_ShortcutCriterion)
+				else
+					HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
 				Count += 1
 			}
 		}

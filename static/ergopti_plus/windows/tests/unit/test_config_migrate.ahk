@@ -74,6 +74,42 @@ _CMG_Cases() {
 	return Cases
 }
 
+; Real macOS binding identities from the authoritative action registry and
+; actual modifier matrix, not an expected fixture allowlist.
+_CMG_MigrationContext() {
+	global _SharedDir
+	Catalogue := JsonParse(_CMG_Read(_SharedDir . "\modules\actions\modifier_chords.json"))
+	Registry := _CMG_Parse(_SharedDir . "\modules\actions\actions.toml")
+	Actions := Map()
+	Actions.CaseSense := "On"
+	for Family in ["sg", "ax"] {
+		for Id in Registry[Family . "_order"]["items"] {
+			Section := Family . "_actions." . Id
+			if !Registry.Has(Section)
+				continue
+			Row := Registry[Section]
+			if Row.Has("is_header") && (Row["is_header"] is TOML_Bool) && Row["is_header"].Value
+				continue
+			Claimed := StrSplit(Row["platform"], ",")
+			for Platform in Claimed {
+				if Trim(Platform) == "all" || Trim(Platform) == "hs"
+					Actions[Id] := true
+			}
+		}
+	}
+	Modifiers := Catalogue["platforms"]["macos"]["modifiers"]
+	Loop (2 ** Modifiers.Length) - 1 {
+		Mask := A_Index, Prefix := ""
+		for Index, Modifier in Modifiers {
+			if Mod(Floor(Mask / (2 ** (Index - 1))), 2) == 1
+				Prefix .= (Prefix == "" ? "" : "_") . Modifier["id"]
+		}
+		for Key in Catalogue["keys"]
+			Actions[Prefix . "_" . Key["id"]] := true
+	}
+	return Map("modifier_chords", Catalogue, "assignable_actions", Actions)
+}
+
 _CMG_RingText() {
 	Text := ""
 	for _, Line in LoggerRingBufferSnapshot()
@@ -101,7 +137,7 @@ _CMG_CorpusPlansMatchExpected() {
 		Replayed += 1
 		Name := CaseInfo["name"]
 		Registry := CaseInfo["registry"]
-		Plan := ConfigMigratePlan(_CMG_Read(CaseInfo["input"]), Registry, "ahk")
+		Plan := ConfigMigratePlan(_CMG_Read(CaseInfo["input"]), Registry, "ahk", _CMG_MigrationContext())
 		AssertEqual(Spec["outcome"], Plan["outcome"], Name . ": outcome (" . Plan["detail"] . ")")
 		if (Spec["outcome"] != "migrated") {
 			AssertFalse(Plan.Has("candidate"), Name . ": a refused or current file has no candidate")
@@ -109,13 +145,19 @@ _CMG_CorpusPlansMatchExpected() {
 		}
 		AssertEqual(Spec["from_version"], Plan["version"], Name . ": the version the migration starts from")
 		AssertEqual(Spec["to_version"], Registry["current"], Name . ": the version it reaches")
+		if Spec.Has("preserve_source") && Spec["preserve_source"].Value {
+			Input := _CMG_Read(CaseInfo["input"])
+			WithoutStamp := RegExReplace(Plan["candidate"], "\[_meta\]\nschema_version = 2\n\n", "", &Removed, 1)
+			AssertEqual(1, Removed, Name . ": only the stamp is added")
+			AssertEqual(Input, WithoutStamp, Name . ": every unsupported source and destination byte survives")
+		}
 		Migrated := _ConfigMigrateParse(Plan["candidate"], Name . " candidate")
 		Expected := _CMG_Parse(CaseInfo["expected"])
 		Assert(ConfigMigrateSameModel(Migrated, Expected), Name
 			. ": the migrated file must read as expected.toml - got " . _CMG_ModelText(Migrated)
 			. " expected " . _CMG_ModelText(Expected))
 		Replay := ConfigMigrateApplySteps(_ConfigMigrateClone(Migrated), Registry, "ahk",
-			Spec["from_version"])
+			Spec["from_version"], _CMG_MigrationContext())
 		Assert(ConfigMigrateSameModel(Replay, Migrated),
 			Name . ": replaying the steps on their own output must change nothing")
 	}
@@ -180,6 +222,43 @@ _CMG_CopyPreservesInlineAncestor() {
 }
 Test("config migrate: conditional copies preserve occupied inline namespaces (config-migrate-copy-namespace)", _CMG_CopyPreservesInlineAncestor)
 
+_CMG_ChordPreservesInlineAncestor() {
+	Dir := _CMG_CorpusDir() . "\op_move_chord_scalar_ancestor"
+	Input := _CMG_Read(Dir . "\inline_ancestor.toml")
+	Plan := ConfigMigratePlan(Input, ConfigMigrateLoadRegistry(Dir . "\migrations.toml"), "ahk", _CMG_MigrationContext())
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	WithoutStamp := RegExReplace(Plan["candidate"], "\[_meta\]\nschema_version = 2\n\n", "", &Removed, 1)
+	AssertEqual(1, Removed)
+	AssertEqual(Input, WithoutStamp, "both complete inline records and comments remain byte exact")
+}
+Test("config migrate: chord handoffs preserve inline ancestor ownership (config-migrate-chord-namespace)", _CMG_ChordPreservesInlineAncestor)
+
+_CMG_ChordContextOwnsKnownActions() {
+	Context := _CMG_MigrationContext(), Actions := Context["assignable_actions"]
+	AssertTrue(Actions.Has("none"), "NONE comes from the real action catalogue")
+	AssertTrue(Actions.Has("open_hotstrings_editor"), "the editor comes from the real action catalogue")
+	AssertTrue(Actions.Has("cmd_ctrl_option_shift_comma"), "the actual modifier matrix is complete")
+	AssertFalse(Actions.Has("future_action"), "unknown strings do not become recognized choices")
+	AssertFalse(Actions.Has("alt_d"), "native aliases are not persisted action identities")
+	AssertFalse(Actions.Has("_modifier_chords_placeholder"), "picker metadata is not an action")
+}
+Test("config migrate: chord context uses actual offered actions (config-migrate-chord-context)", _CMG_ChordContextOwnsKnownActions)
+
+_CMG_ChordRequiresContext() {
+	Dir := _CMG_CorpusDir() . "\op_move_chord_false"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	Raised := false
+	try ConfigMigratePlan(Input, Registry, "ahk")
+	catch as Err {
+		Raised := true
+		AssertContains(Err.Message, "missing chord action context")
+	}
+	AssertTrue(Raised, "no legacy cleanup can be authorized without actual catalogue context")
+	AssertEqual(Input, _CMG_Read(Dir . "\input.toml"), "the entire legacy source remains unchanged")
+}
+Test("config migrate: absent chord context refuses legacy cleanup (config-migrate-chord-context)", _CMG_ChordRequiresContext)
+
 _CMG_StampOnlyPreservesExactRecords() {
 	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
 	Input := _CMG_Read(Dir . "\input.toml")
@@ -222,7 +301,7 @@ _CMG_CorpusBootTransactions() {
 			Path := Dir . "\config.toml"
 			Input := _CMG_Read(CaseInfo["input"])
 			AssertTrue(FSWriteDurable(Path, Input), Name . ": the fixture config must be written")
-			Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP)
+			Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, 0, 0, _CMG_MigrationContext())
 			AssertEqual(Spec["outcome"], Result["status"], Name . ": boot status (" . Result["detail"] . ")")
 			Backup := ConfigMigrateBackupPath(Path, Registry["current"], _CMG_STAMP)
 			if (Spec["outcome"] == "migrated") {
@@ -232,7 +311,7 @@ _CMG_CorpusBootTransactions() {
 				Assert(ConfigMigrateSameModel(_CMG_Parse(Path), _CMG_Parse(CaseInfo["expected"])),
 					Name . ": the published file reads as expected.toml")
 				Published := _CMG_Read(Path)
-				Again := ConfigMigrateRun(Path, Registry, "20990101-000001")
+				Again := ConfigMigrateRun(Path, Registry, "20990101-000001", 0, 0, _CMG_MigrationContext())
 				AssertEqual("current", Again["status"], Name . ": a second boot finds the file current")
 				Assert(FSUtf8ExactMatches(Path, Published), Name . ": a current file is not rewritten")
 				AssertFalse(FileExist(ConfigMigrateBackupPath(Path, Registry["current"], "20990101-000001")),

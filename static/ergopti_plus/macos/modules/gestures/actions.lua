@@ -2494,7 +2494,8 @@ local function register_modifier_chords(catalogue)
 	end
 end
 
-register_modifier_chords(load_modifier_chords(_modifier_chords_json))
+local ModifierChordCatalogue = load_modifier_chords(_modifier_chords_json)
+register_modifier_chords(ModifierChordCatalogue)
 
 --- The translated text of one picker heading. Older header values carry a
 --- leading "#" from when the level was spelled inside the text; the level now
@@ -2543,14 +2544,7 @@ end
 --- Every id a binding may name: the listed single actions (modifier chords
 --- included), the axis actions and "none". Built once — the catalogue and the
 --- chord matrix are fixed for the life of the process.
-local ASSIGNABLE = { none = true }
-for _, item in ipairs(Catalogue.sg_items) do
-	if item.kind == "action" then ASSIGNABLE[item.id] = true end
-end
-for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-	for _, action_id in ipairs(group.actions) do ASSIGNABLE[action_id] = true end
-end
-for _, name in ipairs(Catalogue.ax_items) do ASSIGNABLE[name] = true end
+local ASSIGNABLE = require("actions.assignable").build(Catalogue, ModifierChordCatalogue, "macos")
 
 --- True when `name` is an action the catalogue offers on macOS. Bindings are
 --- validated against this, as Windows validates against its registry, so an id

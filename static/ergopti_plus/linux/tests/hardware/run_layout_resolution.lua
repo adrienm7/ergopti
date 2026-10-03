@@ -130,9 +130,9 @@ end
 --- test a keymap no session ever uses.
 --- @param layout string An XKB layout id, e.g. "fr".
 --- @return string|nil
-local function compile(layout)
+local function compile(layout, options)
 	local pipe = io.popen(string.format(
-		"xkbcli compile-keymap --layout %s 2>/dev/null", layout), "r")
+		"xkbcli compile-keymap --layout %s%s 2>/dev/null", layout, options and (" --options " .. options) or ""), "r")
 	if not pipe then return nil end
 	local text = pipe:read("*a")
 	pipe:close()
@@ -238,6 +238,77 @@ for _, spec in ipairs(LAYOUTS) do
 	end
 end
 
+-- These qualify the real FFI detached probes, native group actions and Compose.
+-- Desktop synchronization is independently qualified by run_xkb_source_qualification.lua.
+print("--- detached physical source probes in a reconstructed native XKB state ---")
+do
+	local Capture = require("adapters.xkb_capture")
+	local function plain(rows, code)
+		for _, row in ipairs(rows or {}) do
+			if row.code == code and row.plain then return row end
+		end
+	end
+	local multi = compile("us,fr", "grp:win_space_toggle")
+	if multi and load_through_driver(multi) then
+		local before = Capture._capture_source_generation_for_test()
+		local us = Capture._capture_direct_sources_for_test({ 30, 40, 26 })
+		check(plain(us, 30) and plain(us, 30).text == "a", "the actual initial US group proves physical A")
+		Capture.process(125, 1)
+		Capture.process(57, 1)
+		Capture.process(57, 0)
+		Capture.process(125, 0)
+		local switched = Capture._capture_source_generation_for_test()
+		local fr = Capture._capture_direct_sources_for_test({ 30, 40, 26 })
+		check(switched and before and switched > before, "a real Super+Space group action changes the source epoch")
+		check(plain(fr, 30) and plain(fr, 30).text == "q", "the detached probe follows the actual French group")
+		check(plain(fr, 40) and plain(fr, 40).text == "ù" and plain(fr, 40).direct,
+			"French ù is admitted on its actual bare physical key")
+		check(plain(fr, 26) and plain(fr, 26).dead and not plain(fr, 26).direct,
+			"French dead circumflex is proved dead by its native keysym")
+		Capture.process(42, 1)
+		local held = Capture.peek_text(30)
+		local neutral = Capture._capture_direct_sources_for_test({ 30 })
+		check(held == "Q" and plain(neutral, 30) and plain(neutral, 30).text == "q",
+			"held Shift cannot turn direct-source evidence into uppercase or a higher-level trigger")
+		check(Capture.peek_text(30) == held and Capture._capture_source_generation_for_test() == switched,
+			"probing leaves held modifiers and the source epoch untouched")
+		Capture.process(42, 0)
+		Capture.process(58, 1)
+		Capture.process(58, 0)
+		neutral = Capture._capture_direct_sources_for_test({ 30 })
+		check(Capture.caps_locked() and plain(neutral, 30) and plain(neutral, 30).text == "q",
+			"a detached plain probe discards CapsLock without changing the live lock")
+		Capture.process(58, 1)
+		Capture.process(58, 0)
+		Capture.process(26, 1)
+		Capture.process(26, 0)
+		Capture._capture_direct_sources_for_test({ 18, 26 })
+		check(Capture.process(18, 1) == "ê", "source probing never consumes a pending real Compose sequence")
+		Capture.process(18, 0)
+		Capture.process(125, 1)
+		Capture.process(57, 1)
+		Capture.process(57, 0)
+		Capture.process(125, 0)
+		check(Capture._capture_source_generation_for_test() > switched and plain(Capture._capture_direct_sources_for_test({ 30 }), 30).text == "a",
+			"switching back creates a new epoch instead of reviving a stale US receipt")
+	else
+		check(false, "a real multi-group native keymap must load")
+	end
+
+	local us = compile("us")
+	if us then
+		-- An independent native customization gives two physical keys the same
+		-- bare glyph. Both must survive: conditional policy refuses ambiguity.
+		local duplicate, count = us:gsub("(%[%s*)s(%s*,%s*)S(%s*%])", "%1semicolon%2colon%3", 1)
+		check(count == 1 and load_through_driver(duplicate), "the native compiler output admits an independent duplicate glyph fixture")
+		if count == 1 then
+			local rows = Capture._capture_direct_sources_for_test({ 31, 39 })
+			check(plain(rows, 31) and plain(rows, 39) and plain(rows, 31).text == ";" and plain(rows, 39).text == ";",
+				"native enumeration preserves both direct semicolon sources instead of first-match inversion")
+		end
+	end
+end
+
 -- The Ergopti layout itself, compiled from the files this repository ships.
 -- Its ERGOPTI_SEVEN_LEVEL type puts Shift on level 3 and CapsLock on level 2,
 -- so a table that assumed "level 2 = Shift" typed "mon-fichier" for
@@ -263,7 +334,7 @@ do
 			const char *string, int format, int flags);
 		char *xkb_keymap_get_as_string(struct xkb_keymap *keymap, int format);
 	]])
-	local lib = ffi.load("xkbcommon.so.0")
+	local lib = ffi.load(require("_generated.native_runtime").xkbcommon)
 	local ctx = lib.xkb_context_new(1)
 	lib.xkb_context_include_path_append(ctx, tmp)
 	lib.xkb_context_include_path_append(ctx, "/usr/share/X11/xkb")

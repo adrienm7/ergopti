@@ -182,6 +182,7 @@
 		"test:hs:e2e": "cd static/ergopti_plus/macos && lua tests/e2e/run_e2e.lua",
 		"test:linux": "node ./tools/test/run-linux-lua.cjs tests/run.lua",
 		"test:linux:e2e": "node ./tools/test/run-linux-lua.cjs tests/e2e/run_e2e.lua",
+		"test:linux:xkb-source": "node ./tools/test/run-linux-xkb-source.cjs",
 		"build:linux": "node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke",
 		"test:properties": "node ./tools/test/test-properties.cjs",
 		"fix:banners": "node ./tools/lint/lint-conventions.js --fix-banners --warn-only",

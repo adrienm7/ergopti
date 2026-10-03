@@ -640,3 +640,65 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 	end)
 
 end)
+
+helpers.describe("keyboard hook: physical editor source provenance", function()
+	helpers.it("(magic-editor-hook) distinguishes a real key from an engine's tap and navigation output", function()
+		local physical, tap, navigation = {}, {}, {}
+		drive({ { 36, 1 }, { 36, 0 } }, function()
+			return { onConsume = function(detail)
+				physical[#physical + 1] = { detail.code, detail.physical }
+				return false
+			end }
+		end)
+		drive({ { 58, 1 }, { 58, 0 } }, function()
+			return { onConsume = function(detail)
+				tap[#tap + 1] = { detail.code, detail.physical }
+				return false
+			end }
+		end)
+		drive({ { 56, 1 }, { 36, 1 }, { 36, 0 }, { 56, 0 } }, function()
+			return { onConsume = function(detail)
+				navigation[#navigation + 1] = { detail.code, detail.physical }
+				return false
+			end }
+		end)
+		helpers.assert_eq(physical, { { 36, true } }, "the grabbed native press retains its real physical origin")
+		helpers.assert_eq(tap, { { 28, false } }, "a synthetic Enter tap must not masquerade as a physical source")
+		helpers.assert_eq(navigation, { { 105, false } }, "a layer output must not match a physical recommendation")
+	end)
+end)
+
+helpers.describe("keyboard hook: physical-origin generation", function()
+	helpers.it("(magic-editor-origin) fences a captured device when its current kernel origin becomes unqualified", function()
+		local prior = package.loaded["modules.hotstrings.device_finder"]
+		local physical, observations = true, {}
+		package.loaded["modules.hotstrings.device_finder"] = {
+			physical_sources = function(paths)
+				local sources = {}
+				for _, path in ipairs(paths) do sources[#sources + 1] = { path = path, name = "fixture keyboard",
+					sysfs = physical and "/devices/usb/input" or "/devices/virtual/input", physical = physical } end
+				return sources
+			end,
+		}
+		local ok, err = pcall(function()
+			drive({ { 36, 1 }, { 36, 0 }, { 48, 1 }, { 48, 0 } }, function(hook)
+				return { onConsume = function(detail)
+					local receipt = hook.physical_source_receipt()
+					observations[#observations + 1] = { code = detail.code, physical = detail.physical,
+						generation = receipt.generation, ready = receipt.ready }
+					physical = false
+					hook.physical_source_receipt()
+					return false
+				end }
+			end)
+		end)
+		package.loaded["modules.hotstrings.device_finder"] = prior
+		if not ok then error(err, 0) end
+		helpers.assert_eq(#observations, 2)
+		helpers.assert_true(observations[1].physical and observations[1].ready)
+		helpers.assert_eq(observations[2].physical, false)
+		helpers.assert_eq(observations[2].ready, false)
+		helpers.assert_true(observations[2].generation > observations[1].generation,
+			"a previous physical receipt cannot survive a change to an upstream virtual origin")
+	end)
+end)

@@ -11,7 +11,9 @@ pkgdesc="Ergonomic keyboard optimizer with AI-powered hotstrings"
 arch=('any')
 url="https://github.com/adrienm7/ergopti"
 license=('MIT')
-depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core')
+# BEGIN GENERATED LINUX NATIVE REQUIREMENTS
+depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'libxkbcommon-x11' 'libx11')
+# END GENERATED LINUX NATIVE REQUIREMENTS
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'
             'openssl: SHA-256 hashing for metrics privacy'

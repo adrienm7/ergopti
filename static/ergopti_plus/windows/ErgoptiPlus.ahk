@@ -369,6 +369,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/window_info.ahk
 #Include adapters/uia_worker.ahk
 #Include adapters/hotkey_registrar.ahk
+#Include ../_shared/modules/shortcuts/magic_editor.ahk
+#Include infra/magic_editor.ahk
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
@@ -1100,6 +1102,10 @@ ReadKeyboardShortcutsConfig()
 LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
+		if _KbSlot == MagicEditorSlot()["id"]
+				continue
+		if MagicEditorRecordOrdinaryPhysical(_KbSlot, _KbAction)
+				continue
 		if (_KbAction == "none")
 				continue
 		_KbChord := _KeyboardSlotChord(_KbSlot)
@@ -1116,6 +1122,7 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 				continue
 		}
 		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
+		MagicEditorRecordOrdinaryHandle(_KbSlot, _KbHandle)
 		_KbBoundCount++
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
@@ -1323,6 +1330,7 @@ BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
 #Include modules/hotstrings.ahk
+MagicEditorStart()
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
 ; in-process refactor. A_InputLevel is still 2 from the #InputLevel 2 above.

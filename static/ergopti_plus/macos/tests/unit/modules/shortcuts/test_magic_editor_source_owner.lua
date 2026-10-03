@@ -1,0 +1,334 @@
+--- tests/unit/modules/shortcuts/test_magic_editor_source_owner.lua
+
+--- ==============================================================================
+--- MODULE: Conditional Editor Shortcut Source Ownership
+--- DESCRIPTION:
+--- Exercises the real shared decision and native registrar around controlled
+--- source receipts. Only a unique direct numeric source may acquire a chord;
+--- stale callbacks, explicit choices and unfinished cleanup cannot deliver.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local OWNED_MODULES = {
+	"hs", "infra.logger", "infra.paths", "infra.manifest_reader",
+	"adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
+	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
+}
+
+local function with_fixture(callback)
+	return helpers.with_stub_scope(OWNED_MODULES, function()
+		local native = dofile("tests/stubs/hs.lua")
+		native.keycodes.map = { a = 0, c = 8, b = 11, j = 38 }
+		_G.hs, package.loaded.hs = native, native
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.paths"] = { shared = function() return "physical-registry.json" end }
+		package.loaded["infra.manifest_reader"] = {
+			default_for = function() return "open_hotstrings_editor" end,
+		}
+		package.loaded["adapters.file_system"] = { read = function()
+			return '{"keys":{"KeyA":{"kind":"key","hs":0},"KeyC":{"kind":"key","hs":8},"KeyB":{"kind":"key","hs":11},"KeyJ":{"kind":"key","hs":38},"Backquote":{"kind":"key","hs":50},"IntlBackslash":{"kind":"key","hs":10}}}'
+		end }
+		local state = {
+			source_id = "source.first", trigger = "★", magic_source = "automatic",
+			replace_active = false, paused = false, inhibited = false, current = true,
+			requests = {}, actions = {}, cancel_refuses = false,
+		}
+		package.loaded["modules.keymap.magic_key_source"] = {
+			remaps = function(code, _, active)
+				return (state.remap_code == code or (state.remap_codes or {})[code] == true) and active() == true
+			end,
+		}
+		package.loaded["adapters.input_source_broker"] = {
+			subscribe = function(_, observer) state.source_changed = observer; return true end,
+			unsubscribe = function() state.source_changed = nil; return true end,
+		}
+		package.loaded["adapters.keyboard_source_probe"] = {
+			current_source_id = function() return state.source_id end,
+			request = function(request, observer)
+				local retained = { request = request, observer = observer, settled = false }
+				retained.operation = {
+					cancel = function()
+						if state.cancel_refuses and not retained.settled then return false end
+						retained.settled = true
+						return true
+					end,
+					is_settled = function() return retained.settled end,
+					on_settled = function(observer) retained.on_settled = observer; return true end,
+				}
+				state.requests[#state.requests + 1] = retained
+				return retained.operation
+			end,
+		}
+		local registrar = require("adapters.hotkey_registrar")
+		local subject = require("modules.shortcuts.magic_editor")
+		local spec = {
+			configuration_generation = 1,
+			is_action = function(action)
+				return action == "open_hotstrings_editor" or action == "script_pause_toggle" or action == "none"
+			end,
+			is_current = function() return state.current end,
+			execute = function(action, binding)
+				state.actions[#state.actions + 1] = { action = action, binding = binding }
+				return true
+			end,
+			context = {
+				trigger = function() return state.trigger end,
+				magic_source = function() return state.magic_source end,
+				replace_active = function() return state.replace_active end,
+				paused = function() return state.paused end,
+				inhibited = function() return state.inhibited end,
+			},
+		}
+		local function respond(index, levels)
+			local retained = state.requests[index or #state.requests]
+			retained.settled = true
+			if retained.on_settled then retained.on_settled() end
+			local selected = {}
+			for _, level in ipairs(levels or {
+				{ code = 0, text = "a", direct = true, dead = false },
+				{ code = 8, text = state.trigger, direct = true, dead = false },
+				{ code = 11, text = "b", direct = true, dead = false },
+			}) do selected[level.code] = level end
+			local ordered = {}
+			for _, code in ipairs(retained.request.codes) do
+				ordered[#ordered + 1] = selected[code] or { code = code, text = "", direct = false, dead = false }
+			end
+			retained.observer({
+				version = 1, source_id = retained.request.source_id, keyboard_type = 40,
+				levels = ordered,
+			})
+		end
+		callback(subject, registrar, native, state, spec, respond)
+	end)
+end
+
+helpers.describe("conditional editor shortcut: native source and ordinary ownership", function()
+	helpers.it("binds the numeric direct source and retargets after source and trigger changes", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(native.hotkey._bound[1].key, 8)
+			helpers.assert_eq(native.hotkey._bound[1].mods, { "ctrl" })
+			native.hotkey._bound[1].pressed_fn()
+			helpers.assert_eq(state.actions, { { action = "open_hotstrings_editor", binding = "keyboard__magic_editor" } })
+			state.source_id, state.trigger = "source.second", "ù"
+			state.source_changed()
+			helpers.assert_eq(registrar.live_count(), 0, "old physical owner must be released before new proof")
+			respond(nil, { { code = 11, text = "ù", direct = true, dead = false } })
+			helpers.assert_eq(native.hotkey._bound[1].key, 11)
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	helpers.it("refuses ambiguous, dead and modifier-only sources", function()
+		for _, levels in ipairs({
+			{ { code = 0, text = "★", direct = true, dead = false }, { code = 8, text = "★", direct = true, dead = false } },
+			{ { code = 8, text = "★", direct = false, dead = true } },
+			{ { code = 8, text = "★", direct = false, dead = false } },
+		}) do
+			with_fixture(function(subject, registrar, _, _, spec, respond)
+				helpers.assert_eq(subject.start(spec), true)
+				respond(nil, levels)
+				helpers.assert_eq(registrar.live_count(), 0)
+				helpers.assert_eq(subject.stop(), true)
+			end)
+		end
+	end)
+
+	helpers.it("uses only an acknowledged explicit replacement beside a native star", function()
+		with_fixture(function(subject, _, native, state, spec, respond)
+			state.magic_source, state.remap_code, state.replace_active = "KeyJ", 38, true
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(native.hotkey._bound[1].key, 38,
+				"the selected active replacement must outrank an unrelated native star")
+			native.hotkey._bound[1].pressed_fn()
+			helpers.assert_eq(#state.actions, 1)
+			state.replace_active = false
+			native.hotkey._bound[1].pressed_fn()
+			helpers.assert_eq(#state.actions, 1, "a replacement-gate change fences the captured source immediately")
+			helpers.assert_eq(subject.refresh(), true)
+			respond()
+			helpers.assert_eq(native.hotkey._bound[1].key, 8, "an ineffective replacement returns to the actual native scan")
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("refuses raw fallback when explicit replacement ownership is unacknowledged", function()
+		with_fixture(function(subject, registrar, _, state, spec, respond)
+			state.magic_source, state.remap_code, state.replace_active = "KeyJ", 38, nil
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(subject.reason(), "source_unavailable")
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("refuses the ISO owner's two effective physical identities", function()
+		with_fixture(function(subject, registrar, _, state, spec, respond)
+			state.magic_source, state.replace_active = "Backquote", true
+			state.remap_codes = { [10] = true, [50] = true }
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(registrar.live_count(), 0, "the primary resolver code cannot stand in for hardware proof")
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("respects explicit none and custom actions in the same ordinary slot", function()
+		for _, action in ipairs({ "none", "script_pause_toggle" }) do
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				spec.action = action
+				helpers.assert_eq(subject.start(spec), true)
+				if action == "none" then
+					helpers.assert_eq(#state.requests, 0, "a disabled logical slot owns no native probe")
+					helpers.assert_eq(registrar.live_count(), 0)
+					helpers.assert_eq(subject.reason(), "shortcut_disabled")
+				else
+					respond()
+					native.hotkey._bound[1].pressed_fn()
+					helpers.assert_eq(state.actions[1].action, action)
+				end
+				helpers.assert_eq(subject.stop(), true)
+			end)
+		end
+	end)
+
+	helpers.it("preserves an explicit physical none claim from another ordinary slot", function()
+		with_fixture(function(subject, registrar, _, _, spec, respond)
+			registrar.replace_physical_claims("ordinary", {
+				{ chord = "Ctrl+C", action = "none", binding_id = "keyboard__hs_ctrl_c" },
+			})
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("lets a later explicit native owner win without delivering the conditional callback", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local conditional = native.hotkey._bound[1]
+			local explicit = registrar.bind("Ctrl+C", function() return true end)
+			helpers.assert_not_nil(explicit)
+			helpers.assert_eq(conditional.enabled, false)
+			conditional.pressed_fn()
+			helpers.assert_eq(#state.actions, 0)
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 1, "the unrelated explicit owner must remain live")
+			helpers.assert_eq(registrar.unbind(explicit), true)
+		end)
+	end)
+
+	helpers.it("fences stale proof and callbacks after trigger, pause or admission changes", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			state.trigger = ";"
+			respond()
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(subject.refresh(), true)
+			respond()
+			local callback = native.hotkey._bound[1].pressed_fn
+			state.paused = true
+			callback()
+			state.paused, state.inhibited = false, true
+			callback()
+			state.inhibited, state.current = false, false
+			callback()
+			helpers.assert_eq(#state.actions, 0)
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("joins refused native probe cleanup before accepting a replacement", function()
+		with_fixture(function(subject, registrar, _, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			state.cancel_refuses = true
+			helpers.assert_eq(subject.stop(), false)
+			respond(1)
+			helpers.assert_eq(registrar.live_count(), 0, "a cancelled but retained callback cannot acquire")
+			state.cancel_refuses = false
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(registrar.live_count(), 1)
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("retargets the latest source after asynchronous cancellation settles", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			state.cancel_refuses = true
+			state.source_id, state.trigger = "source.second", "ù"
+			helpers.assert_eq(subject.refresh(), false)
+			helpers.assert_eq(#state.requests, 1, "replacement cannot race the old task")
+			respond(1)
+			helpers.assert_eq(registrar.live_count(), 0, "settled stale proof remains fenced")
+			helpers.assert_eq(#state.requests, 2, "acknowledged settlement resumes the latest intent")
+			respond(2, { { code = 11, text = "ù", direct = true, dead = false } })
+			helpers.assert_eq(native.hotkey._bound[1].key, 11)
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("retains a failed native delete for exact cleanup retry", function()
+		with_fixture(function(subject, registrar, native, _, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local binding = native.hotkey._bound[1]
+			local delete = binding.delete
+			binding.delete = function() error("native delete refusal") end
+			helpers.assert_eq(subject.stop(), false)
+			helpers.assert_eq(registrar.live_count(), 1)
+			helpers.assert_eq(binding.enabled, false)
+			binding.delete = delete
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	helpers.it("reports acquisition debt during a reentrant pause and releases its late candidate", function()
+		with_fixture(function(subject, registrar, native, _, spec, respond)
+			local native_bind = native.hotkey.bind
+			local pause_receipt = nil
+			native.hotkey.bind = function(...)
+				pause_receipt = subject.stop()
+				return native_bind(...)
+			end
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			helpers.assert_eq(pause_receipt, false, "an in-flight acquisition cannot acknowledge complete shutdown")
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("does not replace an unsupported explicit logical assignment with the default", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			spec.context.assignment_unavailable = true
+			helpers.assert_eq(subject.start(spec), true)
+			helpers.assert_eq(#state.requests, 0)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(subject.reason(), "explicit_assignment")
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+
+	helpers.it("keeps every present legacy choice outside conditional acquisition", function()
+		for _, legacy in ipairs({ false, { mods = { "ctrl", "fn" }, key = "ù" } }) do
+			with_fixture(function(subject, registrar, _, state, spec)
+				spec.context.legacy_present = legacy ~= nil
+				helpers.assert_eq(subject.start(spec), true)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_eq(registrar.live_count(), 0)
+				helpers.assert_eq(subject.stop(), true)
+			end)
+		end
+	end)
+end)

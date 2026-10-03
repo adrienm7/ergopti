@@ -2067,6 +2067,17 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
 # ====================================
 # ===== 3.5.8 shortcuts.keyboard =====
+
+[[features.shortcuts.keyboard]]
+id = "magic_editor"
+platforms = ["ahk", "hs", "linux"]
+default = "open_hotstrings_editor"
+recommended = "open_hotstrings_editor"
+input_altering = true
+active_by_default = true
+cleared = "none"
+type = "action"
+description_key = "menu.shortcuts.keyboard.magic_editor"
 # ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
@@ -2101,7 +2112,7 @@ description_key = "menu.shortcuts.keyboard.win_a"
 id = "win_d"
 platforms = ["ahk"]
 default = "none"
-recommended = "open_hotstrings_editor"
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_d"

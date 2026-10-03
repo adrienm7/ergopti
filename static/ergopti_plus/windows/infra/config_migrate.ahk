@@ -60,6 +60,7 @@ _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
 		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
+		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
@@ -121,12 +122,22 @@ _ConfigMigrateValidateOp(Op, Where) {
 		if Op.Has(Field) && !_ConfigMigrateIsSectionPath(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be a dotted path of bare segments")
 	}
-	for Field in ["key", "to_key"] {
+	for Field in ["key", "to_key", "conditional_key"] {
 		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be one bare segment")
 	}
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
+	if (Op["op"] == "move_chord_action") {
+		if !(Op["platform"] is String) || !(Op["platform"] == "macos")
+			throw Error(Where . ": move_chord_action requires platform macos")
+		for Field in ["action", "disabled_action"] {
+			if !_ConfigMigrateIsBareKey(Op[Field])
+				throw Error(Where . ": '" . Field . "' must be an action id")
+		}
+		if Op["section"] == Op["to_section"]
+			throw Error(Where . ": move_chord_action must change section")
+	}
 	if (Op["op"] == "map_value") {
 		if !(Op["map"] is Array) || Op["map"].Length == 0
 			throw Error(Where . ": map_value needs a non-empty map")
@@ -399,8 +410,107 @@ _ConfigMigrateCopyDestinationAbsent(Model, Section, Key) {
 	return _ConfigMigrateSectionsAtOrBelow(Model, Section . "." . Key).Length == 0
 }
 
+; Resolve only aliases and groups declared by the injected shared catalogue.
+_ConfigMigrateChordActionSlot(Value, Catalogue, PlatformName) {
+	if !(Value is Map) || Value.Count != 2 || !Value.Has("mods") || !Value.Has("key")
+			|| !(Value["mods"] is Array) || !(Value["key"] is String)
+		return ""
+	for Field in Value {
+		if !(Field == "mods" || Field == "key")
+			return ""
+	}
+	Platform := Catalogue["platforms"][PlatformName]
+	Aliases := Map(), Wanted := Map()
+	for Modifier in Platform["modifiers"] {
+		Aliases[Modifier["id"]] := Modifier["id"]
+		Aliases[Modifier["hammerspoon"]] := Modifier["id"]
+	}
+	for Modifier in Value["mods"] {
+		if !(Modifier is String)
+			return ""
+		Id := Aliases.Get(StrLower(Modifier), "")
+		if Id == "" || Wanted.Has(Id)
+			return ""
+		Wanted[Id] := true
+	}
+	KeyId := ""
+	Candidate := StrLower(Value["key"])
+	for Key in Catalogue["keys"] {
+		if Candidate == Key["id"] || Candidate == Key.Get("chord_key", Key["id"])
+				|| Candidate == Key.Get("macos_key", Key["id"]) {
+			KeyId := Key["id"]
+			break
+		}
+	}
+	if KeyId == ""
+		return ""
+	for Group in Platform["shortcut_groups"] {
+		Matched := Group["modifiers"].Length == Value["mods"].Length
+		for Modifier in Group["modifiers"] {
+			if !Wanted.Has(Modifier)
+				Matched := false
+		}
+		if Matched
+			return Group["prefix"] . KeyId
+	}
+	return ""
+}
+
+_ConfigMigrateActionDestinationRepresented(Model, Section, Key, Actions) {
+	if Model.Has(Section) && Model[Section].Has(Key) {
+		Value := Model[Section][Key]
+		return (Value is String) && Actions.Get(Value, false) == true
+	}
+	return _ConfigMigrateCopyDestinationAbsent(Model, Section, Key)
+}
+
+; Resolve every destination before changing any record. Unsupported legacy or
+; occupied, unrecognized choices retain their old source and native owner.
+_ConfigMigrateMoveChordAction(Model, Op, Context) {
+	ChildPath := Op["section"] . "." . Op["key"]
+	ChildSource := false
+	if Model.Has(Op["section"]) && Model[Op["section"]].Has(Op["key"])
+		Value := Model[Op["section"]][Op["key"]]
+	else if Model.Has(ChildPath) {
+		if _ConfigMigrateSectionsAtOrBelow(Model, ChildPath).Length != 1
+			return
+		Value := Model[ChildPath]
+		ChildSource := true
+	} else
+		return
+	if !(Context is Map) || !(Context.Get("modifier_chords", 0) is Map)
+			|| !(Context.Get("assignable_actions", 0) is Map)
+		throw Error("config_migrate: missing chord action context")
+	Catalogue := Context["modifier_chords"], Actions := Context["assignable_actions"]
+	if !Catalogue.Has("keys") || !Catalogue.Has("platforms") || !Catalogue["platforms"].Has(Op["platform"])
+		throw Error("config_migrate: missing chord action context")
+	if !Actions.Get(Op["action"], false) || !Actions.Get(Op["disabled_action"], false)
+		throw Error("config_migrate: migration action is absent from the action catalogue")
+	Disabled := (Value is TOML_Bool) && Value.Value == false
+	Slot := Disabled ? "" : _ConfigMigrateChordActionSlot(Value, Catalogue, Op["platform"])
+	if (!Disabled && Slot == "") || Slot == Op["conditional_key"]
+		return
+	Section := Op["to_section"]
+	if !_ConfigMigrateActionDestinationRepresented(Model, Section, Op["conditional_key"], Actions)
+			|| (Slot != "" && !_ConfigMigrateActionDestinationRepresented(Model, Section, Slot, Actions))
+		return
+	if !Model.Has(Section)
+		Model[Section] := Map()
+	Target := Model[Section]
+	if Slot != "" && !Target.Has(Slot)
+		Target[Slot] := Op["action"]
+	if !Target.Has(Op["conditional_key"])
+		Target[Op["conditional_key"]] := Op["disabled_action"]
+	if ChildSource
+		Model.Delete(ChildPath)
+	else {
+		Model[Op["section"]].Delete(Op["key"])
+		_ConfigMigrateDropIfEmpty(Model, Op["section"])
+	}
+}
+
 ; Applies one validated op to the model.
-_ConfigMigrateApplyOp(Model, Op) {
+_ConfigMigrateApplyOp(Model, Op, Context := 0) {
 	Section := Op["section"]
 	switch Op["op"] {
 		case "rename":
@@ -418,6 +528,8 @@ _ConfigMigrateApplyOp(Model, Op) {
 			if !Model.Has(ToSection)
 				Model[ToSection] := Map()
 			Model[ToSection][ToKey] := ManifestCloneValue(Model[Section][Op["key"]])
+		case "move_chord_action":
+			_ConfigMigrateMoveChordAction(Model, Op, Context)
 		case "move_section":
 			for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section) {
 				Target := Op["to_section"] . SubStr(Name, StrLen(Section) + 1)
@@ -483,12 +595,12 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 
 ; Runs every step at or above FromVersion that names Driver, then stamps the
 ; registry's current version. Mutates and returns Model.
-ConfigMigrateApplySteps(Model, Registry, Driver, FromVersion) {
+ConfigMigrateApplySteps(Model, Registry, Driver, FromVersion, Context := 0) {
 	for Step in Registry["steps"] {
 		if (Step["from"] < FromVersion) || !Step["drivers"].Has(Driver)
 			continue
 		for Op in Step["ops"]
-			_ConfigMigrateApplyOp(Model, Op)
+			_ConfigMigrateApplyOp(Model, Op, Context)
 	}
 	if !Model.Has("_meta")
 		Model["_meta"] := Map()
@@ -601,7 +713,7 @@ _ConfigMigrateStampCandidate(Source, Version, Scan) {
 ; "version", "detail") where outcome is "current", "migrated", "newer",
 ; "invalid", "unsupported" or "failed"; a "migrated" plan also carries the
 ; "candidate" text and the migrated "model".
-ConfigMigratePlan(Source, Registry, Driver) {
+ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 	Plan := Map("outcome", "failed", "version", "", "detail", "")
 	try Before := _ConfigMigrateParse(Source, "config.toml")
 	catch as Err {
@@ -626,7 +738,7 @@ ConfigMigratePlan(Source, Registry, Driver) {
 		Plan["detail"] := "the migration record source refused: " . Err.Message
 		return Plan
 	}
-	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version)
+	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
 	try {
 		if Updates.Length == 1 && DropSections.Length == 0
@@ -707,7 +819,7 @@ _ConfigMigratePublish(FilePath, Candidate, Source) {
 ; (read_only = 1). Registry (a validated Map; the shipped one by default),
 ; Stamp, BackupFn(Path, Content) -> 1 (must refuse an existing path) and
 ; PublishFn(Path, Candidate, Source) -> "" are test seams.
-ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn := 0) {
+ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn := 0, Context := 0) {
 	Result := Map("status", "failed", "read_only", 0, "from", "", "to", "",
 		"backup", "", "detail", "")
 	try LoggerStart("ConfigMigrate", "Checking the config schema version of '{1}' (ahk driver)…",
@@ -774,7 +886,7 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		Source := FSReadUtf8Exact(FilePath)
 		if !(Source is String)
 			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
-		Plan := ConfigMigratePlan(Source, Registry, "ahk")
+		Plan := ConfigMigratePlan(Source, Registry, "ahk", Context)
 		if (Plan["outcome"] != "migrated")
 			return Refuse("failed", Plan["detail"] != "" ? Plan["detail"]
 				: "the file changed while it was classified")

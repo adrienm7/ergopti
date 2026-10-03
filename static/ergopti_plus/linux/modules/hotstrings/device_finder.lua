@@ -228,6 +228,29 @@ local function is_synthetic(dev)
 end
 
 
+--- Describes physical origin from one current kernel snapshot. Capability alone
+--- does not prove that an explicitly pinned device is hardware rather than an
+--- upstream remapper's uinput output; missing sysfs identity stays unqualified.
+--- @param paths table Acquired canonical evdev device paths.
+--- @param devices table|nil Pre-parsed kernel descriptors; reads /proc when absent.
+--- @return table Dense origin records in the requested order.
+function M.physical_sources(paths, devices)
+	local records = {}
+	for _, dev in ipairs(type(devices) == "table" and devices or read_proc_devices()) do
+		local path = event_path(dev)
+		if path then records[path] = dev end
+	end
+	local sources = {}
+	for _, path in ipairs(paths) do
+		local dev = records[path]
+		local known = dev ~= nil and type(dev.sysfs) == "string" and dev.sysfs ~= ""
+		sources[#sources + 1] = { path = path, sysfs = dev and dev.sysfs or "", name = dev and dev.name or "",
+			physical = known and has_bit(dev.ev_mask, EV_KEY_BIT) and not is_synthetic(dev) or false }
+	end
+	return sources
+end
+
+
 -- =========================================
 -- =========================================
 -- ======= 4/ Public API ===================

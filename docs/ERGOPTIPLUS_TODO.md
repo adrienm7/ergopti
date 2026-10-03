@@ -975,22 +975,38 @@ exact-boolean regressions also pass the focused runner.
   platform limits documented. No enum or schema change occurs in this slice.
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
-  macOS, Win/Super on Windows and Linux. It must work with every layout and
-  follow changes from the star to `ù`, `;` or another admitted magic character.
-  Represent it as one ordinary, editable logical slot; absence selects the
-  conditional editor default, and explicit none disables it. Require proven
-  direct-tap ownership; missing, ambiguous, dead, Shift or AltGr-only sources
-  stay inactive. Respect the Shortcuts master, pause and inhibition, preserve
-  personal assignments, and let an explicit resolved-chord choice win,
-  including explicit none. Retarget through the existing binding owners and
-  generation fences; never stack a second fixed physical hotkey.
-  Windows has removed the former fixed Win+magic registration and inert menu
-  reminder, retaining physical remap and Ctrl+save. The former Win+D editor
-  recommendation still needs replacement by this conditional slot; existing
-  saved Win+D/editor assignments must remain. macOS's persisted legacy
-  shortcut requires an acknowledged migration before its owner is retired.
-  Conditional-slot registration, live source resolution, collision handling,
-  21-locale labels and full three-OS regressions remain to implement.
+  macOS, Win/Super on Windows and Linux. The shared conditional policy now
+  represents this as one ordinary editable slot. Missing values select the
+  default; explicit none and existing personal physical-chord assignments win.
+  The slot follows direct sources for star, `ù`, `;` and other admitted magic
+  characters on any layout, and refuses missing, ambiguous, dead or modified
+  sources. Native binding owners retain their pause, inhibition, generation
+  and publication fences. Its editable row and unavailable reasons are
+  translated in all 21 locales.
+  Windows resolves neutral physical keys from the acknowledged layout and
+  native HKL. macOS probes the exact active TIS Unicode layout through its
+  signed native launcher, then retargets through its existing registrar.
+  Linux owns an X11 keymap/group probe and verifies source/device identity;
+  Wayland source ownership remains unavailable, with an explicit translated
+  reason and the editor still reachable from the menu.
+  Fresh configuration omits neutral ordinary shortcut rows on all drivers;
+  an explicit user none is retained by the acknowledged shared writer.
+  A closed schema-v9 migration transfers representable macOS legacy editor
+  shortcuts only to published assignable chord slots, preserves occupied or
+  unknown destinations and refuses ambiguous sources without publishing.
+  Historical saved Win+D/editor choices remain; the old fixed magic hook and
+  Win+D recommendation are retired.
+  Legacy macOS built-ins retain their existing native factories and publish
+  physical claims through their exact lifecycle; late claims suspend only the
+  conflicting conditional owner, with acknowledged compensation and cleanup
+  debt. A revoked owner cannot be restored after a refused deletion.
+  Focused local regressions cover native source admission, collision/none
+  precedence, configuration publication/refusal, scope restoration, migration
+  parity and independent corpora. Complete local integration passed the selected JS, macOS/Linux unit
+  and E2E gates. Native three-OS CI, packaging, installation and launch
+  remain pending. Native macOS/Windows
+  layout delivery and genuine Wayland seats are not qualified by Linux-host
+  stubs or the Xvfb source probe.
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
   `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty

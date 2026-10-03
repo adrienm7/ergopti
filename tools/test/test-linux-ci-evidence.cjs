@@ -430,6 +430,29 @@ assert.doesNotMatch(WORKFLOW, /all \$total job\(s\) passed \(or skipped\)/);
 assert.doesNotMatch(WORKFLOW, /no Wayland socket appeared[^\n]*[\s\S]{0,180}exit 0/);
 assert.doesNotMatch(WORKFLOW, /WebKit\/lgi unavailable[^\n]*[\s\S]{0,180}exit 0/);
 
+// Native physical admission must retain its real X11 group/map evidence.
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['xkb-source-qualification'], 17);
+rejects(({ evidence }) => {
+	const document = evidence.find((row) => 'xkb-source-qualification' in row.subjects);
+	delete document.subjects['xkb-source-qualification'];
+}, /has no evidence for xkb-source-qualification/);
+const sourceStep = pipeline.step(
+	pipeline.job('e2e-linux'),
+	'Qualify actual X11 physical shortcut sources'
+);
+assert.match(
+	pipeline.stepField(sourceStep, 'run') ?? '',
+	/run_xkb_source_qualification\.lua \| tee "\$RUNNER_TEMP\/linux-xkb-source\.log"/
+);
+assert.match(pipeline.stepField(sourceStep, 'run') ?? '', /set -euo pipefail/);
+const nativeRecord =
+	pipeline.stepField(
+		pipeline.step(pipeline.job('e2e-linux'), 'Record mandatory E2E evidence'),
+		'run'
+	) ?? '';
+assert.match(nativeRecord, /xkb_source_assertions=\$\(sed[^\n]+linux-xkb-source\.log/);
+assert.match(nativeRecord, /--subject "xkb-source-qualification=\$xkb_source_assertions"/);
+
 // Every subject the per-job layout proved at ca1a4d64a is still required: the
 // manifest and linux-ok's needs can shrink together, and verify would then
 // accept a box that silently stopped proving something.
@@ -670,7 +693,7 @@ for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 	}
 }
 
-// Two subjects are counts, and each must be read from what its suite printed:
+// Three subjects are counts, and each must be read from what its suite printed:
 // a literal count keeps a floor satisfied by a suite that ran nothing. Every
 // other subject is the literal 1 of a step that passed. That no step before a
 // record can be skipped, or swallow a failure with `|| true` or a `| tee`
@@ -696,7 +719,8 @@ const e2eRecord =
 const recordScript = [...unitRecord, ...e2eRecord];
 for (const line of [
 	'unit_assertions=$(jq -r \'.passed\' "$RUNNER_TEMP/linux-lua.json")',
-	'e2e_assertions=$(sed -n \'s/^1\\.\\.\\([0-9][0-9]*\\)$/\\1/p\' "$RUNNER_TEMP/linux-e2e.log" | tail -1)'
+	'e2e_assertions=$(sed -n \'s/^1\\.\\.\\([0-9][0-9]*\\)$/\\1/p\' "$RUNNER_TEMP/linux-e2e.log" | tail -1)',
+	'xkb_source_assertions=$(sed -n \'s/^=== \\([0-9][0-9]*\\) check(s), 0 failure(s) ===$/\\1/p\' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)'
 ]) {
 	assert.ok(
 		recordScript.includes(line),
@@ -713,7 +737,12 @@ assert.deepStrictEqual(
 	'the test-linux record must name exactly the manifest subjects of test-linux'
 );
 for (const [, subject, value] of recorded) {
-	const expected = { unit: '$unit_assertions', 'hotstring-e2e': '$e2e_assertions' }[subject] ?? '1';
+	const expected =
+		{
+			unit: '$unit_assertions',
+			'hotstring-e2e': '$e2e_assertions',
+			'xkb-source-qualification': '$xkb_source_assertions'
+		}[subject] ?? '1';
 	assert.strictEqual(
 		value,
 		expected,

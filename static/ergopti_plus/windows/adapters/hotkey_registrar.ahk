@@ -784,6 +784,79 @@ _HotkeyRegistrarReserveResolvedOwned(chordString, callback, Owner,
 		HotkeyFn, ProbeFn, HotIfFn, ResolvedDescriptor)
 }
 
+/**
+ * Reserves one physical broker variant with its exact native admission context.
+ * Public chord bindings remain global. This private owner retains the context
+ * for every later activation, suspension and acknowledged retirement.
+ * @param {String} Chord Canonical physical chord.
+ * @param {Func} Callback Broker dispatch callback.
+ * @param {String} Owner Stable lifecycle owner.
+ * @param {Map} Descriptor Validated SC identity.
+ * @param {Func} Criterion Live admission predicate for this one variant.
+ * @param {Map} Ports Optional native behavioural-test ports.
+ * @returns {String} Inert owned handle, or an empty refusal.
+ */
+HotkeyRegistrarReservePhysicalBroker(Chord, Callback, Owner, Descriptor, Criterion, Ports := unset) {
+	global HOTKEY_REGISTRAR_BINDINGS
+	if !HasMethod(Criterion, "Call") || !HotkeyRegistrarResolvedDescriptorIsValid(Descriptor)
+		return ""
+	Native := IsSet(Ports) ? Ports : Map(
+		"hotkey", _HotkeyRegistrarBrokerNative,
+		"hotif", _HotkeyRegistrarBrokerContext.Bind(Criterion),
+		"probe", _HotkeyRegistrarBrokerProbe)
+	if !(Native is Map) || !HasMethod(Native.Get("hotkey", 0), "Call")
+			|| !HasMethod(Native.Get("hotif", 0), "Call") || !HasMethod(Native.Get("probe", 0), "Call")
+		throw TypeError("A physical broker requires exact native ownership ports.")
+	; A contextual reservation must also refuse an unknown global producer.
+	if !IsSet(Ports) && _HotkeyRegistrarNativeExists(Descriptor["native_spec"])
+		return ""
+	Handle := _HotkeyRegistrarReserveResolvedOwned(Chord, Callback, Owner, Descriptor,
+		Native["hotkey"], Native["probe"], Native["hotif"])
+	if Handle == ""
+		return ""
+	Entry := HOTKEY_REGISTRAR_BINDINGS[Handle]
+	Entry["native_port"] := Native.Clone()
+	return Handle
+}
+
+/** Selects the exact physical broker criterion before a native operation. */
+_HotkeyRegistrarBrokerContext(Criterion) {
+	return HotIf(Criterion)
+}
+
+/** Performs one broker native operation and restores the global context. */
+_HotkeyRegistrarBrokerNative(Name, CallbackOrAction, Options := unset) {
+	try {
+		if IsSet(Options)
+			return Hotkey(Name, CallbackOrAction, Options . " I2")
+		return Hotkey(Name, CallbackOrAction)
+	} finally HotIf()
+}
+
+/** Probes only the selected exact context, restoring global state afterwards. */
+_HotkeyRegistrarBrokerProbe(Name) {
+	try {
+		Hotkey(Name)
+		return true
+	} catch as Err {
+		if Err is TargetError
+			return false
+		LoggerWarn("adapters.hotkey_registrar", "The physical broker probe failed closed: {1}.", Err.Message)
+		return true
+	} finally HotIf()
+}
+
+/** Resolves a retained native port while keeping explicit test ports authoritative. */
+_HotkeyRegistrarRetainedPort(Entry, &HotkeyFn, &HotIfFn) {
+	if !Entry.Has("native_port")
+		return
+	Native := Entry["native_port"]
+	if !HasMethod(HotkeyFn, "Call")
+		HotkeyFn := Native["hotkey"]
+	if !HasMethod(HotIfFn, "Call")
+		HotIfFn := Native["hotif"]
+}
+
 ; Enables an inert reservation. Publish callback authority while native is still
 ; confirmed Off, then call On: this closes the interruptible line boundary after
 ; Hotkey() returns where the newly active wrapper could otherwise swallow its
@@ -813,6 +886,7 @@ _HotkeyRegistrarActivate(handle, HotkeyFn := 0, HotIfFn := 0) {
 		Critical(PreviousCritical)
 	}
 
+	_HotkeyRegistrarRetainedPort(Entry, &HotkeyFn, &HotIfFn)
 	try _HotkeyRegistrarInvokeAction(Entry["spec"], "On", HotkeyFn, HotIfFn)
 	catch as Err {
 		Restored := _HotkeyRegistrarPublishLiveState(Entry, TransitionState,
@@ -1045,6 +1119,7 @@ _HotkeyRegistrarRetire(handle, HotkeyFn := 0, HotIfFn := 0) {
 		return true
 	}
 
+	_HotkeyRegistrarRetainedPort(Entry, &HotkeyFn, &HotIfFn)
 	try _HotkeyRegistrarInvokeAction(Entry["spec"], "Off", HotkeyFn, HotIfFn)
 	catch as Err {
 		Restored := _HotkeyRegistrarPublishLiveState(Entry, TransitionState,
@@ -1107,6 +1182,7 @@ _HotkeyRegistrarSetEnabled(handle, enabled, HotkeyFn := 0, HotIfFn := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	_HotkeyRegistrarRetainedPort(Entry, &HotkeyFn, &HotIfFn)
 	try _HotkeyRegistrarInvokeAction(Entry["spec"], want ? "On" : "Off",
 		HotkeyFn, HotIfFn)
 	catch as Err {

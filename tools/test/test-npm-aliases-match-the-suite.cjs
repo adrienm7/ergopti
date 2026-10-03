@@ -55,6 +55,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Python suites: verify-change's xkb-python gate and linux-layout.yml run
 	// them; the JS suite stays free of a Python dependency.
 	'tools/test/run-xkb-python-tests.cjs',
+	// Native X11/XKB qualification requires its own display and headers;
+	// verify-change and the Linux CI lane own that separate native gate.
+	'tools/test/run-linux-xkb-source.cjs',
 	// Real-browser render runs separately from the Node-only suite;
 	// test-changelog-release-install.cjs runs the same page scripts against
 	// a recording DOM inside the suite.

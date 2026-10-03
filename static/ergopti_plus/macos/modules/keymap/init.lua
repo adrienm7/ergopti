@@ -461,6 +461,16 @@ function M.arm_one_shot_shift()
 	return true
 end
 
+local function notify_editor_source_changed()
+	local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+	if type(owner) ~= "table" or type(owner.refresh_magic_editor) ~= "function" then return true end
+	local called, accepted = xpcall(owner.refresh_magic_editor, debug.traceback)
+	if called and accepted == true then return true end
+	Logger.error(LOG, "Conditional editor shortcut retargeting retains cleanup debt: %s.", tostring(accepted))
+	return false
+end
+
+
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 --- @return boolean committed
 function M.pause_processing()
@@ -471,6 +481,7 @@ function M.pause_processing()
 		return false
 	end
 	Logger.debug(LOG, "Processing paused.")
+	notify_editor_source_changed()
 	return true
 end
 
@@ -491,6 +502,7 @@ function M.resume_processing()
 		return false
 	end
 	Logger.debug(LOG, "Processing resumed.")
+	notify_editor_source_changed()
 	return true
 end
 
@@ -520,6 +532,8 @@ function M.set_delay(key, val)
 	return true
 end
 
+
+
 --- Globally reassigns the magic expansion key (the "★" character by default).
 --- Registry.update_trigger_char owns the write to CoreState.magic_key because
 --- it needs the previous value to rename every affected mapping. Do not
@@ -540,6 +554,7 @@ function M.set_trigger_char(char)
 		return false
 	end
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
+	notify_editor_source_changed()
 	return true
 end
 
@@ -550,6 +565,7 @@ end
 --- @return boolean applied
 function M.set_magic_key_source(value)
 	MagicKeySource.set(value)
+	notify_editor_source_changed()
 	return true
 end
 
@@ -566,6 +582,19 @@ end
 local function magic_key_replace_on()
 	return Registry.is_group_enabled("magic_key") == true
 		and Registry.is_section_enabled("magic_key", "replace") == true
+end
+
+--- Reports whether the actual key-down owner can emit an explicit magic key.
+--- This proof concerns replacement only, independently of ordinary UI shortcuts.
+--- @return boolean|nil effective Nil when native ownership cannot be acknowledged.
+function M.is_magic_key_replacement_effective()
+	if MagicKeySource.keycode() == nil or not magic_key_replace_on()
+		or CoreState.processing_paused == true or SyntheticInput.admission_open() ~= true then return false end
+	local enabled, acknowledged = eventtap_is_enabled("keyDown", tap)
+	if acknowledged ~= true then return nil end
+	if enabled ~= true then return false end
+	if _started ~= true then return nil end
+	return true
 end
 
 --- Ignores a specific window title from hotstring processing.
@@ -611,14 +640,19 @@ M.invalidate_hotstring_preview = LLMBridge.invalidate_hotstring_preview
 
 --- Wraps a registry mutation with a prospective/visible preview fence.
 --- @param fn function Registry mutation.
+--- @param changes_source boolean|nil Whether this mutation can change replacement admission.
 --- @return function wrapped
-local function preview_fenced_registry_mutation(fn)
+local function preview_fenced_registry_mutation(fn, changes_source)
 	return function(...)
 		if LLMBridge.invalidate_hotstring_preview() ~= true then
 			Logger.error(LOG, "Registry mutation refused because the active hotstring preview could not be revoked.")
 			return false
 		end
+		local previous_source
+		if changes_source then previous_source = M.is_magic_key_replacement_effective() end
 		local results = table.pack(fn(...))
+		if results[1] == true and changes_source
+			and previous_source ~= M.is_magic_key_replacement_effective() then notify_editor_source_changed() end
 		return table.unpack(results, 1, results.n)
 	end
 end
@@ -626,35 +660,35 @@ end
 -- ── Registry proxies ─────────────────────────────────────────────────────────
 
 M.add                   = preview_fenced_registry_mutation(Registry.add)
-M.load_file             = preview_fenced_registry_mutation(Registry.load_file)
-M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml)
+M.load_file             = preview_fenced_registry_mutation(Registry.load_file, true)
+M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, true)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.is_section_enabled    = Registry.is_section_enabled
-M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section)
-M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section)
+M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section, true)
+M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section, true)
 -- Batch form. The menu toggles every section of a group at once, and routing that
 -- through the single-section API rebuilt the group once per section.
-M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections_enabled)
+M.set_sections_enabled  = preview_fenced_registry_mutation(Registry.set_sections_enabled, true)
 -- Multi-group batch form used by whole-tree menu actions. One exact boolean
 -- commitment covers every setting and live registry rebuild in the click.
-M.set_groups_sections_enabled = preview_fenced_registry_mutation(Registry.set_groups_sections_enabled)
-M.set_category_scope_enabled = preview_fenced_registry_mutation(Registry.set_category_scope_enabled)
-M.apply_hotstring_preferences = preview_fenced_registry_mutation(Registry.apply_hotstring_preferences)
+M.set_groups_sections_enabled = preview_fenced_registry_mutation(Registry.set_groups_sections_enabled, true)
+M.set_category_scope_enabled = preview_fenced_registry_mutation(Registry.set_category_scope_enabled, true)
+M.apply_hotstring_preferences = preview_fenced_registry_mutation(Registry.apply_hotstring_preferences, true)
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
 M.set_group_context     = Registry.set_group_context
 M.set_post_load_hook    = Registry.set_post_load_hook
-M.disable_group         = preview_fenced_registry_mutation(Registry.disable_group)
+M.disable_group         = preview_fenced_registry_mutation(Registry.disable_group, true)
 M.is_group_enabled      = Registry.is_group_enabled
 M.list_groups           = Registry.list_groups
-M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group)
+M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group, true)
 M.registry_transaction = preview_fenced_registry_mutation(Registry.registry_transaction)
 M.with_hotstring_delays = preview_fenced_registry_mutation(Registry.with_hotstring_delays)
 M.hotstring_delay_inventory = Registry.hotstring_delay_inventory
-M.enable_group          = preview_fenced_registry_mutation(Registry.enable_group)
+M.enable_group          = preview_fenced_registry_mutation(Registry.enable_group, true)
 M.sort_mappings         = preview_fenced_registry_mutation(Registry.sort_mappings)
 M.defer_sort            = Registry.defer_sort
 M.flush_sort            = Registry.flush_sort
@@ -2066,6 +2100,7 @@ function M.start()
 
 	_started = true
 	Logger.success(LOG, "Keymap engine started.")
+	notify_editor_source_changed()
 	return true
 end
 
@@ -2177,6 +2212,7 @@ function M.stop(teardown)
 		and window_filter_stopped and diagnostic_mailbox_stopped
 	if stopped then
 		Logger.success(LOG, "Keymap engine stopped.")
+		notify_editor_source_changed()
 	else
 		Logger.error(LOG, "Keymap engine teardown remains incomplete and retryable.")
 	end

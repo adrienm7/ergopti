@@ -256,11 +256,13 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		}
 	end
 
-	rows[#rows + 1] = {
-		label    = i18n.get(group.add_key),
-		disabled = disabled or nil,
-		action   = function() add_binding_to(group.prefix, ctx) end,
-	}
+	if not group.fixed then
+		rows[#rows + 1] = {
+			label    = i18n.get(group.add_key),
+			disabled = disabled or nil,
+			action   = function() add_binding_to(group.prefix, ctx) end,
+		}
+	end
 	return rows
 end
 
