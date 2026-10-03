@@ -297,9 +297,9 @@ _HS_WordExpanderRows(Commands := unset) {
 			; Always ticked: a custom delimiter exists only while it is in the
 			; active string, so its presence IS its enabled state.
 			"checked", true,
-			"items", [Map(
-				"label",  t("menu.hotstrings.delete_delimiter"),
-				"action", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))]))
+			"items", [MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
+				Map("word_expander_delete", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch)),
+				Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 	}
 
 	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))

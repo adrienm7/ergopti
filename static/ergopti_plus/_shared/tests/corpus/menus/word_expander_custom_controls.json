@@ -1,0 +1,26 @@
+{
+	"schema_version": 1,
+	"section": "word_expander_custom_menu",
+	"rows": [
+		{
+			"id": "word_expander_delete",
+			"i18n": "menu.hotstrings.delete_delimiter",
+			"ready": "word_expanders_ready"
+		}
+	],
+	"historical_labels": {
+		"ahk": "menu.hotstrings.delete_delimiter",
+		"hs": "menu.hotstrings.delete_expander",
+		"linux": "menu.hotstrings.delete_delimiter"
+	},
+	"target": {
+		"char": "☃",
+		"key": "custom_probe",
+		"other": "A"
+	},
+	"native_membership": {
+		"before": "A☃",
+		"ack": "A",
+		"refused": "A☃"
+	}
+}

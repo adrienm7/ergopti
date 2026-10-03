@@ -199,11 +199,8 @@ function M.build_management(ctx)
 		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
 		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
-		local ct_sub = {
-			{
-				label    = i18n.get("menu.hotstrings.delete_expander"),
-				disabled = paused or nil,
-				action       = not paused and (function(k) return function()
+		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+			["word_expander_delete"] = (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -228,9 +225,9 @@ function M.build_management(ctx)
 					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 					return true
-				end end)(ct.key) or nil,
-			},
-		}
+				end end)(ct.key),
+		}, { ["word_expanders_ready"] = word_expanders_ready })
+		local ct_sub = delete_row and { delete_row } or {}
 
 		exp_sub[#exp_sub + 1] = {
 			label    = ct_lbl,
