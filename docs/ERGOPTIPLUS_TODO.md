@@ -263,6 +263,17 @@ These are software implementations; final hardware verification remains below.
   Windows registry and macOS hs.settings have no application-owned JSON root
   loader. TOML owners, unknown object parameters, personal menus, native cross-OS
   suites and manual CI remain untouched.
+- [~] **L20.** Linux large-input Crypto receipts: use OpenSSL 3's native byte
+  API with an explicit length and retain its library handle across Lua GC.
+  Five large-input native cases and nineteen portable dispatch/refusal cases
+  failed before the fix. Eighteen independent SHA-256 vectors now pass on the
+  host and in the nonroot Debian native container, including NUL, all byte
+  values, UTF-8 and quote expansion. Eighteen portable cases retain coverage of
+  the existing CLI path when the native binding is absent; this degradation is
+  logged and still carries exec limits. Native refusal is never silently retried.
+  Windows CNG and macOS sha256_bytes already use native byte APIs; macOS's text
+  SHA-256 shell path shares the argument-size risk and needs a separate native
+  reproduction. No macOS source, native cross-OS suite or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
