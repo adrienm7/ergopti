@@ -118,6 +118,25 @@ _GestureRunSystemAction(ActionId, ActionFn) {
 	}
 }
 
+; Only the native confirmed actions opt in to this explicit target port.
+; Ordinary action extensions still receive their established zero arguments.
+_GestureMakeConfirmedSystemRunner(ActionId, ActionFn) {
+	return (Target, Sys) => _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys)
+}
+
+_GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	Sys := _GestureSys(Sys)
+	return Sys.Defer(_GestureRunSystemAction.Bind(ActionId,
+		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys)))
+}
+
+_GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	if !_GestureConfirmedTargetIsLive(Target, Sys) {
+		LoggerWarn("gestures", "Confirmed system action '{1}' was refused before execution: its original window target is no longer owned.", ActionId)
+		return false
+	}
+	return ActionFn.Call(Sys, Target)
+}
 for _SysActionId, _SysActionFn in Map(
 	"sleep_displays", GestureSysSleepDisplays,
 	"toggle_dark_mode", GestureSysToggleDarkMode,
@@ -131,7 +150,10 @@ for _SysActionId, _SysActionFn in Map(
 	"unblock_file_selection", GestureSysUnblockFileSelection,
 	"open_terminal_here", GestureSysOpenTerminalHere,
 	"new_text_file_here", GestureSysNewTextFileHere) {
-	GESTURE_ACTIONS[_SysActionId] := { Fn: _GestureMakeSystemRunner(_SysActionId, _SysActionFn) }
+	_SysActionEntry := { Fn: _GestureMakeSystemRunner(_SysActionId, _SysActionFn) }
+	if _SysActionId == "force_quit_frontmost" || _SysActionId == "unblock_file_selection"
+		_SysActionEntry.ConfirmedFn := _GestureMakeConfirmedSystemRunner(_SysActionId, _SysActionFn)
+	GESTURE_ACTIONS[_SysActionId] := _SysActionEntry
 }
 
 ; Not deferred: Launch returns as soon as the shell accepted the target, and the
@@ -333,17 +355,34 @@ GestureSysForceQuitTarget(Active, Sys) {
 }
 
 ; Terminates the active application at once, unsaved work included.
-GestureSysForceQuitFrontmost(Sys := 0) {
+; @param {Object|Integer} Sys The SystemControl adapter, or 0 for the native one.
+; @param {Object|Integer} ConfirmedTarget The approved window and TargetPid, or
+;   0 for direct execution against the current foreground window.
+GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 	Sys := _GestureSys(Sys)
-	Target := GestureSysForceQuitTarget(Sys.ActiveWindow(), Sys)
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "force_quit_frontmost refused: its original window target is no longer owned.")
+		return false
+	}
+	Target := GestureSysForceQuitTarget(IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow(), Sys)
 	if (Target.Refusal != "") {
 		LoggerWarn("gestures", "force_quit_frontmost refused: {1}.", Target.Refusal)
 		return
 	}
-	if Sys.CloseProcess(Target.Pid)
-		LoggerInfo("gestures", "Process {1} terminated.", Target.Pid)
+	if IsObject(ConfirmedTarget) && (!ConfirmedTarget.HasOwnProp("TargetPid") || Target.Pid != ConfirmedTarget.TargetPid) {
+		LoggerWarn("gestures", "force_quit_frontmost refused: the resolved process differs from its approved target.")
+		return false
+	}
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original window target is no longer owned.")
+		return false
+	}
+	; The captured approval remains effect authority even after later reads.
+	Pid := IsObject(ConfirmedTarget) ? ConfirmedTarget.TargetPid : Target.Pid
+	if Sys.CloseProcess(Pid)
+		LoggerInfo("gestures", "Process {1} terminated.", Pid)
 	else
-		LoggerError("gestures", "Process {1} could not be terminated.", Target.Pid)
+		LoggerError("gestures", "Process {1} could not be terminated.", Pid)
 }
 
 ; Empties the Recycle Bin of every drive. Confirmed by GestureInvokeAction.
@@ -460,14 +499,22 @@ _GestureSysActiveFolder(Sys) {
 ; Removes the Mark of the Web (the Zone.Identifier stream) from the selected
 ; files, and from every file inside a selected folder. Confirmed by
 ; GestureInvokeAction.
-GestureSysUnblockFileSelection(Sys := 0) {
+GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	Sys := _GestureSys(Sys)
-	Window := _GestureSysActiveExplorer(Sys, Sys.ActiveWindow())
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "unblock_file_selection refused: its original window target is no longer owned.")
+		return false
+	}
+	Window := _GestureSysActiveExplorer(Sys, IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow())
 	Paths := IsObject(Window) ? GestureSysExplorerSelectedPaths(Window) : ""
 	if !(Paths is Array) || (Paths.Length = 0) {
 		LoggerInfo("gestures", "unblock_file_selection: no file is selected in Explorer.")
 		Sys.Notify(t("system_actions.no_file_selected"))
 		return
+	}
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "unblock_file_selection refused before mutation: its original window target is no longer owned.")
+		return false
 	}
 	Removed := 0, Failed := 0
 	for Path in Paths {
