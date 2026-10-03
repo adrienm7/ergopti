@@ -321,6 +321,12 @@ remain pending in the next macOS install/launch run.
   The recommended-delay slice awaits native Windows qualification; editing
   hand-written array-of-table delimiters remains unfinished.
 
+The measured-delay native fixture now isolates the real corpus metadata
+cache from the earlier resolution-cascade double and restores the exact
+prior cache identity. Its original inherited 1.0-second, recommended
+0.5-second, resolver and refusal-recovery assertions remain intact; native
+Windows requalification remains pending.
+
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins
   STOPPED, exact native unregistration and the persisted OFF/rule removal.
