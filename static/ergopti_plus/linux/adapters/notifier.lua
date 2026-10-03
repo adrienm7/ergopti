@@ -150,8 +150,10 @@ function M.send(message, opts)
 	-- Backgrounded, and its output discarded. notify-send returns once the
 	-- daemon acknowledges, which is fast but not instant, and this can be
 	-- reached from the keystroke path.
+	-- The native option boundary keeps option-looking caller text literal even
+	-- after shell quoting has preserved it as a single argv element.
 	local command = string.format(
-		"notify-send --app-name=%s --urgency=%s --expire-time=%d %s %s >/dev/null 2>&1 &",
+		"notify-send --app-name=%s --urgency=%s --expire-time=%d -- %s %s >/dev/null 2>&1 &",
 		Shell.quote(DEFAULT_TITLE), urgency, TIMEOUT_MS,
 		Shell.quote(title), Shell.quote(message))
 

@@ -623,6 +623,15 @@ jobs:
           dbus-run-session -- xvfb-run -a luajit tests/hardware/run_model_pull_receipts.lua
         timeout-minutes: 2
 
+      - name: Preserve literal desktop notification text
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
+        timeout-minutes: 2
+
       - name: The webview push reaches a real WebKit page
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
