@@ -17,6 +17,31 @@ os.remove(tmp_base)
 local tmp_file = tmp_base .. "_test.txt"
 local tmp_utf8 = tmp_base .. "_utf8.txt"
 
+helpers.describe("linux-native-path-receipts", function()
+	for _, method in ipairs({ "read", "write", "append", "exists", "delete" }) do
+		for index, path in ipairs({ "\0owned", "owned\0suffix", "owned\0", "owned\0suffix\0" }) do
+			helpers.it("linux-native-path-receipts: " .. method .. " refuses NUL case " .. index, function()
+				local original_open, original_remove = io.open, os.remove
+				local native_calls = 0
+				local lfs = package.loaded["lfs"]
+				local original_attributes = type(lfs) == "table" and lfs.attributes or nil
+				io.open = function() native_calls = native_calls + 1; return nil, "not found", 2 end
+				os.remove = function() native_calls = native_calls + 1; return true end
+				if original_attributes then
+					lfs.attributes = function() native_calls = native_calls + 1; return nil, "not found", 2 end
+				end
+				local ok, result = pcall(fs[method], path, "replacement")
+				io.open, os.remove = original_open, original_remove
+				if original_attributes then lfs.attributes = original_attributes end
+				helpers.assert_true(ok)
+				if method == "read" then helpers.assert_eq(result, nil)
+				else helpers.assert_eq(result, false) end
+				helpers.assert_eq(native_calls, 0, "invalid path must not reach a C-string API")
+			end)
+		end
+	end
+end)
+
 helpers.describe("linux-native-delete-receipts", function()
 	for _, case in ipairs({
 		{ name = "deleted file", result = true, accepted = true },

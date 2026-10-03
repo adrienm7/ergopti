@@ -27,6 +27,13 @@ local Logger = require("logger.shim")
 local LOG = "adapters.file_system"
 local ENOENT = 2 -- Native Linux errno: a failed unlink proves absence only here.
 
+--- Rejects paths that a native C-string API would silently truncate.
+--- @param path any
+--- @return boolean
+local function valid_native_path(path)
+	return type(path) == "string" and path ~= "" and not path:find("\0", 1, true)
+end
+
 --- Reads exact bytes while distinguishing absence from a failed read.
 --- @param path string Source path.
 --- @return string|nil content
@@ -63,8 +70,8 @@ if not ok_lfs then lfs = nil end
 --- @param path string Absolute path to the file.
 --- @return string|nil File contents, or nil on any error.
 function M.read(path)
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "read(): path must be a non-empty string.")
+	if not valid_native_path(path) then
+		Logger.error(LOG, "read(): path must be a non-empty string without NUL.")
 		return nil
 	end
 
@@ -115,8 +122,8 @@ end
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
 function M.write(path, content)
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "write(): path must be a non-empty string.")
+	if not valid_native_path(path) then
+		Logger.error(LOG, "write(): path must be a non-empty string without NUL.")
 		return false
 	end
 	content = type(content) == "string" and content or ""
@@ -142,8 +149,8 @@ end
 --- @param content string UTF-8 content to append.
 --- @return boolean true on success, false on any error.
 function M.append(path, content)
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "append(): path must be a non-empty string.")
+	if not valid_native_path(path) then
+		Logger.error(LOG, "append(): path must be a non-empty string without NUL.")
 		return false
 	end
 	content = type(content) == "string" and content or ""
@@ -168,7 +175,7 @@ end
 --- @param path string Absolute path to test.
 --- @return boolean true if the path exists, false otherwise.
 function M.exists(path)
-	if type(path) ~= "string" or path == "" then return false end
+	if not valid_native_path(path) then return false end
 
 	-- Prefer lfs.attributes which performs a stat() syscall directly.
 	if lfs then
@@ -189,8 +196,8 @@ end
 --- @param path string Absolute path to the file to delete.
 --- @return boolean true on success or file-not-found, false on any other error.
 function M.delete(path)
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "delete(): path must be a non-empty string.")
+	if not valid_native_path(path) then
+		Logger.error(LOG, "delete(): path must be a non-empty string without NUL.")
 		return false
 	end
 
