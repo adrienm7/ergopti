@@ -571,7 +571,7 @@ function checkInfoBarControl() {
 	);
 	const definition = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
 	assert.deepEqual(corpus.states, [false, true], 'both independently captured states execute');
-	assert.equal(definition.length, 3);
+	assert.equal(definition.length, 5);
 	assert.deepEqual(definition[0], { type: 'list', id: 'llm_display_leading' });
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
@@ -690,8 +690,108 @@ function checkAutoTemperatureControl() {
 	);
 }
 
+function checkShowAllControl() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/show_all_control.json'), 'utf8')
+	);
+	assert.deepEqual(corpus.states, [
+		{ progressive: false, show_all: true },
+		{ progressive: true, show_all: false }
+	]);
+	assert.deepEqual(corpus.prediction_counts, [1, 2]);
+	const rows = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
+	assert.equal(rows.length, 5);
+	assert.deepEqual(
+		rows.map((row) => row.id),
+		[
+			'llm_display_leading',
+			'llm_info_bar',
+			'llm_display_remaining',
+			corpus.row.id,
+			'llm_display_trailing'
+		]
+	);
+	assert.equal(rows[3].type, 'check');
+	assert.equal(rows[3].i18n, corpus.row.i18n);
+	assert.deepEqual(rows[3].checked_when, ['llm_show_all_enabled']);
+	assert.deepEqual(rows[3].disabled_when, ['llm_show_all_ready']);
+	for (const [file, first, last] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildDisplayMenu(',
+			'LLM_Menu_BuildNavMenu('
+		],
+		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_display"] = function',
+			'dynamic_handlers["llm_navigation"] = function'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first),
+			end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: real display consumers must exist`);
+		const body = source.slice(start, end);
+		for (const owner of [
+			'llm_show_all',
+			'llm_show_all_enabled',
+			'llm_show_all_ready',
+			'llm_display_trailing'
+		])
+			assert(body.includes(`"${owner}"`), `${file}: the actual native consumer owns ${owner}`);
+		assert(!body.includes(corpus.row.i18n), `${file}: the native label must be retired`);
+	}
+	for (const [file, first, last, projection] of [
+		[
+			'windows/ui/menu/menu_llm/_index.ahk',
+			'LLM_Menu_ApplySharedDefaults() {',
+			'LLM_Menu_ApplySharedDefaults()',
+			'LLM_DisplayShowAll(LLM_Defaults[shared_key])'
+		],
+		[
+			'windows/modules/llm/prediction_engine.ahk',
+			'LLM_Engine_ApplySharedDefaults() {',
+			'_LLM_Engine_FrameSignaturePart(',
+			'LLM_DisplayShowAll(LLM_Defaults[shared_key])'
+		],
+		[
+			'windows/ui/menu/menu_llm/persist.ahk',
+			'_LLM_Menu_SyncToFeatures(',
+			'_LLM_Menu_AppendPersistedUpdates(',
+			'LLM_DisplayProgressive(Validated["show_all_at_once"])'
+		],
+		[
+			'windows/ui/menu/menu_llm/persist.ahk',
+			'LLM_Menu_BuildSavedOpts(',
+			'\n}',
+			'LLM_DisplayShowAll(opts["show_all_at_once"])'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first),
+			end = source.indexOf(last, start + first.length);
+		assert(start >= 0 && end > start, `${file}: the actual typed projection bounds must exist`);
+		assert(
+			source.slice(start, end).includes(projection),
+			`${file}: canonical/native projection cannot drift`
+		);
+	}
+	const contract = JSON.parse(
+		readFileSync(resolve(SHARED, 'modules/llm/menu_persistence_contract.json'), 'utf8')
+	);
+	const wire = contract.entries.find((row) => row.id === 'streaming_multi').ahk;
+	assert.equal(wire.sample, false);
+	assert.equal(wire.persisted_sample, true);
+	console.log(
+		'Show-all display: independent polarities, actual native consumers and all four Windows boundaries qualified.'
+	);
+}
+
 main();
 checkChoiceProjection();
 checkWordExpanderControls();
 checkInfoBarControl();
 checkAutoTemperatureControl();
+checkShowAllControl();

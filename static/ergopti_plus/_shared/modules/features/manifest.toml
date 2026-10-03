@@ -4017,6 +4017,17 @@ disabled_when = ["llm_info_bar_ready"]
 type = "list"
 id = "llm_display_remaining"
 
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_show_all"
+i18n = "menu.llm.show_all_at_once"
+checked_when = ["llm_show_all_enabled"]
+disabled_when = ["llm_show_all_ready"]
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_trailing"
+
 # Generation numeric providers retain their native prompts; the common diversity
 # checkbox has one label, checked state and current readiness owner on every OS.
 [[menu.llm_generation_menu]]

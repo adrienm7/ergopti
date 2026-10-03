@@ -1292,6 +1292,7 @@ local function create_menu(deps)
 						state        = state,
 						keymap       = keymap,
 						is_disabled  = is_disabled,
+						is_paused    = deps.script_control and deps.script_control.is_paused,
 						save_prefs   = save_prefs,
 						update_menu  = update_menu,
 						settings_mgr = settings_mgr,

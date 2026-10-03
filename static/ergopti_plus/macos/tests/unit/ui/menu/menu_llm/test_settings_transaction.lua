@@ -126,6 +126,7 @@ local function with_fixture(options, callback)
 		llm_secure_field_filter_enabled = false,
 		llm_disabled_apps = {{name = "Old", appPath = "/Old.app"}},
 	}
+	if options.progressive_state ~= nil then state.llm_streaming_multi = options.progressive_state end
 	if options.info_bar_state ~= nil then state.llm_show_info_bar = options.info_bar_state end
 	if options.auto_raise_state ~= nil then state.llm_auto_raise_temp = options.auto_raise_state end
 	if options.prediction_count ~= nil then state.llm_num_predictions = options.prediction_count end
@@ -268,6 +269,13 @@ local function with_fixture(options, callback)
 		json_decode = function(raw)
 			local root = assert(require("json").decode(raw))
 			if options.info_label then root.llm_display_menu[2].i18n = options.info_label end
+			for index, row in ipairs(root.llm_display_menu) do
+				if row.id == "llm_show_all" then
+					if options.show_all_label then row.i18n = options.show_all_label end
+					if options.show_all_first then table.remove(root.llm_display_menu, index); table.insert(root.llm_display_menu, 1, row) end
+					break
+				end
+			end
 			if root.llm_generation_menu then
 				if options.auto_label then root.llm_generation_menu[2].i18n = options.auto_label end
 				if options.auto_first then
@@ -495,6 +503,7 @@ local function with_fixture(options, callback)
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
+				is_paused = function() return options.paused == true end,
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
@@ -1227,5 +1236,88 @@ helpers.describe("LLM shared automatic temperature control", function()
 			helpers.assert_eq(fixture.rendered().llm_auto_raise_temp, true)
 			helpers.assert_eq(fixture.calls.menu, 0)
 		end)
+	end)
+end)
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 6/ Show-All Parity =======
+-- ==================================
+-- ==================================
+
+--- Loads explicit historical display semantics independently of native policy.
+--- @return table
+local function show_all_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/show_all_control.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared Show-all check", function()
+	helpers.it("replays both progressive polarities through acknowledged native publication (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, expected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_fixture({progressive_state = expected.progressive, prediction_count = count}, function(fixture)
+					local row = assert(find_item(fixture.streaming_menu(), corpus.row.i18n))
+					helpers.assert_eq(row.checked, expected.show_all)
+					helpers.assert_eq(row.disabled == true, count < 2)
+					local changed = row.fn()
+					helpers.assert_eq(changed, count >= 2)
+					local value = expected.progressive
+					if count >= 2 then value = not expected.progressive end
+					helpers.assert_eq(fixture.state.llm_streaming_multi, value)
+					helpers.assert_eq(fixture.runtime.llm_streaming_multi, value)
+					helpers.assert_eq(fixture.persisted().llm_streaming_multi, value)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("consumes the common Show-all label and row order (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		with_fixture({progressive_state = true, show_all_label = corpus.alternate_i18n, show_all_first = true}, function(fixture)
+			local rows = fixture.streaming_menu()
+			helpers.assert_eq(rows[1].title, corpus.alternate_i18n)
+			helpers.assert_eq(rows[1].checked, false)
+			helpers.assert_eq(rows[2].title, "menu.llm.indent_label")
+		end)
+	end)
+
+	helpers.it("refuses delayed Show-all changes when the current count loses its second slot (shared-show-all)", function()
+		local options = {progressive_state = true, prediction_count = 2}
+		with_fixture(options, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), show_all_corpus().row.i18n))
+			fixture.state.llm_num_predictions = 1
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_streaming_multi, true)
+			helpers.assert_eq(fixture.runtime.llm_streaming_multi, true)
+			helpers.assert_eq(fixture.persisted().llm_streaming_multi, true)
+			helpers.assert_eq(fixture.calls.save, 0)
+			fixture.state.llm_num_predictions = 2
+			options.paused = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, 0)
+		end)
+	end)
+
+	helpers.it("keeps runtime, durable and rendered polarity after false, nil or throwing writers (shared-show-all)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_fixture({progressive_state = true, failures = {{name = "save", mode = mode}}}, function(fixture)
+				local row = assert(find_item(fixture.streaming_menu(), show_all_corpus().row.i18n))
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.state.llm_streaming_multi, true)
+				helpers.assert_eq(fixture.runtime.llm_streaming_multi, true)
+				helpers.assert_eq(fixture.persisted().llm_streaming_multi, true)
+				helpers.assert_eq(fixture.rendered().llm_streaming_multi, true)
+				helpers.assert_eq(fixture.calls.menu, 0)
+			end)
+		end
 	end)
 end)

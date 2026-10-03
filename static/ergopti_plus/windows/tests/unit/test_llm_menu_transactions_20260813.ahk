@@ -944,8 +944,8 @@ _LMT_SharedInfoBarNativeOwner() {
 		OriginalLabel := InfoRow["i18n"]
 		try {
 			InfoRow["i18n"] := Corpus["alternate_i18n"]
-			Definitions[2] := SavedDefinitions[3]
-			Definitions[3] := SavedDefinitions[2]
+			Definitions.RemoveAt(2)
+			Definitions.Push(InfoRow)
 			_LLM_Menu["show_info_bar"] := true
 			_LMT_WriterResult := false
 			_LMT_WriterCalls := 0
@@ -1077,3 +1077,262 @@ _LMT_SharedAutoTemperatureOwner() {
 	} finally _LMT_RestoreFixture(Previous)
 }
 Test("LLM generation: shared temperature diversity retains native receipts and current count", _LMT_SharedAutoTemperatureOwner)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 4/ Show-All Projection =======
+; ======================================
+; ======================================
+
+_LMT_ShowAllCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\show_all_control.json"))
+}
+
+_LMT_ShowAllCollect(CandidateFeatures, CandidateMenu) {
+	return [{ Section: "llm.display", Key: "streaming_multi",
+		Value: CandidateFeatures["llm"]["display"]["streaming_multi"] }]
+}
+
+_LMT_ShowAllToggle(Writer := 0, *) {
+	if !IsObject(Writer)
+		Writer := _LMT_Writer
+	return LLM_Menu_CommitMutation("the native Show-all control",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "show_all_at_once"),
+		_LMT_Apply, Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_ShowAllCollect)
+}
+
+_LMT_ShowAllThrowWriter(Path, Updates) {
+	global _LMT_WriterCalls
+	_LMT_WriterCalls += 1
+	throw Error("The owned Show-all writer refused.")
+}
+
+_LMT_ShowAllPosition(Built, Label) {
+	Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+	Loop Count {
+		Position := A_Index - 1
+		if _CTC_LabelAt(Built, Position) == Label
+			return Position
+	}
+	throw Error("The actual display menu omitted the shared Show-all check.")
+}
+
+_LMT_SharedShowAllNativeOwner() {
+	global _LLM_Menu, Features, _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		Corpus := _LMT_ShowAllCorpus()
+		AssertEqual(2, Corpus["states"].Length)
+		for Expected in Corpus["states"] {
+			for Count in Corpus["prediction_counts"] {
+				_LLM_Menu["show_all_at_once"] := Expected["show_all"]
+				_LLM_Menu["n_predictions"] := Count
+				Features["llm"]["display"]["streaming_multi"] := Expected["progressive"]
+				Features["llm"]["profiles"]["num_predictions"] := Count
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+				try {
+					Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+					AssertEqual(Expected["show_all"], _CTC_IsChecked(Built, Position))
+					Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+					Assert(Flags != 0xFFFFFFFF)
+					AssertEqual(Count < 2, !!(Flags & 0x3))
+					Callback := _LMT_InfoBarCallback(Built, Position)
+					AssertEqual(Count >= 2, Callback.Call())
+					AssertEqual(Count >= 2 ? !Expected["show_all"] : Expected["show_all"], _LLM_Menu["show_all_at_once"])
+					if Count >= 2
+						AssertEqual(!Expected["progressive"], Features["llm"]["display"]["streaming_multi"])
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_WriterCalls)
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_ApplyCalls)
+				} finally _CTC_ReleaseMenu(Built)
+			}
+		}
+		_LLM_Menu["n_predictions"] := 2
+		_LLM_Menu["show_all_at_once"] := false
+		Features["llm"]["display"]["streaming_multi"] := true
+		Features["llm"]["profiles"]["num_predictions"] := 2
+		_LMT_WriterCalls := 0
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+		try {
+			Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"])))
+			_LLM_Menu["n_predictions"] := 1
+			AssertFalse(Callback.Call(), "a delayed click cannot own a withdrawn second slot")
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+			AssertEqual(0, _LMT_WriterCalls)
+		} finally _CTC_ReleaseMenu(Built)
+		_LLM_Menu["n_predictions"] := 2
+		SavedSuspend := A_IsSuspended
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+		try {
+			Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"])))
+			Suspend(true)
+			AssertFalse(Callback.Call(), "a held command cannot publish across a native pause")
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+		} finally {
+			Suspend(SavedSuspend)
+			_CTC_ReleaseMenu(Built)
+		}
+		for Refusal in [false, "", Map()] {
+			_LMT_WriterResult := Refusal
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+				AssertFalse(_LMT_InfoBarCallback(Built, Position).Call())
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		}
+		_LMT_WriterCalls := 0
+		_LMT_ApplyCalls := 0
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle.Bind(_LMT_ShowAllThrowWriter))
+		try {
+			Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+			AssertFalse(_LMT_InfoBarCallback(Built, Position).Call())
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+			AssertEqual(1, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+		} finally _CTC_ReleaseMenu(Built)
+		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
+		SavedDefinitions := Definitions.Clone()
+		CheckRow := Definitions[4]
+		OriginalLabel := CheckRow["i18n"]
+		try {
+			CheckRow["i18n"] := Corpus["alternate_i18n"]
+			Definitions.RemoveAt(4)
+			Definitions.InsertAt(1, CheckRow)
+			_LLM_Menu["n_predictions"] := 2
+			_LMT_WriterResult := false
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				AssertEqual(t(Corpus["alternate_i18n"]), _CTC_LabelAt(Built, 0))
+				AssertFalse(_LMT_InfoBarCallback(Built).Call())
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		} finally {
+			CheckRow["i18n"] := OriginalLabel
+			for Index, Row in SavedDefinitions
+				Definitions[Index] := Row
+		}
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM display: shared Show-all checks keep the native receipt and canonical polarity",
+	_LMT_SharedShowAllNativeOwner)
+
+/** Captures the real dispatcher's retry without starting an ambient timer. */
+_LMT_ShowAllArmRetry(State, Callback, DelayMs) {
+	State["timers"].Push(Map("callback", Callback, "delay", DelayMs))
+	return true
+}
+
+_LMT_ShowAllRetryBusy(State) {
+	return State["busy"]
+}
+
+_LMT_ShowAllSetMaster(Value) {
+	return LLM_Menu_CommitMutation("the Show-all fixture master",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "enabled", Value),
+		_LMT_Apply, _LMT_Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Collect)
+}
+
+_LMT_ShowAllMasterRevokesHeldAndDeferred() {
+	global _LLM_Menu, Features, _LMT_WriterCalls, _LMT_ApplyCalls
+	global MENU_COMMAND_DEFERRAL_RETRY_MS, _MenuStartupCommands
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	SavedStartupCommands := _MenuStartupCommands
+	try {
+		Suspend(false)
+		_MenuStartupCommands := 0
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		_LLM_Menu["n_predictions"] := 2
+		Features["llm"]["profiles"]["num_predictions"] := 2
+		_LLM_Menu["show_all_at_once"] := false
+		Features["llm"]["display"]["streaming_multi"] := true
+		for Deferred in [false, true] {
+			AssertTrue(_LMT_ShowAllSetMaster(true))
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				Callback := _LMT_InfoBarCallback(Built,
+					_LMT_ShowAllPosition(Built, t(_LMT_ShowAllCorpus()["row"]["i18n"])))
+				State := Map("busy", true, "timers", [])
+				if Deferred {
+					Writes := _LMT_WriterCalls
+					AssertEqual("", MenuCommandRun(Callback, [], 0,
+						_LMT_ShowAllRetryBusy.Bind(State), _LMT_ShowAllArmRetry.Bind(State)))
+					AssertEqual(Writes, _LMT_WriterCalls)
+					AssertEqual(1, State["timers"].Length)
+					AssertEqual(MENU_COMMAND_DEFERRAL_RETRY_MS, State["timers"][1]["delay"])
+				}
+				AssertTrue(_LMT_ShowAllSetMaster(false), "the real master owner acknowledges withdrawal")
+				AssertFalse(_LLM_Menu["enabled"])
+				AssertFalse(Features["llm"]["enabled"])
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				if Deferred {
+					State["busy"] := false
+					State["timers"][1]["callback"].Call()
+					AssertEqual(1, State["timers"].Length, "no competing retry is armed after the lease releases")
+				} else {
+					AssertFalse(Callback.Call(), "a retained native callback refuses the disabled master")
+				}
+				AssertEqual(0, _LMT_WriterCalls, "held and dispatcher-deferred delivery publish no display setting")
+				AssertEqual(0, _LMT_ApplyCalls)
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertTrue(Features["llm"]["display"]["streaming_multi"])
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_MenuStartupCommands := SavedStartupCommands
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: master withdrawal fences held and real dispatcher-deferred Show-all commands",
+	_LMT_ShowAllMasterRevokesHeldAndDeferred)
+
+_LMT_ShowAllCanonicalBoundaries() {
+	global _LLM_Menu, Features, LLM_Defaults, _LLM_Engine
+	Previous := _LMT_InstallFixture()
+	SavedDefaults := LLM_Defaults
+	SavedEngine := _LLM_Engine
+	try {
+		for Expected in _LMT_ShowAllCorpus()["states"] {
+			LLM_Defaults := Map("llm_streaming_multi", Expected["progressive"])
+			_LLM_Engine := SavedEngine.Clone()
+			LLM_Engine_ApplySharedDefaults()
+			AssertEqual(Expected["show_all"], _LLM_Engine["show_all_at_once"],
+				"the real engine default loader projects canonical progressive display")
+			Features["llm"]["display"]["streaming_multi"] := Expected["progressive"]
+			Opts := LLM_Menu_BuildSavedOpts()
+			AssertEqual(Expected["show_all"], Opts["show_all_at_once"],
+				"both raw stored polarities load without rewriting historical bytes")
+			_LLM_Menu["show_all_at_once"] := Expected["show_all"]
+			AssertTrue(_LLM_Menu_SyncToFeatures())
+			AssertEqual(Expected["progressive"], Features["llm"]["display"]["streaming_multi"],
+				"the acknowledged writer receives canonical progressive display")
+		}
+	} finally {
+		LLM_Defaults := SavedDefaults
+		_LLM_Engine := SavedEngine
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: shared defaults and saved values invert only at native boundaries",
+	_LMT_ShowAllCanonicalBoundaries)
