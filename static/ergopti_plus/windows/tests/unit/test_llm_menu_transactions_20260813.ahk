@@ -50,7 +50,7 @@ _LMT_Menu() {
 	MenuState["model"] := "live-model"
 	MenuState["user_profiles"] := [Map("id", "user_one",
 		"label", "Live label", "system_single", "Live prompt",
-		"batch", false)]
+		"system_multi", "", "batch", false)]
 	MenuState["profile_id"] := "user_one"
 	MenuState["nav_modifiers"] := ""
 	MenuState["disabled_apps"] := []
@@ -2022,3 +2022,60 @@ _LMT_IndentObservationIsClosed() {
 	AssertFalse(InStr(Summary, "unknown_future_stage"))
 }
 Test("LLM display: indentation owner diagnostics retain only closed stage facts", _LMT_IndentObservationIsClosed)
+
+
+; The full collector serializes stored profiles, not just scalar menu choices.
+; Its fixture must satisfy the same required fields as the actual boot owner.
+_LMT_FullCollectorOwnsCompleteProfile() {
+	global Features, _LLM_Menu
+	Previous := _LMT_InstallFixture()
+	try {
+		Profiles := _LLM_Menu["user_profiles"]
+		AssertEqual(1, Profiles.Length)
+		AssertTrue(Profiles[1].Has("system_multi"),
+			"the common transaction fixture must carry every stored profile prompt")
+		AssertEqual("", Profiles[1]["system_multi"])
+		Payload := _LLM_Menu_SerializeUserProfiles(Profiles)
+		AssertTrue(Payload is String,
+			"the actual stored-profile owner must accept the common fixture")
+		Parsed := _LLM_Menu_DeserializeUserProfiles(Payload)
+		AssertTrue(Parsed is Array,
+			"the actual stored-profile decoder must admit the encoded fixture")
+		AssertEqual("user_one", Parsed[1]["id"])
+		AssertEqual("Live label", Parsed[1]["label"])
+		AssertEqual("Live prompt", Parsed[1]["system_single"])
+		AssertEqual("", Parsed[1]["system_multi"])
+		AssertEqual(false, Parsed[1]["batch"])
+
+		Updates := _ConfigCollectFullSaveUpdates(Features, _LLM_Menu)
+		AssertTrue(Updates is Array,
+			"the actual full collector must reach its returned update image")
+		Found := 0
+		for Update in Updates {
+			if Update.Section == "llm" && Update.Key == "user_profiles" {
+				Found += 1
+				AssertEqual(Payload, Update.Value)
+			}
+		}
+		AssertEqual(1, Found,
+			"one actual full-save update owns the complete stored profile payload")
+
+		Incomplete := LLM_Menu_DeepClone(_LLM_Menu)
+		Incomplete["user_profiles"][1].Delete("system_multi")
+		AssertFalse(_LLM_Menu_SerializeUserProfiles(Incomplete["user_profiles"]),
+			"an incomplete profile must still be refused by its actual owner")
+		AssertFalse(_LLM_Menu_AppendPersistedUpdates([], Incomplete))
+		Refused := false
+		try _ConfigCollectFullSaveUpdates(Features, Incomplete)
+		catch {
+			Refused := true
+		}
+		AssertTrue(Refused,
+			"the actual full collector must retain its incomplete-profile refusal")
+		AssertTrue(_LLM_Menu["user_profiles"][1].Has("system_multi"))
+		AssertEqual(Payload, _LLM_Menu_SerializeUserProfiles(_LLM_Menu["user_profiles"]),
+			"the negative detached candidate must not mutate the live fixture")
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM transaction: actual full collector requires a complete stored profile",
+	_LMT_FullCollectorOwnsCompleteProfile)
