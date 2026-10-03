@@ -201,6 +201,8 @@ headers are reported explicitly rather than inferred to be a rate limit.
 Registered CLI regressions, Linux units and portable E2E pass; the actual
 updater response and complete native checkpoint remain pending.
 
+Native scripting timeouts now retain a bounded read-only sample of the exact installed Hammerspoon server before retiring the owned client. Exact PID/executable identity is checked before and after sampling, native Process/Path headers must match, and loaded binary images do not qualify stack frames. Fifty-six portable Python cases pass. The selected format gate and 351 JS checks pass; the remaining standalone-uninstall check passes unchanged with its fixture outside protected checkout ancestors. The real server sample and all 18 timer measurements still require the next non-release macOS CI checkpoint.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
