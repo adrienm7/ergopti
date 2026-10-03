@@ -24,11 +24,20 @@ SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
 SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
 SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT = 8192
 SCRIPT_DIAGNOSTIC_LINE_LIMIT = 128
-SCRIPTING_PHASES = ("control", "constructor", "pid_control", "observation", "cleanup")
+SCRIPTING_PHASES = (
+    "control",
+    "constructor",
+    "pid_control",
+    "pid_no_prompt",
+    "observation",
+    "cleanup",
+)
 SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = len(SCRIPTING_PHASES)
 CONTROL_CONTRACT = "hs.applescript.control"
 PID_CONTROL_CONTRACT = "hs.applescript.pid-control"
 CONSTRUCTOR_CONTRACT = "hs.applescript.constructor"
+NO_PROMPT_CONTRACT = "hs.applescript.pid-no-prompt"
+NO_PROMPT_SEND_OPTIONS = 3 | 0x00020000
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -82,6 +91,63 @@ def _validate_owned_control(summary, contract, phase, feature):
         for key in ("nonce", "pid", "executable"):
             if type(feature.get(key)) is not type(summary[key]) or feature.get(key) != summary[key]:
                 raise ValueError(f"Native AppleEvent control and feature owners differ: {key}")
+
+
+def validate_no_prompt_receipt(raw, nonce, pid):
+    """Observe exact native admission results without granting any other proof."""
+    if (
+        not isinstance(raw, str)
+        or len(raw) > SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT
+        or not raw.startswith("{")
+        or not raw.endswith("}\n")
+        or "\n" in raw[:-1]
+    ):
+        raise ValueError("The no-prompt receipt is not one bounded JSON line")
+    result = json.loads(raw, object_pairs_hook=unique_object)
+    expected = {
+        "schema_version": 1,
+        "contract": NO_PROMPT_CONTRACT,
+        "phase": "pid_no_prompt",
+        "nonce": nonce,
+        "pid": pid,
+        "send_options": NO_PROMPT_SEND_OPTIONS,
+    }
+    if not isinstance(result, dict) or set(result) != set(expected) | {
+        "status",
+        "result",
+        "error_origin",
+        "error_domain",
+    }:
+        raise ValueError("The no-prompt receipt has incomplete event fields")
+    for key, value in expected.items():
+        if type(result[key]) is not type(value) or result[key] != value:
+            raise ValueError(f"The no-prompt event identity differs: {key}")
+    status, reply, origin = result["status"], result["result"], result["error_origin"]
+    domain = result["error_domain"]
+    if (
+        origin == "send"
+        and (type(domain) is not str or not domain or len(domain) > 128)
+        or origin != "send"
+        and domain is not None
+    ):
+        raise ValueError("The no-prompt error domain is not an actual native error field")
+    if type(status) is not int or not -(2**31) <= status < 2**31:
+        raise ValueError("The no-prompt event status is not an actual OSStatus")
+    if status == 0:
+        if type(reply) is not str or reply != nonce or origin != "none":
+            raise ValueError("The no-prompt reply did not acknowledge its exact nonce")
+        outcome = "acknowledged"
+    else:
+        if reply is not None or origin not in ("send", "handler"):
+            raise ValueError("The no-prompt native refusal has ambiguous reply fields")
+        if status in (-1744, -1743) and origin != "send":
+            raise ValueError("An event-handler error cannot establish transport admission")
+        outcome = (
+            {-1744: "consent_required", -1743: "denied"}.get(status, "refused")
+            if domain == "NSOSStatusErrorDomain"
+            else "refused"
+        )
+    return dict(result, outcome=outcome)
 
 
 def validate_constructor_receipt(raw, nonce, pid, direct_text):
@@ -355,7 +421,7 @@ class NativeDelayedTimerProbe:
             "return execute lua code (item 1 of argv)\nend tell\nend run"
         )
         arguments = ["/usr/bin/osascript", "-e", script, source]
-        if phase in ("pid_control", "constructor"):
+        if phase in ("pid_control", "constructor", "pid_no_prompt"):
             if self.runtime_owner is None:
                 raise RuntimeError("The PID control has no bound native runtime")
             pid, processes = self.runtime_owner
@@ -368,11 +434,13 @@ class NativeDelayedTimerProbe:
             # The sender remains osascript. Only the address changes: a raw kernel
             # PID bypasses application-path resolution while HmSp/EXEC still
             # reaches the pinned NSScriptCommand and its enabled preference.
-            script = (
-                self.constructor_script() if phase == "constructor" else self.pid_control_script()
-            )
+            script = {
+                "constructor": self.constructor_script,
+                "pid_control": self.pid_control_script,
+                "pid_no_prompt": self.no_prompt_script,
+            }[phase]()
             arguments = ["/usr/bin/osascript", "-l", "JavaScript", "-e", script, str(pid), source]
-            if phase == "constructor":
+            if phase in ("constructor", "pid_no_prompt"):
                 arguments.append(self.nonce)
         elif _target_pid is not None:
             raise ValueError("A PID address is reserved for its distinct diagnostic")
@@ -418,13 +486,17 @@ class NativeDelayedTimerProbe:
                 "The native scripting command did not acknowledge actual process exit"
             )
         self.scripting_commands.remove(command)
-        if phase == "constructor":
+        if phase in ("constructor", "pid_no_prompt"):
             if command.returncode != 0:
                 raise RuntimeError(
-                    "The native descriptor constructor refused its bounded receipt "
+                    f"The native {phase} command refused its bounded receipt "
                     f"(exit {command.returncode}): {stderr.strip()[:1000]}"
                 )
-            return validate_constructor_receipt(stdout, self.nonce, pid, source)
+            return (
+                validate_constructor_receipt(stdout, self.nonce, pid, source)
+                if phase == "constructor"
+                else validate_no_prompt_receipt(stdout, self.nonce, pid)
+            )
         acknowledged = (
             stdout == self.nonce + "\n"
             if phase in ("control", "pid_control")
@@ -499,6 +571,63 @@ function run(argv) {
 }
 """.replace("__SCRIPTING_TIMEOUT_SECONDS__", json.dumps(SCRIPTING_TIMEOUT_SECONDS))
         )
+
+    @staticmethod
+    def no_prompt_script():
+        """Discriminate native admission without prompting or changing permission."""
+        return (
+            NativeDelayedTimerProbe.pid_event_constructor()
+            + """
+function run(argv) {
+    if (argv.length !== 3) throw new Error('No-prompt control arguments refused');
+    var pid = Number(argv[0]);
+    var event = constructOwnedEvent(pid, argv[1]);
+    var error = Ref();
+    var reply = event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __SCRIPTING_TIMEOUT_SECONDS__, error);
+    var status = 0, result = null, origin = 'none', domain = null;
+    if (!reply || reply.isNil()) {
+        var nativeError = error[0];
+        if (!nativeError || nativeError.isNil()) throw new Error('Native send status unavailable');
+        status = Number(nativeError.code);
+        domain = ObjC.unwrap(nativeError.domain);
+        origin = 'send';
+    } else {
+        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);
+        if (!errorNumber.isNil()) status = Number(errorNumber.int32Value);
+        if (status !== 0) origin = 'handler';
+        else {
+            var direct = reply.paramDescriptorForKeyword(0x2d2d2d2d);
+            if (direct.isNil()) throw new Error('Native no-prompt result missing');
+            result = ObjC.unwrap(direct.stringValue);
+        }
+    }
+    if (!Number.isInteger(status)) throw new Error('Native send status refused');
+    return JSON.stringify({schema_version:1, contract:'hs.applescript.pid-no-prompt',
+        phase:'pid_no_prompt', nonce:argv[2], pid:pid, send_options:__NO_PROMPT_OPTIONS__,
+        status:status, result:result, error_origin:origin, error_domain:domain});
+}
+""".replace("__NO_PROMPT_OPTIONS__", str(NO_PROMPT_SEND_OPTIONS)).replace(
+                "__SCRIPTING_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)
+            )
+        )
+
+    def control_pid_no_prompt(self, pid, processes):
+        """Retain one supplemental native admission result after exact settlement."""
+        self.bind_runtime(pid, processes)
+        result = self.execute(
+            "return " + json.dumps(self.nonce), phase="pid_no_prompt", _target_pid=pid
+        )
+        if processes(self.executable) != [pid]:
+            raise RuntimeError("The no-prompt native process changed before receipt admission")
+        result["executable"] = str(self.executable)
+        self.retain_diagnostics(
+            [
+                f"Exact owned no-prompt AppleEvent {result['outcome']}: "
+                f"status {result['status']}, origin {result['error_origin']}"
+            ],
+            "pid_no_prompt",
+        )
+        return result
 
     @staticmethod
     def constructor_script():
@@ -609,6 +738,16 @@ function run(argv) {
                 "observations": observations,
             }
         )
+
+    def retain_primary_error(self, error, phase):
+        """Keep the bounded primary refusal even when native samples already exist."""
+        detail = self.pid_control_error_diagnostic(error)
+        if not any(receipt["phase"] == phase for receipt in self.diagnostic_receipts):
+            self.retain_diagnostics(["Native scripting phase refused"], phase)
+        for receipt in self.diagnostic_receipts:
+            if receipt["phase"] == phase:
+                receipt["primary_error"] = detail
+                return
 
     def sample_scripting_command(self, command):
         """Sample only an unreaped own child before any timeout retirement signal."""

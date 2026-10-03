@@ -23,6 +23,19 @@ DOMAIN = "com.ergoptiplus.app.hammerspoon"
 NONCE = "a" * 32
 
 
+def observe_child_budgets(child):
+    """Measure actual communicate deadlines while preserving the native child call."""
+    budgets = []
+    native_communicate = child.communicate
+
+    def communicate(*args, **options):
+        budgets.append(options.get("timeout"))
+        return native_communicate(*args, **options)
+
+    child.communicate = communicate
+    return budgets
+
+
 def receipt():
     """Return actual observation values for the complete native contract."""
     return {
@@ -430,12 +443,14 @@ class PidControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             owner = self.owner(folder)
             children = []
+            communicate_budgets = []
 
             def launch(arguments, **options):
                 source = (
                     "import time; time.sleep(5)" if not children else "print(" + repr(NONCE) + ")"
                 )
                 child = native_popen([sys.executable, "-c", source], **options)
+                communicate_budgets.append(observe_child_budgets(child))
                 children.append(child)
                 return child
 
@@ -448,16 +463,18 @@ class PidControlTests(unittest.TestCase):
                     mock.patch.object(
                         owner, "sample_native_runtime", return_value=["modeled native server"]
                     ),
-                    mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05),
                 ):
-                    with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
-                        owner.control_pid(42, lambda _: [42])
+                    with mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05):
+                        with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
+                            owner.control_pid(42, lambda _: [42])
                     self.assertIsNotNone(children[0].returncode)
                     self.assertEqual(owner.scripting_commands, [])
                     summary = owner.control_pid(42, lambda _: [42])
                 probe.validate_pid_control_summary(summary)
                 self.assertEqual(len(children), 2)
                 self.assertIsNotNone(children[1].returncode)
+                self.assertEqual(communicate_budgets[0], [0.05, 2])
+                self.assertEqual(communicate_budgets[1][0], 10)
             finally:
                 for child in children:
                     if child.poll() is None:
@@ -568,6 +585,224 @@ class PidControlTests(unittest.TestCase):
                 child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
             )
             self.assertEqual(owner.diagnostic_receipts[0]["phase"], "pid_control")
+
+
+def no_prompt_receipt(status=0, result=NONCE, error_origin="none"):
+    """Return independent native event outcomes without granting feature proof."""
+    return {
+        "schema_version": 1,
+        "contract": "hs.applescript.pid-no-prompt",
+        "phase": "pid_no_prompt",
+        "nonce": NONCE,
+        "pid": 42,
+        "send_options": 131075,
+        "status": status,
+        "result": result,
+        "error_origin": error_origin,
+        "error_domain": "NSOSStatusErrorDomain" if error_origin == "send" else None,
+    }
+
+
+class NoPromptControlTests(unittest.TestCase):
+    def owner(self, folder):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+        )
+        owner.nonce = NONCE
+        return owner
+
+    def test_exact_outcomes_use_same_constructor_sender_and_owned_terminal_child(self):
+        for status, outcome in (
+            (0, "acknowledged"),
+            (-1744, "consent_required"),
+            (-1743, "denied"),
+            (-1708, "refused"),
+        ):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                native = no_prompt_receipt(
+                    status, NONCE if status == 0 else None, "none" if status == 0 else "send"
+                )
+                child = mock.Mock(returncode=0)
+                child.communicate.return_value = (json.dumps(native) + "\n", "")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child) as spawn:
+                    receipt = owner.control_pid_no_prompt(42, lambda _: [42])
+                self.assertEqual(receipt["outcome"], outcome)
+                self.assertEqual(receipt["status"], status)
+                self.assertEqual(receipt["executable"], str(EXECUTABLE))
+                self.assertEqual(child.communicate.call_args, mock.call(timeout=10))
+                arguments = spawn.call_args.args[0]
+                self.assertEqual(arguments[:4], ["/usr/bin/osascript", "-l", "JavaScript", "-e"])
+                self.assertEqual(arguments[-3:], ["42", 'return "' + NONCE + '"', NONCE])
+                self.assertTrue(arguments[4].startswith(owner.pid_event_constructor()))
+                self.assertIn("sendEventWithOptionsTimeoutError(131075, 10, error)", arguments[4])
+                self.assertIn("Number(nativeError.code)", arguments[4])
+                self.assertIn("Number(errorNumber.int32Value)", arguments[4])
+                self.assertEqual(owner.scripting_commands, [])
+                self.assertFalse(owner.started)
+                self.assertIn(str(status), owner.diagnostic_receipts[0]["observations"])
+                with self.assertRaises(ValueError):
+                    probe.validate_control_summary(receipt)
+                with self.assertRaises(ValueError):
+                    probe.validate_pid_control_summary(receipt)
+
+    def test_receipt_refuses_identity_field_type_reply_and_error_ambiguity(self):
+        valid = no_prompt_receipt()
+        for field, value in (
+            ("pid", 43),
+            ("nonce", "b" * 32),
+            ("send_options", 3),
+            ("status", True),
+            ("status", None),
+            ("status", 2**32),
+            ("result", NONCE + " "),
+            ("error_origin", "send"),
+            ("phase", "pid_control"),
+        ):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                probe.validate_no_prompt_receipt(
+                    json.dumps(dict(valid, **{field: value})) + "\n", NONCE, 42
+                )
+        for invalid in (
+            dict(valid, extra=True),
+            no_prompt_receipt(-1744, NONCE, "send"),
+            no_prompt_receipt(-1743, None, "handler"),
+            no_prompt_receipt(-50, None, "none"),
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                probe.validate_no_prompt_receipt(json.dumps(invalid) + "\n", NONCE, 42)
+        foreign = no_prompt_receipt(-1744, None, "send")
+        foreign["error_domain"] = "OtherErrorDomain"
+        self.assertEqual(
+            probe.validate_no_prompt_receipt(json.dumps(foreign) + "\n", NONCE, 42)["outcome"],
+            "refused",
+        )
+        raw = json.dumps(valid)
+        for invalid in (
+            raw,
+            raw + "\n\n",
+            " " + raw + "\n",
+            raw[:-1] + ', "status":0}\n',
+            "x" * 9000,
+        ):
+            with self.subTest(invalid=invalid[:80]), self.assertRaises(ValueError):
+                probe.validate_no_prompt_receipt(invalid, NONCE, 42)
+
+    def test_owner_change_and_retained_child_debt_refuse_admission(self):
+        for observations in (([43],), ([42], [43]), ([42], [42], [43])):
+            with self.subTest(observations=observations), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=0)
+                child.communicate.return_value = (json.dumps(no_prompt_receipt()) + "\n", "")
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                    self.assertRaises(RuntimeError),
+                ):
+                    owner.control_pid_no_prompt(42, mock.Mock(side_effect=observations))
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            owner.scripting_commands.append(mock.Mock())
+            with (
+                mock.patch.object(probe.subprocess, "Popen") as spawn,
+                self.assertRaises(RuntimeError),
+            ):
+                owner.control_pid_no_prompt(42, lambda _: [42])
+            spawn.assert_not_called()
+
+    def test_nonterminal_refused_and_timeout_children_never_offer_numeric_outcomes(self):
+        for code in (None, 1):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=code)
+                child.communicate.return_value = (
+                    json.dumps(no_prompt_receipt(-1744, None, "send")) + "\n",
+                    "refused",
+                )
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                    self.assertRaises(RuntimeError),
+                ):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+                self.assertEqual(owner.scripting_commands, [child] if code is None else [])
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            child = mock.Mock(returncode=None)
+            primary = subprocess.TimeoutExpired(["osascript", "PRIVATE_SOURCE"], 10)
+            child.communicate.side_effect = [primary, subprocess.TimeoutExpired(["osascript"], 2)]
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                mock.patch.object(
+                    owner, "sample_scripting_command", return_value=["actual sender frame"]
+                ),
+                mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+            ):
+                with self.assertRaises(RuntimeError) as error:
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            owner.retain_primary_error(error.exception, "pid_no_prompt")
+            self.assertEqual(owner.scripting_commands, [child])
+            self.assertIn("unchanged deadline", owner.diagnostic_receipts[0]["primary_error"])
+            self.assertNotIn("PRIVATE_SOURCE", str(owner.diagnostic_receipts))
+            with (
+                mock.patch.object(probe.subprocess, "Popen") as spawn,
+                self.assertRaises(RuntimeError),
+            ):
+                owner.control_pid_no_prompt(42, lambda _: [42])
+            spawn.assert_not_called()
+
+    def test_primary_error_survives_existing_samples_and_remains_bounded(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            owner.retain_diagnostics(["actual native frame"], "pid_control")
+            owner.retain_primary_error(
+                RuntimeError("Native status -1743\n::error::foreign\n" + "x\n" * 10000),
+                "pid_control",
+            )
+            receipt = owner.diagnostic_receipts[0]
+            self.assertEqual(receipt["observations"], "actual native frame")
+            self.assertIn("Native status -1743", receipt["primary_error"])
+            self.assertLessEqual(len(receipt["primary_error"]), 8192)
+            self.assertLessEqual(len(receipt["primary_error"].splitlines()), 128)
+
+    def test_real_owned_child_timeout_settles_before_native_receipt_retry(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            children = []
+            communicate_budgets = []
+
+            def launch(arguments, **options):
+                source = (
+                    "import time; time.sleep(5)"
+                    if not children
+                    else "print(" + repr(json.dumps(no_prompt_receipt(-1744, None, "send"))) + ")"
+                )
+                child = native_popen([sys.executable, "-c", source], **options)
+                communicate_budgets.append(observe_child_budgets(child))
+                children.append(child)
+                return child
+
+            try:
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", side_effect=launch),
+                    mock.patch.object(owner, "sample_scripting_command", return_value=[]),
+                    mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+                ):
+                    with mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05):
+                        with self.assertRaises(RuntimeError):
+                            owner.control_pid_no_prompt(42, lambda _: [42])
+                    self.assertIsNotNone(children[0].returncode)
+                    self.assertEqual(owner.scripting_commands, [])
+                    result = owner.control_pid_no_prompt(42, lambda _: [42])
+                    self.assertEqual(result["outcome"], "consent_required")
+                    self.assertIsNotNone(children[1].returncode)
+                    self.assertEqual(communicate_budgets[0], [0.05, 2])
+                    self.assertEqual(communicate_budgets[1][0], 10)
+                    self.assertEqual(owner.scripting_commands, [])
+            finally:
+                for child in children:
+                    if child.poll() is None:
+                        child.kill()
+                    child.communicate(timeout=2)
 
 
 def constructor_receipt():
@@ -953,10 +1188,12 @@ class ScriptingLifecycleTests(unittest.TestCase):
             owner.scripting_command_number = 5
             owner.retain_diagnostics(["actual constructor sample"], phase="constructor")
             owner.scripting_command_number = 6
+            owner.retain_diagnostics(["actual no-prompt sample"], phase="pid_no_prompt")
+            owner.scripting_command_number = 7
             owner.retain_diagnostics(["extra request"])
             self.assertEqual(len(owner.diagnostic_receipts), probe.SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT)
             self.assertTrue(owner.diagnostic_receipts[-1]["additional_commands_omitted"])
-            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "constructor")
+            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "pid_no_prompt")
 
     def test_cleanup_refusal_keeps_lua_arguments_out_of_plain_sample_receipts(self):
         primary = subprocess.TimeoutExpired(["osascript", "PRIMARY_LUA_ARGUMENT"], 10)
