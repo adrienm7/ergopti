@@ -392,7 +392,7 @@ end
 		assert.match(authenticated.stdout, /FAIL the newest release is found/);
 		assert.ok(
 			authenticated.stdout.includes(
-				`scoped request and cleanup observations: ${variant.cases.length}\n`
+				`scoped request and cleanup observations: ${variant.cases.length}${NATIVE_LUA_EOL}`
 			)
 		);
 		const captured = fs.readFileSync(path.join(evidence, 'http.json'), 'utf8');
