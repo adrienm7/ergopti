@@ -113,6 +113,10 @@ These are software implementations; final hardware verification remains below.
   delivery. A real ENOENT regression and the portable allocation-cleanup case
   fail before the fix and pass after it. The process runner retains its separate
   callback-on-refusal contract; macOS task construction uses settled handles.
+  The shell runner also forces teardown after SIGTERM, matching the existing
+  argv runner. Native descendants that acknowledge SIGTERM-ignore readiness
+  no longer outlive a deadline or cancellation; both regressions failed before
+  this fix. Physical keyboard validation remains unavailable in the container.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

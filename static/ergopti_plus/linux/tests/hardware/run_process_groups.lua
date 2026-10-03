@@ -8,6 +8,7 @@
 --- terminate that descendant, not merely close the daemon's pipes. No input
 --- device or display server is required (linux-orphaned-process-group).
 --- A real ENOENT spawn also proves refusal does not publish a second outcome.
+--- SIGTERM-resistant descendants must settle on deadlines and cancellation.
 --- ==============================================================================
 
 local uv = require("luv")
@@ -21,12 +22,17 @@ local failures = 0
 
 local PROGRAM = [[
 import os
+import signal
 import sys
 import time
 
 leader = os.getpid()
 child = os.fork()
 if child == 0:
+    if len(sys.argv) > 2:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    with open(sys.argv[1] + ".ready", "w", encoding="ascii") as receipt:
+        receipt.write("ready")
     time.sleep(30)
     os._exit(0)
 with open(sys.argv[1], "w", encoding="ascii") as receipt:
@@ -86,7 +92,7 @@ local function check(name, dispatch, cancel)
 		end), "the production runner did not dispatch")
 		assert(await(function()
 			leader, descendant = read_receipt(path)
-			return leader and not running(leader)
+			return leader and not running(leader) and uv.fs_stat(path .. ".ready") ~= nil
 		end), "the leader did not exit before the deadline")
 		assert(running(descendant), "the fixture did not retain a live descendant")
 		if cancel then
@@ -108,6 +114,7 @@ local function check(name, dispatch, cancel)
 	if type(handle) == "table" then handle.cancel() end
 	await(function() return not uv.loop_alive() end)
 	uv.fs_unlink(path)
+	uv.fs_unlink(path .. ".ready")
 	if ok then
 		print("PASS " .. name .. " (native fork, pipes, process group and libuv)")
 	else
@@ -128,6 +135,21 @@ check("shell-cancel", function(path, callback)
 	return ShellRunner.run_async("python3", { "-c", PROGRAM, path }, { timeout_ms = WAIT_MS }, callback)
 end, true)
 
+check("shell-stubborn-deadline", function(path, callback)
+	return ShellRunner.run_async("python3", { "-c", PROGRAM, path, "ignore-term" },
+		{ timeout_ms = TIMEOUT_MS }, callback)
+end, false)
+
+check("shell-stubborn-cancel", function(path, callback)
+	return ShellRunner.run_async("python3", { "-c", PROGRAM, path, "ignore-term" },
+		{ timeout_ms = WAIT_MS }, callback)
+end, true)
+
+check("process-stubborn-deadline", function(path, callback)
+	return ProcessRunner.run("python3", { "-c", PROGRAM, path, "ignore-term" },
+		{ timeout_ms = TIMEOUT_MS }, callback)
+end, false)
+
 local callbacks = 0
 local handle, reason = ShellRunner.run_async(directory .. "/missing-program", {},
 	{ timeout_ms = TIMEOUT_MS }, function() callbacks = callbacks + 1 end)
@@ -143,5 +165,5 @@ else
 end
 
 assert(uv.fs_rmdir(directory))
-print(string.format("Native process groups: %d passed, %d failed", 4 - failures, failures))
+print(string.format("Native process groups: %d passed, %d failed", 7 - failures, failures))
 os.exit(failures == 0 and 0 or 1)
