@@ -182,6 +182,13 @@ local ok, err = xpcall(function()
 	check(moved == 2 and Capture.load(reordered, "C.UTF-8"), "the complete alias relations may be declared in either order")
 	local reordered_generation, reordered_rows = Capture.source_generation(), Capture.direct_sources({ 39 })
 	check(reordered_generation and plain(reordered_rows, 39) and plain(reordered_rows, 39).text == "ö", "alias declaration order cannot refuse a matching native source")
+	-- Input spacing is canonicalized by the real parser, independently of order.
+	local spaced, spaced_aliases = reordered:gsub("alias <Lat[YZ]> = <A[BD]0[16]>;", function(line)
+		return (line:gsub(" = ", "\t =\t "))
+	end)
+	check(spaced_aliases == 2 and Capture.load(spaced, "C.UTF-8"), "native parsing accepts horizontally spaced complete alias relations")
+	local spaced_generation, spaced_rows = Capture.source_generation(), Capture.direct_sources({ 39 })
+	check(spaced_generation and plain(spaced_rows, 39) and plain(spaced_rows, 39).text == "ö", "native alias spacing and order preserve the exact matching source")
 	-- Aliases change physical identity even when this probed character is unchanged.
 	local altered, replacements = german_map:gsub("alias <LatZ> = <AD06>;", "alias <LatZ> = <AD07>;")
 	check(replacements == 1, "the real German map supplies exactly one alias target adversary")

@@ -382,6 +382,8 @@ TODO 16 remains partial: the native AHK suite passed 8,061 cases and the full-dr
 
 TODO 16 remains partial: supplemental constructor and decoder facts are now retained as closed diagnostic summaries after the owned packet scope is retired. Constructor integers report only the independently expected -1712/-50, unavailable, or unexpected_integer; domains, nil references and error descriptors report only validated primitive types and flags. Actual decoder integers report presence, not a native status verdict. This exposes which existing getter failed without raw private payload or a guessed Cocoa conversion. All 78 original probe test bodies, the entire original/default instrumented JXA source, control verdicts, deadlines, packet schemas, physical retirement and cleanup remain unchanged. The original macOS clean/Karabiner controls and actual Cocoa scalar qualification remain pending native CI.
 
+Linux X11 source qualification now recognizes the native serializer's horizontal alias-column spacing while comparing complete alias names and targets. The existing exact-map, group-epoch, changed-alias, and native-Wayland refusal checks remain intact. An actual owned Xvfb reproduction fails with the former matcher and passes with the corrected matcher, including reordered aliases with different input spacing. This qualifies the controlled X11 source owner, not physical hardware or a native Wayland seat; the complete three-OS release-free checkpoint remains required.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
