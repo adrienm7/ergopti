@@ -25,7 +25,7 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
-const { findRuntime } = require('./run-linux-lua.cjs');
+const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 
@@ -48,6 +48,95 @@ const updaterProbe = path.join(
 	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
 );
 const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
+// The native Linux lane must never certify POSIX observations with Windows Lua.
+const targetCwd = 'C:\\owned checkout\\static\\ergopti_plus\\linux';
+const targetArgv = ['tests/run.lua', '--only', 'an exact case with spaces'];
+const goodTarget = { status: 0, stdout: 'LuaJIT 2.1.fixture\nLinux\n', stderr: '' };
+function observeRouting(platform, receipts) {
+	const calls = [],
+		reports = [];
+	const status = runLinux(targetArgv, {
+		platform,
+		linuxRoot: targetCwd,
+		report: (line) => reports.push(line),
+		spawn: (command, args, options) => {
+			calls.push({ command, args, options });
+			assert.ok(receipts.length, 'no unplanned interpreter or fallback may execute');
+			return receipts.shift();
+		}
+	});
+	return { status, calls, reports };
+}
+const windowsTarget = observeRouting('win32', [goodTarget, { status: 0 }]);
+assert.strictEqual(windowsTarget.status, 0);
+assert.deepStrictEqual(
+	windowsTarget.calls.map((call) => call.command),
+	['wsl.exe', 'wsl.exe']
+);
+assert.deepStrictEqual(windowsTarget.calls[0].args.slice(0, 4), [
+	'--exec',
+	'luajit',
+	'-e',
+	windowsTarget.calls[0].args[3]
+]);
+assert.ok(windowsTarget.calls[0].args[3].includes('jit.os == "Linux"'));
+assert.ok(windowsTarget.calls[0].args[3].includes('jit.version'));
+assert.ok(windowsTarget.calls[0].options.timeout > 0, 'target preparation is bounded');
+assert.deepStrictEqual(windowsTarget.calls[1].args, [
+	'--cd',
+	targetCwd,
+	'--exec',
+	'luajit',
+	...targetArgv
+]);
+assert.strictEqual(windowsTarget.calls[1].options.cwd, targetCwd);
+assert.strictEqual(windowsTarget.calls[1].options.stdio, 'inherit');
+assert.ok(windowsTarget.reports.some((line) => line.includes('Linux via WSL')));
+for (const refusal of [
+	{ error: Object.assign(new Error('WSL missing'), { code: 'ENOENT' }), status: null },
+	{ error: Object.assign(new Error('WSL startup timed out'), { code: 'ETIMEDOUT' }), status: null },
+	{ status: 127, stderr: 'luajit missing' },
+	{ status: null, signal: 'SIGTERM' },
+	{ status: 0, stdout: 'Lua 5.4\nLinux\n' },
+	{ status: 0, stdout: 'LuaJIT 2.1.fixture\nWindows\n' }
+]) {
+	const refused = observeRouting('win32', [refusal]);
+	assert.strictEqual(refused.status, 1, 'an unavailable or wrong native target fails the gate');
+	assert.strictEqual(refused.calls.length, 1, 'Windows Lua is never a fallback');
+}
+for (const receipt of [
+	{ status: 7 },
+	{ status: null, signal: 'SIGTERM' },
+	{ status: null, error: new Error('native target launch refused') }
+]) {
+	const failed = observeRouting('win32', [goodTarget, receipt]);
+	assert.strictEqual(failed.status, receipt.status === 7 ? 7 : 1);
+}
+for (const platform of ['linux', 'darwin']) {
+	const direct = observeRouting(platform, [{ status: 0 }, { status: 3 }]);
+	assert.strictEqual(direct.status, 3);
+	assert.deepStrictEqual(
+		direct.calls.map((call) => call.command),
+		['luajit', 'luajit']
+	);
+	assert.deepStrictEqual(direct.calls[1].args, targetArgv);
+}
+const hostProbeCalls = [];
+assert.strictEqual(
+	findRuntime((command, args) => {
+		hostProbeCalls.push({ command, args });
+		return command === 'lua'
+			? { status: 0 }
+			: { error: Object.assign(new Error('absent'), { code: 'ENOENT' }) };
+	}),
+	'lua',
+	'diagnostic consumers retain host-runtime discovery'
+);
+assert.deepStrictEqual(
+	hostProbeCalls.map((call) => call.command),
+	['luajit', 'lua5.4', 'lua']
+);
+
 const nativeLua = findRuntime();
 assert.ok(nativeLua, 'the real updater probe regression requires the shared Lua runtime');
 const updaterScratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-updater-live-evidence-'));

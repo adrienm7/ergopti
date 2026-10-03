@@ -90,20 +90,20 @@ macOS).
 
 ### project-linux-suite-windows-test-mode
 
-`linux/tests/win_compat.lua` lets the Linux unit suite and the E2E daemon
-children run on a Windows checkout: /tmp and HOME fixtures, an `os.tmpname`
-that creates its file, `mkdir -p`, and every command headed by a POSIX tool run
-whole through Git's sh (cmd.exe answers `date` with its own builtin and
-evaluates `&&`/`||` itself). A check that needs the Linux kernel (setsid,
-`/proc`, POSIX mode bits) is deferred on the Windows host only, as a
-`SKIP [CONF-LINUX-…]` case with a ledger row, and its logic stays runnable
-through a seam. Git's userland spells a path through its mount table:
-`/d/...` for a drive, and `/tmp/...` for a checkout under %TEMP%, which this
-Lua process resolves as `<drive>:\tmp\...`. So win_compat asks `pwd -W` for
-the Windows spelling instead of mapping prefixes back. Action: bridge a new gap
-in win_compat and prove it from a checkout under %TEMP% as well as from D:;
-never relax a Linux assertion, and never defer on a missing facility, which on
-Linux is a failure.
+`test:linux` and `test:linux:e2e` certify the actual POSIX target. On Windows,
+`tools/test/run-linux-lua.cjs` requires Linux LuaJIT in the default WSL
+distribution, verifies `jit.os` and the runtime version, then uses
+`wsl.exe --cd <absolute current driver root> --exec luajit <entry> <arguments>`.
+It runs the current checkout bytes and preserves the native exit status without
+shell reconstruction. Missing WSL or Linux LuaJIT fails preparation; it never
+falls back to Windows Lua. Linux and macOS retain direct runtime selection.
+
+`findRuntime()` remains a host-runtime locator for deliberately native diagnostic
+fixtures. `linux/tests/win_compat.lua` supports those Windows-host observations:
+its `/tmp` and HOME namespaces, drive mapping, `pwd -W` and Git userland bridge
+are test infrastructure, not proof of POSIX child exit status, byte-preserving
+files, permissions or kernel behavior. A mandatory Linux observation must execute
+on the native target, without a skip or an assertion relaxed for Windows.
 
 ### project-plans-are-proportional
 
