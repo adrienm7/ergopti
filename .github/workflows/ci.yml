@@ -28,7 +28,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Manual validations retain their own group when one CI branch advances.
+  # Automatic branch runs still supersede an older automatic run.
+  group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
   cancel-in-progress: true
 
 # ========================================================

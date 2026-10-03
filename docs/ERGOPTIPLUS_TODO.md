@@ -286,6 +286,8 @@ Incomplete native Karabiner feature receipts now retain a bounded summary of act
 
 TODO 16 remains partial. The compiled Windows launch failure now emits bounded native initial executable/start-time identity, descendant PID/parent/creation/path observations with explicit parent-lifetime qualification, and the actual bootstrap/unified log tails resolved from the shared application-directory catalogue. Observation refusal and truncation remain explicit; process argv is not printed. These diagnostics cannot qualify a replacement, readiness or cleanup and leave the original 120-second process/marker/dialog verdict unchanged. Portable baseline collector regression and 14 mutation controls passed with all 353 JS checks; actual Windows PowerShell/native receipt qualification and the startup cause remain pending CI.
 
+Manual CI validations now use an independent concurrency group per run, so advancing the single persistent CI branch does not cancel an earlier manual validation or replace a pending one. Automatic runs retain their branch-level supersession policy. The existing push-only release plan, publication gate, permissions and mandatory OS jobs are unchanged. The registered pipeline guard rejects branch-only/manual-SHA collisions and loss of automatic supersession/cancellation. Native three-OS validation and release-skipped confirmation remain required; item 16 stays partial.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

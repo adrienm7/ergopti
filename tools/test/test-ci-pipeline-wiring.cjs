@@ -1406,6 +1406,34 @@ for (const [what, rel, from, to] of [
 	mustCatch(what, rel, from, to, namingProblems);
 }
 
+/** Keeps every manual validation independent while superseding automatic branch runs. */
+function concurrencyProblems(files) {
+	const text = codeOf(files.find((entry) => entry.rel === ENTRY).text).split('\njobs:')[0];
+	const blocks = [...text.matchAll(/^concurrency:\n((?: {2}[^\n]*\n|[ \t]*\n)*)/gm)];
+	const expected =
+		"group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}\n" +
+		'  cancel-in-progress: true';
+	return blocks.length === 1 && blocks[0][1].trim() === expected
+		? []
+		: [
+				'manual CI must have a unique run group; automatic branch runs must still supersede each other'
+			];
+}
+
+errors.push(...concurrencyProblems(pipeline.files()));
+for (const [what, from, to] of [
+	[
+		'manual branch collision',
+		"-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}",
+		''
+	],
+	['manual duplicate-SHA collision', '&& github.run_id', '&& github.sha'],
+	['automatic runs never supersede', "|| 'automatic'", '|| github.run_id'],
+	['automatic cancellation disabled', 'cancel-in-progress: true', 'cancel-in-progress: false']
+]) {
+	mustCatch(what, ENTRY, from, to, concurrencyProblems);
+}
+
 if (errors.length > 0) {
 	console.error(
 		'[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:'
