@@ -1683,7 +1683,7 @@ Test("LLM display: sparse or retired engine owners refuse streaming without writ
 
 _LMT_IndentCorpus() {
 	global _SharedDir
-	return Jxon_Load(FSReadStrict(_SharedDir . "\tests\corpus\menus\indentation_control.json"))
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\indentation_control.json"))
 }
 
 ; The production writer still owns its lease/source fence; only the terminal
@@ -1722,6 +1722,10 @@ _LMT_IndentWriteObserved(Path, Updates, Mode, Seen) {
 		return ""
 	if Mode == "false"
 		return false
+	if Mode == "truthy integer"
+		return 2
+	if Mode == "truthy string"
+		return "ack"
 	return TOML_BatchWrite(Path, Updates)
 }
 
@@ -1738,7 +1742,7 @@ _LMT_IndentNativeOwners() {
 	try {
 		Corpus := _LMT_IndentCorpus()
 		AssertEqual(15, Corpus["choices"].Length)
-		for Mode in ["false", "nil", "throw", "ack"] {
+		for Mode in ["false", "nil", "throw", "truthy integer", "truthy string", "ack"] {
 			for Position in [0, 7, 14] {
 				_LLM_Menu := _LMT_Menu()
 				_LLM_Menu["enabled"] := true
