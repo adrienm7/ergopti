@@ -44,6 +44,7 @@ local FileSystem  = require("adapters.file_system")
 local Json        = require("json")
 local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
+local InputEvent  = require("infra.input_event")
 local Shared      = require("keymap.magic_key_source")
 
 local LOG = "magic_key_source"
@@ -340,10 +341,44 @@ local function settle(live, evdev)
 	live.handlers.on_chosen(value)
 end
 
+--- Retains an acknowledged magic press without rescanning the native device origin.
+--- @param detail table Native physical key and published origin generation.
+--- @param code number Chosen native key.
+--- @param magic string Character already typed and dispatched.
+--- @return function|nil callback Only qualified presses may own repeats.
+local function repeat_callback_for(detail, code, magic)
+	if detail.physical ~= true or detail.value ~= InputEvent.VALUE_DOWN
+		or type(detail.origin_generation) ~= "number" or detail.origin_generation <= 0
+		or detail.origin_generation % 1 ~= 0 then return nil end
+	local Capture = require("adapters.xkb_capture")
+	local source_generation = Capture.source_generation()
+	if type(source_generation) ~= "number" or source_generation <= 0 or source_generation % 1 ~= 0 then return nil end
+	local preference_generation, origin_generation = Preferences.generation(), detail.origin_generation
+	return function(repeat_detail)
+		if type(repeat_detail) ~= "table" or repeat_detail.value ~= InputEvent.VALUE_REPEAT
+			or repeat_detail.physical ~= true or repeat_detail.code ~= code
+			or repeat_detail.origin_generation ~= origin_generation
+			or type(repeat_detail.mods) ~= "table" or not Shared.unmodified(repeat_detail.mods) or _capture ~= nil
+			or Preferences.generation() ~= preference_generation or M.evdev_code() ~= code
+			or _deps.magic_key() ~= magic or _deps.is_active() ~= true or _deps.replace_on() ~= true
+			or Capture.source_generation() ~= source_generation or _deps.can_type(magic) ~= true
+			or (_deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true) then return false end
+		local called, typed = pcall(_deps.type_text, magic)
+		if not called or typed ~= true then
+			Logger.error(LOG, "The repeated magic key was not typed — the held press remains suppressed.")
+			return false
+		end
+		_deps.end_selection()
+		_deps.dispatch_char(magic, code)
+		return true
+	end
+end
+
 --- Decides one grabbed key press from the keyboard hook's consumption callback.
 --- @param detail table { code, mods, char } as the hook reports a key-down.
 --- @return boolean consumed True when the key was captured or the magic key
 ---   was typed in its place.
+--- @return function|nil repeat_callback Optional owner of this acknowledged physical press.
 function M.on_key(detail)
 	if _deps == nil or type(detail) ~= "table" then return false end
 	if _capture ~= nil then
@@ -371,6 +406,9 @@ function M.on_key(detail)
 		return false
 	end
 	_untypable_reported = nil
+	-- Acquire optional repeat provenance before typing: a broken owner must not
+	-- turn already-typed text into an unconsumed physical press.
+	local repeat_callback = repeat_callback_for(detail, code, magic)
 	local called, typed = pcall(_deps.type_text, magic)
 	if not called or typed ~= true then
 		Logger.error(LOG, "The magic key could not be typed (%s) — the key types its own character.",
@@ -379,7 +417,7 @@ function M.on_key(detail)
 	end
 	_deps.end_selection()
 	_deps.dispatch_char(magic, detail.code)
-	return true
+	return true, repeat_callback
 end
 
 --- Forgets the collaborators, the resolver and any capture (test seam).
