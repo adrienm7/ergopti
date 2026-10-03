@@ -85,6 +85,30 @@ function M.read(path)
 	return result
 end
 
+--- Writes and closes a native file, preserving both failure receipts.
+--- A successful write alone does not guarantee that buffered bytes were flushed.
+--- LuaJIT can return true from write; stock Lua returns the file handle instead.
+--- @param fh userdata Open native file.
+--- @param content string Bytes to write.
+--- @param path string Destination for diagnostics.
+--- @param operation string Adapter operation.
+--- @return boolean
+local function write_and_close(fh, content, path, operation)
+	local write_ok, written, write_err = pcall(fh.write, fh, content)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not write_ok or not written then
+		Logger.error(LOG, "%s(): write failed for '%s' — %s", operation, path,
+			tostring(write_ok and write_err or written))
+		return false
+	end
+	if not close_ok or not closed then
+		Logger.error(LOG, "%s(): close failed for '%s' — %s", operation, path,
+			tostring(close_ok and close_err or closed))
+		return false
+	end
+	return true
+end
+
 --- Writes content to a file, overwriting any existing content.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
@@ -102,13 +126,7 @@ function M.write(path, content)
 			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", path, tostring(err))
 			return false
 		end
-		local write_ok, write_err = pcall(function() fh:write(content) end)
-		fh:close()
-		if not write_ok then
-			Logger.error(LOG, "write(): write failed for '%s' — %s", path, tostring(write_err))
-			return false
-		end
-		return true
+		return write_and_close(fh, content, path, "write")
 	end)
 
 	if not ok then
@@ -135,13 +153,7 @@ function M.append(path, content)
 			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
-		local write_ok, write_err = pcall(function() fh:write(content) end)
-		fh:close()
-		if not write_ok then
-			Logger.error(LOG, "append(): write failed for '%s' — %s", path, tostring(write_err))
-			return false
-		end
-		return true
+		return write_and_close(fh, content, path, "append")
 	end)
 
 	if not ok then
