@@ -1645,6 +1645,48 @@ _LAG_AutomaticMissingModelNotifiesWithoutModal() {
 }
 Test("LLM agent: actual automatic local triage missing-model notice has no modal or pull (todo-46-local-model)",
 	_LAG_AutomaticMissingModelNotifiesWithoutModal)
+/** A native Backspace and its AI admission must erase the same complete scalar. */
+_LAG_UnicodePhysicalBackspace(Active) {
+	Menu := _LAG_Menu(Active ? "off" : "auto", "cerebras", "cerebras", false)
+	_LAG_Run(Menu, _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		_Typing() {
+			global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer, _LLM_Engine
+			Before := _LAG_PredictionSnapshot(Fx)
+			SavedEnabled := _LLM_Engine["enabled"]
+			Window := Gui()
+			EditControl := Window.AddEdit(, "A" . Chr(0x1F600))
+			Window.Show("Hide")
+			SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+			try {
+				_LLM_Bridge_Active := Active
+				if Active
+					_LLM_Bridge_ClearBuffer()
+				_LLM_Engine["enabled"] := false
+				LLM_Bridge_FeedCharIfActive("A")
+				LLM_Bridge_FeedCharIfActive(Chr(0x1F600))
+				ControlSend("{BackSpace}", EditControl)
+				LLM_Bridge_FeedKeyDownIfActive(0x08, true)
+				Sleep(30)
+				AssertEqual("A", EditControl.Value, "one native Backspace removes the complete surrogate pair")
+				Actual := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+				AssertEqual(EditControl.Value, Actual, "the AI must see the exact document after physical erasure")
+				AssertEqual(0, Fx.Remote.Length, "no actual or simulated remote request runs")
+				if !Active
+					_LAG_AssertNoPrediction(Fx, Before)
+			} finally {
+				Window.Destroy()
+				_LLM_Engine["enabled"] := SavedEnabled
+			}
+		}
+		_LAG_WithBridgeOff(_Typing)
+	}
+}
+Test("LLM agent: active prediction context matches native Unicode Backspace (unicode-erase)",
+	_LAG_UnicodePhysicalBackspace.Bind(true))
+Test("LLM agent: agent-only context matches native Unicode Backspace (unicode-erase)",
+	_LAG_UnicodePhysicalBackspace.Bind(false))
+
 
 /** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
 _LAG_ToolsCacheLifetime(StartTick) {

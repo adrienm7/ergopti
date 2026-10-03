@@ -436,7 +436,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 				Auto:          IsStar,
 				Seq:           RegistrationSeq,
 				TLen:          StrLen(Trigger),
-				TriggerBytes:  StrLen(Trigger),   ; AHK StrLen is codepoint-based; good enough
+				TriggerBytes:  StrLen(Trigger),   ; Matching offsets use UTF-16 units.
 				TailChar:      TailChar,
 				HasMagic:      IsStar,
 				StarBase:      StarBase,
@@ -866,7 +866,7 @@ HSE_FeedBackspace(IsPhysical := false) {
 				return
 		}
 		if (HSE_Buffer != "") {
-				HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - 1)
+				HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - _TextTailCodeUnits(HSE_Buffer, 1))
 				return
 		}
 		HSE_StartIsWordBoundary := false
@@ -930,7 +930,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 		global HSE_CONSUMED_DELIMITERS
 
-		StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
+		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
 		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
 				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText

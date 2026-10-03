@@ -19,7 +19,7 @@
 ;   * registration count + trigger-spec shape (CreateHotstring + CreateCaseSensitiveHotstrings)
 ;   * callback closure correctness (driving HotstringHandler through the
 ;     captured callback proves the closure captured Abbr/Repl/options correctly)
-;   * BackSpace count = StrLen(Abbreviation) — the most fragile invariant
+;   * BackSpace count = number of Unicode scalars — the most fragile invariant
 ;   * Replacement and EndChar emitted in the correct order through the
 ;     correct send primitive (SendNewResult vs SendFinalResult)
 ;   * Time-activation guard (typed-too-slowly heuristic) blocks emission
@@ -83,7 +83,7 @@ Test("Hotstrings full: a per-section delay overrides the category and falls back
 
 _TestCallHotstring(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds :=
     0) {
-    BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
+    BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
     PrevCharKey := SubStr(Abbreviation, -2, 1)
     _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
 }
@@ -1140,3 +1140,15 @@ Test("CreateHotstring: OnlyText=false option propagates to the replacement send"
     TestCH_OptionOnlyTextFalse)
 
 ; Hooks are torn down by run_all.ahk's own teardown if needed.
+
+
+TestHH_UnicodeCallbackReplay() {
+	global _Stub_RecordedSends
+	SimulateRegularApp()
+	ResetHotstringRecorders()
+	_TestCallHotstring(Chr(0x1F600) . "x", "R", "", true, true)
+	AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[1],
+		"the callback fixture must preserve the real registration's native key count")
+}
+Test("Hotstrings full: Unicode callback replay uses native Backspace counts (unicode-erase)",
+	TestHH_UnicodeCallbackReplay)

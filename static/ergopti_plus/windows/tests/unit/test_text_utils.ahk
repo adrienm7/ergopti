@@ -69,3 +69,36 @@ _SU_DecodesRealisticFileUrlSegment() {
 	Assert(StrLen(Result) > 0, "Expected non-empty decoded result")
 }
 Test("UriDecode: decodes a realistic file URL path segment", _SU_DecodesRealisticFileUrlSegment)
+
+
+/** Independent character vectors pin native key counts and internal spans. */
+_SU_UnicodeEraseAndReplaySpans() {
+	Vectors := [[], ["a"], [Chr(0x1F600)], ["a", Chr(0x1F600), "b"],
+		[Chr(0x1F600), Chr(0x10400), "x", Chr(0x1F642)],
+		["e", Chr(0x301), Chr(0x1F600)], [Chr(0xD800)], [Chr(0xDC00)]]
+	for Expected in Vectors {
+		Text := ""
+		for Char in Expected
+			Text .= Char
+		AssertEqual(Expected.Length, _TextCodepointLength(Text))
+		Actual := _TextCodepoints(Text)
+		AssertEqual(Expected.Length, Actual.Length, "replay keeps complete pairs and every independent character")
+		for Index, Char in Expected
+			AssertEqual(Char, Actual[Index], "replay must preserve the exact original units")
+		Loop Expected.Length + 3 {
+			Count := A_Index - 1
+			Erased := 0
+			Loop Min(Count, Expected.Length)
+				Erased += StrLen(Expected[Expected.Length - A_Index + 1])
+			AssertEqual(Erased, _TextTailCodeUnits(Text, Count),
+				"native erasure clamps to available whole characters")
+		}
+	}
+	AssertThrows(() => _TextCodepointLength(42), "counting rejects a non-string")
+	AssertThrows(() => _TextCodepoints(42), "replay rejects a non-string")
+	AssertThrows(() => _TextTailCodeUnits("a", -1), "erasure rejects a negative count")
+	AssertThrows(() => _TextTailCodeUnits("a", 1.5), "erasure rejects a fractional count")
+	AssertThrows(() => _TextTailCodeUnits(42, 1), "erasure rejects a non-string")
+}
+Test("text utils: Unicode replay and erasure preserve independent character spans (unicode-erase)",
+	_SU_UnicodeEraseAndReplaySpans)

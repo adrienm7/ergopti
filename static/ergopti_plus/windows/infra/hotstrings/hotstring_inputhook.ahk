@@ -1684,7 +1684,8 @@ _PrefixCommitBackspace() {
 		; engine tail after its decrement.
 		NextPrefixBuffer := _PrefixWordTailFromEngine()
 	} else {
-		NextPrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
+		NextPrefixBuffer := SubStr(_PrefixBuffer, 1,
+			StrLen(_PrefixBuffer) - _TextTailCodeUnits(_PrefixBuffer, 1))
 	}
 	ContentGeneration := _PrefixSetBuffer(NextPrefixBuffer)
 	return {
