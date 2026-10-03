@@ -57,6 +57,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const nativeRuntimeGenerator = require('../codegen/codegen-linux-native-runtime.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -159,6 +160,31 @@ const packageRows = [
 const packageTable = new Map(packageRows.map((match) => [`${match[1]}:${match[2]}`, match[3]]));
 const packageManagers = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const requiredCapabilities = ['luajit', 'notify-send', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
+const nativePackages = {
+	apt: ['libxkbcommon0', 'libxkbcommon-x11-0', 'libx11-6', 'libx11-xcb1'],
+	dnf: ['libxkbcommon', 'libxkbcommon-x11', 'libX11', 'libX11-xcb'],
+	zypper: ['libxkbcommon0', 'libxkbcommon-x11-0', 'libX11-6', 'libX11-xcb1'],
+	pacman: ['libxkbcommon', 'libxkbcommon-x11', 'libx11', 'libx11'],
+	xbps: ['libxkbcommon', 'libxkbcommon-x11', 'libX11', 'libX11'],
+	apk: ['libxkbcommon', 'libxkbcommon-x11', 'libx11', 'libx11']
+};
+const nativeSonames = [
+	'libxkbcommon.so.0',
+	'libxkbcommon-x11.so.0',
+	'libX11.so.6',
+	'libX11-xcb.so.1'
+];
+for (const manager of packageManagers) {
+	for (const [index, soname] of nativeSonames.entries()) {
+		const actual = packageTable.get(`${manager}:${soname}`);
+		if (actual !== nativePackages[manager][index])
+			errors.push(
+				`native runtime ${manager}:${soname} maps to ${actual}, expected ${nativePackages[manager][index]}`
+			);
+		if (!installerCode.includes(`_check_or_install_library ${soname}\n`))
+			errors.push(`the installer never admits the native capability ${soname}`);
+	}
+}
 if (packageRows.length !== packageTable.size) {
 	errors.push('the required dependency table contains a duplicate manager/capability row');
 }
@@ -272,6 +298,67 @@ if (
 		}
 	} finally {
 		fs.rmSync(fixtureRoot, { recursive: true, force: true });
+	}
+	// An installer's exit code cannot substitute for loading the exact native ABI.
+	// The fake LuaJIT records both admission attempts and rejects any different SONAME.
+	const nativeFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-deps-'));
+	try {
+		const provideScript =
+			'#!/bin/bash\n' +
+			'[ "${@: -1}" = "$ERGOPTI_EXPECTED_PACKAGE" ] || exit 9\n' +
+			'if [ "$ERGOPTI_FAKE_PROVIDE" = 1 ]; then : > "$ERGOPTI_FAKE_PRESENT"; fi\n';
+		for (const binary of ['apt-get', 'dnf', 'zypper', 'pacman', 'xbps-install', 'apk']) {
+			fs.writeFileSync(path.join(nativeFixture, binary), provideScript);
+			fs.chmodSync(path.join(nativeFixture, binary), 0o755);
+		}
+		fs.writeFileSync(
+			path.join(nativeFixture, 'luajit'),
+			'#!/bin/bash\n' +
+				'printf "%s\\n" "$2" >> "$ERGOPTI_PROBE_LOG"\n' +
+				'[[ "$2" == *"ffi.load(\'$ERGOPTI_EXPECTED_SONAME\')"* ]] || exit 8\n' +
+				'[ -f "$ERGOPTI_FAKE_PRESENT" ]\n'
+		);
+		fs.chmodSync(path.join(nativeFixture, 'luajit'), 0o755);
+		for (const manager of packageManagers) {
+			for (const [index, soname] of nativeSonames.entries()) {
+				for (const provide of [false, true]) {
+					const present = path.join(nativeFixture, 'present');
+					const log = path.join(nativeFixture, 'probes');
+					fs.rmSync(present, { force: true });
+					fs.rmSync(log, { force: true });
+					const result = spawnSync(bash, ['-s'], {
+						input:
+							`set -u\n_detect_pkg_manager() { echo ${manager}; }\nsudo() { "$@"; }\n` +
+							dependencyFunctions +
+							`\n_check_or_install_library ${soname}\n`,
+						encoding: 'utf8',
+						env: {
+							...process.env,
+							PATH: toPosix(nativeFixture),
+							ERGOPTI_EXPECTED_PACKAGE: nativePackages[manager][index],
+							ERGOPTI_EXPECTED_SONAME: soname,
+							ERGOPTI_FAKE_PRESENT: toPosix(present),
+							ERGOPTI_PROBE_LOG: toPosix(log),
+							ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0'
+						}
+					});
+					if ((result.status === 0) !== provide)
+						errors.push(
+							`native ${manager}:${soname} admission ${provide ? 'rejected a present ABI' : 'accepted a missing ABI'}: ${result.stderr || result.error || ''}`
+						);
+					const probes = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [];
+					if (
+						probes.length !== 2 ||
+						probes.some((probe) => !probe.includes(`ffi.load('${soname}')`))
+					)
+						errors.push(
+							`native ${manager}:${soname} did not re-probe the exact library after installation`
+						);
+				}
+			}
+		}
+	} finally {
+		fs.rmSync(nativeFixture, { recursive: true, force: true });
 	}
 }
 
@@ -397,6 +484,111 @@ if (packageDependencyChecks.some((value) => value == null || value === '' || val
 	);
 }
 
+// Exercise actual generator outputs, including the metadata read by native packagers.
+// Independent historical floors keep a catalogue edit from quietly dropping old requirements.
+const preservedRequirements = {
+	deb: 'luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1'.split(
+		', '
+	),
+	rpm: [
+		'luajit >= 2.1',
+		'xclip',
+		'libnotify',
+		'curl',
+		'libxkbcommon',
+		'libxkbcommon-utils',
+		'at-spi2-core',
+		'polkit',
+		'kmod',
+		'systemd-udev',
+		'libayatana-appindicator-gtk3',
+		'zenity',
+		'shadow-utils',
+		'util-linux'
+	],
+	arch: ['luajit', 'xclip', 'libnotify', 'curl', 'libxkbcommon', 'at-spi2-core'],
+	nix_library_path: ['libayatana-appindicator', 'gtk3', 'glib', 'libxkbcommon', 'at-spi2-core']
+};
+try {
+	const data = JSON.parse(fs.readFileSync(path.join(ROOT, nativeRuntimeGenerator.SOURCE), 'utf8'));
+	const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+	const generated = nativeRuntimeGenerator.render(data, read);
+	const registry = require('../build/generators.cjs').GENERATORS.find(
+		(entry) => entry.script === 'codegen/codegen-linux-native-runtime.cjs'
+	);
+	if (!registry || registry.outputs.length !== Object.keys(generated).length)
+		errors.push('the generator registry does not own every native runtime projection');
+	for (const [file, output] of Object.entries(generated)) {
+		if (read(file) !== output) errors.push(`native runtime projection drift: ${file}`);
+		if (!registry?.outputs.includes(file))
+			errors.push(`native runtime projection has no execution owner: ${file}`);
+	}
+	for (const [format, floors] of Object.entries(preservedRequirements)) {
+		const actual = nativeRuntimeGenerator.requirements(data, format);
+		for (const requirement of floors)
+			if (!actual.includes(requirement))
+				errors.push(`${format} dropped historical requirement ${requirement}`);
+		if (actual.some((pkg) => /xvfb|x11-xkb-utils|(?:^|-)dev(?:el)?$|xkbcomp|setxkbmap/i.test(pkg)))
+			errors.push(`${format} leaked validation or development packages into end-user requirements`);
+	}
+	for (const [format, manager] of [
+		['deb', 'apt'],
+		['rpm', 'dnf'],
+		['arch', 'pacman']
+	]) {
+		const actual = nativeRuntimeGenerator.requirements(data, format);
+		for (const pkg of nativePackages[manager])
+			if (!actual.includes(pkg))
+				errors.push(`${format} metadata does not require native package ${pkg}`);
+	}
+	if (!nixLibraryPath.includes('xorg.libX11'))
+		errors.push('Nix does not expose both native X11 libraries through LD_LIBRARY_PATH');
+	const changed = structuredClone(data);
+	changed.libraries.x11.soname = 'libX11.so.7';
+	changed.libraries.x11.packages.apt = 'libx11-7';
+	changed.libraries.x11.packages.dnf = 'libX11-next';
+	changed.libraries.x11.packages.pacman = 'libx11-next';
+	changed.libraries.x11.nix_package = 'xorg.libX11Next';
+	const changedOutputs = nativeRuntimeGenerator.render(changed, read);
+	if (
+		!changedOutputs[nativeRuntimeGenerator.LUA_OUTPUT].includes('libX11.so.7') ||
+		!changedOutputs['static/ergopti_plus/linux/install.sh'].includes(
+			'_check_or_install_library libX11.so.7'
+		) ||
+		!changedOutputs['tools/build/build-linux-deb.sh'].includes('libx11-7') ||
+		!changedOutputs['tools/build/build-linux-rpm.sh'].includes('libX11-next') ||
+		!changedOutputs['tools/build/PKGBUILD'].includes('libx11-next') ||
+		!changedOutputs['tools/build/nix/flake.nix'].includes('xorg.libX11Next')
+	)
+		errors.push(
+			'a catalogue change failed to reach the actual FFI, installer and package projection'
+		);
+	for (const mutate of [
+		(value) => {
+			delete value.libraries.x11.packages.apk;
+		},
+		(value) => {
+			value.libraries.x11.packages.apk = 'libx11;touch /tmp/injected';
+		},
+		(value) => {
+			value.libraries.x11.soname = "libX11.so.6'); os.execute('x')";
+		}
+	]) {
+		const invalid = structuredClone(data);
+		mutate(invalid);
+		let rejected = false;
+		try {
+			nativeRuntimeGenerator.render(invalid, read);
+		} catch {
+			rejected = true;
+		}
+		if (!rejected)
+			errors.push('the native runtime generator accepted an incomplete or executable catalogue');
+	}
+} catch (error) {
+	errors.push(`native runtime projection proof failed: ${error.stack}`);
+}
+
 // =========================================================
 // =========================================================
 // ======= 4/ Report =======
@@ -414,5 +606,5 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] launcher hard-requires ${launcherDeps.length} command(s), all installed by install.sh; ` +
 		`${referenced.length} exported LUA_PATH root(s) resolve to real directories; ` +
-		`4 package recipe(s) hard-provide live XKB.\x1b[0m`
+		`4 package recipe(s) hard-provide live XKB; 24 native mappings and 48 library admission trials pass.\x1b[0m`
 );

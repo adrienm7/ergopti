@@ -226,7 +226,11 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 			local escaped = name:gsub("_", "_")
 			local pattern = "M%." .. escaped .. "%s*=%s*preview_fenced_registry_mutation%(Registry%."
 				.. escaped .. "%)"
-			helpers.assert_true(source:match(pattern) ~= nil,
+			-- The same preview fence may also acknowledge a changed replacement
+			-- source; admit only the exact closed boolean policy argument.
+			local source_pattern = "M%." .. escaped .. "%s*=%s*preview_fenced_registry_mutation%(Registry%."
+				.. escaped .. ",%s*true%)"
+			helpers.assert_true(source:match(pattern) ~= nil or source:match(source_pattern) ~= nil,
 				("public registry writer '%s' must use the proven preview fence"):format(name))
 		end
 	end)

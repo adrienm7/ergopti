@@ -44,6 +44,7 @@ local ScriptActions = require("modules.shortcuts.script_actions")
 local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
+local MagicEditor = require("shortcuts.magic_editor")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -91,10 +92,10 @@ local SPECIAL_KEYS = {
 	comma = ",",
 }
 
--- The groups the menu offers, in display order. Every prefix here must be one
--- of SLOT_MODS' prefixes: a group whose prefix is not there would offer rows
--- that resolve to no chord at all.
+-- The groups the menu offers, in display order. Ordinary groups use the
+-- catalogue prefixes; contextual slots retain their stable logical identity.
 M.SLOT_GROUPS = {
+	{ prefix = "contextual", group_key = "menu.shortcuts.group_contextual" },
 	{ prefix = "ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
 	{ prefix = "ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
 	{ prefix = "alt_", group_key = "menu.shortcuts.alt_group", add_key = "menu.shortcuts.alt_add" },
@@ -120,6 +121,7 @@ local _assignments = {}
 local _loaded = false
 local _configuration_owner = nil
 local _dispatch_generation = 0
+local _explicit_assignments = {}
 
 --- Exclusively owns mutations and cancels previously queued actions.
 --- @param owner table Exact token retained through runtime compensation.
@@ -214,7 +216,12 @@ end
 --- The label a menu row shows for a slot, e.g. "Ctrl Maj P".
 --- @param slot_id string
 --- @return string
-function M.get_slot_label(slot_id)
+function M.get_slot_label(slot_id, reason)
+	if slot_id == MagicEditor.SLOT_ID then
+		local label = MOD_LABELS.meta .. " + " .. require("modules.hotstrings.magic_key").get()
+		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
+		return label
+	end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return tostring(slot_id) end
 	local parts = {}
@@ -248,6 +255,7 @@ end
 --- @param slot_id string Candidate slot identity.
 --- @return boolean owned
 local function owns_slot(slot_id)
+	if slot_id == MagicEditor.SLOT_ID then return true end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return false end
 	for _, entry in ipairs(catalogue_keys() or {}) do
@@ -356,6 +364,7 @@ local function load_assignments()
 		error("Keyboard shortcut assignments not loaded: no catalogue to check them against.")
 	end
 	local loaded = {}
+	local explicit = {}
 	for slot, action in pairs(manifest_defaults()) do
 		if action ~= "none" then
 			if Gestures.is_assignable(action) then
@@ -369,11 +378,14 @@ local function load_assignments()
 	walk_assignments(decoded, function(slot, action)
 		if stored_assignment_known(slot, action, Gestures) and action ~= "none" then
 			loaded[slot] = action
+			explicit[slot] = action
 		else
 			loaded[slot] = nil
+			explicit[slot] = "none"
 		end
 	end)
 	_assignments = loaded
+	_explicit_assignments = explicit
 	_loaded = true
 	local count = 0
 	for _ in pairs(_assignments) do count = count + 1 end
@@ -412,24 +424,7 @@ function M.set_action(slot_id, action_id)
 
 	local path = require("infra.config_paths").config("config.toml")
 
-	if type(action_id) ~= "string" or action_id == "" or action_id == "none" then
-		-- A slot the manifest binds keeps an explicit "none": deleting the entry
-		-- would bring the default back at the next start.
-		local operation = { section = KEYBOARD_SECTION, key = slot_id }
-		if manifest_defaults()[slot_id] ~= nil then operation.value = "none" else operation.delete = true end
-		local committed, detail = Writer.batch_write(path, { operation })
-		if committed ~= true then
-			Logger.error(LOG, "set_action(): could not persist the removal of '%s': %s.", slot_id, tostring(detail))
-			return false
-		end
-		_assignments[slot_id] = nil
-		_dispatch_generation = _dispatch_generation + 1
-		Logger.info(LOG, "Unbound %s.", M.get_slot_label(slot_id))
-		return true
-	end
-
-	-- The same catalogue check the gesture slots apply, and Windows applies to
-	-- both: an unknown id would be stored, fire on the chord, and do nothing.
+	if type(action_id) ~= "string" or action_id == "" then action_id = "none" end
 	local Gestures = action_catalogue()
 	if not Gestures then
 		Logger.error(LOG, "set_action(): '%s' not bound without the action catalogue.", slot_id)
@@ -439,15 +434,16 @@ function M.set_action(slot_id, action_id)
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for %s.", action_id, slot_id)
 		return false
 	end
-
-	local committed, detail = Writer.batch_write(path, {
-		{ section = KEYBOARD_SECTION, key = slot_id, value = action_id },
-	})
+	-- Explicit None is a personal native-behavior claim. Scope removal alone
+	-- restores absence; it must never be confused with selecting this action.
+	local operation = require("shortcuts.assignment").operation(slot_id, action_id, owns_slot, Gestures.is_assignable)
+	local committed, detail = Writer.batch_write(path, { operation })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist '%s': %s.", slot_id, tostring(detail))
 		return false
 	end
-	_assignments[slot_id] = action_id
+	_assignments[slot_id] = action_id ~= "none" and action_id or nil
+	_explicit_assignments[slot_id] = action_id
 	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Bound %s → %s.", M.get_slot_label(slot_id), action_id)
 	return true
@@ -457,6 +453,7 @@ end
 --- @param prefix string One of SLOT_GROUPS' prefixes.
 --- @return table Array of slot ids.
 function M.available_slots(prefix)
+	if prefix == "contextual" then return { MagicEditor.SLOT_ID } end
 	local out = {}
 	for _, entry in ipairs(catalogue_keys() or {}) do
 		if type(entry.id) == "string" then out[#out + 1] = prefix .. entry.id end
@@ -469,6 +466,7 @@ end
 --- @return table Array of slot ids, sorted so the menu order is stable.
 function M.assigned_slots(prefix)
 	load_assignments()
+	if prefix == "contextual" then return { MagicEditor.SLOT_ID } end
 	local out = {}
 	for slot in pairs(_assignments) do
 		if slot:sub(1, #prefix) == prefix then out[#out + 1] = slot end
@@ -495,6 +493,38 @@ end
 local function suffix_of(key)
 	if type(key) ~= "string" or key == "" then return nil end
 	return SUFFIX_OF_IDENTITY[key] or key:lower()
+end
+
+--- Resolves the ordinary contextual slot through shared physical-source policy.
+--- @param admission table Live master, pause and capture-inhibition proof.
+--- @return table decision Shared policy receipt.
+function M.magic_editor_decision(admission)
+	load_assignments()
+	local Source = require("modules.hotstrings.magic_key_source")
+	local source, claims = Source.editor_source(), {}
+	for _, candidate in ipairs(source.candidates) do
+		if candidate.direct and not candidate.dead then
+			local suffix = suffix_of(candidate.native_text or candidate.text)
+			local slot = suffix and ("super_" .. suffix) or nil
+			local action = slot and _explicit_assignments[slot] or nil
+			if action ~= nil then claims[candidate.identity] = { action = action, binding_id = M.binding_id(slot) } end
+		end
+	end
+	local catalogue = assert(action_catalogue(), "magic editor action catalogue is unavailable")
+	return MagicEditor.resolve({ default_action = Manifest.default_for(MagicEditor.PATH),
+		stored_action = _explicit_assignments[MagicEditor.SLOT_ID], is_action = catalogue.is_assignable,
+		trigger = require("modules.hotstrings.magic_key").get(), source = source, known_codes = Source.known_codes(),
+		explicit_claims = claims, configuration_generation = _dispatch_generation, admission = admission })
+end
+
+--- A physical recommendation claims exactly Super plus its actual plain source.
+local function contextual_match(detail, opts)
+	if type(opts.admission) ~= "function" or type(detail) ~= "table" or detail.physical ~= true then return nil end
+	local mods = type(detail.mods) == "table" and detail.mods or {}
+	if mods.meta ~= true or mods.ctrl or mods.shift or mods.alt or mods.altgr then return nil end
+	local decision = M.magic_editor_decision(opts.admission())
+	if not decision.active or decision.source.native_code ~= detail.code then return nil end
+	return { slot = MagicEditor.SLOT_ID, action = decision.action, decision = decision }
 end
 
 --- The binding a chord would fire right now, or nil.
@@ -590,8 +620,9 @@ end
 --- never inside the callback, because the hook is mid-decision about a physical
 --- event. A chord that is unbound or held back is left to the application, and a
 --- key whose action cannot be queued is typed rather than lost.
---- @param detail table { key, mods } from the hook.
---- @param opts table { only_script = boolean, defer = function(fn): boolean }
+--- @param detail table { key, code, physical, mods } from the hook.
+--- @param opts table { only_script = boolean, defer = function(fn): boolean,
+---   admission = function(): { master, paused, inhibited } Optional live native gates. }
 --- @return boolean consumed, string|nil slot_id
 function M.consume(detail, opts)
 	if _configuration_owner ~= nil then return false, nil end
@@ -599,11 +630,18 @@ function M.consume(detail, opts)
 		Logger.error(LOG, "consume(): no deferral seam — bound chords reach the application.")
 		return false, nil
 	end
-	local hit = match(detail, opts.only_script == true)
+	local hit = contextual_match(detail, opts) or match(detail, opts.only_script == true)
 	if not hit or hit.held_back then return false, nil end
 	local generation = _dispatch_generation
 	if opts.defer(function()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+		if hit.decision then
+			local admission = opts.admission()
+			local current = M.magic_editor_decision(admission)
+			if not MagicEditor.can_deliver(hit.decision, { source_generation = current.source_generation,
+				configuration_generation = _dispatch_generation, action = current.action,
+				master = admission.master, paused = admission.paused, inhibited = admission.inhibited }) then return end
+		end
 		fire(hit)
 	end) ~= true then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
@@ -636,6 +674,7 @@ function M._reset()
 	_configuration_owner = nil
 	_dispatch_generation = _dispatch_generation + 1
 	_assignments = {}
+	_explicit_assignments = {}
 	_loaded = false
 	_catalogue = nil
 end
@@ -649,7 +688,7 @@ end
 --- @return table state
 function M.configuration_candidate(document, written)
 	local catalogue = assert(action_catalogue(), "keyboard action catalogue is unavailable")
-	local assignments = {}
+	local assignments, explicit = {}, {}
 	for slot, action in pairs(manifest_defaults()) do
 		assert(type(action) == "string" and (action == "none" or catalogue.is_assignable(action)), "invalid keyboard default")
 		if action ~= "none" then assignments[slot] = action end
@@ -660,8 +699,9 @@ function M.configuration_candidate(document, written)
 		-- The loader's rule: an outdated action leaves the slot unbound.
 		local known = stored_assignment_known(slot, action, catalogue)
 		assignments[slot] = known and action ~= "none" and action or nil
+		explicit[slot] = known and action or "none"
 	end)
-	return { assignments = assignments }
+	return { assignments = assignments, explicit_assignments = explicit }
 end
 
 --- Enumerates only dynamic slots recognized by this runtime owner.
@@ -690,7 +730,9 @@ end
 --- @return table|nil state
 function M.configuration_snapshot(owner)
 	if _configuration_owner ~= owner then return nil end
-	return { assignments = M.get_assignments() }
+	local assignments, explicit = M.get_assignments(), {}
+	for slot, action in pairs(_explicit_assignments) do explicit[slot] = action end
+	return { assignments = assignments, explicit_assignments = explicit }
 end
 
 --- Applies an acknowledged detached assignment map without persistence.
@@ -698,7 +740,8 @@ end
 --- @param state table Validated candidate or saved state.
 --- @return boolean acknowledged
 function M.apply_configuration(owner, state)
-	if _configuration_owner ~= owner or type(state) ~= "table" or type(state.assignments) ~= "table" then return false end
+	if _configuration_owner ~= owner or type(state) ~= "table" or type(state.assignments) ~= "table"
+		or (state.explicit_assignments ~= nil and type(state.explicit_assignments) ~= "table") then return false end
 	local copy = {}
 	local catalogue = action_catalogue()
 	if not catalogue then return false end
@@ -706,7 +749,13 @@ function M.apply_configuration(owner, state)
 		if not owns_slot(slot) or type(action) ~= "string" or not catalogue.is_assignable(action) then return false end
 		copy[slot] = action
 	end
+	local explicit = {}
+	for slot, action in pairs(state.explicit_assignments or state.assignments) do
+		if not owns_slot(slot) or type(action) ~= "string" or (action ~= "none" and not catalogue.is_assignable(action)) then return false end
+		explicit[slot] = action
+	end
 	_assignments, _loaded = copy, true
+	_explicit_assignments = explicit
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end

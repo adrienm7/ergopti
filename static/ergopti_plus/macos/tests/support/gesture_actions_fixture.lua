@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
+	"actions.assignable",
 	"_generated.action_catalogue",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.

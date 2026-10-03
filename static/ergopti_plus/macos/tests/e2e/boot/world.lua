@@ -378,7 +378,53 @@ local LAYOUTS = {
 		source_id = "org.sil.ukelele.keyboardlayout.ergopti.ergopti_v2_2_2_plus" },
 }
 
---- The machines a scenario can boot on. `worker` delays are within the lease
+--- Independent, bounded NONE-state observations of the modelled OS sources.
+-- These physical keys matter to source selection/dead-key regressions; unknown
+-- machine keys emit no text. The native Swift lane qualifies real TIS/UC output.
+-- Ergopti entries resolve the shipped .keylayout's NONE actions, not action IDs
+-- or the script's effective remap index (native key 8 emits ★, not "j").
+local NATIVE_SOURCE_LEVELS = {
+	["com.apple.keylayout.ABC"] = {
+		[8]="c", [10]="§", [33]="[", [38]="j", [42]="\\", [50]="`",
+	},
+	["com.apple.keylayout.French"] = {
+		[8]="c", [38]="j", [39]="ù", [41]="m", [33]={text="", dead=true},
+	},
+	["org.sil.ukelele.keyboardlayout.ergopti.ergopti_v2_2_2_plus"] = {
+		[8]="★", [10]="$", [30]="j", [33]="z", [38]="s", [50]="ê", [42]={text="", dead=true},
+	},
+}
+
+--- Models only the selected machine's exact native source and requested order.
+--- @param args table Canonical launcher role arguments.
+--- @param layout table Current source descriptor.
+--- @return table answer Strict JSON receipt or native argument refusal.
+local function keyboard_source_answer(args, layout)
+	local map = layout and NATIVE_SOURCE_LEVELS[layout.source_id]
+	if args[1] ~= "--keyboard-source-probe" or not map or args[2] ~= layout.source_id or #args < 3 then
+		return {code=64, stderr="invalid selected keyboard-source request"}
+	end
+	local levels, seen = {}, {}
+	for index=3, #args do
+		local raw = args[index]
+		local canonical = type(raw) == "string" and (raw == "0" or raw:match("^[1-9]%d*$") ~= nil)
+		local code = canonical and tonumber(raw) or nil
+		if not code or code % 1 ~= 0 or code < 0 or code > 127
+			or tostring(code) ~= raw or seen[code] then
+			return {code=64, stderr="invalid native keyboard-source codes"}
+		end
+		seen[code] = true
+		local value = map[code]
+		local text = type(value) == "string" and value or (value and value.text or "")
+		local dead = type(value) == "table" and value.dead == true or false
+		levels[#levels+1] = {code=code, text=text, dead=dead, direct=not dead and text ~= ""}
+	end
+	return {code=0, stdout=require("json").encode({version=1, source_id=layout.source_id,
+		keyboard_type=40, levels=levels}) .. "\n"}
+end
+M.keyboard_source_answer = keyboard_source_answer
+
+-- The machines a scenario can boot on. `worker` delays are within the lease
 --- worker's own budgets (READY_ACK_TIMEOUT_SEC 4 s, a command 1.75 s). A
 --- `during_resume` event happens once, `after` seconds into the boot's first
 --- RESUME, while its answer is still due.
@@ -486,6 +532,7 @@ end
 --- @return table answer { code, stdout, stderr } or { interactive = fn }
 local function machine_answer(path, args, helper)
 	if path == helper then
+		if args[1] == "--keyboard-source-probe" then return keyboard_source_answer(args, _selected_layout) end
 		if args[1] == "--karabiner-lease-worker" then return { interactive = lease_worker } end
 		if args[1] == "--karabiner-lease-revoke" then return { code = 0 } end
 		local answer = HELPER_ROLE_ANSWERS[args[1]]

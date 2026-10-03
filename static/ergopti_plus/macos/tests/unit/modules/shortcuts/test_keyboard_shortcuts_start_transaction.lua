@@ -55,13 +55,7 @@ local function load_subject()
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	require("tests.support.keyboard_config_fixture").install({ cmd_a = "script_pause_toggle", cmd_b = "script_pause_toggle" })
-	local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-		json = {
-			decode = function()
-				return {keys = {{id = "a", label = "A"}, {id = "b", label = "B"}}}
-			end,
-		},
-	})
+	local subject = require("modules.shortcuts.keyboard_shortcuts")
 	return subject, controls, counters
 end
 

@@ -581,6 +581,10 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		// First pass: primitive defaults → flat keys under [section].
 		const flatEntries = entries.filter((e) => {
 			const def = resolveDefault(e, platform);
+			// Presence reserves a personal chord, including an explicit none. Fresh
+			// templates leave neutral ordinary slots absent instead of fabricating
+			// personal intent that would block the physical contextual default.
+			if (sectionPath === 'shortcuts.keyboard' && def === 'none') return false;
 			return typeof def !== 'object' || def === null || Array.isArray(def);
 		});
 		const tableEntries = entries.filter((e) => {

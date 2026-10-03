@@ -2915,7 +2915,14 @@ local function _build_shortcuts(ctx)
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
-				local slot_label = Keyboard.get_slot_label(slot)
+				local reason
+				if slot == require("shortcuts.magic_editor").SLOT_ID then
+					local gate = ctx.input_capture_gate
+					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
+						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
+				end
+				local slot_label = Keyboard.get_slot_label(slot, reason)
 				local choices = slot_binding_rows(slot_label, bound, Keyboard.binding_id(slot),
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {

@@ -71,7 +71,9 @@
                   xclip wl-clipboard xdotool libxkbcommon libnotify
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
-                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core
+                  # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
+                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core xorg.libX11
+                  # END GENERATED LINUX NATIVE REQUIREMENTS
                 ])}
 
               runHook postInstall

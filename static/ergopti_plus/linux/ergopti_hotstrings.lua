@@ -1370,6 +1370,8 @@ local function main()
 		-- Key presses only: a clipboard paste on every press is no typing, and
 		-- a character the layout lacks leaves the key its own.
 		can_type = injector.can_type_directly,
+		input_source_receipt = keyboard_hook.physical_source_receipt,
+		typing_plan = function(text) return require("adapters.keyboard_layout").resolve(text) end,
 		type_text = function(text)
 			if opts.dry_run then return false end
 			local result = injector.type_directly(text)
@@ -1384,6 +1386,23 @@ local function main()
 		-- guarantees; the menu greys the capture row otherwise.
 		can_capture = function() return keyboard_hook.get_mode() == "intercept" end,
 		key_text = keyboard_hook.key_text,
+		-- Source proof follows owners already installed before capture. A tap
+		-- action cannot be inferred to type the magic character from its name.
+		direct_source_admitted = function(code, magic_remapped)
+			if TapHold.is_active() then
+				local native = require("platform.remap.tap_hold_engine").KEY_CODES
+				for id, key in pairs(TapHold.keys()) do
+					if native[id] == code and key.enabled ~= false then return false end
+				end
+			end
+			if magic_remapped then return true end
+			if shortcuts and shortcuts.is_enabled() and not script_actions.is_paused() then
+				for _, key in ipairs(tap_keys.keys()) do
+					if key.linux == code and tap_keys.get_action(key.id) ~= "none" then return false end
+				end
+			end
+			return true
+		end,
 		defer = function(fn, delay_ms) return event_loop.defer(fn, delay_ms) end,
 	})
 
@@ -1471,6 +1490,10 @@ local function main()
 		local consumed = keyboard_shortcuts.consume(detail, {
 			only_script = script_actions.is_paused() or not shortcuts_on,
 			defer = function(fn) return event_loop.defer(fn) end,
+			admission = function()
+				return { master = shortcuts ~= nil and shortcuts.is_enabled() == true and shortcuts.configuration_admitted(),
+					paused = script_actions.is_paused() == true, inhibited = input_capture_gate.blocks_text() == true }
+			end,
 		})
 		if not consumed then return false end
 		local chord = keyboard_shortcuts.chord_name(detail)

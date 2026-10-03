@@ -432,6 +432,9 @@ M.features = {
 		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", input_altering = true, cleared = "none",
 	},
 	{
+		path = "shortcuts.keyboard.magic_editor", id = "magic_editor", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.magic_editor", platforms = { "ahk", "hs", "linux" }, recommended = "open_hotstrings_editor", input_altering = true, cleared = "none",
+	},
+	{
 		path = "shortcuts.keyboard.ctrl_g", id = "ctrl_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true,
 	},
 	{

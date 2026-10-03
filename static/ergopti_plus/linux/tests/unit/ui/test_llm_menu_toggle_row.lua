@@ -117,59 +117,86 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()
+	--- Menu inventory stays editable when its native source is unavailable.
+	--- This fixture owns that dependency rather than inheriting another test's
+	--- initialized physical-source owner or its expired private config path.
+	local function with_unavailable_source(body)
+		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
+		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+		package.loaded["modules.hotstrings.magic_key_source"] = {
+			editor_source = function() return { generation = 1, status = "unavailable", candidates = {} } end,
+			known_codes = function() return {} end,
+		}
+		package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
+		local ok, err = pcall(body)
+		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
+		package.loaded["modules.hotstrings.magic_key"] = saved_magic
+		if not ok then error(err, 0) end
+	end
+
 	-- The positive case, so the absence assertion below cannot pass by looking
 	-- in the wrong submenu.
 	helpers.it("draws every slot group when the catalogue is readable", function()
-		local kbd = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
-		kbd._reset()
-		local mb = helpers.load_module("ui.menu.menu_builder")
-		local rows = submenu_of(mb.build({
-			_version = "0.0.0-dev.12",
-			shortcuts = require("modules.shortcuts.manager"),
-			on_quit = function() end,
-		}), "menu.shortcuts.title")
-		local i18n = require("infra.i18n")
-		for _, group in ipairs(kbd.SLOT_GROUPS) do
-			local label, found = i18n.get(group.group_key), nil
-			for _, row in ipairs(rows or {}) do
-				if row.title == label then found = row end
-			end
-			helpers.assert_true(found ~= nil and type(found.menu) == "table" and #found.menu > 0,
-				"slot group '" .. label .. "' must be drawn with its slots")
-		end
-	end)
-
-	helpers.it("draws no empty slot group when the catalogue cannot be read", function()
-		local saved_paths = package.loaded["infra.paths"]
-		local saved_kbd = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-		local real_paths = require("infra.paths")
-		local blind = setmetatable({ shared = function() return nil end }, { __index = real_paths })
-		package.loaded["infra.paths"] = blind
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		local ok_kbd, kbd = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-		package.loaded["infra.paths"] = saved_paths
-		local ok, err = pcall(function()
-			helpers.assert_true(ok_kbd, tostring(kbd))
+		with_unavailable_source(function()
+			local kbd = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
 			kbd._reset()
-			helpers.assert_eq(#kbd.available_slots("ctrl_"), 0, "the blind catalogue offers no slot")
 			local mb = helpers.load_module("ui.menu.menu_builder")
-			local items = mb.build({
+			local rows = submenu_of(mb.build({
 				_version = "0.0.0-dev.12",
 				shortcuts = require("modules.shortcuts.manager"),
 				on_quit = function() end,
-			})
-			local rows = submenu_of(items, "menu.shortcuts.title")
-			helpers.assert_true(rows ~= nil, "the shortcuts submenu must be drawn")
+			}), "menu.shortcuts.title")
 			local i18n = require("infra.i18n")
 			for _, group in ipairs(kbd.SLOT_GROUPS) do
-				local label = i18n.get(group.group_key)
-				for _, row in ipairs(rows) do
-					helpers.assert_true(row.title ~= label,
-						"slot group '" .. label .. "' was drawn with no slot in it")
+				local label, found = i18n.get(group.group_key), nil
+				for _, row in ipairs(rows or {}) do
+					if row.title == label then found = row end
 				end
+				helpers.assert_true(found ~= nil and type(found.menu) == "table" and #found.menu > 0,
+					"slot group '" .. label .. "' must be drawn with its slots")
 			end
+		end)
+	end)
+
+	helpers.it("draws no empty slot group when the catalogue cannot be read", function()
+		with_unavailable_source(function()
+			local saved_paths = package.loaded["infra.paths"]
+			local saved_kbd = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+			local real_paths = require("infra.paths")
+			local blind = setmetatable({ shared = function() return nil end }, { __index = real_paths })
+			package.loaded["infra.paths"] = blind
+			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+			local ok_kbd, kbd = pcall(require, "modules.shortcuts.keyboard_shortcuts")
+			package.loaded["infra.paths"] = saved_paths
+			local ok, err = pcall(function()
+				helpers.assert_true(ok_kbd, tostring(kbd))
+				kbd._reset()
+				helpers.assert_eq(#kbd.available_slots("ctrl_"), 0, "the blind catalogue offers no slot")
+				local mb = helpers.load_module("ui.menu.menu_builder")
+				local items = mb.build({
+					_version = "0.0.0-dev.12",
+					shortcuts = require("modules.shortcuts.manager"),
+					on_quit = function() end,
+				})
+				local rows = submenu_of(items, "menu.shortcuts.title")
+				helpers.assert_true(rows ~= nil, "the shortcuts submenu must be drawn")
+				local i18n = require("infra.i18n")
+				for _, group in ipairs(kbd.SLOT_GROUPS) do
+					local label, found = i18n.get(group.group_key), nil
+					for _, row in ipairs(rows) do
+						if group.prefix == "contextual" and row.title == label then found = row
+						else helpers.assert_true(row.title ~= label,
+							"slot group '" .. label .. "' was drawn with no slot in it") end
+					end
+					if group.prefix == "contextual" then
+						helpers.assert_type(found, "table", "the logical contextual slot does not depend on the modifier key catalogue")
+						helpers.assert_eq(#found.menu, 1, "its one stable editable slot must remain visible")
+						helpers.assert_type(found.menu[1].menu[1].fn, "function", "unavailable native evidence never removes the ordinary action picker")
+					end
+				end
 		end)
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = saved_kbd
 		if not ok then error(err, 0) end
+		end)
 	end)
 end)

@@ -41,7 +41,17 @@ function validate(input) {
 	);
 	const identities = new Set();
 	for (const entry of slots) {
-		check(entry.default === 'none', `neutral: ${entry.id} must initialize to none`);
+		const contextual = entry.id === 'magic_editor';
+		check(
+			entry.default === (contextual ? 'open_hotstrings_editor' : 'none'),
+			`${contextual ? 'editor' : 'neutral'}: ${entry.id} must use its approved initial action`
+		);
+		check(
+			contextual
+				? entry.active_by_default === true && entry.cleared === 'none'
+				: entry.active_by_default === undefined && entry.cleared === undefined,
+			`editor: only the physical magic slot declares conditional activation and explicit clearing`
+		);
 		check(
 			typeof entry.recommended === 'string' && entry.recommended.length > 0,
 			`recommendation: ${entry.id} needs an independent recommended action`
@@ -56,19 +66,31 @@ function validate(input) {
 			identities.add(identity);
 			const value = (entry.default_per_platform || {})[platform];
 			check(
-				value === undefined || value === 'none',
+				value === undefined || value === (contextual ? 'open_hotstrings_editor' : 'none'),
 				`neutral: ${identity} override must stay none`
 			);
 		}
 	}
-	const editor = slots.filter(
-		(entry) =>
-			entry.platforms.includes('ahk') &&
-			((entry.recommended_per_platform || {}).ahk ?? entry.recommended) === 'open_hotstrings_editor'
+	for (const platform of ['ahk', 'hs', 'linux']) {
+		const editor = slots.filter(
+			(entry) =>
+				entry.platforms.includes(platform) &&
+				((entry.recommended_per_platform || {})[platform] ?? entry.recommended) ===
+					'open_hotstrings_editor'
+		);
+		check(
+			editor.length === 1 && editor[0].id === 'magic_editor',
+			`editor: ${platform} must recommend only the contextual physical magic slot`
+		);
+	}
+	check(
+		JSON.stringify(slots.find((entry) => entry.id === 'magic_editor')?.platforms) ===
+			JSON.stringify(['ahk', 'hs', 'linux']),
+		'editor: the contextual slot must belong to every driver'
 	);
 	check(
-		editor.length === 1 && editor[0].id === 'win_d' && editor[0].default === 'none',
-		'editor: Windows must recommend the editor in exactly one neutral ordinary Win slot'
+		slots.find((entry) => entry.id === 'win_d')?.recommended === 'none',
+		'editor: Win+D has no fixed editor recommendation'
 	);
 	for (const [platform, slot] of Object.entries(PREDICTION_SLOTS)) {
 		const recommended = slots.filter(
@@ -121,9 +143,14 @@ function validate(input) {
 			projected &&
 			loader.match(new RegExp(`(\\w+)\\[${projected[1]}\\]\\s*=\\s*${projected[2]}\\b`));
 		const candidate = direct?.[1] || sink?.[1];
+		const publication = loader.match(/(_actions\s*,[^=\n]*_loaded)\s*=\s*([^\n]+)/);
+		const publishedFields = publication?.[1].split(',').map((value) => value.trim());
+		const publishedValues = publication?.[2].split(',').map((value) => value.trim());
 		const published =
 			candidate &&
-			(new RegExp(`_actions\\s*,\\s*_loaded\\s*=\\s*${candidate}\\s*,\\s*true\\b`).test(loader) ||
+			((publishedFields?.length === publishedValues?.length &&
+				publishedValues?.[publishedFields.indexOf('_actions')] === candidate &&
+				publishedValues?.[publishedFields.indexOf('_loaded')] === 'true') ||
 				new RegExp(`_assignments\\s*=\\s*${candidate}\\b`).test(loader));
 		const overwritten = candidate && new RegExp(`^\\s*${candidate}\\s*=`, 'm').test(loader);
 		check(
@@ -162,31 +189,35 @@ const mutations = [
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_d').recommended_per_platform = { ahk: 'copy' };
+			copy.slots.find((entry) => entry.id === 'win_d').recommended_per_platform = {
+				ahk: 'open_hotstrings_editor'
+			};
 		}
 	],
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_d').recommended = 'copy';
+			copy.slots.find((entry) => entry.id === 'magic_editor').recommended = 'copy';
 		}
 	],
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'win_d').default = 'open_hotstrings_editor';
+			copy.slots.find((entry) => entry.id === 'magic_editor').default = 'none';
 		}
 	],
 	[
 		'neutral',
 		(copy) => {
-			copy.slots[0].default = 'paste_plain';
+			copy.slots.find((entry) => entry.id === 'win_a').default = 'paste_plain';
 		}
 	],
 	[
 		'neutral',
 		(copy) => {
-			copy.slots[0].default_per_platform = { ahk: 'paste_plain' };
+			copy.slots.find((entry) => entry.id === 'win_a').default_per_platform = {
+				ahk: 'paste_plain'
+			};
 		}
 	],
 	[
@@ -244,8 +275,8 @@ const mutations = [
 		'hs-owner',
 		(copy) => {
 			copy.lua.hs = copy.lua.hs.replace(
-				'_actions, _loaded = loaded, true',
-				'_actions, _loaded = {}, true'
+				'_actions, _explicit_actions, _loaded = loaded, explicit, true',
+				'_actions, _explicit_actions, _loaded = {}, explicit, true'
 			);
 		}
 	],
@@ -261,8 +292,8 @@ const mutations = [
 		'hs-owner',
 		(copy) => {
 			copy.lua.hs = copy.lua.hs.replace(
-				'_actions, _loaded = loaded, true',
-				'loaded = {}\n_actions, _loaded = loaded, true'
+				'_actions, _explicit_actions, _loaded = loaded, explicit, true',
+				'loaded = {}\n_actions, _explicit_actions, _loaded = loaded, explicit, true'
 			);
 		}
 	],

@@ -177,14 +177,47 @@ if (!Array.isArray(shortcutsMenu) || shortcutsMenu.length === 0) {
 // ==================================================
 
 if (moduleSrc) {
-	// Anchored to the line start: each SLOT_MODS row is `{ "prefix", {mods} }`, so
-	// an unanchored match would also collect the modifier names from the inner
-	// table and report every one of them as a prefix no group offers.
-	const slotMods = [
-		...(moduleSrc.match(/local\s+SLOT_MODS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(
-			/^\s*\{\s*"([^"]+)"/gm
+	const catalogue = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/modifier_chords.json'),
+			'utf8'
 		)
-	].map((m) => m[1]);
+	);
+	const canonicalGroups = catalogue.platforms?.macos?.shortcut_groups;
+	const canonicalModifiers = catalogue.platforms?.macos?.modifiers;
+	const slotMods = Array.isArray(canonicalGroups)
+		? canonicalGroups.map((group) => group.prefix)
+		: [];
+	if (
+		!Array.isArray(canonicalGroups) ||
+		canonicalGroups.length !== 5 ||
+		new Set(slotMods).size !== 5 ||
+		!Array.isArray(canonicalModifiers)
+	) {
+		errors.push(
+			'the actual macOS catalogue must declare five unique ordinary groups and native modifier aliases'
+		);
+	}
+	const modifierIds = new Set((canonicalModifiers || []).map((modifier) => modifier.id));
+	for (const group of canonicalGroups || []) {
+		if (
+			!Array.isArray(group.modifiers) ||
+			group.modifiers.length === 0 ||
+			group.modifiers.some((modifier) => !modifierIds.has(modifier))
+		) {
+			errors.push(`canonical group ${group.prefix} has no actual modifier owner`);
+		}
+	}
+	if (
+		!/for _, group in ipairs\(platform\.shortcut_groups\)/.test(moduleSrc) ||
+		!/aliases\[modifier\.id\] = assert\(modifier\.hammerspoon/.test(moduleSrc) ||
+		!/groups\[#groups \+ 1\] = \{ group\.prefix, mods \}/.test(moduleSrc) ||
+		!/SLOT_MODS, SPECIAL_KEYS = groups, keys/.test(moduleSrc)
+	) {
+		errors.push(
+			'SLOT_MODS must derive its actual prefixes and native modifiers from the canonical catalogue'
+		);
+	}
 	const groups = [
 		...(moduleSrc.match(/M\.SLOT_GROUPS\s*=\s*\{([\s\S]*?)\n\}/) || [, ''])[1].matchAll(
 			/prefix\s*=\s*"([^"]+)"/g
@@ -197,12 +230,24 @@ if (moduleSrc) {
 		errors.push('M.SLOT_GROUPS parsed empty — the menu would render no groups at all');
 
 	for (const prefix of groups) {
+		if (prefix === 'contextual') continue;
 		if (!slotMods.includes(prefix)) {
 			errors.push(
 				`M.SLOT_GROUPS offers the prefix "${prefix}", which SLOT_MODS cannot resolve. Every row in that ` +
 					'group would produce no chord, so the group would look configurable and bind nothing.'
 			);
 		}
+	}
+
+	if (
+		groups.filter((prefix) => prefix === 'contextual').length !== 1 ||
+		!/if slot_id == MagicPolicy\.SLOT_ID then/.test(moduleSrc) ||
+		!/require\("modules\.shortcuts\.magic_editor"\)/.test(moduleSrc) ||
+		!/MagicPolicy/.test(moduleSrc)
+	) {
+		errors.push(
+			'the one contextual group must resolve through its actual physical-source owner and ordinary action picker'
+		);
 	}
 
 	// And every resolvable prefix should be offered: a prefix the module can bind

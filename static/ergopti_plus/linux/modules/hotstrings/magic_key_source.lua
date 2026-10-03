@@ -58,6 +58,20 @@ local CAPTURE_TIMEOUT_MS = Timings.ms("ui", "magic_key_capture_timeout_ms")
 -- Built on first use: the registry is 37 KB of JSON nobody needs while the
 -- automatic value is in effect and no menu asks for the candidates.
 local _resolver = nil
+local _registry = nil
+local _editor_signature = nil
+local _editor_generation = 0
+
+local function registry()
+	if _registry then return _registry end
+	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local text = path and FileSystem.read(path)
+	if type(text) ~= "string" then error("the physical-key registry is unreadable: " .. tostring(path)) end
+	local decoded = Json.decode(text)
+	assert(type(decoded) == "table" and type(decoded.keys) == "table", "the physical-key registry is malformed")
+	_registry = decoded
+	return decoded
+end
 
 -- The evdev code in effect and the preference generation it was derived from.
 local _code = nil
@@ -86,14 +100,9 @@ local _untypable_reported = nil
 --- @return table resolver
 function M.resolver()
 	if _resolver then return _resolver end
-	local path = Paths.shared("data/keycodes/physical_keys.json")
-	local text = path and FileSystem.read(path)
-	if type(text) ~= "string" then
-		error("the physical-key registry is unreadable: " .. tostring(path))
-	end
 	_resolver = Shared.new({
 		entry    = Manifest.find_entry_by_path(M.PATH),
-		registry = Json.decode(text),
+		registry = registry(),
 		field    = "evdev",
 	})
 	return _resolver
@@ -156,6 +165,71 @@ function M.key_text(code)
 	return _deps.key_text(M.resolver().native(code))
 end
 
+--- Registry identities admitted by the shared conditional shortcut policy.
+--- @return table known_codes KeyboardEvent.code -> true.
+function M.known_codes()
+	local known = {}
+	for code in pairs(registry().keys) do known[code] = true end
+	return known
+end
+
+--- Proves actual plain sources without selecting one or discarding ambiguity.
+--- @return table source Epoch, status and detached native candidates.
+function M.editor_source()
+	local Capture = require("adapters.xkb_capture")
+	local xkb_generation, why = Capture.source_generation()
+	local magic = _deps and _deps.magic_key() or require("modules.hotstrings.magic_key").get()
+	local value, candidates, native_codes, codes, seen = M.get(), {}, {}, {}, {}
+	for code, record in pairs(registry().keys) do
+		if type(record.evdev) == "number" then
+			if not codes[record.evdev] or code < codes[record.evdev] then codes[record.evdev] = code end
+			if not seen[record.evdev] then native_codes[#native_codes + 1] = record.evdev; seen[record.evdev] = true end
+		end
+	end
+	table.sort(native_codes)
+	local origin = _deps and _deps.input_source_receipt and _deps.input_source_receipt() or nil
+	local rows = xkb_generation and (origin == nil or origin.ready == true) and Capture.direct_sources(native_codes) or nil
+	local configured = M.evdev_code()
+	local plan = _deps and _deps.typing_plan and _deps.typing_plan(magic) or nil
+	local typable = false
+	-- Qualify the injector's actual plan against the current native group.
+	-- Its cached inverse table alone cannot prove a remap after a group switch.
+	for _, row in ipairs(rows or {}) do
+		if type(plan) == "table" and row.code == plan.keycode and row.text == magic and not row.dead
+			and type(plan.mods) == "table" and type(row.mods) == "table" and #plan.mods == #row.mods then
+			local same = true
+			for index, mod in ipairs(plan.mods) do if row.mods[index] ~= mod then same = false end end
+			if same then typable = true end
+		end
+	end
+	local remapped = configured ~= nil and _deps ~= nil and _deps.is_active() == true
+		and _deps.can_capture() == true and _deps.replace_on() == true and _deps.can_type(magic) == true and typable
+	if rows then
+		for _, row in ipairs(rows) do
+			-- A proven chosen replacement owns the effective source. Automatic or
+			-- ineffective settings retain every actual native candidate instead.
+			if not remapped or row.code == configured then
+				local mapped = remapped and row.code == configured and row.plain == true
+				local admitted = _deps == nil or _deps.direct_source_admitted == nil
+					or _deps.direct_source_admitted(row.code, remapped and row.code == configured) == true
+				candidates[#candidates + 1] = { code = codes[row.code], native_code = row.code,
+					identity = "evdev:" .. row.code, text = mapped and magic or row.text, native_text = row.text,
+					direct = admitted and (mapped or row.direct == true),
+					dead = not mapped and row.dead == true }
+			end
+		end
+	end
+	-- A single epoch covers source preferences, native group and remap/tap proof.
+	local signature = Json.encode({ preference = Preferences.generation(), native = xkb_generation,
+		value = value, trigger = magic, remapped = remapped, origin = origin, candidates = candidates })
+	if signature ~= _editor_signature then
+		_editor_signature = signature
+		_editor_generation = _editor_generation + 1
+	end
+	return { generation = _editor_generation, status = rows and "ready" or "unavailable",
+		reason = rows and nil or (origin and origin.ready ~= true and "physical-origin-unqualified") or why or "direct-source-unavailable", candidates = candidates }
+end
+
 
 
 
@@ -181,13 +255,28 @@ end
 ---   can_capture   fn() -> boolean  The hook owns the keyboard (grab), so a
 ---                                  captured key never reaches an application.
 ---   key_text      fn(evdev) -> string|nil  What the XKB layout types there.
----   defer         fn(fn, delay_ms) -> boolean  Runs work after the hook returns. }
+---   defer         fn(fn, delay_ms) -> boolean  Runs work after the hook returns.
+---   input_source_receipt fn() -> { generation, ready } Optional native evdev
+---                                  origin acknowledgement.
+---   typing_plan   fn(text) -> { keycode, mods }|nil Optional injector plan
+---                                  qualified against the actual native group.
+---   direct_source_admitted fn(evdev, remapped) -> boolean Optional native
+---                                  tap-hold/remap ownership admission. }
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
 	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
 		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
+	end
+	if deps.input_source_receipt ~= nil and type(deps.input_source_receipt) ~= "function" then
+		error("magic_key_source.init needs a callable input source receipt", 2)
+	end
+	if deps.typing_plan ~= nil and type(deps.typing_plan) ~= "function" then
+		error("magic_key_source.init needs a callable typing plan", 2)
+	end
+	if deps.direct_source_admitted ~= nil and type(deps.direct_source_admitted) ~= "function" then
+		error("magic_key_source.init needs a callable direct source admission", 2)
 	end
 	Logger.start(LOG, "Initializing…")
 	_deps = deps
@@ -297,6 +386,9 @@ end
 function M._reset_for_test()
 	_deps = nil
 	_resolver = nil
+	_registry = nil
+	_editor_signature = nil
+	_editor_generation = _editor_generation + 1
 	_capture = nil
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil

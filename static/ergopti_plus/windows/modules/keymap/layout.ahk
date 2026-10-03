@@ -258,20 +258,10 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 		_RemapEmit.Bind("!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
-	if Character == "l" {
-		; Solves a bug of # + remapped letter L not triggering the Lock shortcup
-		Hotkey(
-			"#" ScanCode,
-			_LockWorkstationEmit,
-			InputLevel
-		)
-	} else {
-		Hotkey(
-			"#" ScanCode,
-			_RemapEmit.Bind("#" Character, Character),
-			InputLevel
-		)
-	}
+	; One physical Win variant arbitrates ordinary assignments, the conditional
+	; magic editor and this exact layout fallback. Preserve Win+L's native owner.
+	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
+		: _RemapEmit.Bind("#" Character, Character))
 }
 
 ; Per-process UIA selection result caches.

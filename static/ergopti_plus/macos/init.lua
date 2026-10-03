@@ -1001,7 +1001,17 @@ do
 	local ConfigMigrate = require("config_migrate")
 	require("toml_codec.writer").set_sparse_defaults(
 		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
+	local catalogue_ok, action_catalogue = pcall(require, "_generated.action_catalogue")
+	local context, context_error
+	if catalogue_ok then
+		context, context_error = ConfigMigrate.load_context(
+			require("infra.paths").shared("modules/actions/modifier_chords.json"), action_catalogue, file_system)
+	else
+		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
+	end
 	ConfigMigrate.boot({
+		context       = context,
+		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
 		driver        = "hs",
 		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),

@@ -33,6 +33,62 @@ function plan(args) {
 	return [...result.stdout.matchAll(/^   - ([\w-]+)/gm)].map((match) => match[1]);
 }
 
+const { run: runNativeSource } = require('./run-linux-xkb-source.cjs');
+const nativeCalls = [];
+for (const platform of ['darwin', 'win32']) {
+	const logs = [];
+	assert.equal(
+		runNativeSource({
+			platform,
+			spawn: () => assert.fail('foreign hosts must defer'),
+			log: (line) => logs.push(line)
+		}),
+		0
+	);
+	assert(
+		logs.some((line) => line.includes('[DEFERRED]')),
+		'foreign host cannot claim native Linux qualification'
+	);
+}
+for (const result of [{ status: 2 }, { status: null }, { error: new Error('missing luajit') }]) {
+	assert.notEqual(
+		runNativeSource({
+			platform: 'linux',
+			spawn: (...args) => {
+				nativeCalls.push(args);
+				return result;
+			},
+			error: () => {}
+		}),
+		0,
+		'Linux prerequisite and native fixture failures must remain blocking'
+	);
+}
+const [command, arguments_, options] = nativeCalls[0];
+assert.equal(command, 'luajit');
+assert.deepEqual(arguments_, ['tests/hardware/run_xkb_source_qualification.lua']);
+assert.equal(options.cwd, path.join(root, 'static/ergopti_plus/linux'));
+assert(
+	options.env.LUA_PATH.includes('../_shared/lua/?.lua'),
+	'the native fixture loads the real shared driver modules'
+);
+assert.equal(
+	options.stdio,
+	'inherit',
+	'native failure diagnostics must reach the verification receipt'
+);
+assert.equal(GATE_COMMANDS['linux-xkb-source'].npm, 'test:linux:xkb-source');
+for (const file of [
+	'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
+	'static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
+	'static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua'
+])
+	assert(
+		selectGates([file]).has('linux-xkb-source'),
+		`${file}: native source proof must be selected`
+	);
+
 const failures = [];
 for (const file of [
 	'docs/ERGOPTIPLUS_TODO.md',

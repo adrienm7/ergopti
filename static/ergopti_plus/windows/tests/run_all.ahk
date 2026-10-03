@@ -1279,9 +1279,12 @@ _LogBootProgress("keylogger modules + tests included")
 ; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
 #Include ../infra/chord.ahk
 #Include ../adapters/hotkey_registrar.ahk
+#Include ../../_shared/modules/shortcuts/magic_editor.ahk
+#Include ../infra/magic_editor.ahk
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_hotkey_registrar_modifier_keys.ahk
+#Include unit/test_magic_editor.ahk
 #Include unit/test_keyboard_slot_win_space.ahk
 #Include unit/test_llm_trigger_shortcut_retired.ahk
 #Include unit/test_llm_hotkey_identity.ahk

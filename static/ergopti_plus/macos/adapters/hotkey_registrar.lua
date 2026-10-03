@@ -58,6 +58,11 @@ local MODIFIER_KEY_NAMES = {
 -- object never leaves this file, so there is exactly one code path that can
 -- delete a hotkey and exactly one place a leak could come from.
 local _bindings = {}
+local _physical_claims = {}
+-- Only conditionals actually suspended by a claim transaction may be restored.
+local _claim_suspensions = {}
+local _claim_transaction = false
+local set_enabled
 
 -- Monotonic token source. Tokens are never reused, so a handle from a released
 -- binding stays permanently unknown instead of silently addressing a later one.
@@ -96,7 +101,7 @@ end
 --- @param chord string Canonical chord string, e.g. "Ctrl+Shift+S".
 --- @param callback function Invoked with no arguments on each press.
 --- @return string|nil handle An opaque handle, or nil when the chord was refused.
-function M.bind(chord, callback)
+local function bind_native(chord, callback, native_key, conditional)
 	if type(callback) ~= "function" then
 		Logger.error(LOG, "bind(): callback must be a function, got %s.", type(callback))
 		return nil
@@ -116,16 +121,31 @@ function M.bind(chord, callback)
 	-- Hammerspoon resolves key names to physical scancodes at bind time and
 	-- expects the key in the spelling the OS uses, which is the lower-cased form
 	-- the notation core already produces for multi-character names.
-	local hs_key = parsed.key:lower()
+	local hs_key = native_key or parsed.key:lower()
+	local identity = M.physical_identity(parsed.mods, hs_key)
+	if conditional and (identity == nil or M.physical_claims()[identity] ~= nil) then
+		return nil
+	end
+	local suspended = {}
+	if not conditional and identity then
+		for handle, owned in pairs(_bindings) do
+			if owned.conditional and owned.identity == identity and owned.enabled then
+				if M.setEnabled(handle, false) ~= true then return nil end
+				suspended[#suspended + 1] = handle
+			end
+		end
+	end
 	-- Keep a Lua-side delivery fence in front of the native callback. Native
 	-- :disable()/:delete() can raise during teardown; without this independent
 	-- fence, a retained Hammerspoon hotkey could still execute an Ergopti action
 	-- after the owning feature had reported itself disabled.
 	local entry = {
 		hotkey = nil,
-		chord = Chord.format(parsed.mods, parsed.key),
+		chord = type(hs_key) == "number" and ("native " .. identity) or Chord.format(parsed.mods, parsed.key),
 		enabled = true,
 		native_settled = true,
+		identity = identity,
+		conditional = conditional == true,
 	}
 	local function deliver_if_enabled(...)
 		if entry.enabled ~= true then return nil end
@@ -151,6 +171,7 @@ function M.bind(chord, callback)
 
 	local ok, hotkey = pcall(hs.hotkey.bind, parsed.mods, hs_key, deliver_if_enabled)
 	if not ok or not hotkey then
+		for _, handle in ipairs(suspended) do M.setEnabled(handle, true) end
 		Logger.warn(LOG, "bind(): the OS refused '%s' — %s.", tostring(chord), tostring(hotkey))
 		return nil
 	end
@@ -160,6 +181,125 @@ function M.bind(chord, callback)
 	_bindings[handle] = entry
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle
+end
+
+--- Resolves a modifier set and native key to one physical acquisition identity.
+--- @param mods table Canonical modifier array.
+--- @param key string|number Native key name or proven virtual keycode.
+--- @return string|nil identity
+function M.physical_identity(mods, key)
+	local code = key
+	if type(code) == "string" then code = hs.keycodes.map[code:lower()] end
+	if type(code) ~= "number" or code % 1 ~= 0 or code < 0 or code > 127 then return nil end
+	local parsed = Chord.parse(Chord.format(mods, "a"))
+	if not parsed then return nil end
+	return table.concat(parsed.mods, "+") .. ":" .. tostring(code)
+end
+
+--- Replaces one owner's explicit claims, including chords assigned to none.
+--- @param owner string Stable assignment owner.
+--- @param rows table[] Canonical chord, action and binding identifier records.
+--- @return boolean committed
+function M.replace_physical_claims(owner, rows)
+	assert(type(owner) == "string" and owner ~= "", "physical claim owner is required")
+	if _claim_transaction then return false end
+	local claims = {}
+	for _, row in ipairs(rows) do
+		local parsed = assert(Chord.parse(row.chord), "physical claim chord is invalid")
+		local identity = M.physical_identity(parsed.mods, parsed.key)
+		if identity then claims[identity] = { action = row.action, binding_id = row.binding_id } end
+	end
+	local previous = _physical_claims[owner]
+	local suspended_before, touched = {}, {}
+	for handle, claimant in pairs(_claim_suspensions) do suspended_before[handle] = claimant end
+	_claim_transaction = true
+	local function transition(handle, want)
+		local entry = _bindings[handle]
+		if touched[handle] == nil then
+			touched[handle] = { enabled = entry.enabled, generation = entry.claim_generation or 0 }
+		end
+		local acknowledged = set_enabled(handle, want, true)
+		return acknowledged == true and _bindings[handle] == entry
+			and (entry.claim_generation or 0) == touched[handle].generation
+	end
+	local function refuse()
+		_physical_claims[owner] = previous
+		for handle, before in pairs(touched) do
+			local entry = _bindings[handle]
+			if entry and (entry.claim_generation or 0) == before.generation then
+				if set_enabled(handle, before.enabled, true) ~= true and before.enabled then
+					-- Failed compensation stays fenced and retains an exact retry receipt.
+					suspended_before[handle] = owner
+				end
+			end
+		end
+		for handle in pairs(_claim_suspensions) do
+			if touched[handle] then _claim_suspensions[handle] = nil end
+		end
+		for handle, claimant in pairs(suspended_before) do
+			local entry = _bindings[handle]
+			local before = touched[handle]
+			if entry and (not before or (entry.claim_generation or 0) == before.generation) then
+				_claim_suspensions[handle] = claimant
+			end
+		end
+		_claim_transaction = false
+		return false
+	end
+	for handle, entry in pairs(_bindings) do
+		if entry.conditional and claims[entry.identity]
+			and (entry.enabled or entry.native_settled ~= true) then
+			if entry.enabled then _claim_suspensions[handle] = owner end
+			if not transition(handle, false) then return refuse() end
+		end
+	end
+	_physical_claims[owner] = claims
+	local remaining = M.physical_claims()
+	local restored = {}
+	for handle in pairs(_claim_suspensions) do
+		local entry = _bindings[handle]
+		if not entry then restored[#restored + 1] = handle
+		elseif remaining[entry.identity] == nil then
+			if not transition(handle, true) then return refuse() end
+			restored[#restored + 1] = handle
+		end
+	end
+	for _, handle in ipairs(restored) do _claim_suspensions[handle] = nil end
+	_claim_transaction = false
+	return true
+end
+
+--- Reads all explicit native claims independently from conditional bindings.
+--- @return table claims Physical identity to explicit assignment metadata.
+function M.physical_claims()
+	local claims = {}
+	for _, rows in pairs(_physical_claims) do
+		for identity, row in pairs(rows) do claims[identity] = row end
+	end
+	for handle, entry in pairs(_bindings) do
+		if entry.identity and not entry.conditional then
+			claims[entry.identity] = { action = "explicit", binding_id = handle }
+		end
+	end
+	return claims
+end
+
+--- Registers an ordinary named chord through the common native owner.
+--- @param chord string Canonical chord.
+--- @param callback function Delivery callback.
+--- @return string|nil handle
+function M.bind(chord, callback)
+	return bind_native(chord, callback)
+end
+
+--- Acquires a proven numeric source without resolving its displayed glyph.
+--- @param mods table Canonical modifiers.
+--- @param code number Proven native virtual keycode.
+--- @param callback function Delivery callback.
+--- @return string|nil handle
+function M.bind_conditional(mods, code, callback)
+	if type(code) ~= "number" or M.physical_identity(mods, code) == nil then return nil end
+	return bind_native(Chord.format(mods, "a"), callback, code, true)
 end
 
 --- Installs the live process-wide delivery predicate for adapter-owned hotkeys.
@@ -190,6 +330,8 @@ function M.unbind(handle)
 
 	-- Close delivery before touching the native object. This assignment cannot
 	-- fail, so even a double native failure remains a fail-closed no-op.
+	_claim_suspensions[handle] = nil
+	entry.claim_generation = (entry.claim_generation or 0) + 1
 	entry.enabled = false
 	local ok, err = pcall(function() entry.hotkey:delete() end)
 	if not ok then
@@ -216,7 +358,7 @@ end
 --- @param handle string A handle previously returned by M.bind().
 --- @param enabled boolean Desired state.
 --- @return boolean true if the handle now holds the requested state.
-function M.setEnabled(handle, enabled)
+set_enabled = function(handle, enabled, preserve_claim_suspension)
 	local entry = _bindings[handle]
 	if not entry then
 		Logger.debug(LOG, "setEnabled(): no live binding for %s.", tostring(handle))
@@ -224,6 +366,11 @@ function M.setEnabled(handle, enabled)
 	end
 
 	local want = enabled and true or false
+	if not preserve_claim_suspension then
+		entry.claim_generation = (entry.claim_generation or 0) + 1
+		if not want then _claim_suspensions[handle] = nil end
+	end
+	if want and entry.conditional and M.physical_claims()[entry.identity] ~= nil then return false end
 	if entry.enabled == want and entry.native_settled == true then return true end
 
 	-- Disabling must become effective at the adapter boundary before the native
@@ -248,6 +395,10 @@ function M.setEnabled(handle, enabled)
 	entry.native_settled = true
 	Logger.debug(LOG, "%s enabled=%s.", entry.chord, tostring(want))
 	return true
+end
+
+function M.setEnabled(handle, enabled)
+	return set_enabled(handle, enabled, false)
 end
 
 

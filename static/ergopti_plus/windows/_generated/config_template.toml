@@ -385,22 +385,7 @@ script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"
 
 [shortcuts.keyboard]
-ctrl_b = "none"
-ctrl_shift_v = "none"
-win_a = "none"
-win_d = "none"
-win_g = "none"
-win_h = "none"
-win_m = "none"
-win_n = "none"
-win_o = "none"
-win_s = "none"
-win_sc029 = "none"
-win_t = "none"
-win_u = "none"
-win_w = "none"
-win_x = "none"
-win_space = "none"
+magic_editor = "open_hotstrings_editor"
 
 [shortcuts.tap_keys]
 number_row_left = "none"

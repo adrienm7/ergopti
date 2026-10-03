@@ -477,6 +477,24 @@ const RULES = [
 			(f.startsWith('static/ergopti_plus/linux/') && f.endsWith('.lua') && !f.includes('/tests/'))
 	},
 	{
+		gate: 'linux-xkb-source',
+		why: 'physical contextual shortcuts require actual X11 group/keymap receipts; the owned native fixture also guards honest Wayland refusal',
+		match: (f) =>
+			[
+				'static/ergopti_plus/linux/adapters/xkb_capture.lua',
+				'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
+				'static/ergopti_plus/linux/adapters/keyboard_hook.lua',
+				'static/ergopti_plus/linux/modules/hotstrings/device_finder.lua',
+				'static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua',
+				'static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua',
+				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
+				'static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua',
+				'tools/test/run-linux-xkb-source.cjs',
+				'.github/workflows/ci-linux.yml'
+			].includes(f) || f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
+	},
+	{
 		gate: 'linux',
 		why: 'the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		match: (f) =>
@@ -545,6 +563,7 @@ const GATE_COMMANDS = {
 	'hs-e2e': { npm: 'test:hs:e2e' },
 	linux: { npm: 'test:linux' },
 	'linux-e2e': { npm: 'test:linux:e2e' },
+	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }

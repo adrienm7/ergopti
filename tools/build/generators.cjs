@@ -39,6 +39,17 @@
  */
 const GENERATORS = [
 	{
+		script: 'codegen/codegen-linux-native-runtime.cjs',
+		outputs: [
+			'static/ergopti_plus/linux/_generated/native_runtime.lua',
+			'static/ergopti_plus/linux/install.sh',
+			'tools/build/build-linux-deb.sh',
+			'tools/build/build-linux-rpm.sh',
+			'tools/build/PKGBUILD',
+			'tools/build/nix/flake.nix'
+		]
+	},
+	{
 		script: 'codegen/codegen-window-titles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/window_titles.lua',

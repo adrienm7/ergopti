@@ -329,8 +329,7 @@ script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"
 
 [shortcuts.keyboard]
-ctrl_g = "none"
-super_space = "none"
+magic_editor = "open_hotstrings_editor"
 
 [shortcuts.tap_keys]
 number_row_left = "none"

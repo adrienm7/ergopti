@@ -1,0 +1,6 @@
+[case]
+description = "An exact legacy Ctrl D becomes an ordinary action and explicit contextual NONE."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

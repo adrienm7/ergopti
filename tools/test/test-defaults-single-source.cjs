@@ -55,6 +55,9 @@ async function main() {
 	// sur les 3 OS »). A new entry joins this list by a deliberate decision,
 	// never by a default edit.
 	const APPROVED_ACTIVE_BY_DEFAULT = [
+		// The maintainer also requested a conditional ordinary editor shortcut
+		// following only the actual unmodified physical magic source (2026-10-02).
+		'shortcuts.keyboard.magic_editor',
 		'shortcuts.script_control.script_altgr_backspace',
 		'shortcuts.script_control.script_altgr_delete',
 		'shortcuts.script_control.script_altgr_enter',
@@ -105,8 +108,60 @@ async function main() {
 	assert.deepEqual(
 		activeByDefault.sort(),
 		[...APPROVED_ACTIVE_BY_DEFAULT].sort(),
-		'only the approved script-management chords may be active in an empty configuration'
+		'only approved script-management and physical magic editor slots may be active by default'
 	);
+	const contextual = manifest.entries.find(
+		(entry) => entry.section === 'shortcuts.keyboard' && entry.id === 'magic_editor'
+	);
+	assert.deepEqual(contextual.platforms, ['ahk', 'hs', 'linux']);
+	assert.equal(
+		contextual.cleared,
+		'none',
+		'explicit contextual removal is a durable ordinary assignment'
+	);
+	const shortcutMaster = manifest.entries.find(
+		(entry) => entry.section === 'category_enabled' && entry.id === 'shortcuts'
+	);
+	assert.equal(
+		shortcutMaster.default,
+		false,
+		'the contextual default must not re-enable the Shortcuts master'
+	);
+	const luaShortcutMaster = manifest.entries.find(
+		(entry) => entry.section === 'shortcuts' && entry.id === 'enabled'
+	);
+	assert.equal(
+		luaShortcutMaster.default,
+		false,
+		'both Lua masters stay disabled in an empty configuration'
+	);
+	for (const [platform, driver] of [
+		['ahk', 'windows'],
+		['hs', 'macos'],
+		['linux', 'linux']
+	]) {
+		const template = parse(
+			fs.readFileSync(paths.shared('..', driver, '_generated', 'config_template.toml'), 'utf8')
+		);
+		assert.equal(
+			template.shortcuts.keyboard.magic_editor,
+			'open_hotstrings_editor',
+			`${driver}: ordinary contextual default`
+		);
+		const master =
+			platform === 'ahk' ? template.category_enabled.shortcuts : template.shortcuts.enabled;
+		assert.equal(master, false, `${driver}: default input capture stays closed`);
+		for (const entry of manifest.entries.filter((item) => item.section === 'shortcuts.keyboard')) {
+			if (entry.platforms && !entry.platforms.includes(platform)) continue;
+			const value = entry.default_per_platform?.[platform] ?? entry.default;
+			if (value === 'none')
+				assert.equal(
+					Object.hasOwn(template.shortcuts.keyboard, entry.id),
+					false,
+					`${driver}: a generated neutral ${entry.id} must not fabricate personal intent`
+				);
+		}
+	}
 	const linuxGestures = fs.readFileSync(
 		paths.shared('..', 'linux', 'modules', 'gestures', 'manager.lua'),
 		'utf8'

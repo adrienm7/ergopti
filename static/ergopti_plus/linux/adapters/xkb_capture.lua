@@ -109,6 +109,36 @@ local _backend = nil
 local _session = nil
 local _keymap_text = nil
 local _locale = nil
+local _source_generation = 0
+local _source_group = nil
+local _source_native_generation = nil
+local _capture_group, _capture_generation = nil, 0
+
+--- Tracks source changes without treating an ordinary key-up as a rebind.
+local function source_identity()
+	if not _session or type(_backend.source_group) ~= "function" then return nil, "the capture backend cannot prove its active group" end
+	local ok, group, native_generation = pcall(_backend.source_group, _session)
+	if not ok or type(group) ~= "number" or group < 0 or group % 1 ~= 0 then
+		return nil, type(native_generation) == "string" and native_generation or "the capture backend returned no active group"
+	end
+	if _source_group ~= group or _source_native_generation ~= native_generation then
+		_source_group, _source_native_generation = group, native_generation
+		_source_generation = _source_generation + 1
+	end
+	return _source_generation
+end
+
+-- The reconstructed capture state is useful for native-library qualification,
+-- but is never desktop source evidence. Production admission uses source_identity.
+local function capture_identity()
+	if not _session then return nil end
+	local getter = _backend.capture_group or _backend.source_group
+	if type(getter) ~= "function" then return nil end
+	local ok, group = pcall(getter, _session)
+	if not ok or type(group) ~= "number" then return nil end
+	if _capture_group ~= group then _capture_group, _capture_generation = group, _capture_generation + 1 end
+	return _capture_generation, group
+end
 
 local function current_locale()
 	-- Store NAMES rather than values: ipairs stops at the first nil, and LC_ALL
@@ -131,10 +161,14 @@ end
 --- @param backend table|nil
 function M._set_backend(backend)
 	destroy(_session)
+	if _backend and _backend.desktop_proof then require("adapters.xkb_source_probe").close() end
 	_backend = backend
 	_session = nil
 	_keymap_text = nil
 	_locale = nil
+	_source_group, _source_native_generation = nil, nil
+	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_source_generation = _source_generation + 1
 end
 
 --- Drops the test backend and all retained keymap state.
@@ -189,8 +223,17 @@ local function bind_ffi_backend()
 			unsigned int key);
 		unsigned int xkb_keymap_min_keycode(struct xkb_keymap *keymap);
 		unsigned int xkb_keymap_max_keycode(struct xkb_keymap *keymap);
+		unsigned int xkb_keymap_num_layouts(struct xkb_keymap *keymap);
+		char *xkb_keymap_get_as_string(struct xkb_keymap *keymap, int format);
+		void free(void *pointer);
 		const char *xkb_keymap_key_get_name(struct xkb_keymap *keymap, unsigned int key);
 		int xkb_state_mod_name_is_active(struct xkb_state *state, const char *name, int type);
+		int xkb_keysym_get_name(unsigned int keysym, char *buffer, unsigned long size);
+		unsigned int xkb_state_serialize_layout(struct xkb_state *state, int components);
+		unsigned int xkb_state_serialize_mods(struct xkb_state *state, int components);
+		unsigned int xkb_state_update_mask(struct xkb_state *state,
+			unsigned int depressed_mods, unsigned int latched_mods, unsigned int locked_mods,
+			unsigned int depressed_layout, unsigned int latched_layout, unsigned int locked_layout);
 
 		struct xkb_compose_table *xkb_compose_table_new_from_locale(
 			struct xkb_context *context,
@@ -215,11 +258,12 @@ local function bind_ffi_backend()
 		return false, "ffi.cdef failed: " .. tostring(cdef_err)
 	end
 
-	local ok_lib, lib = pcall(ffi.load, "xkbcommon.so.0")
-	if not ok_lib then ok_lib, lib = pcall(ffi.load, "xkbcommon") end
-	if not ok_lib then return false, "libxkbcommon.so.0 is not loadable" end
+	local soname = require("_generated.native_runtime").xkbcommon
+	local ok_lib, lib = pcall(ffi.load, soname)
+	if not ok_lib then return false, soname .. " is not loadable" end
 
 	local XKB_KEYMAP_FORMAT_TEXT_V1 = 1
+	local XKB_STATE_LAYOUT_EFFECTIVE = 128
 	local XKB_COMPOSE_NOTHING = 0
 	local XKB_COMPOSE_COMPOSING = 1
 	local XKB_COMPOSE_COMPOSED = 2
@@ -236,7 +280,7 @@ local function bind_ffi_backend()
 		return ffi.string(buffer, written)
 	end
 
-	local backend = {}
+	local backend = { desktop_proof = true }
 
 	function backend.create(text, locale)
 		local session = {}
@@ -274,6 +318,10 @@ local function bind_ffi_backend()
 			lib.xkb_context_unref(session.context)
 			return nil, "xkb_compose_state_new failed"
 		end
+		local identity = lib.xkb_keymap_get_as_string(session.keymap, XKB_KEYMAP_FORMAT_TEXT_V1)
+		session.identity = identity ~= nil and ffi.string(identity) or nil
+		if identity ~= nil then ffi.C.free(identity) end
+		session.groups = tonumber(lib.xkb_keymap_num_layouts(session.keymap))
 		return session
 	end
 
@@ -302,6 +350,65 @@ local function bind_ffi_backend()
 
 	function backend.update_key(session, keycode, direction)
 		lib.xkb_state_update_key(session.state, keycode, direction)
+	end
+
+	-- The physical chords the injector can press, cheapest first. Each is
+	-- pressed on a FRESH state, so the answer is what an application receives
+	-- from exactly that chord — whatever the key's type says a level means.
+	local CHORDS = {
+		{ level = 1, mods = {},                  keys = {} },
+		{ level = 2, mods = { "shift" },         keys = { XKB_LEFTSHIFT } },
+		{ level = 3, mods = { "altgr" },         keys = { XKB_RIGHTALT } },
+		{ level = 4, mods = { "shift", "altgr" }, keys = { XKB_LEFTSHIFT, XKB_RIGHTALT } },
+	}
+
+
+	function backend.capture_group(session)
+		return tonumber(lib.xkb_state_serialize_layout(session.state, XKB_STATE_LAYOUT_EFFECTIVE))
+	end
+
+	function backend.source_group(session, allow_seed)
+		if not session.identity then return nil, "native-keymap-identity-unavailable" end
+		local receipt, reason = require("adapters.xkb_source_probe").read(session.identity, session.groups)
+		if not receipt then return nil, reason end
+		if backend.capture_group(session) ~= receipt.group then
+			lib.xkb_state_update_mask(session.state,
+				lib.xkb_state_serialize_mods(session.state, 1), lib.xkb_state_serialize_mods(session.state, 2),
+				lib.xkb_state_serialize_mods(session.state, 4), 0, 0, receipt.group)
+			if not allow_seed then return nil, "native-group-resynchronized" end
+		end
+		return receipt.group, receipt.generation
+	end
+
+	function backend.direct_sources(session, codes, group)
+		local probe = nil
+		local name_buffer = ffi.new("char[128]")
+		local ok, result = pcall(function()
+			local rows = {}
+			for _, chord in ipairs(CHORDS) do
+				probe = lib.xkb_state_new(session.keymap)
+				assert(probe ~= nil, "xkb_state_new failed for direct sources")
+				-- Keep the active group and discard held/latched/locked modifiers.
+				-- Detached level probes never feed Compose or change capture state.
+				lib.xkb_state_update_mask(probe, 0, 0, 0, 0, 0, group)
+				for _, code in ipairs(chord.keys) do lib.xkb_state_update_key(probe, code, XKB_KEY_DOWN) end
+				for _, code in ipairs(codes) do
+					local sym = tonumber(lib.xkb_state_key_get_one_sym(probe, code + EVDEV_TO_XKB_OFFSET)) or 0
+					local text = Keysym.from_id(sym) or ""
+					local name_length = tonumber(lib.xkb_keysym_get_name(sym, name_buffer, 128)) or 0
+					local name = name_length > 0 and ffi.string(name_buffer) or ""
+					rows[#rows + 1] = { code = code, text = text, mods = { unpack(chord.mods) },
+						plain = #chord.keys == 0, direct = #chord.keys == 0 and text ~= "",
+						dead = name:sub(1, 5) == "dead_" }
+				end
+				lib.xkb_state_unref(probe)
+				probe = nil
+			end
+			return rows
+		end)
+		if probe ~= nil then lib.xkb_state_unref(probe) end
+		if not ok then return nil, tostring(result) end
+		return result
 	end
 
 	function backend.compose_feed(session, sym)
@@ -333,15 +440,6 @@ local function bind_ffi_backend()
 		return lib.xkb_state_mod_name_is_active(session.state, "Lock", XKB_STATE_MODS_LOCKED) == 1
 	end
 
-	-- The physical chords the injector can press, cheapest first. Each is
-	-- pressed on a FRESH state, so the answer is what an application receives
-	-- from exactly that chord — whatever the key's type says a level means.
-	local CHORDS = {
-		{ level = 1, mods = {},                  keys = {} },
-		{ level = 2, mods = { "shift" },         keys = { XKB_LEFTSHIFT } },
-		{ level = 3, mods = { "altgr" },         keys = { XKB_RIGHTALT } },
-		{ level = 4, mods = { "shift", "altgr" }, keys = { XKB_LEFTSHIFT, XKB_RIGHTALT } },
-	}
 
 	-- The typing block first (evdev 1-58 and the ISO key 86), across every
 	-- chord, before anything else. A keymap also binds characters to exotic
@@ -436,8 +534,12 @@ function M.load(text, locale)
 
 	local previous = _session
 	_session = next_session
+	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
 	_keymap_text = text
 	_locale = selected_locale
+	_source_group, _source_native_generation = nil, nil
+	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_source_generation = _source_generation + 1
 	destroy(previous)
 	return true
 end
@@ -450,6 +552,10 @@ function M.reset_state()
 	if not next_session then return false, err end
 	local previous = _session
 	_session = next_session
+	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
+	_source_group, _source_native_generation = nil, nil
+	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_source_generation = _source_generation + 1
 	destroy(previous)
 	return true
 end
@@ -457,9 +563,13 @@ end
 --- Releases all native objects and forgets the retained keymap.
 function M.clear()
 	destroy(_session)
+	if _backend and _backend.desktop_proof then require("adapters.xkb_source_probe").close() end
 	_session = nil
 	_keymap_text = nil
 	_locale = nil
+	_source_group, _source_native_generation = nil, nil
+	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_source_generation = _source_generation + 1
 end
 
 --- @return boolean True when process() has a validated live state.
@@ -499,6 +609,47 @@ function M.inverse_table()
 	local ok, built = pcall(_backend.inverse, _session)
 	if not ok then return nil, tostring(built) end
 	return built
+end
+
+--- Enumerates every plain output in a detached state of the active group.
+--- This preserves duplicates for the shared owner to refuse ambiguity.
+--- @param codes table Dense array of registry evdev codes.
+--- @return table|nil rows { code, text, mods, plain, direct, dead }.
+--- @return string|nil error
+function M.direct_sources(codes)
+	if not _session then return nil, "XKB capture state is not ready" end
+	if type(codes) ~= "table" then return nil, "direct source codes are required" end
+	local count, seen = 0, {}
+	for key, code in pairs(codes) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
+			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
+			return nil, "invalid direct source codes"
+		end
+		seen[code], count = true, count + 1
+	end
+	if count ~= #codes then return nil, "direct source codes must be dense" end
+	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	local generation, detail = source_identity()
+	if not generation then return nil, detail end
+	local ok, rows, err = pcall(_backend.direct_sources, _session, codes, _source_group)
+	if not ok then return nil, tostring(rows) end
+	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	return rows
+end
+
+--- The validated keymap and active-group epoch, independent of ordinary keys.
+--- @return integer|nil generation
+--- @return string|nil error
+function M.source_generation() return source_identity() end
+
+--- Native-library test seam; intentionally supplies no desktop qualification.
+function M._capture_source_generation_for_test() return capture_identity() end
+
+--- Native-library test seam for detached probes of reconstructed capture state.
+function M._capture_direct_sources_for_test(codes)
+	local _, group = capture_identity()
+	if group == nil then return nil, "no reconstructed native capture group" end
+	return _backend.direct_sources(_session, codes, group)
 end
 
 
@@ -596,6 +747,7 @@ function M.process(evdev_code, value)
 	if value == VALUE_UP then
 		local ok, err = pcall(_backend.update_key, _session, keycode, XKB_KEY_UP)
 		if not ok then return nil, nil, tostring(err) end
+		capture_identity()
 		return nil, nil, nil
 	end
 
@@ -605,6 +757,7 @@ function M.process(evdev_code, value)
 		local ok_update, update_err = pcall(
 			_backend.update_key, _session, keycode, XKB_KEY_DOWN)
 		if not ok_update then return nil, nil, tostring(update_err) end
+		capture_identity()
 	end
 	return text, identity, nil
 end

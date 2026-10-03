@@ -1,0 +1,7 @@
+[case]
+description = "Unknown case-variant metadata fields remain outside the exact legacy shape."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

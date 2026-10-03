@@ -284,6 +284,7 @@ return {
 	"tests.unit.modules.shortcuts.test_chatgpt_binding",
 	"tests.unit.modules.shortcuts.test_keyboard_slot_consumes_chord",
 	"tests.unit.modules.shortcuts.test_keyboard_shortcuts",
+	"tests.unit.modules.shortcuts.test_magic_editor_policy",
 	"tests.unit.modules.shortcuts.test_master_state",
 	"tests.unit.modules.test_action_catalogue_parity",
 	"tests.unit.modules.test_action_handlers_declared",

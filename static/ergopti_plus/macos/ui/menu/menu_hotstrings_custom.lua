@@ -300,12 +300,13 @@ function M.build_custom(ctx, counts)
 	local function sc_label()
 		local sc = state.custom_editor_shortcut
 		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
+		if type(sc) ~= "table" then return i18n.get("menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment") end
 		if sc_is_default(sc) then
 			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
 		end
 		local mods_str = table.concat(coerce_mods(sc.mods), "+")
-		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
-				or (sc.key or "?"):upper()
+		return mods_str ~= "" and (mods_str .. " + " .. tostring(sc.key or "?"):upper())
+				or tostring(sc.key or "?"):upper()
 	end
 
 	local function apply_shortcut(mods, key)
@@ -334,7 +335,7 @@ function M.build_custom(ctx, counts)
 			-- concatenating that field directly here would throw, same as the
 			-- sc_is_default/sc_label call sites it already protects (PF-7 fix).
 			current_str = table.concat(coerce_mods(state.custom_editor_shortcut.mods), "+")
-				.. "+" .. (state.custom_editor_shortcut.key or "")
+				.. "+" .. tostring(state.custom_editor_shortcut.key or "")
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
 			i18n.get("hotstrings.shortcut_custom"),
@@ -474,12 +475,6 @@ function M.build_custom(ctx, counts)
 		},
 		{ separator = true },
 		{
-			-- Clicking this item directly opens the shortcut customisation dialog
-			label    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
-			disabled = paused or nil,
-			action       = not paused and sc_fn or nil,
-		},
-		{
 			label = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
 			items  = cat_menu,
 		},
@@ -497,6 +492,15 @@ function M.build_custom(ctx, counts)
 			disabled = paused or nil,
 		},
 	}
+	-- An unsupported legacy chord retains its acknowledged owner and editing
+	-- surface until the ordinary-slot migration can prove a replacement.
+	if state.custom_editor_shortcut ~= nil then
+		table.insert(menu_items, 4, {
+			label = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
+			disabled = paused or nil,
+			action = not paused and sc_fn or nil,
+		})
+	end
 
 	local ext_tree = { folders = {}, files = {} }
 	local function scope_menu(names, file_rows, section_rows)

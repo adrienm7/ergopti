@@ -137,25 +137,29 @@ function parseAhkStaticMap(src, name) {
 }
 
 /**
- * Extracts a Lua `local NAME = { k = "v", … }` table of string values.
+ * Reads the canonical key owner after proving the macOS consumer derives it.
+ * Native behavioral tests additionally exercise the resulting slot chords.
  * @param {string} src
- * @param {string} name
+ * @param {object} catalogue
  * @returns {Object<string,string>}
  */
-function parseLuaTable(src, name) {
-	const re = new RegExp(`local\\s+${name}\\s*=\\s*\\{([\\s\\S]*?)\\n\\}`, 'm');
-	const m = src.match(re);
-	if (!m) {
-		fail(`could not find "local ${name} = { … }" — the parser drifted`);
+function parseLuaCatalogueKeys(src, catalogue) {
+	if (
+		!/for _, key in ipairs\(decoded\.keys\) do keys\[key\.id\] = key\.chord_key or key\.id end/.test(
+			src
+		) ||
+		!/SLOT_MODS, SPECIAL_KEYS = groups, keys/.test(src) ||
+		!/local SPECIAL_KEYS = nil/.test(src)
+	) {
+		fail(
+			'macOS slot keys must derive from the actual modifier catalogue without a private fallback'
+		);
 		return {};
 	}
 	const out = {};
-	for (const pair of m[1].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"/g)) {
-		out[pair[1]] = pair[2];
-	}
-	if (Object.keys(out).length === 0) {
-		fail(`${name}: parsed zero entries — a gate over an empty table passes forever`);
-	}
+	for (const entry of catalogue.keys || []) out[entry.id] = entry.chord_key || entry.id;
+	if (Object.keys(out).length < 36)
+		fail('the shared macOS slot vocabulary must include the real key inventory');
 	return out;
 }
 
@@ -206,7 +210,7 @@ const hsSlotsSrc = fs.readFileSync(HS_SLOTS, 'utf8');
 const ahkPrefixes = parseAhkMap(ahkAdapterSrc, 'HOTKEY_MOD_PREFIXES');
 const ahkNativeKeys = parseAhkMap(ahkAdapterSrc, 'HOTKEY_KEY_NATIVE');
 const ahkSlotKeys = parseAhkStaticMap(ahkSlotsSrc, '_SlotKeyNames');
-const hsSlotKeys = parseLuaTable(hsSlotsSrc, 'SPECIAL_KEYS');
+const hsSlotKeys = parseLuaCatalogueKeys(hsSlotsSrc, catalogue);
 const modOrder = parseModOrder(luaChordSrc);
 const aliases = parseAliases(luaChordSrc);
 
@@ -322,13 +326,13 @@ for (const key of Object.keys(ahkNativeKeys)) {
 // "return" on one driver and "enter" on the other is one config file producing
 // two different bindings.
 for (const entry of catalogue.keys || []) {
-	if (!entry.chord_key) continue;
-	if (ahkSlotKeys[entry.id] !== undefined && ahkSlotKeys[entry.id] !== entry.chord_key) {
+	const expectedChordKey = chordKeyOf(entry);
+	if (ahkSlotKeys[entry.id] !== undefined && ahkSlotKeys[entry.id] !== expectedChordKey) {
 		fail(
 			`Windows slot vocabulary: "${entry.id}" resolves to "${ahkSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`
 		);
 	}
-	if (hsSlotKeys[entry.id] !== undefined && hsSlotKeys[entry.id] !== entry.chord_key) {
+	if (hsSlotKeys[entry.id] !== undefined && hsSlotKeys[entry.id] !== expectedChordKey) {
 		fail(
 			`macOS slot vocabulary: "${entry.id}" resolves to "${hsSlotKeys[entry.id]}", catalogue says "${entry.chord_key}"`
 		);
@@ -338,9 +342,7 @@ for (const entry of catalogue.keys || []) {
 // The drivers may not invent a slot key the catalogue never declared: a suffix
 // that means something on one driver and nothing on the other is exactly the
 // divergence the shared catalogue was created to end.
-const declaredChordKeys = new Set(
-	(catalogue.keys || []).filter((e) => e.chord_key).map((e) => e.id)
-);
+const declaredChordKeys = new Set((catalogue.keys || []).map((e) => e.id));
 for (const [driver, table] of [
 	['Windows', ahkSlotKeys],
 	['macOS', hsSlotKeys]

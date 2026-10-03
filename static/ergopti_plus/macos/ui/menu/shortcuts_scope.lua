@@ -52,7 +52,7 @@ function M.new(options)
 		if script_stopped ~= true or bindings_stopped ~= true then return false end
 		if read_started(script) or read_started(bindings) or read_started(keyboard) then return false end
 		local configuration = { shortcuts = { keyboard = target.keyboard, tap_keys = target.tap_keys } }
-		if keyboard.apply_configuration(configuration) ~= true
+		if keyboard.apply_configuration(configuration, target.keyboard_claims) ~= true
 			or taps.apply_configuration(configuration, gestures.is_assignable) ~= true then return false end
 		for id, enabled in pairs(target.keys) do
 			if (enabled and bindings.enable or bindings.disable)(id) ~= true
@@ -65,9 +65,9 @@ function M.new(options)
 		end
 		if script.set_chords_enabled(target.script_chords_on) ~= true
 			or script.chords_enabled() ~= target.script_chords_on then return false end
-		for id, action in pairs(target.keyboard) do if keyboard.get_action(id) ~= action then return false end end
+		for id, action in pairs(target.keyboard_expected) do if keyboard.get_action(id) ~= action then return false end end
 		for id, action in pairs(target.tap_keys) do if taps.get_action(id) ~= action then return false end end
-		if target.master and shortcuts.resume_bindings("feature_toggle", configuration) ~= true then return false end
+		if target.master and shortcuts.resume_bindings("feature_toggle", configuration, target.keyboard_claims) ~= true then return false end
 		if target.script_started and options.start_script_control() ~= true then return false end
 		if read_started(bindings) ~= target.master or read_started(keyboard) ~= target.master
 			or read_started(script) ~= target.script_started then return false end
@@ -95,8 +95,10 @@ function M.new(options)
 		capture = function()
 			assert(options.idle() == true and script.is_pause_transition_pending() == false
 				and shortcuts.has_bindings_pause_debt() == false, "shortcut scope has unsettled ownership")
+			local assignments, claims = keyboard.get_configuration_intent()
 			local native = { master = read_started(bindings), script_started = read_started(script),
-				keyboard = clone(keyboard.get_assignments()), tap_keys = {}, keys = {},
+				keyboard = assignments, keyboard_claims = claims,
+				keyboard_expected = clone(keyboard.get_assignments()), tap_keys = {}, keys = {},
 				script_actions = script.get_shortcut_actions(), script_chords_on = script.chords_enabled(),
 				url = bindings.get_chatgpt_url() }
 			assert(read_started(keyboard) == native.master, "shortcut children have inconsistent native posture")
@@ -122,7 +124,13 @@ function M.new(options)
 				if row.section ~= "gestures.action_parameters" then
 					local value = row.value
 					if row.delete then value = Manifest.default_for(row.section .. "." .. row.key) end
-					if row.section == "shortcuts.keyboard" then native.keyboard[row.key] = value
+					if row.section == "shortcuts.keyboard" then
+						native.keyboard_expected[row.key] = value
+						if row.delete then
+							native.keyboard[row.key], native.keyboard_claims[row.key] = nil, nil
+						else
+							native.keyboard[row.key], native.keyboard_claims[row.key] = value, true
+						end
 					elseif row.section == "shortcuts.tap_keys" then native.tap_keys[row.key] = value
 					elseif row.section == "shortcuts.keys" then
 						assert(native.keys[row.key] ~= nil, "scope key has no native binding owner: " .. row.key)

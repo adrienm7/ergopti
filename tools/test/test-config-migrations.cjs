@@ -51,6 +51,18 @@ const BARE = /^[A-Za-z0-9_-]+$/;
 const OPS = {
 	rename: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
 	copy_if_absent: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
+	move_chord_action: {
+		required: [
+			'section',
+			'key',
+			'to_section',
+			'action',
+			'conditional_key',
+			'disabled_action',
+			'platform'
+		],
+		optional: []
+	},
 	move_section: { required: ['section', 'to_section'], optional: [] },
 	merge_into: { required: ['section', 'to_section'], optional: [] },
 	map_value: { required: ['section', 'key', 'map'], optional: [] },
@@ -142,7 +154,7 @@ function validateOp(op, where) {
 		if (op[field] !== undefined && !isSectionPath(op[field]))
 			fail(where, `'${field}' must be a dotted path of bare segments`);
 	}
-	for (const field of ['key', 'to_key']) {
+	for (const field of ['key', 'to_key', 'conditional_key']) {
 		if (op[field] !== undefined && !(typeof op[field] === 'string' && BARE.test(op[field]))) {
 			fail(where, `'${field}' must be one bare segment`);
 		}
@@ -165,6 +177,14 @@ function validateOp(op, where) {
 		if (from === to || intoOwnSubtree || outOfOwnParent) {
 			fail(where, `${op.op} cannot move a section onto itself or across its own subtree`);
 		}
+	}
+	if (op.op === 'move_chord_action') {
+		if (op.platform !== 'macos') fail(where, 'move_chord_action requires platform macos');
+		for (const field of ['action', 'disabled_action']) {
+			if (typeof op[field] !== 'string' || !BARE.test(op[field]))
+				fail(where, `${field} must be an action id`);
+		}
+		if (op.section === op.to_section) fail(where, 'move_chord_action must change section');
 	}
 	if (op.op === 'map_value') {
 		if (!Array.isArray(op.map) || op.map.length === 0)
@@ -282,7 +302,7 @@ function validateRegistry(doc, where) {
  * @param {object} doc
  * @returns {Map<string, Map<string, *>>}
  */
-function flatten(doc) {
+function flatten(doc, opaquePaths = new Set()) {
 	const model = new Map();
 	const walk = (node, prefix) => {
 		const values = new Map();
@@ -292,7 +312,8 @@ function flatten(doc) {
 				value !== null &&
 				typeof value === 'object' &&
 				!Array.isArray(value) &&
-				!(value instanceof Date)
+				!(value instanceof Date) &&
+				!opaquePaths.has(prefix === '' ? key : `${prefix}.${key}`)
 			) {
 				hasChildTable = true;
 				walk(value, prefix === '' ? key : `${prefix}.${key}`);
@@ -369,13 +390,87 @@ function copyDestinationAbsent(model, section, key) {
  * @param {Map<string, Map<string, *>>} model
  * @param {object} op
  */
-function applyOp(model, op) {
+function chordActionSlot(value, catalogue, platformName) {
+	if (
+		!value ||
+		typeof value !== 'object' ||
+		Array.isArray(value) ||
+		Object.keys(value).sort().join(',') !== 'key,mods' ||
+		typeof value.key !== 'string' ||
+		!Array.isArray(value.mods)
+	)
+		return null;
+	const platform = catalogue.platforms[platformName];
+	const aliases = new Map();
+	for (const modifier of platform.modifiers) {
+		aliases.set(modifier.id, modifier.id);
+		aliases.set(modifier.hammerspoon, modifier.id);
+	}
+	const wanted = new Set();
+	for (const modifier of value.mods) {
+		const id = typeof modifier === 'string' && aliases.get(modifier.toLowerCase());
+		if (!id || wanted.has(id)) return null;
+		wanted.add(id);
+	}
+	const candidate = value.key.toLowerCase();
+	const key = catalogue.keys.find((item) =>
+		[item.id, item.chord_key ?? item.id, item.macos_key ?? item.id].includes(candidate)
+	);
+	if (!key) return null;
+	const group = platform.shortcut_groups.find(
+		(item) => item.modifiers.length === wanted.size && item.modifiers.every((id) => wanted.has(id))
+	);
+	return group ? group.prefix + key.id : null;
+}
+
+function moveChordAction(model, op, context) {
+	const source = model.get(op.section);
+	const childPath = op.section + '.' + op.key;
+	const child = model.get(childPath);
+	let value,
+		childSource = false;
+	if (source?.has(op.key)) value = source.get(op.key);
+	else if (child) {
+		if (sectionsAtOrBelow(model, childPath).length !== 1) return;
+		value = Object.fromEntries(child);
+		childSource = true;
+	} else return;
+	const catalogue = context?.modifier_chords;
+	const actions = context?.assignable_actions;
+	if (!catalogue?.platforms?.[op.platform]?.shortcut_groups || !actions)
+		throw new Error('missing chord action context');
+	if (!actions.has(op.action) || !actions.has(op.disabled_action))
+		throw new Error('migration action is absent from action catalogue');
+	const slot = value === false ? null : chordActionSlot(value, catalogue, op.platform);
+	if ((value !== false && !slot) || slot === op.conditional_key) return;
+	const target = model.get(op.to_section);
+	const represented = (key) =>
+		target?.has(key)
+			? typeof target.get(key) === 'string' && actions.has(target.get(key))
+			: copyDestinationAbsent(model, op.to_section, key);
+	if (!represented(op.conditional_key) || (slot && !represented(slot))) return;
+	if (!target) model.set(op.to_section, new Map());
+	const destination = model.get(op.to_section);
+	if (slot && !destination.has(slot)) destination.set(slot, op.action);
+	if (!destination.has(op.conditional_key)) destination.set(op.conditional_key, op.disabled_action);
+	if (childSource) model.delete(childPath);
+	else {
+		source.delete(op.key);
+		dropIfEmpty(model, op.section);
+	}
+}
+
+function applyOp(model, op, context) {
 	switch (op.op) {
 		case 'rename': {
 			const toSection = op.to_section ?? op.section;
 			moveValue(model, op.section, op.key, toSection, op.to_key ?? op.key);
 			dropIfEmpty(model, op.section);
 			dropIfEmpty(model, toSection);
+			break;
+		}
+		case 'move_chord_action': {
+			moveChordAction(model, op, context);
 			break;
 		}
 		case 'move_section': {
@@ -437,7 +532,7 @@ function applyOp(model, op) {
  * Runs the registry on a model for one driver.
  * @returns {{outcome: string, model?: Map, from?: number}}
  */
-function migrate(model, registry, driver) {
+function migrate(model, registry, driver, context) {
 	const meta = model.get('_meta');
 	let version = registry.unstamped;
 	if (meta && meta.has('schema_version')) {
@@ -451,7 +546,7 @@ function migrate(model, registry, driver) {
 	const out = cloneModel(model);
 	for (const step of registry.steps) {
 		if (step.from < version) continue;
-		if (step.drivers.includes(driver)) for (const op of step.ops) applyOp(out, op);
+		if (step.drivers.includes(driver)) for (const op of step.ops) applyOp(out, op, context);
 	}
 	if (!out.has('_meta')) out.set('_meta', new Map());
 	out.get('_meta').set('schema_version', registry.current);
@@ -476,6 +571,54 @@ function readToml(file) {
 		fail(path.relative(CORPUS_DIR, file) || file, `does not parse: ${error.message}`);
 		return null;
 	}
+}
+
+// Derive the real macOS action identities from its authoritative generator
+// model and the actual shared modifier matrix; no fixture action allowlist.
+const actionGenerator = require('../codegen/codegen-action-catalogue.cjs');
+const actionModel = actionGenerator.buildModel(
+	actionGenerator.parseRegistry(fs.readFileSync(shared('modules/actions/actions.toml'), 'utf8')),
+	'hs'
+);
+const modifierChords = JSON.parse(
+	fs.readFileSync(shared('modules/actions/modifier_chords.json'), 'utf8')
+);
+const assignableActions = new Set(
+	actionModel.sgItems.filter((item) => item.kind === 'action').map((item) => item.id)
+);
+for (const id of actionModel.axItems) assignableActions.add(id);
+const modifiers = modifierChords.platforms.macos.modifiers;
+for (let mask = 1; mask < 2 ** modifiers.length; mask += 1) {
+	const ids = modifiers
+		.filter((_, index) => Math.floor(mask / 2 ** index) % 2 === 1)
+		.map((item) => item.id);
+	for (const key of modifierChords.keys) assignableActions.add(ids.join('_') + '_' + key.id);
+}
+const migrationContext = { modifier_chords: modifierChords, assignable_actions: assignableActions };
+
+// Inline tables remain opaque only at the exact source of the closed opcode.
+// Every unrelated inline-table corpus record keeps the existing parser guard.
+function opaqueChordPaths(source, registry, where) {
+	const allowed = new Set(
+		registry.steps.flatMap((step) =>
+			step.ops.filter((op) => op.op === 'move_chord_action').map((op) => op.section + '.' + op.key)
+		)
+	);
+	const paths = new Set();
+	let section = '';
+	for (const line of source.split('\n')) {
+		const header = line.match(/^\s*\[([A-Za-z0-9_.-]+)\]\s*(?:#.*)?$/);
+		if (header) section = header[1];
+		const inline = line.match(/^\s*([A-Za-z0-9_-]+)\s*=\s*\{/);
+		if (inline) {
+			const path = section + '.' + inline[1];
+			if (!allowed.has(path))
+				fail(where, 'uses an unrelated inline table, which the three parsers address differently');
+			else paths.add(path);
+		} else if (/=\s*\{/.test(line))
+			fail(where, 'uses an unrelated inline table, which the three parsers address differently');
+	}
+	return paths;
 }
 
 const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml');
@@ -522,13 +665,6 @@ for (const name of onDisk) {
 	}
 	seenOutcomes.add(meta.outcome);
 
-	for (const file of ['input.toml', 'expected.toml']) {
-		const full = path.join(dir, file);
-		if (fs.existsSync(full) && /=\s*\{/.test(fs.readFileSync(full, 'utf8'))) {
-			fail(name, `${file} uses an inline table, which the three parsers address differently`);
-		}
-	}
-
 	const ownRegistryPath = path.join(dir, 'migrations.toml');
 	const registry = fs.existsSync(ownRegistryPath)
 		? validateRegistry(readToml(ownRegistryPath) || {}, `${name}/migrations.toml`)
@@ -545,7 +681,12 @@ for (const name of onDisk) {
 	const expected = hasExpected ? readToml(expectedPath) : null;
 
 	for (const driver of meta.drivers) {
-		const result = migrate(flatten(input), registry, driver);
+		const opaqueInput = opaqueChordPaths(
+			fs.readFileSync(path.join(dir, 'input.toml'), 'utf8'),
+			registry,
+			name + '/input.toml'
+		);
+		const result = migrate(flatten(input, opaqueInput), registry, driver, migrationContext);
 		replays += 1;
 		if (result.outcome !== meta.outcome) {
 			fail(name, `${driver}: outcome '${result.outcome}', case says '${meta.outcome}'`);
@@ -560,7 +701,12 @@ for (const name of onDisk) {
 			);
 		}
 		const actual = normalized(result.model);
-		const wanted = normalized(flatten(expected));
+		const opaqueExpected = opaqueChordPaths(
+			fs.readFileSync(expectedPath, 'utf8'),
+			registry,
+			name + '/expected.toml'
+		);
+		const wanted = normalized(flatten(expected, opaqueExpected));
 		if (!sameValue(actual, wanted)) {
 			fail(
 				name,
@@ -569,7 +715,7 @@ for (const name of onDisk) {
 		}
 		const replayInput = cloneModel(result.model);
 		replayInput.get('_meta').set('schema_version', meta.from_version);
-		const replay = migrate(replayInput, registry, driver);
+		const replay = migrate(replayInput, registry, driver, migrationContext);
 		if (replay.outcome !== 'migrated' || !sameValue(normalized(replay.model), actual)) {
 			fail(
 				name,
@@ -646,6 +792,51 @@ if (inlineChoices) {
 	});
 	if (!sameValue(normalized(model), expected))
 		fail('copy occupied namespace', 'the inline ancestor or source choice changed');
+}
+
+// The generic corpus guard still rejects unrelated inline tables. This actual
+// native-addressed supplementary file pins occupied inline destination bytes.
+{
+	const dir = path.join(CORPUS_DIR, 'op_move_chord_scalar_ancestor');
+	const registry = validateRegistry(
+		readToml(path.join(dir, 'migrations.toml')),
+		'chord inline ancestor'
+	);
+	const model = flatten(
+		readToml(path.join(dir, 'inline_ancestor.toml')),
+		new Set(['hotstrings.editor.shortcut', 'shortcuts.keyboard'])
+	);
+	applyOp(model, registry.steps[0].ops[0], migrationContext);
+	const wanted = {
+		'hotstrings.editor': { shortcut: { mods: ['ctrl'], key: 'd' } },
+		shortcuts: { keyboard: { magic_editor: 'none', future: false } }
+	};
+	if (!sameValue(normalized(model), wanted))
+		fail('chord inline ancestor', 'complete source and occupied inline choice must survive');
+}
+{
+	const model = new Map([['hotstrings.editor', new Map([['shortcut', false]])]]);
+	const op = {
+		op: 'move_chord_action',
+		section: 'hotstrings.editor',
+		key: 'shortcut',
+		to_section: 'shortcuts.keyboard',
+		action: 'open_hotstrings_editor',
+		conditional_key: 'magic_editor',
+		disabled_action: 'none',
+		platform: 'macos'
+	};
+	let refused = false;
+	try {
+		applyOp(model, op);
+	} catch (error) {
+		refused = error.message.includes('missing chord action context');
+	}
+	if (!refused || !sameValue(normalized(model), { 'hotstrings.editor': { shortcut: false } }))
+		fail(
+			'chord missing context',
+			'context refusal must preserve the exact typed source without partial writes'
+		);
 }
 
 for (const op of Object.keys(OPS))

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: AHK Encoding Guard
  * DESCRIPTION:
- * Validates that every .ahk file under static/ergopti_plus/windows/ is encoded
+ * Validates that every driver and shared .ahk source file is encoded
  * as UTF-8 with BOM and uses LF line endings.
  *
  * FEATURES & RATIONALE:
@@ -32,6 +32,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus', 'windows');
 const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
+const SHARED_ROOT = path.resolve(REPOSITORY_ROOT, 'static', 'ergopti_plus', '_shared');
 const FIXER = path.join(REPOSITORY_ROOT, 'tools', 'deploy', 'fix-ahk-encoding.cjs');
 const HOOK = path.join(REPOSITORY_ROOT, '.husky', 'pre-commit');
 
@@ -236,7 +237,7 @@ function run() {
 		process.exit(1);
 	}
 
-	const files = collectAhkFiles(ROOT);
+	const files = [...collectAhkFiles(ROOT), ...collectAhkFiles(SHARED_ROOT)];
 
 	if (files.length === 0) {
 		console.warn(`WARNING: No .ahk files found under ${ROOT}`);
