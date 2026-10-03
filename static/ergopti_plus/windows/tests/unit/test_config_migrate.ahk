@@ -549,3 +549,92 @@ _CMG_OnlyANewFileIsStamped() {
 }
 Test("config migrate: only a config.toml this build creates is stamped by a writer "
 	. "(config-migrate-stamp-new-file)", _CMG_OnlyANewFileIsStamped)
+
+
+_CMG_SemanticSourceAndCandidateProofs() {
+	Registry := _CMR_CopyRegistry()
+	Duplicate := '[source]`nchoice="legitimate"`n[future]`na.b=1`na."b"=2`n'
+	Before := _ConfigMigrateParse(Duplicate, "legacy dotted source projection")
+	AssertEqual(1, Before["future"]["a.b"])
+	AssertEqual(2, Before["future"]['a."b"'], "the flat model cannot observe the semantic duplicate")
+	Plan := ConfigMigratePlan(Duplicate, Registry, "ahk")
+	AssertEqual("failed", Plan["outcome"], "an unrelated malformed namespace cannot authorize publication")
+	AssertFalse(Plan.Has("candidate"))
+	AssertContains(Plan["detail"], "Duplicate TOML semantic assignment")
+
+	Source := '[source]`nchoice="legitimate"`n[foo]`nbar.future=1`n'
+	Registry := _CMR_TargetRegistry("copy_if_absent")
+	Before := _ConfigMigrateParse(Source, "dotted parent before")
+	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, "ahk", 1)
+	Updates := _ConfigMigrateWriterBatch(Before, After, &Drops)
+	Built := _ConfigMigrateRenderRecords(Source, Updates, Drops)
+	Assert(ConfigMigrateSameModel(After, _ConfigMigrateParse(Built["content"], "legacy dotted candidate projection")),
+		"the old flat candidate readback cannot detect the redeclared dotted parent")
+	AssertThrows(TOML_ParseDocument.Bind(Built["content"]), "the independent semantic namespace owner rejects the candidate")
+	Plan := ConfigMigratePlan(Source, Registry, "ahk")
+	AssertEqual("failed", Plan["outcome"], "candidate namespace validation precedes publication")
+	AssertFalse(Plan.Has("candidate"))
+	AssertContains(Plan["detail"], "Duplicate or closed TOML table namespace")
+}
+Test("config migrate: exact semantic source and candidate namespaces precede publication (config-migrate-dotted-document)",
+	_CMG_SemanticSourceAndCandidateProofs)
+
+_CMG_SemanticProofPreservesUnownedValues() {
+	Foreign := 'future.a.b = 1`n"future.a.b" = "literal dot"`n'
+		. '[[profiles]]`nshortcut.key="first"`n[[profiles]]`nshortcut.key="second"`n'
+		. '[legacy]`ntext = ' . "O'Brien" . '`nshape = { rows=[{ flag=false, count=0, text="001" }] }`n'
+	Source := Foreign . '[source]`nchoice="legitimate"`n'
+	Plan := ConfigMigratePlan(Source, _CMR_CopyRegistry(), "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	Assert(StrCompare(SubStr(Plan["candidate"], 1, StrLen(Foreign)), Foreign, true) == 0,
+		"valid root dots, literal dots, both table-array generations and legacy scalar bytes remain exact")
+	Document := TOML_ParseDocument(Plan["candidate"])
+	AssertEqual(1, Document["future"]["a"]["b"])
+	AssertEqual("literal dot", Document["future.a.b"])
+	AssertEqual(2, Document["profiles"].Length)
+	AssertEqual("first", Document["profiles"][1]["shortcut"]["key"])
+	AssertEqual("second", Document["profiles"][2]["shortcut"]["key"])
+	AssertEqual("O'Brien", Document["legacy"]["text"], "an unowned legacy bare scalar retains its existing contract")
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["flag"] is TOML_Bool)
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["count"] is Integer)
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["text"] is String)
+	AssertEqual("legitimate", Document["destination"]["choice"])
+}
+Test("config migrate: semantic proof preserves valid unknown and legacy values (config-migrate-dotted-document-preservation)",
+	_CMG_SemanticProofPreservesUnownedValues)
+
+_CMG_CurrentSemanticRefusalOwnsBoot() {
+	global _CMG_STAMP
+	Directory := _CMG_NewDir(), Calls := { Backup: 0, Publish: 0 }
+	Backup(Path, Bytes) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Path, Candidate, Source) {
+		Calls.Publish += 1
+		return ""
+	}
+	Path := Directory . "\config.toml"
+	Source := '[_meta]`nschema_version=2`n[future]`na.b=1`na."b"=2`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Legacy := _ConfigMigrateParse(Source, "current flat source projection")
+		AssertEqual("current", ConfigMigrateClassify(Legacy, _CMR_CopyRegistry(), &Version),
+			"a current stamp alone cannot prove semantic source ownership")
+		Result := ConfigMigrateRun(Path, _CMR_CopyRegistry(), _CMG_STAMP, Backup, Publish)
+		AssertEqual("failed", Result["status"])
+		AssertEqual(1, Result["read_only"])
+		AssertEqual(0, Calls.Backup, "callbacks only observe: no backup before source proof")
+		AssertEqual(0, Calls.Publish, "the exact publication owner receives no unsafe candidate")
+		AssertContains(Result["detail"], "Duplicate TOML semantic assignment")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertFalse(TOML_BatchWrite(Path, [{ Section: "future", Key: "value", Value: 7 }]))
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "later writes retain the actual owner's refusal")
+	} finally {
+		if _TOML_WriteRefusals().Has(Path)
+			_TOML_WriteRefusals().Delete(Path)
+		DirDelete(Directory, true)
+	}
+}
+Test("config migrate: current-version boot still requires the exact semantic source proof (config-migrate-dotted-document-boot)",
+	_CMG_CurrentSemanticRefusalOwnsBoot)

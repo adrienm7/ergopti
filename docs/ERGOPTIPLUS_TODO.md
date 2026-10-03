@@ -590,6 +590,12 @@ test and corpus bytes match that gate; the subsequent memory correction
 passed formatting and strict conventions. Actual Windows replay and native
 three-OS packaging/installation qualification remain pending.
 
+The Windows migration owner now uses a typed semantic document reader before source classification and after rendering. Independent hand-authored document and inline vectors distinguish nested dotted assignments from quoted literal dots, preserve native Boolean/integer/string intent and table-array owner generations, and refuse duplicate or redeclared namespaces that the legacy flat readback cannot detect. Current-version files also require the read-only semantic source proof before boot admission; refusals preserve exact bytes and prevent backup, publication and subsequent writes. The legacy Windows cache, ordinary batch writer and settings bootstrap remain unchanged; full dotted-key configuration loading and safe ordinary saves, and the existing scalar migration decision, remain pending. Native AHK unit, compile and E2E qualification is pending CI.
+
+The source-selected local gate and explicit shared checks pass formatting,
+353 JS checks and 1,802 AHK UTF-8 BOM/LF files. Every pre-existing native unit
+test byte is unchanged; actual Windows replay and compilation remain pending.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
