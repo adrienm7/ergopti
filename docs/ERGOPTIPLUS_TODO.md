@@ -369,6 +369,17 @@ These are software implementations; final hardware verification remains below.
   uses native iterators but intentionally retains partial dashboard side effects
   on an exception, a distinct unvalidated source-level concern for its owner.
   No common projection policy, native cross-OS gates or manual CI was changed.
+- [~] **L30.** Linux checked-shell capture diagnostics: native popen failures
+  now retain the errno instead of returning/logging an error that embeds the
+  entire command and caller text. Protected capture exceptions use a bounded
+  diagnostic with the shared program-name resolver. Three native and six
+  portable cases failed before the fix. Six native cases pass on host and
+  nonroot Debian using real ARG_MAX and RLIMIT_NOFILE refusals, restored owned
+  descriptors/limits and successful stdout/empty/nonzero controls. Six portable
+  cases cover returned errno and thrown open/read/close receipts. Windows uses
+  native Win32 error codes; macOS also logs raw protected-exception text, an
+  unvalidated source-level privacy concern deferred to its native owner. Shared
+  logging policy, native cross-OS gates and manual CI remain untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

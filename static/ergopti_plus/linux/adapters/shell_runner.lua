@@ -251,8 +251,13 @@ function M.exec_checked(cmd, options)
 		local framed_command = "sh -c " .. M.quote(wrapper)
 			.. " ergopti-exec-checked " .. M.quote(cmd)
 		if output_dir then framed_command = framed_command .. " " .. M.quote(output_dir) end
-		local pipe, open_error = io.popen(framed_command, "r")
-		if not pipe then return false, "", tostring(open_error or "pipe open failed") end
+		-- libc/Lua may prefix a popen error with the entire composed command,
+		-- including caller text. Keep the native errno, never that raw message.
+		local pipe, _, open_errno = io.popen(framed_command, "r")
+		if not pipe then
+			local code = type(open_errno) == "number" and tostring(open_errno) or "unavailable"
+			return false, "", "pipe open failed (errno " .. code .. ")"
+		end
 		local framed = pipe:read("*a")
 		pipe:close()
 		local status, byte_count, content
@@ -271,9 +276,9 @@ function M.exec_checked(cmd, options)
 		return true, content, nil
 	end)
 	if not call_ok then
-		Logger.error(LOG, "exec_checked(): io.popen failed for '%s' — %s",
-			RuntimeLog.program_name(cmd), tostring(command_ok))
-		return false, "", tostring(command_ok)
+		-- Exceptions from open/read/close can carry the same private arguments.
+		Logger.error(LOG, "exec_checked(): native capture raised for '%s'.", RuntimeLog.program_name(cmd))
+		return false, "", "native command capture raised"
 	end
 	_record_exit(RuntimeLog.program_name(cmd), command_ok and 0 or tostring(error_message),
 		Monotonic.now_ms() - started_ms)
