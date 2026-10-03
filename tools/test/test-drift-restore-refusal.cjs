@@ -14,7 +14,15 @@ const root = path.resolve(__dirname, '..', '..');
 const outputs = registry.allOutputs();
 assert.ok(outputs.length >= 15, 'exercise the actual complete generator registry');
 
-for (const mode of ['healthy', 'drift', 'write', 'unlink', 'read', 'generator-write']) {
+for (const mode of [
+	'healthy',
+	'healthy-read-only',
+	'drift',
+	'write',
+	'unlink',
+	'read',
+	'generator-write'
+]) {
 	const originals = new Map(
 		outputs.map((rel) => [path.join(root, rel), Buffer.from(`original ${rel}`)])
 	);
@@ -37,6 +45,7 @@ for (const mode of ['healthy', 'drift', 'write', 'unlink', 'read', 'generator-wr
 			return Buffer.from(files.get(file));
 		},
 		writeFileSync(file, bytes) {
+			assert.notEqual(mode, 'healthy-read-only', 'identical outputs must never be rewritten');
 			if (file === first && (mode === 'write' || mode === 'generator-write'))
 				throw new Error('restoration refused');
 			files.set(file, Buffer.from(bytes));
@@ -63,7 +72,7 @@ for (const mode of ['healthy', 'drift', 'write', 'unlink', 'read', 'generator-wr
 				return {
 					execFileSync() {
 						generated = true;
-						if (mode !== 'healthy') {
+						if (!mode.startsWith('healthy')) {
 							for (const rel of outputs) files.set(path.join(root, rel), Buffer.from('generated'));
 						}
 						if (mode === 'generator-write') throw new Error('original generator failure');
@@ -95,10 +104,10 @@ for (const mode of ['healthy', 'drift', 'write', 'unlink', 'read', 'generator-wr
 		);
 	assert.equal(
 		exitCode,
-		mode === 'healthy' ? 0 : 1,
+		mode.startsWith('healthy') ? 0 : 1,
 		`${mode}: native refusal never becomes success`
 	);
-	if (!['healthy', 'drift'].includes(mode)) {
+	if (!mode.startsWith('healthy') && mode !== 'drift') {
 		assert.ok(
 			diagnostics.some((line) => line.includes(outputs[0]) && line.includes('refused')),
 			`${mode}: preserve the failed operation and exact target`
