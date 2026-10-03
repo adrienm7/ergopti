@@ -288,6 +288,12 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		end
 		return false
 	end
+	-- Curl reads the URL from a C-string config value. NUL silently selects a
+	-- shorter address, so refuse before native side effects or owner replacement.
+	if type(url) == "string" and url:find("\0", 1, true) then
+		Logger.error(LOG, "Cannot compose curl configuration: request URL contains NUL.")
+		return reject("curl config URL cannot contain NUL")
+	end
 	local owner = request_owner(options.owner)
 	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
