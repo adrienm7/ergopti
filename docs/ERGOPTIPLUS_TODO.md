@@ -123,6 +123,16 @@ These are software implementations; final hardware verification remains below.
   native signal cases failed before the fix. Windows receives its native process
   exit status and macOS its Hammerspoon task status; neither consumes this libuv
   receipt. Native Windows/macOS suites and manual CI are deferred by request.
+- [~] **L6.** Linux plain file-write receipts: `write` and `append` now require
+  both a successful native write and a successful close, including buffered
+  flush errors. Files are closed even when writing throws or returns an error.
+  Four real `/dev/full` ENOSPC regressions failed before the fix; both regular
+  file controls pass. Portable fault cases cover returned and thrown errors.
+  Layout import staging already consumes this adapter's boolean receipt;
+  the shared conditional TOML writer is unchanged. Windows checks its native
+  byte receipt and macOS already verifies append/close and uses an atomic write
+  owner. The native regression is registered for future Linux CI; manual CI and
+  native Windows/macOS suites remain deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

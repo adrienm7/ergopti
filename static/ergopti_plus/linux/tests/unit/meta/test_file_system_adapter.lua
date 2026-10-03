@@ -17,6 +17,38 @@ os.remove(tmp_base)
 local tmp_file = tmp_base .. "_test.txt"
 local tmp_utf8 = tmp_base .. "_utf8.txt"
 
+helpers.describe("linux-native-write-receipts", function()
+	for _, method in ipairs({ "write", "append" }) do
+		for _, failure in ipairs({ "write_return", "write_throw", "close_return", "close_throw" }) do
+			helpers.it("linux-native-write-receipts: " .. method .. " rejects " .. failure .. " and closes its file", function()
+				local original_open = io.open
+				local closes = 0
+				local handle = {}
+				function handle:write()
+					if failure == "write_return" then return nil, "No space left on device" end
+					if failure == "write_throw" then error("write failed") end
+					return self
+				end
+				function handle:close()
+					closes = closes + 1
+					if failure == "close_return" then return nil, "No space left on device" end
+					if failure == "close_throw" then error("close failed") end
+					return true
+				end
+				io.open = function(path, mode)
+					if path == "native-write-receipt" then return handle end
+					return original_open(path, mode)
+				end
+				local ok, result = pcall(fs[method], "native-write-receipt", "payload")
+				io.open = original_open
+				helpers.assert_true(ok, "native errors do not escape the adapter")
+				helpers.assert_eq(result, false, "a failed native receipt cannot report success")
+				helpers.assert_eq(closes, 1, "the file is closed even after a failed write")
+			end)
+		end
+	end
+end)
+
 helpers.describe("file_system adapter", function()
 
   -- ==========================================================================
