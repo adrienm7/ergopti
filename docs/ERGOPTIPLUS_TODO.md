@@ -1188,6 +1188,12 @@ persistence must observe actual retirement while retaining every original
 caption, body and result assertion. The independent expiry mutation must
 fail; native Windows qualification remains pending.
 
+Checkpoint 37085309234 showed that the capture callback prevented its
+interrupted modal loop from acknowledging window retirement. The fixture
+now returns that callback, waits for the actual Timeout result, then persists
+its complete snapshot. The retired-window receipt and exact expired-read
+rejection remain strict. Native Windows requalification is pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

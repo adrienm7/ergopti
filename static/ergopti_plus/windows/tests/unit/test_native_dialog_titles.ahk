@@ -8,6 +8,7 @@
 ; shared composer, alongside body, timeout and exact default-text receipts.
 ; Calls precede both owner #Includes, exercising their pre-bootstrap availability.
 ; Snapshot every native property before file I/O pumps the timeout dialog away.
+; Return the capture callback before awaiting actual native timeout retirement.
 ; An expired-window mutation must reproduce the original exact native exception.
 ; ==============================================================================
 
@@ -59,29 +60,34 @@ _NDT_ProbeSource(Artifact, Owner) {
 	return "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. 'OnError(_NDTProbeError)' . "`n"
 		. 'global _NDTReceipt := ""' . "`n"
+		. 'global _NDTSnapshot := 0' . "`n"
 		. '_NDTReceipt := A_Args[1] . "\message"' . "`n"
 		. 'SetTimer(_NDTCapture, 20)' . "`n"
 		. 'MessageResult := Ui_MsgBox("Preserved message body", "Navigation layer", "YesNo Default2 Icon! T0.5")' . "`n"
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
 		. 'FileAppend(MessageResult, A_Args[1] . "\message.result", "UTF-8-RAW")' . "`n"
 		. '_NDTReceipt := A_Args[1] . "\input"' . "`n"
 		. 'SetTimer(_NDTCapture, 20)' . "`n"
 		. 'InputResult := Ui_InputBox("Preserved input body", "Navigation layer", "w320 h180 Password T0.5", " Secret value ")' . "`n"
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
 		. 'FileAppend(InputResult.Result . "``n" . InputResult.Value, A_Args[1] . "\input.result", "UTF-8-RAW")' . "`n"
 		. '_NDTReceipt := A_Args[1] . "\unnamed"' . "`n"
 		. 'SetTimer(_NDTCapture, 20)' . "`n"
 		. 'UnnamedResult := Ui_MsgBox("Preserved unnamed body", , "T0.5")' . "`n"
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
 		. 'FileAppend(UnnamedResult, A_Args[1] . "\unnamed.result", "UTF-8-RAW")' . "`n"
 		. '_NDTReceipt := A_Args[1] . "\cancelled"' . "`n"
 		. 'SetTimer(_NDTCapture, 20)' . "`n"
 		. 'CancelledResult := Ui_InputBox("Preserved cancelled body", "Navigation layer", "w320 h180 T2", " Secret value ")' . "`n"
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
 		. 'FileAppend(CancelledResult.Result . "``n" . CancelledResult.Value, A_Args[1] . "\cancelled.result", "UTF-8-RAW")' . "`n"
 		. 'FileAppend("dialogs-written", "*", "UTF-8-RAW")' . "`nExitApp(0)`n"
 		. '_NDTCapture() {' . "`n"
-		. 'global _NDTReceipt' . "`n"
+		. 'global _NDTReceipt, _NDTSnapshot' . "`n"
 		. 'for Hwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
 		. 'if Hwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", Hwnd)' . "`ncontinue`n"
 		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
@@ -99,15 +105,23 @@ _NDT_ProbeSource(Artifact, Owner) {
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
 		. 'if InStr(_NDTReceipt, "\cancelled")' . "`n"
 		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
+		. '_NDTSnapshot := {Hwnd: Hwnd, Caption: Caption, Body: Body, Buttons: Buttons, Password: Password}' . "`n"
+		. 'return' . "`n}`n}`n"
+		. '_NDTPersist() {' . "`n"
+		. 'global _NDTReceipt, _NDTSnapshot' . "`n"
+		. 'if !IsObject(_NDTSnapshot)' . "`n"
+		. 'throw Error("The actual native dialog must publish its complete snapshot")' . "`n"
+		. 'Captured := _NDTSnapshot' . "`n"
 		. 'if InStr(_NDTReceipt, "\message") && A_Args[2] == "delay" {' . "`n"
 		. 'Sleep(700)' . "`n"
-		. 'FileAppend(DllCall("IsWindow", "Ptr", Hwnd) ? "live" : "retired", _NDTReceipt . ".retirement", "UTF-8-RAW")' . "`n}`n"
-		. 'FileAppend(Caption, _NDTReceipt . ".title", "UTF-8-RAW")' . "`n"
-		. 'FileAppend(Body, _NDTReceipt . ".body", "UTF-8-RAW")' . "`n"
-		. 'if Buttons != ""' . "`n"
-		. 'FileAppend(Buttons, _NDTReceipt . ".buttons", "UTF-8-RAW")' . "`n"
-		. 'if Password != ""' . "`n"
-		. 'FileAppend(Password, _NDTReceipt . ".password", "UTF-8-RAW")' . "`nreturn`n}`n}`n"
+		. 'FileAppend(DllCall("IsWindow", "Ptr", Captured.Hwnd) ? "live" : "retired", _NDTReceipt . ".retirement", "UTF-8-RAW")' . "`n}`n"
+		. 'FileAppend(Captured.Caption, _NDTReceipt . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(Captured.Body, _NDTReceipt . ".body", "UTF-8-RAW")' . "`n"
+		. 'if Captured.Buttons != ""' . "`n"
+		. 'FileAppend(Captured.Buttons, _NDTReceipt . ".buttons", "UTF-8-RAW")' . "`n"
+		. 'if Captured.Password != ""' . "`n"
+		. 'FileAppend(Captured.Password, _NDTReceipt . ".password", "UTF-8-RAW")' . "`n"
+		. '_NDTSnapshot := 0' . "`n}`n"
 		. '_NDTProbeError(Err, *) {' . "`n"
 		. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n"
 		. '#Include ' . Artifact . "`n"
@@ -176,14 +190,16 @@ _NDT_ActualNativeCaptionsAndResults() {
 			if Index == 1 {
 				AssertEqual("retired", FileRead(Fixture . "\message.retirement", "UTF-8"),
 					"native observations survive persistence after the exact dialog has timed out")
-				; Reintroduce an interruption between native reads, independently of
-				; the repaired persistence order. The same T0.5 window must expire
-				; and the original native target exception must reject the mutation.
+				; Move one native read across the actual modal completion boundary.
+				; The same T0.5 result acknowledges retirement before persistence,
+				; so the original target exception must reject the independent read.
 				MutantRoot := Fixture . "\expired_read"
 				DirCreate(MutantRoot)
 				Mutant := StrReplace(_NDT_ProbeSource(Artifact, Owner),
-					'Body := WinGetText("ahk_id " . Hwnd)',
-					'Sleep(700)' . "`n" . 'Body := WinGetText("ahk_id " . Hwnd)', , &Mutations)
+					'Captured := _NDTSnapshot',
+					'Captured := _NDTSnapshot' . "`n"
+						. 'if InStr(_NDTReceipt, "\message")' . "`n"
+						. 'WinGetText("ahk_id " . Captured.Hwnd)', , &Mutations)
 				AssertEqual(1, Mutations, "the expiry mutation changes one exact native observation")
 				MutantHarness := MutantRoot . "\expired_read.ahk"
 				FileAppend(Mutant, MutantHarness, "UTF-8")
