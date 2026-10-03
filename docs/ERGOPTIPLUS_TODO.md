@@ -133,6 +133,16 @@ These are software implementations; final hardware verification remains below.
   byte receipt and macOS already verifies append/close and uses an atomic write
   owner. The native regression is registered for future Linux CI; manual CI and
   native Windows/macOS suites remain deferred by request.
+- [~] **L7.** Linux buffered HTTP receipts: GET, POST and archive downloads
+  now require curl's completed transport as well as a 2xx status. An early
+  connection close with HTTP 200/curl exit 18 reports failure and withholds the
+  partial body. Complete 2xx receipts no longer carry an invented HTTP error;
+  real HTTP error responses retain their diagnostics. Six native loopback/curl
+  regressions and six portable regressions failed before the fix. The existing
+  native HTTP gate now includes buffered controls and downloads to a real file.
+  Windows already admits curl responses only after exit zero; macOS consumes
+  hs.http's native completion status and explicitly clears successful errors.
+  Native Windows/macOS suites and manual CI remain deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

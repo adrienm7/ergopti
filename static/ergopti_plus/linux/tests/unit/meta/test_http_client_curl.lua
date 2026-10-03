@@ -117,6 +117,38 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "download" }) do
+		for _, completed in ipairs({ false, true }) do
+			helpers.it("linux-buffered-http-receipt: " .. method .. " validates "
+				.. (completed and "complete success" or "incomplete transfer"), function()
+				local client, state = fresh_client()
+				local result, terminals = nil, 0
+				local function done(value) result = value; terminals = terminals + 1 end
+				local options = { owner = "buffered-receipt" }
+				if method == "get" then
+					client.get("http://127.0.0.1/fixture", {}, options, done)
+				elseif method == "post" then
+					client.post("http://127.0.0.1/fixture", {}, "{}", done, options)
+				else
+					client.download("http://127.0.0.1/fixture", {}, "/tmp/owned-download", options, done)
+				end
+				state.stderr(completed and "" or "curl: (18) transfer closed with bytes remaining")
+				state.complete_request(1, "partial\nERGOPTI_HTTP_STATUS:200\n", completed and 0 or 18)
+				helpers.assert_eq(terminals, 1, "one native receipt yields one completion")
+				helpers.assert_eq(result.status, 200, "retain the real HTTP status")
+				helpers.assert_eq(result.ok, completed, "HTTP status alone cannot prove completed transport")
+				if completed then
+					helpers.assert_eq(result.error, nil, "successful requests do not carry an error")
+					helpers.assert_eq(result.body, "partial")
+				else
+					helpers.assert_true(result.error:find("bytes remaining", 1, true) ~= nil)
+					helpers.assert_eq(result.body, "", "partial bytes cannot become a successful body")
+				end
+				helpers.assert_true(not client.isActive(options.owner), "request ownership settles")
+			end)
+		end
+	end
+
 	helpers.it("keeps blocking process APIs out of the LLM transport path", function()
 		local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
