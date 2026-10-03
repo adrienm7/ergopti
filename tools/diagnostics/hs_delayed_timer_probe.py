@@ -424,6 +424,22 @@ SUPPLEMENTAL_PRIMITIVE_TYPES = {
 }
 
 
+SUPPLEMENTAL_CALIBRATION_STAGES = (
+    "data_entered",
+    "data_returned",
+    "ref_call_entered",
+    "ref_call_returned",
+    "ref_read_entered",
+    "ref_read_returned",
+    "object_call_entered",
+    "object_call_returned",
+    "object_read_entered",
+    "object_read_returned",
+    "nullable_entered",
+    "nullable_returned",
+)
+
+
 class NoPromptDiagnosticScope:
     """Own fresh server witnesses and sender stages without admitting a control."""
 
@@ -442,6 +458,7 @@ class NoPromptDiagnosticScope:
             "sender.json",
             "scalar.json",
             "decoder.json",
+            "calibration.json",
         }
         self.allowed_names |= {name + ".pending" for name in self.allowed_names}
         self.directory_identity = (self.path.stat().st_dev, self.path.stat().st_ino)
@@ -558,6 +575,174 @@ class NoPromptDiagnosticScope:
                 summary = "true" if fact[field] else "false"
             observations.append(f"{key}(type={fact['type']},{field}={summary})")
         return "; ".join(observations) if observations else "not_observed"
+
+    def calibration_evidence(self):
+        """Qualify a separate Cocoa out-slot without authorizing any AppleEvent."""
+        packet = self._owned_packet(
+            "calibration.json", "hs.applescript.nserror-calibration", {"stages", "facts", "outcome"}
+        )
+        if packet is None:
+            return "not_observed"
+        stages, facts, outcome = packet["stages"], packet["facts"], packet["outcome"]
+        if (
+            not isinstance(stages, list)
+            or not stages
+            or stages != list(SUPPLEMENTAL_CALIBRATION_STAGES[: len(stages)])
+            or not isinstance(facts, dict)
+            or type(outcome) is not str
+            or outcome not in {"pending", "completed", "refused"}
+            or (outcome == "completed" and len(stages) != len(SUPPLEMENTAL_CALIBRATION_STAGES))
+        ):
+            raise ValueError("Supplemental NSError calibration is outside its closed protocol")
+        expected = {
+            name
+            for name, stage in (
+                ("ref", "ref_read_returned"),
+                ("object", "object_read_returned"),
+                ("nullable", "nullable_returned"),
+            )
+            if stage in stages
+        }
+        if set(facts) != expected:
+            raise ValueError("Supplemental NSError facts differ from completed reads")
+        summaries = []
+        admitted = {}
+        for name in ("ref", "object"):
+            if name not in facts:
+                continue
+            fact = facts[name]
+            if (
+                not isinstance(fact, dict)
+                or set(fact) != {"nil_result", "nserror", "code", "domain"}
+                or type(fact["nil_result"]) is not bool
+                or type(fact["nserror"]) is not bool
+            ):
+                raise ValueError("Supplemental NSError identity facts are not closed")
+            self._fact(fact["code"], "integer")
+            self._fact(fact["domain"], "matches")
+            admitted[name] = (
+                fact["nil_result"]
+                and fact["nserror"]
+                and fact["code"] == {"type": "number", "integer": 3840}
+                and fact["domain"] == {"type": "string", "matches": True}
+            )
+            value = fact["code"]["integer"]
+            code = (
+                "3840"
+                if value == 3840
+                else "unavailable"
+                if value is None
+                else "unexpected_integer"
+            )
+            summaries.append(
+                f"{name}(nil={str(fact['nil_result']).lower()},nserror={str(fact['nserror']).lower()},"
+                f"code_type={fact['code']['type']},code={code},domain_type={fact['domain']['type']},"
+                f"matches={str(fact['domain']['matches']).lower()})"
+            )
+        nullable_ok = False
+        if "nullable" in facts:
+            fact = facts["nullable"]
+            if (
+                not isinstance(fact, dict)
+                or set(fact) != {"raw_type", "type", "native_absent", "absent"}
+                or type(fact["raw_type"]) is not str
+                or fact["raw_type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+                or type(fact["type"]) is not str
+                or fact["type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+                or type(fact["native_absent"]) is not bool
+                or type(fact["absent"]) is not bool
+            ):
+                raise ValueError("Supplemental nullable descriptor facts are not closed")
+            nullable_ok = (
+                fact["raw_type"] in {"object", "function"}
+                and fact["type"] == "object"
+                and fact["native_absent"]
+                and fact["absent"]
+            )
+            summaries.append(
+                f"nullable(raw_type={fact['raw_type']},type={fact['type']},"
+                f"native_absent={str(fact['native_absent']).lower()},absent={str(fact['absent']).lower()})"
+            )
+        qualified = outcome == "completed" and admitted.get("object", False) and nullable_ok
+        return f"stage={stages[-1]}; outcome={outcome}; qualified={str(qualified).lower()}; " + (
+            "; ".join(summaries) if summaries else "not_observed"
+        )
+
+    def calibration_javascript(self):
+        """Exercise native NSError** holders using inert malformed UTF-8 JSON."""
+        return (
+            r"""
+function calibrateOwnedNSError(event) {
+    var stages = [], facts = {};
+    function publish(outcome) {
+        var data = {schema_version:1,contract:'hs.applescript.nserror-calibration',
+            nonce:__NONCE__,target_pid:__PID__,
+            sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),
+            stages:stages,facts:facts,outcome:outcome};
+        var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\n').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (!encoded || encoded.isNil()) throw new Error('Supplemental calibration encoding refused');
+        var size = Number(encoded.length);
+        if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__PATH__, true))
+            throw new Error('Supplemental calibration write refused');
+    }
+    function stage(name, key, fact) {
+        var expected = __STAGES__;
+        if (name !== expected[stages.length]) throw new Error('Supplemental calibration stage refused');
+        stages.push(name);
+        if (key !== undefined) facts[key] = fact;
+        publish('pending');
+    }
+    function inspect(result, error) {
+        var absent = result.isNil() === true;
+        var identified = error !== undefined && error !== null
+            && typeof error.isNil === 'function' && error.isNil() === false
+            && typeof error.isKindOfClass === 'function' && error.isKindOfClass($.NSError) === true;
+        var code = identified ? Number(error.code) : NaN;
+        var domain = identified ? ObjC.unwrap(error.domain) : undefined;
+        return {nil_result:absent,nserror:identified,code:integerFact(code),
+            domain:{type:typeof domain,matches:domain === 'NSCocoaErrorDomain'}};
+    }
+    function projectNullable(descriptor) {
+        // The bridge validates provenance; a JavaScript function with isNil is not an ObjC object.
+        ObjC.castObjectToRef(descriptor);
+        if (descriptor.isNil() !== true) throw new Error('Supplemental native nil descriptor refused');
+        return null;
+    }
+    try {
+        stage('data_entered');
+        var data = $.NSString.stringWithString('[').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (data.isNil()) throw new Error('Supplemental inert JSON data refused');
+        stage('data_returned');
+        var raw = Ref();
+        stage('ref_call_entered');
+        var refResult = $.NSJSONSerialization.JSONObjectWithDataOptionsError(data, 0, raw);
+        stage('ref_call_returned');
+        stage('ref_read_entered');
+        var refFact = inspect(refResult, raw[0]);
+        stage('ref_read_returned', 'ref', refFact);
+        var object = $();
+        stage('object_call_entered');
+        var objectResult = $.NSJSONSerialization.JSONObjectWithDataOptionsError(data, 0, object);
+        stage('object_call_returned');
+        stage('object_read_entered');
+        var objectFact = inspect(objectResult, object);
+        stage('object_read_returned', 'object', objectFact);
+        stage('nullable_entered');
+        var descriptor = event.paramDescriptorForKeyword(0x6572726e);
+        var normalized = projectNullable(descriptor);
+        stage('nullable_returned', 'nullable', {raw_type:typeof descriptor,type:typeof normalized,
+            native_absent:descriptor.isNil() === true,absent:normalized === null});
+        publish('completed');
+    } catch (error) {
+        // A calibration refusal remains separate; the original AppleEvent still runs.
+        try { publish('refused'); } catch (writeError) { /* No acknowledged calibration is available. */ }
+    }
+}
+""".replace("__NONCE__", json.dumps(self.identity["nonce"]))
+            .replace("__PID__", str(self.identity["pid"]))
+            .replace("__PATH__", json.dumps(str(self.path / "calibration.json")))
+            .replace("__STAGES__", json.dumps(list(SUPPLEMENTAL_CALIBRATION_STAGES)))
+        )
 
     def scalar_evidence(self, terminal=False, native=None):
         """Retain decoder boundaries independently of the original native status verdict."""
@@ -725,6 +910,7 @@ class NoPromptDiagnosticScope:
             raise ValueError("The no-prompt native receipt lacks terminal sender stages")
         return {
             **self.scalar_evidence(terminal=terminal, native=native),
+            "nserror_calibration": self.calibration_evidence(),
             "server": "completed"
             if len(present) == 2
             else "entered"
@@ -1123,7 +1309,9 @@ function run(argv) {
         if scope is None:
             return script
         script = script.replace(
-            "function run(argv) {", scope.javascript_prelude() + "\nfunction run(argv) {", 1
+            "function run(argv) {",
+            scope.javascript_prelude() + scope.calibration_javascript() + "\nfunction run(argv) {",
+            1,
         )
         script = script.replace(
             "constructOwnedEvent(pid, argv[1])",
@@ -1132,7 +1320,7 @@ function run(argv) {
         )
         script = script.replace(
             "    var error = Ref();",
-            "    recordOwnedStage('constructed');\n    qualifyOwnedScalars(event);\n    var error = Ref();\n    recordOwnedStage('send_entered');",
+            "    recordOwnedStage('constructed');\n    calibrateOwnedNSError(event);\n    qualifyOwnedScalars(event);\n    var error = Ref();\n    recordOwnedStage('send_entered');",
             1,
         )
         script = script.replace(
@@ -1219,6 +1407,7 @@ function run(argv) {
                         f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
                         f"Supplemental constructor scalars: {evidence['scalar_facts']}",
                         f"Supplemental decoder scalars: {evidence['decoder_facts']}",
+                        f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
                     ],
                     "pid_no_prompt",
                 )
@@ -1232,6 +1421,7 @@ function run(argv) {
                     f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
                     f"Supplemental constructor scalars: {evidence['scalar_facts']}",
                     f"Supplemental decoder scalars: {evidence['decoder_facts']}",
+                    f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
                 ],
                 "pid_no_prompt",
             )

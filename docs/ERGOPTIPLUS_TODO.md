@@ -388,6 +388,8 @@ TODO16 remains partial. Native source run37134285521 reported exact executable i
 
 TODO16 remains partial. The real native Reload preflight imports its observer by dot sourcing, which shares parameter-variable scope. Preserve the actual interpreter and private root during that LibraryOnly import, and assert exact post-import identity before the unchanged nine admission vectors and real Reload control. Product clone cold/warm qualification remains pending Windows CI; this fixture correction does not grant new process cleanup authority or change its deadlines.
 
+A separate bounded Cocoa calibration now compares the current Ref out-slot with an explicit object holder through real NSJSONSerialization NSError\*\* calls using inert malformed UTF-8 JSON. It records strict NSError identity, code 3840, NSCocoaErrorDomain and a native nullable-descriptor projection independently of the original raw scalar facts and AppleEvent verdict. The default sender, mandatory transport/feature gates and existing deadlines are unchanged. Portable generated-source regressions pass; actual Cocoa calibration and the unresolved packaged AppleEvent transport still require native macOS CI.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

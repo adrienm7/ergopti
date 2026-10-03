@@ -2442,5 +2442,243 @@ class SupplementalScalarFactSummaryTests(unittest.TestCase):
             self.assertEqual(list(Path(folder).iterdir()), [])
 
 
+class NSErrorOutSlotCalibrationTests(unittest.TestCase):
+    """Execute exact supplemental source against independent bridge identity ports."""
+
+    def run_source(self, scope, mode="native"):
+        port = r"""
+const fs=require('fs');
+const mode=__MODE__;
+const native=new WeakSet();
+let parses=0,sends=0;
+function wrapper(nil, klass) {
+    const value=function(){throw Error('Native wrappers are not JS callbacks');};
+    native.add(value);
+    value.isNil=()=>nil;
+    value.isKindOfClass=kind=>kind===klass;
+    return value;
+}
+const nil=wrapper(true,null);
+const NSError={};
+function error(code,domain) { const value=wrapper(false,NSError); value.code=code; value.domain=domain; return value; }
+function $() { return wrapper(true,null); }
+$.NSUTF8StringEncoding=4;
+$.NSProcessInfo={processInfo:{processIdentifier:31415}};
+$.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
+    if(encoding!==4) throw Error('Expected actual UTF8 encoding');
+    return {isNil:()=>false,length:Buffer.byteLength(text),utf8:text,writeToFileAtomically:(path,atomic)=>{
+        if(atomic!==true) throw Error('Expected atomic publication');
+        if(mode==='write_refusal'&&path.endsWith('calibration.json')) return false;
+        fs.writeFileSync(path,text); return true;
+    }};
+}})};
+$.NSError=NSError;
+$.NSError.errorWithDomainCodeUserInfo=(domain,code,userInfo)=>{
+    if(domain!=='NSOSStatusErrorDomain'||code!==-1712||!native.has(userInfo)||!userInfo.isNil())
+        throw Error('Constructor control changed');
+    return error(-1712,'NSOSStatusErrorDomain');
+};
+$.NSJSONSerialization={JSONObjectWithDataOptionsError:(data,options,out)=>{
+    if(data.utf8!=='['||options!==0) throw Error('Expected independent inert UTF8 payload');
+    parses++;
+    if(out.rawRef===true) {
+        out[0]=mode==='raw_valid'?error(3840,'NSCocoaErrorDomain'):wrapper(false,null);
+    } else {
+        if(!native.has(out)) throw Error('Expected native object holder');
+        out.isNil=()=>false;
+        out.isKindOfClass=klass=>mode==='wrong_class'?false:klass===NSError;
+        out.code=mode==='wrong_status'?3841:mode==='boolean_status'?true:3840;
+        out.domain=mode==='wrong_domain'?'private-secret-marker':'NSCocoaErrorDomain';
+    }
+    return mode==='nonnil_result'?wrapper(false,null):nil;
+}};
+const Ref=()=>({rawRef:true});
+let absent=nil;
+if(mode==='fake_function') { absent=function(){}; absent.isNil=()=>true; }
+if(mode==='number') absent=42;
+if(mode==='false_nil') { absent=wrapper(false,null); absent.isNil=()=>false; }
+if(mode==='truthy_nil') { absent=wrapper(false,null); absent.isNil=()=>1; }
+$.NSAppleEventDescriptor={
+    descriptorWithProcessIdentifier:pid=>({isNil:()=>false,descriptorType:0x6b706964}),
+    descriptorWithString:text=>({isNil:()=>false,stringValue:text}),
+    descriptorWithInt32:value=>({isNil:()=>false,int32Value:value}),
+    appleEventWithEventClassEventIDTargetDescriptorReturnIDTransactionID:(klass,id,target,rid,tid)=>({
+        setParamDescriptorForKeyword:()=>{},
+        paramDescriptorForKeyword:key=>{
+            if(key!==0x6572726e) throw Error('Expected real absent errn keyword');
+            return absent;
+        },
+        sendEventWithOptionsTimeoutError:(options,timeout,out)=>{
+            if(options!==131075||timeout!==8) throw Error('Original admission/budget changed');
+            sends++; out[0]=wrapper(false,null); return nil;
+        }
+    })
+};
+const ObjC={import:name=>{if(name!=='Foundation')throw Error('Import changed');},unwrap:value=>value,
+    castObjectToRef:value=>{if(!native.has(value))throw Error('Not a native ObjC wrapper');return {};}};
+__SCRIPT__
+try { run(['42','return "fixture"',__NONCE__]); }
+catch(error) { /* Keep the original unknown AppleEvent status a refusal. */ }
+process.stdout.write(JSON.stringify({parses:parses,sends:sends})+'\n');
+"""
+        source = (
+            port.replace("__MODE__", json.dumps(mode))
+            .replace("__SCRIPT__", probe.NativeDelayedTimerProbe.no_prompt_script(scope))
+            .replace("__NONCE__", json.dumps(NONCE))
+        )
+        result = subprocess.run(
+            ["node", "-"], input=source, text=True, capture_output=True, timeout=5
+        )
+        self.assertEqual(result.returncode, 0, "The independent source executor crashed")
+        return json.loads(result.stdout)
+
+    def scope(self, folder):
+        scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+        scope.bind_sender(SENDER_PID)
+        return scope
+
+    def test_object_holder_calibration_retains_actual_callable_nil_without_admitting_event(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            observations = self.run_source(scope)
+            self.assertEqual(observations, {"parses": 2, "sends": 1})
+            packet = scope.read("calibration.json")
+            self.assertIsNotNone(packet, "The supplemental calibration did not run")
+            self.assertEqual(packet["outcome"], "completed")
+            self.assertEqual(packet["facts"]["ref"]["nserror"], False)
+            self.assertEqual(packet["facts"]["object"]["code"], {"type": "number", "integer": 3840})
+            self.assertEqual(
+                packet["facts"]["nullable"],
+                {
+                    "raw_type": "function",
+                    "type": "object",
+                    "native_absent": True,
+                    "absent": True,
+                },
+            )
+            self.assertIn("qualified=true", scope.calibration_evidence())
+            # The known real Cocoa packet stays unqualified under the original raw-type policy.
+            original = scope.scalar_evidence()
+            self.assertFalse(original["scalar_qualified"])
+            self.assertIn("absent_errn(type=function,absent=true)", original["scalar_facts"])
+            self.assertIn("code(type=number,integer=unavailable)", original["decoder_facts"])
+            with self.assertRaises(ValueError):
+                scope.observe(
+                    terminal=True,
+                    native={
+                        "error_origin": "send",
+                        "status": -1712,
+                        "error_domain": "NSOSStatusErrorDomain",
+                    },
+                )
+            scope.cleanup()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_raw_holder_success_is_observed_without_fallback_or_changed_holder_choice(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            self.assertEqual(self.run_source(scope, "raw_valid"), {"parses": 2, "sends": 1})
+            self.assertEqual(
+                scope.read("calibration.json")["facts"]["ref"]["code"]["integer"], 3840
+            )
+            self.assertIn("qualified=true", scope.calibration_evidence())
+            scope.cleanup()
+
+    def test_wrong_native_class_status_domain_and_parse_result_cannot_qualify(self):
+        for mode in (
+            "wrong_class",
+            "wrong_status",
+            "boolean_status",
+            "wrong_domain",
+            "nonnil_result",
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                observed = self.run_source(scope, mode)
+                self.assertEqual(observed, {"parses": 2, "sends": 1})
+                evidence = scope.calibration_evidence()
+                self.assertIn("qualified=false", evidence)
+                self.assertNotIn("private-secret-marker", evidence)
+                self.assertNotIn(folder, evidence)
+                self.assertNotIn(NONCE, evidence)
+                scope.cleanup()
+
+    def test_nullable_projection_rejects_fake_callable_numeric_and_unacknowledged_native_nil(self):
+        for mode in ("fake_function", "number", "false_nil", "truthy_nil"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                self.run_source(scope, mode)
+                packet = scope.read("calibration.json")
+                self.assertIsNotNone(packet, "No closed refusal was retained")
+                self.assertEqual(packet["outcome"], "refused")
+                self.assertEqual(packet["stages"][-1], "nullable_entered")
+                self.assertNotIn("nullable", packet["facts"])
+                self.assertIn("qualified=false", scope.calibration_evidence())
+                scope.cleanup()
+
+    def test_calibration_publication_refusal_cannot_suppress_original_send(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            self.assertEqual(self.run_source(scope, "write_refusal"), {"parses": 0, "sends": 1})
+            self.assertEqual(scope.calibration_evidence(), "not_observed")
+            self.assertIsNotNone(scope.read("scalar.json"))
+            self.assertIsNotNone(scope.read("decoder.json"))
+            scope.cleanup()
+
+    def test_packet_owner_shape_prefix_and_projected_nil_acknowledgement_remain_strict(self):
+        mutations = (
+            lambda p: p.update(sender_pid=43),
+            lambda p: p.update(nonce="b" * 32),
+            lambda p: p.update(outcome="private-secret-marker"),
+            lambda p: p["facts"].update(private="private-secret-marker"),
+            lambda p: p["facts"]["object"]["code"].update(integer=True),
+            lambda p: p["facts"]["nullable"].update(raw_type="private-secret-marker"),
+            lambda p: p["stages"].append("future"),
+        )
+        for edit in mutations:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                self.run_source(scope)
+                path = scope.path / "calibration.json"
+                packet = json.loads(path.read_text())
+                edit(packet)
+                path.write_text(json.dumps(packet) + "\n")
+                with self.assertRaises(ValueError) as failure:
+                    scope.calibration_evidence()
+                self.assertNotIn("private-secret-marker", str(failure.exception))
+                scope.cleanup()
+        for field, value in (
+            ("raw_type", "number"),
+            ("type", "function"),
+            ("native_absent", False),
+            ("absent", False),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                self.run_source(scope)
+                path = scope.path / "calibration.json"
+                packet = json.loads(path.read_text())
+                packet["facts"]["nullable"][field] = value
+                path.write_text(json.dumps(packet) + "\n")
+                self.assertIn("qualified=false", scope.calibration_evidence())
+                scope.cleanup()
+
+    def test_unbound_present_calibration_and_unexpected_integer_remain_private(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            self.run_source(scope)
+            path = scope.path / "calibration.json"
+            packet = json.loads(path.read_text())
+            packet["facts"]["object"]["code"]["integer"] = 987654321
+            path.write_text(json.dumps(packet) + "\n")
+            evidence = scope.calibration_evidence()
+            self.assertIn("unexpected_integer", evidence)
+            self.assertNotIn("987654321", evidence)
+            scope.sender_pid = None
+            with self.assertRaisesRegex(ValueError, "actual bound sender"):
+                scope.calibration_evidence()
+            scope.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()
