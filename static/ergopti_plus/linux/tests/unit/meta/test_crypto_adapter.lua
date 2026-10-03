@@ -10,16 +10,30 @@
 local helpers = require("tests.helpers")
 local crypto  = helpers.load_module("adapters.crypto")
 
+--- Loads one adapter against the native digest provider's actual interface.
+local function fresh_crypto(provider)
+	local previous_provider = package.loaded["infra.openssl_digest"]
+	local previous_crypto = package.loaded["adapters.crypto"]
+	package.loaded["infra.openssl_digest"] = provider
+	package.loaded["adapters.crypto"] = nil
+	local subject = require("adapters.crypto")
+	package.loaded["infra.openssl_digest"] = previous_provider
+	package.loaded["adapters.crypto"] = previous_crypto
+	return subject
+end
+
 helpers.describe("crypto adapter", function()
 	for _, row in ipairs(require("tests.support.crypto_vectors")) do
 		helpers.it("linux-crypto-byte-receipts: frames " .. row.id .. " without argv NUL", function()
+			local subject = fresh_crypto({ available = false,
+				sha256 = function() return nil, "native primitive unavailable" end })
 			local Shell = require("adapters.shell_runner")
 			local command, calls = nil, 0
 			Shell._set_runner(function(value)
 				command, calls = value, calls + 1
 				return "SHA2-256(stdin)= " .. row.sha256 .. "\n"
 			end)
-			local ok, digest = pcall(crypto.sha256, row.input)
+			local ok, digest = pcall(subject.sha256, row.input)
 			Shell._reset_runner()
 			helpers.assert_true(ok)
 			helpers.assert_eq(digest, row.sha256)
@@ -28,6 +42,39 @@ helpers.describe("crypto adapter", function()
 				"a command passed to exec cannot carry an embedded NUL")
 		end)
 	end
+	for _, row in ipairs(require("tests.support.crypto_vectors")) do
+		helpers.it("linux-crypto-native-receipts: delegates exact bytes for " .. row.id, function()
+			local native_calls, shell_calls, received = 0, 0, nil
+			local subject = fresh_crypto({ available = true, sha256 = function(data)
+				native_calls, received = native_calls + 1, data
+				return row.sha256, nil
+			end })
+			local Shell = require("adapters.shell_runner")
+			Shell._set_runner(function() shell_calls = shell_calls + 1; error("native hashing must not shell out") end)
+			local ok, result = pcall(subject.sha256, row.input)
+			Shell._reset_runner()
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, row.sha256)
+			helpers.assert_eq(native_calls, 1)
+			helpers.assert_eq(received, row.input, "native provider must receive all original bytes")
+			helpers.assert_eq(shell_calls, 0)
+		end)
+	end
+	helpers.it("linux-crypto-native-receipts: preserves native refusal without a CLI retry", function()
+		local native_calls, shell_calls = 0, 0
+		local subject = fresh_crypto({ available = true, sha256 = function()
+			native_calls = native_calls + 1
+			return nil, "native primitive refused"
+		end })
+		local Shell = require("adapters.shell_runner")
+		Shell._set_runner(function() shell_calls = shell_calls + 1; return "" end)
+		local ok, result = pcall(subject.sha256, "abc")
+		Shell._reset_runner()
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, "")
+		helpers.assert_eq(native_calls, 1)
+		helpers.assert_eq(shell_calls, 0, "a refused primitive cannot silently switch implementation")
+	end)
 
   -- ==========================================================================
   -- 1. Module structure

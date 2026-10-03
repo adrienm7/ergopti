@@ -5,7 +5,7 @@ local json = require("json")
 local file = assert(io.open("../_shared/data/crypto/sha256_vectors.json", "rb"))
 local rows = assert(json.decode(file:read("*a")))
 assert(file:close())
-assert(#rows == 11, "shared SHA-256 corpus must be complete")
+assert(#rows == 18, "shared SHA-256 corpus must be complete")
 for _, row in ipairs(rows) do
 	assert(#row.input_hex % 2 == 0 and not row.input_hex:find("[^0-9a-f]"))
 	local bytes = row.input_hex:gsub("..", function(pair) return string.char(tonumber(pair, 16)) end)
