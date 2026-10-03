@@ -421,6 +421,44 @@ local function _build_layouts(ctx)
 		return ctx.webview.show("layout_manager")
 	end
 
+	-- The manifest owns this switch and its position before the physical picker.
+	-- The canonical choice owner also owns the runtime publication and redraw.
+	render_ctx.feature_rows = {}
+	for key, value in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[key] = value end
+	local replace_path = "hotstrings.magic_key.replace"
+	for _, declaration in ipairs(ManifestMenu and ManifestMenu.get_array("layout_menu") or {}) do
+		if declaration.type == "feature" and declaration.path == replace_path then
+			render_ctx.feature_rows[replace_path] = function()
+				local config = ctx.config
+				if type(config) ~= "table" or type(config.is_group_enabled) ~= "function"
+					or type(config.is_section_checked) ~= "function" or type(config.toggle_section) ~= "function" then
+					Logger.error(LOG, "No canonical magic replacement choice owner in the layout menu.")
+					return nil
+				end
+				local function admitted()
+					return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+						and config.is_group_enabled("magickey") == true
+				end
+				local enabled = admitted()
+				return {
+					label = i18n_safe(declaration.i18n),
+					checked = config.is_section_checked("magickey", "replace") == true,
+					disabled = not enabled,
+					action = enabled and function()
+						if not admitted() then return false end
+						local ok, committed = pcall(config.toggle_section, "magickey", "replace")
+						if not ok or committed ~= true then
+							Logger.error(LOG, "Magic replacement choice was not committed: %s.", tostring(committed))
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							return false
+						end
+						return true
+					end or nil,
+				}
+			end
+		end
+	end
+
 	local providers = {
 		-- The custom layout picker: the registry layouts the layout manager
 		-- installed, the one this session activated checked; choosing one makes
