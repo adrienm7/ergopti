@@ -586,8 +586,16 @@ _CMG_SemanticProofPreservesUnownedValues() {
 	Source := Foreign . '[source]`nchoice="legitimate"`n'
 	Plan := ConfigMigratePlan(Source, _CMR_CopyRegistry(), "ahk")
 	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
-	Assert(StrCompare(SubStr(Plan["candidate"], 1, StrLen(Foreign)), Foreign, true) == 0,
-		"valid root dots, literal dots, both table-array generations and legacy scalar bytes remain exact")
+	; The metadata owner inserts its new table before the first physical header,
+	; after root values. Pin the entire independent byte image, including that
+	; owned insertion, rather than assuming all foreign records are contiguous.
+	Expected := 'future.a.b = 1`n"future.a.b" = "literal dot"`n'
+		. '[_meta]`nschema_version = 2`n`n'
+		. '[[profiles]]`nshortcut.key="first"`n[[profiles]]`nshortcut.key="second"`n'
+		. '[legacy]`ntext = ' . "O'Brien" . '`nshape = { rows=[{ flag=false, count=0, text="001" }] }`n'
+		. '[source]`nchoice="legitimate"`n`n[destination]`nchoice = "legitimate"`n'
+	Assert(StrCompare(Plan["candidate"], Expected, true) == 0,
+		"all unknown source bytes and the exact owned metadata and destination insertions remain exact")
 	Document := TOML_ParseDocument(Plan["candidate"])
 	AssertEqual(1, Document["future"]["a"]["b"])
 	AssertEqual("literal dot", Document["future.a.b"])
