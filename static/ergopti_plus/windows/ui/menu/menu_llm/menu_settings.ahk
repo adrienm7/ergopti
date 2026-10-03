@@ -387,7 +387,9 @@ _LLM_Menu_StreamingSnapshot() {
 		"backend", _LLM_Menu["backend"], "streaming", _LLM_Menu["streaming"],
 		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
 		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
-		"blocked", !(_LLM_Engine is Map) || _LLM_Engine["backend"] != _LLM_Menu["backend"]
+		"blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("backend") || !_LLM_Engine.Has("enabled")
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
 			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
 			|| !LLM_EffectiveStreaming(_LLM_Menu["backend"], true))
 }

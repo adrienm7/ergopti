@@ -1596,3 +1596,77 @@ _LMT_StreamingNativeRefusal() {
 	}
 }
 Test("LLM display: the real Windows streaming row remains truthful and cannot reach a writer", _LMT_StreamingNativeRefusal)
+
+
+_LMT_StreamingCountCommand(State) {
+	State["calls"] += 1
+	return true
+}
+
+_LMT_StreamingSparseOwnerRefusal() {
+	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	HadEngine := IsSet(_LLM_Engine)
+	SavedEngine := HadEngine ? _LLM_Engine : 0
+	try {
+		Suspend(false)
+		_LLM_Menu["backend"] := "ollama"
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["streaming"] := true
+		_LLM_Menu["show_all_at_once"] := false
+		_LLM_Menu["future_streaming_neighbor"] := "preserve"
+		Owners := [Map("id", "unset"), Map("id", "non-map", "owner", 0),
+			Map("id", "empty", "owner", Map()),
+			Map("id", "retired debounce", "owner", Map("timer_active", false)),
+			Map("id", "missing enabled", "owner", Map("backend", "ollama")),
+			Map("id", "missing backend", "owner", Map("enabled", true))]
+		for Vector in Owners {
+			if Vector.Has("owner")
+				_LLM_Engine := Vector["owner"]
+			else
+				_LLM_Engine := unset
+			Failure := ""
+			Snapshot := 0
+			try {
+				Snapshot := _LLM_Menu_StreamingSnapshot()
+			} catch as Err {
+				Failure := Err.Message
+			}
+			AssertEqual("", Failure, Vector["id"] . ": a missing runtime owner is a refusal, never an exception")
+			Assert(Snapshot is Map, Vector["id"] . ": the real owner returns an admission snapshot")
+			AssertTrue(Snapshot["blocked"], Vector["id"] . ": incomplete engine state is unavailable")
+			AssertFalse(LLM_DisplayStreamingReady(Snapshot), Vector["id"] . ": unavailable state cannot enable a shared row")
+			State := Map("calls", 0)
+			Command := _LMT_StreamingCountCommand.Bind(State)
+			AssertFalse(_LLM_Menu_StreamingCommand(Snapshot, Command), Vector["id"] . ": unavailable state cannot reach the setting owner")
+			AssertEqual(0, State["calls"])
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, Command)
+			try {
+				Matches := 0
+				Loop DllCall("GetMenuItemCount", "ptr", Built.Handle, "int") {
+					Position := A_Index - 1
+					if InStr(_CTC_LabelAt(Built, Position), t("menu.llm.show_streaming")) == 1 {
+						Matches += 1
+						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+						Assert(NativeState & 0x3, Vector["id"] . ": the actual Win32 row remains disabled")
+						AssertFalse(_CTC_IsChecked(Built, Position))
+					}
+				}
+				AssertEqual(1, Matches, Vector["id"] . ": the shared declaration remains visible exactly once")
+			} finally _CTC_ReleaseMenu(Built)
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+			AssertTrue(_LLM_Menu["streaming"], "refusal preserves historical stored intent")
+			AssertEqual("preserve", _LLM_Menu["future_streaming_neighbor"])
+		}
+	} finally {
+		if HadEngine
+			_LLM_Engine := SavedEngine
+		else
+			_LLM_Engine := unset
+		Suspend(SavedSuspend)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: sparse or retired engine owners refuse streaming without writes or missing-key exceptions", _LMT_StreamingSparseOwnerRefusal)
