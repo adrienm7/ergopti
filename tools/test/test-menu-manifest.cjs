@@ -656,7 +656,7 @@ function checkInfoBarControl() {
 	);
 	const definition = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
 	assert.deepEqual(corpus.states, [false, true], 'both independently captured states execute');
-	assert.equal(definition.length, 5);
+	assert.equal(definition.length, 6);
 	assert.deepEqual(definition[0], { type: 'list', id: 'llm_display_leading' });
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
@@ -775,6 +775,53 @@ function checkAutoTemperatureControl() {
 	);
 }
 
+function checkTokenStreamingControl() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/token_streaming_control.json'), 'utf8')
+	);
+	const rows = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
+	assert.equal(rows.length, 6);
+	assert.deepEqual(rows[3], {
+		type: 'check',
+		id: corpus.row.id,
+		i18n: corpus.row.i18n,
+		platforms: ['hs', 'linux'],
+		unavailable: 'grey',
+		reason_key: 'platform_reason.token_streaming_transport_missing',
+		checked_when: ['llm_token_streaming_enabled'],
+		disabled_when: ['llm_token_streaming_ready']
+	});
+	for (const [file, first, last] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildDisplayMenu(',
+			'LLM_Menu_BuildNavMenu('
+		],
+		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_display"] = function',
+			'dynamic_handlers["llm_navigation"] = function'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first),
+			end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: real streaming consumer bounds must exist`);
+		const body = source.slice(start, end);
+		for (const owner of [corpus.row.id, 'llm_token_streaming_enabled', 'llm_token_streaming_ready'])
+			assert(body.includes(`"${owner}"`), `${file}: shared streaming owner ${owner} is consumed`);
+		assert(
+			!body.includes(corpus.row.i18n),
+			`${file}: the streaming label belongs to the shared declaration`
+		);
+	}
+	console.log(
+		'Token streaming control: exact shared row, platform refusal and three actual consumers qualified.'
+	);
+}
+
 function checkShowAllControl() {
 	const assert = require('node:assert/strict');
 	const corpus = JSON.parse(
@@ -786,21 +833,22 @@ function checkShowAllControl() {
 	]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
 	const rows = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
-	assert.equal(rows.length, 5);
+	assert.equal(rows.length, 6);
 	assert.deepEqual(
 		rows.map((row) => row.id),
 		[
 			'llm_display_leading',
 			'llm_info_bar',
 			'llm_display_remaining',
+			'llm_token_streaming',
 			corpus.row.id,
 			'llm_display_trailing'
 		]
 	);
-	assert.equal(rows[3].type, 'check');
-	assert.equal(rows[3].i18n, corpus.row.i18n);
-	assert.deepEqual(rows[3].checked_when, ['llm_show_all_enabled']);
-	assert.deepEqual(rows[3].disabled_when, ['llm_show_all_ready']);
+	assert.equal(rows[4].type, 'check');
+	assert.equal(rows[4].i18n, corpus.row.i18n);
+	assert.deepEqual(rows[4].checked_when, ['llm_show_all_enabled']);
+	assert.deepEqual(rows[4].disabled_when, ['llm_show_all_ready']);
 	for (const [file, first, last] of [
 		[
 			'windows/ui/menu/menu_llm/menu_settings.ahk',
@@ -953,6 +1001,7 @@ function checkAutomaticTriggerControls() {
 
 checkInfoBarControl();
 checkAutoTemperatureControl();
+checkTokenStreamingControl();
 checkShowAllControl();
 checkAutomaticTriggerControls();
 

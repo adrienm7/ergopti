@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Удалить Ergopti из Karabiner",
 	"menu.global.restore_touchpad_gestures": "Восстановить жесты сенсорной панели Windows",
 	"dialog.start_at_login.failed": "Не удалось изменить автозапуск. Проверьте настройки автозапуска системы.",
-	"onboarding.error.open_failed": "Не удалось открыть мастер настройки. Проверьте журналы и повторите попытку через меню."
+	"onboarding.error.open_failed": "Не удалось открыть мастер настройки. Проверьте журналы и повторите попытку через меню.",
+	"platform_reason.token_streaming_transport_missing": "Не в Windows: Windows пока не может показывать предложения токен за токеном. Этот параметр остаётся неактивным."
 }

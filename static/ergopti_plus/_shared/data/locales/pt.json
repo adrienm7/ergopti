@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Remover o Ergopti do Karabiner",
 	"menu.global.restore_touchpad_gestures": "Restaurar os gestos do touchpad do Windows",
 	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
-	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu."
+	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu.",
+	"platform_reason.token_streaming_transport_missing": "Não no Windows: O Windows ainda não pode mostrar sugestões token por token. Esta opção permanece inativa."
 }

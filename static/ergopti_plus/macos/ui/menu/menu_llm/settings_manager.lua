@@ -250,7 +250,25 @@ end
 function M.new(deps)
 	local obj = { deps = deps }
 	local setting_recovery_debt = nil
+	local setting_generation = 0
 	function obj.scope_idle() return setting_recovery_debt == nil end
+
+	--- Persists only inside the source authority retained by this one action.
+	--- @param debt table Per-action guard, including compensation retries.
+	--- @param label string Native publication phase.
+	--- @return boolean acknowledged
+	local function publish_setting(debt, label)
+		if debt.publication_guard then
+			local ok, admitted = Logger.callback(LOG, label .. " source admission", debt.publication_guard, "before")
+			if ok ~= true or admitted ~= true then return false end
+		end
+		if save_prefs(deps, label) ~= true then return false end
+		if debt.publication_guard then
+			local ok, admitted = Logger.callback(LOG, label .. " source receipt", debt.publication_guard, "acknowledged")
+			if ok ~= true or admitted ~= true then return false end
+		end
+		return true
+	end
 
 	--- Restores every boundary reached by a rejected setting transition.
 	--- @param debt table Mutable per-boundary compensation ledger.
@@ -268,7 +286,7 @@ function M.new(deps)
 			end
 		end
 		if debt.persist then
-			local persisted = save_prefs(deps, "LLM setting preference rollback")
+			local persisted = publish_setting(debt, "LLM setting preference rollback")
 			-- The outer preference owner may restore its last committed candidate
 			-- when this compensating write refuses, so reclaim this key immediately
 			deps.state[snapshot.key] = clone_value(snapshot.state_value)
@@ -317,6 +335,17 @@ function M.new(deps)
 		return restore_setting_transaction(setting_recovery_debt)
 	end
 
+	--- Reads an actual runtime value and this transaction owner's current revision.
+	--- @param key string Existing canonical runtime setting.
+	--- @return table|nil snapshot Unknown/refused getters remain unavailable.
+	function obj.setting_snapshot(key)
+		local getter = deps.keymap and deps.keymap.get_llm_runtime_setting
+		if type(getter) ~= "function" then return nil end
+		local ok, found, value = Logger.callback(LOG, "LLM display runtime snapshot", getter, key)
+		if ok ~= true or found ~= true then return nil end
+		return {owner = obj, generation = setting_generation, value = value}
+	end
+
 	--- Applies one state/runtime/persistence/native-setting/menu transaction.
 	--- Void runtime and native setters commit on a non-throwing nil return; literal
 	--- false is an operational refusal. Preference persistence alone requires true.
@@ -328,6 +357,7 @@ function M.new(deps)
 			Logger.error(LOG, "LLM setting transaction refused invalid options.")
 			return false
 		end
+		if options.publication_guard ~= nil and type(options.publication_guard) ~= "function" then return false end
 		if not is_finite_number(options.value) then
 			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
 				tostring(options.key))
@@ -377,6 +407,7 @@ function M.new(deps)
 		}
 		local debt = {
 			snapshot = snapshot,
+			publication_guard = options.publication_guard,
 			runtime_callback = runtime_callback,
 			runtime = false,
 			persist = false,
@@ -394,6 +425,7 @@ function M.new(deps)
 		end
 
 		local candidate = clone_value(options.value)
+		setting_generation = setting_generation + 1
 		debt.runtime = true
 		if not invoke_required("LLM setting runtime sync", runtime_callback,
 			clone_value(candidate)) then
@@ -402,7 +434,7 @@ function M.new(deps)
 
 		deps.state[options.key] = clone_value(candidate)
 		debt.persist = true
-		if not save_prefs(deps, "LLM setting preference save") then
+		if not publish_setting(debt, "LLM setting preference save") then
 			return reject_transition("preference save")
 		end
 

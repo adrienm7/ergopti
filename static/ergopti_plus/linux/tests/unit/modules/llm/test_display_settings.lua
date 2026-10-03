@@ -138,8 +138,10 @@ local function with_info_menu(options, callback)
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local settings, storage = load_settings({
+		["llm.enabled"] = options.stored_enabled ~= false,
 		["llm.display.show_info_bar"] = options.selected,
 		["llm.display.streaming_multi"] = options.progressive,
+		["llm.display.streaming"] = options.streaming,
 		["llm.profiles.num_predictions"] = options.count,
 		["llm.future_field"] = 42,
 	}, options.refused)
@@ -168,18 +170,34 @@ local function with_info_menu(options, callback)
 		i18n = require("infra.i18n"), logger = require("logger.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
-	local observed = { writes = 0, redraws = 0, active = true, paused = false }
-	local native_set = storage.set
-	storage.set = function(...)
+	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = "ollama", revision = 0 }
+	local native_set, native_many = storage.set, storage.set_many
+	local function admission_boundary()
 		observed.writes = observed.writes + 1
-		if options.refusal_mode == "nil" then return nil end
+		if observed.source_race then
+			observed.source_race = false
+			assert(native_set("llm.enabled", false))
+		end
+		if options.refusal_mode == "nil" then return false, nil end
 		if options.refusal_mode == "throw" then error("owned writer refused") end
+		return true
+	end
+	storage.set = function(...)
+		local admitted, result = admission_boundary()
+		if not admitted then return result end
 		return native_set(...)
+	end
+	storage.set_many = function(...)
+		local admitted, result = admission_boundary()
+		if not admitted then return result end
+		return native_many(...)
 	end
 	local ok, err = xpcall(function()
 		local items = helpers.load_module("ui.menu.menu_builder").build({
 			_version = "0.0.0-dev.12",
-			llm = { is_enabled = function() return observed.active end, toggle = function() return true end },
+			llm = { is_enabled = function() return observed.active end, toggle = function() return true end,
+				get_backend = function() return observed.backend end,
+				streaming_revision = function() return observed.revision end },
 			on_quit = function() end,
 			is_paused = function() return observed.paused end,
 			on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
@@ -359,6 +377,127 @@ helpers.describe("LLM shared Show-all check", function()
 				helpers.assert_eq(storage.get("llm.future_field"), 42)
 				helpers.assert_eq(observed.redraws, 0)
 				helpers.assert_eq(row.checked or false, false)
+			end)
+		end
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Shared Streaming Check =======
+-- =========================================
+-- =========================================
+
+helpers.describe("LLM token streaming live admission", function()
+	for _, condition in ipairs({ "paused", "off", "backend", "retired source", "restored runtime owner" }) do
+		helpers.it("refuses an existing callback after " .. condition .. " (shared-token-streaming)", function()
+			with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
+				local row = show_all_row(parent, "menu.llm.show_streaming")
+				if condition == "paused" then observed.paused = true end
+				if condition == "off" then observed.active = false end
+				if condition == "backend" then observed.backend = "api" end
+				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
+				if condition == "restored runtime owner" then observed.revision = observed.revision + 2 end
+				local before = observed.writes
+				local result = row.fn()
+				helpers.assert_eq(observed.writes, before, "a retained row cannot write after current admission changes")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(settings.get("streaming"), false)
+				helpers.assert_eq(observed.redraws, 0)
+			end)
+		end)
+	end
+end)
+
+--- Reads independent native capability and stale-command expectations.
+--- @return table corpus
+local function token_streaming_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("json").decode(text))
+end
+
+helpers.describe("shared token streaming policy", function()
+	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
+		local policy = require("llm.display_policy")
+		local corpus = token_streaming_corpus()
+		helpers.assert_eq(#corpus.capabilities, 9)
+		helpers.assert_eq(#corpus.cases, 15)
+		for _, vector in ipairs(corpus.capabilities) do
+			helpers.assert_eq(policy.streaming_capable(vector.platform, vector.backend), vector.capable)
+		end
+		for _, vector in ipairs(corpus.cases) do
+			local expected, current = {}, {}
+			for key, value in pairs(corpus.base) do expected[key], current[key] = value, value end
+			for key, value in pairs(vector.expected or {}) do expected[key] = value end
+			for key, value in pairs(vector.current) do current[key] = value end
+			local decision = policy.streaming_intent(expected, current)
+			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
+			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
+		end
+	end)
+end)
+
+helpers.describe("Linux acknowledged token streaming checkbox", function()
+	helpers.it("refuses the actual settings writer after a canonical source race (shared-token-streaming)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, token_streaming_corpus().row.i18n)
+			observed.source_race = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(settings.get("streaming"), false)
+			helpers.assert_eq(storage.get("llm.display.streaming"), false)
+			helpers.assert_eq(storage.get_many({"llm.enabled"})["llm.enabled"], false)
+			helpers.assert_eq(storage.has("llm.enabled"), false, "the external off choice remains sparse")
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+
+	helpers.it("refuses a freshly rendered canonical-off/runtime-on checkbox (shared-token-streaming)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 2, stored_enabled = false}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, token_streaming_corpus().row.i18n)
+			helpers.assert_eq(row.disabled, true)
+			if row.fn then helpers.assert_eq(row.fn(), false) end
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(settings.get("streaming"), false)
+		end)
+	end)
+
+	helpers.it("keeps the durable boolean across restart and refreshes only after acknowledgement (shared-token-streaming)", function()
+		for _, selected in ipairs({false, true}) do
+			with_info_menu({selected = true, progressive = true, streaming = selected, count = 2}, function(parent, settings, storage, observed)
+				local row = show_all_row(parent, token_streaming_corpus().row.i18n)
+				helpers.assert_eq(row.checked or false, selected)
+				helpers.assert_eq(row.disabled == true, false)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(settings.get("streaming"), not selected)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 1)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				settings._reset()
+				helpers.assert_eq(settings.get("streaming"), not selected)
+				helpers.assert_eq(row.fn(), false, "a published revision retires its previous menu callback")
+				helpers.assert_eq(observed.writes, 1)
+			end)
+		end
+	end)
+
+	helpers.it("does not redraw or publish after false, nil or throwing durable writers (shared-token-streaming)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_info_menu({selected = true, progressive = true, streaming = false, count = 2, refused = mode == "false", refusal_mode = mode}, function(parent, settings, storage, observed)
+				local row = show_all_row(parent, token_streaming_corpus().row.i18n)
+				local ok, result = pcall(row.fn)
+				helpers.assert_true(not ok or result == false)
+				helpers.assert_eq(settings.get("streaming"), false)
+				helpers.assert_eq(storage.get("llm.display.streaming"), false)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 0)
 			end)
 		end
 	end)

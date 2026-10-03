@@ -1206,11 +1206,19 @@ _LMT_SharedShowAllNativeOwner() {
 		} finally _CTC_ReleaseMenu(Built)
 		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
 		SavedDefinitions := Definitions.Clone()
-		CheckRow := Definitions[4]
+		CheckIndex := 0
+		for Index, Definition in Definitions {
+			if Definition.Get("id", "") == "llm_show_all" {
+				CheckIndex := Index
+				break
+			}
+		}
+		Assert(CheckIndex > 0, "the shared Show-all declaration must exist before its placement mutation")
+		CheckRow := Definitions[CheckIndex]
 		OriginalLabel := CheckRow["i18n"]
 		try {
 			CheckRow["i18n"] := Corpus["alternate_i18n"]
-			Definitions.RemoveAt(4)
+			Definitions.RemoveAt(CheckIndex)
 			Definitions.InsertAt(1, CheckRow)
 			_LLM_Menu["n_predictions"] := 2
 			_LMT_WriterResult := false
@@ -1484,3 +1492,101 @@ _LMT_SharedTriggerDeclaration() {
 	}
 }
 Test("LLM trigger: native command placement follows the shared label and order", _LMT_SharedTriggerDeclaration)
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 6/ Shared Token Streaming =======
+; =========================================
+; =========================================
+
+_LMT_StreamingCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\token_streaming_control.json"))
+}
+
+_LMT_StreamingPolicyContract() {
+	Corpus := _LMT_StreamingCorpus()
+	AssertEqual(9, Corpus["capabilities"].Length)
+	AssertEqual(15, Corpus["cases"].Length)
+	for Vector in Corpus["capabilities"] {
+		AssertEqual(Vector["capable"], LLM_DisplayStreamingCapable(Vector["platform"], Vector["backend"]),
+			"actual shared capability matches the independent native transport inventory")
+	}
+	for Vector in Corpus["cases"] {
+		Expected := Corpus["base"].Clone()
+		Current := Corpus["base"].Clone()
+		for Key, Value in Vector.Get("expected", Map())
+			Expected[Key] := Value
+		for Key, Value in Vector["current"]
+			Current[Key] := Value
+		Decision := LLM_DisplayStreamingIntent(Expected, Current)
+		AssertEqual(Vector["admitted"], Decision["admitted"], Vector["id"])
+		if Vector["admitted"]
+			AssertEqual(Vector["value"], Decision["value"], Vector["id"])
+	}
+}
+Test("LLM display: shared token streaming replays independent capabilities and stale intents", _LMT_StreamingPolicyContract)
+
+_LMT_StreamingNativeRefusal() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	try {
+		Corpus := _LMT_StreamingCorpus()
+		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
+		StreamingRow := 0
+		for Definition in Definitions {
+			if Definition.Get("id", "") == Corpus["row"]["id"]
+				StreamingRow := Definition
+		}
+		Assert(StreamingRow is Map, "the actual shared declaration must own the streaming row")
+		AssertEqual("grey", StreamingRow["unavailable"])
+		AssertEqual("platform_reason.token_streaming_transport_missing", StreamingRow["reason_key"])
+		for Backend in ["ollama", "api", "mlx"] {
+			_LLM_Menu["backend"] := Backend
+			_LLM_Menu["enabled"] := true
+			_LLM_Menu["streaming"] := true
+			_LLM_Menu["show_all_at_once"] := false
+			State := Map("calls", 0)
+			Command := (*) => State["calls"] += 1
+			Expected := _LLM_Menu_StreamingSnapshot()
+			AssertFalse(LLM_BackendCapabilities(Backend)["streaming"], "Windows has no partial-frame transport")
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an unsupported click cannot reach a writer")
+			Suspend(true)
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "a retained click remains refused under native pause")
+			Suspend(SavedSuspend)
+			_LLM_Menu := _LLM_Menu.Clone()
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an old row cannot claim a replacement map owner")
+			AssertEqual(0, State["calls"])
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+			AssertTrue(_LLM_Menu["streaming"], "unavailable native rendering does not strip historical stored intent")
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, Command)
+			try {
+				Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+				Matches := 0
+				Loop Count {
+					Position := A_Index - 1
+					Label := _CTC_LabelAt(Built, Position)
+					if InStr(Label, t(Corpus["row"]["i18n"])) == 1 {
+						Matches += 1
+						Assert(Label != t(Corpus["row"]["i18n"]), "the disabled native row explains why it cannot stream")
+						AssertContains(Label, "Windows")
+						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+						Assert(NativeState & 0x3, "the real Win32 row is greyed")
+						AssertFalse(_CTC_IsChecked(Built, Position), "a buffered transport never reports effective token streaming")
+					}
+				}
+				AssertEqual(1, Matches, "the native menu projects exactly one shared streaming declaration")
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: the real Windows streaming row remains truthful and cannot reach a writer", _LMT_StreamingNativeRefusal)

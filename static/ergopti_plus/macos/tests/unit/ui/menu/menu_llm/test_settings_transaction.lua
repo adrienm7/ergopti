@@ -39,6 +39,7 @@ local MODULES = {
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
 	"infra.manifest_menu",
+	"infra.preferences",
 }
 
 local DEFAULT_STATE = {
@@ -91,6 +92,8 @@ end
 
 local function with_fixture(options, callback)
 	options = options or {}
+	require("infra.paths").shared_root()
+	local preferences_owner = options.preferences or require("infra.preferences")
 	local saved_modules = {}
 	for _, name in ipairs(MODULES) do
 		saved_modules[name] = package.loaded[name]
@@ -134,7 +137,21 @@ local function with_fixture(options, callback)
 		state.llm_instant_on_word_end, state.llm_after_hotstring = table.unpack(options.trigger_states)
 	end
 	local runtime = clone_value(state)
+	local display_generation = 0
 	local persisted = clone_value(state)
+	local publication_id = 0
+	package.loaded["infra.preferences"] = options.preferences or {
+		flat_key_for = preferences_owner.flat_key_for,
+		state_value_for = preferences_owner.state_value_for,
+		current_view = function() return clone_value(persisted), {status = "ok", content = "owned fixture"} end,
+		source_snapshot = function() return {status = "ok", content = "owned fixture"} end,
+		source_matches = function(expected, current)
+			return type(expected) == "table" and type(current) == "table" and expected.status == current.status and expected.content == current.content
+		end,
+		publication_receipt = function()
+			return {id = publication_id, source = {status = "ok", content = "owned fixture"}}
+		end,
+	}
 	local rendered = clone_value(state)
 	local settings_store = clone_value(state)
 	for key, value in pairs(options.runtime_overrides or {}) do
@@ -203,6 +220,7 @@ local function with_fixture(options, callback)
 	}
 
 	_G.hs = {
+		fs = saved_hs.fs,
 		execute = function(command)
 			if command == "/usr/bin/uname -m" then return "x86_64" end
 			if command == "/usr/bin/sw_vers -productVersion" then return "14.5" end
@@ -237,6 +255,11 @@ local function with_fixture(options, callback)
 
 	package.loaded["modules.llm"] = {
 		DEFAULT_STATE = clone_value(DEFAULT_STATE),
+		streaming_snapshot = function()
+			return { owner = runtime, generation = display_generation,
+				backend = runtime.llm_backend, enabled = runtime.llm_enabled,
+				streaming = runtime.llm_streaming, blocked = false }
+		end,
 		get_backend = function() return state.llm_backend end,
 		get_current_model = function() return state.llm_model or "" end,
 		set_backend = function() return true end,
@@ -367,13 +390,37 @@ local function with_fixture(options, callback)
 		return true, clone_value(runtime[key])
 	end
 
+	local owned_save
+	if options.preference_source then
+		owned_save = require("ui.menu.preferences_transaction").bind(options.preferences, {
+			path = options.preference_source, state = state, hotfiles = {}, core_modules = {},
+			initial_state = state, initial_preferences = state,
+			restore_runtime = function(snapshot)
+				return require("ui.menu.preferences_transaction").restore_table(runtime, snapshot)
+			end,
+		})
+	end
+
 	local function save_prefs()
-		return run_boundary("save", clone_value(state), function()
+		if owned_save then
+			calls.save = calls.save + 1
+			histories.save[#histories.save + 1] = clone_value(state)
+			local committed = owned_save()
+			if committed == true then
+				persisted = clone_value(state)
+				if options.after_save then options.after_save() end
+			end
+			return committed
+		end
+		local committed = run_boundary("save", clone_value(state), function()
 			persisted = clone_value(state)
 		end, true)
+		if committed == true then publication_id = publication_id + 1 end
+		return committed
 	end
 
 	local function update_menu()
+		if options.before_menu then options.before_menu(calls.menu + 1) end
 		return run_boundary("menu", clone_value(state), function()
 			rendered = clone_value(state)
 		end, nil)
@@ -481,6 +528,7 @@ local function with_fixture(options, callback)
 			update_menu = update_menu,
 			active_tasks = {},
 		})
+		assert(type(handler.build_item) == "function", table.concat(errors, "\n"))
 		local submenu = handler.build_item().submenu
 		local generation = find_item(submenu, "menu.llm.generation_menu_title")
 		local predictions = find_item(generation.menu, "menu.llm.num_predictions_label")
@@ -503,6 +551,7 @@ local function with_fixture(options, callback)
 		histories = histories,
 		errors = errors,
 		manager = manager,
+		retire_display = function() display_generation = display_generation + 1 end,
 		set_prompt = function(value) prompt_value = value end,
 		persisted = function() return persisted end,
 		rendered = function() return rendered end,
@@ -1423,6 +1472,215 @@ helpers.describe("LLM shared automatic trigger controls", function()
 					helpers.assert_eq(fixture.calls.menu, 0)
 				end)
 			end
+		end
+	end)
+end)
+
+--- Reads independent native capability and stale-command expectations.
+--- @return table corpus
+local function token_streaming_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("json").decode(text))
+end
+
+helpers.describe("shared token streaming policy", function()
+	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
+		local policy = require("llm.display_policy")
+		local corpus = token_streaming_corpus()
+		helpers.assert_eq(#corpus.capabilities, 9)
+		helpers.assert_eq(#corpus.cases, 15)
+		for _, vector in ipairs(corpus.capabilities) do
+			helpers.assert_eq(policy.streaming_capable(vector.platform, vector.backend), vector.capable)
+		end
+		for _, vector in ipairs(corpus.cases) do
+			local expected, current = {}, {}
+			for key, value in pairs(corpus.base) do expected[key], current[key] = value, value end
+			for key, value in pairs(vector.expected or {}) do expected[key] = value end
+			for key, value in pairs(vector.current) do current[key] = value end
+			local decision = policy.streaming_intent(expected, current)
+			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
+			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
+		end
+	end)
+end)
+
+helpers.describe("native streaming checkbox admission", function()
+	for _, condition in ipairs({ "paused", "off", "backend", "runtime disagreement", "retired owner" }) do
+		helpers.it("refuses a retained checkbox after " .. condition .. " (shared-token-streaming)", function()
+			local options = {}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.streaming_menu(), "menu.llm.show_streaming"))
+				if condition == "paused" then options.paused = true end
+				if condition == "off" then fixture.state.llm_enabled = false; fixture.runtime.llm_enabled = false end
+				if condition == "backend" then fixture.state.llm_backend = "api"; fixture.runtime.llm_backend = "api" end
+				if condition == "runtime disagreement" then fixture.runtime.llm_streaming = true end
+				if condition == "retired owner" then fixture.retire_display() end
+				local before = fixture.calls.save
+				local result = row.fn()
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(fixture.calls.save, before)
+				helpers.assert_eq(fixture.state.llm_streaming, false)
+				helpers.assert_eq(fixture.persisted().llm_streaming, false)
+				helpers.assert_eq(fixture.rendered().llm_streaming, false)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("macOS acknowledged token streaming checkbox", function()
+	for _, race in ipairs({"before menu construction", "before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
+	helpers.it("preserves a real foreign master winner " .. race .. " through compensation and a fresh second click (shared-token-streaming)", function()
+		local path = require("infra.config_paths").get("ConfigTomlPath")
+		local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.display]\nstreaming = false\nstreaming_multi = true\n[private]\nfuture = 42\n'
+		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
+			or initial:gsub('enabled = true', 'enabled = false')
+		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
+		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(read_path)
+				if read_path ~= path then wrong_path = true end
+				return disk, "ok"
+			end,
+			write = function() unconditional = unconditional + 1; return false end,
+			write_if_unchanged = function(write_path, content, source)
+				if write_path ~= path then wrong_path = true end
+				attempts = attempts + 1
+				if attempts == 1 and race == "before forward acknowledgement" then disk = external end
+				if source.status ~= "ok" or source.content ~= disk then return false, "source changed" end
+				disk = content
+				return true
+			end,
+		}
+		package.loaded["infra.preferences"] = nil
+		local preferences = require("infra.preferences")
+		local ok, err = xpcall(function()
+			local _, status = preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			with_fixture({preferences = preferences, preference_source = path,
+				failures = race ~= "before forward acknowledgement" and {{name = "menu", mode = "false"}} or {},
+				after_save = function()
+					if race == "between own acknowledgement and receipt admission" then disk = external end
+				end,
+				before_menu = function(occurrence)
+					if occurrence == 1 and race == "after forward acknowledgement" then disk = external end
+				end,
+			}, function(fixture)
+				local previous_temperature = fixture.state.llm_temperature
+				if race == "before menu construction" then disk = external end
+				local row = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+				if race == "before menu construction" then
+					if row.fn then helpers.assert_eq(row.fn(), false) end
+					helpers.assert_eq(disk, external, "stale compensation cannot overwrite the foreign temperature")
+					helpers.assert_eq(row.disabled, true, "an already foreign full-document image is not action authority")
+					helpers.assert_eq(attempts, 0)
+					helpers.assert_eq(fixture.calls.save, 0)
+					helpers.assert_eq(fixture.manager.scope_idle(), true)
+					helpers.assert_eq(preferences.publication_receipt(path), {id = 0})
+					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = initial})
+					helpers.assert_eq(fixture.state.llm_temperature, previous_temperature)
+					helpers.assert_eq(fixture.runtime.llm_temperature, previous_temperature)
+					helpers.assert_eq(require("infra.toml.codec").decode(disk).llm.generation.temperature, 0.9)
+					helpers.assert_eq(unconditional, 0)
+					helpers.assert_eq(wrong_path, false)
+					return
+				end
+				helpers.assert_eq(row.disabled == true, false)
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(disk, external, "compensation cannot turn the external master on")
+				local receipt = preferences.publication_receipt(path)
+				if race == "before forward acknowledgement" then
+					helpers.assert_eq(receipt.id, 0)
+					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = external})
+				else
+					helpers.assert_eq(receipt.id, 1, "only the true owned forward save issues authority")
+					helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
+					local acknowledged = require("infra.toml.codec").decode(receipt.source.content)
+					helpers.assert_eq(acknowledged.llm.enabled, true)
+					helpers.assert_eq((acknowledged.llm.display or {}).streaming, nil, "acknowledged true follows the shared sparse default")
+					helpers.assert_eq(preferences.source_snapshot(path), receipt.source)
+				end
+				helpers.assert_eq(attempts, 1, "compensation cannot borrow a foreign source")
+				helpers.assert_eq(fixture.manager.scope_idle(), false, "refused compensation remains owned debt")
+				helpers.assert_eq(fixture.state.llm_enabled, true)
+				helpers.assert_eq(fixture.runtime.llm_enabled, true)
+				local before = attempts
+				local fresh = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+				helpers.assert_eq(fresh.disabled, true)
+				if fresh.fn then helpers.assert_eq(fresh.fn(), false) end
+				helpers.assert_eq(attempts, before)
+				helpers.assert_eq(fixture.manager.apply_setting_transaction({
+					key = "llm_streaming", value = false, runtime_fn = "set_llm_streaming", publish_setting = false,
+				}), false, "a later action cannot borrow the foreign image to settle retained debt")
+				helpers.assert_eq(attempts, before)
+				helpers.assert_eq(fixture.manager.scope_idle(), false)
+				helpers.assert_eq(disk, external)
+				helpers.assert_eq(unconditional, 0)
+				helpers.assert_eq(wrong_path, false)
+			end)
+		end, debug.traceback)
+		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		if not ok then error(err, 0) end
+	end)
+
+	end
+
+	helpers.it("refuses canonical master withdrawal independently of menu and runtime RAM (shared-token-streaming)", function()
+		local canonical = {llm_enabled = true, llm_backend = "ollama", llm_streaming = false, llm_streaming_multi = true}
+		with_fixture({preferences = {current_view = function() return clone_value(canonical), {status = "ok", content = tostring(canonical.llm_enabled)} end,
+			source_snapshot = function() return {status = "ok", content = "true"} end,
+			source_matches = function(expected, current) return expected.content == current.content end}}, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+			canonical.llm_enabled = false
+			local before = fixture.calls.save
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, before)
+			helpers.assert_eq(fixture.state.llm_enabled, true)
+			helpers.assert_eq(fixture.runtime.llm_enabled, true)
+			helpers.assert_eq(fixture.state.llm_streaming, false)
+		end)
+	end)
+
+	helpers.it("retires a held callback after actual progressive off/on transactions (shared-token-streaming)", function()
+		with_fixture({}, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+			for _, value in ipairs({false, true}) do
+				helpers.assert_eq(fixture.manager.apply_setting_transaction({
+					key = "llm_streaming_multi", value = value,
+					runtime_fn = "set_llm_streaming_multi", publish_setting = false,
+				}), true)
+			end
+			local before = fixture.calls.save
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, before)
+			helpers.assert_eq(fixture.state.llm_streaming, false)
+			helpers.assert_eq(fixture.persisted().llm_streaming, false)
+		end)
+	end)
+
+	helpers.it("refuses actual progressive runtime disagreement (shared-token-streaming)", function()
+		with_fixture({}, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+			fixture.runtime.llm_streaming_multi = false
+			local before = fixture.calls.save
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, before)
+			helpers.assert_eq(fixture.state.llm_streaming, false)
+		end)
+	end)
+
+	helpers.it("retains native rollback after false, nil or throwing durable writers (shared-token-streaming)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_fixture({failures = {{name = "save", mode = mode}}}, function(fixture)
+				local row = assert(find_item(fixture.streaming_menu(), token_streaming_corpus().row.i18n))
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.state.llm_streaming, false)
+				helpers.assert_eq(fixture.runtime.llm_streaming, false)
+				helpers.assert_eq(fixture.persisted().llm_streaming, false)
+				helpers.assert_eq(fixture.rendered().llm_streaming, false)
+				helpers.assert_eq(fixture.calls.menu, 0)
+			end)
 		end
 	end)
 end)

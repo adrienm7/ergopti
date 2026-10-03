@@ -85,8 +85,9 @@ end
 --- Persists before publishing one live display setting.
 --- @param name string
 --- @param value number|boolean
+--- @param expected_source table|nil Exact canonical snapshot for guarded menu commands.
 --- @return boolean
-function M.set(name, value)
+function M.set(name, value, expected_source)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid display setting %s=%s.", tostring(name), tostring(value))
@@ -97,7 +98,12 @@ function M.set(name, value)
 		Logger.error(LOG, "No storage; display setting '%s' was not changed.", name)
 		return false
 	end
-	local persisted = Storage.set(PREF_PREFIX .. name, value)
+	local persisted
+	if expected_source ~= nil then
+		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source)
+	else
+		persisted = Storage.set(PREF_PREFIX .. name, value)
+	end
 	if persisted ~= true then
 		Logger.error(LOG, "Display setting '%s' could not be persisted; live state is unchanged.", name)
 		return false

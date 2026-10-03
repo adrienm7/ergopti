@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "从 Karabiner 中移除 Ergopti",
 	"menu.global.restore_touchpad_gestures": "恢复 Windows 触摸板手势",
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
-	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。"
+	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。",
+	"platform_reason.token_streaming_transport_missing": "Windows 上没有: Windows 暂时无法逐个令牌显示建议。此选项保持停用。"
 }

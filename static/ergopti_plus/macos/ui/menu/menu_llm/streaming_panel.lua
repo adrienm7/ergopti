@@ -20,6 +20,8 @@ local llm_mod = require("modules.llm")
 local i18n    = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local DisplayPolicy = require("llm.display_policy")
+local Preferences = require("infra.preferences")
+local ConfigPaths = require("infra.config_paths")
 
 
 
@@ -50,26 +52,35 @@ function M.build(ctx)
 		submenu  = settings_mgr.build_indent_menu(),  -- settings_mgr's tree, handed over whole
 	})
 
-	-- Streaming flags are nil-safe: old configs without these keys default to false
-	local streaming_on       = (state.llm_streaming == true)
-	-- true = show predictions progressively as tokens arrive (per-prediction streaming)
-	local streaming_multi_on = (state.llm_streaming_multi == true)
-
-	-- Token-level streaming — only visible when multi-prediction streaming is on,
-	-- since per-token updates are meaningless in show-all-at-once mode
-	table.insert(rows, {
-		label    = i18n.get("menu.llm.show_streaming"),
-		checked  = streaming_on,
-		disabled = (is_disabled or not streaming_multi_on) or nil,
-		action   = not is_disabled and function()
-			return settings_mgr.apply_setting_transaction({
-				key = "llm_streaming",
-				value = not streaming_on,
-				runtime_fn = "set_llm_streaming",
-				publish_setting = false,
-			})
-		end or nil,
-	})
+	local function streaming_snapshot()
+		local snapshot = llm_mod.streaming_snapshot()
+		local source = settings_mgr.setting_snapshot("llm_streaming_multi")
+		local canonical, canonical_source = Preferences.current_view(ConfigPaths.get("ConfigTomlPath"))
+		snapshot.source = Preferences.source_snapshot(ConfigPaths.get("ConfigTomlPath"))
+		if source then
+			snapshot.owner = source.owner
+			snapshot.generation = snapshot.generation + source.generation
+		end
+		snapshot.platform = "hs"
+		if type(ctx.is_paused) == "function" then snapshot.paused = ctx.is_paused() end
+		snapshot.progressive = state.llm_streaming_multi
+		local function current_boolean(key)
+			if canonical == nil then return nil end
+			if canonical[key] == nil then return llm_mod.DEFAULT_STATE[key] end
+			return canonical[key]
+		end
+		snapshot.blocked = snapshot.blocked == true or ctx.is_disabled == true
+			or source == nil or source.value ~= snapshot.progressive
+			or not Preferences.source_matches(snapshot.source, canonical_source)
+			or canonical == nil or current_boolean("llm_enabled") ~= snapshot.enabled
+			or current_boolean("llm_streaming") ~= snapshot.streaming
+			or current_boolean("llm_streaming_multi") ~= snapshot.progressive
+			or (canonical and canonical.llm_backend ~= nil and canonical.llm_backend ~= snapshot.backend)
+			or state.llm_enabled ~= snapshot.enabled or state.llm_backend ~= snapshot.backend
+			or state.llm_streaming ~= snapshot.streaming
+		return snapshot
+	end
+	local streaming_source = streaming_snapshot()
 
 	local function show_all_ready()
 		return DisplayPolicy.ready(state.llm_num_predictions,
@@ -88,6 +99,36 @@ function M.build(ctx)
 					publish_setting = false,
 				})
 			end,
+			["llm_token_streaming"] = function()
+				local current = streaming_snapshot()
+				if not Preferences.source_matches(streaming_source.source, current.source) then return false end
+				local decision = DisplayPolicy.streaming_intent(streaming_source, current)
+				if decision.admitted ~= true then return false end
+				local path, expected_source = ConfigPaths.get("ConfigTomlPath"), current.source
+				local before_id
+				local function publication_guard(phase)
+					if phase == "before" then
+						local _, source = Preferences.current_view(path)
+						if not Preferences.source_matches(expected_source, source) then return false end
+						local receipt = Preferences.publication_receipt(path)
+						if type(receipt) ~= "table" or type(receipt.id) ~= "number" or receipt.id < 0
+							or receipt.id ~= math.floor(receipt.id) then return false end
+						before_id = receipt.id
+						return true
+					end
+					if phase ~= "acknowledged" then return false end
+					local receipt = Preferences.publication_receipt(path)
+					if not receipt or receipt.id ~= before_id + 1
+						or not Preferences.source_matches(receipt.source, receipt.source) then return false end
+					expected_source = receipt.source
+					return true
+				end
+				return settings_mgr.apply_setting_transaction({
+					key = "llm_streaming", value = decision.value,
+					runtime_fn = "set_llm_streaming", publish_setting = false,
+					publication_guard = publication_guard,
+				})
+			end,
 			["llm_info_bar"] = function()
 				return settings_mgr.apply_setting_transaction({
 					key = "llm_show_info_bar",
@@ -100,6 +141,11 @@ function M.build(ctx)
 		state_getters = {
 			["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(state.llm_streaming_multi) end,
 			["llm_show_all_ready"] = show_all_ready,
+			["llm_token_streaming_enabled"] = function()
+				return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
+					and streaming_source.streaming == true
+			end,
+			["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
 			["llm_info_bar_enabled"] = function() return state.llm_show_info_bar end,
 			["llm_info_bar_ready"] = function() return not is_disabled end,
 		},

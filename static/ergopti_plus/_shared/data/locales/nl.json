@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Ergopti uit Karabiner verwijderen",
 	"menu.global.restore_touchpad_gestures": "Windows-touchpadgebaren herstellen",
 	"dialog.start_at_login.failed": "Automatisch starten kon niet worden gewijzigd. Controleer de opstartinstellingen van het systeem.",
-	"onboarding.error.open_failed": "De configuratiewizard kon niet worden geopend. Controleer de logboeken en probeer het opnieuw via het menu."
+	"onboarding.error.open_failed": "De configuratiewizard kon niet worden geopend. Controleer de logboeken en probeer het opnieuw via het menu.",
+	"platform_reason.token_streaming_transport_missing": "Niet op Windows: Windows kan suggesties nog niet token voor token tonen. Deze optie blijft inactief."
 }
