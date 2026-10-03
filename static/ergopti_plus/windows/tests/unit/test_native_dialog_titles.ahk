@@ -351,23 +351,30 @@ _NDT_FolderPickerProbeSource(Artifact, Owner) {
 		. '#Include ' . Owner . "`n"
 }
 
-/**
- * Runs native dialogs with independent captions for default and customized policy.
- * Both native return shapes and exact input defaults remain observable.
- */
-_NDT_ActualNativeCaptionsAndResults() {
-	global _StaticDir
-	Root := A_Temp . "\ergopti_native_dialogs_" . A_ScriptHwnd . "_" . A_TickCount
-	AssertFalse(DirExist(Root), "the native-dialog fixture must be privately owned")
-	DirCreate(Root)
-	Ownership := {CanRetire: true}
-	Cases := [
+/** Returns fresh independent expected captions for every supported policy variant. */
+_NDT_PolicyCases() {
+	return [
 		{Prefix: "ErgoptiPlus", Separator: " — ", Expected: "ErgoptiPlus — Navigation layer"},
 		{Prefix: "", Separator: " — ", Expected: "Navigation layer"},
 		{Prefix: "Other product", Separator: ": ", Expected: "Other product: Navigation layer"},
 		{Prefix: 'Quoted "product" ``name``', Separator: "", Expected: 'Quoted "product" ``name``Navigation layer'},
 		{Prefix: "Other `; product", Separator: " `; ", Expected: "Other `; product `; Navigation layer"}
 	]
+}
+
+
+/**
+ * Owns generated artifacts and exact child retirement for one native UI family.
+ * @param {string} Family - Distinct privately owned fixture namespace.
+ * @param {Func} CheckPolicy - Performs every original assertion for one policy.
+ */
+_NDT_RunPolicyFamily(Family, CheckPolicy) {
+	global _StaticDir
+	Root := A_Temp . "\ergopti_native_" . Family . "_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the native-dialog fixture must be privately owned")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	Cases := _NDT_PolicyCases()
 	try {
 		Policies := "["
 		for Index, Spec in Cases {
@@ -394,106 +401,145 @@ _NDT_ActualNativeCaptionsAndResults() {
 		for Index, Spec in Cases {
 			Fixture := Root . "\" . Index
 			Artifact := Fixture . "\static\ergopti_plus\windows\_generated\window_titles.ahk"
-			Harness := Fixture . "\native_dialogs.ahk"
-			FileAppend(_NDT_ProbeSource(Artifact, Owner), Harness, "UTF-8")
-			AssertEqual("dialogs-written", _NDT_RunChild(A_AhkPath,
-				["/ErrorStdOut", Harness, Fixture, Index == 1 ? "delay" : "immediate"], Ownership), "native dialogs acknowledge private receipts with ASCII stdout")
-			for Kind in ["message", "input", "unnamed", "cancelled"] {
-				Caption := Fixture . "\" . Kind . ".title"
-				Body := Fixture . "\" . Kind . ".body"
-				AssertTrue(FileExist(Caption), "an actual visible native " . Kind . " window was captured")
-				Expected := Kind == "unnamed" ? Spec.Prefix : Spec.Expected
-				AssertEqual(Expected, FileRead(Caption, "UTF-8"),
-					"actual " . Kind . " caption follows independent private policy " . Index)
-				Assert(InStr(FileRead(Body, "UTF-8"), "Preserved " . Kind . " body") > 0,
-					"branding never changes the native dialog body")
-			}
-			AssertEqual("Timeout", FileRead(Fixture . "\message.result", "UTF-8"),
-				"message button/options forwarding preserves the native timeout result")
-			if Index == 1 {
-				AssertEqual("retired", FileRead(Fixture . "\message.retirement", "UTF-8"),
-					"native observations survive persistence after the exact dialog has timed out")
-				; Move one native read across the actual modal completion boundary.
-				; The same T0.5 result acknowledges retirement before persistence,
-				; so the original target exception must reject the independent read.
-				MutantRoot := Fixture . "\expired_read"
-				DirCreate(MutantRoot)
-				Mutant := StrReplace(_NDT_ProbeSource(Artifact, Owner),
-					'Captured := _NDTSnapshot',
-					'Captured := _NDTSnapshot' . "`n"
-						. 'if InStr(_NDTReceipt, "\message")' . "`n"
-						. 'WinGetText("ahk_id " . Captured.Hwnd)', , &Mutations)
-				AssertEqual(1, Mutations, "the expiry mutation changes one exact native observation")
-				MutantHarness := MutantRoot . "\expired_read.ahk"
-				FileAppend(Mutant, MutantHarness, "UTF-8")
-				AssertEqual("Target window not found.", _NDT_RunChild(A_AhkPath,
-					["/ErrorStdOut", MutantHarness, MutantRoot, "immediate"], Ownership, 2),
-					"the independent expired-window mutation reproduces the original rejected target query")
-			}
-			AssertEqual("yes|no|7", FileRead(Fixture . "\message.buttons", "UTF-8"),
-				"the native message retains Yes/No buttons and the second default button")
-			AssertEqual("Timeout`n Secret value ", FileRead(Fixture . "\input.result", "UTF-8"),
-				"password/size/timeout forwarding preserves result and exact default text")
-			AssertEqual("password", FileRead(Fixture . "\input.password", "UTF-8"),
-				"the actual native input control preserves password masking")
-			AssertEqual("Timeout", FileRead(Fixture . "\unnamed.result", "UTF-8"),
-				"an omitted caption preserves native options and return values")
-			AssertEqual("Cancel`n Secret value ", FileRead(Fixture . "\cancelled.result", "UTF-8"),
-				"closing the native input window preserves cancellation and exact entered text")
-			PickerRoot := Fixture . "\file_picker"
-			DirCreate(PickerRoot)
-			PickerHarness := PickerRoot . "\file_picker.ahk"
-			FileAppend(_NDT_FilePickerProbeSource(Artifact, Owner), PickerHarness, "UTF-8")
-			AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
-				["/ErrorStdOut", PickerHarness, PickerRoot], Ownership),
-				"the actual native file picker completes without hidden errors")
-			for Kind in ["selected", "cancelled"] {
-				AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
-					"the real file picker caption follows independent policy " . Index)
-				Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
-					"the actual native picker retains the display label and filter pattern (" . Kind
-						. ", policy " . Index . ", owned HWND control classes/IDs: "
-						. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8") . ")")
-			}
-			AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
-				FileRead(PickerRoot . "\selected.result", "UTF-8"),
-				"native options, initial file and default name select the exact privately owned path")
-			AssertEqual("Array|0", FileRead(PickerRoot . "\cancelled.result", "UTF-8"),
-				"multiselect cancellation retains the original empty native Array shape")
-			FolderRoot := Fixture . "\folder_picker"
-			DirCreate(FolderRoot)
-			FolderHarness := FolderRoot . "\folder_picker.ahk"
-			FileAppend(_NDT_FolderPickerProbeSource(Artifact, Owner), FolderHarness, "UTF-8")
-			AssertEqual("folders-written", _NDT_RunChild(A_AhkPath,
-				["/ErrorStdOut", FolderHarness, FolderRoot], Ownership),
-				"actual folder callbacks complete without hidden errors")
-			for Kind in ["selected", "cancelled"] {
-				AssertEqual(Spec.Expected, FileRead(FolderRoot . "\" . Kind . ".title", "UTF-8"),
-					"the real folder caption follows independent shared policy " . Index)
-				Assert(InStr(FileRead(FolderRoot . "\" . Kind . ".body", "UTF-8"),
-					"ErgoptiPlus — preserved folder body") > 0, "caption changes never rewrite the explanatory folder body")
-				Assert(Integer(FileRead(FolderRoot . "\" . Kind . ".lease", "UTF-8")) > 0,
-					"the visible native folder carries its exact initialization lease")
-				AssertEqual("retired", FileRead(FolderRoot . "\" . Kind . ".retirement", "UTF-8"),
-					"native selection and cancellation acknowledge actual modal HWND retirement")
-			}
-			AssertEqual(FileRead(FolderRoot . "\owned.path", "UTF-8"),
-				FileRead(FolderRoot . "\selected.result", "UTF-8"),
-				"initial-only navigation selects the exact independently canonical native folder")
-			AssertEqual("String|", FileRead(FolderRoot . "\cancelled.result", "UTF-8"),
-				"folder cancellation preserves its original empty String result")
-			AssertEqual("0", FileRead(FolderRoot . "\selected.edits", "UTF-8"),
-				"option1 retains the native dialog without an edit box")
-			Assert(Integer(FileRead(FolderRoot . "\cancelled.edits", "UTF-8")) > 0,
-				"option3 retains the native edit-box control")
+			CheckPolicy.Call(Index, Spec, Fixture, Artifact, Owner, Ownership)
 		}
 	} finally {
 		if Ownership.CanRetire
 			DirDelete(Root, true)
 	}
 }
+
+
+/** Preserves all actual message/input, timeout and expired-read assertions. */
+_NDT_CheckDialogPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	Harness := Fixture . "\native_dialogs.ahk"
+	FileAppend(_NDT_ProbeSource(Artifact, Owner), Harness, "UTF-8")
+	AssertEqual("dialogs-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", Harness, Fixture, Index == 1 ? "delay" : "immediate"], Ownership), "native dialogs acknowledge private receipts with ASCII stdout")
+	for Kind in ["message", "input", "unnamed", "cancelled"] {
+		Caption := Fixture . "\" . Kind . ".title"
+		Body := Fixture . "\" . Kind . ".body"
+		AssertTrue(FileExist(Caption), "an actual visible native " . Kind . " window was captured")
+		Expected := Kind == "unnamed" ? Spec.Prefix : Spec.Expected
+		AssertEqual(Expected, FileRead(Caption, "UTF-8"),
+			"actual " . Kind . " caption follows independent private policy " . Index)
+		Assert(InStr(FileRead(Body, "UTF-8"), "Preserved " . Kind . " body") > 0,
+			"branding never changes the native dialog body")
+	}
+	AssertEqual("Timeout", FileRead(Fixture . "\message.result", "UTF-8"),
+		"message button/options forwarding preserves the native timeout result")
+	if Index == 1 {
+		AssertEqual("retired", FileRead(Fixture . "\message.retirement", "UTF-8"),
+			"native observations survive persistence after the exact dialog has timed out")
+		; Move one native read across the actual modal completion boundary.
+		; The same T0.5 result acknowledges retirement before persistence,
+		; so the original target exception must reject the independent read.
+		MutantRoot := Fixture . "\expired_read"
+		DirCreate(MutantRoot)
+		Mutant := StrReplace(_NDT_ProbeSource(Artifact, Owner),
+			'Captured := _NDTSnapshot',
+			'Captured := _NDTSnapshot' . "`n"
+				. 'if InStr(_NDTReceipt, "\message")' . "`n"
+				. 'WinGetText("ahk_id " . Captured.Hwnd)', , &Mutations)
+		AssertEqual(1, Mutations, "the expiry mutation changes one exact native observation")
+		MutantHarness := MutantRoot . "\expired_read.ahk"
+		FileAppend(Mutant, MutantHarness, "UTF-8")
+		AssertEqual("Target window not found.", _NDT_RunChild(A_AhkPath,
+			["/ErrorStdOut", MutantHarness, MutantRoot, "immediate"], Ownership, 2),
+			"the independent expired-window mutation reproduces the original rejected target query")
+	}
+	AssertEqual("yes|no|7", FileRead(Fixture . "\message.buttons", "UTF-8"),
+		"the native message retains Yes/No buttons and the second default button")
+	AssertEqual("Timeout`n Secret value ", FileRead(Fixture . "\input.result", "UTF-8"),
+		"password/size/timeout forwarding preserves result and exact default text")
+	AssertEqual("password", FileRead(Fixture . "\input.password", "UTF-8"),
+		"the actual native input control preserves password masking")
+	AssertEqual("Timeout", FileRead(Fixture . "\unnamed.result", "UTF-8"),
+		"an omitted caption preserves native options and return values")
+	AssertEqual("Cancel`n Secret value ", FileRead(Fixture . "\cancelled.result", "UTF-8"),
+		"closing the native input window preserves cancellation and exact entered text")
+}
+
+
+/** Preserves all actual file captions, filters, selection and cancellation assertions. */
+_NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	PickerRoot := Fixture . "\file_picker"
+	DirCreate(PickerRoot)
+	PickerHarness := PickerRoot . "\file_picker.ahk"
+	FileAppend(_NDT_FilePickerProbeSource(Artifact, Owner), PickerHarness, "UTF-8")
+	AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", PickerHarness, PickerRoot], Ownership),
+		"the actual native file picker completes without hidden errors")
+	for Kind in ["selected", "cancelled"] {
+		AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
+			"the real file picker caption follows independent policy " . Index)
+		Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
+			"the actual native picker retains the display label and filter pattern (" . Kind
+				. ", policy " . Index . ", owned HWND control classes/IDs: "
+				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8") . ")")
+	}
+	AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
+		FileRead(PickerRoot . "\selected.result", "UTF-8"),
+		"native options, initial file and default name select the exact privately owned path")
+	AssertEqual("Array|0", FileRead(PickerRoot . "\cancelled.result", "UTF-8"),
+		"multiselect cancellation retains the original empty native Array shape")
+}
+
+
+/** Preserves all actual folder captions, controls, leases and retirement assertions. */
+_NDT_CheckFolderPickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	FolderRoot := Fixture . "\folder_picker"
+	DirCreate(FolderRoot)
+	FolderHarness := FolderRoot . "\folder_picker.ahk"
+	FileAppend(_NDT_FolderPickerProbeSource(Artifact, Owner), FolderHarness, "UTF-8")
+	AssertEqual("folders-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", FolderHarness, FolderRoot], Ownership),
+		"actual folder callbacks complete without hidden errors")
+	for Kind in ["selected", "cancelled"] {
+		AssertEqual(Spec.Expected, FileRead(FolderRoot . "\" . Kind . ".title", "UTF-8"),
+			"the real folder caption follows independent shared policy " . Index)
+		Assert(InStr(FileRead(FolderRoot . "\" . Kind . ".body", "UTF-8"),
+			"ErgoptiPlus — preserved folder body") > 0, "caption changes never rewrite the explanatory folder body")
+		Assert(Integer(FileRead(FolderRoot . "\" . Kind . ".lease", "UTF-8")) > 0,
+			"the visible native folder carries its exact initialization lease")
+		AssertEqual("retired", FileRead(FolderRoot . "\" . Kind . ".retirement", "UTF-8"),
+			"native selection and cancellation acknowledge actual modal HWND retirement")
+	}
+	AssertEqual(FileRead(FolderRoot . "\owned.path", "UTF-8"),
+		FileRead(FolderRoot . "\selected.result", "UTF-8"),
+		"initial-only navigation selects the exact independently canonical native folder")
+	AssertEqual("String|", FileRead(FolderRoot . "\cancelled.result", "UTF-8"),
+		"folder cancellation preserves its original empty String result")
+	AssertEqual("0", FileRead(FolderRoot . "\selected.edits", "UTF-8"),
+		"option1 retains the native dialog without an edit box")
+	Assert(Integer(FileRead(FolderRoot . "\cancelled.edits", "UTF-8")) > 0,
+		"option3 retains the native edit-box control")
+}
+
+
+/** Actual message/input qualification remains independent of either picker. */
+_NDT_ActualNativeCaptionsAndResults() {
+	_NDT_RunPolicyFamily("dialogs", _NDT_CheckDialogPolicy)
+}
 Test("native dialogs: actual captions and results follow customized shared policy (shared-window-titles)",
 	_NDT_ActualNativeCaptionsAndResults)
+
+
+/** An exact file-filter refusal cannot prevent the real folder family from running. */
+_NDT_ActualNativeFilePickerCaptionsAndResults() {
+	_NDT_RunPolicyFamily("file_picker", _NDT_CheckFilePickerPolicy)
+}
+Test("native file picker: actual captions, filters and results follow customized shared policy (shared-window-titles)",
+	_NDT_ActualNativeFilePickerCaptionsAndResults)
+
+
+/** Every folder policy executes through the actual owned SHBrowseForFolderW ABI. */
+_NDT_ActualNativeFolderPickerCaptionsAndResults() {
+	_NDT_RunPolicyFamily("folder_picker", _NDT_CheckFolderPickerPolicy)
+}
+Test("native folder picker: actual captions, leases and retirement follow customized shared policy (shared-window-titles)",
+	_NDT_ActualNativeFolderPickerCaptionsAndResults)
+
 
 
 /**

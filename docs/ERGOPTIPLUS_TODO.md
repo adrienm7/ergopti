@@ -1373,6 +1373,14 @@ cases pass, but the earlier filter failure prevents the real folder UI cases.
 The next Windows checkpoint must establish the actual control structure before
 repairing its observation; neither the filter cause nor folder UI is qualified.
 
+Windows native message/input dialogs, file pickers and folder pickers now have
+independently registered policy cases. A file-filter assertion can no longer
+prevent real folder UI measurement. Each family retains all five original
+policy variants, exact assertions and native process arguments; the generated
+fixtures and child-retirement owner are unchanged. Seven independent coupling
+mutations fail the isolation guard. Local 353 JavaScript and encoding checks
+pass; actual file-filter semantics and real folder UI still await native CI.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
