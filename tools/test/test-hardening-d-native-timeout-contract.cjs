@@ -324,6 +324,33 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 {
 	const file = 'tools/diagnostics/hs_delayed_timer_probe.py';
 	const source = read(path.join(ROOT, file));
+	// Python formatting may wrap this binding; its exact owner and uniqueness remain mandatory.
+	const usesNativeTimeoutOwner = (script) =>
+		[
+			...script.matchAll(
+				/"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\s*str\(NO_PROMPT_NATIVE_TIMEOUT_SECONDS\)/g
+			)
+		].length === 1;
+	const compactBinding =
+		'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)';
+	for (const [binding, expected] of [
+		[compactBinding, true],
+		[
+			'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\n                str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)',
+			true
+		],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)', false],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", 8', false],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS_FUTURE)', false],
+		['"__FOREIGN_TIMEOUT__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)', false],
+		[`${compactBinding}\n${compactBinding}`, false],
+		['', false]
+	]) {
+		if (usesNativeTimeoutOwner(binding) !== expected)
+			errors.push(
+				`${file}: native timeout-owner recognition failed its independent binding fixture`
+			);
+	}
 	const seconds = (name) => {
 		const match = source.match(new RegExp(`^${name} = ([\\d.]+)$`, 'm'));
 		if (!match) {
@@ -350,9 +377,7 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 				nativeScript,
 				'event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __NO_PROMPT_NATIVE_TIMEOUT_SECONDS__, error)'
 			) !== 1 ||
-			!/"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str\(NO_PROMPT_NATIVE_TIMEOUT_SECONDS\)/.test(
-				nativeScript
-			)
+			!usesNativeTimeoutOwner(nativeScript)
 		) {
 			errors.push(
 				`${file}: the outer executor and inner native send no longer spend their declared owners`

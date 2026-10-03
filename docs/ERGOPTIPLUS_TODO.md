@@ -392,6 +392,8 @@ A separate bounded Cocoa calibration now compares the current Ref out-slot with 
 
 TODO 16 remains partial: the compiled-startup admission C# fixture now normalizes its actual own executable through checked native GetLongPathNameW, matching the pinned AHK receipt producer. A native controlled short-alias child requires independent open-file volume/index equality and an exact long-path receipt before admission; foreign same-basename files, invalid paths and unknown modes remain refused. The validator, workflow and cleanup authority are unchanged. Portable admission and producer mutation checks pass; native Windows execution of the corrected positive and all seven negative scenarios, followed by the real compiled installer launch, remains pending. Historical native failure on run 37142330761 is preserved.
 
+The supplemental packaged AppleEvent decoder now uses the NSError object holder qualified by actual Cocoa calibration, and projects nullable descriptors only after native bridge provenance and exact nil acknowledgement. Raw callable bridge types remain separate closed facts. The original unscoped/PID sender bodies, constructor, send options and 8-second native / 10-second outer deadlines remain unchanged. The 96 Python regressions include exact generated-source Foundation-port replay, strict malformed/class/type/provenance refusals, and mandatory server-witness admission. Native qualification of the corrected sender and complete packaged launch remains pending; calibration does not acknowledge transport or readiness.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

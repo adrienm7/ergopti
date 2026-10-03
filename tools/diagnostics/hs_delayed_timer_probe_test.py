@@ -656,7 +656,12 @@ def supplemental_scalar_packets(scope, sender_pid, status):
             "domain": {"type": "string", "matches": True},
             "int32": {"type": "number", "integer": -50},
             "nil_ref": {"type": "undefined", "absent": True},
-            "absent_errn": {"type": "object", "absent": True},
+            "absent_errn": {
+                "raw_type": "function",
+                "type": "object",
+                "native_absent": True,
+                "absent": True,
+            },
         },
     )
     branch = "send" if status != 0 else "handler"
@@ -672,7 +677,14 @@ def supplemental_scalar_packets(scope, sender_pid, status):
             "domain": {"type": "string", "recognized": True},
         }
         if status != 0
-        else {"errn": {"type": "object", "absent": True}},
+        else {
+            "errn": {
+                "raw_type": "function",
+                "type": "object",
+                "native_absent": True,
+                "absent": True,
+            }
+        },
     )
     for name, packet in (("scalar.json", scalar), ("decoder.json", decoder)):
         if name in scope.allowed_names:
@@ -2215,9 +2227,11 @@ class SupplementalScalarBranchTests(unittest.TestCase):
             for expression in (
                 "$.NSError.errorWithDomainCodeUserInfo",
                 "$.NSAppleEventDescriptor.descriptorWithInt32(-50)",
-                "Number(nativeError.code)",
+                "var rawCode = nativeError.code;",
+                "Number(rawCode)",
                 "ObjC.unwrap(nativeError.domain)",
-                "Number(errorNumber.int32Value)",
+                "var rawInt32 = errorNumber.int32Value;",
+                "Number(rawInt32)",
                 "recordDecoderBoundary('send', 'code_entered')",
                 "recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status))",
             ):
@@ -2244,10 +2258,12 @@ class SupplementalScalarBranchTests(unittest.TestCase):
         """Execute exact generated source against independent Foundation ports, never Cocoa."""
         port = r"""
 const fs = require('fs');
-const nil = {isNil:()=>true};
+const native = new WeakSet();
+function wrap(value) { native.add(value); return value; }
+const nil = wrap({isNil:()=>true});
 const mode = __MODE__;
 let sends = 0;
-function $(...args) { if(args.length) throw Error('Unexpected nil constructor'); return nil; }
+function $(...args) { if(args.length) throw Error('Unexpected nil constructor'); return wrap({isNil:()=>true}); }
 $.NSUTF8StringEncoding=4;
 $.NSProcessInfo={processInfo:{processIdentifier:31415}};
 $.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
@@ -2258,9 +2274,9 @@ $.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
         fs.writeFileSync(path,text); return true;
     }};
 }})};
-function nativeError(code) { return {isNil:()=>false,code:code,domain:'NSOSStatusErrorDomain'}; }
+function nativeError(code) { return wrap({isNil:()=>false,isKindOfClass:klass=>klass===$.NSError,code:code,domain:'NSOSStatusErrorDomain'}); }
 $.NSError={errorWithDomainCodeUserInfo:(domain,code,userInfo)=>{
-    if(domain!=='NSOSStatusErrorDomain'||code!==-1712||userInfo!==nil) throw Error('NSError constructor changed');
+    if(domain!=='NSOSStatusErrorDomain'||code!==-1712||userInfo.isNil()!==true) throw Error('NSError constructor changed');
     return nativeError(mode==='invalid_scalar'?undefined:code);
 }};
 $.NSAppleEventDescriptor={
@@ -2278,13 +2294,13 @@ $.NSAppleEventDescriptor={
             if(options!==131075||timeout!==8) throw Error('Native deadline/options changed'); sends++;
             if(mode==='handler') return {isNil:()=>false,paramDescriptorForKeyword:key=>{
                 if(key!==0x6572726e) throw Error('Handler errn key changed');
-                return {isNil:()=>false,int32Value:-50};
+                return wrap({isNil:()=>false,isKindOfClass:klass=>klass===$.NSAppleEventDescriptor,int32Value:-50});
             }};
-            error[0]=nativeError(mode==='invalid_send'?undefined:-1712); return nil;
+            Object.assign(error,nativeError(mode==='invalid_send'?undefined:-1712)); return nil;
         }};
     }
 };
-const ObjC={import:name=>{if(name!=='Foundation') throw Error('Import changed');},unwrap:value=>value};
+const ObjC={import:name=>{if(name!=='Foundation') throw Error('Import changed');},unwrap:value=>value,castObjectToRef:value=>{if(!native.has(value))throw Error('Native provenance refused');return {};}};
 const Ref=()=>({});
 __SCRIPT__
 try { const result=run(['42','return "fixture"',__NONCE__]); process.stdout.write(result+'\n'); }
@@ -2445,7 +2461,7 @@ class SupplementalScalarFactSummaryTests(unittest.TestCase):
 class NSErrorOutSlotCalibrationTests(unittest.TestCase):
     """Execute exact supplemental source against independent bridge identity ports."""
 
-    def run_source(self, scope, mode="native"):
+    def run_source(self, scope, mode="native", capture=False):
         port = r"""
 const fs=require('fs');
 const mode=__MODE__;
@@ -2510,21 +2526,43 @@ $.NSAppleEventDescriptor={
         },
         sendEventWithOptionsTimeoutError:(options,timeout,out)=>{
             if(options!==131075||timeout!==8) throw Error('Original admission/budget changed');
-            sends++; out[0]=wrapper(false,null); return nil;
+            sends++;
+            if(mode==='handler_valid'||mode==='handler_nil'||mode==='handler_forged'||mode==='handler_forged_nil'||mode==='handler_boolean') {
+                const handler=wrapper(false,$.NSAppleEventDescriptor);
+                handler.paramDescriptorForKeyword=key=>{
+                    if(key===0x2d2d2d2d) { const text=wrapper(false,$.NSAppleEventDescriptor); text.stringValue=__NONCE__; return text; }
+                    if(key!==0x6572726e) throw Error('Unexpected handler keyword');
+                    if(mode==='handler_nil') return nil;
+                    if(mode==='handler_forged'||mode==='handler_forged_nil') { const fake=function(){}; fake.isNil=()=>mode==='handler_forged_nil'; fake.int32Value=-50; return fake; }
+                    const descriptor=wrapper(false,$.NSAppleEventDescriptor);
+                    descriptor.int32Value=mode==='handler_boolean'?true:-50;
+                    return descriptor;
+                };
+                return handler;
+            }
+            if(out.rawRef===true) { out[0]=wrapper(false,null); return nil; }
+            if(!native.has(out)) throw Error('Expected exact native NSError object holder');
+            out.isNil=()=>mode==='send_nil';
+            out.isKindOfClass=klass=>mode!=='send_wrong_class'&&klass===NSError;
+            out.code=mode==='send_boolean'?true:mode==='send_string'?'-1712':mode==='send_valid'||mode==='send_wrong_class'||mode==='send_nil'||mode==='send_other_domain'||mode==='send_missing_domain'?-1712:NaN;
+            out.domain=mode==='send_other_domain'?'NSCocoaErrorDomain':mode==='send_missing_domain'?'':mode.startsWith('send_')?'NSOSStatusErrorDomain':undefined;
+            return nil;
         }
     })
 };
 const ObjC={import:name=>{if(name!=='Foundation')throw Error('Import changed');},unwrap:value=>value,
     castObjectToRef:value=>{if(!native.has(value))throw Error('Not a native ObjC wrapper');return {};}};
 __SCRIPT__
-try { run(['42','return "fixture"',__NONCE__]); }
-catch(error) { /* Keep the original unknown AppleEvent status a refusal. */ }
-process.stdout.write(JSON.stringify({parses:parses,sends:sends})+'\n');
+let output=null,refused=false;
+try { output=run(['42','return "fixture"',__NONCE__]); }
+catch(error) { refused=true; /* Keep every unknown AppleEvent status a refusal. */ }
+process.stdout.write(JSON.stringify({parses:parses,sends:sends,...(__CAPTURE__?{output:output,refused:refused}:{})})+'\n');
 """
         source = (
             port.replace("__MODE__", json.dumps(mode))
             .replace("__SCRIPT__", probe.NativeDelayedTimerProbe.no_prompt_script(scope))
             .replace("__NONCE__", json.dumps(NONCE))
+            .replace("__CAPTURE__", json.dumps(capture))
         )
         result = subprocess.run(
             ["node", "-"], input=source, text=True, capture_output=True, timeout=5
@@ -2537,7 +2575,9 @@ process.stdout.write(JSON.stringify({parses:parses,sends:sends})+'\n');
         scope.bind_sender(SENDER_PID)
         return scope
 
-    def test_object_holder_calibration_retains_actual_callable_nil_without_admitting_event(self):
+    def test_object_holder_calibration_retains_actual_callable_nil_without_admitting_event(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as folder:
             scope = self.scope(folder)
             observations = self.run_source(scope)
@@ -2557,10 +2597,15 @@ process.stdout.write(JSON.stringify({parses:parses,sends:sends})+'\n');
                 },
             )
             self.assertIn("qualified=true", scope.calibration_evidence())
-            # The known real Cocoa packet stays unqualified under the original raw-type policy.
+            # The calibrated native nullable projection qualifies controls only: the unknown
+            # actual send status still cannot acknowledge transport or readiness.
             original = scope.scalar_evidence()
-            self.assertFalse(original["scalar_qualified"])
-            self.assertIn("absent_errn(type=function,absent=true)", original["scalar_facts"])
+            self.assertTrue(original["scalar_qualified"])
+            self.assertIn("absent_errn(type=object,absent=true)", original["scalar_facts"])
+            self.assertIn(
+                "absent_errn_bridge(raw_type=function,native_absent=true)",
+                original["scalar_facts"],
+            )
             self.assertIn("code(type=number,integer=unavailable)", original["decoder_facts"])
             with self.assertRaises(ValueError):
                 scope.observe(
@@ -2678,6 +2723,167 @@ process.stdout.write(JSON.stringify({parses:parses,sends:sends})+'\n');
             with self.assertRaisesRegex(ValueError, "actual bound sender"):
                 scope.calibration_evidence()
             scope.cleanup()
+
+
+class QualifiedNSErrorOwnerTests(unittest.TestCase):
+    """Replay calibrated bridge representations through the exact original decoder."""
+
+    scope = NSErrorOutSlotCalibrationTests.scope
+    run_source = NSErrorOutSlotCalibrationTests.run_source
+
+    def test_actual_object_holder_retains_native_send_refusal_without_server_acknowledgement(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            result = self.run_source(scope, "send_valid", capture=True)
+            self.assertFalse(result["refused"])
+            native = probe.validate_no_prompt_receipt(result["output"] + "\n", NONCE, 42)
+            self.assertEqual(native["status"], -1712)
+            self.assertEqual(native["outcome"], "refused")
+            self.assertEqual(native["error_domain"], "NSOSStatusErrorDomain")
+            observed = scope.observe(terminal=True, native=native)
+            self.assertTrue(observed["scalar_qualified"])
+            self.assertEqual(observed["decoder_boundary"], "domain_returned")
+            self.assertEqual(observed["server"], "not_observed")
+            self.assertEqual(
+                scope.read("scalar.json")["facts"]["absent_errn"],
+                {
+                    "raw_type": "function",
+                    "type": "object",
+                    "native_absent": True,
+                    "absent": True,
+                },
+            )
+            self.assertIn("raw_type=function", observed["scalar_facts"])
+            self.assertNotIn("denied", str(observed))
+            scope.cleanup()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_real_handler_descriptor_and_nullable_reply_preserve_mandatory_server_proof(
+        self,
+    ):
+        for mode, status in (("handler_valid", -50), ("handler_nil", 0)):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                result = self.run_source(scope, mode, capture=True)
+                self.assertFalse(result["refused"])
+                native = probe.validate_no_prompt_receipt(result["output"] + "\n", NONCE, 42)
+                self.assertEqual(native["status"], status)
+                self.assertEqual(
+                    scope.read("decoder.json")["facts"]["errn"],
+                    {
+                        "raw_type": "function",
+                        "type": "object" if status == 0 else "function",
+                        "native_absent": status == 0,
+                        "absent": status == 0,
+                    },
+                )
+                self.assertTrue(
+                    scope.scalar_evidence(terminal=True, native=native)["scalar_qualified"]
+                )
+                if status == 0:
+                    with self.assertRaisesRegex(ValueError, "incomplete server witnesses"):
+                        scope.observe(terminal=True, native=native, require_completion=True)
+                else:
+                    self.assertEqual(
+                        scope.observe(terminal=True, native=native)["server"],
+                        "not_observed",
+                    )
+                scope.cleanup()
+
+    def test_missing_native_error_identity_integer_and_domain_refuse_actual_generated_owner(
+        self,
+    ):
+        for mode in (
+            "send_nil",
+            "send_wrong_class",
+            "send_boolean",
+            "send_string",
+            "send_missing_domain",
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                result = self.run_source(scope, mode, capture=True)
+                self.assertEqual(result["sends"], 1)
+                self.assertTrue(result["refused"])
+                self.assertIsNone(result["output"])
+                observed = scope.observe()
+                self.assertEqual(observed["server"], "not_observed")
+                self.assertNotIn("denied", str(observed))
+                self.assertNotIn(NONCE, str(observed))
+                scope.cleanup()
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_actual_non_osstatus_error_domain_is_retained_without_tcc_classification(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            result = self.run_source(scope, "send_other_domain", capture=True)
+            self.assertFalse(result["refused"])
+            native = probe.validate_no_prompt_receipt(result["output"] + "\n", NONCE, 42)
+            self.assertEqual(native["error_domain"], "NSCocoaErrorDomain")
+            self.assertEqual(native["outcome"], "refused")
+            self.assertEqual(scope.observe(terminal=True, native=native)["server"], "not_observed")
+            scope.cleanup()
+
+    def test_forged_handler_callable_and_boolean_integer_cannot_acknowledge_native_status(
+        self,
+    ):
+        for mode in ("handler_forged", "handler_forged_nil", "handler_boolean"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                result = self.run_source(scope, mode, capture=True)
+                self.assertTrue(result["refused"])
+                self.assertIsNone(result["output"])
+                self.assertEqual(result["sends"], 1)
+                self.assertEqual(scope.observe()["server"], "not_observed")
+                scope.cleanup()
+
+    def test_nullable_packet_raw_identity_and_projection_are_strict_and_private(self):
+        for edit in (
+            lambda f: f.update(raw_type="number"),
+            lambda f: f.update(raw_type="private-secret-marker"),
+            lambda f: f.update(raw_type={}),
+            lambda f: f.update(native_absent=False),
+            lambda f: f.update(native_absent=1),
+            lambda f: f.update(type="function"),
+            lambda f: f.pop("raw_type"),
+            lambda f: f.update(private="private-secret-marker"),
+        ):
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                result = self.run_source(scope, "send_valid", capture=True)
+                self.assertFalse(result["refused"])
+                packet = scope.read("scalar.json")
+                edit(packet["facts"]["absent_errn"])
+                (scope.path / "scalar.json").write_text(json.dumps(packet) + "\n")
+                with self.assertRaises(ValueError) as failure:
+                    scope.scalar_evidence()
+                self.assertNotIn("private-secret-marker", str(failure.exception))
+                scope.cleanup()
+
+    def test_default_and_pid_native_sources_and_deadlines_remain_byte_exact(self):
+        # These independent pinned source hashes predate the supplementary correction.
+        import hashlib
+
+        self.assertEqual(
+            hashlib.sha256(probe.NativeDelayedTimerProbe.no_prompt_script().encode()).hexdigest(),
+            "c6487804c8096deca481e5036a45898c655ee5a91f54725f7109e193bd745911",
+        )
+        self.assertEqual(
+            hashlib.sha256(probe.NativeDelayedTimerProbe.pid_control_script().encode()).hexdigest(),
+            "f6071d8c7bc0065b91f0260c0734c11bc1c8bacc25c71db38e351e741b2236d7",
+        )
+        self.assertEqual(
+            hashlib.sha256(
+                probe.NativeDelayedTimerProbe.pid_event_constructor().encode()
+            ).hexdigest(),
+            "9786b4c904ea4fdb2ed1c4f0496a76928af310dfc4c6ede0616f149aa0be9136",
+        )
+        self.assertEqual(probe.NO_PROMPT_NATIVE_TIMEOUT_SECONDS, 8)
+        self.assertEqual(probe.SCRIPTING_TIMEOUT_SECONDS, 10)
 
 
 if __name__ == "__main__":
