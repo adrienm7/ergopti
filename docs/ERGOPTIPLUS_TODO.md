@@ -523,6 +523,21 @@ These are software implementations; final hardware verification remains below.
   UTF-16 command line, which cannot be equated with Lua binary strings. Matching
   bridge regressions are deferred to their native owners. Native cross-OS gates,
   manual CI and physical input tests remain unexecuted.
+- [~] **L41.** Linux curl config URL NUL refusal: reject an unrepresentable
+  URL before native allocation, file/network side effects or replacement of an
+  active owner. Curl's stdin config parser previously accepted the shorter
+  address with a genuine HTTP 200, unlike its existing header/body refusal.
+  Five native and thirteen portable cases fail before the fix. Seven actual
+  loopback curl cases pass on host and Debian, covering buffered GET/POST,
+  streaming, protected download bytes, retained in-flight ownership, literal
+  percent escapes and already-refused config header/body controls. Thirteen
+  portable cases check byte positions, exact callback ownership and no resource
+  allocation. The Windows curl path rejects unsafe URL scalars by source;
+  macOS uses native Hammerspoon HTTP and rejects controls in redirect parsing,
+  while initial native URL bridging remains unvalidated. Neither driver's native
+  gate or source was changed. Technical refusal diagnostics contain no URL
+  bytes. Shared encoding policy, manual CI and physical input tests remain
+  unchanged or unexecuted; Linux native socket/process tests are real execution.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

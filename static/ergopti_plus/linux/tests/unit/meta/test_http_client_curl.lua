@@ -118,6 +118,47 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "download", "postStream" }) do
+		for index, target in ipairs({ "https://example.invalid/api\0private-suffix", "https://example.invalid/api\0", "\0https://example.invalid/api" }) do
+			helpers.it("linux-http-url-nul: refuses " .. method .. " URL byte position " .. index .. " before native allocation", function()
+				local client, state = fresh_client()
+				local callbacks, result, chunks = 0, nil, 0
+				local function complete(value) result = value; callbacks = callbacks + 1 end
+				local dispatched
+				if method == "get" then dispatched = client.get(target, {}, {}, complete)
+				elseif method == "post" then dispatched = client.post(target, {}, "{}", complete)
+				elseif method == "download" then dispatched = client.download(target, {}, "/tmp/native-url.part", {}, complete)
+				else dispatched = client.postStream(target, {}, "{}", {}, function() chunks = chunks + 1 end, complete) end
+				helpers.assert_eq(dispatched, false)
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.status, 0)
+				helpers.assert_true(type(result.error) == "string" and result.error ~= "")
+				helpers.assert_true(result.error:find("private-suffix", 1, true) == nil, "never disclose URL bytes in refusal diagnostics")
+				helpers.assert_eq(#state.handles, 0)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_eq(chunks, 0)
+				helpers.assert_eq(client.isActive(), false)
+			end)
+		end
+	end
+	helpers.it("linux-http-url-nul: invalid metadata cannot cancel an existing owner", function()
+		local client, state = fresh_client()
+		local good, bad = nil, nil
+		local options = { owner = "retained-native-url" }
+		helpers.assert_true(client.get("https://example.invalid/good", {}, options, function(value) good = value end))
+		local handles = #state.handles
+		helpers.assert_eq(client.get("https://example.invalid/good\0ignored", {}, options, function(value) bad = value end), false)
+		helpers.assert_eq(bad.ok, false)
+		helpers.assert_true(client.isActive(options.owner))
+		helpers.assert_eq(#state.handles, handles)
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(#state.kills, 0)
+		state.complete_request(1, "Retained body\nERGOPTI_HTTP_STATUS:200\n", 0)
+		helpers.assert_eq(good.ok, true)
+		helpers.assert_eq(good.body, "Retained body")
+		helpers.assert_eq(client.isActive(options.owner), false)
+	end)
 	for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 		for _, mode in ipairs({ "deadline", "cancel", "gone", "refusal" }) do
 			helpers.it("linux-cli-orphan-receipts: " .. method .. " retains group ownership through " .. mode, function()
