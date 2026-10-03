@@ -436,6 +436,21 @@
 		{
 			"type": "list",
 			"id": "llm_display_remaining"
+		},
+		{
+			"type": "check",
+			"id": "llm_show_all",
+			"i18n": "menu.llm.show_all_at_once",
+			"checked_when": [
+				"llm_show_all_enabled"
+			],
+			"disabled_when": [
+				"llm_show_all_ready"
+			]
+		},
+		{
+			"type": "list",
+			"id": "llm_display_trailing"
 		}
 	],
 	"llm_generation_menu": [

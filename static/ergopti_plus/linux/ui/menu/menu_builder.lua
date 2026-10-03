@@ -2099,10 +2099,16 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_display"] = function(target)
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
+		local DisplayPolicy = require("llm.display_policy")
+		local ProfileSettings = require("modules.llm.profile_settings")
+		local function show_all_ready()
+			return DisplayPolicy.ready(ProfileSettings.get("num_predictions"),
+				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
+		end
 		local rows = {}
 		for _, setting in ipairs({
 			{ name = "streaming", key = "menu.llm.show_streaming" },
-			{ name = "streaming_multi", key = "menu.llm.show_all_at_once" },
 		}) do
 			local current = DisplaySettings.get(setting.name)
 			rows[#rows + 1] = {
@@ -2114,6 +2120,8 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		local streaming_rows = rows
+		rows = {}
 		local indent = DisplaySettings.get("pred_indent") or 0
 		local indent_rows = {}
 		for _, value in ipairs(DisplaySettings.indent_values()) do
@@ -2136,6 +2144,12 @@ local function _build_llm(ctx)
 		local info_bar = DisplaySettings.get("show_info_bar")
 		local display_ctx = {
 			commands = {
+				["llm_show_all"] = function()
+					if not show_all_ready() then return false end
+					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 				["llm_info_bar"] = function()
 					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -2143,13 +2157,16 @@ local function _build_llm(ctx)
 				end,
 			},
 			state_getters = {
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
+				["llm_show_all_ready"] = show_all_ready,
 				["llm_info_bar_enabled"] = function() return info_bar end,
 				["llm_info_bar_ready"] = function() return true end,
 			},
 		}
 		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
 			["llm_display_leading"] = function() return {} end,
-			["llm_display_remaining"] = function() return rows end,
+			["llm_display_remaining"] = function() return streaming_rows end,
+			["llm_display_trailing"] = function() return rows end,
 		})
 		append_rendered_row(target, {
 			label = i18n_safe("menu.llm.display_menu_title"),

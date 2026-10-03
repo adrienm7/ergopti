@@ -16,6 +16,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../../_shared/modules/llm/display_policy.ahk
+
 
 
 
@@ -187,7 +189,8 @@ LLM_Engine_ApplySharedDefaults() {
 
 	for shared_key, engine_key in _key_map {
 		if LLM_Defaults.Has(shared_key)
-			_LLM_Engine[engine_key] := LLM_Defaults[shared_key]
+			_LLM_Engine[engine_key] := (shared_key == "llm_streaming_multi")
+				? LLM_DisplayShowAll(LLM_Defaults[shared_key]) : LLM_Defaults[shared_key]
 	}
 }
 

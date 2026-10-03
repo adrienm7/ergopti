@@ -797,7 +797,7 @@ function M.predict(context, output_context, override)
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if not is_batch and request_index < requested then
 				-- Shown now: the next variant may wait for the backend's interval.
-				if #candidates > 0 then publish() end
+				if #candidates > 0 and DisplaySettings.get("streaming_multi") == true then publish() end
 				dispatch()
 				return
 			end

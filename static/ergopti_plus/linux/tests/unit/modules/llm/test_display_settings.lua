@@ -134,38 +134,54 @@ end)
 --- @param options table Fixture state, writer refusal and shared label mutation.
 --- @param callback function Observations asserted outside native callbacks.
 local function with_info_menu(options, callback)
-	local names = { "infra.llm_preferences", "modules.llm.display_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "infra.llm_preferences", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local settings, storage = load_settings({
 		["llm.display.show_info_bar"] = options.selected,
+		["llm.display.streaming_multi"] = options.progressive,
+		["llm.profiles.num_predictions"] = options.count,
 		["llm.future_field"] = 42,
 	}, options.refused)
+	package.loaded["modules.llm.profile_settings"] = nil
+	local profiles = require("modules.llm.profile_settings")
+	profiles._reset()
 	local renderer = assert(require("menu.renderer").new({
 		platform = "linux",
 		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
 		json_decode = function(raw)
 			local root = assert(require("json").decode(raw))
 			if options.label then root.llm_display_menu[2].i18n = options.label end
+			for index, row in ipairs(root.llm_display_menu) do
+				if row.id == "llm_show_all" then
+					if options.show_all_label then row.i18n = options.show_all_label end
+					if options.show_all_first then table.remove(root.llm_display_menu, index); table.insert(root.llm_display_menu, 1, row) end
+					break
+				end
+			end
 			if options.info_last then
-				root.llm_display_menu[2], root.llm_display_menu[3] = root.llm_display_menu[3], root.llm_display_menu[2]
+				local info = table.remove(root.llm_display_menu, 2)
+				table.insert(root.llm_display_menu, info)
 			end
 			return root
 		end,
 		i18n = require("infra.i18n"), logger = require("logger.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
-	local observed = { writes = 0, redraws = 0 }
+	local observed = { writes = 0, redraws = 0, active = true, paused = false }
 	local native_set = storage.set
 	storage.set = function(...)
 		observed.writes = observed.writes + 1
+		if options.refusal_mode == "nil" then return nil end
+		if options.refusal_mode == "throw" then error("owned writer refused") end
 		return native_set(...)
 	end
 	local ok, err = xpcall(function()
 		local items = helpers.load_module("ui.menu.menu_builder").build({
 			_version = "0.0.0-dev.12",
-			llm = { is_enabled = function() return true end, toggle = function() return true end },
+			llm = { is_enabled = function() return observed.active end, toggle = function() return true end },
 			on_quit = function() end,
+			is_paused = function() return observed.paused end,
 			on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 		})
 		local title = require("infra.i18n").get("menu.llm.display_menu_title")
@@ -176,7 +192,7 @@ local function with_info_menu(options, callback)
 				if nested then return nested end
 			end
 		end
-		callback(assert(find(items), "the actual AI display submenu must be present"), settings, storage, observed)
+		callback(assert(find(items), "the actual AI display submenu must be present"), settings, storage, observed, profiles)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	restore()
@@ -246,5 +262,104 @@ helpers.describe("LLM shared Info Bar check", function()
 			helpers.assert_eq(observed.writes, 1)
 			helpers.assert_eq(observed.redraws, 0)
 		end)
+	end)
+end)
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 4/ Show-All Parity =======
+-- ==================================
+-- ==================================
+
+--- Reads fixed progressive and show-all semantics independently of native code.
+--- @return table
+local function show_all_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+--- Finds the declared checkbox after Linux's real tray projection.
+--- @param parent table
+--- @param key string
+--- @return table
+local function show_all_row(parent, key)
+	local title = require("infra.i18n").get(key)
+	for _, row in ipairs(parent.menu) do if row.title == title then return row end end
+	error("the real display submenu omitted " .. key)
+end
+
+helpers.describe("LLM shared Show-all check", function()
+	helpers.it("replays both canonical polarities and persists only an admitted change (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, expected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_info_menu({selected = true, progressive = expected.progressive, count = count}, function(parent, settings, storage, observed)
+					local row = show_all_row(parent, corpus.row.i18n)
+					helpers.assert_eq(row.checked or false, expected.show_all)
+					helpers.assert_eq(row.disabled == true, count < 2)
+					helpers.assert_eq(row.fn(), count >= 2)
+					local value = expected.progressive
+					if count >= 2 then value = not expected.progressive end
+					helpers.assert_eq(settings.get("streaming_multi"), value)
+					helpers.assert_eq(storage.get("llm.future_field"), 42)
+					helpers.assert_eq(observed.writes, count >= 2 and 1 or 0)
+					helpers.assert_eq(observed.redraws, count >= 2 and 1 or 0)
+					settings._reset()
+					helpers.assert_eq(settings.get("streaming_multi"), value, "restart retains canonical polarity")
+				end)
+			end
+		end
+	end)
+
+	helpers.it("uses the declared Show-all label and placement (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		with_info_menu({selected = true, progressive = true, count = 2, show_all_label = corpus.alternate_i18n, show_all_first = true}, function(parent)
+			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(parent.menu[1].checked or false, false)
+			helpers.assert_eq(parent.menu[2].title, require("infra.i18n").get("menu.llm.show_info_bar"))
+		end)
+	end)
+
+	helpers.it("refuses a held callback after current count or native readiness is withdrawn (shared-show-all)", function()
+		with_info_menu({selected = true, progressive = true, count = 2}, function(parent, settings, storage, observed, profiles)
+			local row = show_all_row(parent, show_all_corpus().row.i18n)
+			helpers.assert_true(profiles.set("num_predictions", 1))
+			local before = observed.writes
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(observed.writes, before)
+			helpers.assert_true(profiles.set("num_predictions", 2))
+			before = observed.writes
+			observed.paused = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(observed.writes, before)
+			observed.paused = false
+			observed.active = false
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(settings.get("streaming_multi"), true)
+			helpers.assert_eq(observed.writes, before)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+
+	helpers.it("keeps durable, runtime and menu state after false, nil or throwing writers (shared-show-all)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_info_menu({selected = true, progressive = true, count = 2, refused = mode == "false", refusal_mode = mode}, function(parent, settings, storage, observed)
+				local row = show_all_row(parent, show_all_corpus().row.i18n)
+				local ok, result = pcall(row.fn)
+				helpers.assert_true(not ok or result == false, "a refusal cannot acknowledge success")
+				helpers.assert_eq(settings.get("streaming_multi"), true)
+				helpers.assert_eq(storage.get("llm.display.streaming_multi"), true)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				helpers.assert_eq(observed.redraws, 0)
+				helpers.assert_eq(row.checked or false, false)
+			end)
+		end
 	end)
 end)

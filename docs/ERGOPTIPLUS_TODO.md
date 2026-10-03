@@ -774,7 +774,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (current baseline: Windows 105, macOS 187, Linux 115, each
+      drivers still build (current baseline: Windows 105, macOS 186, Linux 115, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -881,13 +881,27 @@ composition pass; native Windows, complete packaging and installation remain
 pending CI. The current native-row census is Windows 105, macOS 187 and Linux 115.
 Items 54 and 81 remain partial.
 
-Streaming-display parity remains a separate follow-up: canonical
-`llm.display.streaming_multi = true` becomes Windows `show_all_at_once = true`,
-which waits for all variants, while macOS and Linux interpret true as progressive
-variant display. macOS ticks Show All At Once for false, but Linux ticks it for
-true. Reconcile the native prediction owners and shared check polarity before
-retiring this policy; preserve Windows' explicit refusal of unsupported token
-streaming rather than infer capability from the stored setting.
+The common Show All At Once check now belongs to the shared display child. The
+canonical `llm.display.streaming_multi = true` means progressive variant display
+on all three drivers; Windows projects this to its existing native
+`show_all_at_once = false` field at both default loaders and the saved-value
+restore/write boundaries. Linux now suppresses intermediate completed variants
+when the canonical flag is false, as its token callback already did. The shared
+checkbox is checked for false and rereads count and native readiness before
+using each existing acknowledged persistence owner. An independent polarity,
+count and sequential-event corpus covers the actual menu and display callers,
+including delayed callbacks and false, nil or throwing writer refusals.
+
+Historical Windows preferences already use the same canonical path as macOS and
+Linux and contain no platform provenance. Existing true values now receive the
+canonical progressive interpretation; no guessed migration or automatic byte
+rewrite attempts to infer their origin. The native Windows engine field keeps
+its existing meaning and its original all-at-once/progressive assertions.
+The current native-row census is Windows 105, macOS 186 and Linux 115. The prior
+automatic-temperature census above is a historical checkpoint. Items 54 and 81
+remain partial; native Windows, packaging and installation confirmation requires
+CI. Token-level streaming remains a separate native/provider policy follow-up;
+Windows still explicitly refuses unsupported token transport.
 
 The Windows indentation catalogue now initializes beside its display-row reader,
 so the resident boot graph and definitions-only native test graph share the same
@@ -899,6 +913,8 @@ The original submenu, restore, backend-caption and category-checkbox assertions
 remain intact. Local JavaScript and encoding gates are qualified separately;
 Windows native unit, parse and E2E confirmation still requires CI. Items 54 and
 81 remain partial and native row counts are unchanged.
+
+The common Show All At Once check is declared in the shared display child. Canonical `llm.display.streaming_multi = true` means progressive display on all three drivers; Windows inverts only at its unchanged native all-at-once boundary. Linux withholds intermediate complete candidates when all-at-once is enabled. Actual native owners retain strict acknowledged writes, live count, pause and master admission. Windows held and real dispatcher-deferred callbacks refuse after an acknowledged master withdrawal. Historical Windows stored booleans now follow the canonical progressive meaning, with no guessed migration or data rewrite. The native census after this tranche is Windows 105, macOS 186, Linux 115. Items 54 and 81 remain partial; actual Windows native execution, packaging and installation require complete three-OS CI. Token-level streaming remains a separate capability follow-up.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -958,7 +974,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 105, macOS 187 and Linux 115 rows are still built by the
+      Windows 105, macOS 186 and Linux 115 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:

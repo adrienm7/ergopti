@@ -65,7 +65,7 @@ local FAKED = {
 	"modules.llm.api_ollama", "modules.llm.profiles",
 }
 local RELOADED = {
-	"modules.llm.navigation_settings", "modules.llm.prediction_engine", "ui.tooltip.llm",
+	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "ui.tooltip.llm",
 	"adapters.keyboard_hook",
 }
 
@@ -146,18 +146,24 @@ local function with_offer(options, body)
 	local ok, err = pcall(function()
 		package.loaded["infra.llm_preferences"] = PreferencesFixture.new({ initial = {
 			[NAVIGATION_KEY] = options.nav, [VALIDATION_KEY] = options.val,
+			["llm.display.streaming_multi"] = options.progressive,
+			["llm.display.streaming"] = options.streaming,
 		} })
 		helpers.load_module("modules.llm.navigation_settings")._reset()
+		helpers.load_module("modules.llm.display_settings")._reset()
 		package.loaded["adapters.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 		}
 		-- Each sequential request answers the next prediction.
 		local requests = 0
+		local frames = {}
+		local callbacks = {}
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, _, _, on_chunk, on_done)
 				requests = requests + 1
 				local text = " " .. WORDS[requests]
+				callbacks[#callbacks + 1] = { chunk = on_chunk, done = on_done }
 				on_chunk(text)
 				on_done(text, nil)
 			end,
@@ -171,10 +177,19 @@ local function with_offer(options, body)
 		}
 		local overlay = helpers.load_module("ui.tooltip.llm")
 		helpers.assert_true(overlay.init({ style = {}, renderer = {
-			show = function() return true end,
+				show = function(rows)
+					local count = 0
+					for _, row in ipairs(rows) do
+						for _, word in ipairs(WORDS) do
+							if row.segments and row.segments[1].text == word then count = count + 1 end
+						end
+					end
+					frames[#frames + 1] = count
+					return true
+				end,
 			hide = function() return true end,
 		} }), "the real tooltip must accept a renderer double")
-		local world = { overlay = overlay, applied = {} }
+		local world = { overlay = overlay, applied = {}, frames = frames, callbacks = callbacks }
 		local scheduler = Fakes.timer_scheduler()
 		world.engine = helpers.load_module("modules.llm.prediction_engine")
 		world.engine.init({
@@ -518,5 +533,58 @@ helpers.describe("prediction tooltip: a tap-hold's Tab (llm-accept-inserts)", fu
 		helpers.assert_eq(#from_key, 1)
 		helpers.assert_eq(tabs[1].mods, from_key[1].mods,
 			"with nothing held, the tapped Tab carries the physical Tab's (empty) modifiers")
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 7/ Display Event Polarity =======
+-- =========================================
+-- =========================================
+
+--- Reads event expectations independent of the production display condition.
+--- @return table
+local function display_events_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("prediction tooltip: canonical progressive display", function()
+	helpers.it("shows intermediate completed variants only under progressive display (shared-show-all-events)", function()
+		local corpus = display_events_corpus()
+		helpers.assert_eq(#corpus.sequential_events, 2)
+		for _, expected in ipairs(corpus.sequential_events) do
+			with_offer({nav = {}, val = {}, count = 2, progressive = expected.progressive, streaming = false}, function(world)
+				local intermediate, final = 0, 0
+				for _, count in ipairs(world.frames) do
+					if count == 1 then intermediate = intermediate + 1 end
+					if count == 2 then final = final + 1 end
+				end
+				helpers.assert_eq(intermediate, expected.intermediate_frames)
+				helpers.assert_eq(final, expected.final_frames)
+				helpers.assert_eq(#world.callbacks, 2, "both real sequential callback paths execute")
+			end)
+		end
+	end)
+
+	helpers.it("does not paint retired chunks or completions under either display polarity (shared-show-all-events)", function()
+		for _, expected in ipairs(display_events_corpus().sequential_events) do
+			with_offer({nav = {}, val = {}, count = 2, progressive = expected.progressive, streaming = false}, function(world)
+				world.engine.cancel()
+				local before = #world.frames
+				for _, callback in ipairs(world.callbacks) do
+					callback.chunk("retired candidate")
+					callback.done("retired candidate", nil)
+				end
+				helpers.assert_eq(#world.frames, before)
+				helpers.assert_eq(#world.engine.get_suggestions(), 0)
+			end)
+		end
 	end)
 end)

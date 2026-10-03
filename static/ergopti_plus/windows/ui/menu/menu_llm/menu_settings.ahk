@@ -335,21 +335,33 @@ _LLMMenuBuildIndentRange() {
  * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu(InfoCommand := unset) {
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InfoCommand)
 		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
+	if !IsSet(ShowAllCommand)
+		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
 	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
-		Map("llm_display_leading", (*) => [], "llm_display_remaining", (*) => _LLM_Menu_DisplayRows()),
-		Map("llm_info_bar", InfoCommand),
-		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true))
+		Map("llm_display_leading", (*) => [],
+			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
+			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
+		Map("llm_info_bar", InfoCommand, "llm_show_all", (*) =>
+			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
+		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
+			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
+			"llm_show_all_ready", _LLM_Menu_ShowAllReady))
 }
 
 /**
  * Row data for the display submenu, including the nested indent picker.
  * @returns {Array} Native display settings after the shared Info Bar check.
  */
-_LLM_Menu_DisplayRows() {
+_LLM_Menu_ShowAllReady() {
+	global _LLM_Menu
+	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"] || A_IsSuspended ? true : false)
+}
+
+_LLM_Menu_DisplayRows(Position := "all") {
 	global _LLM_Menu
 	Rows := []
 	n := _LLM_Menu["n_predictions"]
@@ -374,12 +386,8 @@ _LLM_Menu_DisplayRows() {
 "disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
 		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
 
-	; Show all predictions at once
-	Rows.Push(Map(
-		"label",    t("menu.llm.show_all_at_once"),
-		"checked",  _LLM_Menu["show_all_at_once"],
-		"disabled", (n < 2),
-		"action",   (*) => LLM_Menu_ToggleBool("show_all_at_once")))
+	LeadingRows := Rows
+	Rows := []
 
 	Rows.Push(Map("separator", true))
 
@@ -415,7 +423,13 @@ _LLM_Menu_DisplayRows() {
 		(*) => _LLM_AssignAndRebuild("pred_indent",
 			_LLM_DefaultFor("llm_pred_indent", 0)))
 
-	return Rows
+	if Position == "remaining"
+		return LeadingRows
+	if Position == "trailing"
+		return Rows
+	for Row in Rows
+		LeadingRows.Push(Row)
+	return LeadingRows
 }
 
 

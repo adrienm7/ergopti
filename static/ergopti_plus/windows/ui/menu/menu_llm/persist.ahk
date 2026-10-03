@@ -130,7 +130,7 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["generation"]["reset_on_nav"]         := Validated["reset_on_nav"]
 	llm["display"]["show_info_bar"]           := Validated["show_info_bar"]
 	llm["display"]["streaming"]               := Validated["streaming"]
-	llm["display"]["streaming_multi"]         := Validated["show_all_at_once"]
+	llm["display"]["streaming_multi"]         := LLM_DisplayProgressive(Validated["show_all_at_once"])
 	llm["display"]["pred_indent"]             := Validated["pred_indent"]
 	llm["trigger"]["debounce_ms"]             := Validated["debounce_ms"]
 	llm["trigger"]["instant_on_word_end"]     := Validated["instant_on_word_end"]
@@ -268,6 +268,9 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	]
 		_LLM_Menu_PutValidatedPersistedOption(
 			opts, Entry[1], Entry[2], Entry[3])
+	; Features stores progressive display; the native engine retains show-all.
+	if opts.Has("show_all_at_once")
+		opts["show_all_at_once"] := LLM_DisplayShowAll(opts["show_all_at_once"])
 	TemperatureRaw := llm["generation"]["temperature"]
 	if (TemperatureRaw is Integer) || (TemperatureRaw is Float)
 		_LLM_Menu_PutValidatedPersistedOption(opts, "temperature",
