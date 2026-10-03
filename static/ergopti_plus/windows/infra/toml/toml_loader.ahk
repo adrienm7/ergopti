@@ -466,7 +466,9 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 }
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
-LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
+LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource := unset) {
+		if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)
+				throw TypeError("Invalid personal hotstring source descriptor.")
 		global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
 		global HS_TOML_SECTION_HEADER_PATTERN
 		if !FileExist(FilePath) {
@@ -522,6 +524,10 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
 								Options["Category"] := CategoryLabel
 								Options["Section"] := CurrentSection
+				if IsSet(PersonalSource)
+						Options["PersonalSource"] := PersonalSource
+								if IsSet(PersonalSource)
+										Options["PersonalSource"] := PersonalSource
 								; Provenance must not adopt a new activation owner for whole-file packs.
 								if SelectedSection == ""
 										Options["Group"] := "default"

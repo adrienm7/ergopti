@@ -1,0 +1,7 @@
+{
+	"version": 1,
+	"namespace": "personal-file:",
+	"component_separator": ":",
+	"label_separator": " / ",
+	"extension": ".toml"
+}

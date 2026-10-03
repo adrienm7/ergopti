@@ -46,6 +46,7 @@ local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
 local Shell  = require("adapters.shell_runner")
 local CatalogueFiles = require("hotstrings.catalogue_files")
+local PersonalFiles = require("hotstrings.personal_files")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -201,6 +202,11 @@ function M.load_catalogue(paths, options)
 		local path = type(source) == "table" and source.path or source
 		local forced_group = type(source) == "table" and source.category or nil
 		local extension = type(source) == "table" and source.extension or nil
+		local personal_source = type(source) == "table" and source.personal_source or nil
+		if personal_source ~= nil then
+			assert(PersonalFiles.is_descriptor(personal_source), "invalid personal source descriptor")
+			personal_source = PersonalFiles.copy(personal_source)
+		end
 		-- A layout extension may supply some sections of a bundled category: its
 		-- file loads only those (only_sections) and the bundled file loads the
 		-- rest (skip_sections). The category record, and so its metadata, comes
@@ -234,6 +240,7 @@ function M.load_catalogue(paths, options)
 			local category = categories[group] or {
 				id             = group,
 				path           = path,
+				personal_source = personal_source and PersonalFiles.copy(personal_source) or nil,
 				description    = type(meta.description) == "table" and meta.description or {},
 				delay          = tonumber(meta.delay),
 				show_tooltip   = meta.show_tooltip,
@@ -308,6 +315,7 @@ function M.load_catalogue(paths, options)
 								_catalogue_priority = true,
 								_declared_priority  = type(entry.priority) == "number" and entry.priority or nil,
 								group             = group,
+								personal_source   = personal_source and PersonalFiles.copy(personal_source) or nil,
 								section           = sec_name,
 							}
 						end

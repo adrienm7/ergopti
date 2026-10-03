@@ -78,7 +78,8 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		Rec := _HotstringRegistrar
 		Meta := _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult,
 				TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
-				(IsSet(options) and options.Has("Group")) ? options["Group"] : unset)
+				(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
 		; Personal-info previews must render the value snapshot carried by the
 		; registered Spec, not re-read the mutable PersonalInformation Map.  The
 		; editor publishes that Map before its terminal Reload, so a second read in
@@ -122,6 +123,8 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: SubStr(Abbreviation, -2, 1), Category: Category, Section: Section, Priority: Priority }
 		if (IsSet(options) and options.Has("Group"))
 				Meta.group := options["Group"]
+		if (IsSet(options) and options.Has("PersonalSource"))
+				Meta.PersonalSource := PersonalFileDescriptorCopy(options["PersonalSource"])
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
@@ -142,7 +145,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; field the value came from, so a sink that tried to decide for itself would be
 ; guessing from the text. HSE_Register copies every Meta field onto the Spec, so
 ; the flag reaches HSEMatch.IsPrivate at each of the three fire paths.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset) {
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset, PersonalSource := unset) {
 		Meta := {
 				Replacement: Replacement,
 				Trigger: Abbreviation,
@@ -161,6 +164,8 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 		; their explicit default group while named/absent owners keep native semantics.
 		if IsSet(Group)
 				Meta.group := Group
+		if IsSet(PersonalSource)
+				Meta.PersonalSource := PersonalFileDescriptorCopy(PersonalSource)
 		return Meta
 }
 
@@ -396,7 +401,8 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				ConformFlags := StrReplace(Flags, "C")
 				ConformMeta := _MakeHotstringMeta(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
 						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
-						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset)
+						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
 				_RegisterHotstringFast(
@@ -430,7 +436,8 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				Rec ? (FlagsPortion Abbr) : "",
 				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
 				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
-						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset)
+						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
 		)
 
 		RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)

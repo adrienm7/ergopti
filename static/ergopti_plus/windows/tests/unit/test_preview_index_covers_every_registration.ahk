@@ -291,7 +291,7 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 		CategoryEnabled["Hotstrings"] := true
 		_HotstringRegistrar := 0
 		HSE_RegistryClear()
-		AssertEqual(4, LoadExtTomlFile(Packs[1]["Path"], Packs[1]["Label"]), "metadata is excluded from both entry shapes")
+		AssertEqual(4, LoadExtTomlFile(Packs[1]["Path"], Packs[1]["Label"], "", Packs[1]["PersonalSource"]), "metadata is excluded from both entry shapes")
 		AssertEqual(1, HSE_RegistryByGroup.Count, "source metadata must preserve whole-file activation ownership")
 		AssertTrue(HSE_RegistryByGroup.Has("default"))
 		Specs := HSE_RegistryByGroup["default"]
@@ -300,7 +300,7 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "owned conform", "explicit", "EXPLICIT", "Explicit"]
 		Index := Map()
 		Set := Map()
-		AssertEqual(4, _RegisterExtPackTriggers(Path, Label, Index, Set))
+		AssertEqual(4, _RegisterExtPackTriggers(Path, Label, Index, Set, "", Packs[1]["PersonalSource"]))
 		PreviewRows := Map()
 		PreviewRows.CaseSense := "On"
 		for _, Bucket in Index {
@@ -323,6 +323,9 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 			Preview := PreviewRows[OwnedSpec.Trigger]
 			AssertEqual(OwnedSpec.Category, Preview.Category)
 			AssertEqual(OwnedSpec.Section, Preview.Section)
+			AssertEqual(Packs[1]["PersonalSource"]["id"], OwnedSpec.PersonalSource["id"], "the actual live spec retains discovery identity")
+			AssertEqual(OwnedSpec.PersonalSource["id"], Preview.PersonalSource["id"], "the real preview row retains the same source")
+			Assert(OwnedSpec.PersonalSource != Preview.PersonalSource, "live and preview never share mutable provenance")
 			AssertEqual(OwnedSpec.Priority, Preview.Priority)
 			AssertEqual(OwnedSpec.Replacement, Preview.Output)
 		}
@@ -367,3 +370,91 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 }
 Test("personal pack provenance: nested Unicode labels and parsed sections match real preview rows", (*) => _PICR_LivePersonalProvenanceMatchesPreview("Équipe / mémoire"))
 Test("personal pack provenance: bundled-label collisions preserve whole-file activation ownership", (*) => _PICR_LivePersonalProvenanceMatchesPreview("rolls"))
+
+
+_PICR_DescriptorCorpus() {
+	global _SharedDir
+	DescriptorCorpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\personal_file_descriptors.json", "UTF-8"))
+	AssertEqual(13, DescriptorCorpus["vectors"].Length, "the independent cross-driver goldens must be complete")
+	SeenDescriptors := Map()
+	SeenDescriptors.CaseSense := "On"
+	for AuthorityVector in DescriptorCorpus["vectors"] {
+		OwnedDescriptor := PersonalFileDescribe(AuthorityVector["components"])
+		Assert(OwnedDescriptor["id"] == AuthorityVector["id"], AuthorityVector["name"])
+		Assert(OwnedDescriptor["label"] == AuthorityVector["label"], AuthorityVector["name"])
+		AssertFalse(SeenDescriptors.Has(OwnedDescriptor["id"]), "every admitted filename has a distinct identity")
+		SeenDescriptors[OwnedDescriptor["id"]] := true
+		AssertFalse(InStr(OwnedDescriptor["id"], "."), "the identity stays one canonical TOML path segment")
+		DecodedComponents := PersonalFileComponents(AuthorityVector["id"])
+		AssertTrue(DecodedComponents is Array)
+		AssertEqual(AuthorityVector["components"].Length, DecodedComponents.Length)
+		for Position, NativeComponent in DecodedComponents
+			Assert(NativeComponent == AuthorityVector["components"][Position], "native UTF-8 roundtrip preserves exact components")
+		CopiedDescriptor := PersonalFileDescriptorCopy(OwnedDescriptor)
+		OwnedDescriptor["components"][1] := "mutated.toml"
+		AssertTrue(PersonalFileDescriptorValid(CopiedDescriptor))
+		AssertFalse(PersonalFileDescriptorValid(OwnedDescriptor), "forged components refuse")
+		CopiedDescriptor["label"] := "forged"
+		AssertFalse(PersonalFileDescriptorValid(CopiedDescriptor), "forged label refuses")
+	}
+	for InvalidComponents in DescriptorCorpus["invalid_components"] {
+		AdmittedComponents := true
+		try PersonalFileDescribe(InvalidComponents)
+		catch {
+			AdmittedComponents := false
+		}
+		AssertFalse(AdmittedComponents, "malformed relative components refuse")
+	}
+	for InvalidIdentity in DescriptorCorpus["invalid_ids"]
+		AssertEqual(0, PersonalFileComponents(InvalidIdentity), "noncanonical or malformed UTF-8 identity refuses")
+	ExtraDescriptor := PersonalFileDescribe(["a.toml"])
+	ExtraDescriptor["future"] := true
+	AssertFalse(PersonalFileDescriptorValid(ExtraDescriptor), "unknown fields cannot silently cross the source boundary")
+	NumericLabel := PersonalFileDescribe(["123.toml"])
+	NumericLabel["label"] := 123
+	AssertFalse(PersonalFileDescriptorValid(NumericLabel), "native comparison cannot coerce a numeric label into text")
+	AssertFalse(PersonalFileDescriptorValid(Map("ID", "personal-file:612e746f6d6c", "components", ["a.toml"], "label", "a")), "descriptor fields retain exact shared spelling")
+}
+Test("personal-file descriptors: independent exact UTF-8 identity corpus", _PICR_DescriptorCorpus)
+
+
+_PICR_DistinctDiscoveredSources() {
+	global ScriptInformation
+	OwnedRoot := A_Temp . "\ergopti_picr_sources_" . A_TickCount
+	SourceFiles := Map("a__b.toml", "personal-file:615f5f622e746f6d6c",
+		"a\b.toml", "personal-file:61:622e746f6d6c",
+		"words.old.toml", "personal-file:776f7264732e6f6c642e746f6d6c",
+		"work\team.toml", "personal-file:776f726b:7465616d2e746f6d6c",
+		"home\team.toml", "personal-file:686f6d65:7465616d2e746f6d6c",
+		"Équipe\mémoire.toml", "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+		"rolls.toml", "personal-file:726f6c6c732e746f6d6c", ".toml", "personal-file:2e746f6d6c")
+	HadRoot := ScriptInformation.Has("PersonalHotstringsDir")
+	PriorRoot := ScriptInformation.Get("PersonalHotstringsDir", "")
+	try {
+		for Directory in ["", "a", "work", "home", "Équipe"]
+			DirCreate(OwnedRoot . "\" . Directory)
+		for RelativeFile in SourceFiles
+			FileAppend('[probe]`n"pqx" = "Owned"`n', OwnedRoot . "\" . RelativeFile, "UTF-8")
+		FileAppend('[probe]`n"pqx" = "Canonical"`n', OwnedRoot . "\personal_hotstrings.toml", "UTF-8")
+		ScriptInformation["PersonalHotstringsDir"] := OwnedRoot
+		Packs := HS_EnumeratePersonalExtFiles()
+		AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
+		SeenSources := Map()
+		for Pack in Packs {
+			RelativeFile := SubStr(Pack["Path"], StrLen(OwnedRoot) + 2)
+			AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
+			AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
+			AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
+			AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
+			SeenSources[Pack["PersonalSource"]["id"]] := true
+		}
+		AssertEqual(8, SeenSources.Count)
+	} finally {
+		if HadRoot
+			ScriptInformation["PersonalHotstringsDir"] := PriorRoot
+		else
+			ScriptInformation.Delete("PersonalHotstringsDir")
+		try DirDelete(OwnedRoot, true)
+	}
+}
+Test("personal-file descriptors: recursive native discovery retains distinct exact paths", _PICR_DistinctDiscoveredSources)

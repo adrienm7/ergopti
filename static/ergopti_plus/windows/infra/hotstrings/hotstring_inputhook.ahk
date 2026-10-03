@@ -903,7 +903,7 @@ HotstringPrefixWatcherRebuildIndex() {
 	; per-pack tooltip colour, a setting with nothing behind it.
 	_extPacks := 0
 	for _, Pack in HS_EnumeratePersonalExtFiles() {
-		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet)
+		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet, "", Pack["PersonalSource"])
 		_extPacks += 1
 	}
 	global _HotstringExtensionPacks, Features
