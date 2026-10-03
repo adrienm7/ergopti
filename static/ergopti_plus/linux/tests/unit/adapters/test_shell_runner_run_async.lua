@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 
 --- A libuv double that records the child it starts.
 --- @return table luv, table state
-local function fake_luv()
+local function fake_luv(spawn_error)
 	local state = { kills = {} }
 	local luv = {}
 	local function handle(kind) return { kind = kind, closing = false } end
@@ -35,6 +35,7 @@ local function fake_luv()
 	function luv.kill(pid, signal) state.kills[#state.kills + 1] = { pid = pid, signal = signal }; return true end
 	function luv.spawn(command, options, on_exit)
 		state.command, state.options, state.on_exit = command, options, on_exit
+		if spawn_error then return nil, spawn_error end
 		state.process = handle("process")
 		return state.process, 4321
 	end
@@ -63,6 +64,21 @@ local function fresh_runner(luv)
 end
 
 helpers.describe("shell_runner.run_async (linux)", function()
+	helpers.it("refuses a failed spawn without calling back (linux-spawn-refusal-once)", function()
+		local luv, state = fake_luv("ENOENT: no such file or directory")
+		local runner = fresh_runner(luv)
+		local answers = 0
+		local handle, err = runner.run_async("missing-program", {}, { timeout_ms = 1000 },
+			function() answers = answers + 1 end)
+		helpers.assert_nil(handle)
+		helpers.assert_eq(answers, 0, "the caller handles a refused dispatch through the return value")
+		helpers.assert_contains(err, "ENOENT", "the refusal must retain libuv's cause")
+		helpers.assert_true(state.timer.stopped)
+		helpers.assert_true(state.timer.closing)
+		helpers.assert_true(state.options.stdio[2].closing)
+		helpers.assert_true(state.options.stdio[3].closing)
+	end)
+
 	helpers.it("refuses without libuv instead of blocking the event loop", function()
 		local runner = fresh_runner(nil)
 		helpers.assert_eq(runner.HAS_ASYNC, false)
