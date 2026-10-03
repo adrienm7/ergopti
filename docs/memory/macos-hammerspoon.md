@@ -629,8 +629,26 @@ read the older `[karabiner] enabled`: builds before 2026-09-22 wrote `false`
 there on first launch without asking. The launcher never registers the guardian
 LaunchAgent; the Lua lease controller's first guardian observation of a
 lifecycle does (`--register-remap-guardian`), so nothing is registered while
-the switch is off. Nothing unregisters it either: a guardian registered while
-on stays in Login Items after the switch is turned off, until uninstall.
+the switch is off. OFF and « Remove Ergopti from Karabiner » share the exact
+retirement owner and invoke `--unregister-remap-guardian` after aggregate
+STOPPED. The preference remains on until the exact child settles with
+`unregistered\n`; a refused or partially completed native removal recovers a
+fresh READY lease before releasing the previous enabled state. Already-off
+removal keeps the preference off on refusal. Cancellation of registration
+retains its raw task until `onSettled`, so an accepted pending SIGTERM cannot
+register after an acknowledged OFF. New activation, observations and registration
+are fenced while the retained unregister child owns its transition.
+
+The native unregister role validates the launcher vnode before effects, waits
+for durable record retirement, removes only an exact own legacy plist, checks
+SMAppService status after unregistering and confirms singleton exit plus the
+exact launchctl missing-service status 113. It never holds activation.lock while
+calling unregister or bootout: the guardian itself needs that lock to drain.
+The existing hosted `helper_registration` scenario exercises the actual signed
+helper, wrong-inode refusal with the live job retained, removal and idempotent
+removal. Its receipt keeps primary and cleanup failures and refuses unknown
+launchctl statuses. Lua fixtures and the Python receipt judge do not substitute
+for that native qualification.
 Turning it off removes only marked rules by byte-span surgery proven by decoded
 equality; never re-serialize `karabiner.json`, which would rewrite personal
 rules.

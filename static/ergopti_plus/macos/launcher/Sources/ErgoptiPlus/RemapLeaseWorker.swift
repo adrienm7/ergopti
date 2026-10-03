@@ -363,6 +363,34 @@ func runGuardianRegistration(
 	return LeaseWorkerExit.success.rawValue
 }
 
+/// Validates exact helper identity before any own LaunchAgent removal effect.
+func runGuardianUnregistration(
+	arguments: [String],
+	executablePath: String?,
+	environment: [String: String],
+	identityReader: (String) -> LeaseExecutableIdentity? = {
+		LeaseExecutableIdentity.capture(at: $0)
+	},
+	unregister: (String) -> RemapGuardianUnregistrationResult = {
+		unregisterRemapGuardian(executablePath: $0)
+	},
+	writeResult: (Data) -> Bool = {
+		writeLauncherLogData($0, descriptor: STDOUT_FILENO)
+	}
+) -> Int32 {
+	guard validatedGuardianControlInvocation(
+		arguments: arguments,
+		expectedFlag: kUnregisterRemapGuardianFlag,
+		executablePath: executablePath,
+		environment: environment,
+		identityReader: identityReader
+	), let executablePath else { return LeaseWorkerExit.invalidArguments.rawValue }
+	let result = unregister(executablePath)
+	guard let output = (result.rawValue + "\n").data(using: .utf8), writeResult(output)
+	else { return LeaseWorkerExit.innerFailed.rawValue }
+	return LeaseWorkerExit.success.rawValue
+}
+
 /// Builds the only JSON payload shapes the native guardian may emit.
 enum LeasePayloads {
 	/// Builds the only live-generation write shape.
@@ -2871,6 +2899,7 @@ enum KarabinerLeaseWorker {
 			|| arguments[1] == kKarabinerLeaseGuardianFlag
 			|| arguments[1] == kRemapGuardianStatusFlag
 			|| arguments[1] == kRegisterRemapGuardianFlag
+			|| arguments[1] == kUnregisterRemapGuardianFlag
 			|| arguments[1] == kOpenRemapGuardianSettingsFlag
 	}
 
@@ -2905,6 +2934,13 @@ enum KarabinerLeaseWorker {
 		#endif
 		if arguments[1] == kRegisterRemapGuardianFlag {
 			return runGuardianRegistration(
+				arguments: arguments,
+				executablePath: Bundle.main.executablePath,
+				environment: ProcessInfo.processInfo.environment
+			)
+		}
+		if arguments[1] == kUnregisterRemapGuardianFlag {
+			return runGuardianUnregistration(
 				arguments: arguments,
 				executablePath: Bundle.main.executablePath,
 				environment: ProcessInfo.processInfo.environment

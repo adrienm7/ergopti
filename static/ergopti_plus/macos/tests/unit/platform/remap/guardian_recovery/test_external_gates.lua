@@ -471,8 +471,14 @@ helpers.describe("Karabiner recovery external gates", function()
 				helpers.assert_eq(calls.builds, 0)
 				helpers.assert_eq(calls.deploys, 0)
 				helpers.assert_eq(calls.starts_paused, 0)
-				helpers.assert_eq(calls.guardian_cached_status, "ready",
-					case.label .. " must invalidate cache authority before termination")
+				if case.label == "Disable" then
+					helpers.assert_eq(calls.guardian_unregistrations, 1)
+					helpers.assert_nil(calls.guardian_cached_status,
+						"late approval must not replace the acknowledged unregistered state")
+				else
+					helpers.assert_eq(calls.guardian_cached_status, "ready",
+						case.label .. " must invalidate cache authority before termination")
+				end
 			end)
 		end)
 	end
