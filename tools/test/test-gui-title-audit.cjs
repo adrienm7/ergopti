@@ -347,9 +347,9 @@ function assertNativeFileFilterBehavior(source) {
 		'if Index != 5',
 		'_NDT_MutateDelegatedFilter(FilterSource, "")',
 		'_NDT_MutateDelegatedFilter(FilterSource, "Changed label (*.txt)")',
-		'["/ErrorStdOut", LabelMutationHarness, LabelMutationRoot], Ownership, 2)',
+		'["/ErrorStdOut", LabelMutationHarness, LabelMutationRoot], Ownership, 2, FilterBudgets.ChildMs)',
 		'"Owned BIN visible under the restricted file filter", _NDT_RunChild(A_AhkPath,',
-		'["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2)'
+		'["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2, FilterBudgets.ChildMs)'
 	])
 		assert.ok(checks.includes(invariant), `the real positive/control cases retain ${invariant}`);
 	assert.ok(
@@ -378,8 +378,8 @@ function assertNativeFileFilterBehavior(source) {
 	for (const invariant of [
 		'ObserverProcess == DllCall("GetCurrentProcessId", "UInt")',
 		'UIA.ElementFromHandle(ObserverView, , false)',
-		'UIA.ConnectionTimeout := 500',
-		'UIA.TransactionTimeout := 500',
+		'UIA.ConnectionTimeout := ObserverUiaTimeoutMs',
+		'UIA.TransactionTimeout := ObserverUiaTimeoutMs',
 		'ObserverElement.ProcessId != ObserverProcess',
 		'StrSplit(FileRead(ObserverArgs[8], "UTF-8"), "|")',
 		'ObserverItems[1] != ObserverExpectedItems[1] || ObserverItems[2] != ObserverExpectedItems[2]',
@@ -394,7 +394,7 @@ function assertNativeFileFilterBehavior(source) {
 		'DllCall("GetDlgCtrlID", "Ptr", OwnerType, "Int") != 1136',
 		'ControlChooseIndex(2, ObserverType)',
 		'ControlChooseIndex(1, ObserverType)',
-		'((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= 4000',
+		'((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs',
 		'txt-visible|bin-hidden|all-files-bin-visible|restored-txt-visible|restored-bin-hidden|separate-client|owner-fenced',
 		'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")'
 	])
@@ -432,14 +432,14 @@ function assertNativeFileFilterBehavior(source) {
 	for (const invariant of [
 		'DllCall("GetDlgCtrlID", "Ptr", PickerViewCandidate, "Int") == 1121',
 		'DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerShellView)',
-		'_NFPRoot . "\\baseline.filter"]',
+		'_NFPRoot . "\\baseline.filter", _NFPViewWaitMs, _NFPUiaTimeoutMs]',
 		'PickerObserverHandle := ComObject("WScript.Shell").Exec(PickerObserverCommand)',
 		'SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128)',
 		'PickerObserverHandle.StdOut.ReadAll()',
 		'PickerObserverHandle.StdErr.ReadAll()',
 		'if PickerObserverErrors != ""',
 		'PickerObserverHandle.Terminate()',
-		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000',
+		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < _NFPObserverBudgetMs',
 		'if PickerObserverExit != 0',
 		'PickerObserverOutput != "owned-filter-observed" || PickerObserverFailure != ""',
 		'FileRead(PickerObserverReceipt . ".ack", "UTF-8") != "owned-filter-observed"'
@@ -464,13 +464,69 @@ function assertNativeFileFilterBehavior(source) {
 	])
 		assert.ok(probe.includes(invariant), `the actual native producer retains ${invariant}`);
 	assert.match(
+		source,
+		/^_NDT_RunChild\([^\n]*TimeoutMs := 15000\) \{/m,
+		'unrelated native families preserve their original process bound'
+	);
+	assert.match(
 		body('_NDT_RunChild'),
-		/TickElapsed\(Started\) < 15000/,
-		'the native proof never widens the original owned process deadline'
+		/TickElapsed\(Started\) < TimeoutMs/,
+		'the owned process enforces its selected bound'
+	);
+	const budgets = body('_NDT_FileFilterBudgets');
+	for (const invariant of [
+		'UiaTimeoutMs := 500',
+		'ViewWaitMs := 4000',
+		'ShellSpellings := 2',
+		'VisibleCalls := ShellSpellings * 3',
+		'AbsentCalls := ShellSpellings',
+		'TransitionCalls := VisibleCalls * 2 + VisibleCalls + AbsentCalls',
+		'SetupCalls := 2',
+		'ObserverMs := 3 * ViewWaitMs + (TransitionCalls + AbsentCalls + SetupCalls) * UiaTimeoutMs',
+		'ChildMs: 15000 + 2 * ObserverMs'
+	])
+		assert.ok(
+			budgets.includes(invariant),
+			'the process bounds derive from unchanged native query and transition bounds'
+		);
+	for (const index of [1, 2])
+		assert.ok(
+			observer.includes(
+				'ControlChooseIndex(' +
+					index +
+					', ObserverType)\' . "`n"\n\t\t. \'ObserverStarted := A_TickCount'
+			),
+			'each native filter transition starts its own settling interval'
+		);
+	for (const invariant of [
+		'ObserverWaitMs := Integer(ObserverArgs[9])',
+		'ObserverUiaTimeoutMs := Integer(ObserverArgs[10])'
+	])
+		assert.ok(
+			observer.includes(invariant),
+			'the native client receives its canonical bounds through actual arguments'
+		);
+	for (const field of ['ObserverMs', 'ViewWaitMs', 'UiaTimeoutMs'])
+		assert.ok(
+			probe.includes('FilterBudgets.' + field),
+			'the picker consumes every canonical native budget'
+		);
+	assert.ok(
+		checks.includes(
+			'["/ErrorStdOut", FilterHarness, FilterRoot], Ownership, 0, FilterBudgets.ChildMs)'
+		),
+		'the genuine child uses the bound for both real observers'
 	);
 }
 assertNativeFileFilterBehavior(nativePolicySource);
 const nativeBehaviorMutations = [
+	nativePolicySource.replace('UiaTimeoutMs := 500', 'UiaTimeoutMs := 1000'),
+	nativePolicySource.replace('ViewWaitMs := 4000', 'ViewWaitMs := 8000'),
+	nativePolicySource.replace('ObserverMs := 3 * ViewWaitMs', 'ObserverMs := 30 * ViewWaitMs'),
+	nativePolicySource.replace(
+		'ObserverWaitMs := Integer(ObserverArgs[9])',
+		'ObserverWaitMs := 8000'
+	),
 	nativePolicySource.replace('Test("native file filter:', 'DisabledCase("native file filter:'),
 	nativePolicySource.replace('Name: OwnerName}', 'Name: OwnerName, mm: "SubString"}'),
 	nativePolicySource.replace(
@@ -488,14 +544,14 @@ const nativeBehaviorMutations = [
 		'"phase skipped"'
 	),
 	nativePolicySource.replace(
-		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000',
+		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < _NFPObserverBudgetMs',
 		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 10000'
 	),
 	nativePolicySource.replace('if PickerObserverErrors != ""', 'if false'),
 	nativePolicySource.replace('PickerObserverHandle.Terminate()', 'PickerObserverHandle.Status'),
 	nativePolicySource.replace(
-		'Ownership, 2),\n\t\t"removing the real native filter',
-		'Ownership, 0),\n\t\t"removing the real native filter'
+		'Ownership, 2, FilterBudgets.ChildMs),\n\t\t"removing the real native filter',
+		'Ownership, 0, FilterBudgets.ChildMs),\n\t\t"removing the real native filter'
 	)
 ];
 for (const mutant of nativeBehaviorMutations) {
