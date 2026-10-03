@@ -1,6 +1,7 @@
 # tools/diagnostics/hs_delayed_timer_probe_test.py
 """Refuse incomplete native observations and preserve the scripting preference."""
 
+import base64
 import copy
 import json
 import os
@@ -382,7 +383,8 @@ class PidControlTests(unittest.TestCase):
             self.assertIn("descriptorWithProcessIdentifier(pid)", source)
             self.assertIn("Number(target.descriptorType) !== 0x6b706964", source)
             self.assertIn("0x486d5370, 0x45584543, target, -1, 0", source)
-            self.assertIn("descriptorWithString(argv[1]), 0x2d2d2d2d", source)
+            self.assertIn("descriptorWithString(source), 0x2d2d2d2d", source)
+            self.assertIn("constructOwnedEvent(Number(argv[0]), argv[1])", source)
             self.assertIn("sendEventWithOptionsTimeoutError(3, 10, error)", source)
             self.assertIn("paramDescriptorForKeyword(0x6572726e)", source)
             self.assertIn("Number(errorNumber.int32Value) !== 0", source)
@@ -566,6 +568,198 @@ class PidControlTests(unittest.TestCase):
                 child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
             )
             self.assertEqual(owner.diagnostic_receipts[0]["phase"], "pid_control")
+
+
+def constructor_receipt():
+    """Independent descriptor expectations; never derive them from the builder."""
+    return {
+        "schema_version": 1,
+        "contract": "hs.applescript.constructor",
+        "phase": "constructor",
+        "constructed": True,
+        "nonce": NONCE,
+        "pid": 42,
+        "address_type": 0x6B706964,
+        "address_bytes_base64": base64.b64encode((42).to_bytes(4, sys.byteorder)).decode("ascii"),
+        "event_class": 0x486D5370,
+        "event_id": 0x45584543,
+        "direct_type": 0x75747874,
+        "direct_text": 'return "' + NONCE + ' — ù ★"',
+    }
+
+
+class ConstructorTests(unittest.TestCase):
+    """Portable ownership proves no native API execution; scenarios own that proof."""
+
+    def owner(self, folder):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+        )
+        owner.nonce = NONCE
+        return owner
+
+    def test_constructor_reuses_sender_native_builder_and_real_owned_child(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            receipt = constructor_receipt()
+            raw = json.dumps(receipt, ensure_ascii=False)
+            launched = []
+
+            def launch(arguments, **options):
+                launched.append(arguments)
+                return native_popen([sys.executable, "-c", "print(" + repr(raw) + ")"], **options)
+
+            with mock.patch.object(probe.subprocess, "Popen", side_effect=launch):
+                result = owner.constructor_control(42, lambda _: [42])
+            self.assertEqual(result, dict(receipt, executable=str(EXECUTABLE)))
+            arguments = launched[0]
+            self.assertEqual(arguments[:4], ["/usr/bin/osascript", "-l", "JavaScript", "-e"])
+            self.assertEqual(arguments[-3:], ["42", receipt["direct_text"], NONCE])
+            script = arguments[4]
+            builder = owner.pid_event_constructor()
+            self.assertTrue(script.startswith(builder))
+            self.assertTrue(owner.pid_control_script().startswith(builder))
+            self.assertEqual(script.count(builder), 1)
+            self.assertIn("event.attributeDescriptorForKeyword(0x61646472)", script)
+            self.assertIn("address.data.base64EncodedStringWithOptions(0)", script)
+            self.assertIn("event.eventClass", script)
+            self.assertIn("event.eventID", script)
+            self.assertIn("direct.descriptorType", script)
+            self.assertIn("direct.stringValue", script)
+            for forbidden in ("sendEvent", "Application(", "launch", str(owner.app)):
+                self.assertNotIn(forbidden, script)
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertFalse(owner.started)
+            self.assertEqual(owner.diagnostic_receipts[0]["phase"], "constructor")
+            with self.assertRaises(ValueError):
+                probe.validate_control_summary(result)
+            with self.assertRaises(ValueError):
+                probe.validate_pid_control_summary(result)
+
+    def test_constructor_receipt_requires_exact_measured_descriptor_fields(self):
+        valid = constructor_receipt()
+        raw = json.dumps(valid, ensure_ascii=False) + "\n"
+        self.assertEqual(
+            probe.validate_constructor_receipt(raw, NONCE, 42, valid["direct_text"]), valid
+        )
+        for key, value in (
+            ("constructed", 1),
+            ("constructed", False),
+            ("schema_version", True),
+            ("contract", "hs.applescript.pid-control"),
+            ("phase", "pid_control"),
+            ("nonce", "foreign"),
+            ("pid", True),
+            ("pid", 43),
+            ("address_type", 0x70736E20),
+            ("event_class", 0x61657674),
+            ("event_id", 0x6F617070),
+            ("direct_type", 0x54455854),
+            ("direct_text", 'return "ASCII replacement"'),
+            ("address_bytes_base64", ""),
+            ("address_bytes_base64", "!!!!AAAA"),
+            (
+                "address_bytes_base64",
+                base64.b64encode((43).to_bytes(4, sys.byteorder)).decode("ascii"),
+            ),
+            ("address_bytes_base64", "KgAAAB=="),
+        ):
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                probe.validate_constructor_receipt(
+                    json.dumps(dict(valid, **{key: value})) + "\n", NONCE, 42, valid["direct_text"]
+                )
+        for changed in (
+            dict(valid, extra="unowned"),
+            {key: value for key, value in valid.items() if key != "address_type"},
+        ):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                probe.validate_constructor_receipt(
+                    json.dumps(changed) + "\n", NONCE, 42, valid["direct_text"]
+                )
+        for malformed in (
+            raw[:-1],
+            raw + "\n",
+            " " + raw,
+            "[]\n",
+            '{"pid":42,"pid":43}\n',
+            "x" * 9000 + "\n",
+        ):
+            with self.subTest(malformed=malformed[:80]), self.assertRaises(ValueError):
+                probe.validate_constructor_receipt(malformed, NONCE, 42, valid["direct_text"])
+
+    def test_constructor_refuses_foreign_identity_and_retained_child_debt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with mock.patch.object(probe.subprocess, "Popen") as native:
+                with self.assertRaisesRegex(RuntimeError, "foreign or changed"):
+                    owner.constructor_control(42, lambda _: [43])
+                pending = mock.Mock()
+                owner.scripting_commands.append(pending)
+                with self.assertRaisesRegex(RuntimeError, "has not settled"):
+                    owner.constructor_control(42, lambda _: [42])
+            native.assert_not_called()
+            self.assertEqual(owner.scripting_commands, [pending])
+
+    def test_constructor_rechecks_owner_before_dispatch_and_after_receipt(self):
+        for observations in ([[42], [43]], [[42], [42], [43]]):
+            with self.subTest(observations=observations), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=0)
+                child.communicate.return_value = (json.dumps(constructor_receipt()) + "\n", "")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child) as native:
+                    with self.assertRaisesRegex(RuntimeError, "target differs|process changed"):
+                        owner.constructor_control(42, mock.Mock(side_effect=observations))
+                self.assertEqual(native.call_count, 0 if len(observations) == 2 else 1)
+                self.assertEqual(owner.scripting_commands, [])
+
+    def test_constructor_rejects_malformed_refused_and_unsettled_native_results(self):
+        for status, stdout in (
+            (1, "{}\n"),
+            (0, "{}\n"),
+            (None, json.dumps(constructor_receipt()) + "\n"),
+        ):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=status)
+                child.communicate.return_value = (stdout, "constructor refused")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+                    with self.assertRaises((RuntimeError, ValueError)):
+                        owner.constructor_control(42, lambda _: [42])
+                self.assertEqual(child.communicate.call_args_list, [mock.call(timeout=10)])
+                self.assertEqual(owner.scripting_commands, [child] if status is None else [])
+
+    def test_constructor_timeout_retains_exact_child_until_cleanup_then_retries(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            primary = subprocess.TimeoutExpired(["osascript", "constructor"], 10)
+            cleanup = subprocess.TimeoutExpired(["osascript", "constructor cleanup"], 2)
+            child = mock.Mock(pid=43, returncode=None)
+            child.poll.return_value = None
+            child.communicate.side_effect = [primary, cleanup]
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child) as native,
+                mock.patch.object(
+                    owner, "sample_scripting_command", return_value=["owned constructor sampled"]
+                ),
+                mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
+                    owner.constructor_control(42, lambda _: [42])
+                with self.assertRaisesRegex(RuntimeError, "has not settled"):
+                    owner.constructor_control(42, lambda _: [42])
+                self.assertEqual(native.call_count, 1)
+            self.assertEqual(owner.scripting_commands, [child])
+            child.kill.assert_called_once_with()
+            self.assertEqual(
+                child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
+            )
+            child.returncode = -9
+            child.communicate.side_effect = None
+            child.communicate.return_value = ("", "")
+            owner.retire_scripting_command(child)
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertEqual(owner.diagnostic_receipts[0]["phase"], "constructor")
 
 
 class ObservationFailureTests(unittest.TestCase):
@@ -757,10 +951,12 @@ class ScriptingLifecycleTests(unittest.TestCase):
             owner.scripting_command_number = 4
             owner.retain_diagnostics(["actual PID control sample"], phase="pid_control")
             owner.scripting_command_number = 5
+            owner.retain_diagnostics(["actual constructor sample"], phase="constructor")
+            owner.scripting_command_number = 6
             owner.retain_diagnostics(["extra request"])
             self.assertEqual(len(owner.diagnostic_receipts), probe.SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT)
             self.assertTrue(owner.diagnostic_receipts[-1]["additional_commands_omitted"])
-            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "pid_control")
+            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "constructor")
 
     def test_cleanup_refusal_keeps_lua_arguments_out_of_plain_sample_receipts(self):
         primary = subprocess.TimeoutExpired(["osascript", "PRIMARY_LUA_ARGUMENT"], 10)

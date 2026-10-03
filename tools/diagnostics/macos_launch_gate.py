@@ -710,6 +710,18 @@ def run(app, output, scenario, seed_tag):
                         f"{type(error).__name__}: {error}"
                     )
                 try:
+                    observation["native_descriptor_constructor"] = native_probe.constructor_control(
+                        child_pids[0], processes
+                    )
+                except Exception as error:
+                    detail = native_probe.pid_control_error_diagnostic(error)
+                    observation["native_descriptor_constructor_error"] = detail
+                    if not any(
+                        receipt["phase"] == "constructor"
+                        for receipt in native_probe.diagnostic_receipts
+                    ):
+                        native_probe.retain_diagnostics([detail], phase="constructor")
+                try:
                     observation["native_pid_transport_control"] = native_probe.control_pid(
                         child_pids[0], processes
                     )
@@ -797,6 +809,11 @@ def run(app, output, scenario, seed_tag):
     if native_probe:
         report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
         report["native_transport_control"] = observation.get("native_transport_control")
+        report["native_descriptor_constructor"] = observation.get("native_descriptor_constructor")
+        if observation.get("native_descriptor_constructor_error"):
+            report["native_descriptor_constructor_error"] = observation[
+                "native_descriptor_constructor_error"
+            ]
         report["native_pid_transport_control"] = observation.get("native_pid_transport_control")
         if observation.get("native_pid_transport_control_error"):
             report["native_pid_transport_control_error"] = observation[
