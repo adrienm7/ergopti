@@ -361,6 +361,7 @@ jobs:
       - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
         run: |
           sudo apt-get install -y --no-install-recommends lua-luv

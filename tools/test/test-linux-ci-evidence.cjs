@@ -55,6 +55,280 @@ try {
 			'API rate limit exceeded. Bearer ABCDEFGHIJKLMNOP; https://private.invalid/path?sig=secret',
 		documentation_url: 'https://docs.github.com/rate-limits'
 	});
+	// Run the actual fixture wrapper against independent URL decisions. Its
+	// release refusal stays red, and authentication never becomes update proof.
+	const fixtureToken = 'CI_UPDATER_ONLY_SECRET_MARKER_123456789';
+	const releaseOrigin = 'https://api.github.com/repos/adrienm7/ergopti/releases';
+	const authenticationCases = [
+		[releaseOrigin, true],
+		[`${releaseOrigin}?per_page=20&page=2`, true],
+		[`${releaseOrigin}?per_page=20`, true],
+		['http://api.github.com/repos/adrienm7/ergopti/releases', false],
+		['HTTPS://api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://API.GITHUB.COM/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com./repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com:443/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://evil.api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com@evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://evil.invalid@api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://user:password@api.github.com/repos/adrienm7/ergopti/releases', false],
+		[`${releaseOrigin}/`, false],
+		[`${releaseOrigin}/latest`, false],
+		['https://api.github.com/repos/adrienm7/other/releases', false],
+		['https://api.github.com/repos/ADRIENM7/ergopti/releases', false],
+		['https://api.github.com/repos/adrienm7/ergopti/%72eleases', false],
+		['https://api.github.com/repos/adrienm7/ergopti/x/../releases', false],
+		[`${releaseOrigin}#owned`, false],
+		[`${releaseOrigin}?per_page=20#owned`, false],
+		[`${releaseOrigin}?per_page=20?page=2`, false],
+		[`${releaseOrigin}?page=2\n`, false],
+		[`${releaseOrigin} `, false],
+		['https://github.com/adrienm7/ergopti/releases/download/v1/package.tar.gz', false],
+		['https://release-assets.githubusercontent.com/package.tar.gz', false]
+	];
+	const authenticationHarness = `
+local native = { requests = 0 }
+local uv = {}
+function uv.run() error('synchronous refusal needs no event loop') end
+function uv.new_pipe() return {} end
+function uv.new_timer() return {} end
+function uv.timer_start() return true end
+function uv.timer_stop() return true end
+function uv.read_start(pipe, callback) pipe.read = callback; return true end
+function uv.read_stop() return true end
+function uv.is_closing(handle) return handle.closing == true end
+function uv.close(handle) handle.closing = true end
+function uv.write(_, config, callback) native.config = config; callback(nil); return true end
+function uv.kill() error('completed receipt must not cancel a live successor') end
+function uv.spawn(command, options, callback)
+ assert(command == 'curl' and options.detached == true, 'native curl ownership changed')
+ native.argv, native.pipes, native.exit = options.args, options.stdio, callback
+ native.requests = native.requests + 1
+ return {}, 4000 + native.requests
+end
+package.preload.luv = function() return uv end
+package.preload['logger.shim'] = function() return {
+ debug = function() end,
+ error = function(_, format, detail)
+  assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
+  if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end
+ end,
+} end
+package.preload['adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
+local Client = dofile(os.getenv('UPDATER_NATIVE_CLIENT'))
+local Json = require('json')
+local rows = assert(Json.decode(os.getenv('UPDATER_AUTH_CASES')))
+local original_headers = { Accept = 'application/vnd.github+json', ['If-None-Match'] = 'original-etag' }
+local options = { owner = 'updater', timeout_ms = 9000, follow_redirects = true, https_only = true, etag_compare = '/owned/etag-in', etag_save = '/owned/etag-out', max_body_bytes = 65536 }
+local http_status = tonumber(os.getenv('UPDATER_HTTP_STATUS')) or 403
+local answer = { ok = false, status = http_status, error = 'HTTP ' .. http_status }
+local expected, count, callbacks = nil, 0, 0
+local original_get = function(url, headers, sent_options, callback)
+ assert(url == expected[1], 'fixture changed original URL')
+ assert(headers.Accept == original_headers.Accept and headers['If-None-Match'] == original_headers['If-None-Match'], 'fixture changed ordinary headers')
+ if expected[2] and os.getenv('GITHUB_ACTIONS') == 'true' then
+  assert(headers.Authorization == 'Bearer ' .. os.getenv('GITHUB_TOKEN'), 'exact release request is not authenticated')
+  assert(headers ~= original_headers, 'authentication must not mutate caller headers')
+  assert(sent_options ~= options and sent_options.follow_redirects == false, 'authenticated request follows a redirect')
+ else
+  assert(headers == original_headers and headers.Authorization == nil, 'authentication escaped its exact CI origin')
+  assert(sent_options == options, 'non-authenticated request lost exact options identity')
+ end
+ assert(original_headers.Authorization == nil, 'caller header table was mutated')
+ assert(options.follow_redirects == true, 'caller redirect policy was mutated')
+ for name, value in pairs(options) do
+  assert(name == 'follow_redirects' or sent_options[name] == value, 'request ownership, deadline, cache or limit changed')
+ end
+ count = count + 1
+ local delivered = false
+ local sent = Client.get(url, headers, sent_options, function(result)
+  assert(result.status == http_status and result.ok == false, 'native HTTP refusal changed')
+  answer = result
+  assert(callback(result, 'original callback receipt') == 'original callback return')
+  delivered = true
+ end)
+ assert(sent == true and not delivered, 'native adapter must return before completion')
+ local argv = table.concat(native.argv, '\\n')
+ assert(not argv:find(os.getenv('GITHUB_TOKEN'), 1, true), 'CI token reached native argv')
+ assert(argv:find('--config\\n-', 1, true), 'native curl lost private stdin config')
+ assert((argv:find('--location', 1, true) == nil) == (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true'), 'native curl redirect policy escaped authentication scope')
+ if expected[2] and os.getenv('GITHUB_ACTIONS') == 'true' then
+  assert(native.config:find('header = "Authorization: Bearer ' .. os.getenv('GITHUB_TOKEN') .. '"', 1, true), 'native stdin lacks exact CI authentication')
+ else
+  assert(not native.config:find(os.getenv('GITHUB_TOKEN'), 1, true), 'native stdin authenticated a foreign request')
+ end
+ native.pipes[2].read(nil, '{"message":"actual refused response"}\\nERGOPTI_HTTP_STATUS:' .. http_status .. '\\n')
+ native.pipes[2].read(nil, nil)
+ native.pipes[3].read(nil, nil)
+ native.exit(http_status >= 400 and 22 or 0, 0)
+ assert(native.callback_error == nil, 'native callback assertion was swallowed')
+ assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')
+ return sent
+end
+local trusted_url, getter_calls = os.getenv('UPDATER_TRUSTED_RELEASE_URL'), 0
+local manager = { _http_client = { get = original_get }, init = function()
+ trusted_url = 'https://api.github.com/repos/untrusted/changed/releases'
+end, current_version = function() return '0.0.0-dev.1' end, get_channel = function() return 'dev' end }
+if os.getenv('UPDATER_GETTER_ABSENT') ~= 'true' then
+ manager.release_api_url = function() getter_calls = getter_calls + 1; return trusted_url end
+end
+manager.check_for_updates = function(_, callback)
+ for _, row in ipairs(rows) do
+  expected = row
+  assert(manager._http_client.get(row[1], original_headers, options, function(result, receipt)
+   assert(result == answer and receipt == 'original callback receipt', 'fixture changed response ownership')
+   callbacks = callbacks + 1
+   return 'original callback return'
+  end) == true, 'fixture changed dispatch result')
+ end
+ assert(count == #rows and callbacks == #rows, 'fixture skipped a scoped request')
+ callback(false, nil, answer.error)
+end
+package.preload['modules.updater.manager'] = function() return manager end
+local original_exit = os.exit
+os.exit = function(status)
+ assert(manager._http_client.get == original_get, 'authentication wrapper was not released')
+ assert(status == 1, 'authentication cannot forgive a release refusal')
+ assert(getter_calls == (os.getenv('GITHUB_ACTIONS') == 'true' and 1 or 0), 'trusted release owner was not captured exactly once')
+ print('scoped request and cleanup observations: ' .. count)
+ original_exit(status)
+end
+`;
+	const customOrigin = 'https://api.github.com/repos/fixture-owner/other-project/releases';
+	const authVariants = [
+		...['true', 'false', 'TRUE'].map((ci) => ({
+			ci,
+			origin: releaseOrigin,
+			cases: authenticationCases,
+			status: 403,
+			name: ci
+		})),
+		{
+			ci: 'true',
+			origin: customOrigin,
+			cases: [
+				[customOrigin, true],
+				[`${customOrigin}?per_page=20&page=2`, true],
+				[releaseOrigin, false],
+				[`${releaseOrigin}?per_page=20&page=2`, false],
+				[`${customOrigin}/latest`, false],
+				['https://api.github.com/repos/untrusted/changed/releases', false]
+			],
+			status: 403,
+			name: 'custom-owner'
+		},
+		{
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [[releaseOrigin, true]],
+			status: 302,
+			name: 'redirect-refusal'
+		}
+	];
+	for (const variant of authVariants) {
+		const { ci } = variant;
+		const evidence = path.join(updaterScratch, `authentication-${variant.name}`);
+		fs.mkdirSync(evidence);
+		const authenticated = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: ci,
+					GITHUB_TOKEN: fixtureToken,
+					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
+					UPDATER_HTTP_STATUS: String(variant.status),
+					UPDATER_AUTH_CASES: JSON.stringify(variant.cases)
+				}
+			}
+		);
+		assert.ifError(authenticated.error);
+		assert.strictEqual(authenticated.status, 1, 'real release refusal must remain nonzero');
+		assert.match(authenticated.stdout, /FAIL the newest release is found/);
+		assert.ok(
+			authenticated.stdout.includes(
+				`scoped request and cleanup observations: ${variant.cases.length}\n`
+			)
+		);
+		const captured = fs.readFileSync(path.join(evidence, 'http.json'), 'utf8');
+		assert.strictEqual(JSON.parse(captured).responses.length, variant.cases.length);
+		assert.ok(
+			JSON.parse(captured).responses.every((response) => response.status === variant.status)
+		);
+		for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+			assert.ok(!authenticated.stdout.includes(privateText), 'stdout leaked private request state');
+			assert.ok(!authenticated.stderr.includes(privateText), 'stderr leaked private request state');
+			assert.ok(!captured.includes(privateText), 'artifact leaked private request state');
+		}
+	}
+	for (const token of [
+		'',
+		'short',
+		fixtureToken + '\n',
+		fixtureToken + '\r',
+		fixtureToken + ' ',
+		fixtureToken + 'é',
+		'x'.repeat(256)
+	]) {
+		const refused = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: 'true',
+					GITHUB_TOKEN: token,
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
+					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
+				}
+			}
+		);
+		assert.ifError(refused.error);
+		assert.notStrictEqual(refused.status, 0);
+		assert.match(refused.stderr, /CI updater authentication is unavailable or invalid/);
+		assert.doesNotMatch(refused.stdout + refused.stderr, /CI_UPDATER_ONLY_SECRET_MARKER/);
+		assert.doesNotMatch(refused.stdout, /installed |scoped request and cleanup/);
+	}
+	for (const endpoint of [
+		null,
+		'http://api.github.com/repos/fixture/owned/releases',
+		'https://api.github.com:443/repos/fixture/owned/releases',
+		'https://api.github.com@evil.invalid/repos/fixture/owned/releases',
+		'https://api.github.com/repos/fixture/owned/releases#foreign',
+		'https://api.github.com/repos/../owned/releases'
+	]) {
+		const rejectedOwner = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: 'true',
+					GITHUB_TOKEN: fixtureToken,
+					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',
+					UPDATER_TRUSTED_RELEASE_URL: endpoint || '',
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
+				}
+			}
+		);
+		assert.ifError(rejectedOwner.error);
+		assert.notStrictEqual(rejectedOwner.status, 0);
+		assert.match(rejectedOwner.stderr, /CI updater release owner is (unavailable|invalid)/);
+		assert.doesNotMatch(rejectedOwner.stdout, /installed |scoped request and cleanup/);
+		assert.ok(!rejectedOwner.stderr.includes(fixtureToken));
+	}
 	const injected = `
 package.preload.luv = function() return { run = function() error('a synchronous refusal needs no event loop') end } end
 local response = { ok = false, status = 403, error = 'HTTP 403', error_body = os.getenv('UPDATER_RESPONSE') }
@@ -68,6 +342,7 @@ local original_get = function(url, sent_headers, sent_options, callback)
  return true
 end
 local manager = { _http_client = { get = original_get }, init = function() end,
+ release_api_url = function() return 'https://api.github.com/repos/fixture/owned/releases?per_page=100' end,
  current_version = function() return '0.0.0-dev.1' end, get_channel = function() return 'dev' end }
 manager.check_for_updates = function(_, callback)
  assert(manager._http_client.get('https://api.github.com/owned/releases', headers, options, function(received, receipt)
@@ -94,6 +369,7 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
 				UPDATER_RESPONSE: refusal
 			}
@@ -148,6 +424,7 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
 				UPDATER_RESPONSE: JSON.stringify({
 					message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000)
@@ -183,6 +460,7 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
 				UPDATER_RESPONSE: refusal
 			}
@@ -616,6 +894,29 @@ const testLinuxSteps = pipeline.steps(pipeline.job('e2e-linux'));
 const updaterStep = pipeline.step(
 	pipeline.job('e2e-linux'),
 	'Update to the newest release and restart'
+);
+/** The fixture token belongs only to the exact owned updater step. */
+function assertUpdaterAuthentication(step) {
+	assert.match(step, /^          GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
+	assert.strictEqual(pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.match(
+		step,
+		/^          bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
+	);
+}
+assertUpdaterAuthentication(updaterStep);
+assert.throws(() =>
+	assertUpdaterAuthentication(
+		updaterStep.replace('          GITHUB_TOKEN: ${{ github.token }}\n', '')
+	)
+);
+assert.throws(() =>
+	assertUpdaterAuthentication(
+		updaterStep.replace('${{ github.token }}', '${{ secrets.PAT_ERGOPTI }}')
+	)
+);
+assert.throws(() =>
+	assertUpdaterAuthentication(updaterStep.replace('${{ !cancelled() }}', '${{ success() }}'))
 );
 assert.match(
 	updaterStep,

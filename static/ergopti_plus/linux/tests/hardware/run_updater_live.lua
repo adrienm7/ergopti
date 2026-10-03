@@ -44,6 +44,36 @@ local rules = assert(Json.decode(read(DRIVER .. "/../_shared/modules/diagnostics
 local http_evidence = { schema_version = 1, responses = {} }
 local evidence_dir = os.getenv("ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR")
 local transport_get = Updater._http_client.get
+local ci = os.getenv("GITHUB_ACTIONS") == "true"
+local ci_token = ci and os.getenv("GITHUB_TOKEN") or nil
+if ci then
+	assert(type(ci_token) == "string" and #ci_token >= 20 and #ci_token <= 255
+		and ci_token:match("^[A-Za-z0-9_]+$"), "CI updater authentication is unavailable or invalid")
+end
+
+--- Reads an exact GitHub release-list path without URL alias normalization.
+--- @param url any
+--- @return string|nil
+local function release_request_path(url)
+	if type(url) ~= "string" or url:find("[%c%s]") then return nil end
+	local suffix = url:match("^https://api%.github%.com(/[^#]*)$")
+	if not suffix then return nil end
+	local path, query = suffix:match("^([^?]+)%?(.*)$")
+	if not path then path = suffix end
+	local owner, repo = path:match("^/repos/([A-Za-z0-9_.%-]+)/([A-Za-z0-9_.%-]+)/releases$")
+	if not owner or owner:match("^%.+$") or repo:match("^%.+$")
+		or (query ~= nil and not query:match("^[A-Za-z0-9_.~%%=&+%-]*$")) then return nil end
+	return path
+end
+
+-- The installed old-version build is this checkout's packaged manager. Its
+-- immutable release URL comes from the shared defaults, never a caller URL.
+local ci_release_path = nil
+if ci then
+	assert(type(Updater.release_api_url) == "function", "CI updater release owner is unavailable")
+	ci_release_path = release_request_path(Updater.release_api_url())
+	assert(ci_release_path ~= nil, "CI updater release owner is invalid")
+end
 
 --- Bounds independently redacted response text without cutting a UTF-8 character.
 --- Request headers and URLs are never collected by this observational probe.
@@ -87,7 +117,19 @@ local function observe_response(result)
 end
 
 Updater._http_client.get = function(url, headers, options, callback)
-	return transport_get(url, headers, options, function(result, ...)
+	local sent_headers = headers
+	local sent_options = options
+	if ci and release_request_path(url) == ci_release_path then
+		sent_headers = {}
+		for name, value in pairs(headers or {}) do sent_headers[name] = value end
+		sent_headers.Authorization = "Bearer " .. ci_token
+		sent_options = {}
+		for name, value in pairs(options or {}) do sent_options[name] = value end
+		-- Even a same-origin redirect can leave this repository's release list.
+		-- A genuine 3xx is a refusal, never an authenticated retry or fallback.
+		sent_options.follow_redirects = false
+	end
+	return transport_get(url, sent_headers, sent_options, function(result, ...)
 		local captured = pcall(observe_response, result)
 		if not captured then io.stderr:write("HTTP refusal evidence could not be captured.\n") end
 		return callback(result, ...)
