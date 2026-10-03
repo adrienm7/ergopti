@@ -550,6 +550,21 @@ class NoPromptDiagnosticScope:
             raise ValueError("A supplemental scalar flag has the wrong type")
 
     @staticmethod
+    def _descriptor_fact(fact):
+        """Admit only a native nullable projection, retaining its raw bridge type."""
+        if (
+            not isinstance(fact, dict)
+            or set(fact) != {"raw_type", "type", "native_absent", "absent"}
+            or type(fact["raw_type"]) is not str
+            or fact["raw_type"] not in {"object", "function"}
+            or type(fact["native_absent"]) is not bool
+            or type(fact["absent"]) is not bool
+            or fact["native_absent"] != fact["absent"]
+            or fact["type"] != ("object" if fact["absent"] else fact["raw_type"])
+        ):
+            raise ValueError("A supplemental descriptor projection is not a closed native fact")
+
+    @staticmethod
     def _fact_summary(facts, constructors=False):
         """Retain only closed getter facts, never raw domains or unexpected integers."""
         observations = []
@@ -574,6 +589,10 @@ class NoPromptDiagnosticScope:
                 )
                 summary = "true" if fact[field] else "false"
             observations.append(f"{key}(type={fact['type']},{field}={summary})")
+            if "raw_type" in fact:
+                observations.append(
+                    f"{key}_bridge(raw_type={fact['raw_type']},native_absent={str(fact['native_absent']).lower()})"
+                )
         return "; ".join(observations) if observations else "not_observed"
 
     def calibration_evidence(self):
@@ -772,7 +791,10 @@ function calibrateOwnedNSError(event) {
             if set(facts) != keys:
                 raise ValueError("Supplemental scalar facts differ from completed reads")
             for key in keys:
-                self._fact(facts[key], specifications[key][1])
+                if key == "absent_errn":
+                    self._descriptor_fact(facts[key])
+                else:
+                    self._fact(facts[key], specifications[key][1])
             scalar_facts = self._fact_summary(facts, constructors=True)
             scalar_stage = stages[-1]
             scalar_qualified = (
@@ -808,15 +830,24 @@ function calibrateOwnedNSError(event) {
             ):
                 raise ValueError("Supplemental decoder boundaries are not a closed prefix")
             specifications = (
-                {"code": ("code_returned", "integer"), "domain": ("domain_returned", "recognized")}
+                {
+                    "code": ("code_returned", "integer"),
+                    "domain": ("domain_returned", "recognized"),
+                }
                 if branch == "send"
-                else {"errn": ("errn_returned", "absent"), "int32": ("int32_returned", "integer")}
+                else {
+                    "errn": ("errn_returned", "absent"),
+                    "int32": ("int32_returned", "integer"),
+                }
             )
             keys = {key for key, (stage, _) in specifications.items() if stage in stages}
             if set(facts) != keys:
                 raise ValueError("Supplemental decoder facts differ from completed reads")
             for key in keys:
-                self._fact(facts[key], specifications[key][1])
+                if key == "errn":
+                    self._descriptor_fact(facts[key])
+                else:
+                    self._fact(facts[key], specifications[key][1])
             decoder_facts = self._fact_summary(facts)
             boundary = stages[-1]
             if terminal:
@@ -984,6 +1015,17 @@ function publishOwnedPacket(name, contract, stages, facts, branch) {
         throw new Error('Supplemental packet write refused');
 }
 function integerFact(value) { return {type:typeof value,integer:Number.isInteger(value) ? value : null}; }
+function projectOwnedDescriptor(descriptor) {
+    ObjC.castObjectToRef(descriptor);
+    var absent = descriptor.isNil();
+    if (absent === true) return null;
+    if (absent !== false || descriptor.isKindOfClass($.NSAppleEventDescriptor) !== true)
+        throw new Error('Supplemental native descriptor identity refused');
+    return descriptor;
+}
+function descriptorFact(raw, projected) {
+    return {raw_type:typeof raw,type:typeof projected,native_absent:raw.isNil() === true,absent:projected === null};
+}
 function recordScalar(stage, key, fact) {
     var expected = __SCALAR_STAGES__;
     if (stage !== expected[scalarStages.length]) throw new Error('Supplemental scalar order refused');
@@ -1012,7 +1054,8 @@ function qualifyOwnedScalars(reply) {
     recordScalar('nil_ref_returned','nil_ref',{type:typeof missing,absent:!missing || missing.isNil()});
     recordScalar('absent_errn_entered');
     var absent = reply.paramDescriptorForKeyword(0x6572726e);
-    recordScalar('absent_errn_returned','absent_errn',{type:typeof absent,absent:absent.isNil()});
+    var projected = projectOwnedDescriptor(absent);
+    recordScalar('absent_errn_returned','absent_errn',descriptorFact(absent, projected));
 }
 function recordDecoderBoundary(branch, stage, key, fact) {
     var routes = __DECODER_STAGES__;
@@ -1302,7 +1345,8 @@ function run(argv) {
         status:status, result:result, error_origin:origin, error_domain:domain});
 }
 """.replace("__NO_PROMPT_OPTIONS__", str(NO_PROMPT_SEND_OPTIONS)).replace(
-                "__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)
+                "__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",
+                str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS),
             )
         )
 
@@ -1320,7 +1364,7 @@ function run(argv) {
         )
         script = script.replace(
             "    var error = Ref();",
-            "    recordOwnedStage('constructed');\n    calibrateOwnedNSError(event);\n    qualifyOwnedScalars(event);\n    var error = Ref();\n    recordOwnedStage('send_entered');",
+            "    recordOwnedStage('constructed');\n    calibrateOwnedNSError(event);\n    qualifyOwnedScalars(event);\n    var error = $();\n    recordOwnedStage('send_entered');",
             1,
         )
         script = script.replace(
@@ -1346,27 +1390,27 @@ function run(argv) {
 
         script = script.replace(
             "        var nativeError = error[0];",
-            "        recordDecoderBoundary('send', 'reference_entered');\n        var nativeError = error[0];\n        recordDecoderBoundary('send', 'reference_returned');",
+            "        recordDecoderBoundary('send', 'reference_entered');\n        var nativeError = error;\n        ObjC.castObjectToRef(nativeError);\n        if (nativeError.isNil() !== false || nativeError.isKindOfClass($.NSError) !== true)\n            throw new Error('Native NSError identity unavailable');\n        recordDecoderBoundary('send', 'reference_returned');",
             1,
         )
         script = script.replace(
             "        status = Number(nativeError.code);",
-            "        recordDecoderBoundary('send', 'code_entered');\n        status = Number(nativeError.code);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));",
+            "        recordDecoderBoundary('send', 'code_entered');\n        var rawCode = nativeError.code;\n        status = Number(rawCode);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));",
             1,
         )
         script = script.replace(
             "        domain = ObjC.unwrap(nativeError.domain);",
-            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});",
+            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});\n        if (typeof rawCode !== 'number' || !Number.isInteger(rawCode))\n            throw new Error('Native NSError integer unavailable');\n        if (typeof domain !== 'string' || domain.length === 0)\n            throw new Error('Native NSError domain unavailable');",
             1,
         )
         script = script.replace(
             "        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);",
-            "        recordDecoderBoundary('handler', 'errn_entered');\n        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);\n        recordDecoderBoundary('handler', 'errn_returned', 'errn', {type:typeof errorNumber,absent:errorNumber.isNil()});",
+            "        recordDecoderBoundary('handler', 'errn_entered');\n        var rawErrorNumber = reply.paramDescriptorForKeyword(0x6572726e);\n        var errorNumber = projectOwnedDescriptor(rawErrorNumber);\n        recordDecoderBoundary('handler', 'errn_returned', 'errn', descriptorFact(rawErrorNumber, errorNumber));",
             1,
         )
         script = script.replace(
             "        if (!errorNumber.isNil()) status = Number(errorNumber.int32Value);",
-            "        if (!errorNumber.isNil()) {\n            recordDecoderBoundary('handler', 'int32_entered');\n            status = Number(errorNumber.int32Value);\n            recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status));\n        } else recordDecoderBoundary('handler', 'absent_errn');",
+            "        if (errorNumber !== null) {\n            recordDecoderBoundary('handler', 'int32_entered');\n            var rawInt32 = errorNumber.int32Value;\n            status = Number(rawInt32);\n            recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status));\n            if (typeof rawInt32 !== 'number' || !Number.isInteger(rawInt32))\n                throw new Error('Native descriptor integer unavailable');\n        } else recordDecoderBoundary('handler', 'absent_errn');",
             1,
         )
         return script
