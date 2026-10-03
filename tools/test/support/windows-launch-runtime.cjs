@@ -61,33 +61,66 @@ function describeNativeIdentityFailure(result, fixture) {
 	});
 }
 
+/** Resolves the acquired fixture directory without borrowing spelling as identity. */
+function canonicalFixtureDirectory(requested, fileSystem = fs) {
+	const acquired = fileSystem.statSync(requested, { bigint: true });
+	const canonical = fileSystem.realpathSync.native(requested);
+	assert.ok(
+		typeof canonical === 'string' && path.isAbsolute(canonical),
+		'the acquired fixture requires an actual absolute native directory'
+	);
+	if (process.platform === 'win32')
+		assert.ok(
+			path.win32.parse(canonical).root.length >= 3,
+			'the native fixture directory must be fully qualified'
+		);
+	const resolved = fileSystem.statSync(canonical, { bigint: true });
+	assert.ok(
+		acquired.isDirectory() === true && resolved.isDirectory() === true,
+		'the acquired fixture and its native image must be directories'
+	);
+	assert.ok(
+		typeof acquired.dev === 'bigint' &&
+			typeof resolved.dev === 'bigint' &&
+			typeof acquired.ino === 'bigint' &&
+			typeof resolved.ino === 'bigint' &&
+			acquired.ino > 0n &&
+			resolved.ino > 0n,
+		'the native fixture directory requires exact independent file identities'
+	);
+	assert.equal(acquired.dev, resolved.dev, 'the native directory identifies another device');
+	assert.equal(acquired.ino, resolved.ino, 'the native directory identifies another file');
+	return canonical;
+}
+
 module.exports = function checkWindowsLaunchRuntime() {
 	if (process.platform !== 'win32') {
 		console.log('[SKIP] native Windows launch refusal fixtures require Windows');
 		return;
 	}
 	const root = path.resolve(__dirname, '../../..');
-	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launch-refusals-'));
-	const powerShell = path.join(
-		process.env.SystemRoot,
-		'System32/WindowsPowerShell/v1.0/powershell.exe'
-	);
-	const executable = path.join(temporary, 'child/ErgoptiPlus.exe');
-	fs.mkdirSync(path.dirname(executable));
-	const quote = (value) => "'" + value.replaceAll("'", "''") + "'";
-	function invoke(args, env, timeout, binary = powerShell) {
-		const result = spawnSync(binary, ['-NoProfile', '-NonInteractive', ...args], {
-			cwd: root,
-			encoding: 'utf8',
-			windowsHide: true,
-			timeout,
-			env: { ...process.env, ...env }
-		});
-		assert.ifError(result.error);
-		assert.notEqual(result.status, null, 'a native process exit receipt is required');
-		return result;
-	}
+	const acquiredDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launch-refusals-'));
 	try {
+		const temporary = canonicalFixtureDirectory(acquiredDirectory);
+		const powerShell = path.join(
+			process.env.SystemRoot,
+			'System32/WindowsPowerShell/v1.0/powershell.exe'
+		);
+		const executable = path.join(temporary, 'child/ErgoptiPlus.exe');
+		fs.mkdirSync(path.dirname(executable));
+		const quote = (value) => "'" + value.replaceAll("'", "''") + "'";
+		function invoke(args, env, timeout, binary = powerShell) {
+			const result = spawnSync(binary, ['-NoProfile', '-NonInteractive', ...args], {
+				cwd: root,
+				encoding: 'utf8',
+				windowsHide: true,
+				timeout,
+				env: { ...process.env, ...env }
+			});
+			assert.ifError(result.error);
+			assert.notEqual(result.status, null, 'a native process exit receipt is required');
+			return result;
+		}
 		const compile = invoke(
 			[
 				'-Command',
@@ -223,8 +256,10 @@ module.exports = function checkWindowsLaunchRuntime() {
 			'[OK] Native Windows observer rejects extraction-only, crash, stale receipt and diagnostic failures.'
 		);
 	} finally {
-		fs.rmSync(temporary, { recursive: true, force: true });
+		fs.rmSync(acquiredDirectory, { recursive: true, force: true });
 	}
 };
 
 module.exports.describeNativeIdentityFailure = describeNativeIdentityFailure;
+
+module.exports.canonicalFixtureDirectory = canonicalFixtureDirectory;

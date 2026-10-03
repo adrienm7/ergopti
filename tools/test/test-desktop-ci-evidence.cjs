@@ -893,6 +893,142 @@ for (const [from, to] of [
 	);
 }
 
+// The fixture must supply the canonical package location without relaxing recordWindows.
+{
+	const canonicalDirectory =
+		require('./support/windows-launch-runtime.cjs').canonicalFixtureDirectory;
+	assert.equal(
+		typeof canonicalDirectory,
+		'function',
+		'the actual native owner must expose its directory admission'
+	);
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-canonical-fixture-root-'));
+	try {
+		const target = path.join(owned, 'actual');
+		const alias = path.join(owned, 'alias');
+		fs.mkdirSync(target);
+		fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir');
+		const canonical = canonicalDirectory(alias);
+		assert.equal(
+			canonical,
+			fs.realpathSync.native(target),
+			'an actual alias must resolve through the native owner'
+		);
+		assert.notEqual(
+			alias,
+			canonical,
+			'the positive control must have independently different spellings'
+		);
+		const originalIdentity = fs.statSync(alias, { bigint: true });
+		const canonicalIdentity = fs.statSync(canonical, { bigint: true });
+		assert.equal(originalIdentity.dev, canonicalIdentity.dev);
+		assert.equal(
+			originalIdentity.ino,
+			canonicalIdentity.ino,
+			'the canonical image must be the same physical directory'
+		);
+		const packageBytes = 'independent canonical package fixture';
+		const canonicalPackage = path.join(canonical, 'ErgoptiPlus.exe');
+		const requestedPackage = path.join(alias, 'ErgoptiPlus.exe');
+		fs.writeFileSync(canonicalPackage, packageBytes);
+		const native = windowsStartup();
+		native.executable = canonicalPackage;
+		native.receipt.executable = canonicalPackage;
+		native.launched_sha256 = crypto.createHash('sha256').update(packageBytes).digest('hex');
+		const observation = path.join(owned, 'observation.json');
+		const output = path.join(owned, 'recorded.json');
+		fs.writeFileSync(
+			observation,
+			JSON.stringify({
+				marker_seen: true,
+				crashed_early: false,
+				marker_seconds: 1,
+				native_startup: native
+			})
+		);
+		const oldSha = process.env.GITHUB_SHA;
+		try {
+			process.env.GITHUB_SHA = 'a'.repeat(40);
+			assert.throws(
+				() => recordWindows(observation, requestedPackage, output),
+				/not the launched executable/,
+				'the old requested-spelling policy must fail the unchanged strict product validator'
+			);
+			assert.equal(fs.existsSync(output), false, 'an alias mismatch must publish no evidence');
+			recordWindows(observation, canonicalPackage, output);
+			assert.equal(
+				JSON.parse(fs.readFileSync(output, 'utf8')).package_sha256,
+				native.launched_sha256,
+				'the native canonical fixture must record actual same-file package bytes'
+			);
+		} finally {
+			if (oldSha === undefined) delete process.env.GITHUB_SHA;
+			else process.env.GITHUB_SHA = oldSha;
+		}
+		const foreign = path.join(owned, 'foreign');
+		fs.mkdirSync(foreign);
+		const foreignPort = { statSync: fs.statSync, realpathSync: { native: () => foreign } };
+		assert.throws(
+			() => canonicalDirectory(alias, foreignPort),
+			/another file/,
+			'a native image of a foreign directory must not replace the actual owned directory'
+		);
+		let physicalReads = 0;
+		const foreignDevice = {
+			statSync: () => ({
+				isDirectory: () => true,
+				dev: originalIdentity.dev + (physicalReads++ === 0 ? 0n : 1n),
+				ino: originalIdentity.ino
+			}),
+			realpathSync: { native: () => target }
+		};
+		assert.throws(
+			() => canonicalDirectory(alias, foreignDevice),
+			/another device/,
+			'equal file indices on another device do not establish physical ownership'
+		);
+		assert.throws(
+			() =>
+				canonicalDirectory(alias, {
+					statSync: fs.statSync,
+					realpathSync: { native: () => 'relative-directory' }
+				}),
+			/actual absolute native directory/
+		);
+		const file = path.join(owned, 'regular-file');
+		fs.writeFileSync(file, 'actual regular file');
+		assert.throws(() => canonicalDirectory(file), /must be directories/);
+		const unknownIdentity = {
+			statSync: () => ({ isDirectory: () => true, dev: 0n, ino: 0n }),
+			realpathSync: { native: () => target }
+		};
+		assert.throws(() => canonicalDirectory(alias, unknownIdentity), /independent file identities/);
+		const textualIdentity = {
+			statSync: () => ({ isDirectory: () => true, dev: '1', ino: '1' }),
+			realpathSync: { native: () => target }
+		};
+		assert.throws(() => canonicalDirectory(alias, textualIdentity), /independent file identities/);
+		assert.equal(
+			fs.existsSync(target),
+			true,
+			'refused projections must not retire the actual fixture'
+		);
+		assert.equal(
+			fs.existsSync(foreign),
+			true,
+			'foreign identity refusal must not delete a sibling'
+		);
+	} finally {
+		fs.rmSync(owned, { recursive: true, force: true });
+	}
+	assert.ok(
+		compiledRuntime.includes('const temporary = canonicalFixtureDirectory(acquiredDirectory);')
+	);
+	assert.ok(
+		compiledRuntime.includes('fs.rmSync(acquiredDirectory, { recursive: true, force: true });')
+	);
+}
+
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();
