@@ -212,6 +212,14 @@ local _wrap_ax_selection_valid = false
 local WRAP_AX_SELECTION_TTL_SEC = 0.2
 
 
+--- Retires selection freshness after an accepted physical action changes focus or text.
+--- The next wrap must read AX again: the action may remove or create a selection.
+local function invalidate_wrap_selection_cache()
+	_wrap_ax_selection_cache = nil
+	_wrap_ax_selection_valid = false
+end
+
+
 --- Applies the exact-provenance gate shared by every input tap in this module.
 --- Owned output is never a user command. An unreadable tag is also non-authoritative,
 --- but still claims and returns the older-output fence so no queued action is lost.
@@ -862,6 +870,7 @@ function M.bind_tap_keys(admission_guard, decide)
 				if not raw_binding_admitted(admission_guard) then return false end
 				return run()
 			end)
+		if scheduled == true then invalidate_wrap_selection_cache() end
 		return finish_tap(scheduled, fence_events)
 	end, "tap keys")
 end

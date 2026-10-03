@@ -412,6 +412,8 @@ The current composition reruns JavaScript and the complete Linux E2E suite.
 Windows and macOS use separate selection cache owners; their native freshness
 and physical-device acceptance remain unqualified by these Linux results.
 
+The macOS registered Tap Keys callback now retires positive and negative AX selection-cache freshness only after the actual deferred producer acknowledges scheduling. Independent registered-callback regressions use the real AX text reader within the unchanged 0.2-second TTL, verify fresh selection creation/removal, preserve deferred execution, and retain rejected-queue, modifier, unassigned, closed-admission, synthetic-provenance and autorepeat behavior. Portable macOS units/E2E qualify this source slice; native three-OS CI and physical input remain separate requirements. Windows physical input epoch invalidation is source-reviewed only; its real tap-to-UIA epoch transition is not yet qualified.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
