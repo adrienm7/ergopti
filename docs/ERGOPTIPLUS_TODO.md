@@ -547,6 +547,22 @@ with the shared Word menu passes five preservation and eight Delete transaction
 cases; the existing Linux persistence case also passes. Native qualification
 remains pending.
 
+Linux custom-delimiter saves now claim only the stored occurrence admitted by
+the existing reader. Unrelated Add and acknowledged Delete preserve unusable
+same-key neighbors, their ordering and unknown nested metadata, including an
+invalid record before a valid one. Twelve independent regressions failed against
+the original planner and now pass through the real catalogue, preference lease
+and source-fenced writer, including publication refusal and explicit retry.
+The selected source gate passed 5,002 Linux unit cases and 176 E2E scenarios;
+strict conventions passed. The unchanged macOS repair-owner module passed its
+19 existing portable tests. Windows uses delimiter strings through its existing
+native override transaction; no custom-record migration was invented.
+Explicit cleanup and the reader's first-usable policy are unchanged. An otherwise
+valid duplicate retained after removal may become admitted on a later reload.
+Complete three-OS native qualification remains pending, so item 34 stays partial.
+
+Pending custom-delimiter additions and changes are now admitted through the real reader against the planned preserved list before publication or an empty-plan acknowledgement. A retained duplicate cannot silently mask a new key, character, label or consume choice. Semantic refusal preserves source bytes and leaves the delta available for rollback or retry after explicit cleanup; actual writer source fencing and unknown record/comment preservation remain intact. Linux focused registered tests qualify both Delete→Add cases and changed-record collisions; complete three-OS native qualification remains pending.
+
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins
   STOPPED, exact native unregistration and the persisted OFF/rule removal.
