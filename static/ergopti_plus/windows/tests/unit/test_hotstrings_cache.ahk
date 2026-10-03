@@ -305,7 +305,7 @@ Test("common autocorrection: the real TOML fallback preserves all historical reg
 _HsCacheSourceOrderNative(ThroughTsv, CapsOnly, BoundMode := "") {
 	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
 	global _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup, _HotstringBoundSources
-	Reference := JSON.Parse(FileRead(_HsCacheTestSharedDir()
+	Reference := JsonParse(FileRead(_HsCacheTestSharedDir()
 		. "\tests\corpus\hotstrings\source_order_entries.json", "UTF-8"))
 	Root := A_Temp . "\ergopti-source-order-" . A_TickCount . "-" . Random(100000, 999999)
 	DirCreate(Root)

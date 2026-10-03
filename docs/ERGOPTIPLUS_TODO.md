@@ -1610,6 +1610,8 @@ native Windows execution is pending CI.
 
 TODO 104 remains partial: the shared hotstring reader now retains physical entry order, and common autocorrection consumes it through the three native registry/cache owners. Independent interleaving tests preserve cross-section insertion precedence while French packs and bound-source owners keep their existing declared order. The current caps identity and all 140 historical rules, flags, metadata, delays and common priority remain unchanged. The runtime family split, config/override migration and full hosted parity validation remain outstanding.
 
+Windows native qualification follow-up: the new ordered-cache fixtures now use the existing JsonParse owner. Privacy/options and two-sided magic-marker source guards inspect the shared native row registrar and explicitly verify both the legacy generated-section and source-ordered category routes, including the bound-source fallback. Two additional native route cases preserve privacy, preview snapshots, both marker replacements and caller-map independence. Portable source/convention/encoding checks pass; actual Windows CI qualification remains required. TODO104 remains partial: the runtime family split and owned migration are not implemented.
+
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples

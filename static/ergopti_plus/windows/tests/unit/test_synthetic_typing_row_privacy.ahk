@@ -483,16 +483,82 @@ Test("hotstrings: the cache registrar forwards every caller option, IsPrivate in
 ; The cache reproduces the runtime TOML path 1:1, so the two forward the same
 ; way or the "fallback" quietly means something else.
 _STRP_BothRegistrarsForwardTheSameWay() {
-	for _, FnName in ["_HsCacheRegisterSection", "LoadHotstringsSection"] {
+	for _, FnName in ["_HsCacheRegisterRows", "LoadHotstringsSection"] {
 		Body := _DriverFuncBody(FnName)
 		Assert(InStr(Body, "ExtraOptions.Clone()"),
 			FnName . " must start from a copy of the caller's options instead of naming the keys worth forwarding — an enumerated list is a list somebody has to remember to extend, and the one nobody extended was the privacy marker")
 		Assert(!RegExMatch(Body, 'Has\("OnlyText"\)'),
 			FnName . " must no longer special-case OnlyText: the hand-picked forward IS the defect, and leaving it beside the copy invites the next option to be hand-picked too")
 	}
+	Section := _DriverFuncBody("_HsCacheRegisterSection")
+	Assert(InStr(Section, "_HsCacheRegisterRows(LoaderKey, _HS_CACHE_ROWS[LoaderKey], FeatureConfig, ExtraOptions, ResolvedPriority)"),
+		"the legacy cache section must forward its exact rows, caller options and priority into the shared registrar")
+	Ensure := _DriverFuncBody("HotstringsCacheEnsure")
+	Assert(InStr(Ensure, "_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)"),
+		"the real generated fast-path map must bind the inspected legacy section owner")
+	Fallback := _DriverFuncBody("LoadHotstringsSection")
+	Assert(InStr(Fallback, "GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]")
+		&& InStr(Fallback, "GeneratedFn(FeatureConfig, ExtraOptions, ResolvedPriority)"),
+		"the legacy section loader must pass caller options through the actual generated owner")
+	Ordered := _DriverFuncBody("LoadHotstringsCategory")
+	Assert(InStr(Ordered, "_HsCacheRegisterRows(Record[1], [Record[2]], Configs[Parts[2]], ExtraOptions, Priorities[Parts[2]])"),
+		"the ordered category must pass caller options and its resolved priority into the same native row owner")
+	Assert(InStr(Ordered, "LoadHotstringsSection(CategoryName, Section, Config, ExtraOptions)"),
+		"a bound category must preserve caller options through the existing section fallback")
 }
 Test("meta hotstrings: both hotstring registrars forward caller options wholesale (personal-info-typing-row-leak)",
 	_STRP_BothRegistrarsForwardTheSameWay)
+
+
+; Exercise both real loader routes, not merely the extracted row body's text.
+_STRP_CurrentCacheRoutesPreserveCallerOptions(SourceOrdered) {
+	global _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, _HotstringBoundSources, HotstringGroupConfig
+	global ScriptInformation, HSE_RegistryByGroup
+	Saved := [_HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, _HotstringBoundSources, HotstringGroupConfig, ScriptInformation["MagicKey"]]
+	Key := "autocorrection.caps"
+	Row := ["*", "fixture★", "output★", true, false, true, ""]
+	Extras := Map("IsPrivate", true, "OnlyText", false, "FutureCacheOption", "preserved",
+		"PreviewValues", ["captured-preview"])
+	try {
+		_HS_CACHE_ROWS := Map(Key, [Row])
+		_HS_CACHE_ROWS.SourceOrder := [[Key, Row]]
+		_HS_CACHE_ROWS.SourceOrderVersion := true
+		_HS_CACHE_LOADED := true
+		_GENERATED_HOTSTRINGS := Map(Key, _HsCacheRegisterSection.Bind(Key))
+		_HotstringsOverrides := Map(), _HotstringBoundSources := Map(), HotstringGroupConfig := Map()
+		ScriptInformation["MagicKey"] := "§"
+		HotstringsResolveBumpGen()
+		HSE_RegistryClear()
+		if SourceOrdered
+			LoadHotstringsCategory("autocorrection", Map("caps", Map("enabled", true)), Extras)
+		else
+			LoadHotstringsSection("autocorrection", "caps", { Enabled: true }, Extras)
+		Assert(HSE_RegistryByGroup.Has(Key), "the actual native route must publish the admitted group")
+		AssertEqual(1, HSE_RegistryByGroup[Key].Length, "the route registers its exact row once")
+		Spec := HSE_RegistryByGroup[Key][1]
+		AssertEqual(true, Spec.IsPrivate, "both routes preserve the privacy marker")
+		AssertEqual(false, Spec.OnlyText, "both routes preserve the longstanding caller option")
+		AssertEqual("captured-preview", Spec.PreviewValues[1], "both routes preserve the current preview metadata")
+		Spec.PreviewValues[1] := "changed-preview"
+		AssertEqual("captured-preview", Extras["PreviewValues"][1], "the native builder owns an independent preview snapshot")
+		AssertEqual("fixture§", Spec.Trigger, "the trigger uses the current magic key")
+		AssertEqual("output§", Spec.Replacement, "the replacement uses the same current magic key")
+		AssertEqual("preserved", Extras["FutureCacheOption"], "the caller's original map remains independent")
+		AssertEqual(4, Extras.Count, "per-row metadata must not mutate the caller's original map")
+	} finally {
+		HSE_RegistryClear()
+		_HS_CACHE_ROWS := Saved[1], _HS_CACHE_LOADED := Saved[2], _GENERATED_HOTSTRINGS := Saved[3]
+		_HotstringsOverrides := Saved[4], _HotstringBoundSources := Saved[5], HotstringGroupConfig := Saved[6]
+		ScriptInformation["MagicKey"] := Saved[7]
+		HotstringsResolveBumpGen()
+	}
+}
+Test("hotstrings: legacy cached section preserves privacy, future options and both magic markers (source-ordered-autocorrection)",
+	_STRP_CurrentCacheRoutesPreserveCallerOptions.Bind(false))
+Test("hotstrings: ordered cached category preserves privacy, future options and both magic markers (source-ordered-autocorrection)",
+	_STRP_CurrentCacheRoutesPreserveCallerOptions.Bind(true))
 
 
 
