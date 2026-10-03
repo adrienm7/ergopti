@@ -318,3 +318,120 @@ helpers.describe("Local API foreign JSON identities", function()
 		helpers.assert_true(json.is_array(decoded.entries[2].base_url))
 	end)
 end)
+
+
+--- Writes independent physical source bytes as an external writer would.
+local function external_api_source(bytes)
+	local file = assert(io.open(PATH, "wb"))
+	assert(file:write(bytes)); assert(file:close())
+end
+
+local function physical_api_source()
+	local file = assert(io.open(PATH, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return bytes
+end
+
+local FOREIGN_API_SOURCE = '{"version":1,"active_id":"external","future":{"keep":true},"entries":[{"id":"external","provider":"lmstudio","token":"","label":"External","model":"external-model","future":[]}]}'
+
+helpers.describe("API entry source ownership for local discovery", function()
+	helpers.it("refuses every cached mutation after an external replacement and rolls back RAM", function()
+		for _, mutation in ipairs({ "add", "remove", "selection" }) do
+			local entries = fresh()
+			local first = assert(entries.add({ provider = "cerebras", token = "first-private", label = "First" }))
+			local second = assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "local-model" }))
+			external_api_source(FOREIGN_API_SOURCE)
+			local outcome
+			if mutation == "add" then
+				outcome = entries.add({ provider = "lmstudio", token = "", label = "New local", model = "new-model" })
+			elseif mutation == "remove" then outcome = entries.remove(first.id)
+			else outcome = entries.set_active(first.id) end
+			if mutation == "add" then helpers.assert_eq(outcome, nil, mutation .. " must refuse stale source")
+			else helpers.assert_eq(outcome, false, mutation .. " must refuse stale source") end
+			helpers.assert_eq(physical_api_source(), FOREIGN_API_SOURCE, mutation .. " preserves exact external bytes")
+			helpers.assert_eq(entries.active().id, second.id, mutation .. " preserves prior RAM selection")
+			helpers.assert_eq(#entries.list(), 2, mutation .. " rolls back the cached list")
+			local restarted = fresh(true)
+			helpers.assert_eq(restarted.active().id, "external", mutation .. " restart reads actual external source")
+		end
+	end)
+
+	helpers.it("does not treat a once-absent file as authority over a new external file", function()
+		local entries = fresh()
+		helpers.assert_eq(#entries.list(), 0)
+		os.execute("mkdir -p '" .. DIR .. "'")
+		external_api_source(FOREIGN_API_SOURCE)
+		local added = entries.add({ provider = "lmstudio", token = "", label = "Local", model = "m" })
+		helpers.assert_eq(added, nil)
+		helpers.assert_eq(physical_api_source(), FOREIGN_API_SOURCE)
+		helpers.assert_eq(#entries.list(), 0)
+	end)
+
+	helpers.it("rechecks exact source after private staging and never acknowledges the staged loser", function()
+		local entries = fresh()
+		local original = assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "m" }))
+		local stage_calls = 0
+		entries._set_private_create_for_test(function(path, text)
+			local written, reason = create_without_mode(path, text)
+			if written then stage_calls = stage_calls + 1; external_api_source(FOREIGN_API_SOURCE) end
+			return written, reason
+		end)
+		local selected = entries.set_active(original.id)
+		-- All assertions follow the production publication callback's return.
+		helpers.assert_eq(stage_calls, 1, "the external writer acts after a real stage was created")
+		helpers.assert_eq(selected, false)
+		helpers.assert_eq(physical_api_source(), FOREIGN_API_SOURCE)
+		helpers.assert_eq(entries.active().id, original.id)
+		local temporary = io.open(PATH .. ".tmp", "rb")
+		local has_temporary = temporary ~= nil
+		if temporary then temporary:close() end
+		helpers.assert_eq(has_temporary, false, "the refused owned stage is retired")
+	end)
+end)
+
+
+helpers.describe("API entry physical source refusals", function()
+	helpers.it("an unreadable source never becomes a new empty writable store", function()
+		local entries = fresh()
+		assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "m" }))
+		local bytes = physical_api_source()
+		entries = fresh(true)
+		local original_open = io.open
+		io.open = function(path, ...)
+			if path == PATH then return nil, "controlled unreadable source", 13 end
+			return original_open(path, ...)
+		end
+		local loaded, added
+		local ok, err = pcall(function()
+			loaded = #entries.list()
+			-- Restore read access before mutation: load refusal must stay owned.
+			io.open = original_open
+			added = entries.add({ provider = "lmstudio", token = "", label = "Unexpected", model = "new" })
+		end)
+		io.open = original_open
+		helpers.assert_eq(io.open, original_open)
+		if not ok then error(err) end
+		helpers.assert_eq(loaded, 0)
+		helpers.assert_eq(added, nil)
+		helpers.assert_eq(physical_api_source(), bytes)
+	end)
+
+	helpers.it("a reentrant selection cannot acquire the private publication owner", function()
+		local entries = fresh()
+		local first = assert(entries.add({ provider = "lmstudio", token = "", label = "First", model = "first" }))
+		local second = assert(entries.add({ provider = "lmstudio", token = "", label = "Second", model = "second" }))
+		local stage_calls, nested = 0, nil
+		entries._set_private_create_for_test(function(path, text)
+			local written, reason = create_without_mode(path, text)
+			stage_calls = stage_calls + 1
+			if stage_calls == 1 and written then nested = entries.set_active(second.id) end
+			return written, reason
+		end)
+		local outer = entries.set_active(first.id)
+		helpers.assert_eq(nested, false, "only the actual first publication owns this source")
+		helpers.assert_eq(stage_calls, 1)
+		helpers.assert_eq(outer, true)
+		helpers.assert_eq(entries.active().id, first.id)
+		helpers.assert_eq(fresh(true).active().id, first.id, "the one acknowledged owner reaches restart")
+	end)
+end)

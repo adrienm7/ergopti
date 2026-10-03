@@ -28,6 +28,7 @@ local ConfigPaths = require("infra.config_paths")
 local ConfigOutdated = require("config_outdated")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local AuthPolicy = require("llm.local_server_auth")
+local SourceWriter = require("toml_codec.writer")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -90,8 +91,9 @@ end
 --- Writes text to a new file only its owner can read, then renames it over path.
 --- @param path string
 --- @param text string
+--- @param expected table Exact classified disk source captured at load/publication.
 --- @return boolean ok, string|nil err
-local function write_private(path, text)
+local function write_private(path, text, expected)
 	local dir = path:match("^(.*)/[^/]+$")
 	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
 	local tmp = path .. ".tmp"
@@ -101,6 +103,14 @@ local function write_private(path, text)
 	if not created then
 		os.remove(tmp)
 		return false, create_err
+	end
+	-- The existing synchronous private-file owner does not yield between this
+	-- exact post-stage check and rename. This fences observed source drift;
+	-- it is not a cross-process kernel compare/exchange or an external lock.
+	local source, status = SourceWriter.read_classified(path)
+	if status ~= expected.status or (status == "ok" and source ~= expected.content) then
+		os.remove(tmp)
+		return false, "source changed after private staging"
 	end
 	local renamed, rename_err = os.rename(tmp, path)
 	if not renamed then
@@ -163,15 +173,24 @@ end
 local function state()
 	if _state then return _state end
 	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {} }
-	local fh = io.open(M.path(), "r")
-	if not fh then return _state end
-	local text = fh:read("*a")
-	fh:close()
+	local text, read_status = SourceWriter.read_classified(M.path())
+	if read_status ~= "ok" and read_status ~= "absent" then
+		_state.write_refusal = "its physical source could not be read completely"
+		return _state
+	end
+	_state.source = { status = read_status, content = text }
+	if read_status == "absent" then return _state end
 	local root = Json.decode_lossless(text)
 	if type(root) ~= "table" or type(root.entries) ~= "table" then
 		local aside = M.path() .. ".corrupt"
-		os.rename(M.path(), aside)
-		Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
+		local moved = os.rename(M.path(), aside)
+		if moved == true then
+			_state.source = { status = "absent", content = "" }
+			Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)
+		else
+			_state.write_refusal = "its malformed source could not be kept aside"
+			Logger.error(LOG, "The malformed API entries source could not be kept aside; replacement is refused.")
+		end
 		return _state
 	end
 	if root.version ~= nil and root.version ~= VERSION then
@@ -227,6 +246,7 @@ end
 --- @return boolean
 local function persist()
 	local current = state()
+	if current.publishing == true then return false end
 	if current.write_refusal then
 		Logger.error(LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
 			.. "or rewriting it would lose its keys.", M.path(), current.write_refusal)
@@ -251,7 +271,17 @@ local function persist()
 	local image = {}
 	for key, value in pairs(current.root_extras) do image[key] = value end
 	image.version, image.entries, image.active_id = VERSION, Json.array(entries), active
-	local ok, err = write_private(M.path(), Json.encode(image))
+	local payload = Json.encode(image)
+	-- The shared publication owner checks the actual disk snapshot before the
+	-- private 0600 writer stages it. The private writer rechecks after staging.
+	-- Reentrant mutations cannot acquire a second publication owner.
+	current.publishing = true
+	local ok, err = SourceWriter.publish_if_unchanged(M.path(), payload, {
+		read_with_status = SourceWriter.read_classified,
+		write_if_unchanged = write_private,
+	}, current.source)
+	current.publishing = false
+	if ok == true then current.source = { status = "ok", content = payload } end
 	if not ok then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
 end
