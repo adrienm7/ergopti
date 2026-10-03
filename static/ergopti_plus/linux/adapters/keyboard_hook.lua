@@ -1483,12 +1483,39 @@ function M.check_device()
 	local acquired, acquire_err = _acquire(keyboards, force_path)
 	if acquired then
 		_seed_caps_lock(_devices[1])
+		-- A source/capture change retires every old repeat callback, but the
+		-- application still never saw its consumed down. Keep that debt only
+		-- on committed source/key owners until an actual release arrives.
+		local sources, suppressed, physical, snapshots = {}, {}, {}, {}
+		for _, path in ipairs(_devices) do sources[path] = true end
+		for key, down in pairs(_physical_down) do
+			if _consumed_down[key] and sources[down.source] then
+				local snapshot = snapshots[down.source]
+				if snapshot == nil then
+					local keys, query_err = EvdevReader.pressed_keys(keyboard_slot(down.source), KEY_MAX)
+					snapshot = { keys = keys }
+					snapshots[down.source] = snapshot
+					if keys == nil then
+						Logger.warn(LOG, "Suppressed-key state unavailable on recovered source %s — "
+							.. "retaining consumed presses until release (%s).", down.source, tostring(query_err))
+					end
+				end
+				-- The kernel can prove a release whose event was lost while the
+				-- descriptor was closed. An unavailable query proves no release.
+				if snapshot.keys == nil or snapshot.keys[down.code] == true then
+					suppressed[key], physical[key] = true, down
+				end
+			end
+		end
 		_reset_modifier_state()
-		_physical_down = {}
+		_consumed_down, _physical_down = suppressed, physical
 		_sync_dropped = {}
 		_acquire_pointers(pointers)
 		_running = true
 		_reacquiring = false
+		-- A cold reacquisition published before it was running. A warm one
+		-- already published ready through _acquire and needs no second scan.
+		if not _origin_ready then M.physical_source_receipt() end
 		Logger.success(LOG, "Re-acquired %d keyboard source(s) (intercept=%s).",
 			#keyboards, tostring(_intercept))
 	else
