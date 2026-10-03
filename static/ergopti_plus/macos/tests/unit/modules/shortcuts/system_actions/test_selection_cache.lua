@@ -137,4 +137,159 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 					.. "any other, or the cache is inert in the most common case", REPEAT_COUNT))
 		end)
 	end)
+
+
+	-- Accepted physical taps retire either AX cache state without changing this
+	-- suite's dependency-free registration boundary.
+	local function observe_tap(mode)
+		local observed
+		with_fixture(function()
+			helpers.with_stub_scope({ "hs.axuielement" }, function()
+				local native_text = helpers.load_with_stubs("modules.shortcuts.actions.text")
+				local read_ax = native_text.read_ax_selection
+				local state = {
+					now = 1000, live = "selected", reads = 0, runs = 0,
+					attributes = {}, attempts = {}, refuse_queue = false,
+					failed_starts = 0, failed_zero_delays = 0, allow_wrap = false,
+				}
+				if mode == "accepted negative" then state.live = nil end
+				package.loaded["hs.axuielement"] = {
+					systemWideElement = function()
+						return { attributeValue = function(_, name)
+							state.attributes[#state.attributes + 1] = name
+							return { attributeValue = function(_, attribute)
+								state.attributes[#state.attributes + 1] = attribute
+								return state.live
+							end }
+						end }
+					end,
+				}
+				local contract = fresh_hs_contract()
+				local delayed = extend_contract(contract.timer.delayed, {
+					new = function(delay, callback)
+						local timer = contract.timer.delayed.new(delay, callback)
+						local start = timer.start
+						timer.start = function(self, ...)
+							if state.refuse_queue then
+								state.failed_starts = state.failed_starts + 1
+								return false
+							end
+							return start(self, ...)
+						end
+						return timer
+					end,
+				})
+				local ctx = fixture.load_h01_system({
+					hs_overrides = { timer = extend_contract(contract.timer, {
+						secondsSinceEpoch = function() return state.now end,
+						delayed = delayed,
+						doAfter = function(delay, callback)
+							if state.refuse_queue then
+								state.failed_zero_delays = state.failed_zero_delays + 1
+								return nil
+							end
+							return contract.timer.doAfter(delay, callback)
+						end,
+					}) },
+					text_actions = {
+						WRAP_PAIRS = native_text.WRAP_PAIRS,
+						read_ax_selection = function()
+							state.reads = state.reads + 1
+							return read_ax()
+						end,
+						wrap_selection = function(text)
+							state.attempts[#state.attempts + 1] = text
+							return state.allow_wrap
+						end,
+					},
+				})
+				ctx.system.bind_wrap_text_if_selected(nil)
+				local wrap = ctx.hs.eventtap.__taps[#ctx.hs.eventtap.__taps]
+				local function wrap_key()
+					return wrap.fn(fixture.physical_key_down(ctx, 25, "(", {}))
+				end
+				state.first_wrap = wrap_key()
+				local admission = function() return mode ~= "closed admission" end
+				ctx.system.bind_tap_keys(admission, function(key)
+					if mode == "unassigned" or key ~= 10 then return nil end
+					return function()
+						state.runs = state.runs + 1
+						state.live = mode == "accepted negative" and "fresh" or nil
+						state.allow_wrap = true
+						return true
+					end
+				end)
+				local tap = ctx.hs.eventtap.__taps[#ctx.hs.eventtap.__taps]
+				state.now = 1000.05
+				state.refuse_queue = mode == "refused queue"
+				local event = fixture.physical_key_down(ctx, 10, "`",
+					mode == "modified" and { shift = true } or {})
+				if mode == "owned" then event = fixture.owned_key_down(ctx, "`", 10, "`", {}) end
+				if mode == "unreadable provenance" then event.getProperty = function() error("unreadable Quartz property") end end
+				if mode == "autorepeat" then
+					local get_property = event.getProperty
+					event.getProperty = function(self, property)
+						if property == ctx.hs.eventtap.event.properties.keyboardEventAutorepeat then return 1 end
+						return get_property(self, property)
+					end
+				end
+				state.accepted = tap.fn(event)
+				state.runs_before_dispatch = state.runs
+				state.reads_before_dispatch = state.reads
+				state.pending_before_dispatch = ctx.synthetic.stats().pending_post_callback_actions
+				state.refuse_queue = false
+				if state.pending_before_dispatch > 0 then fixture.fire_post_callback_actions(ctx.hs) end
+				state.now = 1000.10
+				state.second_wrap = wrap_key()
+				state.now = 1000.15
+				state.third_wrap = wrap_key()
+				state.pending_after_dispatch = ctx.synthetic.stats().pending_post_callback_actions
+				observed = state
+			end)
+		end)
+		return observed
+	end
+
+	for _, mode in ipairs({ "accepted negative", "accepted positive" }) do
+		helpers.it(mode .. " tap refreshes the real AX reader inside the selection TTL", function()
+			local state = observe_tap(mode)
+			helpers.assert_true(state.accepted)
+			helpers.assert_eq(state.first_wrap, false)
+			helpers.assert_eq(state.runs_before_dispatch, 0, "accepted actions remain deferred")
+			helpers.assert_eq(state.reads_before_dispatch, 1, "tap acceptance must not query AX inline")
+			helpers.assert_eq(state.pending_before_dispatch, 1)
+			helpers.assert_eq(state.runs, 1)
+			helpers.assert_eq(state.pending_after_dispatch, 0)
+			helpers.assert_eq(state.reads, 2, "accepted tap retires either cached selection state")
+			helpers.assert_eq(table.concat(state.attributes, ","),
+				"AXFocusedUIElement,AXSelectedText,AXFocusedUIElement,AXSelectedText")
+			helpers.assert_eq(#state.attempts, 1, "retired positive selection must never be reused")
+			helpers.assert_eq(state.attempts[1], mode == "accepted negative" and "fresh" or "selected")
+			helpers.assert_eq(state.second_wrap, mode == "accepted negative")
+			helpers.assert_eq(state.third_wrap, false, "fresh negative results retain the original TTL cache")
+			helpers.assert_eq(state.failed_starts, 0)
+			helpers.assert_eq(state.failed_zero_delays, 0)
+		end)
+	end
+
+	for _, mode in ipairs({ "refused queue", "modified", "unassigned", "closed admission",
+		"owned", "unreadable provenance", "autorepeat" }) do
+		helpers.it(mode .. " tap preserves the existing AX selection cache", function()
+			local state = observe_tap(mode)
+			helpers.assert_eq(state.accepted, mode == "autorepeat")
+			helpers.assert_eq(state.first_wrap, false)
+			helpers.assert_eq(state.second_wrap, false)
+			helpers.assert_eq(state.third_wrap, false)
+			helpers.assert_eq(state.runs_before_dispatch, 0)
+			helpers.assert_eq(state.runs, 0)
+			helpers.assert_eq(state.pending_before_dispatch, 0)
+			helpers.assert_eq(state.pending_after_dispatch, 0)
+			helpers.assert_eq(state.reads, 1, "unaccepted tap must not retire eligible selection")
+			helpers.assert_eq(table.concat(state.attributes, ","), "AXFocusedUIElement,AXSelectedText")
+			helpers.assert_eq(table.concat(state.attempts, ","), "selected,selected,selected")
+			helpers.assert_eq(state.failed_starts, mode == "refused queue" and 2 or 0)
+			helpers.assert_eq(state.failed_zero_delays, mode == "refused queue" and 2 or 0,
+				"native fallback and its deferred refusal diagnostic each attempt one timer")
+		end)
+	end
 end)
