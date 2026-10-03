@@ -408,6 +408,8 @@ The compiled native fixture now admits a real 8.3 alias only when Framework-norm
 
 Actual Windows native C# short-alias identity controls now pass, but the following compiled startup fixture used the short TEMP directory spelling while its strict process-bound observer returned the native long path. The fixture now resolves only its acquired private directory through Node native realpath and verifies independent BigInt volume/file identities before constructing package paths. The product recorder, native observer and C# validator remain unchanged. Portable real filesystem alias and strict-recorder controls pass and reject the original policy plus foreign or unavailable identity; actual Windows compiled startup qualification remains required.
 
+A Windows native independent-CIM enrichment control once reached the minimal fallback despite earlier success with unchanged code. The test now retains closed primary completion status, received UTF-8 byte counts, exact deadline/attempt/task observations and the owned deadline marker in its unchanged strict-primary failure. Production enrichment, five-second primary budget, thirty-second test wait and exact cleanup are unchanged. Two native callback/privacy receipt cases are registered; local source/convention/encoding qualification does not establish native Windows execution or repair the underlying cause. Actual Windows CI remains required.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
