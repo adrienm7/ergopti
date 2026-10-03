@@ -918,9 +918,14 @@ _LMT_InfoBarCallback(Built, Position := 0) {
 }
 
 _LMT_SharedInfoBarNativeOwner() {
-	global _LLM_Menu, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
 	global _LMT_WriterCalls, _LMT_ApplyCalls
 	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	PreviousSuspend := A_IsSuspended
+	Suspend(false)
+	Path := _LMT_InfoBarPrivatePath()
+	ConfigurationFile := Path
 	HadIndent := IsSet(LLM_MENU_INDENT_OPTIONS)
 	PreviousIndent := HadIndent ? LLM_MENU_INDENT_OPTIONS : 0
 	; The unit graph omits _index.ahk; provide its independent accepted range
@@ -931,6 +936,7 @@ _LMT_SharedInfoBarNativeOwner() {
 		AssertEqual(2, Corpus["states"].Length)
 		for Selected in Corpus["states"] {
 			_LLM_Menu["show_info_bar"] := Selected
+			_LMT_InfoBarAdmitFixture(Path, Selected)
 			_LMT_WriterCalls := 0
 			_LMT_ApplyCalls := 0
 			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle)
@@ -953,6 +959,7 @@ _LMT_SharedInfoBarNativeOwner() {
 			Definitions.RemoveAt(2)
 			Definitions.Push(InfoRow)
 			_LLM_Menu["show_info_bar"] := true
+			_LMT_InfoBarAdmitFixture(Path, true)
 			_LMT_WriterResult := false
 			_LMT_WriterCalls := 0
 			_LMT_ApplyCalls := 0
@@ -977,6 +984,10 @@ _LMT_SharedInfoBarNativeOwner() {
 			LLM_MENU_INDENT_OPTIONS := PreviousIndent
 		else
 			LLM_MENU_INDENT_OPTIONS := unset
+		Suspend(PreviousSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
 		_LMT_RestoreFixture(Previous)
 	}
 }
@@ -2079,3 +2090,142 @@ _LMT_FullCollectorOwnsCompleteProfile() {
 }
 Test("LLM transaction: actual full collector requires a complete stored profile",
 	_LMT_FullCollectorOwnsCompleteProfile)
+
+_LMT_InfoBarPrivatePath() {
+	Path := A_Temp . "\ergopti-info-bar-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "this test must acquire an absent private source")
+	return Path
+}
+
+_LMT_InfoBarAdmitFixture(Path, Selected) {
+	global _LLM_Menu, _LLM_Engine
+	_LLM_Menu["enabled"] := true
+	_LLM_Menu["n_predictions"] := 1
+	_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+	Initial := '[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n[llm.display]`nshow_info_bar = '
+		. (Selected ? "true" : "false") . '`n[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n'
+	if FileExist(Path)
+		FileDelete(Path)
+	FileAppend(Initial, Path, "UTF-8-RAW")
+	return Initial
+}
+
+_LMT_InfoBarLeaseWrite(Expected, Writer, Path, Updates) {
+	return _LLM_Menu_InfoBarWrite(Expected, Path, Updates, Writer)
+}
+
+_LMT_InfoBarCommit(Writer, Value, Expected) {
+	return LLM_Menu_CommitMutation("the actual retained Info Bar owner",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		_LMT_Apply, _LMT_InfoBarLeaseWrite.Bind(Expected, Writer), _LMT_Notify,
+		_LMT_Acquire, _LMT_Settle, _LMT_InfoBarCollect)
+}
+
+_LMT_InfoBarWriter(Mode, Seen, Path, Updates, Content, Presence) {
+	Seen["calls"] += 1
+	Seen["updates"] := LLM_Menu_DeepClone(Updates)
+	if Mode == "throw"
+		throw Error("Info Bar writer refused")
+	if Mode == "nil"
+		return ""
+	if Mode == "false"
+		return false
+	if Mode == "source race" {
+		Foreign := StrReplace(Content, "temperature = 0.9", "temperature = 0.8")
+		Seen["source_race_changed"] := Foreign != Content
+		Assert(Foreign != Content, "the terminal port must create an actual different valid source")
+		FileDelete(Path)
+		FileAppend(Foreign, Path, "UTF-8-RAW")
+	}
+	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+}
+
+_LMT_InfoBarRetainedReceipts() {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	PreviousSuspend := A_IsSuspended
+	Path := _LMT_InfoBarPrivatePath()
+	ConfigurationFile := Path
+	try {
+		for Condition in ["ack", "false", "nil", "throw", "source race", "paused", "master", "source", "runtime", "sparse", "retired"] {
+			_LLM_Menu := _LMT_Menu()
+			Initial := _LMT_InfoBarAdmitFixture(Path, true)
+			Seen := Map("calls", 0)
+			Mode := Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? Condition : "ack"
+			Command := _LMT_InfoBarCommit.Bind(_LMT_InfoBarWriter.Bind(Mode, Seen))
+			Built := LLM_Menu_BuildDisplayMenu(Command)
+			try {
+				Callback := _LMT_InfoBarCallback(Built)
+				if Condition == "paused"
+					Suspend(true)
+				if Condition == "master"
+					_LLM_Menu["enabled"] := false
+				if Condition == "source" {
+					FileDelete(Path)
+					FileAppend(StrReplace(Initial, "temperature = 0.9", "temperature = 0.8"), Path, "UTF-8-RAW")
+				}
+				if Condition == "runtime"
+					_LLM_Engine["show_info_bar"] := false
+				if Condition == "sparse"
+					_LLM_Engine := Map("timer_active", false)
+				if Condition == "retired"
+					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				Before := FSReadUtf8Exact(Path)
+				_LMT_ApplyCalls := 0
+				AssertEqual(Condition == "ack", Callback.Call(), Condition)
+				if Condition == "source race"
+					AssertEqual(true, Seen.Get("source_race_changed", false), "the actual terminal port must change the source outside the production-caught callback")
+				AssertEqual(Condition == "ack" || Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? 1 : 0, Seen["calls"], Condition)
+				AssertEqual(Condition == "ack" ? 1 : 0, _LMT_ApplyCalls, Condition)
+				if Condition == "ack" {
+					AssertEqual(1, Seen["updates"].Length)
+					AssertEqual("llm.display", Seen["updates"][1].Section)
+					AssertEqual("show_info_bar", Seen["updates"][1].Key)
+					AssertFalse(_LLM_Menu["show_info_bar"])
+					Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+					AssertEqual(42, Document["private"]["future"])
+					AssertEqual(0.9, Document["llm"]["generation"]["temperature"])
+					AssertFalse(Callback.Call(), "the acknowledged publication retires its old menu identity")
+					AssertEqual(1, Seen["calls"])
+				} else {
+					AssertTrue(_LLM_Menu["show_info_bar"])
+					AssertEqual(Condition == "source race" ? StrReplace(Before, "temperature = 0.9", "temperature = 0.8") : Before,
+						FSReadUtf8Exact(Path), "refusal preserves exact foreign bytes")
+				}
+			} finally {
+				Suspend(PreviousSuspend)
+				_CTC_ReleaseMenu(Built)
+			}
+		}
+	} finally {
+		Suspend(PreviousSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: real Info Bar commands require retained source and strict leased publication", _LMT_InfoBarRetainedReceipts)
+
+_LMT_InfoBarPolicyCorpus() {
+	Corpus := _LMT_InfoBarCorpus()
+	Owner := Map()
+	Other := Map()
+	AssertEqual(15, Corpus["cases"].Length)
+	for Vector in Corpus["cases"] {
+		Expected := LLM_Menu_DeepClone(Corpus["base"])
+		Current := LLM_Menu_DeepClone(Corpus["base"])
+		for Field, Value in Vector.Get("expected", Map())
+			Expected[Field] := Value
+		for Field, Value in Vector["current"]
+			Current[Field] := Value
+		Expected["owner"] := Expected["owner"] == "owned" ? Owner : Other
+		Current["owner"] := Current["owner"] == "owned" ? Owner : Other
+		Decision := LLM_DisplayInfoBarIntent(Expected, Current)
+		AssertEqual(Vector["admitted"], Decision["admitted"], Vector["id"])
+		if Vector["admitted"]
+			AssertEqual(Vector["value"], Decision["value"], Vector["id"])
+	}
+}
+Test("LLM display: Info Bar owner policy replays independent source admission vectors", _LMT_InfoBarPolicyCorpus)

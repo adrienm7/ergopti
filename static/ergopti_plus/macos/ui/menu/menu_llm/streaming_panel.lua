@@ -97,6 +97,32 @@ function M.build(ctx)
 		return snapshot
 	end
 	local indentation_source = indentation_snapshot()
+	local function info_bar_snapshot()
+		local snapshot = llm_mod.streaming_snapshot()
+		local runtime = settings_mgr.setting_snapshot("llm_show_info_bar")
+		local canonical, physical = Preferences.current_view(ConfigPaths.get("ConfigTomlPath"))
+		snapshot.source = Preferences.source_snapshot(ConfigPaths.get("ConfigTomlPath"))
+		if runtime then
+			snapshot.owner = runtime.owner
+			snapshot.generation = snapshot.generation + runtime.generation
+		end
+		if type(ctx.is_paused) == "function" then snapshot.paused = ctx.is_paused() end
+		snapshot.info_bar = state.llm_show_info_bar
+		local function canonical_value(key)
+			if canonical == nil then return nil end
+			if canonical[key] == nil then return llm_mod.DEFAULT_STATE[key] end
+			return canonical[key]
+		end
+		snapshot.blocked = snapshot.blocked == true or ctx.is_disabled == true
+			or runtime == nil or runtime.value ~= snapshot.info_bar
+			or not Preferences.source_matches(snapshot.source, physical)
+			or canonical_value("llm_enabled") ~= snapshot.enabled
+			or canonical_value("llm_show_info_bar") ~= snapshot.info_bar
+			or (canonical and canonical.llm_backend ~= nil and canonical.llm_backend ~= snapshot.backend)
+			or state.llm_enabled ~= snapshot.enabled or state.llm_backend ~= snapshot.backend
+		return snapshot
+	end
+	local info_bar_source = info_bar_snapshot()
 
 	local function show_all_ready()
 		return DisplayPolicy.ready(state.llm_num_predictions,
@@ -141,11 +167,15 @@ function M.build(ctx)
 				})
 			end,
 			["llm_info_bar"] = function()
+				local current = info_bar_snapshot()
+				if not Preferences.source_matches(info_bar_source.source, current.source) then return false end
+				local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
+				if decision.admitted ~= true then return false end
 				return settings_mgr.apply_setting_transaction({
-					key = "llm_show_info_bar",
-					value = not state.llm_show_info_bar,
-					runtime_fn = "set_llm_show_info_bar",
-					publish_setting = false,
+					key = "llm_show_info_bar", value = decision.value,
+					runtime_fn = "set_llm_show_info_bar", publish_setting = false,
+					publication_guard = SettingsManager.publication_guard(Preferences,
+						ConfigPaths.get("ConfigTomlPath"), current.source),
 				})
 			end,
 		},
@@ -159,8 +189,8 @@ function M.build(ctx)
 					and streaming_source.streaming == true
 			end,
 			["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
-			["llm_info_bar_enabled"] = function() return state.llm_show_info_bar end,
-			["llm_info_bar_ready"] = function() return not is_disabled end,
+			["llm_info_bar_enabled"] = function() return info_bar_source.info_bar end,
+			["llm_info_bar_ready"] = function() return DisplayPolicy.info_bar_ready(info_bar_source) end,
 		},
 	}
 	return ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {

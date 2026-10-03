@@ -2165,7 +2165,23 @@ local function _build_llm(ctx)
 			return snapshot
 		end
 		local indentation_source = indentation_snapshot()
-		local info_bar = DisplaySettings.get("show_info_bar")
+		local function info_bar_snapshot()
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.show_info_bar" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local selected = DisplaySettings.get("show_info_bar")
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				info_bar = selected, enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or selected ~= values["llm.display.show_info_bar"],
+			}
+		end
+		local info_bar_source = info_bar_snapshot()
 		local display_ctx = {
 			commands = {
 				["llm_indentation"] = function(value)
@@ -2191,7 +2207,10 @@ local function _build_llm(ctx)
 					return true
 				end,
 				["llm_info_bar"] = function()
-					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
+					local current = info_bar_snapshot()
+					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("show_info_bar", decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -2206,8 +2225,8 @@ local function _build_llm(ctx)
 						and streaming_source.streaming == true
 				end,
 				["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
-				["llm_info_bar_enabled"] = function() return info_bar end,
-				["llm_info_bar_ready"] = function() return true end,
+				["llm_info_bar_enabled"] = function() return info_bar_source.info_bar end,
+				["llm_info_bar_ready"] = function() return DisplayPolicy.info_bar_ready(info_bar_source) end,
 			},
 		}
 		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {

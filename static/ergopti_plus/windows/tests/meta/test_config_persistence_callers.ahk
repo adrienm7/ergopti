@@ -157,6 +157,39 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
 	_CPC_EveryDirectTomlWriterConsumesItsBoolean)
 
+_CPC_InternalTomlPublishersConsumeResult() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "internal publisher inventory requires actual readable production source")
+	Lines := StrSplit(Src, "`n", "`r")
+	Calls := 0
+	for Index, Line in Lines {
+		if !RegExMatch(Line, "\b_TOML_BatchWriteImpl\(") || _CPC_IsFunctionDeclaration(Lines, Index)
+			continue
+		Calls += 1
+		Assert(_CPC_LineConsumesResult(Lines, Index),
+			"an internal TOML builder or publisher cannot discard its qualified result: " . Trim(Line))
+	}
+	; The two canonical TOML gateways retain their result; the Info Bar writer
+	; adds one exact-source publication beneath its existing borrowed lease.
+	AssertEqual(3, Calls, "audit every internal publisher before changing its complete inventory")
+	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
+	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
+	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
+	Assert(Writer != "" && Action != "" && Command != "", "all source, transaction and result owners must exist")
+	ReadPos := InStr(Writer, "Content := FSReadUtf8Exact(Path)")
+	SourcePos := InStr(Writer, "_LLM_Menu_EnableReadSource()",, ReadPos)
+	PublishPos := InStr(Writer, 'return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)')
+	Assert(ReadPos > 0 && SourcePos > ReadPos && PublishPos > SourcePos,
+		"the actual native writer binds the canonical publisher to its revalidated source image")
+	Assert(InStr(Action, "return LLM_Menu_CommitMutation(") > 0
+		&& InStr(Action, "_LLM_Menu_InfoBarWrite.Bind(Expected)") > 0,
+		"the exact-source writer remains beneath the canonical borrowed-lease transaction")
+	Assert(InStr(Command, 'return Command.Call(Decision["value"], Expected) == true') > 0,
+		"a refused or malformed native setter result cannot acknowledge the command")
+}
+Test("AHK-15-persistence: every internal publisher retains its exact source and result owner",
+	_CPC_InternalTomlPublishersConsumeResult)
+
 _CPC_EveryFeatureWriterConsumesItsResult() {
 	Src := _DriverSourceNoComments()
 	Calls := 0

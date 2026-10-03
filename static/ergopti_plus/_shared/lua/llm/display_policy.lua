@@ -131,4 +131,31 @@ function M.indentation_intent(expected, current, value, values)
 	return { admitted = false }
 end
 
+--- Admits the presentation checkbox from a live current native owner.
+--- Info Bar does not depend on prediction count or streaming capability.
+--- @param snapshot table Current runtime gates and owner revision.
+--- @return boolean
+function M.info_bar_ready(snapshot)
+	return type(snapshot) == "table" and type(snapshot.owner) == "table"
+		and type(snapshot.generation) == "number" and snapshot.generation >= 0
+		and snapshot.generation == math.floor(snapshot.generation)
+		and type(snapshot.backend) == "string" and snapshot.backend ~= ""
+		and type(snapshot.info_bar) == "boolean" and snapshot.enabled == true
+		and snapshot.paused == false and snapshot.blocked == false
+end
+
+--- Resolves one held checkbox against the same acknowledged native source.
+--- @param expected table Rendering snapshot.
+--- @param current table Current snapshot before the canonical setting owner.
+--- @return table decision { admitted, value? }.
+function M.info_bar_intent(expected, current)
+	if not M.info_bar_ready(expected) or not M.info_bar_ready(current) then
+		return { admitted = false }
+	end
+	for _, field in ipairs({ "owner", "generation", "backend", "info_bar" }) do
+		if expected[field] ~= current[field] then return { admitted = false } end
+	end
+	return { admitted = true, value = not current.info_bar }
+end
+
 return M
