@@ -532,6 +532,33 @@ class NoPromptDiagnosticScope:
         elif type(value) is not bool:
             raise ValueError("A supplemental scalar flag has the wrong type")
 
+    @staticmethod
+    def _fact_summary(facts, constructors=False):
+        """Retain only closed getter facts, never raw domains or unexpected integers."""
+        observations = []
+        for key in ("code", "domain", "int32", "nil_ref", "absent_errn", "errn"):
+            if key not in facts:
+                continue
+            fact = facts[key]
+            if key in {"code", "int32"}:
+                value = fact["integer"]
+                if value is None:
+                    summary = "unavailable"
+                elif not constructors:
+                    summary = "present"
+                elif value == (-1712 if key == "code" else -50):
+                    summary = "-1712" if key == "code" else "-50"
+                else:
+                    summary = "unexpected_integer"
+                field = "integer"
+            else:
+                field = (
+                    ("matches" if constructors else "recognized") if key == "domain" else "absent"
+                )
+                summary = "true" if fact[field] else "false"
+            observations.append(f"{key}(type={fact['type']},{field}={summary})")
+        return "; ".join(observations) if observations else "not_observed"
+
     def scalar_evidence(self, terminal=False, native=None):
         """Retain decoder boundaries independently of the original native status verdict."""
         scalar = self._owned_packet(
@@ -539,6 +566,7 @@ class NoPromptDiagnosticScope:
         )
         scalar_stage = "not_observed"
         scalar_qualified = False
+        scalar_facts, decoder_facts = "not_observed", "not_observed"
         if scalar is not None:
             stages, facts = scalar["stages"], scalar["facts"]
             if (
@@ -560,6 +588,7 @@ class NoPromptDiagnosticScope:
                 raise ValueError("Supplemental scalar facts differ from completed reads")
             for key in keys:
                 self._fact(facts[key], specifications[key][1])
+            scalar_facts = self._fact_summary(facts, constructors=True)
             scalar_stage = stages[-1]
             scalar_qualified = (
                 len(stages) == len(SUPPLEMENTAL_SCALAR_STAGES)
@@ -603,6 +632,7 @@ class NoPromptDiagnosticScope:
                 raise ValueError("Supplemental decoder facts differ from completed reads")
             for key in keys:
                 self._fact(facts[key], specifications[key][1])
+            decoder_facts = self._fact_summary(facts)
             boundary = stages[-1]
             if terminal:
                 expected_branch = "send" if native["error_origin"] == "send" else "handler"
@@ -639,6 +669,8 @@ class NoPromptDiagnosticScope:
             "scalar_qualified": scalar_qualified,
             "decoder_branch": branch,
             "decoder_boundary": boundary,
+            "scalar_facts": scalar_facts,
+            "decoder_facts": decoder_facts,
         }
 
     def observe(self, require_completion=False, terminal=False, native=None):
@@ -1185,6 +1217,8 @@ function run(argv) {
                     [
                         f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
                         f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
+                        f"Supplemental constructor scalars: {evidence['scalar_facts']}",
+                        f"Supplemental decoder scalars: {evidence['decoder_facts']}",
                     ],
                     "pid_no_prompt",
                 )
@@ -1196,6 +1230,8 @@ function run(argv) {
                     f"status {result['status']}, origin {result['error_origin']}",
                     f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
                     f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
+                    f"Supplemental constructor scalars: {evidence['scalar_facts']}",
+                    f"Supplemental decoder scalars: {evidence['decoder_facts']}",
                 ],
                 "pid_no_prompt",
             )

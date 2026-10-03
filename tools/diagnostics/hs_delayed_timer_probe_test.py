@@ -2347,5 +2347,100 @@ catch(error) { process.stdout.write(JSON.stringify({closed_failure:true,sends:se
                 scope.cleanup()
 
 
+class SupplementalScalarFactSummaryTests(unittest.TestCase):
+    """Closed constructor facts remain observable after their physical scope retires."""
+
+    owner = SupplementalReadinessTests.owner
+    invoke = SupplementalReadinessTests.invoke
+    mutate_packet = SupplementalScalarBranchTests.mutate_packet
+
+    def test_unqualified_constructor_identifies_exact_closed_getter_after_cleanup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with self.assertRaises(ValueError):
+                self.invoke(
+                    owner,
+                    mutation=self.mutate_packet(
+                        "scalar.json", lambda d: d["facts"]["code"].update(integer=None)
+                    ),
+                )
+            observed = str(owner.diagnostic_receipts)
+            self.assertIn("code(type=number,integer=unavailable)", observed)
+            self.assertIn("int32(type=number,integer=-50)", observed)
+            self.assertIn("domain(type=string,matches=true)", observed)
+            self.assertIn("nil_ref(type=undefined,absent=true)", observed)
+            self.assertIn("absent_errn(type=object,absent=true)", observed)
+            self.assertIn("qualified: false", observed)
+            self.assertNotIn(folder, observed)
+            self.assertNotIn(NONCE, observed)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+            self.assertIsNone(owner.no_prompt_scope)
+
+    def test_unexpected_constructor_integer_is_closed_not_raw_payload(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with self.assertRaises(ValueError):
+                self.invoke(
+                    owner,
+                    mutation=self.mutate_packet(
+                        "scalar.json", lambda d: d["facts"]["int32"].update(integer=987654321)
+                    ),
+                )
+            observed = str(owner.diagnostic_receipts)
+            self.assertIn("code(type=number,integer=-1712)", observed)
+            self.assertIn("int32(type=number,integer=unexpected_integer)", observed)
+            self.assertNotIn("987654321", observed)
+            self.assertNotIn(NONCE, observed)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_actual_decoder_scalar_invalid_and_partial_reads_are_observations_only(self):
+        for partial in (False, True):
+            with self.subTest(partial=partial), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+
+                def mutate(d):
+                    if partial:
+                        d.update(stages=["reference_entered"], facts={})
+                    else:
+                        d["facts"]["code"]["integer"] = None
+
+                with self.assertRaisesRegex(RuntimeError, "exit -11"):
+                    self.invoke(
+                        owner,
+                        status=-1712,
+                        code=-11,
+                        mutation=self.mutate_packet("decoder.json", mutate),
+                    )
+                observed = str(owner.diagnostic_receipts)
+                if partial:
+                    self.assertIn("Supplemental decoder scalars: not_observed", observed)
+                    self.assertIn("boundary: reference_entered", observed)
+                else:
+                    self.assertIn(
+                        "Supplemental decoder scalars: code(type=number,integer=unavailable)",
+                        observed,
+                    )
+                    self.assertIn("domain(type=string,recognized=true)", observed)
+                self.assertNotIn("admitted", observed)
+                self.assertNotIn("denied", observed)
+                self.assertNotIn(NONCE, observed)
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_unknown_synthetic_fact_type_never_projects_private_payload(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with self.assertRaises(ValueError) as error:
+                self.invoke(
+                    owner,
+                    mutation=self.mutate_packet(
+                        "scalar.json",
+                        lambda d: d["facts"]["code"].update(type="private-secret-marker"),
+                    ),
+                )
+            self.assertNotIn("private-secret-marker", str(error.exception))
+            self.assertNotIn("private-secret-marker", str(owner.diagnostic_receipts))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
