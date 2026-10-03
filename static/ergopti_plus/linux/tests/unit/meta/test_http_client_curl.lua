@@ -49,7 +49,8 @@ local function fake_luv(config)
 	function fake.close(value) value.closing = true end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
-		if options.kill_failure and not state.allow_kills then return false end
+		if options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
+		if options.kill_failure and not state.allow_kills then return nil, "EPERM: operation not permitted", "EPERM" end
 		return true
 	end
 	function fake.spawn(command, options, callback)
@@ -117,6 +118,52 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
+		for _, mode in ipairs({ "deadline", "cancel", "gone", "refusal" }) do
+			helpers.it("linux-cli-orphan-receipts: " .. method .. " retains group ownership through " .. mode, function()
+				local config = { kill_missing = mode == "gone", kill_failure = mode == "refusal" }
+				local client, state
+				if method == "sha256" then client, state = fresh_digest(config) else client, state = fresh_client(config) end
+				local result, callbacks = nil, 0
+				local function done(value) result, callbacks = value, callbacks + 1 end
+				if method == "get" then client.get("http://127.0.0.1/receipt", {}, {}, done)
+				elseif method == "post" then client.post("http://127.0.0.1/receipt", {}, "{}", done)
+				elseif method == "download" then client.download("http://127.0.0.1/receipt", {}, "/tmp/receipt", {}, done)
+				elseif method == "stream" then client.postStream("http://127.0.0.1/receipt", {}, "{}", {}, function() end, done)
+				else client.sha256("/tmp/receipt", {}, function(value, failure)
+					done({ digest = value, error = failure })
+				end) end
+				state.exit(0)
+				helpers.assert_true(client.isActive(), "live inherited streams retain ownership after leader exit")
+				if mode == "deadline" then
+					state.timer.callback()
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_eq(result.error, "timeout")
+				else
+					local cancelled = client.cancel()
+					if mode == "refusal" then
+						helpers.assert_eq(cancelled, false, "refused native signal retains the request")
+						helpers.assert_true(client.isActive())
+						state.allow_kills = true
+						helpers.assert_true(client.cancel())
+					else helpers.assert_eq(cancelled, true) end
+					helpers.assert_eq(callbacks, 0)
+				end
+				helpers.assert_true(#state.kills >= 1, "leader retirement cannot skip signalling the group")
+				helpers.assert_eq(state.kills[1].pid, -4321)
+				if mode == "deadline" or mode == "cancel" then
+					helpers.assert_eq(state.kills[2].signal, "sigkill")
+				end
+				helpers.assert_true(not client.isActive())
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+				local previous = callbacks
+				state.stdout(nil)
+				state.stderr(nil)
+				state.exit(0)
+				helpers.assert_eq(callbacks, previous, "late stream and exit receipts stay retired")
+			end)
+		end
+	end
 	for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 		for _, signal in ipairs({ 15, 9, 10, 12 }) do
 			helpers.it("linux-cli-signal-receipts: " .. method .. " rejects signal " .. signal, function()

@@ -13,6 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
+local ProcessGroup = require("infra.libuv_process_group")
 local LOG = "adapters.file_digest"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -79,24 +80,11 @@ local function close_timer(request)
 	request.timer = nil
 end
 
---- Sends a signal to the detached sha256sum process group.
---- @param request table
---- @param signal string
---- @return boolean
-local function signal_group(request, signal)
-	if not luv or not request.pid or type(luv.kill) ~= "function" then return false end
-	local ok, accepted = pcall(luv.kill, -request.pid, signal)
-	return ok and accepted ~= nil and accepted ~= false
-end
-
 --- Terminates the entire owned process group.
 --- @param request table
 --- @return boolean
 local function terminate_group(request)
-	if request.exited then return true end
-	local terminated = signal_group(request, "sigterm")
-	if terminated then signal_group(request, "sigkill") end
-	return terminated
+	return ProcessGroup.terminate(luv, request.pid)
 end
 
 --- Publishes one terminal result and makes every late callback inert.
