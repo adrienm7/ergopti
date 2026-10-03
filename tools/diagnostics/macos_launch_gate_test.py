@@ -40,6 +40,19 @@ def timer_summary():
     }
 
 
+def control_summary():
+    """Return an independent native transport acknowledgement, not feature proof."""
+    return {
+        "schema_version": 1,
+        "contract": "hs.applescript.control",
+        "phase": "control",
+        "acknowledged": True,
+        "nonce": "a" * 32,
+        "pid": 42,
+        "executable": "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon",
+    }
+
+
 HEALTHY = {
     "launcher_log": "[t] embedded Hammerspoon bootstrap logger configured\n",
     "driver_log": "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
@@ -47,6 +60,7 @@ HEALTHY = {
     "quit_seconds": 1.5,
     "state_problems": [],
     "native_delayed_timer": timer_summary(),
+    "native_transport_control": control_summary(),
 }
 
 
@@ -138,7 +152,9 @@ class VerdictTests(unittest.TestCase):
         cause = "native scripting TimeoutExpired: " + "p" * 4096 + context
         report = {
             "failures": [cause],
-            "native_probe_diagnostics": [{"command": 2, "observations": context}],
+            "native_probe_diagnostics": [
+                {"command": 2, "phase": "observation", "observations": context}
+            ],
         }
         with tempfile.TemporaryDirectory(prefix="ergopti-native-plain-") as root:
             output = Path(root) / "evidence"
@@ -153,9 +169,13 @@ class VerdictTests(unittest.TestCase):
                 status = gate.main(["/Applications/ErgoptiPlus.app", str(output), "clean"])
             self.assertEqual(status, 1)
             lines = stdout.getvalue().splitlines()
-            plain = [line for line in lines if line.startswith("native probe command2: ")]
+            plain = [
+                line for line in lines if line.startswith("native probe command2 (observation): ")
+            ]
             self.assertTrue(plain, "owned context must have a plain-log channel")
-            self.assertIn("native probe command2: TCCAccessRequest (native final frame)", plain)
+            self.assertIn(
+                "native probe command2 (observation): TCCAccessRequest (native final frame)", plain
+            )
             self.assertTrue(all(not line.startswith("::") for line in plain))
             self.assertEqual(json.loads((output / "result.json").read_text()), report)
 
@@ -167,6 +187,7 @@ class VerdictTests(unittest.TestCase):
                     "native_probe_diagnostics": [
                         {
                             "command": 1,
+                            "phase": "observation",
                             "observations": "native frame\r\n::notice::foreign annotation\n%0A::error::text",
                         }
                     ],
@@ -176,67 +197,117 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(
             lines,
             [
-                "native probe command1: native frame",
-                "native probe command1: ::notice::foreign annotation",
-                "native probe command1: %0A::error::text",
+                "native probe command1 (observation): native frame",
+                "native probe command1 (observation): ::notice::foreign annotation",
+                "native probe command1 (observation): %0A::error::text",
             ],
         )
 
     def test_launch_report_retains_its_own_probe_diagnostics_after_refusal(self):
-        with tempfile.TemporaryDirectory(prefix="ergopti-owned-native-log-") as root:
-            app, output = Path(root) / "ErgoptiPlus.app", Path(root) / "evidence"
-            output.mkdir()
-            child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
-            launcher = app / "Contents/MacOS/ErgoptiPlus"
-            for executable in (launcher, child):
-                executable.parent.mkdir(parents=True, exist_ok=True)
-                executable.write_text("owned fixture executable")
-            with (app / "Contents/Info.plist").open("wb") as handle:
-                plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
-            owner = timer_probe.NativeDelayedTimerProbe(app, output, gate.HS_DOMAIN)
-            live = {"started": False}
+        for scenario in ("clean", "karabiner_config"):
+            with tempfile.TemporaryDirectory(prefix="ergopti-owned-native-log-") as root:
+                app, output = Path(root) / "ErgoptiPlus.app", Path(root) / "evidence"
+                output.mkdir()
+                child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
+                launcher = app / "Contents/MacOS/ErgoptiPlus"
+                for executable in (launcher, child):
+                    executable.parent.mkdir(parents=True, exist_ok=True)
+                    executable.write_text("owned fixture executable")
+                with (app / "Contents/Info.plist").open("wb") as handle:
+                    plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
+                owner_type = (
+                    timer_probe.NativeDelayedTimerProbe
+                    if scenario == "clean"
+                    else karabiner_probe.NativeKarabinerConfigProbe
+                )
+                owner = owner_type(app, output, gate.HS_DOMAIN)
+                live = {"started": False}
 
-            def processes(executable):
-                return [42 if executable == child else 41] if live["started"] else []
+                def processes(executable):
+                    return [42 if executable == child else 41] if live["started"] else []
 
-            def native_run(arguments, **options):
-                if arguments[0] == "open":
-                    live["started"] = True
-                return subprocess.CompletedProcess(arguments, 0, "arm64", "")
+                def native_run(arguments, **options):
+                    if arguments[0] == "open":
+                        live["started"] = True
+                    return subprocess.CompletedProcess(arguments, 0, "arm64", "")
 
-            def observe_native(pid, resolve):
-                self.assertEqual(pid, 42)
-                self.assertEqual(resolve(child), [42])
-                owner.scripting_command_number = 1
-                owner.retain_diagnostics(["observed native Hammerspoon server thread: Thread_42"])
-                raise RuntimeError("primary refusal with unrelated secret")
+                def observe_native(pid, resolve):
+                    self.assertEqual(pid, 42)
+                    self.assertEqual(resolve(child), [42])
+                    owner.scripting_command_number = 1
+                    owner.retain_diagnostics(
+                        ["observed native Hammerspoon server thread: Thread_42"]
+                    )
+                    raise RuntimeError("primary refusal with unrelated secret")
 
-            def quit_native(*_):
-                live["started"] = False
-                return 0.5
+                def quit_native(*_):
+                    live["started"] = False
+                    return 0.5
 
-            with (
-                mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
-                mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
-                mock.patch.object(gate, "NativeDelayedTimerProbe", return_value=owner),
-                mock.patch.object(owner, "enable"),
-                mock.patch.object(owner, "observe", side_effect=observe_native),
-                mock.patch.object(owner, "restore"),
-                mock.patch.object(gate, "processes", side_effect=processes),
-                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
-                mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
-                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
-                mock.patch.object(gate, "check_state", return_value=[]),
-                mock.patch.object(gate, "quit_application", side_effect=quit_native),
-                mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
-            ):
-                report = gate.run(app, output, "clean", "")
-            self.assertEqual(report["native_probe_diagnostics"], owner.diagnostic_receipts)
-            self.assertEqual(len(report["failures"]), 1)
-            self.assertIn("primary refusal", report["failures"][0])
-            self.assertNotIn("unrelated secret", str(report["native_probe_diagnostics"]))
-            self.assertEqual(report["quit_seconds"], 0.5)
+                with (
+                    mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
+                    mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
+                    mock.patch.object(gate, owner_type.__name__, return_value=owner),
+                    mock.patch.object(owner, "enable"),
+                    mock.patch.object(
+                        owner, "control", side_effect=RuntimeError("control refused")
+                    ) as control,
+                    mock.patch.object(owner, "observe", side_effect=observe_native),
+                    mock.patch.object(owner, "restore"),
+                    mock.patch.object(gate, "processes", side_effect=processes) as resolver,
+                    mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                    mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
+                    mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
+                    mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
+                    mock.patch.object(gate, "check_state", return_value=[]),
+                    mock.patch.object(gate, "quit_application", side_effect=quit_native),
+                    mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
+                ):
+                    report = gate.run(app, output, scenario, "")
+                self.assertEqual(report["native_probe_diagnostics"], owner.diagnostic_receipts)
+                control.assert_called_once_with(42, resolver)
+                self.assertEqual(len(report["failures"]), 2)
+                self.assertIn("control refused", report["failures"][0])
+                self.assertIn("primary refusal", report["failures"][1])
+                self.assertNotIn("unrelated secret", str(report["native_probe_diagnostics"]))
+                self.assertEqual(report["quit_seconds"], 0.5)
+
+    def test_successful_feature_proofs_cannot_hide_native_control_refusal(self):
+        from hs_karabiner_config_probe_test import receipt, EXECUTABLE, NONCE, DOMAIN
+
+        summary = karabiner_probe.validate_receipt(receipt(), NONCE, 42, EXECUTABLE, DOMAIN)
+        summary["preference_restored"] = True
+        for scenario in ("clean", "karabiner_config"):
+            with self.subTest(scenario=scenario):
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_karabiner_config=summary,
+                        native_transport_control_error="actual control owner refused",
+                    ),
+                )
+                self.assertTrue(any("actual control owner refused" in value for value in failures))
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_karabiner_config=summary,
+                        native_transport_control=None,
+                    ),
+                )
+                self.assertTrue(any("control" in value for value in failures))
+
+    def test_control_receipt_cannot_substitute_for_missing_native_feature_proofs(self):
+        for scenario, field in (
+            ("clean", "native_delayed_timer"),
+            ("karabiner_config", "native_karabiner_config"),
+        ):
+            with self.subTest(scenario=scenario):
+                failures = gate.evaluate(scenario, observe(**{field: None}))
+                self.assertTrue(failures)
+                self.assertFalse(
+                    any("control" in value for value in failures),
+                    "the valid control remains separate from the absent feature proof",
+                )
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])

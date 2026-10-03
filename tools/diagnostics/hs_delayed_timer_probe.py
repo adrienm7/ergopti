@@ -22,7 +22,9 @@ SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
 SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
 SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT = 8192
 SCRIPT_DIAGNOSTIC_LINE_LIMIT = 128
-SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = 2
+SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = 3
+SCRIPTING_PHASES = ("control", "observation", "cleanup")
+CONTROL_CONTRACT = "hs.applescript.control"
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -38,6 +40,34 @@ def unique_object(pairs):
             raise ValueError(f"Duplicate native receipt field: {key}")
         result[key] = value
     return result
+
+
+def validate_control_summary(summary, feature=None):
+    """Require exact owned control identity without treating it as feature proof."""
+    fields = {"schema_version", "contract", "phase", "acknowledged", "nonce", "pid", "executable"}
+    if not isinstance(summary, dict) or set(summary) != fields:
+        raise ValueError("The native AppleEvent control receipt is incomplete")
+    for key, expected in {
+        "schema_version": 1,
+        "contract": CONTROL_CONTRACT,
+        "phase": "control",
+        "acknowledged": True,
+    }.items():
+        if type(summary[key]) is not type(expected) or summary[key] != expected:
+            raise ValueError(f"Native AppleEvent control acknowledgement differs: {key}")
+    if (
+        type(summary["pid"]) is not int
+        or summary["pid"] <= 0
+        or not isinstance(summary["nonce"], str)
+        or re.fullmatch(r"[0-9a-f]{32}", summary["nonce"]) is None
+        or not isinstance(summary["executable"], str)
+        or not summary["executable"].startswith("/")
+    ):
+        raise ValueError("Native AppleEvent control identity is invalid")
+    if isinstance(feature, dict):
+        for key in ("nonce", "pid", "executable"):
+            if type(feature.get(key)) is not type(summary[key]) or feature.get(key) != summary[key]:
+                raise ValueError(f"Native AppleEvent control and feature owners differ: {key}")
 
 
 def validate_receipt(result, nonce, pid, executable, bundle_id):
@@ -254,8 +284,10 @@ class NativeDelayedTimerProbe:
             )
         self.preference.enable()
 
-    def execute(self, source):
+    def execute(self, source, phase="observation"):
         """Target the already running installed bundle and require its exact reply."""
+        if phase not in SCRIPTING_PHASES:
+            raise ValueError("The native scripting phase is unknown")
         if self.scripting_commands:
             raise RuntimeError("The prior native scripting command has not settled")
         script = (
@@ -288,7 +320,7 @@ class NativeDelayedTimerProbe:
                     diagnostics.append(
                         f"native Hammerspoon server sample failed: {type(sampling).__name__}: {sampling}"
                     )
-            self.retain_diagnostics(diagnostics)
+            self.retain_diagnostics(diagnostics, phase)
             try:
                 self.retire_scripting_command(command)
             except Exception as cleanup:
@@ -305,20 +337,45 @@ class NativeDelayedTimerProbe:
                 "The native scripting command did not acknowledge actual process exit"
             )
         self.scripting_commands.remove(command)
-        if command.returncode != 0 or stdout.strip() != self.nonce:
+        acknowledged = (
+            stdout == self.nonce + "\n" if phase == "control" else stdout.strip() == self.nonce
+        )
+        if command.returncode != 0 or not acknowledged:
             raise RuntimeError(
                 "The packaged native timer scripting command did not acknowledge its nonce "
                 f"(exit {command.returncode}): {stderr.strip()[:1000]}"
             )
 
-    def retain_diagnostics(self, diagnostics):
+        return self.nonce
+
+    def control(self, pid, processes):
+        """Test the same live AppleEvent handler with an exact owned nonce line."""
+        self.bind_runtime(pid, processes)
+        acknowledgement = self.execute("return " + json.dumps(self.nonce), phase="control")
+        if type(acknowledgement) is not str or acknowledgement != self.nonce:
+            raise RuntimeError("The native AppleEvent control owner did not acknowledge its nonce")
+        if processes(self.executable) != [pid]:
+            raise RuntimeError(
+                "The native AppleEvent control process changed before receipt admission"
+            )
+        return {
+            "schema_version": 1,
+            "contract": CONTROL_CONTRACT,
+            "phase": "control",
+            "acknowledged": True,
+            "nonce": self.nonce,
+            "pid": pid,
+            "executable": str(self.executable),
+        }
+
+    def retain_diagnostics(self, diagnostics, phase="observation"):
         """Retain bounded native observations independently of error annotations."""
         if not diagnostics:
             return
         if len(self.diagnostic_receipts) >= SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT:
             self.diagnostic_receipts[-1]["additional_commands_omitted"] = True
             return
-        # The two native fixture calls (observation and cleanup) each own their
+        # Control, observation and cleanup each own their independent native
         # sampling replies. Do not include the Lua source or the primary error;
         # either could contain unrelated user data. Redact native source paths.
         observations = self.sample_frame_text("\n".join(diagnostics))
@@ -333,6 +390,7 @@ class NativeDelayedTimerProbe:
         self.diagnostic_receipts.append(
             {
                 "command": self.scripting_command_number,
+                "phase": phase,
                 "observations": observations,
             }
         )
@@ -627,7 +685,8 @@ class NativeDelayedTimerProbe:
                     self.execute(
                         "return dofile({}).cleanup({})".format(
                             json.dumps(str(fixture), ensure_ascii=False), json.dumps(self.nonce)
-                        )
+                        ),
+                        phase="cleanup",
                     )
             except Exception as cleanup_error:
                 cleanup_cause = f"{type(cleanup_error).__name__}: {cleanup_error}"

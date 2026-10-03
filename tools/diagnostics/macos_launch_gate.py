@@ -57,7 +57,11 @@ import subprocess
 import sys
 import time
 
-from hs_delayed_timer_probe import NativeDelayedTimerProbe, validate_summary
+from hs_delayed_timer_probe import (
+    NativeDelayedTimerProbe,
+    validate_summary,
+    validate_control_summary,
+)
 from hs_karabiner_config_probe import (
     NativeKarabinerConfigProbe,
     validate_summary as validate_karabiner_summary,
@@ -299,6 +303,22 @@ def seed(scenario, home, seed_tag, today):
 def evaluate(scenario, observation):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
+    if scenario in ("clean", "karabiner_config"):
+        if observation.get("native_transport_control_error"):
+            failures.append(
+                "the native AppleEvent control failed: "
+                + observation["native_transport_control_error"]
+            )
+        else:
+            try:
+                feature_key = (
+                    "native_delayed_timer" if scenario == "clean" else "native_karabiner_config"
+                )
+                validate_control_summary(
+                    observation.get("native_transport_control"), observation.get(feature_key)
+                )
+            except ValueError as error:
+                failures.append(f"the native AppleEvent control proof is incomplete: {error}")
     if scenario == "karabiner_config":
         if observation.get("native_karabiner_config_error"):
             failures.append(
@@ -589,10 +609,10 @@ def print_native_probe_diagnostics(report):
             # Prefix every line so a sampled symbol or refusal cannot be parsed
             # as a GitHub workflow command. The native owner bounds and redacts
             # these observations before putting them in the durable report.
-            print(f"native probe command{receipt['command']}: {line}")
+            print(f"native probe command{receipt['command']} ({receipt['phase']}): {line}")
         if receipt.get("additional_commands_omitted"):
             print(
-                f"native probe command{receipt['command']}: [additional diagnostic commands omitted]"
+                f"native probe command{receipt['command']} ({receipt['phase']}): [additional diagnostic commands omitted]"
             )
 
 
@@ -681,6 +701,17 @@ def run(app, output, scenario, seed_tag):
                     raise RuntimeError(
                         "The native probe requires the launcher's single exact child"
                     )
+                try:
+                    observation["native_transport_control"] = native_probe.control(
+                        child_pids[0], processes
+                    )
+                except Exception as error:
+                    observation["native_transport_control_error"] = (
+                        f"{type(error).__name__}: {error}"
+                    )
+                # The control never replaces the original feature proof. Attempt
+                # it independently even after refusal; retained transport debt
+                # may itself refuse this call, which is a second honest failure.
                 observation[native_result_key] = native_probe.observe(child_pids[0], processes)
             except Exception as error:
                 observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
@@ -751,6 +782,9 @@ def run(app, output, scenario, seed_tag):
                     ) + f"preference restoration failed: {error}"
     if native_probe:
         report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
+        report["native_transport_control"] = observation.get("native_transport_control")
+        if observation.get("native_transport_control_error"):
+            report["native_transport_control_error"] = observation["native_transport_control_error"]
         report[native_result_key] = observation.get(native_result_key)
         if observation.get(native_result_key + "_error"):
             report[native_result_key + "_error"] = observation[native_result_key + "_error"]

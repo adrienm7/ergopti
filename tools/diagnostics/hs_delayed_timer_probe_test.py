@@ -223,6 +223,133 @@ class PreferenceTests(unittest.TestCase):
                     owner.restore()
 
 
+class NativeControlTests(unittest.TestCase):
+    """The transport control owns a real child and never stands in for the feature."""
+
+    def test_real_control_child_acknowledges_exact_nonce_and_exit(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.nonce = NONCE
+            launched = []
+
+            def launch(arguments, **options):
+                launched.append(arguments)
+                return native_popen([sys.executable, "-c", "print(" + repr(NONCE) + ")"], **options)
+
+            with mock.patch.object(probe.subprocess, "Popen", side_effect=launch):
+                summary = owner.control(42, lambda _: [42])
+            probe.validate_control_summary(summary)
+            self.assertEqual(summary["nonce"], NONCE)
+            self.assertEqual(summary["pid"], 42)
+            self.assertEqual(summary["executable"], str(EXECUTABLE))
+            self.assertEqual(launched[0][0], "/usr/bin/osascript")
+            self.assertEqual(launched[0][-1], 'return "' + NONCE + '"')
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertFalse(owner.started, "control must not mark the feature as started")
+
+    def test_native_control_refuses_missing_foreign_whitespace_and_nonzero_replies(self):
+        for stdout, status in (
+            ("", 0),
+            (NONCE, 0),
+            ("b" * 32 + "\n", 0),
+            (" " + NONCE + "\n", 0),
+            (NONCE + " \n", 0),
+            (NONCE + "\n\n", 0),
+            (NONCE + "\n", 1),
+        ):
+            with (
+                self.subTest(stdout=stdout, status=status),
+                tempfile.TemporaryDirectory() as folder,
+            ):
+                owner = probe.NativeDelayedTimerProbe(
+                    Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+                )
+                owner.nonce = NONCE
+                child = mock.Mock(returncode=status)
+                child.communicate.return_value = (stdout, "native refusal")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+                    with self.assertRaisesRegex(RuntimeError, "nonce"):
+                        owner.control(42, lambda _: [42])
+                self.assertEqual(child.communicate.call_args, mock.call(timeout=10))
+                self.assertEqual(
+                    owner.scripting_commands, [], "terminal refused child is still joined"
+                )
+
+    def test_control_refuses_dispatch_acknowledgement_and_changed_live_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.nonce = NONCE
+            for refused in (None, False, True, "b" * 32):
+                with (
+                    self.subTest(refused=refused),
+                    mock.patch.object(owner, "execute", return_value=refused),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "did not acknowledge"):
+                        owner.control(42, lambda _: [42])
+            with mock.patch.object(owner, "execute", return_value=NONCE):
+                with self.assertRaisesRegex(RuntimeError, "process changed"):
+                    owner.control(42, mock.Mock(side_effect=[[42], [43]]))
+            with mock.patch.object(owner, "execute") as native:
+                with self.assertRaisesRegex(RuntimeError, "foreign or changed"):
+                    owner.control(42, lambda _: [43])
+            native.assert_not_called()
+
+    def test_control_receipt_requires_strict_identity_and_same_feature_owner(self):
+        valid = {
+            "schema_version": 1,
+            "contract": "hs.applescript.control",
+            "phase": "control",
+            "acknowledged": True,
+            "nonce": NONCE,
+            "pid": 42,
+            "executable": str(EXECUTABLE),
+        }
+        probe.validate_control_summary(
+            valid, {"nonce": NONCE, "pid": 42, "executable": str(EXECUTABLE)}
+        )
+        for field, value in (
+            ("schema_version", True),
+            ("acknowledged", False),
+            ("acknowledged", "true"),
+            ("pid", True),
+            ("pid", 0),
+            ("phase", "observation"),
+            ("nonce", "foreign"),
+            ("executable", "relative"),
+        ):
+            with self.subTest(field=field, value=value):
+                with self.assertRaises(ValueError):
+                    probe.validate_control_summary(dict(valid, **{field: value}))
+        for changed in (None, {}, dict(valid, extra="unowned")):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                probe.validate_control_summary(changed)
+        for field in ("nonce", "pid", "executable"):
+            feature = {"nonce": NONCE, "pid": 42, "executable": str(EXECUTABLE)}
+            feature[field] = 43 if field == "pid" else "foreign"
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "owners differ"):
+                probe.validate_control_summary(valid, feature)
+
+    def test_control_phase_cannot_bypass_retained_transport_debt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            pending = mock.Mock()
+            owner.scripting_commands.append(pending)
+            with mock.patch.object(probe.subprocess, "Popen") as native:
+                with self.assertRaisesRegex(RuntimeError, "has not settled"):
+                    owner.control(42, lambda _: [42])
+                with self.assertRaisesRegex(ValueError, "phase is unknown"):
+                    owner.execute("return 'unowned'", phase="unowned")
+            native.assert_not_called()
+            self.assertEqual(owner.scripting_commands, [pending])
+
+
 class ObservationFailureTests(unittest.TestCase):
     """Cleanup refusal must neither replace the primary cause nor admit success."""
 
@@ -244,6 +371,7 @@ class ObservationFailureTests(unittest.TestCase):
                 self.assertIs(raised.exception.__cause__, primary)
                 self.assertEqual(execute.call_count, 2)
                 self.assertIn(".cleanup", execute.call_args.args[0])
+                self.assertEqual(execute.call_args.kwargs, {"phase": "cleanup"})
 
     def test_bad_native_receipt_and_cleanup_refusal_are_both_retained(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -253,7 +381,7 @@ class ObservationFailureTests(unittest.TestCase):
             )
             owner.nonce = NONCE
 
-            def execute(source):
+            def execute(source, phase="observation"):
                 if ".cleanup" in source:
                     raise RuntimeError("cleanup nonce was not acknowledged")
                 wrong = receipt()
@@ -276,7 +404,7 @@ class ObservationFailureTests(unittest.TestCase):
             )
             owner.nonce = NONCE
 
-            def execute(source):
+            def execute(source, phase="observation"):
                 if ".cleanup" in source:
                     raise RuntimeError("cleanup nonce was not acknowledged")
                 (output / "native-delayed-timers.json").write_text(json.dumps(receipt()))
@@ -337,7 +465,7 @@ class ScriptingLifecycleTests(unittest.TestCase):
                     mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05),
                 ):
                     with self.assertRaisesRegex(RuntimeError, "TimeoutExpired") as raised:
-                        owner.execute("return 'fixture'")
+                        owner.execute("return 'fixture'", phase="control")
                 self.assertIsInstance(raised.exception.__cause__, subprocess.TimeoutExpired)
                 self.assertIn("sample-osascript-1.txt", str(raised.exception))
                 self.assertIn("AESendMessage (fixture frame)", str(raised.exception))
@@ -358,6 +486,7 @@ class ScriptingLifecycleTests(unittest.TestCase):
                 retained = owner.diagnostic_receipts
                 self.assertEqual(len(retained), 1)
                 self.assertEqual(retained[0]["command"], 1)
+                self.assertEqual(retained[0]["phase"], "control")
                 self.assertIn(
                     "HSAppleScriptRunString (fixture server frame)", retained[0]["observations"]
                 )
@@ -406,9 +535,12 @@ class ScriptingLifecycleTests(unittest.TestCase):
                 probe.SCRIPT_DIAGNOSTIC_LINE_LIMIT,
             )
             owner.scripting_command_number = 3
+            owner.retain_diagnostics(["actual cleanup sample"], phase="cleanup")
+            owner.scripting_command_number = 4
             owner.retain_diagnostics(["extra request"])
             self.assertEqual(len(owner.diagnostic_receipts), probe.SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT)
             self.assertTrue(owner.diagnostic_receipts[-1]["additional_commands_omitted"])
+            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "cleanup")
 
     def test_cleanup_refusal_keeps_lua_arguments_out_of_plain_sample_receipts(self):
         primary = subprocess.TimeoutExpired(["osascript", "PRIMARY_LUA_ARGUMENT"], 10)
