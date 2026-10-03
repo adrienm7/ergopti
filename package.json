@@ -417,7 +417,8 @@
 		"test:bash-resolution": "node ./tools/test/test-bash-resolution.cjs",
 		"test:editor-format-on-save": "node ./tools/test/test-editor-format-on-save.cjs",
 		"check:agent-skills": "node ./tools/agents/sync-skills.cjs check",
-		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write"
+		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write",
+		"test:windows-bundle-stamp-encoding": "node ./tools/test/test-windows-bundle-stamp-encoding.cjs"
 	},
 	"type": "module",
 	"dependencies": {

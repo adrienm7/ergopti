@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows packaging stamp preserves exact AHK source encoding',
+		cmd: 'node',
+		args: ['tools/test/test-windows-bundle-stamp-encoding.cjs'],
+		repro: 'npm run test:windows-bundle-stamp-encoding'
+	},
+	{
 		name: 'JS suite failures preserve error headlines and process status',
 		cmd: 'node',
 		args: ['tools/test/test-js-suite-failure-diagnostics.cjs'],

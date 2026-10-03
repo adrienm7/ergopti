@@ -541,7 +541,7 @@ jobs:
           $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
           $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
           $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
-          Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+          [IO.File]::WriteAllText($bundlePath, $text, [Text.UTF8Encoding]::new($true))
           Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
           Write-Host "BUNDLE_VERSION     stamped: $version"
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
