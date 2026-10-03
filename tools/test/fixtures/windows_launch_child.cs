@@ -37,16 +37,24 @@ public static class WindowsLaunchChild
     private static string CanonicalExistingFile(string path)
     {
         if (String.IsNullOrEmpty(path) || !Path.IsPathRooted(path)
-            || !String.Equals(Path.GetFullPath(path), path, StringComparison.OrdinalIgnoreCase)
+            || Path.GetPathRoot(path).Length < 3
             || !File.Exists(path) || Directory.Exists(path))
             throw new InvalidOperationException("The native module must be an existing absolute regular file.");
+        // GetFullPath expands 8.3 names on .NET Framework. Input spelling is
+        // not canonical authority; dot components remain inadmissible aliases.
+        foreach (var piece in path.Split(new char[] { '\\', '/' })) {
+            if (piece == "." || piece == "..")
+                throw new InvalidOperationException("Native module dot components are refused.");
+        }
         var result = new StringBuilder(32768);
         uint size = GetLongPathNameW(path, result, (uint)result.Capacity);
         if (size == 0 || size >= result.Capacity || size != result.Length)
             throw new InvalidOperationException("The native module canonicalization was incomplete.");
         var canonical = result.ToString();
         if (!File.Exists(canonical) || Directory.Exists(canonical)
-            || !String.Equals(Path.GetFullPath(canonical), canonical, StringComparison.OrdinalIgnoreCase))
+            || !String.Equals(Path.GetFullPath(canonical), canonical, StringComparison.OrdinalIgnoreCase)
+            || !String.Equals(Path.GetFullPath(path), canonical, StringComparison.OrdinalIgnoreCase)
+            || !SamePhysicalFile(path, canonical))
             throw new InvalidOperationException("The canonical native module is not an absolute regular file.");
         return canonical;
     }
@@ -117,6 +125,25 @@ public static class WindowsLaunchChild
             bool refused = false;
             try { CanonicalExistingFile(invalid); } catch (InvalidOperationException) { refused = true; }
             Require(refused, "An invalid native module path was admitted.");
+        }
+        // These malformed spellings identify the actual copied file; refusal
+        // cannot pass merely because a synthetic negative happens not to exist.
+        var priorDirectory = Environment.CurrentDirectory;
+        try {
+            Environment.CurrentDirectory = Path.GetDirectoryName(expected);
+            var driveRelative = expected.Substring(0, 2) + Path.GetFileName(expected);
+            var rootRelative = expected.Substring(2);
+            var dotted = Path.Combine(Path.GetDirectoryName(expected), ".", Path.GetFileName(expected));
+            var parentDotted = Path.Combine(Path.GetDirectoryName(expected), "..",
+                Path.GetFileName(Path.GetDirectoryName(expected)), Path.GetFileName(expected));
+            foreach (var invalid in new string[] { driveRelative, rootRelative, dotted, parentDotted }) {
+                Require(SamePhysicalFile(invalid, expected), "An invalid-spelling control must identify the actual copied file.");
+                bool refused = false;
+                try { CanonicalExistingFile(invalid); } catch (InvalidOperationException) { refused = true; }
+                Require(refused, "An existing malformed native module spelling was admitted.");
+            }
+        } finally {
+            Environment.CurrentDirectory = priorDirectory;
         }
         var start = new ProcessStartInfo(alias, "--own-image") {
             UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true

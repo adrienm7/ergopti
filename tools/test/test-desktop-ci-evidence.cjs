@@ -677,12 +677,19 @@ function checkCompiledFixtureNormalization(source, runtime) {
 		'CanonicalExistingFile(Process.GetCurrentProcess().MainModule.FileName)',
 		'{ "executable", OwnExecutable() }',
 		'!Path.IsPathRooted(path)',
-		'!String.Equals(Path.GetFullPath(path), path, StringComparison.OrdinalIgnoreCase)',
+		'Path.GetPathRoot(path).Length < 3',
+		'piece == "." || piece == ".."',
+		'!String.Equals(Path.GetFullPath(path), canonical, StringComparison.OrdinalIgnoreCase)',
+		'!SamePhysicalFile(path, canonical)',
 		'!File.Exists(path) || Directory.Exists(path)',
 		'GetLongPathNameW(path, result, (uint)result.Capacity)',
 		'size == 0 || size >= result.Capacity || size != result.Length',
 		'!File.Exists(canonical) || Directory.Exists(canonical)',
 		'SamePhysicalFile(alias, expected)',
+		'SamePhysicalFile(invalid, expected)',
+		'Environment.CurrentDirectory = priorDirectory;',
+		'new string[] { driveRelative, rootRelative, dotted, parentDotted }',
+		'An existing malformed native module spelling was admitted.',
 		'!SamePhysicalFile(expected, foreign)',
 		'GetFileInformationByHandle(first, out a)',
 		'GetFileInformationByHandle(second, out b)',
@@ -700,6 +707,11 @@ function checkCompiledFixtureNormalization(source, runtime) {
 	assert.doesNotMatch(
 		source,
 		/IsPathFullyQualified|GetEnvironmentVariable\("(?:EXPECTED|ERGOPTI_EXPECTED)/
+	);
+	assert.doesNotMatch(
+		source,
+		/Path\.GetFullPath\(path\), path,/,
+		'Framework alias expansion cannot be refused before native canonical admission'
 	);
 	for (const scenario of [
 		'ready',
@@ -748,6 +760,15 @@ for (const [from, to] of [
 		'Process.GetCurrentProcess().MainModule.FileName'
 	],
 	['!Path.IsPathRooted(path)', 'false'],
+	['Path.GetPathRoot(path).Length < 3', 'false'],
+	['piece == "." || piece == ".."', 'false'],
+	[
+		'!String.Equals(Path.GetFullPath(path), canonical, StringComparison.OrdinalIgnoreCase)',
+		'false'
+	],
+	['!SamePhysicalFile(path, canonical)', 'false'],
+	['SamePhysicalFile(invalid, expected)', 'true'],
+	['Environment.CurrentDirectory = priorDirectory;', '// restoration omitted'],
 	['size == 0 || size >= result.Capacity || size != result.Length', 'size == 0'],
 	['SamePhysicalFile(alias, expected)', 'true'],
 	['!SamePhysicalFile(expected, foreign)', 'true'],
