@@ -1253,3 +1253,156 @@ Test("quit unchanged recording", _SiblingQueryFactory("quit_frontmost_app", Gest
 Test("microphone unchanged recording", _SiblingQueryFactory("mic_mute_toggle", GestureSysMicMuteToggle, "SetCaptureMuted", false))
 Test("theme unchanged recording", _SiblingQueryFactory("toggle_dark_mode", GestureSysToggleDarkMode, "WriteDword", false))
 Test("theme mid-first-write pause completes transaction", _SiblingThemeMidWriteStillSettles)
+
+class _QEFF_Path {
+	__New(Sys) => this.Sys := Sys
+	Path {
+		get {
+			this.Sys.PauseAt("folder")
+			return this.Sys.FolderPath
+		}
+	}
+}
+class _QEFF_Folder {
+	__New(Sys) {
+		this.Sys := Sys
+		this.Self := _QEFF_Path(Sys)
+	}
+	ParseName(Name) {
+		this.Sys.PauseAt("rename_item")
+		return {Name: Name}
+	}
+}
+class _QEFF_Document {
+	__New(Sys) {
+		this.Sys := Sys
+		this.Folder := _QEFF_Folder(Sys)
+	}
+	SelectItem(Item, Flags) => this.Sys._Log("SelectItem", Item.Name, Flags)
+}
+class _QEFF_DriveItem {
+	__New(Sys, Name) {
+		this.Sys := Sys
+		this.Name := Name
+	}
+	InvokeVerb(Verb) {
+		this.Sys._Log("Eject", this.Name, Verb)
+		this.Sys.PauseAt("ejected")
+	}
+}
+class _QEFF_Computer {
+	__New(Sys) => this.Sys := Sys
+	ParseName(Name) {
+		this.Sys.PauseAt("drive_item")
+		return _QEFF_DriveItem(this.Sys, Name)
+	}
+}
+class _QEFF_Shell {
+	__New(Sys) => this.Sys := Sys
+	Windows() => [{HWND: 0x100, Tab: 1, Document: _QEFF_Document(this.Sys)}]
+	Namespace(Id) {
+		this.Sys.PauseAt("namespace")
+		return _QEFF_Computer(this.Sys)
+	}
+}
+class _QEFF_Fake extends _SysActionsFake {
+	__New(Mode) {
+		super.__New()
+		this.Mode := Mode
+		this.Active := {Hwnd: 0x100, Pid: 812, Class: "CabinetWClass"}
+		this.ActiveTab := 1
+		this.Drives := "EF"
+		this.FolderPath := "C:\owned"
+		this.MonitorList := [{Left: 0, Top: 0, Right: 100, Bottom: 100}]
+		this.Pointer := {X: 10, Y: 10}
+	}
+	PauseAt(Phase) {
+		if this.Mode == Phase
+			Suspend(true)
+	}
+	ActiveWindow() {
+		Current := super.ActiveWindow()
+		this.PauseAt("active")
+		return Current
+	}
+	MousePosition() {
+		Current := super.MousePosition()
+		this.PauseAt("pointer")
+		return Current
+	}
+	Monitors() {
+		Current := super.Monitors()
+		this.PauseAt("monitors")
+		return Current
+	}
+	RemovableDrives() {
+		Current := super.RemovableDrives()
+		this.PauseAt("drives")
+		return Current
+	}
+	ShellApplication() {
+		this.PauseAt("shell")
+		return _QEFF_Shell(this)
+	}
+	WindowsTerminalPath() {
+		Current := super.WindowsTerminalPath()
+		this.PauseAt("terminal")
+		return Current
+	}
+	CreateNewFile(Path) {
+		Status := super.CreateNewFile(Path)
+		this.PauseAt(Status == "exists" ? "collision" : "created")
+		return Status
+	}
+}
+_QEFF_Case(ProbeRow) {
+	Fake := _QEFF_Fake(ProbeRow.Mode)
+	if ProbeRow.HasOwnProp("EmptyDrives")
+		Fake.Drives := ""
+	if ProbeRow.HasOwnProp("EmptyFolder")
+		Fake.FolderPath := ""
+	if ProbeRow.HasOwnProp("Collision")
+		Fake.CreateStatuses := ["exists", "created"]
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureMakeSystemRunner(ProbeRow.Action, ProbeRow.Fn.Bind(Fake), Fake).Call()
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(ProbeRow.Count, _SysActions_CallsNamed(Fake, ProbeRow.Effect).Length,
+			ProbeRow.Name . ": the next effect must respect the admitted query state")
+		if ProbeRow.HasOwnProp("CreatedCount")
+			AssertEqual(ProbeRow.CreatedCount, _SysActions_CallsNamed(Fake, "CreateNewFile").Length,
+				"already-created file receipt is preserved without retry or rollback")
+	} finally Suspend(PriorPause)
+}
+_QEFF_CaseFactory(ProbeRow) => () => _QEFF_Case(ProbeRow)
+for _SysActions_QueryEffectCase in [
+	{Name: "center pointer pause", Action: "center_mouse", Fn: GestureSysCenterMouse, Mode: "pointer", Effect: "MoveMouse", Count: 0},
+	{Name: "center monitor pause", Action: "center_mouse", Fn: GestureSysCenterMouse, Mode: "monitors", Effect: "MoveMouse", Count: 0},
+	{Name: "center unchanged", Action: "center_mouse", Fn: GestureSysCenterMouse, Mode: "", Effect: "MoveMouse", Count: 1},
+	{Name: "eject drive query pause", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "drives", Effect: "Eject", Count: 0},
+	{Name: "eject namespace pause", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "namespace", Effect: "Eject", Count: 0},
+	{Name: "eject drive item pause", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "drive_item", Effect: "Eject", Count: 0},
+	{Name: "eject first effect pause retains one receipt", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "ejected", Effect: "Eject", Count: 1},
+	{Name: "eject empty query pause cannot notify", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "drives", EmptyDrives: true, Effect: "Notify", Count: 0},
+	{Name: "eject unchanged", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "", Effect: "Eject", Count: 2},
+	{Name: "eject empty unchanged notice", Action: "eject_all_disks", Fn: GestureSysEjectAllDisks, Mode: "", EmptyDrives: true, Effect: "Notify", Count: 1},
+	{Name: "terminal active query pause", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "active", Effect: "Launch", Count: 0},
+	{Name: "terminal folder query pause", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "folder", Effect: "Launch", Count: 0},
+	{Name: "terminal alias query pause", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "terminal", Effect: "Launch", Count: 0},
+	{Name: "terminal empty query pause cannot notify", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "folder", EmptyFolder: true, Effect: "Notify", Count: 0},
+	{Name: "terminal unchanged", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "", Effect: "Launch", Count: 1},
+	{Name: "terminal empty unchanged notice", Action: "open_terminal_here", Fn: GestureSysOpenTerminalHere, Mode: "", EmptyFolder: true, Effect: "Notify", Count: 1},
+	{Name: "newfile active query pause", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "active", Effect: "CreateNewFile", Count: 0},
+	{Name: "newfile folder query pause", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "folder", Effect: "CreateNewFile", Count: 0},
+	{Name: "newfile created pause cannot open rename", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "created", Effect: "SelectItem", Count: 0, CreatedCount: 1},
+	{Name: "newfile collision pause cannot retry create", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "collision", Collision: true, Effect: "CreateNewFile", Count: 1},
+	{Name: "newfile rename query pause cannot select", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "rename_item", Effect: "SelectItem", Count: 0, CreatedCount: 1},
+	{Name: "newfile empty query pause cannot notify", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "folder", EmptyFolder: true, Effect: "Notify", Count: 0},
+	{Name: "newfile unchanged creates once", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "", Effect: "CreateNewFile", Count: 1},
+	{Name: "newfile unchanged selects once", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "", Effect: "SelectItem", Count: 1},
+	{Name: "newfile collision unchanged retries", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "", Collision: true, Effect: "CreateNewFile", Count: 2},
+	{Name: "newfile empty unchanged notice", Action: "new_text_file_here", Fn: GestureSysNewTextFileHere, Mode: "", EmptyFolder: true, Effect: "Notify", Count: 1}
+] {
+	Test(_SysActions_QueryEffectCase.Name . " (system-query-effects)", _QEFF_CaseFactory(_SysActions_QueryEffectCase))
+}

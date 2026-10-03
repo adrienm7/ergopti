@@ -261,6 +261,10 @@ GestureSysCenterMouse(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	Position := Sys.MousePosition()
 	Center := GestureSysMonitorCenter(Position.X, Position.Y, Sys.Monitors())
+	if A_IsSuspended {
+		LoggerInfo("gestures", "center_mouse was cancelled before moving the pointer: the script is suspended.")
+		return false
+	}
 	if !IsObject(Center) {
 		LoggerError("gestures", "center_mouse: no monitor holds the pointer at {1},{2}.", Position.X, Position.Y)
 		return
@@ -427,6 +431,10 @@ GestureSysEjectAllDisks(Sys := 0) {
 	global GESTURE_SYS_CSIDL_DRIVES
 	Sys := _GestureSys(Sys)
 	Letters := Sys.RemovableDrives()
+	if A_IsSuspended {
+		LoggerInfo("gestures", "eject_all_disks was cancelled after its drive query: the script is suspended.")
+		return false
+	}
 	if (Letters = "") {
 		LoggerInfo("gestures", "eject_all_disks: no removable drive.")
 		Sys.Notify(t("system_actions.no_disk_to_eject"))
@@ -436,7 +444,16 @@ GestureSysEjectAllDisks(Sys := 0) {
 	Ejected := 0
 	for Letter in StrSplit(Letters) {
 		try {
-			Computer.ParseName(Letter . ":\").InvokeVerb("Eject")
+			if A_IsSuspended {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its next drive: the script is suspended.")
+				return false
+			}
+			DriveItem := Computer.ParseName(Letter . ":\")
+			if A_IsSuspended {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its drive ejection: the script is suspended.")
+				return false
+			}
+			DriveItem.InvokeVerb("Eject")
 			Ejected += 1
 		} catch as Err {
 			LoggerError("gestures", "Drive {1}: could not be ejected: {2}", Letter, Err.Message)
@@ -570,12 +587,20 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 GestureSysOpenTerminalHere(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
+	if A_IsSuspended {
+		LoggerInfo("gestures", "open_terminal_here was cancelled after its folder query: the script is suspended.")
+		return false
+	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "open_terminal_here: no Explorer folder is active.")
 		Sys.Notify(t("system_actions.no_folder"))
 		return
 	}
 	Terminal := Sys.WindowsTerminalPath()
+	if A_IsSuspended {
+		LoggerInfo("gestures", "open_terminal_here was cancelled before launching the terminal: the script is suspended.")
+		return false
+	}
 	try {
 		; "-d ." starts in the working directory, so the folder is never quoted
 		; into a command line (a trailing backslash would escape the quote).
@@ -592,6 +617,10 @@ GestureSysCreateTextFile(Folder, BaseName, Sys) {
 	global GESTURE_SYS_NEW_FILE_ATTEMPTS
 	Loop GESTURE_SYS_NEW_FILE_ATTEMPTS {
 		Path := RTrim(Folder, "\") . "\" . BaseName . (A_Index = 1 ? "" : " (" . A_Index . ")") . ".txt"
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before creating its file: the script is suspended.")
+			return ""
+		}
 		Status := Sys.CreateNewFile(Path)
 		if (Status = "created")
 			return Path
@@ -610,6 +639,10 @@ GestureSysNewTextFileHere(Sys := 0) {
 	global GESTURE_SYS_SVSI_RENAME
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
+	if A_IsSuspended {
+		LoggerInfo("gestures", "new_text_file_here was cancelled after its folder query: the script is suspended.")
+		return false
+	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "new_text_file_here: no Explorer folder is active.")
 		Sys.Notify(t("system_actions.no_folder"))
@@ -623,7 +656,17 @@ GestureSysNewTextFileHere(Sys := 0) {
 		return
 	SplitPath(Path, &Name)
 	try {
-		Here.Window.Document.SelectItem(Here.Window.Document.Folder.ParseName(Name), GESTURE_SYS_SVSI_RENAME)
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before preparing its rename: the script is suspended.")
+			return false
+		}
+		Document := Here.Window.Document
+		Item := Document.Folder.ParseName(Name)
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before selecting its created file: the script is suspended.")
+			return false
+		}
+		Document.SelectItem(Item, GESTURE_SYS_SVSI_RENAME)
 	} catch as Err {
 		LoggerWarn("gestures", "The new text file exists but Explorer could not select it: {1}", Err.Message)
 	}
