@@ -146,7 +146,9 @@ _LLV_NoticeRetirementPreservesForeignOwnership() {
 				Failure := ""
 				Outcome := true
 				try Outcome := _LLV_InvokeAndRetireNotice(_LLV_NoticeBoundaryAction.Bind(Interrupted, Observed), &Notice)
-				catch as Err Failure := Err.Message
+				catch as Err {
+					Failure := Err.Message
+				}
 				AssertEqual(Interrupted ? "owned live-mode notice interruption" : "", Failure,
 					"the notice boundary preserves the actual callback exception")
 				if !Interrupted
