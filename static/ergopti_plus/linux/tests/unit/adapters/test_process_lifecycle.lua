@@ -17,7 +17,8 @@ local helpers = require("tests.helpers")
 
 --- Runs body with io.popen stubbed to replay canned `ps` outputs.
 --- Each entry of outputs is either a string (ps stdout, exit 0) or false (fork
---- failure: io.popen returns nil). Restores io.popen even on failure.
+--- failure: io.popen returns nil). A table carries { output, status } for a
+--- real checked-runner status frame. Restores io.popen even on failure.
 --- @param outputs table Array of string|false.
 --- @param body function Receives nothing; reads popen calls in order.
 local function with_ps(outputs, body)
@@ -28,12 +29,15 @@ local function with_ps(outputs, body)
 		local out = outputs[at]
 		if out == nil then out = outputs[#outputs] end
 		if out == false then return nil end
+		local receipt = type(out) == "table" and out or { output = tostring(out), status = 0 }
+		local content = receipt.output
 		local lines = {}
-		for line in (tostring(out) .. "\n"):gmatch("([^\n]*)\n") do
+		for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 			lines[#lines + 1] = line
 		end
 		local pos = 0
 		return {
+			read = function() return string.format("%d %d\n%s", receipt.status, #content, content) end,
 			lines = function()
 				return function()
 					pos = pos + 1
@@ -64,6 +68,34 @@ local PS_AC = "COMMAND\na\nc\n"
 
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
+
+helpers.describe("linux-process-snapshot-receipts", function()
+	for _, status in ipairs({ 1, 7, 127, 143 }) do
+		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot replace a successful baseline", function()
+			with_ps({ PS_ABC }, function()
+				local M, launched, quit = fresh_lifecycle()
+				M.start()
+				with_ps({ { output = PS_AB, status = status } }, function() M.tick(PROCESS_TICK) end)
+				helpers.assert_eq(quit, {}, "nonempty partial stdout cannot prove any process quit")
+				helpers.assert_eq(launched, {})
+				with_ps({ PS_AC }, function() M.tick(PROCESS_TICK * 2) end)
+				M.stop()
+				helpers.assert_eq(quit, { "b" }, "recovery diffs only the last successful baseline")
+				helpers.assert_eq(launched, {}, "partial failure cannot synthesize a recovery launch")
+			end)
+		end)
+		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot seed startup ownership", function()
+			with_ps({ { output = PS_AB, status = status } }, function()
+				local M, launched, quit = fresh_lifecycle()
+				M.start()
+				with_ps({ PS_ABC }, function() M.tick(PROCESS_TICK) end)
+				M.stop()
+				helpers.assert_eq(launched, {}, "the first trustworthy snapshot silently adopts existing processes")
+				helpers.assert_eq(quit, {})
+			end)
+		end)
+	end
+end)
 
 helpers.describe("process_lifecycle: a failed snapshot fires nothing (ps-storm)", function()
 
