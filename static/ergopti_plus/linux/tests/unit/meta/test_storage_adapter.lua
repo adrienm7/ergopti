@@ -86,6 +86,41 @@ helpers.describe("storage native open receipts", function()
 	end
 end)
 
+helpers.describe("storage root JSON shape", function()
+	for index, body in ipairs({ "[]", '["original"]', '[{"keep":"é","nested":[1,2]}]', '[null,"original"]' }) do
+		helpers.it("linux-storage-shape-receipts: preserves array history " .. index, function()
+			local root = make_temp_config_root()
+			local path = root .. "/ergopti_plus/storage.json"
+			local file = assert(io.open(path, "wb"))
+			assert(file:write(body) and file:close())
+			local real_getenv = os.getenv
+			os.getenv = function(name)
+				if name == "XDG_CONFIG_HOME" then return root end
+				return real_getenv(name)
+			end
+			local ok, err = xpcall(function()
+				local storage = helpers.load_module("adapters.storage")
+				helpers.assert_eq(storage.get("any", "fallback"), "fallback")
+				local recovery = storage.recovery_status()
+				helpers.assert_true(recovery and recovery.preserved == true)
+				file = assert(io.open(recovery.path, "rb"))
+				local bytes = file:read("*a")
+				assert(file:close())
+				helpers.assert_eq(bytes, body)
+				helpers.assert_true(storage.set("replacement", true))
+				helpers.assert_eq(helpers.load_module("adapters.storage").get("replacement"), true)
+			end, debug.traceback)
+			os.getenv = real_getenv
+			package.loaded["adapters.storage"] = nil
+			os.remove(path)
+			os.remove(path .. ".corrupt")
+			os.remove(root .. "/ergopti_plus")
+			os.remove(root)
+			helpers.assert_true(ok, tostring(err))
+		end)
+	end
+end)
+
 helpers.describe("storage durable snapshot ownership", function()
 	for _, method in ipairs({ "set", "set_many" }) do
 		for _, source in ipairs({ "input", "returned", "refused" }) do

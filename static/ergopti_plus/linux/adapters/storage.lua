@@ -130,7 +130,9 @@ local function _load()
 		return
 	end
 	local decode_ok, decoded = pcall(json.decode, content)
-	if decode_ok and type(decoded) == "table" then
+	-- Lua represents both JSON objects and arrays as tables. A root array is
+	-- not this key-value store: the next object write would discard its entries.
+	if decode_ok and type(decoded) == "table" and content:match("^%s*{") then
 		_cache = decoded
 		return
 	end

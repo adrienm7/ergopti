@@ -254,6 +254,15 @@ These are software implementations; final hardware verification remains below.
   resistant-child retirement needs a separate native reproduction before
   proposing explicit group ownership and forceful retirement. No macOS native
   owner or gate was modified; native cross-OS suites and manual CI remain deferred.
+- [~] **L19.** Linux JSON store root shape: accept only a decoded JSON object,
+  instead of allowing a root array to masquerade as the key-value store and lose
+  its numeric entries during the next write. Four native and four portable
+  cases failed before the fix. The native store matrix now passes 38 cases;
+  invalid array histories are preserved byte-for-byte before a valid replacement
+  is created, and object/nested-array/whitespace controls retain their values.
+  Windows registry and macOS hs.settings have no application-owned JSON root
+  loader. TOML owners, unknown object parameters, personal menus, native cross-OS
+  suites and manual CI remain untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

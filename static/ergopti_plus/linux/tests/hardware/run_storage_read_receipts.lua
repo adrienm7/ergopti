@@ -128,6 +128,41 @@ check("fresh owner recovers after native permissions are repaired", function()
 	assert(fresh(config).get("preserve") == "original")
 end)
 
+for index, body in ipairs({ "[]", '["original"]', '[{"keep":"é","nested":[1,2]}]', '[null,"original"]' }) do
+	check("preserves non-object store history " .. index, function()
+		local config = mkdir(root .. "/shape-array-" .. index)
+		local parent = mkdir(config .. "/ergopti_plus")
+		local store = parent .. "/storage.json"
+		write(store, body)
+		files[#files + 1] = store .. ".corrupt"
+		local storage = fresh(config)
+		assert(storage.get("any", "default") == "default")
+		local recovery = storage.recovery_status()
+		assert(recovery and recovery.preserved == true, "JSON array masqueraded as a key-value store")
+		assert(read(recovery.path) == body, "invalid store shape lost its original bytes")
+		assert(storage.set("replacement", true))
+		assert(fresh(config).get("replacement") == true)
+		assert(read(recovery.path) == body, "new valid store overwrote the preserved history")
+	end)
+end
+
+for index, body in ipairs({ "{}", " \n\t{}", '{"1":"original","nested":{"values":[false,0,"é"]}}' }) do
+	check("accepts object store control " .. index, function()
+		local config = mkdir(root .. "/shape-object-" .. index)
+		local parent = mkdir(config .. "/ergopti_plus")
+		write(parent .. "/storage.json", body)
+		local storage = fresh(config)
+		assert(storage.set("replacement", true) and storage.recovery_status() == nil)
+		storage = fresh(config)
+		assert(storage.get("replacement") == true)
+		if index == 3 then
+			assert(storage.get("1") == "original")
+			local values = storage.get("nested").values
+			assert(values[1] == false and values[2] == 0 and values[3] == "é")
+		end
+	end)
+end
+
 for _, method in ipairs({ "set", "set_many" }) do
 	for _, source in ipairs({ "input", "returned", "refused" }) do
 		check(method .. " owns its durable snapshot after " .. source .. " mutation", function()
