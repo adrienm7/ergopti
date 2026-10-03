@@ -325,6 +325,8 @@ actual aggregate refusal tests cover incomplete/failed receipts; hosted
 failure-artifact execution and the separate bootstrap cause fix remain
 pending native qualification.
 
+Windows qualification now reads actual menu item types independently of packed submenu counts and retains native ten/eleven-child probes with real leading, trailing and doubled separator controls. The build-identity fixture accepts only the two known provider signatures and checks the actual default version row. Bootstrap fixtures resolve their already-owned temporary directory through native GetLongPathNameW before deriving expected forwarding bytes, matching the independently observed child identity. All existing byte, durability, terminal handoff and refusal assertions remain intact; production code is unchanged. Corrected native execution and complete packaging/install qualification remain pending the next non-release Windows checkpoint.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
