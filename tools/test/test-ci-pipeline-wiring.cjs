@@ -1522,6 +1522,114 @@ for (const [what, from, to] of [
 	mustCatch(what, ENTRY, from, to, concurrencyProblems);
 }
 
+/** Requires real reporter subprocess regressions on each native host before product units. */
+function reporterLifecycleProblems(files) {
+	const problems = [];
+	for (const [rel, id, host, product, shell] of [
+		[WINDOWS_BOX, 'test-ahk', 'windows-', 'Run AHK test suite', 'pwsh'],
+		[MACOS_BOX, 'package-macos', 'macos-', 'Build release launcher', null]
+	]) {
+		const entry = files.find((candidate) => candidate.rel === rel);
+		const job =
+			entry && pipeline.jobsOfText(entry.text, rel).find((candidate) => candidate.id === id);
+		if (!job || !(pipeline.field(job.body, 'runs-on') ?? '').startsWith(host)) {
+			problems.push(`${rel} ${id} must qualify the reporter on its actual native host`);
+			continue;
+		}
+		const steps = pipeline.steps(job.body);
+		const matches = steps.filter((candidate) => candidate.name === REPORTER_STEP);
+		const nodes = steps.filter(
+			(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
+		);
+		const node = nodes[0];
+		const unit = steps.findIndex((candidate) => candidate.name === product);
+		const report = steps.findIndex((candidate) => candidate.name === REPORTER_STEP);
+		if (
+			matches.length !== 1 ||
+			nodes.length !== 1 ||
+			unit < 0 ||
+			report <= steps.indexOf(node) ||
+			report >= unit
+		) {
+			problems.push(
+				`${rel} ${id} must run exactly one reporter self-test after Node and before product units`
+			);
+			continue;
+		}
+		if (
+			!node.body.includes("          node-version-file: '.node-version'") ||
+			pipeline.stepField(node.body, 'if') !== null ||
+			pipeline.stepField(node.body, 'continue-on-error') !== null
+		) {
+			problems.push(`${rel} ${id} must unconditionally prepare the repository Node runtime`);
+		}
+		const test = matches[0];
+		if (
+			(pipeline.runOf(test.body) ?? []).join('\n').trim() !== REPORTER_COMMAND ||
+			pipeline.stepField(test.body, 'if') !== null ||
+			pipeline.stepField(test.body, 'continue-on-error') !== null ||
+			pipeline.stepField(test.body, 'shell') !== shell ||
+			pipeline.stepField(test.body, 'working-directory') !== null
+		) {
+			problems.push(
+				`${rel} ${id} reporter self-tests must run the exact command and propagate failure on every profile`
+			);
+		}
+	}
+	return problems;
+}
+
+const REPORTER_STEP = 'Run reporter lifecycle self-tests';
+const REPORTER_COMMAND = 'node tools/test/test-report.cjs';
+errors.push(...reporterLifecycleProblems(pipeline.files()));
+for (const [rel, shell] of [
+	[WINDOWS_BOX, '        shell: pwsh\n'],
+	[MACOS_BOX, '']
+]) {
+	const block = `      - name: ${REPORTER_STEP}\n${shell}        run: ${REPORTER_COMMAND}\n`;
+	for (const [what, replacement] of [
+		['missing native reporter self-test', ''],
+		[
+			'manual-only native reporter self-test',
+			block.replace(
+				`${shell}        run:`,
+				`${shell}        if: github.event_name == 'workflow_dispatch'\n        run:`
+			)
+		],
+		[
+			'forgiven native reporter self-test',
+			block.replace(`${shell}        run:`, `${shell}        continue-on-error: true\n        run:`)
+		],
+		[
+			'swallowed native reporter exit',
+			block.replace(REPORTER_COMMAND, REPORTER_COMMAND + ' || true')
+		],
+		['duplicate native reporter self-test', block + '\n' + block],
+		[
+			'renamed native reporter command',
+			block.replace(REPORTER_COMMAND, 'node tools/test/report.cjs --help')
+		]
+	]) {
+		mustCatch(what, rel, block, replacement, reporterLifecycleProblems);
+	}
+	const steps = pipeline.steps(
+		pipeline
+			.jobsOfText(pipeline.files().find((candidate) => candidate.rel === rel).text, rel)
+			.find((candidate) => candidate.id === (rel === WINDOWS_BOX ? 'test-ahk' : 'package-macos'))
+			.body
+	);
+	const node = steps.find(
+		(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
+	).body;
+	mustCatch(
+		'reporter before Node setup',
+		rel,
+		node + '\n\n' + block,
+		block + '\n' + node + '\n',
+		reporterLifecycleProblems
+	);
+}
+
 if (errors.length > 0) {
 	console.error(
 		'[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:'
