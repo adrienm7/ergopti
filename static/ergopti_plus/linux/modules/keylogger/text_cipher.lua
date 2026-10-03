@@ -210,15 +210,16 @@ function M.encrypt(device_id, event_id, plaintext)
 	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
 	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
 	-- "line" and read back as a value the user never typed.
-	local input = plaintext
+	local input, pipeline_options = plaintext, nil
 	if plaintext:find("\0", 1, true) then
 		-- The shell command reaches exec as a C string; a raw NUL truncates the
 		-- heredoc while OpenSSL still encrypts the surviving prefix successfully.
 		-- Transport only textual bytes, then restore them at the native boundary.
 		input = Base64.encode(plaintext)
 		cmd = "openssl base64 -d -A | " .. cmd
+		pipeline_options = { pipefail = true }
 	end
-	local ciphertext, native_error = OpenSSL.exec(cmd, input)
+	local ciphertext, native_error = OpenSSL.exec(cmd, input, pipeline_options)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
 		Logger.error(LOG, "Encryption did not complete successfully — %s; refusing to store plaintext.",
 			native_error or "empty ciphertext")

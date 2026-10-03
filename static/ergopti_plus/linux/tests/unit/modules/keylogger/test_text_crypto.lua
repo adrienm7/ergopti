@@ -360,14 +360,16 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 			capture_shell()
 			cipher.set_enabled(true)
 			local shell = Shell()
-			local previous = shell.exec_exact_stdin
+			local native = require("infra.openssl_command")
+			local previous = native.exec
 			local transport
-			shell.exec_exact_stdin = function(command, input)
-				transport = { command = command, input = input }
-				return native_receipt(command, "Y2lwaGVydGV4dA==")
+			native.exec = function(command, input, options)
+				if input == nil then return previous(command, input, options) end
+				transport = { command = command, input = input, options = options }
+				return "Y2lwaGVydGV4dA=="
 			end
 			local ok, result = pcall(cipher.encrypt, "binary-device", index, plaintext)
-			shell.exec_exact_stdin = previous
+			native.exec = previous
 			shell._reset_runner()
 			helpers.assert_true(ok and TextCrypto.is_encrypted(result), "binary encryption must still return the canonical envelope")
 			helpers.assert_true(transport ~= nil, "the cipher must reach the native stdin transport")
@@ -377,6 +379,8 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 				"the shared binary codec must retain every original byte")
 			helpers.assert_true(transport.command:find("openssl base64 -d -A | ", 1, true) == 1,
 				"native decoding must happen before the encryption primitive")
+			helpers.assert_true(transport.options and transport.options.pipefail == true,
+				"a failed decoder must invalidate its successful encryption consumer")
 		end)
 	end
 
@@ -437,6 +441,30 @@ end)
 
 
 helpers.describe("text_cipher — failure never falls back to plaintext", function()
+	for _, checked in ipairs({ true, false }) do
+		helpers.it("requires a pipeline supervisor only for checked pipelines " .. tostring(checked) .. " (openssl-pipeline-receipts)", function()
+			local shell, calls = Shell(), 0
+			local previous = shell.has_command
+			shell.has_command = function() return false end
+			shell._set_runner(function(command)
+				calls = calls + 1
+				return native_receipt(command, "Synthetic output", 0)
+			end)
+			local options = checked and { pipefail = true } or nil
+			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture", "text", options)
+			shell.has_command = previous
+			shell._reset_runner()
+			helpers.assert_true(ok)
+			if checked then
+				helpers.assert_nil(result, "a missing supervisor must not silently weaken pipeline receipts")
+				helpers.assert_true(type(reason) == "string" and reason ~= "")
+				helpers.assert_eq(calls, 0, "refused capability must be checked before native execution")
+			else
+				helpers.assert_eq(result, "Synthetic output", "ordinary commands do not require a pipeline supervisor")
+				helpers.assert_eq(calls, 1)
+			end
+		end)
+	end
 	for index, case in ipairs({
 		{ output = "", status = 0, expected = "" },
 		{ output = "Binary\0stdout\n\n", status = 0, expected = "Binary\0stdout\n\n" },
@@ -466,8 +494,10 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		local ok, err = pcall(function()
 			local capture = require("infra.openssl_command")
 			for _, pair in ipairs({ { "", "text" }, { false, "text" }, { "openssl\0hidden", "text" },
-				{ "openssl fixture", "binary\0stdin" }, { "openssl fixture", false } }) do
-				helpers.assert_nil(capture.exec(pair[1], pair[2]))
+				{ "openssl fixture", "binary\0stdin" }, { "openssl fixture", false },
+				{ "openssl fixture", "text", false }, { "openssl fixture", "text", "invalid" },
+				{ "openssl fixture", "text", { pipefail = "invalid" } } }) do
+				helpers.assert_nil(capture.exec(pair[1], pair[2], pair[3]))
 			end
 			helpers.assert_eq(calls, 0)
 		end)

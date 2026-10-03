@@ -459,6 +459,21 @@ These are software implementations; final hardware verification remains below.
   source-level concern deferred to its native owner; Windows uses checked native
   crypto status codes. Shared key/envelope policy, native cross-OS gates and
   manual CI remain unchanged or unexecuted; no physical typing device was used.
+- [~] **L37.** Linux at-rest OpenSSL pipeline receipts: supervise both native
+  decoder and encryption stages instead of trusting only the last POSIX exit.
+  A failed decoder could return a valid envelope containing just one original
+  byte. Eight native failure guards plus the missing-supervisor capability case
+  fail before the fix; all thirty native cases pass with real OpenSSL and an
+  explicit failed/partial-output wrapper, ordinary users, and actual SQLite
+  rejection/retry. Healthy controls retain a 90,001-byte binary plaintext and
+  permit ordinary encryption without Bash; checked pipelines fail closed when
+  their installed Bash supervisor is absent. Six portable checks fail before
+  the fix, then pass with the unchanged codec/ordering assertions and explicit
+  checked-pipeline policy. Only the native command is quoted, preserving the
+  original stdin argument budget. macOS' separate OpenSSL shell path remains an
+  unvalidated source concern deferred to its native owner; Windows uses checked
+  native crypto APIs. Shared key/envelope policy is unchanged. Native cross-OS
+  gates, manual CI and physical typing tests remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
