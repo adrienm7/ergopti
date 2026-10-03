@@ -1,7 +1,11 @@
 # tools/test/fixtures/test_source_boot_ownership.ps1
 
 # Exercise the observer's actual admission helpers without terminating processes.
-param([Parameter(Mandatory)][string] $Observer)
+param(
+    [Parameter(Mandatory)][string] $Observer,
+    [Parameter(Mandatory)][string] $Ahk,
+    [Parameter(Mandatory)][string] $Root
+)
 $ErrorActionPreference = 'Stop'
 . $Observer -Entry 'unused' -Ahk 'unused' -Root 'unused' -Nonce 'unused' -LibraryOnly
 $entry = 'C:\private clone\ErgoptiPlus.ahk'
@@ -90,4 +94,69 @@ foreach ($case in @(
         throw 'Source-owner evidence exposed private process metadata.'
     }
 }
+# Exercise the real AHK Reload filename, rather than a synthesized command line.
+$controlRoot = Join-Path $Root 'native-reload-path'
+[void][IO.Directory]::CreateDirectory($controlRoot)
+$sourceRoot = Join-Path $controlRoot 'owned source'
+[void][IO.Directory]::CreateDirectory($sourceRoot)
+$controlEntry = Join-Path $sourceRoot 'reload owner.ahk'
+$controlScript = @'
+#Requires AutoHotkey v2.0
+#SingleInstance Off
+#Warn All, StdOut
+ProbeStart := A_TickCount
+ProbeRoot := EnvGet("ERGOPTI_STARTUP_SMOKE_DIR")
+ParentMarker := ProbeRoot "\parent.pid"
+if !FileExist(ParentMarker) {
+    FileAppend(ProcessExist(), ParentMarker, "UTF-8-RAW")
+    Reload()
+    Sleep(10000)
+    ExitApp(91)
+}
+FileAppend("[INFO] Native Reload control reached readiness.`n", ProbeRoot "\native.log", "UTF-8-RAW")
+Executable := StrReplace(StrReplace(A_AhkPath, "\", "\\"), '"', '\"')
+Ready := '{"schema_version":1,"pid":' ProcessExist()
+    . ',"compiled":false,"driver_ready":true,"menu_ready":true,"logs_flushed":true'
+    . ',"nonce":"' EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE") '","phase":"ready"'
+    . ',"executable":"' Executable '","fixture":"native-reload","elapsed_ms":' (A_TickCount - ProbeStart) '}'
+FileAppend(Ready, ProbeRoot "\ready.json", "UTF-8-RAW")
+SetTimer(CheckReloadAcknowledgment, 10)
+CheckReloadAcknowledgment() {
+    if FileExist(EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") "\ack.txt")
+        ExitApp(0)
+}
+'@
+[IO.File]::WriteAllText($controlEntry, $controlScript.Replace("`r", '') + "`n", [Text.UTF8Encoding]::new($true))
+# Dot segments reliably differ without assuming that the volume enables 8.3 names.
+$noncanonicalEntry = $sourceRoot + '\..\owned source\reload owner.ahk'
+$canonicalEntry = [SourceBootProcess]::CanonicalEntry($noncanonicalEntry)
+if ($canonicalEntry -ieq $noncanonicalEntry) { throw 'The native Reload path control is vacuous.' }
+foreach ($invalid in @((Join-Path $sourceRoot 'missing.ahk'), $sourceRoot, 'relative.ahk')) {
+    $refused = $false
+    try { $null = [SourceBootProcess]::CanonicalEntry($invalid) }
+    catch { $refused = $true }
+    if (!$refused) { throw 'An absent, directory or relative source entry was admitted.' }
+}
+$pwsh = (Get-Process -Id $PID).Path
+$controlOutput = & $pwsh -NoProfile -NonInteractive -File $Observer -Entry $noncanonicalEntry `
+    -Ahk $Ahk -Root $controlRoot -Nonce ('b' * 32) -ExpectReload `
+    -ReadyTimeoutSeconds 10 -ExitTimeoutMs 5000 -CleanupTimeoutMs 1000 2>&1
+if ($LASTEXITCODE -ne 0 -or @($controlOutput).Count -ne 0) {
+    throw ('The bounded native Reload control failed: ' + ($controlOutput -join "`n"))
+}
+$control = Get-Content -LiteralPath (Join-Path $controlRoot 'observation.json') -Raw | ConvertFrom-Json
+if ($control.source_owner.script_argument_supplied_exact -ne $false -or
+    $control.source_owner.script_argument_canonical_exact -ne $true -or
+    $control.entry -cne $noncanonicalEntry -or
+    $control.ready_pid -eq $control.initial_pid -or $control.reloaded -ne $true -or
+    $control.initial_exit_code -ne 0 -or $control.exit_code -ne 0 -or
+    $control.receipt.nonce -cne ('b' * 32)) {
+    throw 'Actual Reload did not prove original-path refusal and canonical exact admission.'
+}
+$remaining = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.ExecutablePath -ieq $Ahk -and $null -ne $_.CommandLine -and
+    [SourceBootProcess]::HasExactEntry($_.CommandLine, $canonicalEntry)
+})
+if ($remaining.Count -ne 0) { throw 'An owned native Reload control survived retirement.' }
+Write-Output '[OK] Actual AHK Reload refuses the supplied dot-segment spelling and admits its canonical exact source; both generations retired.'
 Write-Output '[OK] Source observer admits only the exact script and proven process generation; refusal evidence remains closed.'

@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type @'
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class SourceBootProcess {
@@ -41,6 +42,18 @@ public static class SourceBootProcess {
     private static extern IntPtr CommandLineToArgvW(string command, out int count);
     [DllImport("kernel32.dll")]
     private static extern IntPtr LocalFree(IntPtr allocation);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+    private static extern uint GetLongPathName(string path, StringBuilder result, uint capacity);
+    public static string CanonicalEntry(string entry) {
+        if (!Path.IsPathFullyQualified(entry) || !File.Exists(entry))
+            throw new InvalidOperationException("The private source entry must be an existing absolute file.");
+        string full = Path.GetFullPath(entry);
+        StringBuilder canonical = new StringBuilder(32768);
+        uint size = GetLongPathName(full, canonical, (uint)canonical.Capacity);
+        if (size == 0 || size >= canonical.Capacity || !File.Exists(canonical.ToString()))
+            throw new InvalidOperationException("Could not normalize the existing private source entry.");
+        return canonical.ToString();
+    }
     public static bool HasExactEntry(string command, string entry) {
         int count;
         IntPtr arguments = CommandLineToArgvW(command, out count);
@@ -117,6 +130,11 @@ function Get-SourceOwnerEvidence {
     }
 }
 if ($LibraryOnly) { return }
+
+# AHK normalizes its source filename before Reload, including 8.3 aliases.
+# Normalize the caller-selected file before launch; exact argument admission stays intact.
+$requestedEntry = $Entry
+$Entry = [SourceBootProcess]::CanonicalEntry($Entry)
 
 $env:LOCALAPPDATA = Join-Path $Root 'localappdata'
 $env:ERGOPTI_STARTUP_SMOKE_DIR = $Root
@@ -196,7 +214,11 @@ try {
     $observation = [ordered]@{
         initial_pid = $initial.Id; ready_pid = $receipt.pid; reloaded = $ExpectReload.IsPresent
         initial_exit_code = $initial.ExitCode; exit_code = $exitCode
-        entry = $Entry; log_files = $logs.Count; receipt = $receipt
+        entry = $requestedEntry; log_files = $logs.Count; receipt = $receipt
+        source_owner = [ordered]@{
+            script_argument_supplied_exact = [SourceBootProcess]::HasExactEntry($native.CommandLine, $requestedEntry)
+            script_argument_canonical_exact = [SourceBootProcess]::HasExactEntry($native.CommandLine, $Entry)
+        }
     }
     [IO.File]::WriteAllText((Join-Path $Root 'observation.json'),
         ($observation | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))

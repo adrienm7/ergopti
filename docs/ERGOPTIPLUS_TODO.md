@@ -384,6 +384,8 @@ TODO 16 remains partial: supplemental constructor and decoder facts are now reta
 
 Linux X11 source qualification now recognizes the native serializer's horizontal alias-column spacing while comparing complete alias names and targets. The existing exact-map, group-epoch, changed-alias, and native-Wayland refusal checks remain intact. An actual owned Xvfb reproduction fails with the former matcher and passes with the corrected matcher, including reordered aliases with different input spacing. This qualifies the controlled X11 source owner, not physical hardware or a native Wayland seat; the complete three-OS release-free checkpoint remains required.
 
+TODO16 remains partial. Native source run37134285521 reported exact executable identity but refused the first script argument. AutoHotkey v2.0.26 normalizes the source filename, including 8.3 expansion, before Reload. Normalize only the caller-selected existing absolute file before initial launch; preserve exact first-script-argument admission, generation, image, handle and cleanup checks. A real native Reload control requires supplied dot-segment spelling to fail exact comparison and its canonical spelling to succeed, then verifies both generations retire. The observation retains caller-selected spelling. Actual cold/warm private clone qualification and the real failing runner alias remain pending Windows CI; no parser-option or file-ID admission fallback is introduced.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
