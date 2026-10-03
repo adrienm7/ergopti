@@ -710,3 +710,57 @@ helpers.describe("magic key source: per-press repeat ownership", function()
 		end)
 	end
 end)
+
+helpers.describe("magic key source: tap assignment admission", function()
+	helpers.it("(magic-key-source) configured claims refuse choice and capture without changing any bytes", function()
+		with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n[shortcuts.tap_keys]\nnumber_row_left = "send_text" # owned choice\n[action_parameters]\nfuture = "preserved"\n', function(Source, Preferences, path)
+			local Paths = require("infra.config_paths")
+			local get_path, saved = Paths.config, package.loaded["modules.shortcuts.tap_keys"]
+			local called, detail = pcall(function()
+				Paths.config = function(name) if name == "config.toml" then return path end return get_path(name) end
+				package.loaded["modules.shortcuts.tap_keys"] = nil
+				local Tap = require("modules.shortcuts.tap_keys")
+				helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
+				local file = assert(io.open(path, "rb")); local before = file:read("*a"); file:close()
+				local state = { active = false, replace = false, typed_ok = true }
+				local calls = wire(Source, state)
+				local ok, reason = Source.set("Backquote")
+				helpers.assert_eq(ok, false, "transient pause and replacement gates never release stored ownership")
+				helpers.assert_eq(reason, Shared.TAP_CONFLICT_REASON)
+				helpers.assert_eq(Source.get(), "KeyJ")
+				state.active = true; state.replace = true
+				local refused = {}
+				helpers.assert_true(Source.capture({ on_chosen = function(value) refused[#refused + 1] = value end,
+					on_refused = function(value) refused[#refused + 1] = value end }))
+				helpers.assert_true(Source.on_key({ code = 41, mods = {} }))
+				calls.deferred[#calls.deferred].fn()
+				helpers.assert_eq(refused, { Shared.TAP_CONFLICT_REASON })
+				file = assert(io.open(path, "rb")); local after = file:read("*a"); file:close()
+				helpers.assert_eq(after, before, "every source/tap/future/comment byte remains unchanged")
+				helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
+				helpers.assert_true(Source.set("auto"))
+				helpers.assert_true(Tap.set_action("number_row_left", "none"))
+				helpers.assert_true(Source.set("Backquote"), "none explicitly gives the key back")
+			end)
+			Paths.config = get_path
+			package.loaded["modules.shortcuts.tap_keys"] = saved
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("(magic-key-source) old conflicting intent refuses initial injection until actual tap admission releases it", function()
+		with_source('[hotstrings]\nmagic_key_source = "Backquote"\n', function(Source)
+			local state = { active = true, replace = true, typed_ok = true, blocked_code = 41 }
+			local calls = wire(Source, state)
+			local consumed, repeat_owner = Source.on_key({ code = 41, mods = {}, value = 1, physical = true, origin_generation = 1 })
+			helpers.assert_eq(consumed, false)
+			helpers.assert_nil(repeat_owner)
+			helpers.assert_eq(calls.typed, {})
+			helpers.assert_eq(calls.dispatched, {})
+			helpers.assert_eq(calls.ended, 0)
+			state.blocked_code = nil
+			helpers.assert_true(Source.on_key({ code = 41, mods = {} }))
+			helpers.assert_eq(calls.typed, { "★" })
+		end)
+	end)
+end)

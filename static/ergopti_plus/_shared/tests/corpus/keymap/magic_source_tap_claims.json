@@ -1,0 +1,115 @@
+{
+	"reason_key": "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment",
+	"cases": [
+		{
+			"name": "automatic preserves all tap assignments",
+			"source": "auto",
+			"assignments": {
+				"number_row_left": "send_text"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"evdev": ""
+			}
+		},
+		{
+			"name": "left edge reserves its native identities",
+			"source": "Backquote",
+			"assignments": {
+				"number_row_left": "send_text"
+			},
+			"expected": {
+				"ahk": "number_row_left",
+				"hs": "number_row_left",
+				"evdev": "number_row_left"
+			}
+		},
+		{
+			"name": "first right edge remains assigned",
+			"source": "Minus",
+			"assignments": {
+				"number_row_right_1": "send_text"
+			},
+			"expected": {
+				"ahk": "number_row_right_1",
+				"hs": "number_row_right_1",
+				"evdev": "number_row_right_1"
+			}
+		},
+		{
+			"name": "second right edge remains assigned",
+			"source": "Equal",
+			"assignments": {
+				"number_row_right_2": "send_text"
+			},
+			"expected": {
+				"ahk": "number_row_right_2",
+				"hs": "number_row_right_2",
+				"evdev": "number_row_right_2"
+			}
+		},
+		{
+			"name": "ISO swapped twin intersects only Mac aliases",
+			"source": "IntlBackslash",
+			"assignments": {
+				"number_row_left": "send_text"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "number_row_left",
+				"evdev": ""
+			}
+		},
+		{
+			"name": "none explicitly releases the source",
+			"source": "Backquote",
+			"assignments": {
+				"number_row_left": "none"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"evdev": ""
+			}
+		},
+		{
+			"name": "another assigned edge does not reserve this key",
+			"source": "Backquote",
+			"assignments": {
+				"number_row_right_1": "send_text"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"evdev": ""
+			}
+		},
+		{
+			"name": "ordinary letter remains available with all edges assigned",
+			"source": "KeyJ",
+			"assignments": {
+				"number_row_left": "send_text",
+				"number_row_right_1": "send_text",
+				"number_row_right_2": "send_text"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"evdev": ""
+			}
+		},
+		{
+			"name": "unknown future assignment is not a catalogued physical key",
+			"source": "Backquote",
+			"assignments": {
+				"future_tap": "send_text"
+			},
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"evdev": ""
+			}
+		}
+	]
+}

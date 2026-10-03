@@ -35,6 +35,9 @@ local LABEL_KEY = "menu.layout.magic_key_source"
 local AUTOMATIC_KEY = "menu.layout.magic_key_source.auto"
 local CAPTURE_KEY = "menu.layout.magic_key_source.capture"
 
+-- Reuse the assignment-priority reason already translated for every driver.
+M.TAP_CONFLICT_REASON = "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
+
 
 
 
@@ -77,6 +80,10 @@ function M.new(opts)
 		error("magic_key_source.new needs the registry field of the native id", 2)
 	end
 
+	assert(opts.aliases == nil or type(opts.aliases) == "table", "magic_key_source: aliases must be an array")
+	for _, form in ipairs(opts.aliases or {}) do
+		assert(type(form) == "string" and form ~= "", "magic_key_source: alias form must be a name")
+	end
 	local automatic = entry.default
 	local candidates, native_for, code_for = {}, {}, {}
 	for _, value in ipairs(entry.enum_values) do
@@ -137,6 +144,23 @@ function M.new(opts)
 		return native
 	end
 
+	--- Every native identity a chosen key can use, including configured board forms.
+	--- @param value string Candidate or automatic value.
+	--- @return table native_codes Fresh, deduplicated native identity array.
+	function resolver.native_codes(value)
+		local primary = resolver.native(value)
+		if primary == nil then return {} end
+		local result, seen = { primary }, { [primary] = true }
+		for _, form in ipairs(opts.aliases or {}) do
+			local code = native_of(registry.keys[value], field, form)
+			if code ~= nil and not seen[code] then
+				seen[code] = true
+				result[#result + 1] = code
+			end
+		end
+		return result
+	end
+
 	--- The value naming a native key, nil when that key is no candidate.
 	--- @param native any Native id of a pressed key.
 	--- @return string|nil code
@@ -156,6 +180,28 @@ end
 -- ======= 2/ Press decision =======
 -- =================================
 -- =================================
+
+--- Finds a configured tap assignment intersecting the source's actual native identities.
+--- Temporary category or pause gates do not release the persisted assignment.
+--- @param resolver table Physical-source resolver.
+--- @param value string Candidate or automatic value.
+--- @param keys table Canonical tap-key catalogue rows.
+--- @param field string Native catalogue field (hs or linux).
+--- @param get_action function Reads the recognized assignment of a tap id.
+--- @return string|nil id Configured owner, nil when there is no conflict.
+function M.tap_conflict(resolver, value, keys, field, get_action)
+	assert(type(keys) == "table" and type(get_action) == "function", "magic_key_source: tap owners are required")
+	local native = {}
+	for _, code in ipairs(resolver.native_codes(value)) do native[code] = true end
+	for _, key in ipairs(keys) do
+		local ids = key[field]
+		if type(ids) ~= "table" then ids = { ids } end
+		for _, code in ipairs(ids) do
+			if native[code] and get_action(key.id) ~= "none" then return key.id end
+		end
+	end
+	return nil
+end
 
 --- Whether a press carries no modifier, the only press the remap takes.
 --- @param mods table|nil Held modifiers, name to truthy (event flags or hook state).
@@ -228,7 +274,11 @@ function M.menu_rows(resolver, opts)
 		{ separator = true },
 	}
 	for _, code in ipairs(resolver.candidates()) do
-		items[#items + 1] = { label = label_of(code), checked = current == code, action = chooser(code) }
+		local reason = opts.reason and opts.reason(code) or nil
+		local label = label_of(code)
+		if reason ~= nil then label = label .. " — " .. t(reason) end
+		items[#items + 1] = { label = label, checked = current == code,
+			disabled = reason ~= nil or nil, action = reason == nil and chooser(code) or nil }
 	end
 	local shown = current == resolver.automatic and t(AUTOMATIC_KEY) or label_of(current)
 	return { { label = t(LABEL_KEY) .. " : " .. shown, items = items } }

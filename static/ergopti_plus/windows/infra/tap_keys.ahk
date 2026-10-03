@@ -105,6 +105,19 @@ SetTapKeyAction(Id, ActionName) {
 	return ReloadPreservingSuspend()
 }
 
+; The configured tap owner of a scan code, independent of temporary gates.
+; @param {Integer} Scan Native physical scan code.
+; @returns {String} Assigned tap id, or empty when no assignment owns it.
+TapKeyAssignedToScan(Scan) {
+	global TapKeyAssignments, TAP_KEY_ORDER, TAP_KEY_SCANCODES, GESTURE_ACTIONS
+	for Id in TAP_KEY_ORDER {
+		Action := TapKeyAssignments.Get(Id, "none")
+		if TAP_KEY_SCANCODES[Id] == Scan && Action != "none" && GESTURE_ACTIONS.Has(Action)
+			return Id
+	}
+	return ""
+}
+
 ; Whether the Shortcuts category lets the tap keys fire.
 _TapKeysCategoryEnabled() {
 	global CategoryEnabled
