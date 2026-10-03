@@ -474,6 +474,20 @@ These are software implementations; final hardware verification remains below.
   unvalidated source concern deferred to its native owner; Windows uses checked
   native crypto APIs. Shared key/envelope policy is unchanged. Native cross-OS
   gates, manual CI and physical typing tests remain unexecuted.
+- [~] **L38.** Linux CLI SHA-256 fallback receipts: reuse the Linux checked
+  OpenSSL owner for ordinary input and checked decoder pipelines. Without FFI,
+  a failed primitive or partial decoder could previously admit a useful digest.
+  Seventeen native and fourteen portable cases fail before the fix. Twenty-nine
+  actual Lua 5.4/OpenSSL cases pass on host and nonroot Debian, with explicit
+  post-calculation failure/signal adapters, independent shared byte vectors and
+  a 44,000-byte repeated-quote control. Eighteen actual native FFI vectors and
+  fifty-one portable adapter checks retain normal hashing and refusal semantics.
+  Existing inert POSIX words and binary exact stdin retain their transport;
+  scripts without external stdin avoid quoting the native command twice.
+  Native byte hashing and shared digest/encoding policy are unchanged. macOS
+  text hashing similarly ignores its native command success flag (unvalidated,
+  deferred to the native owner); Windows checks BCrypt return codes. Native
+  cross-OS gates, manual CI and physical input tests remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
