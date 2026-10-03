@@ -133,6 +133,8 @@ _LLM_Ollama_DispatchAsync(job) {
 	; to release the Critical region before the blocking OS calls.
 	_LLM_Ollama_Async[req_id] := Map(
 		"pid", 0, "process_owner", 0,
+		"presence_owner", 0, "presence_pending", false,
+		"presence_admitted", false, "presence_model", "",
 		"tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
 		"tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
@@ -150,8 +152,14 @@ _LLM_Ollama_DispatchAsync(job) {
 		SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
 }
 
+; Deferred preflight owns one-shot delivery and exact callback cancellation.
+; A repeating timer would retry private work outside its admission lifecycle.
 _LLM_Ollama_SchedulePreflight(Callback, Period) {
-	SetTimer(Callback, Period)
+	if !(Period is Integer) || Period > 0
+		throw ValueError("_LLM_Ollama_SchedulePreflight: expected a negative one-shot period or zero cancellation.")
+	if Period == 0
+		return SetTimer(Callback, 0)
+	return SetTimer(Callback, -Abs(Period))
 }
 
 ; A chat slot stays reserved while the existing auxiliary curl owner probes tags.

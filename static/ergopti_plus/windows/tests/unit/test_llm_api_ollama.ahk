@@ -1226,10 +1226,18 @@ _OllamaPresenceWithFixture(Body) {
 			(*) => 0, _OllamaPresenceRecordFailure.Bind(State))
 		State["id"] := Id
 		AssertTrue(_LLM_Ollama_Async.Has(Id), "the public chat call must reserve the existing request slot")
+		Entry := _LLM_Ollama_Async[Id]
+		AssertEqual(0, Entry["presence_owner"], "the reserved slot declares that no native tags owner exists yet")
+		AssertFalse(Entry["presence_pending"], "a queued preflight is not an acquired tags owner")
+		AssertFalse(Entry["presence_admitted"], "reserving a slot does not admit a private POST")
+		AssertEqual("", Entry["presence_model"], "the model is unproven until tags admission")
 		AssertFalse(FileExist(_LLM_Ollama_Async[Id]["tmp_payload"]), "no private payload is written while tags are pending")
 		if HasMethod(State["timer"], "Call")
 			State["timer"].Call()
 		AssertEqual(1, State["tags"], "actual chat admission must issue tags before any inference")
+		AssertTrue(Entry["presence_owner"] == State["owner"], "preflight publishes the exact auxiliary lease in the existing slot")
+		AssertTrue(Entry["presence_pending"], "the published native tags owner is pending its actual receipt")
+		AssertFalse(Entry["presence_admitted"], "a pending tags owner still cannot admit a POST")
 		AssertTrue(State["strict"], "the guard requires a strict receipt while legacy menus keep arrays")
 		AssertEqual(0, State["posts"], "a pending list cannot admit an inference POST")
 		Body.Call(State)
@@ -1460,3 +1468,32 @@ _OllamaPresenceCancelRefusalCase() {
 }
 Test("Ollama local presence: native cancellation refusal keeps lease debt and reserved slot until receipt (todo-46-local-model)",
 	_OllamaPresenceCancelRefusalCase)
+
+
+; The native scheduler accepts one-shots and exact callback cancellation only.
+; Its callback records observations; assertions remain outside timer delivery.
+_OllamaPresenceNativeScheduleContract() {
+	Calls := 0
+	Callback() => (++Calls)
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Ollama_SchedulePreflight(Callback, -1)
+		_LLM_Ollama_SchedulePreflight(Callback, 0)
+	} finally Critical(PreviousCritical)
+	try {
+		Sleep(30)
+		AssertEqual(0, Calls, "zero retires the exact armed callback before dispatch")
+		_LLM_Ollama_SchedulePreflight(Callback, -1)
+		Started := A_TickCount
+		while Calls == 0 && ((A_TickCount - Started) & 0xFFFFFFFF) < 500
+			Sleep(-1)
+		AssertEqual(1, Calls, "a negative period delivers the deferred preflight once")
+		Sleep(30)
+		AssertEqual(1, Calls, "the admitted preflight cannot become a repeating timer")
+		AssertThrows(() => _LLM_Ollama_SchedulePreflight(Callback, 1), "a positive repeating period is refused")
+		AssertThrows(() => _LLM_Ollama_SchedulePreflight(Callback, -1.5), "fractional periods are refused")
+		AssertThrows(() => _LLM_Ollama_SchedulePreflight(Callback, "-1"), "numeric strings are not integer periods")
+	} finally _LLM_Ollama_SchedulePreflight(Callback, 0)
+}
+Test("Ollama local presence: native preflight timer owns one-shot and cancel semantics (todo-46-local-model)",
+	_OllamaPresenceNativeScheduleContract)
