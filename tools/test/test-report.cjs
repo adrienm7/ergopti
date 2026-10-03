@@ -2,11 +2,12 @@
 
 /**
  * ==============================================================================
- * MODULE: report.cjs parser self-test
+ * MODULE: report.cjs parser and lifecycle self-test
  * DESCRIPTION:
  * Exercises report.cjs's format-agnostic parseResults against representative TAP
  * (AHK run_all.ahk) and Lua-runner output, so the unified reporter cannot
  * silently miscount or miss failures (which would let a red CI run look green).
+ * Actual CLI subprocesses also prove complete output draining and exit status.
  * ==============================================================================
  */
 
@@ -16,7 +17,7 @@ const assert = require('assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { parseResults, formatCount } = require('./report.cjs');
 
 let checks = 0;
@@ -205,6 +206,174 @@ try {
 	fs.rmSync(fixture, { recursive: true, force: true });
 }
 
-console.log(
-	`\x1b[32m[OK] report.cjs parser: ${checks} assertion(s) passed (TAP + Lua formats).\x1b[0m`
-);
+/**
+ * Exercises the actual CLI against unread pipes, not an injected output writer.
+ * @returns {Promise<void>} Settles after every owned reporter has closed.
+ */
+async function testOutputDrain() {
+	const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-reporter-drain-'));
+	const reporter = path.resolve(__dirname, 'report.cjs');
+	const transcript = path.join(folder, 'tap.txt');
+	const runner = path.join(folder, 'runner.cjs');
+	const stderrRunner = path.join(folder, 'stderr-runner.cjs');
+	const stderrFile = path.join(folder, 'stderr.txt');
+	const jsonPath = path.join(folder, 'receipt.json');
+	const failures = Array.from(
+		{ length: 12 },
+		(_, index) => `owned slow-reader cause ${index + 1}: ` + 'x'.repeat(48 * 1024 - 1024)
+	);
+	// Exceed both POSIX pipe and Node socket buffering with independently fitting
+	// causes; one short near-budget cause alone does not force a blocked writer.
+	const tap =
+		failures.map((failure, index) => `not ok ${index + 1} - ${failure}\n`).join('') +
+		'# 7738 passed, 12 failed\n';
+	const stderr = 'owned stderr: ' + 'e'.repeat(96 * 1024) + '\n';
+	fs.writeFileSync(transcript, tap);
+	fs.writeFileSync(
+		runner,
+		"const fs = require('node:fs'); process.stdout.write(fs.readFileSync(process.argv[2])); process.exitCode = Number(process.argv[3]);\n"
+	);
+	function collect(args) {
+		return new Promise((resolve, reject) => {
+			const child = spawn(process.execPath, [reporter, ...args], {
+				env: { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: '' }
+			});
+			const output = [],
+				errors = [];
+			child.stdout.on('data', (chunk) => output.push(chunk));
+			child.stderr.on('data', (chunk) => errors.push(chunk));
+			child.stdout.pause();
+			// Start the slow-reader interval only once real output reaches the pipe;
+			// process startup time must not consume the backpressure fixture.
+			let resume;
+			child.stdout.once('readable', () => {
+				resume = setTimeout(() => child.stdout.resume(), 200);
+			});
+			let timedOut = false;
+			const deadline = setTimeout(() => {
+				timedOut = true;
+				child.kill('SIGKILL');
+			}, 4000);
+			child.on('error', reject);
+			child.on('close', (code, signal) => {
+				clearTimeout(resume);
+				clearTimeout(deadline);
+				if (timedOut) return reject(new Error('Owned reporter did not settle within 4s'));
+				resolve({
+					code,
+					signal,
+					stdout: Buffer.concat(output).toString(),
+					stderr: Buffer.concat(errors).toString()
+				});
+			});
+		});
+	}
+	try {
+		for (const mode of ['child', 'parse']) {
+			const result = await collect([
+				'--name',
+				'slow-reader',
+				'--json',
+				jsonPath,
+				'--',
+				...(mode === 'child'
+					? [process.execPath, runner, transcript, '9']
+					: ['PARSE_FILE', transcript])
+			]);
+			check(
+				'slow reader preserves exact ' + mode + ' status',
+				result.code === (mode === 'child' ? 9 : 1) && result.signal === null
+			);
+			if (mode === 'child') {
+				check('slow reader retains every original stdout byte', result.stdout.startsWith(tap));
+			}
+			const notice = result.stdout
+				.split('\n')
+				.find((line) => line.startsWith('::notice title=slow-reader all failures::'));
+			check(
+				'slow reader retains the complete fitting cause in its bounded notice',
+				!!notice && notice.includes(failures[0]) && notice.includes('11 failure details omitted')
+			);
+			const annotations = result.stdout
+				.split('\n')
+				.filter((line) => line.startsWith('::error title=slow-reader test failed::'));
+			check(
+				'slow reader retains every full error annotation',
+				annotations.length === failures.length &&
+					annotations.every((line, index) => line.endsWith(failures[index]))
+			);
+			check(
+				'slow reader retains the final summary',
+				result.stdout.includes('[report:slow-reader]') &&
+					result.stdout.includes(`(exit ${result.code}, format tap).\n`)
+			);
+			const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+			assert.deepStrictEqual(json.failures, failures);
+			check(
+				'slow reader JSON keeps exact native status',
+				json.exit_code === result.code && json.failed === 12 && json.passed === 7738
+			);
+		}
+		// Keep stream-drain proof separate from TAP parsing: simultaneous arbitrary
+		// stderr text can bisect a TAP line in the reporter's combined transcript.
+		// A file keeps the payload below Windows' command-line length limit.
+		fs.writeFileSync(stderrFile, stderr);
+		fs.writeFileSync(
+			stderrRunner,
+			"const fs = require('node:fs'); process.stderr.write(fs.readFileSync(process.argv[2])); process.exitCode = 7;\n"
+		);
+		const stderrResult = await collect([
+			'--name',
+			'stderr-drain',
+			'--',
+			process.execPath,
+			stderrRunner,
+			stderrFile
+		]);
+		check('natural failure retains every original stderr byte', stderrResult.stderr === stderr);
+		check(
+			'stderr failure settles with exact native status and final output',
+			stderrResult.code === 7 &&
+				stderrResult.signal === null &&
+				stderrResult.stdout.includes('(exit 7, format unknown).\n')
+		);
+		fs.writeFileSync(transcript, 'ok 1 - owned success\n# 1 passed, 0 failed\n');
+		const success = await collect(['--name', 'drained-success', '--', 'PARSE_FILE', transcript]);
+		check(
+			'natural success settles with zero status and final output',
+			success.code === 0 &&
+				success.signal === null &&
+				success.stdout.includes('(exit 0, format tap).\n')
+		);
+		const refused = await collect([
+			'--name',
+			'spawn-refused',
+			'--',
+			path.join(folder, 'absent-command')
+		]);
+		check(
+			'spawn refusal settles with status2 and its diagnostic',
+			refused.code === 2 &&
+				refused.signal === null &&
+				refused.stderr.includes('[report:spawn-refused] failed to spawn:')
+		);
+		const usage = await collect([]);
+		check(
+			'usage refusal settles with status2 and full usage',
+			usage.code === 2 && usage.signal === null && usage.stderr.endsWith('-- <cmd> [args…]\n')
+		);
+	} finally {
+		fs.rmSync(folder, { recursive: true, force: true });
+	}
+}
+
+testOutputDrain()
+	.then(() => {
+		console.log(
+			`\x1b[32m[OK] report.cjs parser: ${checks} assertion(s) passed (TAP + Lua formats).\x1b[0m`
+		);
+	})
+	.catch((error) => {
+		console.error(error);
+		process.exitCode = 1;
+	});
