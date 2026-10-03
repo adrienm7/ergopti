@@ -10,6 +10,94 @@
 local helpers = require("tests.helpers")
 local fs      = helpers.load_module("adapters.file_system")
 
+--- Selects a metadata backend while preserving the production adapter itself.
+local function with_exists_backend(backend, result, test)
+	local previous_require, previous_open = require, io.open
+	local previous_files = package.loaded["adapters.file_system"]
+	local Shell = require("adapters.shell_runner")
+	local previous_run = Shell.run
+	local state = { stats = 0, opens = 0, commands = {} }
+	local function stat(path)
+		state.stats = state.stats + 1
+		state.path = path
+		if result == "raise" then error("metadata refused") end
+		return result == "present" and { mode = "file" } or nil, "native refusal"
+	end
+	local function access(fd, path, mode, flags)
+		state.stats = state.stats + 1
+		state.fd, state.path, state.mode, state.flags = fd, path, mode, flags
+		if result == "raise" then error("native access refused") end
+		return result == "present" and 0 or -1
+	end
+	require = function(name)
+		if name == "lfs" then
+			if backend == "lfs" then return { attributes = stat } end
+			error("optional lfs unavailable")
+		end
+		if name == "luv" then
+			if backend == "luv" then return { fs_stat = stat } end
+			error("optional luv unavailable")
+		end
+		if name == "ffi" then
+			if backend == "ffi" then return { cdef = function() end, C = { faccessat = access } } end
+			error("optional ffi unavailable")
+		end
+		return previous_require(name)
+	end
+	local loaded, Files = pcall(helpers.load_module, "adapters.file_system")
+	require = previous_require
+	package.loaded["adapters.file_system"] = previous_files
+	if not loaded then error(Files, 0) end
+	io.open = function() state.opens = state.opens + 1; return nil, "no readable stream" end
+	Shell.run = function(command)
+		state.commands[#state.commands + 1] = command
+		if result == "raise" then error("native test refused") end
+		return result == "present"
+	end
+	local ok, err = xpcall(function() test(Files, state, Shell) end, debug.traceback)
+	io.open, Shell.run = previous_open, previous_run
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-file-exists-receipts", function()
+	for _, backend in ipairs({ "lfs", "luv", "ffi" }) do
+		for _, result in ipairs({ "present", "absent", "denied", "raise" }) do
+			helpers.it("linux-file-exists-receipts: " .. backend .. " " .. result .. " uses metadata without a stream", function()
+				with_exists_backend(backend, result, function(Files, state)
+					helpers.assert_eq(Files.exists("/metadata-owned"), result == "present")
+					helpers.assert_eq(state.stats, 1)
+					helpers.assert_eq(state.path, "/metadata-owned")
+					if backend == "ffi" then
+						helpers.assert_eq(state.fd, -100)
+						helpers.assert_eq(state.mode, 0)
+						helpers.assert_eq(state.flags, 512, "existence must use effective credentials")
+					end
+					helpers.assert_eq(state.opens, 0, "exists cannot need read permission or wait on a FIFO")
+					helpers.assert_eq(#state.commands, 0, "an available stat backend owns the receipt")
+				end)
+			end)
+		end
+	end
+	for _, result in ipairs({ "present", "absent", "raise" }) do
+		helpers.it("linux-file-exists-receipts: shell fallback " .. result .. " quotes one literal path", function()
+			with_exists_backend("shell", result, function(Files, state, Shell)
+				local path = "/owned/é漢-'quote\nline"
+				helpers.assert_eq(Files.exists(path), result == "present")
+				helpers.assert_eq(state.opens, 0)
+				helpers.assert_eq(state.stats, 0)
+				helpers.assert_eq(#state.commands, 1)
+				helpers.assert_eq(state.commands[1], "test -e " .. Shell.quote(path) .. " 2>/dev/null")
+			end)
+		end)
+	end
+	helpers.it("linux-file-exists-receipts: invalid NUL path cannot reach any backend", function()
+		with_exists_backend("luv", "present", function(Files, state)
+			helpers.assert_eq(Files.exists("/owned\0suffix"), false)
+			helpers.assert_eq(state.stats + state.opens + #state.commands, 0)
+		end)
+	end)
+end)
+
 -- Create a temp file path for tests that mutate the filesystem.
 local tmp_base = os.tmpname and os.tmpname() or (os.getenv("TEMP") or "/tmp") .. "/ergopti_fs_test"
 -- os.tmpname() actually creates a file — remove it and use it as a directory marker

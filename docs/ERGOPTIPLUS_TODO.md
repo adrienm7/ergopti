@@ -380,6 +380,20 @@ These are software implementations; final hardware verification remains below.
   native Win32 error codes; macOS also logs raw protected-exception text, an
   unvalidated source-level privacy concern deferred to its native owner. Shared
   logging policy, native cross-OS gates and manual CI remain untouched.
+- [~] **L31.** Linux file-existence metadata: without optional LuaFileSystem,
+  use libuv stat or in-process libc F_OK; plain Lua without native bindings uses
+  the POSIX shell test builtin. Unreadable files/directories and sockets were
+  falsely absent; FIFO probes actually blocked until their owned child was killed
+  by the test guard. Thirteen native and eleven portable cases failed before the
+  fix. Twenty-one native cases pass on host and nonroot Debian using constrained C-module availability,
+  real permission/symlink/FIFO/socket receipts, LuaJIT libc and actual Lua 5.4
+  shell fallback without either Lua stat library; sixteen portable cases cover
+  backend/refusal/quoting contracts. Windows uses native attributes; macOS normally uses hs.fs.attributes
+  but its unavailable-binding fallback has the same source-level open issue,
+  deferred to its owner. An initial shell-only draft failed two existing reload
+  and uninstall assertions; native libc restores both without changing those
+  reserved tests. Classified TOML paths, native cross-OS gates and manual CI
+  remain unchanged or unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
