@@ -645,3 +645,60 @@ _HSDT_SharedControlRefusesDelayedPause() {
 	}
 }
 Test("word expanders: shared native controls refuse delayed delivery after pause", _HSDT_SharedControlRefusesDelayedPause)
+
+
+_HSDT_CustomDeleteCorpus() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\menus\word_expander_custom_controls.json"
+	Corpus := JsonParse(FSReadUtf8Exact(Path))
+	Assert(Corpus is Map, "the independent custom-delimiter corpus must be readable")
+	AssertEqual(1, Corpus["rows"].Length)
+	return Corpus
+}
+
+_HSDT_DeclaredCustomDeleteReceipts() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	Corpus := _HSDT_CustomDeleteCorpus()
+	Saved := _HSDT_SaveState()
+	try {
+		for Mode in ["ack", "refused", "paused"] {
+			_HSDT_Seed("declared-custom-delete-" . Mode,
+				Corpus["native_membership"]["before"], Corpus["native_membership"]["before"])
+			Seen := Map("ready", true)
+			Expected := Corpus["rows"][1]
+			Writer := Mode == "refused" ? _HSDT_FalseWriter : _HSDT_AcceptWriter
+			Command := _HS_DelimRemoveCustomCommit.Bind(Corpus["target"]["char"], Writer,
+				_HSDT_AcceptReplace, _HSDT_Notify)
+			Row := MenuRenderer_CommandRow(Corpus["section"], Expected["id"],
+				Map(Expected["id"], Command), Map(Expected["ready"], (*) => Seen["ready"]))
+			Assert(Row is Map, "the declared provider supplies the actual native row")
+			AssertEqual(t(Expected["i18n"]), Row["label"])
+			if Mode == "paused"
+				Seen["ready"] := false
+			; Native callbacks collect through the real delimiter transaction;
+			; assertions follow delivery and any production-caught refusal.
+			Committed := Row["action"].Call()
+			AssertEqual(Mode == "ack", Committed)
+			AssertEqual(Mode == "ack" ? Corpus["native_membership"]["ack"]
+				: Corpus["native_membership"]["refused"], _HotstringsWordDelimiters)
+			AssertEqual(_HotstringsWordDelimiters, _HotstringsConsumedDelimiters)
+			AssertEqual(Mode == "paused" ? 0 : 1, _HSDT_WriteCalls)
+			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_ReplaceCalls)
+			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_NotifyCalls)
+		}
+	} finally _HSDT_Restore(Saved)
+}
+Test("custom word expanders: declared Delete retains native ACK, refusal and delayed pause",
+	_HSDT_DeclaredCustomDeleteReceipts)
+
+_HSDT_CustomProviderOwnsDeclaredDelete() {
+	Body := _DriverFuncBody("_HS_WordExpanderRows")
+	Assert(Body != "", "the actual custom-delimiter provider must exist")
+	Assert(InStr(Body, 'MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete"'))
+	Assert(InStr(Body, "_HS_DelimRemoveCustom(C)"), "the shared row retains its captured native target owner")
+	AssertFalse(InStr(Body, 't("menu.hotstrings.delete_delimiter")'),
+		"a native fixed label cannot override the canonical command declaration")
+}
+Test("custom word expanders: actual provider consumes its shared Delete declaration",
+	_HSDT_CustomProviderOwnsDeclaredDelete)

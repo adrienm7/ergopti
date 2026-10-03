@@ -1168,13 +1168,14 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 					if def.custom then
-						sub[#sub + 1] = {
-							label = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
-							action    = function()
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+							["word_expander_delete"] = function()
 								local saved = snapshot()
-								if Terminators.remove_custom_terminator(key) then commit(saved) end
+								if Terminators.remove_custom_terminator(key) ~= true then return false end
+								return commit(saved) == true
 							end,
-						}
+						}, { ["word_expanders_ready"] = word_expanders_ready })
+						if delete_row then sub[#sub + 1] = delete_row end
 					end
 				end
 			end

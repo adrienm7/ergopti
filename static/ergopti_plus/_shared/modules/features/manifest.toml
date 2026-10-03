@@ -5292,6 +5292,12 @@ type = "---"
 type = "list"
 id = "word_expander_entries"
 
+[[menu.word_expander_custom_menu]]
+type = "command"
+id = "word_expander_delete"
+i18n = "menu.hotstrings.delete_delimiter"
+disabled_when = ["word_expanders_ready"]
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "word_expanders"

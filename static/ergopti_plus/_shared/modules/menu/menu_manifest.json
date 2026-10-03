@@ -1805,6 +1805,16 @@
 			"id": "word_expander_entries"
 		}
 	],
+	"word_expander_custom_menu": [
+		{
+			"type": "command",
+			"id": "word_expander_delete",
+			"i18n": "menu.hotstrings.delete_delimiter",
+			"disabled_when": [
+				"word_expanders_ready"
+			]
+		}
+	],
 	"hotstrings_params_group": [
 		{
 			"type": "list",
