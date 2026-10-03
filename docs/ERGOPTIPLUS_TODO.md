@@ -416,6 +416,19 @@ These are software implementations; final hardware verification remains below.
   parsing. This is virtual graphical validation; physical desktops, Wayland,
   native cross-OS gates and manual CI remain unexecuted. Shared notification
   policy and the twenty-one translated product catalogues are unchanged.
+- [~] **L34.** Linux at-rest encryption identity fallback: use the real
+  /var/lib/dbus/machine-id when /etc/machine-id is absent, empty or whitespace.
+  A repository-shaped /var/infra path made encryption unavailable on otherwise
+  supported systems. Five native and three portable cases failed before the
+  fix. Eight native cases pass using actual read-only Docker bind mounts and an
+  isolated private mount-namespace runner, with synthetic system identity data,
+  real OpenSSL and an ordinary cipher user. Six portable cases cover primary
+  priority, fallback, closed handles, cached derivation and fail-closed absence.
+  macOS uses IOPlatformUUID and Windows uses MachineGuid; shared key/envelope
+  policy is unchanged. Initial namespace setup lacked installed mount targets
+  and ran no assertions; the owned container setup supplies those targets, and
+  the subsequent complete before/after matrices pass. Native cross-OS gates
+  and manual CI remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
