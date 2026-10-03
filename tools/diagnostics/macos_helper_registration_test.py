@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import macos_helper_registration as probe
 
+FIXTURE_UID = 501
+
 
 class NativeBoundary:
     """Retain an exact helper identity and observable launchctl job lifecycle."""
@@ -30,6 +32,8 @@ class NativeBoundary:
     def run(self, arguments, **options):
         self.calls.append(arguments)
         if arguments[0] == "/bin/launchctl":
+            if arguments[2] != f"gui/{FIXTURE_UID}/com.ergoptiplus.remap-guardian":
+                raise AssertionError("Unexpected guardian user domain")
             if arguments[1] == "print":
                 self.print_count += 1
                 if self.print_count == 1:
@@ -75,6 +79,7 @@ class HelperGuardianAcceptanceTests(unittest.TestCase):
             error = None
             with (
                 patch.object(probe.sys, "platform", "darwin"),
+                patch.object(probe.os, "getuid", return_value=FIXTURE_UID, create=True),
                 patch.dict(os.environ, {"RUNNER_ENVIRONMENT": "github-hosted"}),
                 patch.object(probe.subprocess, "run", side_effect=boundary.run),
             ):
