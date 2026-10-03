@@ -1204,7 +1204,8 @@ exact-boolean regressions also pass the focused runner.
   positions, the separator and personal-information editor. Portable local
   validation is recorded separately. Full native Windows and complete three-OS
   packaging, installation and launch qualification remain pending. The personal
-  file identity/gate and macOS placeholder-admission remainders are unchanged.
+  file identity/gate remains pending. The macOS personal-info placeholder now
+  participates through its acknowledged native owner, as qualified below.
   Linux Dynamic now consumes the same explicit command pair and shared bulk
   planner. Its existing transaction commits the declared dynamic master and
   seven manifest families as one conditional cohort under both real leases,
@@ -1229,6 +1230,12 @@ exact-boolean regressions also pass the focused runner.
   replacement interpreter while preserving this process's cached authority.
   The original posture/backup/refusal assertions stay intact; an additional
   assertion proves the pending live text cache still contains the old source.
+
+The macOS Dynamic scope now admits the shared-index personal-info module placeholder through the existing acknowledged runtime façade and canonical preference owner. It applies the native module choice before publishing config.toml, restores the module/menu/registry snapshots on rejection, refuses unsupported declared owners, and retains unrelated groups, unknown fields, sparse state, pause, and master posture. The checkbox reads the same native owner. Unchanged or never-applied module state is not reset.
+
+Thirty new actual-owner regressions cover enable/disable, false/nil/throw module and save acknowledgements, sparse rollback, conditional-writer refusal, external stale bytes and retry, selected-group isolation, unsupported declarations, exact mapping identities, unchanged native state, the checkbox action and post-commit refresh refusal. Independent initial failures and full receipts remain outside the repository.
+
+The selected local gates pass 353 JS checks, 13,302 macOS units, 101 macOS E2E checks and 65 focused scope cases in the private baseline. Complete native three-OS packaging, installation and launch qualification and Windows personal-file identity remain pending.
 
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
