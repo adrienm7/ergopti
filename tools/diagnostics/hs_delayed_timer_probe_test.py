@@ -477,6 +477,157 @@ class ScriptingLifecycleTests(unittest.TestCase):
             self.assertIn("actual modal frame", messages[1])
             self.assertNotIn("image only", " ".join(messages))
 
+    def test_server_sample_keeps_main_lua_and_background_wait_in_their_native_threads(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+            stacks = """Call graph:
+617 Thread_33233 DispatchQueue_1: com.apple.main-thread (serial)
++ 617 start (in dyld) + 20
++ ! 615 NSApplicationMain (in AppKit) + 40
++ ! : 610 CFRunLoopRunSpecific (in CoreFoundation) + 50
++                   ! : |   + !   4 lua_pcallk (in LuaSkin) + 368
++                   ! : |   + !           :       3 HSAppleScriptRunString (in Hammerspoon) + 12
+617 Thread_33234 DispatchQueue_2: com.apple.CFNetwork (serial)
++ 617 thread_start (in libsystem_pthread.dylib) + 8
++ ! 617 _dispatch_worker_thread2 (in libdispatch.dylib) + 36
++ ! : 617 CFNetworkNativeCaller (source /Users/private/secret.txt)
++                           617 _dispatch_semaphore_wait_slow (in libdispatch.dylib) + 132
+617 Thread_33235 /Users/private/unrelated-thread
++ 617 unrelated (source /Users/private/unrelated-secret.txt)
+Binary Images:
+com.apple.TCC (loaded image only /Users/private/image-secret.txt)
+"""
+
+            def sample(arguments, **options):
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\n"
+                    + "Unrelated: /Users/private/header-secret.txt\n"
+                    + stacks
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            with mock.patch.object(probe.subprocess, "run", side_effect=sample):
+                messages = owner.sample_native_runtime()
+            self.assertEqual(len(messages), 3)
+            self.assertIn("Thread_33233 DispatchQueue_1: com.apple.main-thread", messages[1])
+            self.assertIn("+ ! 615 NSApplicationMain", messages[1])
+            self.assertIn("+                   ! : |   + !   4 lua_pcallk", messages[1])
+            self.assertIn(
+                "+                   ! : |   + !           :       3 HSAppleScriptRunString",
+                messages[1],
+            )
+            self.assertNotIn("semaphore", messages[1])
+            self.assertIn("Thread_33234 DispatchQueue_2: com.apple.CFNetwork", messages[2])
+            self.assertIn("+ ! 617 _dispatch_worker_thread2", messages[2])
+            self.assertIn("CFNetworkNativeCaller", messages[2])
+            self.assertIn(
+                "+                           617 _dispatch_semaphore_wait_slow", messages[2]
+            )
+            self.assertNotIn("lua_pcallk", messages[2])
+            observed = "\n".join(messages)
+            for foreign in ("/Users/private", "Thread_33235", "com.apple.TCC", "loaded image only"):
+                self.assertNotIn(foreign, observed)
+
+    def test_native_thread_branches_do_not_inherit_a_sibling_call(self):
+        sample = """Call graph:
+9 Thread_1 DispatchQueue_1: com.apple.main-thread (serial)
++ 9 root (in Hammerspoon) + 1
++ ! 4 unrelatedSibling (in Hammerspoon) + 2
++ ! : 4 unrelatedLeaf (in Hammerspoon) + 3
++ ! 5 nativeOwner (in Hammerspoon) + 4
++ ! : 5 lua_pcallk (in LuaSkin) + 5
+9 Thread_2
++ 9 backgroundOwner (in Hammerspoon) + 6
++ ! 9 lua_pcallk (in LuaSkin) + 7
+Binary Images:
+lua_pcallk image only
+"""
+        contexts = probe.NativeDelayedTimerProbe.observed_sample_contexts(sample, ("lua_pcall",))
+        self.assertEqual(len(contexts), 2)
+        self.assertIn("root (in Hammerspoon)", contexts[0])
+        self.assertIn("nativeOwner (in Hammerspoon)", contexts[0])
+        self.assertNotIn("unrelatedSibling", contexts[0])
+        self.assertNotIn("unrelatedLeaf", contexts[0])
+        self.assertIn("Thread_2", contexts[1])
+        self.assertIn("backgroundOwner", contexts[1])
+        self.assertIn("lua_pcallk", contexts[0])
+        self.assertIn("lua_pcallk", contexts[1])
+        self.assertNotIn("image only", "\n".join(contexts))
+
+    def test_native_thread_contexts_are_bounded_without_losing_the_selected_wait(self):
+        lines = ["Call graph:", "9 Thread_1 DispatchQueue_1: com.apple.main-thread (serial)"]
+        lines.extend(
+            "+ " + "! " * depth + f"9 caller{depth} (in Hammerspoon) + 1" for depth in range(35)
+        )
+        lines.append("+ " + "! " * 35 + "9 lua_pcallk (in LuaSkin) + 368")
+        for thread in range(2, 7):
+            lines.extend(
+                (
+                    f"9 Thread_{thread}",
+                    "+ 9 backgroundOwner (in libdispatch.dylib) + 1",
+                    "+ ! 9 _dispatch_semaphore_wait_slow (in libdispatch.dylib) + 132",
+                )
+            )
+        contexts = probe.NativeDelayedTimerProbe.observed_sample_contexts(
+            "\n".join(lines), ("lua_pcall", "dispatch_semaphore_wait")
+        )
+        self.assertEqual(len(contexts), probe.SCRIPT_SAMPLE_CONTEXT_THREAD_LIMIT)
+        self.assertLessEqual(sum(map(len, contexts)), probe.SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT)
+        self.assertIn("lua_pcallk", contexts[0])
+        self.assertIn("native sample context truncated", contexts[0])
+        self.assertIn("native ancestry omitted", contexts[0])
+        self.assertIn("additional native thread contexts omitted", contexts[-1])
+        self.assertNotIn("Thread_4", "\n".join(contexts))
+        self.assertLessEqual(
+            sum(line.lstrip().startswith("+") for line in contexts[0].splitlines()),
+            probe.SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT,
+        )
+
+    def test_native_sample_headers_are_not_accepted_as_executing_stack_frames(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+
+            def sample(arguments, **options):
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\n"
+                    + "Source: /Users/private/TCC-secret.txt\nBinary Images:\nlua_pcallk image only\n"
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            with mock.patch.object(probe.subprocess, "run", side_effect=sample):
+                messages = owner.sample_native_runtime()
+            self.assertIn("no Call graph section", messages[1])
+            for foreign in ("/Users/private", "TCC-secret", "lua_pcallk", "observed native"):
+                self.assertNotIn(foreign, "\n".join(messages))
+
+    def test_unattributed_native_frames_redact_complete_source_locations(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+
+            def sample(arguments, **options):
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\nCall graph:\n"
+                    + "NSAlert runModal (source /Users/private/secret data.txt)\n"
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            with mock.patch.object(probe.subprocess, "run", side_effect=sample):
+                messages = owner.sample_native_runtime()
+            self.assertIn("thread unattributed", messages[1])
+            self.assertIn("NSAlert runModal", messages[1])
+            self.assertNotIn("/Users/private", messages[1])
+            self.assertNotIn("secret data.txt", messages[1])
+            self.assertNotIn("data.txt", messages[1])
+
     def test_sampling_and_retirement_failures_keep_primary_and_owner_debt(self):
         primary = subprocess.TimeoutExpired(["osascript"], probe.SCRIPTING_TIMEOUT_SECONDS)
         cleanup = subprocess.TimeoutExpired(["osascript"], probe.SCRIPT_CLEANUP_TIMEOUT_SECONDS)

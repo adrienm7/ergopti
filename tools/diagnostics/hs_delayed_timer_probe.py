@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import plistlib
+import re
 import secrets
 import subprocess
 import time
@@ -16,6 +17,9 @@ SCRIPT_SAMPLE_SECONDS = 1
 SCRIPT_CLEANUP_TIMEOUT_SECONDS = 2
 SCRIPT_SAMPLE_READ_LIMIT = 65536
 SCRIPT_SAMPLE_FRAME_LIMIT = 6
+SCRIPT_SAMPLE_CONTEXT_THREAD_LIMIT = 3
+SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
+SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -361,6 +365,106 @@ class NativeDelayedTimerProbe:
             )
         )[:SCRIPT_SAMPLE_FRAME_LIMIT]
 
+    @staticmethod
+    def sample_frame_text(line):
+        """Retain native symbols while omitting private source locations from logs."""
+        safe = re.sub(r"\([^)]*/[^)]*\)", "(location redacted)", line)
+        return re.sub(r"(?:https?://|/)[^\s)]+", "[path redacted]", safe)
+
+    @staticmethod
+    def observed_sample_contexts(sample_text, markers):
+        """Keep native thread ownership and call ancestry instead of merging frames."""
+        if "Call graph:" not in sample_text:
+            return []
+        stacks = sample_text.split("Call graph:", 1)[1].split("Binary Images:", 1)[0]
+        threads = []
+        current = None
+        ancestors = []
+        for line in stacks.splitlines():
+            thread = re.match(r"^\s*(\d+\s+Thread_(?:\d+|0x[0-9a-fA-F]+))\b(.*)$", line)
+            if thread:
+                queue = re.search(
+                    r"\b(DispatchQueue_\d+)(?::\s*([A-Za-z_][A-Za-z0-9_.-]*)(?=\s|$))?",
+                    thread[2],
+                )
+                main = queue is not None and queue[2] == "com.apple.main-thread"
+                label = thread[1]
+                if queue:
+                    label += " " + queue[1]
+                    if queue[2]:
+                        label += ": " + queue[2]
+                current = {
+                    "label": label,
+                    "main": main,
+                    "frames": [],
+                    "selected": set(),
+                    "critical": [],
+                }
+                threads.append(current)
+                ancestors = []
+                continue
+            frame = re.match(r"^([ \t+!|:]*)(\d+\s+.+)$", line)
+            if current is None or not frame:
+                continue
+            depth = len(frame[1].expandtabs())
+            while ancestors and ancestors[-1][0] >= depth:
+                ancestors.pop()
+            index = len(current["frames"])
+            # Source locations can contain private paths; retain symbols and native ancestry.
+            safe = NativeDelayedTimerProbe.sample_frame_text(line)
+            current["frames"].append(safe)
+            ancestors.append((depth, index))
+            critical = any(marker in safe for marker in markers)
+            if critical:
+                current["critical"].append(index)
+            if critical or (
+                current["main"] and any(marker in frame[2] for marker in ("CFRunLoop", "mach_msg"))
+            ):
+                current["selected"].update(ancestor[1] for ancestor in ancestors)
+        selected = [thread for thread in threads if thread["selected"]]
+        selected.sort(key=lambda thread: not thread["main"])
+        contexts = []
+        remaining = SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT
+        for thread in selected[:SCRIPT_SAMPLE_CONTEXT_THREAD_LIMIT]:
+            indices = sorted(thread["selected"])
+            truncated = len(indices) > SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT
+            if truncated:
+                retained = set(thread["critical"][:SCRIPT_SAMPLE_FRAME_LIMIT])
+                retained.update(indices[:2])
+                for index in reversed(indices):
+                    if len(retained) >= SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT:
+                        break
+                    retained.add(index)
+                indices = sorted(retained)
+            omitted = thread["selected"] - set(indices)
+            heading = "observed native Hammerspoon server thread: " + thread["label"]
+            context = heading
+            previous = -1
+            truncation_note = "\n[native sample context truncated]"
+            for index in indices:
+                gap = (
+                    "\n[native ancestry omitted]"
+                    if any(previous < item < index for item in omitted)
+                    else ""
+                )
+                frame = gap + "\n" + thread["frames"][index]
+                if len(context) + len(frame) + len(truncation_note) > remaining:
+                    truncated = True
+                    break
+                context += frame
+                previous = index
+            if truncated:
+                context += truncation_note
+            if len(context) > remaining:
+                break
+            contexts.append(context)
+            remaining -= len(context)
+        if len(selected) > len(contexts) and contexts:
+            note = "\n[additional native thread contexts omitted]"
+            if len(note) <= remaining:
+                contexts[-1] += note
+        return contexts
+
     def bind_runtime(self, pid, processes):
         """Retain the exact installed server owner already admitted by the gate."""
         if type(pid) is not int or pid <= 0 or processes(self.executable) != [pid]:
@@ -403,26 +507,38 @@ class NativeDelayedTimerProbe:
                 "native Hammerspoon server sample unqualified: native Process/Path identity differs"
             ]
         diagnostics = [f"native Hammerspoon server sample retained: {sample.name}"]
-        critical_frames = self.observed_sample_frames(
-            sample_text,
-            (
-                "TCC",
-                "AppleEvent",
-                "AEWait",
-                "NSAppleScript",
-                "HSAppleScript",
-                "NSAlert",
-                "runModal",
-                "lua_pcall",
-                "dispatch_semaphore_wait",
-            ),
+        if "Call graph:" not in sample_text:
+            diagnostics.append(
+                "native Hammerspoon server stack context unavailable: no Call graph section"
+            )
+            return diagnostics
+        markers = (
+            "TCC",
+            "AppleEvent",
+            "AEWait",
+            "NSAppleScript",
+            "HSAppleScript",
+            "NSAlert",
+            "runModal",
+            "lua_pcall",
+            "dispatch_semaphore_wait",
         )
-        context_frames = self.observed_sample_frames(
-            sample_text, ("com.apple.main-thread", "CFRunLoop", "mach_msg")
-        )
-        frames = list(dict.fromkeys(critical_frames + context_frames))[:SCRIPT_SAMPLE_FRAME_LIMIT]
-        if frames:
-            diagnostics.append("observed native Hammerspoon server frames: " + " | ".join(frames))
+        contexts = self.observed_sample_contexts(sample_text, markers)
+        if contexts:
+            diagnostics.extend(contexts)
+        else:
+            stacks = sample_text.split("Call graph:", 1)[-1]
+            critical_frames = self.observed_sample_frames(stacks, markers)
+            context_frames = self.observed_sample_frames(stacks, ("CFRunLoop", "mach_msg"))
+            frames = list(dict.fromkeys(critical_frames + context_frames))[
+                :SCRIPT_SAMPLE_FRAME_LIMIT
+            ]
+            frames = [self.sample_frame_text(frame) for frame in frames]
+            if frames:
+                diagnostics.append(
+                    "observed native Hammerspoon server frames (thread unattributed): "
+                    + " | ".join(frames)
+                )
         return diagnostics
 
     def retire_scripting_command(self, command):
