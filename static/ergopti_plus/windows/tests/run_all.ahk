@@ -1066,6 +1066,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_warmup_retry_suspend_guard.ahk
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
+#Include meta/test_layout_poll_native_arming.ahk
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
