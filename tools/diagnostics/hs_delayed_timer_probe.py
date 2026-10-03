@@ -15,6 +15,8 @@ import time
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
 APPLE_SCRIPT_KEY = "HSAppleScriptEnabledKey"
 SCRIPTING_TIMEOUT_SECONDS = 10
+# Leave the existing deadline margin for JXA construction and status receipt delivery.
+NO_PROMPT_NATIVE_TIMEOUT_SECONDS = 8
 SCRIPT_SAMPLE_SECONDS = 1
 SCRIPT_CLEANUP_TIMEOUT_SECONDS = 2
 SCRIPT_SAMPLE_READ_LIMIT = 65536
@@ -583,7 +585,7 @@ function run(argv) {
     var pid = Number(argv[0]);
     var event = constructOwnedEvent(pid, argv[1]);
     var error = Ref();
-    var reply = event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __SCRIPTING_TIMEOUT_SECONDS__, error);
+    var reply = event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __NO_PROMPT_NATIVE_TIMEOUT_SECONDS__, error);
     var status = 0, result = null, origin = 'none', domain = null;
     if (!reply || reply.isNil()) {
         var nativeError = error[0];
@@ -607,7 +609,7 @@ function run(argv) {
         status:status, result:result, error_origin:origin, error_domain:domain});
 }
 """.replace("__NO_PROMPT_OPTIONS__", str(NO_PROMPT_SEND_OPTIONS)).replace(
-                "__SCRIPTING_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)
+                "__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)
             )
         )
 

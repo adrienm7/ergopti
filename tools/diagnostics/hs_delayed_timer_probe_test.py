@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -635,7 +636,7 @@ class NoPromptControlTests(unittest.TestCase):
                 self.assertEqual(arguments[:4], ["/usr/bin/osascript", "-l", "JavaScript", "-e"])
                 self.assertEqual(arguments[-3:], ["42", 'return "' + NONCE + '"', NONCE])
                 self.assertTrue(arguments[4].startswith(owner.pid_event_constructor()))
-                self.assertIn("sendEventWithOptionsTimeoutError(131075, 10, error)", arguments[4])
+                self.assertIn("sendEventWithOptionsTimeoutError(131075, 8, error)", arguments[4])
                 self.assertIn("Number(nativeError.code)", arguments[4])
                 self.assertIn("Number(errorNumber.int32Value)", arguments[4])
                 self.assertEqual(owner.scripting_commands, [])
@@ -762,6 +763,77 @@ class NoPromptControlTests(unittest.TestCase):
             self.assertIn("Native status -1743", receipt["primary_error"])
             self.assertLessEqual(len(receipt["primary_error"]), 8192)
             self.assertLessEqual(len(receipt["primary_error"].splitlines()), 128)
+
+    def test_native_send_budget_leaves_real_executor_time_for_construction_and_receipt(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            children = []
+            communicate_budgets = []
+            native_budgets = []
+
+            def launch(arguments, **options):
+                # Model only the native boundary; execute/communicate and retirement
+                # remain real. The status is independent of the production builder.
+                match = re.search(
+                    r"sendEventWithOptionsTimeoutError\(131075, ([0-9.]+), error\)",
+                    arguments[4],
+                )
+                self.assertIsNotNone(match)
+                native_budget = float(match.group(1))
+                native_budgets.append(native_budget)
+                self.assertEqual(arguments[:4], ["/usr/bin/osascript", "-l", "JavaScript", "-e"])
+                self.assertEqual(arguments[-3:], ["42", 'return "' + NONCE + '"', NONCE])
+                receipt = {
+                    "schema_version": 1,
+                    "contract": "hs.applescript.pid-no-prompt",
+                    "phase": "pid_no_prompt",
+                    "nonce": NONCE,
+                    "pid": 42,
+                    "send_options": 131075,
+                    "status": -1712,
+                    "result": None,
+                    "error_origin": "send",
+                    "error_domain": "NSOSStatusErrorDomain",
+                }
+                source = (
+                    "import time; time.sleep(1); time.sleep("
+                    + repr(native_budget)
+                    + "); print("
+                    + repr(json.dumps(receipt))
+                    + ", flush=True)"
+                )
+                child = native_popen([sys.executable, "-c", source], **options)
+                communicate_budgets.append(observe_child_budgets(child))
+                children.append(child)
+                return child
+
+            try:
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", side_effect=launch),
+                    mock.patch.object(owner, "sample_scripting_command", return_value=[]),
+                    mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+                ):
+                    result = owner.control_pid_no_prompt(42, lambda _: [42])
+                self.assertEqual(result["status"], -1712)
+                self.assertEqual(result["outcome"], "refused")
+                self.assertEqual(result["error_origin"], "send")
+                self.assertEqual(result["error_domain"], "NSOSStatusErrorDomain")
+                self.assertEqual(result["executable"], str(EXECUTABLE))
+                self.assertEqual(communicate_budgets, [[10]])
+                self.assertEqual(native_budgets, [8])
+                self.assertEqual(children[0].returncode, 0)
+                self.assertEqual(owner.scripting_commands, [])
+                self.assertFalse(owner.started)
+                with self.assertRaises(ValueError):
+                    probe.validate_control_summary(result)
+                with self.assertRaises(ValueError):
+                    probe.validate_pid_control_summary(result)
+            finally:
+                for child in children:
+                    if child.poll() is None:
+                        child.kill()
+                    child.communicate(timeout=2)
 
     def test_real_owned_child_timeout_settles_before_native_receipt_retry(self):
         native_popen = subprocess.Popen
