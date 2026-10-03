@@ -28,6 +28,7 @@ module.exports = function checkWindowsStartupLogRuntime() {
 	]
 		.map((name) => pipeline.scriptBlock(recipe, name).join('\n'))
 		.join('\n');
+	const initialization = pipeline.scriptBlock(recipe, '$startupEvidence = [ordered]@{').join('\n');
 	const catalog = TOML.parse(
 		fs.readFileSync(
 			path.join(pipeline.ROOT, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml'),
@@ -68,6 +69,9 @@ module.exports = function checkWindowsStartupLogRuntime() {
 						functions +
 						'\n' +
 						'$proc = [Diagnostics.Process]::GetCurrentProcess()\n' +
+						'$exe = $proc.MainModule.FileName\n' +
+						initialization +
+						'\n' +
 						'$launchOwner = [ordered]@{ pid = $proc.Id; expected_executable = $proc.MainModule.FileName; observed_executable = $proc.MainModule.FileName; start_utc = $proc.StartTime.ToUniversalTime(); identity_qualified = $true; identity_error = $null }\n' +
 						'$name = ' +
 						quote(catalog.logs.files.unified_prefix) +

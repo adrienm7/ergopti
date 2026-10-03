@@ -1108,13 +1108,7 @@ jobs:
               Write-LaunchDiagnostics $proc $seconds $stagingSeconds
               Stop-LaunchedApp $proc
               Save-StartupFailureEvidence
-              if ($crashedEarly) {
-                  Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
-              } elseif ($dialogSeen) {
-                  Write-Error "ErgoptiPlus.exe raised a dialog before extracting its runtime bundle (crash-on-launch) — its text is above."
-              } else {
-                  Write-Error "ErgoptiPlus.exe neither extracted its runtime bundle nor raised a dialog within ${hangBoundSeconds}s — see the diagnostics above."
-              }
+              Write-Error "ErgoptiPlus.exe did not complete native readiness (exit=$exitCode, dialog=$dialogSeen) within ${hangBoundSeconds}s — see the diagnostics above."
               throw "ErgoptiPlus.exe did not complete native readiness (exit=$exitCode, dialog=$dialogSeen) within ${hangBoundSeconds}s."
           }
           $markerSeconds = [math]::Round($seconds, 1)

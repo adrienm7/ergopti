@@ -1327,7 +1327,29 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		marker_seen: true,
 		crashed_early: false,
 		marker_seconds: 1,
-		failures: []
+		failures: [],
+		native_startup: {
+			nonce: 'c'.repeat(32),
+			pid: 42,
+			executable: 'C:\\private\\ErgoptiPlus.exe',
+			launched_sha256: 'b'.repeat(64),
+			exit_code: 0,
+			log_files: 1,
+			logged_errors: [],
+			receipt: {
+				schema_version: 1,
+				nonce: 'c'.repeat(32),
+				pid: 42,
+				executable: 'C:\\private\\ErgoptiPlus.exe',
+				compiled: true,
+				build_commit: sha,
+				bundle_identity: '0.0.0-dev\n' + sha,
+				phase: 'ready',
+				driver_ready: true,
+				menu_ready: true,
+				logs_flushed: true
+			}
+		}
 	};
 	const verify = (record, jobs = needs) =>
 		desktop.verify({
@@ -1338,9 +1360,13 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			scenarios: [],
 			release: false
 		});
-	assert.doesNotThrow(
-		() => verify(positive),
-		'the unchanged original successful receipt still passes'
+	assert.doesNotThrow(() => verify(positive), 'the complete successful receipt still passes');
+	const missingReadiness = structuredClone(positive);
+	delete missingReadiness.native_startup;
+	assert.throws(
+		() => verify(missingReadiness),
+		/Missing native Windows readiness evidence/,
+		'an extraction marker cannot replace the native readiness receipt'
 	);
 	for (const record of [
 		{
