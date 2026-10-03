@@ -402,6 +402,8 @@ TODO 16 remains partial. Add bounded owned native NSError integer-getter observa
 
 Partial native qualification: Windows own-module alias control failures now retain a closed classification of the actual captured stderr: whitelisted exception type, an exact authored fixture refusal, fixture method names, and output character counts. Raw native error text, paths, arguments and stdout remain withheld. All existing own-file 8.3 controls, native exit/stderr assertions, readiness checks, deadlines and cleanup remain unchanged; the underlying runtime exception is still unclassified until hosted Windows executes this diagnostic.
 
+Actual macOS Cocoa observations now prove that the owned NSError and independently boxed NSNumber integer getters are bridged as strings. The supplemental no-prompt decoder qualifies that representation only with exact native NSError/NSNumber provenance, a matching safe integer and the retained current getter; arbitrary strings, callable/Boolean values, foreign classes and mismatches remain refused. All 102 prior portable tests and the original sender/deadlines/gates remain intact. The next actual native run must qualify the new projection before interpreting any transport or TCC status; the original AppleEvent readiness and native feature verdicts remain mandatory.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

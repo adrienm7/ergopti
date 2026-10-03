@@ -2469,6 +2469,7 @@ class NSErrorOutSlotCalibrationTests(unittest.TestCase):
         port = r"""
 const fs=require('fs');
 const mode=__MODE__;
+const nativeString=mode.startsWith('native_string');
 const native=new WeakSet();
 let parses=0,sends=0;
 function callableInteger(value) { const getter=()=>{throw Error('Scalar getters must not be invoked');}; getter.valueOf=()=>value; return getter; }
@@ -2497,16 +2498,16 @@ $.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
 $.NSError=NSError;
 $.NSNumber={numberWithInteger:raw=>{
     if(mode==='box_refusal') throw Error('Owned NSNumber constructor refused');
-    if(mode==='box_forged') return {isNil:()=>false,isKindOfClass:()=>true,integerValue:Number(raw)};
-    const box=wrapper(false,mode==='box_wrong_class'?null:$.NSNumber);
-    const integer=mode==='box_mismatch'?Number(raw)+1:Number(raw);
-    box.integerValue=mode==='box_callable'?callableInteger(integer):integer;
+    if(mode==='box_forged'||(mode==='send_string'&&typeof raw==='string')||mode==='native_string_box_forged') return {isNil:()=>false,isKindOfClass:()=>true,integerValue:Number(raw)};
+    const box=wrapper(mode==='native_string_box_nil',mode==='box_wrong_class'||mode==='native_string_box_wrong_class'?null:$.NSNumber);
+    const integer=mode==='box_mismatch'||mode==='native_string_box_mismatch'?Number(raw)+1:Number(raw);
+    box.integerValue=mode==='box_callable'||mode==='native_string_box_callable'?callableInteger(integer):mode==='native_string_box_boolean'?true:mode==='native_string_box_fraction'?'-1712.5':nativeString?String(integer):integer;
     return box;
 }};
 $.NSError.errorWithDomainCodeUserInfo=(domain,code,userInfo)=>{
     if(domain!=='NSOSStatusErrorDomain'||code!==-1712||!native.has(userInfo)||!userInfo.isNil())
         throw Error('Constructor control changed');
-    return error(mode==='send_callable'?callableInteger(-1712):-1712,'NSOSStatusErrorDomain');
+    return error(mode==='send_callable'?callableInteger(-1712):nativeString?'-1712':-1712,'NSOSStatusErrorDomain');
 };
 $.NSJSONSerialization={JSONObjectWithDataOptionsError:(data,options,out)=>{
     if(data.utf8!=='['||options!==0) throw Error('Expected independent inert UTF8 payload');
@@ -2517,7 +2518,7 @@ $.NSJSONSerialization={JSONObjectWithDataOptionsError:(data,options,out)=>{
         if(!native.has(out)) throw Error('Expected native object holder');
         out.isNil=()=>false;
         out.isKindOfClass=klass=>mode==='wrong_class'?false:klass===NSError;
-        out.code=mode==='wrong_status'?3841:mode==='boolean_status'?true:3840;
+        out.code=mode==='wrong_status'?3841:mode==='boolean_status'?true:nativeString?'3840':3840;
         if(mode==='send_callable') out.code=callableInteger(3840);
         out.domain=mode==='wrong_domain'?'private-secret-marker':'NSCocoaErrorDomain';
     }
@@ -2561,7 +2562,15 @@ $.NSAppleEventDescriptor={
             out.isKindOfClass=klass=>mode!=='send_wrong_class'&&klass===NSError;
             out.code=mode==='send_boolean'?true:mode==='send_string'?'-1712':mode==='send_valid'||mode==='send_wrong_class'||mode==='send_nil'||mode==='send_other_domain'||mode==='send_missing_domain'?-1712:NaN;
             if(mode==='send_callable') out.code=callableInteger(-1712);
-            out.domain=mode==='send_other_domain'?'NSCocoaErrorDomain':mode==='send_missing_domain'?'':mode.startsWith('send_')?'NSOSStatusErrorDomain':undefined;
+            if(nativeString) {
+                const codes={native_string_fraction:'-1712.5',native_string_unsafe:'9007199254740993',
+                    native_string_exponent:'-1.712e3',native_string_hex:'0xF',native_string_space:' -1712',
+                    native_string_zero_prefix:'-01712',native_string_boolean:true};
+                out.code=Object.hasOwn(codes,mode)?codes[mode]:'-1712';
+                if(mode==='native_string_owner_changes') { let reads=0; Object.defineProperty(out,'code',{get:()=>++reads===1?'-1712':'-50'}); }
+                if(mode==='native_string_foreign_owner') native.delete(out);
+            }
+            out.domain=mode==='send_other_domain'||mode==='native_string_other_domain'?'NSCocoaErrorDomain':mode==='send_missing_domain'?'':mode.startsWith('send_')||nativeString?'NSOSStatusErrorDomain':undefined;
             return nil;
         }
     })
@@ -3022,6 +3031,143 @@ class QualifiedNSErrorOwnerTests(unittest.TestCase):
         )
         self.assertEqual(probe.NO_PROMPT_NATIVE_TIMEOUT_SECONDS, 8)
         self.assertEqual(probe.SCRIPTING_TIMEOUT_SECONDS, 10)
+
+
+class QualifiedNativeStringIntegerTests(unittest.TestCase):
+    """Replay the actual Cocoa string bridge through the real generated sender."""
+
+    scope = NSErrorOutSlotCalibrationTests.scope
+    run_source = NSErrorOutSlotCalibrationTests.run_source
+
+    def test_actual_calibrated_native_string_getters_retain_numeric_refusal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            result = self.run_source(scope, "native_string", capture=True)
+            self.assertEqual((result["parses"], result["sends"]), (2, 1))
+            self.assertFalse(result["refused"])
+            native = probe.validate_no_prompt_receipt(result["output"] + "\n", NONCE, 42)
+            self.assertEqual(native["status"], -1712)
+            self.assertEqual(native["error_origin"], "send")
+            self.assertEqual(native["error_domain"], "NSOSStatusErrorDomain")
+            self.assertEqual(native["outcome"], "refused")
+            evidence = scope.observe(terminal=True, native=native)
+            self.assertTrue(evidence["scalar_qualified"])
+            self.assertEqual(evidence["server"], "not_observed")
+            for name, fact in scope.read("getter.json")["facts"].items():
+                self.assertEqual(fact["raw_type"], "string", name)
+                self.assertEqual(fact["box_raw_type"], "string", name)
+                for field in (
+                    "owner_native",
+                    "converted_integer",
+                    "box_native",
+                    "box_integer",
+                    "box_matches",
+                ):
+                    self.assertIs(fact[field], True, (name, field))
+                self.assertIs(fact["control_matches"], None if name == "send" else True)
+            self.assertNotIn(NONCE, str(evidence))
+            self.assertNotIn(folder, str(evidence))
+            scope.cleanup()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_string_projection_refuses_unowned_box_mismatch_and_invalid_representations(self):
+        modes = (
+            "send_string",
+            "native_string_box_forged",
+            "native_string_box_wrong_class",
+            "native_string_box_nil",
+            "native_string_box_mismatch",
+            "native_string_box_callable",
+            "native_string_box_boolean",
+            "native_string_box_fraction",
+            "native_string_foreign_owner",
+            "native_string_owner_changes",
+            "native_string_fraction",
+            "native_string_unsafe",
+            "native_string_exponent",
+            "native_string_hex",
+            "native_string_space",
+            "native_string_zero_prefix",
+            "native_string_boolean",
+        )
+        for mode in modes:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                result = self.run_source(scope, mode, capture=True)
+                self.assertEqual((result["parses"], result["sends"]), (2, 1))
+                self.assertTrue(result["refused"])
+                self.assertIsNone(result["output"])
+                self.assertEqual(scope.observe()["server"], "not_observed")
+                scope.cleanup()
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_string_error_domain_and_server_witness_admission_remain_independent(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            result = self.run_source(scope, "native_string_other_domain", capture=True)
+            self.assertFalse(result["refused"])
+            native = probe.validate_no_prompt_receipt(result["output"] + "\n", NONCE, 42)
+            self.assertEqual(native["error_domain"], "NSCocoaErrorDomain")
+            self.assertEqual(native["outcome"], "refused")
+            self.assertEqual(scope.observe(terminal=True, native=native)["server"], "not_observed")
+            scope.cleanup()
+
+    def direct_projection(self, scope, mode):
+        port = r"""
+const native=new WeakSet();
+const mode=__MODE__;
+const NSError={},NSNumber={};
+function wrapper(klass,value) {
+    const owner=function(){throw Error('Do not call native wrappers');};
+    native.add(owner); owner.isNil=()=>false; owner.isKindOfClass=expected=>expected===klass;
+    owner.code=value;return owner;
+}
+const owner=wrapper(mode==='wrong_owner_class'?NSNumber:NSError,'-1712');
+const ObjC={castObjectToRef:value=>{if(!native.has(value))throw Error('Foreign native identity');return {};}};
+const $={NSError:NSError,NSNumber:NSNumber};
+$.NSNumber.numberWithInteger=raw=>{
+    const box=wrapper(mode==='wrong_box_class'?NSError:NSNumber,null);
+    box.integerValue=mode==='box_mismatch'?'-1711':String(Number(raw));return box;
+};
+__SCRIPT__
+let input=owner,raw='-1712';
+if(mode==='foreign_string') input='-1712';
+if(mode==='foreign_function') {input=function(){};input.code=raw;input.isNil=()=>false;input.isKindOfClass=()=>true;}
+if(mode==='different_owned_code') raw='-50';
+if(mode==='nonprimitive_owned_getter') {raw=function(){};raw.valueOf=()=>-1712;raw.toString=()=>'-1712';owner.code=raw;}
+let refused=false,value=null;
+try { value=projectOwnedNSErrorInteger(input,raw); } catch(error) {refused=true;}
+process.stdout.write(JSON.stringify({refused:refused,value:value})+'\n');
+"""
+        port = port.replace("__MODE__", json.dumps(mode)).replace(
+            "__SCRIPT__", scope.javascript_prelude()
+        )
+        result = subprocess.run(
+            ["node", "-"], input=port, text=True, capture_output=True, timeout=5
+        )
+        self.assertEqual(result.returncode, 0, "Independent projection source execution failed")
+        return json.loads(result.stdout)
+
+    def test_direct_owner_provenance_and_matching_box_cannot_be_bypassed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            self.assertEqual(
+                self.direct_projection(scope, "valid"), {"refused": False, "value": -1712}
+            )
+            for mode in (
+                "foreign_string",
+                "foreign_function",
+                "wrong_owner_class",
+                "wrong_box_class",
+                "box_mismatch",
+                "different_owned_code",
+                "nonprimitive_owned_getter",
+            ):
+                self.assertEqual(
+                    self.direct_projection(scope, mode), {"refused": True, "value": None}, mode
+                )
+            self.assertEqual(scope.observe()["server"], "not_observed")
+            scope.cleanup()
 
 
 if __name__ == "__main__":
