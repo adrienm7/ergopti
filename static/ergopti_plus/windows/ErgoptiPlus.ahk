@@ -627,7 +627,8 @@ BootProfile_Stamp("Paths and shared configuration loaded")
 ; Settle parse-time personal includes before any process reveals the tray icon.
 try {
 		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
-				_PersonalShortcutsBootAllowsReload(A_IsCompiled, _DriverStartupSmokeDir != ""))
+				_PersonalShortcutsBootAllowsReload(A_IsCompiled,
+						_DriverStartupSmokeDir != "" and EnvGet("ERGOPTI_STARTUP_SMOKE_BOOTSTRAP") != "1"))
 				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
 		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
@@ -1450,6 +1451,8 @@ if (_DriverStartupSmokeDir != "") {
 		_StartupSmokeNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")
 		if _StartupSmokeNonce != ""
 				StartupSmokePublishReady(_DriverStartupSmokeDir, _StartupSmokeNonce, true)
+		if EnvGet("ERGOPTI_STARTUP_SMOKE_ACK") == "1"
+				StartupSmokeAwaitObserver(_DriverStartupSmokeDir, _StartupSmokeNonce)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's
 		; immediate destruction of that fresh tree can itself raise STATUS_HEAP_CORRUPTION

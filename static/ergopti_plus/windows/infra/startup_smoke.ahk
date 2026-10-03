@@ -9,6 +9,8 @@
 
 #Requires AutoHotkey v2.0
 #Include ../adapters/system_control.ahk
+#Include ../adapters/file_system.ahk
+#Include tick_count.ahk
 
 ; Publish a fresh durable receipt only after the complete startup contract holds.
 ; @param Directory {String} Exclusive probe directory owned by the parent.
@@ -33,4 +35,24 @@ StartupSmokePublishReady(Directory, Nonce, LogsFlushed) {
 	if !FSWriteCreateDurable(Path, Receipt)
 		throw Error("The startup readiness receipt could not be created durably.")
 	return Path
+}
+
+; A fresh source boot can Reload before readiness, so its parent must acquire
+; the successor's native handle before it exits. The nonce keeps acknowledgments
+; private to this run; a missing observer remains bounded and fails visibly.
+; @return {Boolean} True after the observer owns this process's terminal receipt.
+StartupSmokeAwaitObserver(Directory, Nonce, TimeoutMs := 10000, PollMs := 10) {
+	if !RegExMatch(Nonce, "^[0-9a-f]{32}$")
+		throw ValueError("Invalid startup smoke nonce.")
+	StartedAt := A_TickCount
+	AckPath := Directory . "\ack.txt"
+	while !TickExpired(StartedAt, TimeoutMs) {
+		if FileExist(AckPath) {
+			if FSReadStrict(AckPath) != Nonce
+				throw Error("The startup observer acknowledgment belongs to another run.")
+			return true
+		}
+		Sleep(PollMs)
+	}
+	throw Error("The startup observer did not acknowledge readiness before the timeout.")
 }
