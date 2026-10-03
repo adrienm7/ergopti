@@ -50,6 +50,31 @@ module.exports = function checkWindowsLaunchRuntime() {
 		);
 		assert.equal(compile.status, 0, compile.stdout + compile.stderr);
 		assert.ok(fs.existsSync(executable), 'native fixture compilation must produce its executable');
+		const identity = invoke(
+			[
+				'-Command',
+				'& ' +
+					quote(executable) +
+					' --identity-controls ' +
+					quote(path.join(temporary, 'identity-controls')) +
+					'; exit $LASTEXITCODE'
+			],
+			{},
+			30000
+		);
+		assert.equal(identity.status, 0, 'the real native module alias controls must pass');
+		assert.equal(identity.stderr, '', 'native identity controls must emit no stderr');
+		assert.equal(
+			identity.stdout.trim(),
+			'[OK] Native own-module short alias has independent file identity and exact long-path receipt; foreign and invalid paths are refused.'
+		);
+		const unknownMode = invoke(
+			['-Command', '& ' + quote(executable) + ' --unknown; exit $LASTEXITCODE'],
+			{},
+			10000
+		);
+		assert.notEqual(unknownMode.status, 0, 'unknown native control modes must be refused');
+		assert.match(unknownMode.stderr, /Unknown native identity control mode/);
 		const script = pipeline
 			.runOf(
 				pipeline.step(
@@ -63,6 +88,10 @@ module.exports = function checkWindowsLaunchRuntime() {
 			1,
 			'the fixture must change only the owned hang bound'
 		);
+		assert.ok(
+			script.includes('-ArgumentList "/ErrorStdOut"'),
+			'the native C# entry point must preserve the actual observer launch argument'
+		);
 		const probe = path.join(temporary, 'observe.ps1');
 		for (const scenario of [
 			'ready',
@@ -71,7 +100,8 @@ module.exports = function checkWindowsLaunchRuntime() {
 			'receipt-then-error-exit',
 			'missing-logs',
 			'logged-error',
-			'foreign-nonce'
+			'foreign-nonce',
+			'foreign-executable'
 		]) {
 			const bound = scenario === 'marker-only' ? 2 : 10;
 			fs.writeFileSync(

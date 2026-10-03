@@ -354,6 +354,22 @@ try {
 				native_startup: observation
 			})
 		);
+	const foreignReceipt = structuredClone(native);
+	foreignReceipt.receipt.executable = path.join(
+		startupEvidenceRoot,
+		'foreign sibling',
+		'ErgoptiPlus.exe'
+	);
+	publishObservation(foreignReceipt);
+	assert.throws(
+		() => recordWindows(resultFile, executable, output),
+		/Readiness came from another executable/
+	);
+	assert.equal(
+		fs.existsSync(output),
+		false,
+		'a foreign same-basename receipt must publish no evidence'
+	);
 	const foreignPath = structuredClone(native);
 	foreignPath.executable = path.join(startupEvidenceRoot, 'another', 'ErgoptiPlus.exe');
 	foreignPath.receipt.executable = foreignPath.executable;
@@ -619,6 +635,113 @@ assert.ok(pipeline.job('macos-ok').includes(`pattern: launch-gate-${profile}-*`)
 console.log(
 	'[OK] Desktop verdicts reject incomplete launches; shared core gates run independently.'
 );
+
+/** The native fixture must report its own canonical image without relaxing admission. */
+function checkCompiledFixtureNormalization(source, runtime) {
+	for (const token of [
+		'if (args.Length != 0 && args[0].StartsWith("--", StringComparison.Ordinal))',
+		'CanonicalExistingFile(Process.GetCurrentProcess().MainModule.FileName)',
+		'{ "executable", OwnExecutable() }',
+		'!Path.IsPathRooted(path)',
+		'!String.Equals(Path.GetFullPath(path), path, StringComparison.OrdinalIgnoreCase)',
+		'!File.Exists(path) || Directory.Exists(path)',
+		'GetLongPathNameW(path, result, (uint)result.Capacity)',
+		'size == 0 || size >= result.Capacity || size != result.Length',
+		'!File.Exists(canonical) || Directory.Exists(canonical)',
+		'SamePhysicalFile(alias, expected)',
+		'!SamePhysicalFile(expected, foreign)',
+		'GetFileInformationByHandle(first, out a)',
+		'GetFileInformationByHandle(second, out b)',
+		'a.Volume == b.Volume && a.IndexHigh == b.IndexHigh && a.IndexLow == b.IndexLow',
+		'SamePhysicalFile(module, canonical)',
+		'(bool)receipt["same_file"] && (bool)receipt["alias_observed"]',
+		'String.Equals((string)receipt["canonical"], expected, StringComparison.OrdinalIgnoreCase)',
+		'using (var child = Process.Start(start)) {\n            try {\n                var handle = child.Handle;',
+		'if (!child.HasExited)',
+		'child.Kill();',
+		'child.WaitForExit(5000)',
+		'receipt["executable"] = CanonicalExistingFile(foreign);'
+	])
+		assert.ok(source.includes(token), 'the native own-image contract must retain ' + token);
+	assert.doesNotMatch(
+		source,
+		/IsPathFullyQualified|GetEnvironmentVariable\("(?:EXPECTED|ERGOPTI_EXPECTED)/
+	);
+	for (const scenario of [
+		'ready',
+		'marker-only',
+		'early-exit',
+		'receipt-then-error-exit',
+		'missing-logs',
+		'logged-error',
+		'foreign-nonce',
+		'foreign-executable'
+	])
+		assert.ok(runtime.includes("'" + scenario + "'"), 'native admission must execute ' + scenario);
+	for (const token of [
+		'script.includes(\'-ArgumentList "/ErrorStdOut"\')',
+		' --identity-controls ',
+		' --unknown; exit $LASTEXITCODE',
+		'assert.equal(identity.status, 0',
+		"assert.equal(identity.stderr, ''",
+		'assert.notEqual(unknownMode.status, 0',
+		'assert.notEqual(result.status, 0',
+		'failure.failures.length > 0',
+		'assert.equal(result.status, 0',
+		'receipt.compiled, true',
+		'native_startup.exit_code, 0'
+	])
+		assert.ok(
+			runtime.includes(token),
+			'native compilation/admission controls must retain ' + token
+		);
+}
+const compiledFixture = fs.readFileSync(
+	path.join(__dirname, 'fixtures/windows_launch_child.cs'),
+	'utf8'
+);
+const compiledRuntime = fs.readFileSync(
+	path.join(__dirname, 'support/windows-launch-runtime.cjs'),
+	'utf8'
+);
+checkCompiledFixtureNormalization(compiledFixture, compiledRuntime);
+for (const [from, to] of [
+	[
+		'if (args.Length != 0 && args[0].StartsWith("--", StringComparison.Ordinal))',
+		'if (args.Length != 0)'
+	],
+	[
+		'CanonicalExistingFile(Process.GetCurrentProcess().MainModule.FileName)',
+		'Process.GetCurrentProcess().MainModule.FileName'
+	],
+	['!Path.IsPathRooted(path)', 'false'],
+	['size == 0 || size >= result.Capacity || size != result.Length', 'size == 0'],
+	['SamePhysicalFile(alias, expected)', 'true'],
+	['!SamePhysicalFile(expected, foreign)', 'true'],
+	['(bool)receipt["same_file"] && (bool)receipt["alias_observed"]', '(bool)receipt["same_file"]'],
+	[
+		'using (var child = Process.Start(start)) {\n            try {\n                var handle = child.Handle;',
+		'using (var child = Process.Start(start)) {\n            var handle = child.Handle;\n            try {'
+	],
+	['child.WaitForExit(5000)', 'true']
+]) {
+	assert.ok(compiledFixture.includes(from), 'the mutation must alter the actual native producer');
+	assert.throws(
+		() => checkCompiledFixtureNormalization(compiledFixture.replaceAll(from, to), compiledRuntime),
+		from
+	);
+}
+for (const [from, to] of [
+	["'foreign-executable'", "'ready'"],
+	[' --identity-controls ', ' --unused '],
+	["assert.equal(identity.stderr, ''", "assert.ok(identity.stderr === ''"]
+]) {
+	assert.ok(compiledRuntime.includes(from), 'the mutation must alter the actual native control');
+	assert.throws(
+		() => checkCompiledFixtureNormalization(compiledFixture, compiledRuntime.replaceAll(from, to)),
+		from
+	);
+}
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();
