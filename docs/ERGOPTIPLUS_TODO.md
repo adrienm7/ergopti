@@ -200,6 +200,14 @@ These are software implementations; final hardware verification remains below.
   icon/title/priority assertion remain blocking. Checkpoint 37061649827 lacked
   the worker parser output; the next native run must qualify its cause.
 
+  Checkpoint 37089270207 failed the native healthy-guardian presence fixture
+  after its caller dropped the runtime reference. The fixture now blocks the
+  actual acknowledgement callback to prove that presence remains valid while
+  the observer retains the singleton, then requires weak-runtime retirement
+  and physical singleton release within the existing two-second bound before
+  the unchanged absent-owner assertion. Portable source gates do not qualify
+  native Swift behavior; native XCTest and complete three-OS CI remain pending.
+
   Concurrent Windows performance commits are integrated without replacing the
   pending editor, model or remap slices. The committed delay policy and its
   independent vectors remain intact. This merge retains the original native

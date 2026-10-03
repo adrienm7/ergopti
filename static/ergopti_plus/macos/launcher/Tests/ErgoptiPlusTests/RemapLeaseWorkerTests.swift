@@ -2084,9 +2084,20 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		defer { try? FileManager.default.removeItem(at: home) }
 		let paths = LeaseGuardianPaths(homeDirectory: home.path)
+		let callbackEntered = DispatchSemaphore(value: 0)
+		let releaseCallback = DispatchSemaphore(value: 0)
+		defer { releaseCallback.signal() }
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			acknowledgementWriter: { data, path, directory in
+				let published = writeGuardianFileAtomically(
+					data: data, path: path, directory: directory
+				)
+				callbackEntered.signal()
+				_ = releaseCallback.wait(timeout: .now() + 5)
+				return published
+			},
 			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
@@ -2097,6 +2108,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			activationAuthorized: { true }
 		)
 		XCTAssertTrue(registration.arm())
+		XCTAssertEqual(callbackEntered.wait(timeout: .now() + 2), .success)
 		XCTAssertTrue(registration.guardianStillPresent())
 		XCTAssertTrue(registration.beginLiveTransport())
 
@@ -2106,7 +2118,17 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			registration.guardianStillPresent(),
 			"unlocking the activation gate must retain its exact-generation identity descriptor"
 		)
+		weak var runtimeLifetime = runtime
 		runtime = nil
+		XCTAssertNotNil(runtimeLifetime,
+			"the blocked production callback must retain the exact singleton owner")
+		XCTAssertTrue(registration.guardianStillPresent(),
+			"dropping the caller reference must not misreport a still-retained guardian")
+		releaseCallback.signal()
+		XCTAssertTrue(waitForGuardianRuntimeRelease(
+			{ runtimeLifetime }, paths: paths, timeout: 2
+		), "presence loss must follow actual observer and singleton release")
+		XCTAssertNil(runtimeLifetime)
 		XCTAssertFalse(
 			registration.guardianStillPresent(),
 			"the retained descriptor must still detect loss of the exact singleton owner"
