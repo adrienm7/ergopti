@@ -802,3 +802,248 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 		helpers.assert_eq(state.raw, { "36:1", "36:2", "36:2", "36:0", "36:1", "36:2", "36:0" })
 	end)
 end)
+
+
+helpers.describe("keyboard hook: recovery repeat ownership", function()
+	--- Reopens a real reader through the actual watchdog after an owned down.
+	--- @param mode string Independent native source/lifetime scenario.
+	--- @return table observed Callback epochs, cookies and raw emitted events.
+	local function observe_recovery(mode)
+		local names = { "adapters.xkb_capture", "adapters.evdev_reader",
+			"modules.hotstrings.device_finder", "adapters.keyboard_hook" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local paths = { os.tmpname(), os.tmpname() }
+		for _, path in ipairs(paths) do assert(io.open(path, "w")):close() end
+		local observed = { origins = 0, epochs = {}, repeated = {}, raw = {}, opens = 0, key_queries = 0 }
+		local hook, Capture, Reader
+		local ok, err = pcall(function()
+			Capture = helpers.load_module(names[1])
+			Capture._set_backend({
+				create = function() return {} end, destroy = function() end,
+				source_group = function() return 0, 1 end,
+				key_sym = function() return "j" end, key_utf8 = function() return "j" end,
+				sym_utf8 = function(_, sym) return sym end, update_key = function() end,
+				compose_feed = function() end, compose_status = function() return "nothing" end,
+				compose_reset = function() end,
+			})
+			assert(Capture.load("fixture keymap"))
+			Reader = helpers.load_module(names[2])
+			local Input = require("infra.input_event")
+			local phase, handles, native_held = 1, {}, {}
+			local streams = { [paths[1]] = { mode == "fresh" and {} or { { 1, 1000 } } } }
+			streams[paths[1]][2] = mode == "fresh" and { { 1, 2000 }, { 2, 3000 }, { 0, 4000 } }
+				or { { 2, 2000 }, { 0, 3000 }, { 1, 4000 }, { 2, 5000 }, { 0, 6000 } }
+			if mode == "multiple" then
+				streams[paths[1]][1] = { { 1, 1000, 36 }, { 1, 1500, 37 } }
+				streams[paths[1]][2] = { { 2, 2000, 36 }, { 2, 2500, 37 },
+					{ 0, 3000, 36 }, { 0, 3500, 37 }, { 1, 4000, 36 }, { 2, 5000, 36 }, { 0, 6000, 36 } }
+			elseif mode == "released" then
+				streams[paths[1]][2] = { { 1, 2000 }, { 2, 3000 }, { 0, 4000 } }
+			elseif mode == "unknown" then
+				streams[paths[1]][2] = { { 1, 2000 }, { 2, 3000 }, { 0, 4000 },
+					{ 1, 5000 }, { 2, 6000 }, { 0, 7000 } }
+			elseif mode == "double" then
+				streams[paths[1]][2] = { { 2, 2000 } }
+				streams[paths[1]][3] = { { 2, 3000 }, { 0, 4000 }, { 1, 5000 }, { 2, 6000 }, { 0, 7000 } }
+			elseif mode == "retired" then
+				streams[paths[2]] = { {}, { { 1, 2000 }, { 2, 3000 }, { 0, 4000 } } }
+			elseif mode == "added" then
+				streams[paths[1]][2] = { { 2, 2000 }, { 0, 4000 } }
+				streams[paths[2]] = { {}, { { 1, 3000 }, { 2, 5000 }, { 0, 6000 } } }
+			end
+			Reader._set_backend({
+				open = function(path)
+					observed.opens = observed.opens + 1
+					handles[observed.opens] = { path = path, phase = phase, at = 0 }
+					return observed.opens
+				end,
+				ioctl = function() return true end,
+				read = function(fd)
+					local state = handles[fd]
+					if state.phase ~= phase then state.phase, state.at = phase, 0 end
+					state.at = state.at + 1
+					local event = streams[state.path][phase] and streams[state.path][phase][state.at]
+					if not event then return nil end
+					local code = event[3] or 36
+					native_held[state.path] = native_held[state.path] or {}
+					if event[1] == 1 then native_held[state.path][code] = true
+					elseif event[1] == 0 then native_held[state.path][code] = false end
+					return Input.encode(1, code, event[1], Input.native_size(), event[2])
+				end,
+				poll = function(fd)
+					local state = handles[fd]
+					return streams[state.path][phase] and streams[state.path][phase][state.at + 1] ~= nil
+				end,
+				close = function() return true end,
+				read_bits = function(fd, request, count)
+					if request % 256 == Reader.EVIOCGKEY_NR then
+						observed.key_queries = observed.key_queries + 1
+						if mode == "unknown" and phase > 1 then
+							observed.refused_key_query = true
+							return nil, "fixture native key snapshot unavailable"
+						end
+						local keys = native_held[handles[fd].path] or {}
+						if keys[36] ~= true then observed.released_key_receipt = true end
+						local bytes = {}
+						for index = 1, count do bytes[index] = 0 end
+						for code, held in pairs(keys) do
+							if held then
+								local index = math.floor(code / 8) + 1
+								bytes[index] = bytes[index] + 2 ^ (code % 8)
+							end
+						end
+						for index = 1, count do bytes[index] = string.char(bytes[index]) end
+						return table.concat(bytes)
+					end
+					return string.rep("\0", count)
+				end,
+			})
+			local source_set = { paths[1] }
+			package.loaded[names[3]] = {
+				find_devices = function() return source_set, {} end,
+				is_key_device = function() return true end,
+				physical_sources = function(current)
+					observed.origins = observed.origins + 1
+					local sources = {}
+					for _, path in ipairs(current) do sources[#sources + 1] = {
+						path = path, sysfs = "/fixture/native-keyboard", name = "fixture keyboard", physical = true } end
+					return sources
+				end,
+			}
+			hook = helpers.load_module(names[4])
+			hook.start({ intercept = true,
+				onConsume = function(detail)
+					observed.epochs[#observed.epochs + 1] = detail.origin_generation or "unavailable"
+					local cookie = #observed.epochs
+					if mode == "boolean" or detail.origin_generation == nil then return true end
+					return { consume = true, repeat_callback = function()
+						observed.repeated[#observed.repeated + 1] = cookie
+						return true
+					end }
+				end,
+				onEmitRaw = function(code, value)
+					observed.raw[#observed.raw + 1] = code .. ":" .. value
+					return true
+				end,
+			})
+			observed.started = hook.isRunning()
+			hook.pump()
+			phase = 2
+			if mode == "retired" then source_set = { paths[2] }
+			elseif mode == "added" then source_set = { paths[1], paths[2] }
+			else
+				assert(Reader.close("keyboard:" .. paths[1]))
+				if mode == "released" or mode == "unknown" then native_held[paths[1]] = {} end
+				hook.pump()
+				observed.recovering = hook.isRecovering()
+			end
+			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+			observed.reacquired = hook.isRunning()
+			hook.pump()
+			if mode == "double" then
+				phase = 3
+				assert(Reader.close("keyboard:" .. paths[1]))
+				hook.pump()
+				observed.recovering_again = hook.isRecovering()
+				for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+				observed.reacquired_again = hook.isRunning()
+				hook.pump()
+			end
+		end)
+		if hook then pcall(hook.stop) end
+		if Reader then pcall(Reader._reset_backend) end
+		if Capture then pcall(Capture._reset_backend) end
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		for _, path in ipairs(paths) do os.remove(path) end
+		if not ok then error(err, 0) end
+		return observed
+	end
+
+	helpers.it("(magic-source-recovery) the first fresh press after acknowledged reacquisition owns its native epoch", function()
+		local state = observe_recovery("fresh")
+		helpers.assert_true(state.started and state.recovering and state.reacquired)
+		helpers.assert_eq(#state.epochs, 1)
+		helpers.assert_type(state.epochs[1], "number")
+		helpers.assert_true(state.epochs[1] > 0)
+		helpers.assert_eq(state.repeated, { 1 })
+		helpers.assert_eq(state.raw, {})
+		helpers.assert_eq(state.opens, 2)
+		helpers.assert_eq(state.key_queries, 0, "sources with no consumed debt require no release query")
+		helpers.assert_eq(state.origins, 5, "startup and completed recovery publish at lifecycle boundaries, never per repeat")
+	end)
+
+	for _, mode in ipairs({ "held", "double", "boolean" }) do
+		helpers.it("(magic-source-recovery) retains " .. mode .. " suppression debt until actual release", function()
+			local state = observe_recovery(mode)
+			helpers.assert_true(state.started and state.recovering and state.reacquired)
+			helpers.assert_eq(#state.epochs, 2, "a suppressed old repeat never creates a new consumption decision")
+			helpers.assert_type(state.epochs[1], "number")
+			helpers.assert_type(state.epochs[2], "number")
+			helpers.assert_true(state.epochs[2] > state.epochs[1])
+			helpers.assert_eq(state.repeated, mode == "boolean" and {} or { 2 }, "the retired old callback must never run")
+			helpers.assert_eq(state.raw, {}, "an old consumed down cannot become a raw repeat/release")
+			helpers.assert_eq(state.opens, mode == "double" and 3 or 2)
+			helpers.assert_eq(state.key_queries, mode == "double" and 2 or 1, "each indebted source is queried once per reopening")
+			helpers.assert_eq(state.origins, mode == "double" and 8 or 5)
+			if mode == "double" then helpers.assert_true(state.recovering_again and state.reacquired_again) end
+		end)
+	end
+
+	helpers.it("(magic-source-recovery) one native snapshot preserves two independent consumed keys until release", function()
+		local state = observe_recovery("multiple")
+		helpers.assert_true(state.started and state.recovering and state.reacquired)
+		helpers.assert_eq(#state.epochs, 3)
+		for _, epoch in ipairs(state.epochs) do helpers.assert_type(epoch, "number") end
+		helpers.assert_eq(state.epochs[1], state.epochs[2], "the two original keys share their actual source epoch")
+		helpers.assert_true(state.epochs[3] > state.epochs[2])
+		helpers.assert_eq(state.repeated, { 3 }, "neither retired key callback may repeat before its own release")
+		helpers.assert_eq(state.raw, {})
+		helpers.assert_eq(state.key_queries, 1, "native release evidence is acquired once per indebted source, not per key or repeat")
+		helpers.assert_eq(state.origins, 5)
+	end)
+
+	helpers.it("(magic-source-recovery) acknowledges a native release while closed before accepting the next fresh down", function()
+		local state = observe_recovery("released")
+		helpers.assert_true(state.started and state.recovering and state.reacquired)
+		helpers.assert_eq(#state.epochs, 2, "a release confirmed by the native owner must not swallow the new press")
+		helpers.assert_type(state.epochs[1], "number")
+		helpers.assert_type(state.epochs[2], "number")
+		helpers.assert_true(state.epochs[2] > state.epochs[1])
+		helpers.assert_eq(state.repeated, { 2 })
+		helpers.assert_eq(state.raw, {})
+		helpers.assert_eq(state.key_queries, 1)
+		helpers.assert_eq(state.released_key_receipt, true, "the real bitset reader must acknowledge physical release")
+		helpers.assert_eq(state.origins, 5)
+	end)
+
+	helpers.it("(magic-source-recovery) an unavailable native release query keeps debt until an actual key-up", function()
+		local state = observe_recovery("unknown")
+		helpers.assert_true(state.started and state.recovering and state.reacquired)
+		helpers.assert_eq(state.refused_key_query, true, "the real bitset reader must observe the native refusal")
+		helpers.assert_eq(#state.epochs, 2, "unknown release cannot acknowledge the first reopened press")
+		helpers.assert_type(state.epochs[1], "number")
+		helpers.assert_type(state.epochs[2], "number")
+		helpers.assert_true(state.epochs[2] > state.epochs[1])
+		helpers.assert_eq(state.repeated, { 2 }, "only the press after an observed key-up may own repetitions")
+		helpers.assert_eq(state.raw, {})
+		helpers.assert_eq(state.key_queries, 1)
+		helpers.assert_eq(state.origins, 5)
+	end)
+
+	for _, mode in ipairs({ "added", "retired" }) do
+		helpers.it("(magic-source-recovery) keeps " .. mode .. " keyboard ownership distinct for the same key code", function()
+			local state = observe_recovery(mode)
+			helpers.assert_true(state.started and state.reacquired)
+			helpers.assert_eq(#state.epochs, 2)
+			helpers.assert_type(state.epochs[1], "number")
+			helpers.assert_type(state.epochs[2], "number")
+			helpers.assert_true(state.epochs[2] > state.epochs[1])
+			helpers.assert_eq(state.repeated, { 2 }, "only the new source's own accepted press may repeat")
+			helpers.assert_eq(state.raw, {})
+			helpers.assert_eq(state.opens, 2)
+			helpers.assert_eq(state.origins, 4, "a warm acquisition already publishes qualified origin; no redundant scan")
+			helpers.assert_eq(state.key_queries, mode == "added" and 1 or 0, "retired debt never queries or owns a replacement source")
+		end)
+	end
+end)
