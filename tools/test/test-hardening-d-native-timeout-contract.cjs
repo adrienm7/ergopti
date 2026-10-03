@@ -333,11 +333,13 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 		return Number(match[1]);
 	};
 	const execute = source.match(/    def execute\([\s\S]*?(?=\n    (?:@staticmethod|def ))/);
-	const script = source.match(/    def no_prompt_script\(\):[\s\S]*?(?=\n    def )/);
+	const script = source.match(
+		/^    def no_prompt_script\((?:scope=None)?\):[\s\S]*?(?=\n    (?:@staticmethod|def ))/m
+	);
 	if (!execute || !script) {
 		errors.push(`${file}: the actual executor and no-prompt script owners could not be read`);
 	} else {
-		const executor = execute[0].replace(/^\s*#.*$/gm, '');
+		const executor = execute[0].replace(/#[^\n]*/g, '');
 		const nativeScript = script[0]
 			.replace(/\/\*[\s\S]*?\*\//g, '')
 			.replace(/\/\/[^\n]*/g, '')

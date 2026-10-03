@@ -312,6 +312,8 @@ filesystem and leases for missing, changed, matching and refused stages.
 The actual compiled startup smoke and native AHK regressions still require
 the next Windows CI checkpoint; lineage or exit zero is not readiness.
 
+The supplemental no-prompt PID diagnostic now records two fresh, exact-owner server witnesses and a bounded monotonic sender-stage prefix. Entry, completed execution, native send status and reply admission remain distinct; a witness cannot replace either original ten-second control or feature proof. Strict scalar receipts reject stale identity, replaced inodes, symlinks, nonregular or oversized files and malformed stage order. Acknowledged cleanup retains the exact receipt scope while its sender remains unsettled, rejects replacement requests and removes witnesses only after physical child retirement. Cleanup refusal keeps the scope owned for a later retry. Malformed supplemental JSON errors remain closed and cannot expose private receipt keys. Original controls, preference restoration, native eight-second send and ten-second child deadlines are unchanged. Portable causal regressions and generated-body execution qualify instrumentation only; the actual macOS bridge, SIGSEGV stage and readiness cause remain pending the next non-release native checkpoint. Signal 11 is not classified as a consent refusal, and item 16 remains partial.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
