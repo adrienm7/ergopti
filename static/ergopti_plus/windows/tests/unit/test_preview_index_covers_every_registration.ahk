@@ -481,3 +481,80 @@ Test("personal-file descriptors: recursive native discovery retains distinct exa
 Test("personal-file descriptors: recursive native discovery admits the exact long root", (*) => _PICR_DistinctDiscoveredSources("long"))
 
 #Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+
+; A TOML header comment cannot create or erase known-trigger analytics rows.
+_PICR_CommentedHeaderCatalogue(Kind, Mode, Brackets := 2) {
+	global Features, ScriptInformation, CategoryEnabled
+	ProcessId := ProcessExist()
+	Root := A_Temp . "\ergopti_picr_header_" . ProcessId . "_" . A_TickCount
+	Path := Root . "\owned.toml"
+	AssertFalse(DirExist(Root), "the fixture refuses a pre-existing temporary root")
+	DirCreate(Root)
+	Open := Brackets == 1 ? "[" : "[["
+	Close := Brackets == 1 ? "]" : "]]"
+	Inline := '"cmtb" = { output = "second#value", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`n'
+	Content := Open . "first" . Close . (Mode == "first" ? " # first section" : "") . '`n"cmta" = { output = "first#value", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`n'
+	if Mode == "second" || Mode == "selected"
+		Content .= Open . "second" . Close . " # selected section`n" . Inline
+	else if Mode == "metadata"
+		Content .= Open . "_meta.sections" . Close . ' # metadata`ndescription = "not a trigger"`n'
+	HadMaster := CategoryEnabled.Has("Hotstrings")
+	PriorMaster := CategoryEnabled.Get("Hotstrings", false)
+	HadPersonal := Features["hotstrings"].Has("personal")
+	PriorPersonal := Features["hotstrings"].Get("personal", 0)
+	HadPath := ScriptInformation.Has("PersonalTomlPath")
+	PriorPath := ScriptInformation.Get("PersonalTomlPath", "")
+	try {
+		CategoryEnabled["Hotstrings"] := true
+		Features["hotstrings"]["personal"] := Map("first", Map("enabled", true), "second", Map("enabled", true))
+		ScriptInformation["PersonalTomlPath"] := Path
+		FileAppend(Content, Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Index := Map(), TriggerSet := Map()
+		if Kind == "category"
+			Count := _RegisterCategoryTriggers("personal", Index, TriggerSet)
+		else
+			Count := _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, Mode == "selected" ? "second" : "")
+		ExpectedCount := Mode == "second" ? 2 : 1
+		AssertEqual(ExpectedCount, Count, "only source hotstring rows enter the analytics catalogue")
+		if Mode != "selected" {
+			AssertTrue(TriggerSet.Has("cmta"), "the first declared source row remains a known trigger")
+			AssertEqual("first", TriggerSet["cmta"].Section, "commented headers retain exact section ownership")
+			AssertEqual("first#value", TriggerSet["cmta"].Output, "a hash inside output remains source text")
+		}
+		if Mode == "second" || Mode == "selected" {
+			AssertTrue(TriggerSet.Has("cmtb"), "a later commented section cannot disappear or inherit its predecessor")
+			AssertEqual("second", TriggerSet["cmtb"].Section, "the second declared section owns its row")
+			AssertEqual("second#value", TriggerSet["cmtb"].Output)
+		}
+		if Mode == "selected"
+			AssertFalse(TriggerSet.Has("cmta"), "selection still excludes another declared section")
+		AssertFalse(TriggerSet.Has("description"), "commented metadata can never become a known trigger")
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			if HadMaster
+				CategoryEnabled["Hotstrings"] := PriorMaster
+			else
+				CategoryEnabled.Delete("Hotstrings")
+			if HadPersonal
+				Features["hotstrings"]["personal"] := PriorPersonal
+			else
+				Features["hotstrings"].Delete("personal")
+			if HadPath
+				ScriptInformation["PersonalTomlPath"] := PriorPath
+			else
+				ScriptInformation.Delete("PersonalTomlPath")
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_picr_header_" . ProcessId . "_") == 1, "cleanup stays inside this process-owned temporary root")
+			DirDelete(Root, true)
+		}
+	}
+}
+Test("catalogue: commented initial personal header retains analytics rows (catalogue-header-comments)", (*) => _PICR_CommentedHeaderCatalogue("category", "first"))
+Test("catalogue: commented later personal header retains analytics rows (catalogue-header-comments)", (*) => _PICR_CommentedHeaderCatalogue("category", "second"))
+for _PICR_HeaderBrackets in [1, 2] {
+	Test("catalogue: commented initial extension header " . _PICR_HeaderBrackets . " retains analytics rows (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "first", _PICR_HeaderBrackets))
+	Test("catalogue: commented later extension header " . _PICR_HeaderBrackets . " retains exact ownership (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "second", _PICR_HeaderBrackets))
+	Test("catalogue: commented selected extension header " . _PICR_HeaderBrackets . " retains analytics rows (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "selected", _PICR_HeaderBrackets))
+	Test("catalogue: commented metadata header " . _PICR_HeaderBrackets . " cannot become a trigger (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "metadata", _PICR_HeaderBrackets))
+}
