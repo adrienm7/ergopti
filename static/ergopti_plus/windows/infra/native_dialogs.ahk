@@ -32,3 +32,17 @@ Ui_MsgBox(Text := "", Title := "", Options := "") {
 Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {
 	return InputBox(Prompt, WindowTitle(Title), Options, Default)
 }
+
+/**
+ * Opens the native file picker with the shared caption and untouched selection policy.
+ * The pinned native owner passes this third argument to IFileDialog.SetTitle;
+ * it is window chrome rather than body text, unlike DirSelect's prompt.
+ * @param {string|integer} Options - Native open/save, existence and multiselect flags.
+ * @param {string} RootDir - Exact initial directory and optional default file name.
+ * @param {string} Title - Already-translated, brandless caption.
+ * @param {string} Filter - Native display labels and file patterns, unchanged.
+ * @returns {string|Array} The native selected path, paths, or cancellation receipt.
+ */
+Ui_FileSelect(Options := "", RootDir := "", Title := "", Filter := "") {
+	return FileSelect(Options, RootDir, WindowTitle(Title), Filter)
+}
