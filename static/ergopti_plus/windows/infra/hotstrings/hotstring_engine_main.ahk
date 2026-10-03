@@ -404,7 +404,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 								Group := Meta["group"]
 						if Meta.Has("group_order")
 								GroupOrder := Meta["group_order"]
-						if (Group == "default" and Meta.Has("Category") and Meta.Has("Section")
+						if (!Meta.Has("group") and Meta.Has("Category") and Meta.Has("Section")
 								and Meta["Category"] != "" and Meta["Section"] != "")
 								Group := Meta["Category"] . "." . Meta["Section"]
 				} else {
@@ -412,7 +412,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 								Group := Meta.group
 						if Meta.HasOwnProp("group_order")
 								GroupOrder := Meta.group_order
-						if (Group == "default" and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
+						if (!Meta.HasOwnProp("group") and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
 								and Meta.Category != "" and Meta.Section != "")
 								Group := Meta.Category . "." . Meta.Section
 				}

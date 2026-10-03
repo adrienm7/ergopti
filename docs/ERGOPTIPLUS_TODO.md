@@ -1241,6 +1241,8 @@ Thirty new actual-owner regressions cover enable/disable, false/nil/throw module
 
 The selected local gates pass 353 JS checks, 13,302 macOS units, 101 macOS E2E checks and 65 focused scope cases in the private baseline. Complete native three-OS packaging, installation and launch qualification and Windows personal-file identity remain pending.
 
+Windows native registration now retains an explicitly supplied default group when category/section provenance is also present. Both metadata containers derive a group only when no explicit group exists; four registered native cases retain exact group indexes, matching, specification identity and insertion sequence for explicit default, named, future, legacy-empty and omitted owners. Supplemental actual Lua-owner probes retain their existing explicit-group behavior. Selected portable syntax, encoding and JS gates pass; actual Windows execution remains pending CI. This is a prerequisite for personal-file provenance: Windows personal-file identity, live/preview gates and menu commands remain incomplete, so item 102 stays partial.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue

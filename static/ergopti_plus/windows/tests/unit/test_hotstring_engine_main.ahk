@@ -1605,3 +1605,79 @@ TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking() {
 }
 Test("HSE: conform admission preserves clean casing, registry precedence and identity masking",
     TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking)
+
+
+; Explicit ownership is distinct from the fallback group name. In particular,
+; source provenance must not let a bundled section claim a registration whose
+; caller deliberately retains the default owner.
+_TestHSE_ExplicitGroupAuthority(UseMap, HasGroup, GroupName, Category, Section, Expected) {
+    global HSE_RegistryByGroup, HSE_SeqCounter
+    HSE_TestReset()
+    try {
+        Meta := UseMap ? Map("Category", Category, "Section", Section, "Replacement", "owned")
+            : { Category: Category, Section: Section, Replacement: "owned" }
+        if HasGroup {
+            if UseMap
+                Meta["group"] := GroupName
+            else
+                Meta.group := GroupName
+        }
+        Spec := HSE_Register("*", "qz", (*) => "", Meta)
+        AssertEqual(Expected, Spec.Group, "the explicit native owner wins independently of source provenance")
+        AssertEqual(Category, Spec.Category, "ownership never rewrites the supplied category")
+        AssertEqual(Section, Spec.Section, "ownership never rewrites the supplied section")
+        AssertEqual(0, Spec.GroupOrder, "provenance does not invent a load-order rank")
+        AssertEqual(1, HSE_SeqCounter, "one registration allocates exactly one insertion sequence")
+        AssertTrue(HSE_RegistryByGroup.Has(Expected), "the owning native group is indexed")
+        AssertEqual(1, HSE_RegistryByGroup.Count, "no derived or duplicate owner is indexed")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "the native group retains the exact registered object")
+
+        Foreign := Expected == "rolls.hc" ? "default" : "rolls.hc"
+        HSE_DisableGroup(Foreign)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Found := HSE_FeedChar("z")
+        AssertTrue(IsObject(Found), "a foreign section gate cannot steal this native registration")
+        AssertEqual("qz", Found.Trigger)
+
+        HSE_DisableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        AssertEqual("", HSE_FeedChar("z"), "only its actual owner silences the registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "disabling retains the exact owned specification")
+        HSE_EnableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Restored := HSE_FeedChar("z")
+        AssertTrue(IsObject(Restored), "the owning native gate restores the registration")
+        AssertEqual("qz", Restored.Trigger)
+        AssertEqual(1, HSE_RegistryByGroup[Expected].Length, "re-enabling never duplicates a registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec)
+        AssertEqual(1, HSE_SeqCounter, "toggle publication never allocates another insertion sequence")
+    } finally {
+        HSE_TestReset()
+    }
+}
+
+Test("HSE explicit default Map owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(true, true, "default", "rolls", "hc", "default"))
+Test("HSE explicit default object owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(false, true, "default", "rolls", "hc", "default"))
+
+_TestHSE_GroupAuthorityGoldens(UseMap) {
+    ; Independent goldens preserve named, future and legacy-empty explicit
+    ; groups, and the old derivation only when no explicit owner was supplied.
+    for AuthorityRecord in [
+        { Present: true, Name: "custom_group", Category: "rolls", Section: "hc", Expected: "custom_group" },
+        { Present: true, Name: "future: Équipe / source", Category: "rolls", Section: "hc", Expected: "future: Équipe / source" },
+        { Present: true, Name: "", Category: "rolls", Section: "hc", Expected: "" },
+        { Present: false, Name: "", Category: "rolls", Section: "hc", Expected: "rolls.hc" },
+        { Present: false, Name: "", Category: "", Section: "", Expected: "default" }
+    ]
+        _TestHSE_ExplicitGroupAuthority(UseMap, AuthorityRecord.Present, AuthorityRecord.Name,
+            AuthorityRecord.Category, AuthorityRecord.Section, AuthorityRecord.Expected)
+}
+Test("HSE Map group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(true))
+Test("HSE object group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(false))
