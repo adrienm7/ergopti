@@ -223,14 +223,22 @@ local function buffered_result(request)
 	if not status then
 		return { ok = false, status = 0, body = "", error = "missing HTTP status" }
 	end
-	local succeeded = status >= 200 and status < 300
+	local http_success = status >= 200 and status < 300
+	local succeeded = http_success and request.exit_code == 0
+	local failure
+	if not http_success then
+		failure = "HTTP " .. tostring(status)
+	elseif not succeeded then
+		failure = request.stderr_text ~= "" and request.stderr_text
+			or "curl exited with code " .. tostring(request.exit_code)
+	end
 	return {
 		ok = succeeded,
 		status = status,
 		body = succeeded and body or "",
 		-- A refused request explains itself in its body ("invalid API key").
-		error_body = not succeeded and body or nil,
-		error = succeeded and nil or "HTTP " .. tostring(status),
+		error_body = not http_success and body or nil,
+		error = failure,
 	}
 end
 

@@ -161,6 +161,51 @@ response = { status = 200, body = '{"message":{"content":"ready 😀"},"done":fa
 local recovered, recovered_error = request_chat()
 check(recovered == "ready 😀" and recovered_error == nil, "a following genuine stream recovers and offers text")
 
+-- Buffered GET, POST and file downloads share one receipt decoder. Curl reports
+-- both HTTP 200 and exit 18 when the peer closes before Content-Length bytes.
+local destination = assert(os.tmpname())
+for _, method in ipairs({ "get", "post", "download" }) do
+	for _, case in ipairs({
+		{ status = 200, body = "partial", incomplete = true },
+		{ status = 299, body = "complete" },
+		{ status = 404, body = '{"error":"route not found"}' },
+	}) do
+		response = case
+		local answer, terminals = nil, 0
+		local owner = "native-buffered-" .. method
+		local options = { owner = owner, timeout_ms = 2000 }
+		local function done(value) answer = value; terminals = terminals + 1 end
+		if method == "get" then
+			Http.get(base_url .. "/api/chat", {}, options, done)
+		elseif method == "post" then
+			Http.post(base_url .. "/api/chat", {}, "{}", done, options)
+		else
+			Http.download(base_url .. "/api/chat", {}, destination, options, done)
+		end
+		check(run_until(function() return answer ~= nil end), method .. " native buffered receipt settles")
+		local correct = answer and answer.status == case.status
+		if case.incomplete then
+			correct = correct and not answer.ok and answer.body == ""
+				and type(answer.error) == "string" and answer.error:find("curl", 1, true) ~= nil
+		elseif case.status == 299 then
+			correct = correct and answer.ok and answer.error == nil
+			if method == "download" then
+				local file = assert(io.open(destination, "r"))
+				correct = correct and file:read("*a") == case.body
+				file:close()
+			else
+				correct = correct and answer.body == case.body
+			end
+		else
+			correct = correct and not answer.ok and answer.error == "HTTP 404"
+		end
+		check(correct, method .. " validates buffered HTTP " .. tostring(case.status)
+			.. (case.incomplete and " with native curl transfer failure" or " with completed native curl"))
+		check(terminals == 1 and not Http.isActive(owner), method .. " buffered owner settles exactly once")
+	end
+end
+assert(os.remove(destination))
+
 local chunks, receipt, terminal_count = {}, nil, 0
 response = { status = 299, body = "native body" }
 Http.postStream(base_url .. "/api/chat", {}, "{}", { owner = "native-status", timeout_ms = 2000 },
