@@ -147,6 +147,30 @@ return function(helpers)
 	end
 
 	helpers.describe("hotstrings scope overrides: recommended delays", function()
+		helpers.it("replays independent delay recommendations shared with the AHK owner", function()
+			local fixture = assert(require("json").decode(assert(read(shared ..
+				"/tests/corpus/hotstrings/scope_override_delay_vectors.json"))))
+			for _, vector in ipairs(fixture.vectors) do
+				local changes, recommendations = Planner.plan({ mode = vector.mode,
+					features = fixture.features,
+					groups = { { id = vector.id, override = { vector.id },
+						sections = { vector.section }, bundled = vector.bundled } },
+					inherited = function() return vector.inherited end })
+				local expected = vector.expected
+				helpers.assert_eq(#recommendations, expected ~= nil and 1 or 0, vector.name)
+				local explicit = {}
+				for _, change in ipairs(changes) do
+					if change.value ~= nil then explicit[#explicit + 1] = change end
+				end
+				helpers.assert_eq(#explicit, expected ~= nil and 1 or 0, vector.name .. " writer ownership")
+				if expected ~= nil then
+					helpers.assert_eq(recommendations[1], { group = vector.id, section = vector.section,
+						seconds = expected, inherited = vector.inherited }, vector.name)
+					helpers.assert_eq(explicit[1].value, expected, vector.name)
+				end
+			end
+		end)
+
 		helpers.it("leaves every bundled section on the manifest recommendation after restore", function()
 			local tree = apply(customised(), (plan("recommended")))
 			local checked = 0

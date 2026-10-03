@@ -1,0 +1,106 @@
+{
+	"features": [
+		{
+			"section": "hotstrings.autocorrection",
+			"id": "caps",
+			"default": {
+				"time_activation_seconds": 0.5
+			},
+			"recommended": {
+				"time_activation_seconds": 0.5
+			},
+			"path": "hotstrings.autocorrection.caps"
+		},
+		{
+			"section": "hotstrings.rolls",
+			"id": "hc",
+			"default": {
+				"time_activation_seconds": 0
+			},
+			"recommended": {
+				"time_activation_seconds": 0
+			},
+			"path": "hotstrings.rolls.hc"
+		},
+		{
+			"section": "hotstrings.french_autocorrection",
+			"id": "accents",
+			"default": {
+				"time_activation_seconds": 0.5
+			},
+			"recommended": {
+				"time_activation_seconds": 0.5
+			},
+			"path": "hotstrings.french_autocorrection.accents"
+		}
+	],
+	"vectors": [
+		{
+			"name": "recommended differs from corpus inheritance",
+			"mode": "recommended",
+			"id": "autocorrection",
+			"section": "caps",
+			"bundled": true,
+			"inherited": 1,
+			"expected": 0.5
+		},
+		{
+			"name": "equal inheritance stays sparse",
+			"mode": "recommended",
+			"id": "autocorrection",
+			"section": "caps",
+			"bundled": true,
+			"inherited": 0.5
+		},
+		{
+			"name": "clear only removes timing overrides",
+			"mode": "clear",
+			"id": "autocorrection",
+			"section": "caps",
+			"bundled": true,
+			"inherited": 1
+		},
+		{
+			"name": "personal content gets no bundled recommendation",
+			"mode": "recommended",
+			"id": "autocorrection",
+			"section": "caps",
+			"bundled": false,
+			"inherited": 1
+		},
+		{
+			"name": "category underscore spelling follows actual language owner",
+			"mode": "recommended",
+			"id": "french_autocorrection",
+			"section": "accents",
+			"bundled": true,
+			"inherited": 1,
+			"expected": 0.5
+		},
+		{
+			"name": "zero recommendation is explicit when inheritance differs",
+			"mode": "recommended",
+			"id": "rolls",
+			"section": "hc",
+			"bundled": true,
+			"inherited": 0.5,
+			"expected": 0
+		},
+		{
+			"name": "undeclared section keeps corpus inheritance",
+			"mode": "recommended",
+			"id": "autocorrection",
+			"section": "future",
+			"bundled": true,
+			"inherited": 1
+		},
+		{
+			"name": "exact section case is preserved",
+			"mode": "recommended",
+			"id": "autocorrection",
+			"section": "Caps",
+			"bundled": true,
+			"inherited": 1
+		}
+	]
+}

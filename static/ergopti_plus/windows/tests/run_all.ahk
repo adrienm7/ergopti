@@ -217,6 +217,7 @@ global _DefaultLogsDir := _LogsDir
 ; definitions at top level.
 #Include ../infra/config_io.ahk
 #Include ../infra/config_scope.ahk
+#Include ../../_shared/modules/hotstrings/scope_overrides.ahk
 #Include ../infra/hotstrings/hotstrings_scope.ahk
 #Include ../infra/config_global_scope.ahk
 #Include ../ui/personal_toml_editor.ahk

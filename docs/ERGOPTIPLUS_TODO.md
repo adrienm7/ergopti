@@ -291,13 +291,17 @@ remain pending in the next macOS install/launch run.
       main thread). Two maintainer decisions are pending: config_migrate's
       fail-closed guard for invalid stamps (site 108) and a migrations.toml
       exception for key removals handled by the cleanup (site 112).
-- [ ] **34.** Item 5 follow-ups: check that the Windows « recommended » delays
-      equal the manifest recommendation, and make a hand-written
-      `[[hotstrings.terminators]]` list editable from the menu. Both Lua drivers
-      now share the shipped-delimiter restoration policy; macOS applies it to
-      the file, runtime and next-save state, keeping personal delimiters and
-      restoring the exact snapshot after publication or runtime refusal. The
-      common behavior contract runs in both driver suites.
+- [~] **34.** Match the Windows recommended hotstring delays to the shared
+  manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
+  The shared AHK override policy now writes an explicit recommended delay only
+  when inherited source metadata differs; clear restores that inheritance.
+  Independent delay vectors run through Lua and native AHK contracts, keeping
+  personal/unknown parameters and transactional refusal recovery intact.
+  Both Lua drivers share shipped-delimiter restoration; macOS applies it to
+  file/runtime/next-save state and restores its snapshot on refusal.
+  The recommended-delay slice awaits native Windows qualification; editing
+  hand-written array-of-table delimiters remains unfinished.
+
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins
   STOPPED, exact native unregistration and the persisted OFF/rule removal.
