@@ -31,7 +31,8 @@ local i18n    = require("infra.i18n")
 --- Row DATA since 2026-08-07: the caller renders the whole array through the
 --- shared renderer, so this panel says what its rows are and nothing more.
 --- @param ctx table Context: { state, is_disabled, settings_mgr }.
---- @param out table The destination ROW array to append to.
+--- @param out table The destination numeric ROW array to append to.
+--- @return table Context for the shared generation child and its acknowledged command.
 function M.build(ctx, out)
 	local state        = ctx.state
 	local is_disabled  = ctx.is_disabled
@@ -51,22 +52,29 @@ function M.build(ctx, out)
 		})
 	end
 
-	-- Auto-raise temperature across parallel predictions — only useful when
-	-- multiple predictions are requested so the variants explore different
-	-- temperature regions (disabled badge when num_predictions < 2)
-	table.insert(out, {
-		label    = i18n.get("menu.llm.auto_raise_temp"),
-		checked  = state.llm_auto_raise_temp,
-		disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
-		action   = function()
-			return settings_mgr.apply_setting_transaction({
-				key = "llm_auto_raise_temp",
-				value = not state.llm_auto_raise_temp,
-				runtime_fn = "set_llm_auto_raise_temp",
-				publish_setting = false,
-			})
-		end,
-	})
+	--- Reads current native facts before rendering or delivering the command.
+	--- @return boolean ready
+	local function ready()
+		local count = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
+		return not is_disabled and count >= 2
+	end
+	return {
+		commands = {
+			["llm_auto_raise_temperature"] = function()
+				if not ready() then return false end
+				return settings_mgr.apply_setting_transaction({
+					key = "llm_auto_raise_temp",
+					value = not state.llm_auto_raise_temp,
+					runtime_fn = "set_llm_auto_raise_temp",
+					publish_setting = false,
+				})
+			end,
+		},
+		state_getters = {
+			["llm_auto_raise_enabled"] = function() return state.llm_auto_raise_temp end,
+			["llm_auto_raise_ready"] = ready,
+		},
+	}
 end
 
 return M

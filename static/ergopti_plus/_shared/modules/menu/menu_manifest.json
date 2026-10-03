@@ -324,7 +324,7 @@
 			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
 		},
 		{
-			"type": "list",
+			"type": "dynamic",
 			"id": "llm_generation",
 			"platforms": [
 				"linux"
@@ -436,6 +436,23 @@
 		{
 			"type": "list",
 			"id": "llm_display_remaining"
+		}
+	],
+	"llm_generation_menu": [
+		{
+			"type": "list",
+			"id": "llm_generation_values"
+		},
+		{
+			"type": "check",
+			"id": "llm_auto_raise_temperature",
+			"i18n": "menu.llm.auto_raise_temp",
+			"checked_when": [
+				"llm_auto_raise_enabled"
+			],
+			"disabled_when": [
+				"llm_auto_raise_ready"
+			]
 		}
 	],
 	"agent_menu": [

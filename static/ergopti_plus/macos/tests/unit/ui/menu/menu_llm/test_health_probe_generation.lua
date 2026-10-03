@@ -223,7 +223,13 @@ local function with_fixture(callback)
 		}
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
-			build = function(_, _, handlers, _, render_ctx)
+			build = function(key, _, handlers, _, render_ctx, providers)
+				-- Only the health-bearing top-level handlers are observed here.
+				-- Generation's declared child retains the old pass-through numeric
+				-- provider; its real check is covered by test_settings_transaction.
+				if key == "llm_generation_menu" then
+					return providers.llm_generation_values()
+				end
 				last_render_ctx = render_ctx
 				local items = {}
 				handlers.llm_backend(items)

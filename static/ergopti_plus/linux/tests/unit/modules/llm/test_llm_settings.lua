@@ -215,3 +215,176 @@ helpers.describe("llm settings: the bounds", function()
 	end)
 
 end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 4/ Shared Automatic Temperature Check =======
+-- =====================================================
+-- =====================================================
+
+--- Builds the actual inline generation menu over both existing durable owners.
+--- @param options table Independent count/state, refusal and declaration mutations.
+--- @param callback function Observations asserted outside delivered callbacks.
+local function with_auto_menu(options, callback)
+	local names = { "infra.llm_preferences", "modules.llm.settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local storage = PreferencesFixture.new({initial = {
+		["llm.generation.auto_raise_temp"] = options.selected,
+		["llm.profiles.num_predictions"] = options.count or 2,
+		["llm.future_field"] = 42,
+	}, writes_fail = options.refused})
+	package.loaded["infra.llm_preferences"] = storage
+	package.loaded["modules.llm.settings"] = nil
+	package.loaded["modules.llm.profile_settings"] = nil
+	package.loaded["ui.menu.menu_builder"] = nil
+	local settings = require("modules.llm.settings")
+	local profiles = require("modules.llm.profile_settings")
+	settings._reset()
+	profiles._reset()
+	local renderer = assert(require("menu.renderer").new({
+		platform = "linux",
+		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		json_decode = function(raw)
+			local root = assert(require("json").decode(raw))
+			if root.llm_generation_menu then
+				if options.label then root.llm_generation_menu[2].i18n = options.label end
+				if options.auto_first then
+					root.llm_generation_menu[1], root.llm_generation_menu[2] = root.llm_generation_menu[2], root.llm_generation_menu[1]
+				end
+			end
+			return root
+		end,
+		i18n = require("infra.i18n"), logger = require("logger.shim"),
+	}))
+	package.loaded["infra.manifest_menu"] = renderer
+	local observed = { writes = 0, redraws = 0 }
+	local native_set = storage.set
+	storage.set = function(...)
+		observed.writes = observed.writes + 1
+		return native_set(...)
+	end
+	local native_delete = storage.delete
+	storage.delete = function(...)
+		observed.writes = observed.writes + 1
+		return native_delete(...)
+	end
+	local admission = { enabled = true }
+	local context = {
+		_version = "0.0.0-dev.12", paused = false,
+		llm = { is_enabled = function() return admission.enabled end, toggle = function() return true end },
+		on_quit = function() end,
+		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
+	}
+	local ok, err = xpcall(function()
+		local items = helpers.load_module("ui.menu.menu_builder").build(context)
+		local function find(rows, title)
+			for index, row in ipairs(rows or {}) do
+				if row.title == title then return row, rows, index end
+				local child, siblings, position = find(row.menu, title)
+				if child then return child, siblings, position end
+			end
+		end
+		local title = require("infra.i18n").get(options.label or "menu.llm.auto_raise_temp")
+		local row, siblings, position = find(items, title)
+		callback(assert(row, "the actual automatic temperature control must exist"), settings, profiles, storage, observed, context, admission, siblings, position)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	if not ok then error(err, 0) end
+end
+
+--- Reads expectations captured independently of the declaration and native policy.
+--- @return table corpus
+local function auto_raise_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/auto_raise_temperature.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared automatic temperature control", function()
+	helpers.it("replays the bool by prediction-count matrix through real owners (shared-auto-raise)", function()
+		local corpus = auto_raise_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		helpers.assert_eq(#corpus.prediction_counts, 2)
+		for _, selected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_auto_menu({selected = selected, count = count}, function(row, settings, _, storage, observed)
+					helpers.assert_eq(row.checked or false, selected)
+					helpers.assert_eq(row.disabled or false, count < 2)
+					local result = row.fn()
+					local expected = selected
+					if count >= 2 then expected = not selected end
+					helpers.assert_eq(settings.get("auto_raise_temp"), expected)
+					helpers.assert_eq(storage.get("llm.generation.auto_raise_temp", settings.get("auto_raise_temp")), expected)
+					helpers.assert_eq(storage.get("llm.future_field"), 42)
+					helpers.assert_eq(observed.writes, count >= 2 and 1 or 0)
+					helpers.assert_eq(observed.redraws, count >= 2 and 1 or 0)
+					helpers.assert_eq(result, count >= 2)
+					if count >= 2 and not selected then
+						helpers.assert_eq(storage.has("llm.generation.auto_raise_temp"), false, "the owned default stays sparse")
+					end
+					settings._reset()
+					helpers.assert_eq(settings.get("auto_raise_temp"), expected)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("uses the changed shared label and order before numeric providers (shared-auto-raise)", function()
+		with_auto_menu({selected = true, label = auto_raise_corpus().alternate_i18n, auto_first = true}, function(row, _, _, _, observed, _, _, siblings, position)
+			local count_label = string.format(require("infra.i18n").get("menu.llm.num_predictions_label"), "2")
+			local count_position
+			for index, sibling in ipairs(siblings) do if sibling.title == count_label then count_position = index end end
+			helpers.assert_true(count_position ~= nil, "the actual numeric provider remains present")
+			helpers.assert_true(position < count_position, "the declaration moves the check before numeric values")
+			helpers.assert_eq(row.title, require("infra.i18n").get(auto_raise_corpus().alternate_i18n))
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+
+	helpers.it("refuses a delayed callback after the real count owner changes (shared-auto-raise)", function()
+		with_auto_menu({selected = true}, function(row, settings, profiles, storage, observed)
+			helpers.assert_eq(profiles.set("num_predictions", 1), true)
+			observed.writes = 0
+			local result = row.fn()
+			helpers.assert_eq(settings.get("auto_raise_temp"), true)
+			helpers.assert_eq(storage.get("llm.future_field"), 42)
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+			helpers.assert_eq(result, false)
+		end)
+	end)
+
+	helpers.it("refuses stale callbacks after pause or the live AI gate closes (shared-auto-raise)", function()
+		for _, gate in ipairs({ "pause", "master" }) do
+			with_auto_menu({selected = true}, function(row, settings, _, _, observed, context, admission)
+				if gate == "pause" then context.paused = true else admission.enabled = false end
+				local result = row.fn()
+				helpers.assert_eq(settings.get("auto_raise_temp"), true)
+				helpers.assert_eq(observed.writes, 0)
+				helpers.assert_eq(observed.redraws, 0)
+				helpers.assert_eq(result, false)
+			end)
+		end
+	end)
+
+	helpers.it("preserves live and durable values with no optimistic redraw on writer refusal (shared-auto-raise)", function()
+		for _, selected in ipairs(auto_raise_corpus().states) do
+			with_auto_menu({selected = selected, refused = true}, function(row, settings, _, storage, observed)
+				local result = row.fn()
+				helpers.assert_eq(settings.get("auto_raise_temp"), selected)
+				helpers.assert_eq(storage.get("llm.generation.auto_raise_temp"), selected)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 0)
+				helpers.assert_eq(result, false)
+			end)
+		end
+	end)
+end)

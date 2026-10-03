@@ -3898,7 +3898,7 @@ platforms = ["ahk", "hs", "linux"]
 
 # The suggestion count ("Nombre de suggestions") is a generation parameter: it
 # is the first row of the generation settings on every driver (the
-# `llm_generation_settings` submenu, or Linux's inline `llm_generation` list),
+# `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3926,7 +3926,7 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
 [[menu.llm_menu]]
-type = "list"
+type = "dynamic"
 id = "llm_generation"
 platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
@@ -4032,6 +4032,19 @@ disabled_when = ["llm_info_bar_ready"]
 [[menu.llm_display_menu]]
 type = "list"
 id = "llm_display_remaining"
+
+# Generation numeric providers retain their native prompts; the common diversity
+# checkbox has one label, checked state and current readiness owner on every OS.
+[[menu.llm_generation_menu]]
+type = "list"
+id = "llm_generation_values"
+
+[[menu.llm_generation_menu]]
+type = "check"
+id = "llm_auto_raise_temperature"
+i18n = "menu.llm.auto_raise_temp"
+checked_when = ["llm_auto_raise_enabled"]
+disabled_when = ["llm_auto_raise_ready"]
 
 [[menu.agent_menu]]
 type = "choice"

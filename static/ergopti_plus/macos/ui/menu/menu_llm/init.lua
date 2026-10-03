@@ -1268,7 +1268,7 @@ local function create_menu(deps)
 						table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, action = settings_mgr.reset_max_words })
 				end
 
-				TempPanel.build({
+				local generation_ctx = TempPanel.build({
 						state        = state,
 						keymap       = keymap,
 						is_disabled  = is_disabled,
@@ -1280,7 +1280,9 @@ local function create_menu(deps)
 				row_for("llm_generation_settings", {
 						title    = i18n.get("menu.llm.generation_menu_title"),
 						disabled = MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused),
-						menu     = ManifestMenu.render_rows(generation_rows, "llm_generation_settings"),
+						menu     = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+							["llm_generation_values"] = function() return generation_rows end,
+						}),
 				})
 
 

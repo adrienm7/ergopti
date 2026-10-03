@@ -975,3 +975,105 @@ _LMT_SharedInfoBarNativeOwner() {
 	}
 }
 Test("LLM display: shared Info Bar state and labels retain the native transaction owner", _LMT_SharedInfoBarNativeOwner)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 3/ Shared Automatic Temperature Check =======
+; =====================================================
+; =====================================================
+
+_LMT_AutoTemperatureCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\auto_raise_temperature.json"))
+}
+
+_LMT_AutoTemperatureValues(*) {
+	return [Map("label", t("menu.llm.temperature_label"), "disabled", true)]
+}
+
+_LMT_AutoTemperatureCollect(CandidateFeatures, CandidateMenu) {
+	return [{ Section: "llm.generation", Key: "auto_raise_temp", Value: CandidateMenu["auto_raise_temp"] }]
+}
+
+_LMT_AutoTemperatureToggle(*) {
+	return LLM_Menu_CommitMutation("the native automatic temperature control",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "auto_raise_temp"),
+		_LMT_Apply, _LMT_Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_AutoTemperatureCollect)
+}
+
+_LMT_SharedAutoTemperatureOwner() {
+	global _LLM_Menu, _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	try {
+		Corpus := _LMT_AutoTemperatureCorpus()
+		AssertEqual(2, Corpus["states"].Length)
+		AssertEqual(2, Corpus["prediction_counts"].Length)
+		for Selected in Corpus["states"] {
+			for Count in Corpus["prediction_counts"] {
+				_LLM_Menu["auto_raise_temp"] := Selected
+				_LLM_Menu["n_predictions"] := Count
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				Built := LLM_Menu_BuildGenerationMenu(_LMT_AutoTemperatureToggle, _LMT_AutoTemperatureValues)
+				try {
+					AssertEqual(t(Corpus["row"]["i18n"]), _CTC_LabelAt(Built, 1))
+					AssertEqual(Selected, _CTC_IsChecked(Built, 1))
+					State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 1, "uint", 0x400, "uint")
+					Assert(State != 0xFFFFFFFF, "the actual native check must exist")
+					AssertEqual(Count < 2, !!(State & 0x3))
+					Callback := _LMT_InfoBarCallback(Built, 1)
+					AssertEqual(Count >= 2, Callback.Call())
+					AssertEqual(Count >= 2 ? !Selected : Selected, _LLM_Menu["auto_raise_temp"])
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_WriterCalls)
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_ApplyCalls)
+				} finally _CTC_ReleaseMenu(Built)
+			}
+		}
+		_LLM_Menu["auto_raise_temp"] := true
+		_LLM_Menu["n_predictions"] := 2
+		_LMT_WriterCalls := 0
+		_LMT_ApplyCalls := 0
+		Built := LLM_Menu_BuildGenerationMenu(_LMT_AutoTemperatureToggle, _LMT_AutoTemperatureValues)
+		try {
+			Callback := _LMT_InfoBarCallback(Built, 1)
+			_LLM_Menu["n_predictions"] := 1
+			AssertFalse(Callback.Call(), "a delayed command rereads the actual prediction-count owner")
+			AssertTrue(_LLM_Menu["auto_raise_temp"])
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+		} finally _CTC_ReleaseMenu(Built)
+		Definitions := _MR_GetManifestRoot()["llm_generation_menu"]
+		SavedDefinitions := Definitions.Clone()
+		CheckRow := Definitions[2]
+		OriginalLabel := CheckRow["i18n"]
+		try {
+			CheckRow["i18n"] := Corpus["alternate_i18n"]
+			Definitions[1] := SavedDefinitions[2]
+			Definitions[2] := SavedDefinitions[1]
+			_LLM_Menu["n_predictions"] := 2
+			_LLM_Menu["auto_raise_temp"] := true
+			_LMT_WriterResult := false
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildGenerationMenu(_LMT_AutoTemperatureToggle, _LMT_AutoTemperatureValues)
+			try {
+				AssertEqual(t(Corpus["alternate_i18n"]), _CTC_LabelAt(Built, 0))
+				AssertEqual(t("menu.llm.temperature_label"), _CTC_LabelAt(Built, 1))
+				Callback := _LMT_InfoBarCallback(Built)
+				AssertFalse(Callback.Call())
+				AssertTrue(_LLM_Menu["auto_raise_temp"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		} finally {
+			CheckRow["i18n"] := OriginalLabel
+			for Index, Row in SavedDefinitions
+				Definitions[Index] := Row
+		}
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM generation: shared temperature diversity retains native receipts and current count", _LMT_SharedAutoTemperatureOwner)

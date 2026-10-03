@@ -127,6 +127,8 @@ local function with_fixture(options, callback)
 		llm_disabled_apps = {{name = "Old", appPath = "/Old.app"}},
 	}
 	if options.info_bar_state ~= nil then state.llm_show_info_bar = options.info_bar_state end
+	if options.auto_raise_state ~= nil then state.llm_auto_raise_temp = options.auto_raise_state end
+	if options.prediction_count ~= nil then state.llm_num_predictions = options.prediction_count end
 	local runtime = clone_value(state)
 	local persisted = clone_value(state)
 	local rendered = clone_value(state)
@@ -266,6 +268,12 @@ local function with_fixture(options, callback)
 		json_decode = function(raw)
 			local root = assert(require("json").decode(raw))
 			if options.info_label then root.llm_display_menu[2].i18n = options.info_label end
+			if root.llm_generation_menu then
+				if options.auto_label then root.llm_generation_menu[2].i18n = options.auto_label end
+				if options.auto_first then
+					root.llm_generation_menu[1], root.llm_generation_menu[2] = root.llm_generation_menu[2], root.llm_generation_menu[1]
+				end
+			end
 			if options.info_first then
 				root.llm_display_menu[1], root.llm_display_menu[2] = root.llm_display_menu[2], root.llm_display_menu[1]
 			end
@@ -289,7 +297,7 @@ local function with_fixture(options, callback)
 			return items
 		end,
 		build = function(key, category, handlers, groups, ctx, providers)
-			if key == "llm_display_menu" then
+			if key == "llm_display_menu" or key == "llm_generation_menu" then
 				return display_renderer.build(key, category, handlers, groups, ctx, providers)
 			end
 			local items = {}
@@ -494,7 +502,7 @@ local function with_fixture(options, callback)
 		end,
 		temperature_menu = function()
 			local rows = {}
-			TemperaturePanel.build({
+			local generation_ctx = TemperaturePanel.build({
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
@@ -502,6 +510,11 @@ local function with_fixture(options, callback)
 				update_menu = update_menu,
 				settings_mgr = manager,
 			}, rows)
+			if generation_ctx then
+				return package.loaded["infra.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+					["llm_generation_values"] = function() return rows end,
+				})
+			end
 			return package.loaded["infra.manifest_menu"].render_rows(rows)
 		end,
 		top_level_callbacks = build_top_level_callbacks,
@@ -1129,6 +1142,89 @@ helpers.describe("LLM shared Info Bar control", function()
 			helpers.assert_eq(fixture.runtime.llm_show_info_bar, true)
 			helpers.assert_eq(fixture.persisted().llm_show_info_bar, true)
 			helpers.assert_eq(fixture.rendered().llm_show_info_bar, true)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 9/ Shared Automatic Temperature Check =======
+-- =====================================================
+-- =====================================================
+
+--- Reads independent checkbox states and useful prediction counts.
+--- @return table corpus
+local function auto_raise_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/auto_raise_temperature.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared automatic temperature control", function()
+	helpers.it("replays both states and prediction counts through the actual setting owner (shared-auto-raise)", function()
+		local corpus = auto_raise_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		helpers.assert_eq(#corpus.prediction_counts, 2)
+		for _, selected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_fixture({auto_raise_state = selected, prediction_count = count}, function(fixture)
+					local menu = fixture.temperature_menu()
+					local row = assert(find_item(menu, corpus.row.i18n))
+					helpers.assert_eq(row.checked or false, selected)
+					helpers.assert_eq(row.disabled or false, count < 2)
+					local result = row.fn()
+					helpers.assert_eq(result, count >= 2)
+					local expected = selected
+					if count >= 2 then expected = not selected end
+					helpers.assert_eq(fixture.state.llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.calls.save, count >= 2 and 1 or 0)
+					helpers.assert_eq(fixture.calls.menu, count >= 2 and 1 or 0)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("follows the changed shared label and order without rewriting numeric controls (shared-auto-raise)", function()
+		local corpus = auto_raise_corpus()
+		with_fixture({auto_label = corpus.alternate_i18n, auto_first = true}, function(fixture)
+			local menu = fixture.temperature_menu()
+			helpers.assert_eq(menu[1].title, corpus.alternate_i18n)
+			helpers.assert_true(menu[2].title:find("menu.llm.temperature_label", 1, true) ~= nil)
+			helpers.assert_eq(find_item(menu, corpus.row.i18n), nil)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("refuses a delayed command after the actual prediction count becomes one (shared-auto-raise)", function()
+		with_fixture({auto_raise_state = true, prediction_count = 2}, function(fixture)
+			local row = assert(find_item(fixture.temperature_menu(), auto_raise_corpus().row.i18n))
+			fixture.state.llm_num_predictions = 1
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("keeps every publication after the existing writer refuses the command (shared-auto-raise)", function()
+		with_fixture({auto_raise_state = true, failures = {{name = "save", mode = "false"}}}, function(fixture)
+			local row = assert(find_item(fixture.temperature_menu(), auto_raise_corpus().row.i18n))
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.rendered().llm_auto_raise_temp, true)
 			helpers.assert_eq(fixture.calls.menu, 0)
 		end)
 	end)

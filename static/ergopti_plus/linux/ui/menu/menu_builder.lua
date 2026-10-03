@@ -2285,7 +2285,13 @@ local function _build_llm(ctx)
 	-- declared the last two as features for as long as it has existed and this
 	-- driver read them from the canonical defaults with no way to change either —
 	-- constants wearing the shape of settings.
-	providers["llm_generation"] = function()
+	dynamic_handlers["llm_generation"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — generation controls cannot read their current count: %s.",
+				tostring(ProfileSettings))
+			return
+		end
 		local ok_settings, Settings = pcall(require, "modules.llm.settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM settings unavailable — the generation rows cannot be built.")
@@ -2348,16 +2354,31 @@ local function _build_llm(ctx)
 				items = choices,
 			}
 		end
-		local auto_raise = Settings.get("auto_raise_temp")
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.auto_raise_temp"),
-			checked = auto_raise == true,
-			action = function()
-				Settings.set("auto_raise_temp", not auto_raise)
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
+		--- Reads current group, pause and prediction-count facts before delivery.
+		--- @return boolean ready
+		local function ready()
+			local count = ProfileSettings.get("num_predictions")
+			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+				and type(count) == "number" and count >= 2
+		end
+		local generation_ctx = {
+			commands = {
+				["llm_auto_raise_temperature"] = function()
+					if not ready() then return false end
+					if Settings.set("auto_raise_temp", not Settings.get("auto_raise_temp")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_auto_raise_enabled"] = function() return Settings.get("auto_raise_temp") end,
+				["llm_auto_raise_ready"] = ready,
+			},
 		}
-		return rows
+		local generation_rows = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+			["llm_generation_values"] = function() return rows end,
+		})
+		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
 	end
 
 	-- The category switch, the submenu's first row: appindicator binds item.fn
