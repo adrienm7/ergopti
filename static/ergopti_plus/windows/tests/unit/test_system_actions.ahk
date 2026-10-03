@@ -1085,3 +1085,100 @@ _SysActions_DirectLegacyForceStillRuns() {
 	AssertEqual(812, Killed[1][2], "direct legacy execution uses its current source PID")
 }
 Test("system actions: direct legacy force API keeps its contract (confirmed-target-review)", _SysActions_DirectLegacyForceStillRuns)
+
+class _QueryPauseFake extends _SysActionsFake {
+	__New(At) {
+		super.__New()
+		this.At := At
+		this.ReadCount := 0
+	}
+	WindowSnapshot(Hwnd) {
+		this.ReadCount += 1
+		Current := super.WindowSnapshot(Hwnd)
+		if this.ReadCount == this.At
+			Suspend(true)
+		return Current
+	}
+	IsDirectory(Path) {
+		if this.At == 4
+			Suspend(true)
+		return false
+	}
+}
+class _QueryDoc {
+	SelectedItems() => [{Path: "C:\owned\selected.txt"}]
+}
+class _QueryShell {
+	Windows() => [{HWND: 0x100, Document: _QueryDoc()}]
+}
+_QueryPauseCase(At) {
+	Fake := _QueryPauseFake(At)
+	Target := { Hwnd: 0x100, Pid: 812, Class: "Notepad", TargetPid: 812 }
+	Fake.Snapshots[0x100] := Target.Clone()
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureScheduleConfirmedSystemAction("force_quit_frontmost", GestureSysForceQuitFrontmost, Target, Fake)
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length,
+			"pause during ownership read cannot reach destructive effect")
+	} finally Suspend(PriorPause)
+}
+_QueryPauseFactory(At) => () => _QueryPauseCase(At)
+_QueryPauseQuestionCase(At, Forbidden) {
+	Fake := _QueryPauseFake(At)
+	Fake.Answer := "OK"
+	Target := { Hwnd: 0x100, Pid: 812, Class: "Notepad", TargetPid: 812 }
+	Fake.Snapshots[0x100] := Target.Clone()
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureConfirmThenInvoke("force_quit_frontmost", "", Target, Fake)
+		AssertEqual(0, Forbidden == "Deferred" ? Fake.Deferred.Length : _SysActions_CallsNamed(Fake, Forbidden).Length,
+			"pause during ownership read refuses next observable boundary")
+	} finally Suspend(PriorPause)
+}
+_QueryPauseQuestionFactory(At, Forbidden) => () => _QueryPauseQuestionCase(At, Forbidden)
+_QueryPauseUnblockCase(At) {
+	Fake := _QueryPauseFake(At)
+	Fake.Shell := _QueryShell()
+	Target := {Hwnd: 0x100, Pid: 812, Class: "CabinetWClass"}
+	Fake.Snapshots[0x100] := Target.Clone()
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureScheduleConfirmedSystemAction("unblock_file_selection", GestureSysUnblockFileSelection, Target, Fake)
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(0, _SysActions_CallsNamed(Fake, "DeleteZoneIdentifier").Length,
+			"paused confirmed explorer callback cannot mutate a recorded file")
+	} finally Suspend(PriorPause)
+}
+_QueryPauseUnblockFactory(At) => () => _QueryPauseUnblockCase(At)
+_QueryPausePositive(ActionName) {
+	Fake := _QueryPauseFake(0)
+	Fake.Shell := _QueryShell()
+	IsForce := ActionName == "force_quit_frontmost"
+	Target := {Hwnd: 0x100, Pid: 812, Class: IsForce ? "Notepad" : "CabinetWClass"}
+	if IsForce
+		Target.TargetPid := 812
+	Fake.Snapshots[0x100] := Target.Clone()
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		Fn := IsForce ? GestureSysForceQuitFrontmost : GestureSysUnblockFileSelection
+		_GestureScheduleConfirmedSystemAction(ActionName, Fn, Target, Fake)
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(1, _SysActions_CallsNamed(Fake, IsForce ? "CloseProcess" : "DeleteZoneIdentifier").Length,
+			"unchanged unpaused receipt still permits exactly one recorded effect")
+	} finally Suspend(PriorPause)
+}
+_QueryPausePositiveFactory(ActionName) => () => _QueryPausePositive(ActionName)
+for _SysActions_QueryPauseRead in [1, 2, 3]
+	Test("confirmed callback pause during ownership read  (confirmed-query-pause)" . _SysActions_QueryPauseRead, _QueryPauseFactory(_SysActions_QueryPauseRead))
+Test("confirmation read pause cannot ask (confirmed-query-pause)", _QueryPauseQuestionFactory(1, "Ask"))
+Test("post-answer read pause cannot reactivate (confirmed-query-pause)", _QueryPauseQuestionFactory(2, "Activate"))
+Test("post-focus ownership read pause cannot queue effect (confirmed-query-pause)", _QueryPauseQuestionFactory(4, "Deferred"))
+for _SysActions_QueryPauseRead in [1, 3, 4]
+	Test("unblock callback pause during ownership/directory read  (confirmed-query-pause)" . _SysActions_QueryPauseRead, _QueryPauseUnblockFactory(_SysActions_QueryPauseRead))
+for _SysActions_QueryPausePositiveAction in ["force_quit_frontmost", "unblock_file_selection"]
+	Test("confirmed callback unchanged  (confirmed-query-pause)" . _SysActions_QueryPausePositiveAction, _QueryPausePositiveFactory(_SysActions_QueryPausePositiveAction))

@@ -135,6 +135,10 @@ _GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
 		LoggerWarn("gestures", "Confirmed system action '{1}' was refused before execution: its original window target is no longer owned.", ActionId)
 		return false
 	}
+	if A_IsSuspended {
+		LoggerInfo("gestures", "Confirmed system action '{1}' was cancelled after ownership validation: the script is suspended.", ActionId)
+		return false
+	}
 	return ActionFn.Call(Sys, Target)
 }
 for _SysActionId, _SysActionFn in Map(
@@ -377,6 +381,10 @@ GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 		LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original window target is no longer owned.")
 		return false
 	}
+	if IsObject(ConfirmedTarget) && A_IsSuspended {
+		LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
+		return false
+	}
 	; The captured approval remains effect authority even after later reads.
 	Pid := IsObject(ConfirmedTarget) ? ConfirmedTarget.TargetPid : Target.Pid
 	if Sys.CloseProcess(Pid)
@@ -507,6 +515,10 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	}
 	Window := _GestureSysActiveExplorer(Sys, IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow())
 	Paths := IsObject(Window) ? GestureSysExplorerSelectedPaths(Window) : ""
+	if IsObject(ConfirmedTarget) && A_IsSuspended {
+		LoggerInfo("gestures", "unblock_file_selection was cancelled after selection inspection: the script is suspended.")
+		return false
+	}
 	if !(Paths is Array) || (Paths.Length = 0) {
 		LoggerInfo("gestures", "unblock_file_selection: no file is selected in Explorer.")
 		Sys.Notify(t("system_actions.no_file_selected"))
@@ -519,6 +531,10 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	Removed := 0, Failed := 0
 	for Path in Paths {
 		for Target in (Sys.IsDirectory(Path) ? Sys.FilesUnder(Path) : [Path]) {
+			if IsObject(ConfirmedTarget) && A_IsSuspended {
+				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: the script is suspended.")
+				return false
+			}
 			Result := Sys.DeleteZoneIdentifier(Target)
 			if (Result = "removed")
 				Removed += 1
