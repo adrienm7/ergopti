@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",
 	"tests.unit.adapters.test_clipboard_failure_atomic",
 	"tests.unit.adapters.test_clipboard_selection_transaction",

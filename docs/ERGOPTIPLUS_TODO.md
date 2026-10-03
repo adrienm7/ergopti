@@ -833,14 +833,25 @@ is committed; one request is one commit with its regression test.
       `metrics.shortcut_*`; and the second half of the Linux reason
       `platform_reason.metrics_extras_are_not_on_linux`, which still speaks
       of a shortcut.
-- [ ] **73.** Follow-ups of the tray rows the Windows separator bug hid
-      (`submenu-read-as-separator-2026-10-01`, fixed): the three families of «
-      Combinaisons de touches » are back and read their raw `group_label`
-      (« AltGrLAlt », « AltGrCapsLock », « LAltCapsLock ») where a translated
-      name is expected; and find which action left the three French hotstring
+- [ ] **73.** Partial: Windows combination families and pairs already use
+      the canonical translated tap-hold key labels; macOS now resolves both
+      physical keys through the same catalogue and invalidates its picker
+      cache when the locale changes. The complete 182-entry native matrix,
+      action IDs, press order and setter refusal boundaries stay unchanged;
+      the three script-management pairs remain hidden. Linux still has no
+      combination engine and retains the shared availability reason. The
+      real macOS provider regression covers all 21 locales; shared contracts
+      also replay each driver's physical catalogue. Native CI qualification
+      remains pending. Find which action left the three French hotstring
       categories off in the maintainer's config.toml on 2026-09-30 (a
       restore, a clear or the wizard), since « ct★ » did nothing only because
-      `category_enabled.french_magickey` was false.
+      `category_enabled.french_magickey` was false; no historical attribution
+      is established yet.
+
+The physical-label contract is independent of the native matrix and stored action
+IDs. Original provider cases fail before the fix; the qualified component suites
+pass with all 21 locale catalogues. Full native CI remains required.
+
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
       Windows 105, macOS 188 and Linux 116 rows are still built by the

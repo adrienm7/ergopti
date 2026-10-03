@@ -31,6 +31,7 @@ local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
 local Paths       = require("infra.paths")
 local KeyCatalog  = require("tap_hold.key_catalog")
+local CombinationLabels = require("tap_hold.combination_labels")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -607,8 +608,9 @@ end
 --- @param update_menu function Callback to refresh the menu bar.
 --- @param enabled     boolean  Whether the integration is active.
 --- @param combo_def   table    Entry from MOD_COMBOS.
+--- @param pair_label  string   Canonical translated physical pair.
 --- @return table hs.menubar menu item.
-local function build_one_combo_item(karabiner, action_index, update_menu, enabled, combo_def)
+local function build_one_combo_item(karabiner, action_index, update_menu, enabled, combo_def, pair_label)
 	local cid = combo_def.id
 
 	local ok_tap,   current_tap   = pcall(karabiner.get_combo_tap_action,   cid)
@@ -673,7 +675,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		render_ctx, { ["key_combination_slots"] = function() return slots end })
 
 	return {
-		label    = string.format("%s  :  %s", combo_def.label, combo_label),
+		label    = string.format("%s  :  %s", pair_label, combo_label),
 		checked  = is_active or nil,
 		disabled = not enabled or nil,
 		-- This child has already passed through the shared renderer.
@@ -707,7 +709,7 @@ local function report_unplaced_combos(karabiner)
 	end
 end
 
---- Builds the modifier combo items of one hand, grouped by their "group" field.
+--- Builds one hand's modifier combos, grouped by the first physical key.
 --- Items are grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
@@ -731,12 +733,14 @@ local function build_raccourcis_items(karabiner, action_index, update_menu, enab
 		if is_symmetric and non_canonical[combo_def.id] then goto continue end
 		if combo_hand(combo_def) ~= hand then goto continue end
 
-		if combo_def.group ~= current_group then
-			items[#items + 1] = MenuUtils.build_section_header(combo_def.group)
-			current_group = combo_def.group
+		local keys = combo_def.from.simultaneous
+		local labels = CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)
+		if labels.group_id ~= current_group then
+			items[#items + 1] = MenuUtils.build_section_header(labels.group_label)
+			current_group = labels.group_id
 		end
 		items[#items + 1] = build_one_combo_item(
-			karabiner, action_index, update_menu, enabled, combo_def)
+			karabiner, action_index, update_menu, enabled, combo_def, labels.label)
 
 		::continue::
 	end
@@ -899,7 +903,7 @@ local _picker_cache = nil
 --- @param enabled boolean Whether the integration is active.
 --- @return string
 local function picker_fingerprint(karabiner, enabled)
-	local parts = { enabled and "1" or "0" }
+	local parts = { enabled and "1" or "0", i18n.get_locale() }
 	local ok_sym, sym = pcall(karabiner.get_combo_symmetric)
 	parts[#parts + 1] = (ok_sym and sym) and "1" or "0"
 	-- The global tap/hold timeout is rendered in every per-key delay submenu
