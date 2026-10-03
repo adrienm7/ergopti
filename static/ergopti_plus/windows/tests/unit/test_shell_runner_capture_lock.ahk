@@ -318,6 +318,25 @@ _SRCL_TreeHeldCaptureOutlivesBudget() {
 Test("shell runner: a tree capture held past its budget warns once (shell-capture-lock)",
 	_SRCL_TreeHeldCaptureOutlivesBudget)
 
+_SRCL_CaptureBudgetSurvivesTickWrap() {
+	Claim := Map("TmpFile", "private-wrap-fixture", "CaptureDir", "private-wrap-directory")
+	Origin := 0xFFFFFFF0
+	BeforeExpiry := (Origin + SR_CAPTURE_LOCK_BUDGET_MS - 1) & 0xFFFFFFFF
+	AtExpiry := (Origin + SR_CAPTURE_LOCK_BUDGET_MS) & 0xFFFFFFFF
+	Log := _SRCL_BeginLog()
+	try {
+		AssertEqual("retry", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "wrap fixture", Origin))
+		AssertEqual(Origin, Claim["CaptureLockSince"])
+		AssertEqual("retry", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "wrap fixture", BeforeExpiry))
+		AssertEqual("abandoned", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "wrap fixture", AtExpiry),
+			"capture-budget-tick-wrap: a locked capture cannot keep its poller past the budget")
+	} finally _SRCL_EndLog(Log)
+	AssertEqual(0, _SRCL_Count(Log.Lines, "ERROR"))
+	AssertEqual(1, _SRCL_Count(Log.Lines, "WARNING", "the next start's sweep removes it"))
+}
+Test("shell runner capture-budget-tick-wrap: lock expiry keeps its bounded budget",
+	_SRCL_CaptureBudgetSurvivesTickWrap)
+
 ; The legacy poller shares the policy: a held capture defers the release within
 ; the budget, then releases it to the sweep with one warning and no error.
 _SRCL_LegacyHeldCaptureIsNotAnError() {
