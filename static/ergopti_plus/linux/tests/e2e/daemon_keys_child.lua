@@ -27,6 +27,8 @@
 --- ==============================================================================
 
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
+local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
+if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/modules/hotstrings/magickey.toml" end
 arg = { "--device", DEVICE, "--config", CONFIG }
 package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
 
@@ -45,9 +47,9 @@ require("tests.win_compat").install()
 local TAP_WRAP = os.getenv("ERGOPTI_E2E_TAP_WRAP") or "none"
 local selection = { primary = "", reads = 0, attempts = 0, queued = 0, executed = 0, focused = false }
 local selection_config = nil
-if TAP_WRAP ~= "none" then
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
-	assert(modes[TAP_WRAP], "unknown tap/wrap scenario")
+	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
 	local original = Paths.config
 	selection_config = os.tmpname()
@@ -87,6 +89,8 @@ local function chars(text)
 end
 
 local screen, code_of, char_of, next_code = {}, {}, {}, 1000
+local repeat_state = { reads = 0, attempts = 0, dispatched = 0, origins = 0, decisions = 0,
+	raw = 0, group = 0, origin_name = "fixture keyboard", compose_failed = false }
 local function code_for(c)
 	if not code_of[c] then
 		code_of[c] = next_code
@@ -120,6 +124,10 @@ package.preload["adapters.uinput_writer"] = function()
 		is_open = function() return true end,
 		sync = function() return true end,
 		emit = function(code, value)
+			if MAGIC_REPEAT ~= "none" and value == 1 and char_of[code] == "★" then
+				repeat_state.attempts = repeat_state.attempts + 1
+				if MAGIC_REPEAT == "injection" and repeat_state.attempts == 2 then return false end
+			end
 			if value == 1 then
 				if code == Codes.KEY_BACKSPACE then table.remove(screen)
 				elseif code == Codes.KEY_ENTER then screen[#screen + 1] = "\n"
@@ -143,7 +151,7 @@ hook.start = function(options)
 	end
 end
 hook.isRunning = function() return true end
-hook.get_mode = function() return "scripted" end
+hook.get_mode = function() return MAGIC_REPEAT ~= "none" and "intercept" or "scripted" end
 hook.held_text_modifier_codes = function() return {} end
 hook.emergency_stop = function(why) print("EMERGENCY STOP: " .. tostring(why)) end
 -- The script is the keyboard: an idle tick of the loop has no device to read.
@@ -265,6 +273,40 @@ TapHold.init = function(options)
 	return real_tap_hold_init(options)
 end
 
+-- Keep the actual pause and inhibition owners; observe their construction and
+-- vary only desktop boundaries while the native reader delivers a held press.
+local repeat_controller, repeat_gate
+if MAGIC_REPEAT ~= "none" then
+	local Actions = require("modules.shortcuts.script_actions")
+	local make_actions = Actions.new
+	Actions.new = function(options)
+		repeat_controller = make_actions(options)
+		return repeat_controller
+	end
+	local Gate = require("infra.input_capture_gate")
+	local make_gate = Gate.new
+	Gate.new = function(options)
+		repeat_gate = make_gate(options)
+		return repeat_gate
+	end
+	local Source = require("modules.hotstrings.magic_key_source")
+	local initialize = Source.init
+	Source.init = function(options)
+		local dispatch = options.dispatch_char
+		options.dispatch_char = function(...)
+			repeat_state.dispatched = repeat_state.dispatched + 1
+			return dispatch(...)
+		end
+		return initialize(options)
+	end
+	local Finder = require("modules.hotstrings.device_finder")
+	Finder.physical_sources = function(paths)
+		repeat_state.origins = repeat_state.origins + 1
+		return { { path = paths[1], physical = MAGIC_REPEAT ~= "untrusted",
+			sysfs = "/fixture/native-keyboard", name = repeat_state.origin_name } }
+	end
+end
+
 -- A focused ordinary text field, conclusively.
 package.preload["adapters.secure_field_detector"] = function()
 	return {
@@ -287,6 +329,82 @@ package.preload["adapters.event_loop"] = function()
 	-- loop begins, and dropping that boundary would conceal startup failures.
 	local adapter = dofile("adapters/event_loop.lua")
 	adapter.run = function(loop)
+		if MAGIC_REPEAT ~= "none" then
+			local Source = require("modules.hotstrings.magic_key_source")
+			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
+				"the real magic-key category must acknowledge activation")
+			assert(Source.set("KeyJ"), "the real source owner must acknowledge the key")
+			local Capture = require("adapters.xkb_capture")
+			local primed, chosen = false, 0
+			-- Count origin publications during this press, excluding boot probes.
+			repeat_state.origins = 0
+			Capture._set_backend({
+				create = function() return {} end,
+				destroy = function() end,
+				source_group = function() return repeat_state.group, 1 end,
+				key_sym = function() return "j" end,
+				key_utf8 = function()
+					if not primed then
+						primed = true
+						hook.physical_source_receipt()
+					end
+					repeat_state.reads = repeat_state.reads + 1
+					if repeat_state.reads == 1 and MAGIC_REPEAT == "compose-first" then
+						repeat_state.compose_failed = true
+					elseif repeat_state.reads == 2 then
+						if MAGIC_REPEAT == "compose-first" then repeat_state.compose_failed = false
+						elseif MAGIC_REPEAT == "paused" then repeat_controller.toggle_pause()
+						elseif MAGIC_REPEAT == "group" then repeat_state.group = 1
+						elseif MAGIC_REPEAT == "source" then assert(Source.set("KeyQ"))
+						elseif MAGIC_REPEAT == "inhibited" then assert(repeat_gate.acquire("repeat-fixture", 1))
+						elseif MAGIC_REPEAT == "origin" then
+							repeat_state.origin_name = "replacement keyboard"
+							hook.physical_source_receipt()
+						elseif MAGIC_REPEAT == "compose" then repeat_state.compose_failed = true end
+					elseif repeat_state.reads == 3 then
+						if MAGIC_REPEAT == "paused" then repeat_controller.toggle_pause()
+						elseif MAGIC_REPEAT == "group" then repeat_state.group = 0
+						elseif MAGIC_REPEAT == "inhibited" then assert(repeat_gate.release("repeat-fixture", 1)) end
+						repeat_state.compose_failed = false
+					end
+					return "j"
+				end,
+				sym_utf8 = function(_, sym) return sym end,
+				update_key = function() end,
+				compose_feed = function() end,
+				compose_status = function() return "nothing" end,
+				compose_reset = function()
+					if repeat_state.compose_failed then error("fixture compose retirement refused") end
+				end,
+			})
+			assert(Capture.load("fixture keymap"))
+			if MAGIC_REPEAT == "capture" then
+				assert(Source.capture({ on_chosen = function() chosen = chosen + 1 end,
+					on_refused = function(reason) error(reason) end }))
+			end
+			local stream = { { type = 1, code = 36, value = 1 }, { type = 1, code = 36, value = 2 },
+				{ type = 1, code = 36, value = 2 }, { type = 1, code = 36, value = 0 } }
+			hook._test_drive(stream, {
+				liveXkb = true,
+				onChar = callbacks.onChar, onKey = callbacks.onKey,
+				onPhysical = callbacks.onPhysical, onHold = callbacks.onHold,
+				onConsume = function(detail)
+					repeat_state.decisions = repeat_state.decisions + 1
+					return callbacks.onConsume(detail)
+				end,
+				onEmitRaw = function()
+					repeat_state.raw = repeat_state.raw + 1
+					return true
+				end,
+			}, true)
+			adapter._run_idle_tick()
+			print(string.format("MAGIC_REPEAT decisions=%d dispatched=%d attempts=%d origins=%d raw=%d chosen=%d",
+				repeat_state.decisions, repeat_state.dispatched, repeat_state.attempts,
+				repeat_state.origins, repeat_state.raw, chosen))
+			print(string.format("SCREEN %q", table.concat(screen)))
+			Capture._reset_backend()
+			return
+		end
 		if TAP_WRAP ~= "none" then
 			local Shortcuts = require("modules.shortcuts.manager")
 			assert(Shortcuts.set_enabled(true), "the real shortcut owner must acknowledge activation")

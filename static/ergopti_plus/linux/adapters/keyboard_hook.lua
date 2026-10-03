@@ -126,6 +126,7 @@ local _release_forwarded_sources
 -- actions it hands back that are not a plain key.
 local _physical_sources = {}
 local _origin_generation, _origin_signature = 0, nil
+local _origin_ready = false
 local _remapper = nil
 local _on_tap = nil
 local _release_remapped
@@ -337,12 +338,13 @@ end
 --- from the application: the application's own Compose never saw it, so the
 --- next key must read here as it types there, not composed with it.
 local function _cancel_capture_compose()
-	if _test_capture_event then return end
+	if _test_capture_event then return true end
 	local ok, err = XkbCapture.cancel_compose()
 	if not ok then
 		_xkb_failed("XKB Compose could not be cancelled after a consumed key (%s) — the next key may read composed.",
 			tostring(err))
 	end
+	return ok == true
 end
 
 --- The role a physical key has in the ACTIVE layout, asked of XKB before its
@@ -581,6 +583,32 @@ local function _event_clock_now_ms()
 	return _clock_event_ms + math.max(0, since_read)
 end
 
+--- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
+--- @param receipt any Consumer result.
+--- @return function|nil callback Exact callback owned by this physical press.
+local function consumed_repeat_callback(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or receipt.consume ~= true
+		or type(receipt.repeat_callback) ~= "function" then return nil end
+	for key in pairs(receipt) do
+		if key ~= "consume" and key ~= "repeat_callback" then return nil end
+	end
+	return receipt.repeat_callback
+end
+
+--- Detaches the native event identity and its already-published origin epoch.
+--- @param ev table Decoded evdev event.
+--- @param source string Owned device path.
+--- @param identity string|nil Native layout identity.
+--- @param char string|nil Native layout character.
+--- @return table detail Consumer event.
+local function consumption_detail(ev, source, identity, char)
+	return { key = identity or char, char = char, code = ev.code,
+		physical = ev.remapped ~= true and _physical_sources[source] == true,
+		origin_generation = _origin_ready and _origin_generation or nil,
+		value = ev.value, mods = M.held_modifiers(), shift_side = M.held_shift_side(),
+	}
+end
+
 local function _dispatch_event(ev, source)
 	-- Intercept mode grabbed the device, so nothing reaches the application
 	-- except through here: put the raw event back BEFORE doing anything else.
@@ -722,7 +750,20 @@ local function _dispatch_event(ev, source)
 		else
 			-- XKB read each auto-repeat of the consumed press too, a dead key's
 			-- included, and the application saw none of them.
-			_cancel_capture_compose()
+			local compose_cancelled = _cancel_capture_compose()
+			local repeat_callback = _consumed_down[consumed_key]
+			if ev.value == InputEvent.VALUE_REPEAT and type(repeat_callback) == "function" then
+				local called, acknowledged = false, false
+				if compose_cancelled then
+					called, acknowledged = _call_callback("consumed-key repeat callback",
+						repeat_callback, consumption_detail(ev, source, identity, char))
+				end
+				if not called or acknowledged ~= true then
+					-- A refusal retires this press; later repeats cannot revive it,
+					-- and its suppressed down still owns the eventual release.
+					_consumed_down[consumed_key] = true
+				end
+			end
 		end
 		return
 	end
@@ -731,25 +772,23 @@ local function _dispatch_event(ev, source)
 	-- the source stream. XKB and modifier state are current before the decision;
 	-- raw pass-through and semantic callbacks happen only if it declines.
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
-		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume, {
-			key = identity or char,
-			char = char,
-			code = ev.code,
-			physical = ev.remapped ~= true and _physical_sources[source] == true,
-			value = ev.value,
-			mods = M.held_modifiers(),
-			shift_side = M.held_shift_side(),
-		})
+		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume,
+			consumption_detail(ev, source, identity, char))
+		local repeat_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
 			_forward_raw(ev, source)
 			return
-		elseif consume == true then
-			_consumed_down[consumed_key] = true
+		elseif consume == true or repeat_callback ~= nil then
+			_consumed_down[consumed_key] = repeat_callback or true
 			-- A dead key consumed here (a tap key or the physical magic key on
 			-- a French ^ or a US-international ') would otherwise stay pending.
-			_cancel_capture_compose()
+			if not _cancel_capture_compose() then
+				-- Its first output is already consumed; a refused retirement
+				-- cannot leave optional repeats alive for this held press.
+				_consumed_down[consumed_key] = true
+			end
 			return
 		end
 	end
@@ -1191,6 +1230,7 @@ function M.physical_source_receipt()
 	local encoded = table.concat(signature, ";")
 	if _origin_signature ~= encoded then _origin_signature, _origin_generation = encoded, _origin_generation + 1 end
 	_physical_sources = physical
+	_origin_ready = ready == true
 	return { generation = _origin_generation, ready = ready == true }
 end
 
@@ -1635,6 +1675,9 @@ function M.start(opts)
 	_ticks_since_check = 0
 	_reported_missing = false
 	_running = true
+	-- Acquisition proved the device before it was running. Publish admission
+	-- at the completed lifecycle boundary so the first press can own repeats.
+	M.physical_source_receipt()
 	Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
 		#_devices, #_pointer_devices, _layout, tostring(_intercept))
 end

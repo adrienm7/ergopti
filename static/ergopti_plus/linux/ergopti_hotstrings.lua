@@ -1503,7 +1503,13 @@ local function main()
 		return true
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
-		if MagicKeySource.on_key(detail) then return true end
+		local magic_consumed, repeat_callback = MagicKeySource.on_key(detail)
+		if magic_consumed then
+			if type(repeat_callback) == "function" then
+				return { consume = true, repeat_callback = input_capture_gate.guard(repeat_callback) }
+			end
+			return true
+		end
 		if script_chords.on_key(detail) then return true end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.

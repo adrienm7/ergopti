@@ -636,3 +636,169 @@ helpers.describe("keyboard_hook: a failing callback still forwards the grabbed e
 	end)
 
 end)
+
+
+helpers.describe("keyboard hook: acknowledged consumed repeats", function()
+	local function observe(mode)
+		local previous = package.loaded["modules.hotstrings.device_finder"]
+		local state = { origins = 0, consumed = 0, repeated = 0, raw = {}, values = {} }
+		package.loaded["modules.hotstrings.device_finder"] = {
+			physical_sources = function(paths)
+				state.origins = state.origins + 1
+				return { { path = paths[1], sysfs = "/sys/probe/keyboard", name = "fixture keyboard", physical = true } }
+			end,
+		}
+		local ok, err = pcall(function()
+			local hook = helpers.load_module("adapters.keyboard_hook")
+			local primed = false
+			local stream = { ev(EV_KEY, 36, 1), ev(EV_KEY, 36, 2), ev(EV_KEY, 36, 2),
+				ev(EV_KEY, 36, 0), ev(EV_KEY, 36, 1), ev(EV_KEY, 36, 2), ev(EV_KEY, 36, 0) }
+			if mode == "independent" then
+				stream = { ev(EV_KEY, 36, 1), ev(EV_KEY, 37, 1), ev(EV_KEY, 36, 2), ev(EV_KEY, 37, 2),
+					ev(EV_KEY, 36, 2), ev(EV_KEY, 37, 2), ev(EV_KEY, 36, 0), ev(EV_KEY, 37, 0),
+					ev(EV_KEY, 36, 1), ev(EV_KEY, 36, 2), ev(EV_KEY, 36, 0) }
+			end
+			hook._test_drive(stream, {
+				captureEvent = function(_, value)
+					if not primed then hook.physical_source_receipt(); primed = true end
+					if value ~= 0 then return "j", "j" end
+				end,
+				onConsume = function(detail)
+					state.consumed = state.consumed + 1
+					state.origin = detail.origin_generation
+					if mode == "boolean" then return true end
+					local receipt = { consume = true, repeat_callback = function(repeat_detail)
+						state.repeated = state.repeated + 1
+						state.values[#state.values + 1] = repeat_detail.value
+						if mode == "independent" then
+							state.keys = state.keys or {}
+							state.keys[#state.keys + 1] = detail.code .. ":" .. repeat_detail.code
+							if detail.code == 36 and state.repeated == 1 then return false end
+						end
+						if mode == "refused" and state.repeated == 1 then return false end
+						return true
+					end }
+					if mode == "malformed" then receipt.foreign = true end
+					return receipt
+				end,
+				onEmitRaw = function(code, value)
+					state.raw[#state.raw + 1] = code .. ":" .. value
+					return true
+				end,
+			}, true)
+		end)
+		package.loaded["modules.hotstrings.device_finder"] = previous
+		if not ok then error(err, 0) end
+		return state
+	end
+
+	helpers.it("(magic-source-repeat) keeps the exact press callback through repeat and releases it at key-up", function()
+		local state = observe("accepted")
+		helpers.assert_eq(state.consumed, 2)
+		helpers.assert_eq(state.repeated, 3)
+		helpers.assert_eq(state.values, { 2, 2, 2 })
+		helpers.assert_type(state.origin, "number")
+		helpers.assert_true(state.origin > 0)
+		helpers.assert_eq(state.origins, 1, "repeats use the existing native epoch without sysfs rescans")
+		helpers.assert_eq(state.raw, {}, "a consumed down owns every repeat and its release")
+	end)
+
+	helpers.it("(magic-source-repeat) retires a refused callback until the next physical press", function()
+		local state = observe("refused")
+		helpers.assert_eq(state.consumed, 2)
+		helpers.assert_eq(state.repeated, 2, "refusal cannot revive before key-up")
+		helpers.assert_eq(state.raw, {})
+	end)
+
+	helpers.it("(magic-source-repeat) independent held keys retain their own callbacks and refusal lifetimes", function()
+		local state = observe("independent")
+		helpers.assert_eq(state.consumed, 3)
+		helpers.assert_eq(state.repeated, 4)
+		helpers.assert_eq(state.keys, { "36:36", "37:37", "37:37", "36:36" })
+		helpers.assert_eq(state.raw, {})
+	end)
+
+	helpers.it("(magic-source-repeat) publishes a qualified origin before the first newly started physical press", function()
+		local names = { "adapters.xkb_capture", "adapters.evdev_reader", "modules.hotstrings.device_finder" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local path = os.tmpname()
+		local file = assert(io.open(path, "w"))
+		file:close()
+		local hook, observed = nil, { origins = 0, epochs = {}, repeated = 0, raw = {} }
+		local ok, err = pcall(function()
+			local Capture = helpers.load_module(names[1])
+			Capture._set_backend({
+				create = function() return {} end, destroy = function() end,
+				source_group = function() return 0, 1 end,
+				key_sym = function() return "j" end, key_utf8 = function() return "j" end,
+				sym_utf8 = function(_, sym) return sym end, update_key = function() end,
+				compose_feed = function() end, compose_status = function() return "nothing" end,
+				compose_reset = function() end,
+			})
+			assert(Capture.load("fixture keymap"))
+			local Reader = helpers.load_module(names[2])
+			local Input = require("infra.input_event")
+			local queue, at = {}, 0
+			for i, value in ipairs({ 1, 2, 0 }) do queue[i] = Input.encode(1, 36, value, Input.native_size()) end
+			Reader._set_backend({
+				open = function() return 1 end, ioctl = function() return true end,
+				read = function() at = at + 1; return queue[at] end,
+				poll = function() return queue[at + 1] ~= nil end, close = function() return true end,
+				read_bits = function(_, _, count) return string.rep("\0", count) end,
+			})
+			package.loaded[names[3]] = {
+				is_key_device = function() return true end,
+				physical_sources = function(paths)
+					observed.origins = observed.origins + 1
+					return { { path = paths[1], sysfs = "/fixture/native-keyboard",
+						name = "fixture keyboard", physical = true } }
+				end,
+			}
+			hook = helpers.load_module("adapters.keyboard_hook")
+			hook.start({ device = path, pinned = true, intercept = true,
+				onConsume = function(detail)
+					observed.epochs[#observed.epochs + 1] = detail.origin_generation or "unavailable"
+					if detail.origin_generation == nil then return true end
+					return { consume = true, repeat_callback = function()
+						observed.repeated = observed.repeated + 1
+						return true
+					end }
+				end,
+				onEmitRaw = function(code, value)
+					observed.raw[#observed.raw + 1] = code .. ":" .. value
+					return true
+				end,
+			})
+			observed.running = hook.isRunning()
+			hook.pump()
+			hook.stop()
+			Capture._reset_backend()
+			Reader._reset_backend()
+		end)
+		if hook then pcall(hook.stop) end
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		os.remove(path)
+		if not ok then error(err, 0) end
+		helpers.assert_eq(observed.running, true, "the native reader must actually have started")
+		helpers.assert_eq(#observed.epochs, 1)
+		helpers.assert_type(observed.epochs[1], "number", "the first physical press already owns its qualified epoch")
+		helpers.assert_true(observed.epochs[1] > 0)
+		helpers.assert_eq(observed.repeated, 1)
+		helpers.assert_eq(observed.origins, 2, "acquisition and completed startup publish once each; repeats do not rescan")
+		helpers.assert_eq(observed.raw, {})
+	end)
+
+	helpers.it("(magic-source-repeat) ordinary boolean consumers stay nonrepeating", function()
+		local state = observe("boolean")
+		helpers.assert_eq(state.consumed, 2)
+		helpers.assert_eq(state.repeated, 0)
+		helpers.assert_eq(state.raw, {})
+	end)
+
+	helpers.it("(magic-source-repeat) an unsupported receipt never claims the physical press", function()
+		local state = observe("malformed")
+		helpers.assert_eq(state.repeated, 0)
+		helpers.assert_eq(state.raw, { "36:1", "36:2", "36:2", "36:0", "36:1", "36:2", "36:0" })
+	end)
+end)

@@ -632,3 +632,81 @@ helpers.describe("magic replacement: the layout prerequisite", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("magic key source: per-press repeat ownership", function()
+	local function observe(mode)
+		local previous = package.loaded["adapters.xkb_capture"]
+		local state = { active = true, replace = true, typed_ok = true, group = 0, native_epoch = 1 }
+		local observed
+		local ok, err = pcall(function()
+			local Capture = helpers.load_module("adapters.xkb_capture")
+			Capture._set_backend({
+				create = function() return {} end, destroy = function() end,
+				source_group = function() return state.group, state.native_epoch end,
+			})
+			assert(Capture.load("fixture keymap", "C"))
+			with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+				local calls = wire(Source, state)
+				local press = { code = KEY_J, value = 1, physical = true, origin_generation = 1, mods = {} }
+				if mode == "untrusted" then press.physical = false end
+				if mode == "unknown epoch" then press.origin_generation = nil end
+				if mode == "unknown group" then state.group = nil end
+				local consumed, repeat_callback = Source.on_key(press)
+				observed = { consumed = consumed, callback = repeat_callback, calls = calls }
+				if type(repeat_callback) == "function" then
+					local repeat_event = { code = KEY_J, value = 2, physical = true, origin_generation = 1, mods = {} }
+					if mode == "paused" then state.active = false end
+					if mode == "group" then state.group = 1 end
+					if mode == "origin" then repeat_event.origin_generation = 2 end
+					if mode == "modified" then repeat_event.mods.shift = true end
+					if mode == "injection" then state.typed_ok = false end
+					if mode == "source" then assert(Source.set("KeyQ")) end
+					if mode == "replacement" then state.replace = false end
+					if mode == "magic" then state.magic = "ù" end
+					if mode == "untrusted repeat" then repeat_event.physical = false end
+					if mode == "missing modifiers" then repeat_event.mods = nil end
+					if mode == "admission" then state.blocked_code = KEY_J end
+					observed.first_repeat = repeat_callback(repeat_event)
+					observed.second_repeat = repeat_callback(repeat_event)
+				end
+				Source._reset_for_test()
+			end)
+			Capture._reset_backend()
+		end)
+		package.loaded["adapters.xkb_capture"] = previous
+		if not ok then error(err, 0) end
+		return observed
+	end
+
+	helpers.it("(magic-source-repeat) dispatches each acknowledged repeated magic character", function()
+		local state = observe("accepted")
+		helpers.assert_eq(state.consumed, true)
+		helpers.assert_type(state.callback, "function")
+		helpers.assert_eq(state.first_repeat, true)
+		helpers.assert_eq(state.second_repeat, true)
+		helpers.assert_eq(state.calls.typed, { "★", "★", "★" })
+		helpers.assert_eq(#state.calls.dispatched, 3)
+		helpers.assert_eq(state.calls.ended, 3)
+	end)
+	for _, mode in ipairs({ "paused", "group", "origin", "modified", "injection", "source", "replacement", "magic",
+		"untrusted repeat", "missing modifiers", "admission" }) do
+		helpers.it("(magic-source-repeat) refuses a " .. mode .. " change on the held source", function()
+			local state = observe(mode)
+			helpers.assert_eq(state.consumed, true)
+			helpers.assert_type(state.callback, "function")
+			helpers.assert_eq(state.first_repeat, false)
+			helpers.assert_eq(state.second_repeat, false)
+			helpers.assert_eq(#state.calls.dispatched, 1, "only acknowledged output reaches the character path")
+			helpers.assert_eq(state.calls.ended, 1)
+		end)
+	end
+	for _, mode in ipairs({ "untrusted", "unknown epoch", "unknown group" }) do
+		helpers.it("(magic-source-repeat) leaves an " .. mode .. " press nonrepeatable", function()
+			local state = observe(mode)
+			helpers.assert_eq(state.consumed, true, "the existing first-press boolean contract remains intact")
+			helpers.assert_nil(state.callback)
+			helpers.assert_eq(#state.calls.dispatched, 1)
+		end)
+	end
+end)

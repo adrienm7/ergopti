@@ -410,8 +410,7 @@ item 104 separately tracks the common-autocorrection section split.
   the original bytes and runtime, and paused or closed-group callbacks cannot
   write. Its focused native Linux regression covers the menu and transaction;
   full three-OS CI and real-device acceptance remain pending. Linux follow-ups:
-  holding the key types one ★ where the others auto-repeat, choosing Backquote,
-  Minus or Equal silently
+  choosing Backquote, Minus or Equal silently
   overrides a tap-key action. An acknowledged Linux tap-key consumption now
   retires only the previous wrap-on-type PRIMARY window before its deferred
   action runs; unassigned, modified and refused tap keys still reach ordinary
@@ -432,6 +431,8 @@ Windows and macOS use separate selection cache owners; their native freshness
 and physical-device acceptance remain unqualified by these Linux results.
 
 The macOS registered Tap Keys callback now retires positive and negative AX selection-cache freshness only after the actual deferred producer acknowledges scheduling. Independent registered-callback regressions use the real AX text reader within the unchanged 0.2-second TTL, verify fresh selection creation/removal, preserve deferred execution, and retain rejected-queue, modifier, unassigned, closed-admission, synthetic-provenance and autorepeat behavior. Portable macOS units/E2E qualify this source slice; native three-OS CI and physical input remain separate requirements. Windows physical input epoch invalidation is source-reviewed only; its real tap-to-UIA epoch transition is not yet qualified.
+
+An acknowledged chosen Linux magic-key press now owns its auto-repeats through a strict per-source/key callback receipt. Its published native-origin and active-XKB epochs, preference generation, pause, modifiers, capture and injection acknowledgement must remain valid. An initial Compose-cancellation refusal retires optional repeats while preserving the consumed first output. A refused or stale repeat stays suppressed until physical release; ordinary tap and capture consumers remain once-only. Completed initial keyboard startup publishes native-origin admission before the first eligible press, without per-repeat device rescans. Independent actual-daemon screen/receipt cases reproduce the former behavior. Separate watchdog recovery gaps, real-device three-OS acceptance and the magic-source/tap-action collision remain pending.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and

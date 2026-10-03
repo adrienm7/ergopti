@@ -454,6 +454,34 @@ local TAP_WRAP_SCENARIOS = {
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
 }
 
+-- A real consumed down owns repeats only while its native epochs and owners
+-- remain valid. A refused repeat stays swallowed until release, even if the
+-- pause, group or inhibition is restored before the next repeat.
+local MAGIC_REPEAT_SCENARIOS = {
+	{ name = "a held physical magic key emits every acknowledged repeat", magic_repeat = "accepted", keys = "",
+		screen = "★★★", magic_receipt = "decisions=1 dispatched=3 attempts=3 origins=1 raw=0 chosen=0" },
+	{ name = "a refused magic injection retires the held press", magic_repeat = "injection", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=2 origins=1 raw=0 chosen=0" },
+	{ name = "an untrusted origin cannot own magic repeats", magic_repeat = "untrusted", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "a captured magic source consumes the held answer once", magic_repeat = "capture", keys = "",
+		screen = "", magic_receipt = "decisions=1 dispatched=0 attempts=0 origins=1 raw=0 chosen=1" },
+	{ name = "a pause retires magic repeats through resume", magic_repeat = "paused", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "a group change retires magic repeats through restoration", magic_repeat = "group", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "a source choice retires the old held magic key", magic_repeat = "source", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "input inhibition retires magic repeats through release", magic_repeat = "inhibited", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "an origin epoch change retires magic repeats", magic_repeat = "origin", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=2 raw=0 chosen=0" },
+	{ name = "an initial compose refusal retires the magic press through recovery", magic_repeat = "compose-first", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+	{ name = "a refused compose retirement suppresses magic repeats", magic_repeat = "compose", keys = "",
+		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+}
+
 -- Each scenario runs in its own daemon child, started through the shell that
 -- io.popen and os.execute hand a command to: /bin/sh on Linux, cmd.exe on
 -- Windows. cmd.exe has no `NAME=value command` prefix, no single quotes and no
@@ -541,6 +569,7 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local pipe = io.popen(command, "r")
 			local output = pipe and pipe:read("*a") or ""
@@ -551,6 +580,14 @@ do
 					pass(prefix .. scenario.name .. " (exact owner receipt)")
 				else
 					fail(prefix .. scenario.name .. " (exact owner receipt)", scenario.receipt, receipt or "absent")
+				end
+			end
+			if scenario.magic_receipt then
+				local receipt = output:match("MAGIC_REPEAT ([^\r\n]+)")
+				if receipt == scenario.magic_receipt then
+					pass(prefix .. scenario.name .. " (exact repeat receipt)")
+				else
+					fail(prefix .. scenario.name .. " (exact repeat receipt)", scenario.magic_receipt, receipt or "absent")
 				end
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
@@ -565,6 +602,7 @@ do
 	end
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
+	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
