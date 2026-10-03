@@ -174,6 +174,14 @@ These are software implementations; final hardware verification remains below.
   same ownership and release rules. macOS already uses a strong registry and
   Windows retains tokens in its Map. Physical input is unrelated to this proof;
   native Windows/macOS suites and manual CI remain deferred by request.
+- [~] **L11.** Linux file digest receipts: allow the actual filename payload in
+  sha256sum stdout without expanding its diagnostic budget. Valid absolute paths
+  of 958, 1106 and 3500 bytes failed before the fix. Twelve native cases now
+  exercise real hashing, boundary paths, literal UTF-8/control characters, known
+  SHA-256 vectors and missing/unreadable files; six portable cases also verify
+  chunk accumulation, bounded stderr/excess stdout and terminal cleanup. Windows
+  Get-FileHash returns the hash separately, and macOS shasum has no matching fixed
+  output cap. Native cross-OS validation and manual CI remain deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
