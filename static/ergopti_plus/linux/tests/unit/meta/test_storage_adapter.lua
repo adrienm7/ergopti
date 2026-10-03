@@ -37,6 +37,55 @@ local function make_temp_config_root()
 	return base
 end
 
+helpers.describe("storage native open receipts", function()
+	for _, receipt in ipairs({ 13, 1, 20, 5, 24, 40, "unknown", "throw" }) do
+		helpers.it("linux-storage-read-receipts: blocks mutation after " .. receipt, function()
+			local root = make_temp_config_root()
+			local path = root .. "/ergopti_plus/storage.json"
+			local original = '{"preserve":"original"}'
+			local file = assert(io.open(path, "wb"))
+			assert(file:write(original) and file:close())
+			local real_getenv, real_open = os.getenv, io.open
+			local writes = 0
+			os.getenv = function(name)
+				if name == "XDG_CONFIG_HOME" then return root end
+				return real_getenv(name)
+			end
+			io.open = function(target, mode)
+				if target == path and mode == "r" then
+					if receipt == "throw" then error("native open raised") end
+					return nil, "native open refused", type(receipt) == "number" and receipt or nil
+				end
+				if target == path .. ".tmp" and mode == "w" then writes = writes + 1 end
+				return real_open(target, mode)
+			end
+			local ok, err = xpcall(function()
+				local storage = helpers.load_module("adapters.storage")
+				helpers.assert_eq(storage.set("replacement", true), false)
+				helpers.assert_eq(storage.set_many({ replacement = true }), false)
+				helpers.assert_eq(storage.delete("preserve"), false)
+				helpers.assert_eq(storage.clear(), false)
+				helpers.assert_eq(writes, 0, "unclassified source cannot start a write")
+				local recovery = storage.recovery_status()
+				helpers.assert_eq(recovery.reason, "read_failed")
+				helpers.assert_eq(recovery.path, path)
+				helpers.assert_eq(recovery.preserved, true)
+			end, debug.traceback)
+			os.getenv, io.open = real_getenv, real_open
+			package.loaded["adapters.storage"] = nil
+			file = assert(io.open(path, "rb"))
+			local preserved = file:read("*a")
+			assert(file:close())
+			os.remove(path)
+			os.remove(path .. ".tmp")
+			os.remove(root .. "/ergopti_plus")
+			os.remove(root)
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(preserved, original)
+		end)
+	end
+end)
+
 
 
 

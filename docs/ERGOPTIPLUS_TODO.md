@@ -192,6 +192,16 @@ These are software implementations; final hardware verification remains below.
   macOS text `sha256` shell path still has the analogous NUL boundary and needs
   a separate native reproduction. Native cross-OS suites and manual CI remain
   deferred by request; no macOS crypto owner or native gate was modified.
+- [~] **L13.** Linux JSON store read receipts: start an empty store only after
+  native ENOENT, and block mutations with recovery metadata after other open
+  refusals. A real mode-000 storage.json was overwritten by a successful set
+  before the fix. Thirteen of eighteen native cases failed before it; coverage
+  includes all four mutations, inaccessible parents, non-directory ancestors,
+  missing-store creation, unrelated nested values and recovery after permissions
+  are repaired and ownership reloaded. Portable cases classify individual errno
+  and thrown receipts. Windows uses per-key registry writes and macOS hs.settings;
+  neither has this whole-file JSON load-and-replace path. No TOML owner, personal
+  menu, native cross-OS suite or manual CI was changed or executed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
