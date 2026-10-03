@@ -314,6 +314,17 @@ the next Windows CI checkpoint; lineage or exit zero is not readiness.
 
 The supplemental no-prompt PID diagnostic now records two fresh, exact-owner server witnesses and a bounded monotonic sender-stage prefix. Entry, completed execution, native send status and reply admission remain distinct; a witness cannot replace either original ten-second control or feature proof. Strict scalar receipts reject stale identity, replaced inodes, symlinks, nonregular or oversized files and malformed stage order. Acknowledged cleanup retains the exact receipt scope while its sender remains unsettled, rejects replacement requests and removes witnesses only after physical child retirement. Cleanup refusal keeps the scope owned for a later retry. Malformed supplemental JSON errors remain closed and cannot expose private receipt keys. Original controls, preference restoration, native eight-second send and ten-second child deadlines are unchanged. Portable causal regressions and generated-body execution qualify instrumentation only; the actual macOS bridge, SIGSEGV stage and readiness cause remain pending the next non-release native checkpoint. Signal 11 is not classified as a consent refusal, and item 16 remains partial.
 
+Compiled Windows smoke runs 37120948767 and 37121403261 failed the
+existing tracked-parent/marker guard after a native parent exit 0; CIM
+same-executable descendants did not establish a readiness/handoff ACK.
+The lane now retains fresh negative JSON before compiled startup and
+closed native identity/exit/phase observations on failure, with an
+always-run upload of that owned JSON. Original marker/wait/deadline/exit
+and mandatory verdicts remain strict. Registered mutation guards and
+actual aggregate refusal tests cover incomplete/failed receipts; hosted
+failure-artifact execution and the separate bootstrap cause fix remain
+pending native qualification.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
