@@ -645,6 +645,16 @@ checks pass, with unchanged macOS sources covered by the prior full suite.
 Native Windows, packaging and installation validation remain pending CI.
 Items 54 and 81 remain partial for the other native menu groups.
 
+The Windows native three-state Mode replay now binds each current corpus state
+as an explicit callback argument. Checkpoint
+[37094197821](https://github.com/adrienm7/ergopti/actions/runs/37094197821)
+reached the real menu assertions, then refused an unset loop variable because
+AutoHotkey captures a different cell from its active `for` enumerator. Every
+independent checked-state, label, order, caption and refusal assertion remains
+unchanged; the bound callback still runs against the actual native menu. Local
+encoding and JavaScript gates do not qualify its native behavior. Windows replay
+and the complete three-OS checkpoint remain pending.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

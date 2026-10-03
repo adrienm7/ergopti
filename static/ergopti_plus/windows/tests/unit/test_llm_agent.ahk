@@ -341,8 +341,8 @@ _LAG_ModeMenuGolden() {
 	AssertEqual(3, Corpus["modes"].Length, "the independent catalogue contains three modes")
 	AssertEqual(3, Corpus["states"].Length, "all three native states must be exercised")
 	for State in Corpus["states"] {
-		_LAG_Run(_LAG_Menu(State["selected"], "cerebras", "cerebras"), _LTN_Screen(""), _Body)
-		_Body(Fx, Lines, Sent) {
+		_LAG_Run(_LAG_Menu(State["selected"], "cerebras", "cerebras"), _LTN_Screen(""), _Body.Bind(Corpus, State))
+		_Body(Corpus, State, Fx, Lines, Sent) {
 			global _LLM_Menu
 			Owned := []
 			try {
