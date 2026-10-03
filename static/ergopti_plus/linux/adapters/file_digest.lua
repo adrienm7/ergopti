@@ -173,6 +173,9 @@ function M.sha256(path, options, callback)
 	local timeout_ms = tonumber(request_options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
 		callback = callback,
+		-- GNU sha256sum echoes the literal filename in its NUL-ended receipt.
+		-- Reserve that known payload separately from the bounded output budget.
+		stdout_limit = MAX_OUTPUT_BYTES + #path,
 		stdout_text = "",
 		stderr_text = "",
 		stdout_eof = false,
@@ -232,7 +235,8 @@ function M.sha256(path, options, callback)
 		elseif chunk == nil then
 			request[eof_field] = true
 			maybe_complete(request)
-		elseif #request[field] + #chunk > MAX_OUTPUT_BYTES then
+		elseif #request[field] + #chunk > (field == "stdout_text"
+			and request.stdout_limit or MAX_OUTPUT_BYTES) then
 			terminate_group(request)
 			finish(request, nil, "sha256sum output exceeds limit")
 		else

@@ -577,6 +577,47 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 end)
 
 helpers.describe("file_digest: asynchronous sha256sum ownership", function()
+	for _, length in ipairs({ 957, 958, 1106, 3500 }) do
+		helpers.it("linux-digest-path-budget: hashes a " .. length .. "-byte path", function()
+			local digest, state = fresh_digest()
+			local path = "/" .. string.rep("p", length - 1)
+			local value, err, callbacks = nil, nil, 0
+			local expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+			helpers.assert_true(digest.sha256(path, {}, function(result, failure)
+				value, err, callbacks = result, failure, callbacks + 1
+			end))
+			local receipt = expected .. " *" .. path .. "\0"
+			-- Exercise accumulated chunks, not only a single oversized read.
+			for index = 1, #receipt, 113 do state.stdout(receipt:sub(index, index + 112)) end
+			state.complete_request(1, nil, 0)
+			helpers.assert_eq(value, expected)
+			helpers.assert_eq(err, nil)
+			helpers.assert_eq(callbacks, 1)
+			helpers.assert_true(not digest.isActive())
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+		end)
+	end
+
+	for _, stream in ipairs({ "stdout", "stderr" }) do
+		helpers.it("linux-digest-path-budget: bounds excess " .. stream .. " on long paths", function()
+			local digest, state = fresh_digest()
+			local path = "/" .. string.rep("p", 1105)
+			local value, err, callbacks = nil, nil, 0
+			helpers.assert_true(digest.sha256(path, {}, function(result, failure)
+				value, err, callbacks = result, failure, callbacks + 1
+			end))
+			local limit = stream == "stdout" and 1024 + #path or 1024
+			state[stream](string.rep("x", limit + 1))
+			state.complete_request(1, nil, 0)
+			helpers.assert_eq(value, nil)
+			helpers.assert_eq(err, "sha256sum output exceeds limit")
+			helpers.assert_eq(callbacks, 1, "late exit must not publish a second receipt")
+			helpers.assert_true(not digest.isActive())
+			helpers.assert_eq(state.kills[1].pid, -4321)
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+		end)
+	end
+
 	helpers.it("hashes a literal absolute path without a shell", function()
 		local digest, state = fresh_digest()
 		local value = nil
