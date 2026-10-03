@@ -1295,6 +1295,16 @@ strict warnings, exact ASCII acknowledgement, zero exit, empty stderr and
 owned process-tree retirement. Portable verification cannot execute AHK;
 native Windows qualification remains pending.
 
+The folder-picker native ABI now belongs to its adapter. Its 17 direct
+system-call lines leave domain orchestration, restoring the unchanged core
+OS-purity count from 269 to 252. Both production and headless include graphs
+reach the same owner; the native class body, callbacks, window leases and
+PIDL/COM retirement semantics are preserved. Independent scanners reproduce
+the original excess and six provenance mutations reject ownership bypasses.
+The architecture inventory was regenerated through its owner. Selected
+portable checks pass; actual AHK and full three-OS qualification remain
+pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

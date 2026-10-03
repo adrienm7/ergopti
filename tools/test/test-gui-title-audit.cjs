@@ -32,6 +32,105 @@ for (const locale of localeNames) {
 		);
 	}
 }
+/** Verifies the real folder owner remains reachable without native calls in infra. */
+function assertFolderAdapterOwnership(sources) {
+	const code = (name) => sources[name].replace(/^\s*;.*$/gm, '');
+	assert.match(
+		code('adapter'),
+		/class\s+_Ui_FolderNative\s*\{/,
+		'the adapter owns the native ABI class'
+	);
+	assert.doesNotMatch(
+		code('infra'),
+		/class\s+_Ui_FolderNative\s*\{/,
+		'infra cannot duplicate the native ABI class'
+	);
+	assert.doesNotMatch(
+		code('infra'),
+		/\b(?:DllCall|CallbackCreate|CallbackFree)\s*\(/,
+		'native calls belong to the adapter rather than folder orchestration'
+	);
+	for (const method of [
+		'SHBrowseForFolderW',
+		'GetWindowThreadProcessId',
+		'SetWindowTextW',
+		'CoTaskMemFree'
+	])
+		assert.ok(
+			code('adapter').includes(method),
+			`the adapter retains the actual ${method} primitive`
+		);
+	assert.match(
+		code('infra'),
+		/Native\s*:=\s*_Ui_FolderNative\b/,
+		'the actual folder owner uses the native adapter'
+	);
+	assert.match(
+		code('infra'),
+		/^#Include %A_LineFile%\\\.\.\\\.\.\\adapters\\native_folder_picker\.ahk$/m,
+		'the folder owner includes its adapter for both production and private children'
+	);
+	assert.match(
+		code('dialogs'),
+		/^#Include %A_LineFile%\\\.\.\\native_folder_picker\.ahk$/m,
+		'the caption delegate includes the actual folder orchestration'
+	);
+	assert.match(
+		code('entry'),
+		/^#Include infra\/native_dialogs\.ahk$/m,
+		'the production entry reaches the same caption owner'
+	);
+	assert.match(
+		code('runner'),
+		/^#Include \.\.\/infra\/native_dialogs\.ahk$/m,
+		'the headless runner reaches the same caption owner'
+	);
+}
+const folderOwnerSources = Object.fromEntries(
+	Object.entries({
+		adapter: 'adapters/native_folder_picker.ahk',
+		infra: 'infra/native_folder_picker.ahk',
+		dialogs: 'infra/native_dialogs.ahk',
+		entry: 'ErgoptiPlus.ahk',
+		runner: 'tests/run_all.ahk'
+	}).map(([name, relative]) => [
+		name,
+		fs
+			.readFileSync(path.join(repository, 'static/ergopti_plus/windows', relative), 'utf8')
+			.replace(/^\uFEFF/, '')
+	])
+);
+assertFolderAdapterOwnership(folderOwnerSources);
+const folderMutations = [
+	{
+		...folderOwnerSources,
+		infra: folderOwnerSources.infra + '\nDllCall("Shell32\\SHBrowseForFolderW")\n'
+	},
+	{ ...folderOwnerSources, infra: folderOwnerSources.infra + '\nCallbackCreate(Callback)\n' },
+	{ ...folderOwnerSources, infra: folderOwnerSources.infra + '\nclass _Ui_FolderNative {}\n' },
+	{
+		...folderOwnerSources,
+		infra: folderOwnerSources.infra.replace(/^#Include.*native_folder_picker\.ahk$/m, '')
+	},
+	{
+		...folderOwnerSources,
+		entry: folderOwnerSources.entry.replace(/^#Include infra\/native_dialogs\.ahk$/m, '')
+	},
+	{
+		...folderOwnerSources,
+		runner: folderOwnerSources.runner.replace(/^#Include \.\.\/infra\/native_dialogs\.ahk$/m, '')
+	}
+];
+for (const mutant of folderMutations)
+	assert.throws(
+		() => assertFolderAdapterOwnership(mutant),
+		assert.AssertionError,
+		'native ownership and both real include graphs must reject each independent bypass'
+	);
+console.log(
+	`Native folder adapter provenance mutations: ${folderMutations.length}/${folderMutations.length} passed.`
+);
+
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-title-audit-'));
 const sourcePath = (platform) =>
 	`static/ergopti_plus/${platform}/ui/error_dialog/init.${platform === 'windows' ? 'ahk' : 'lua'}`;
