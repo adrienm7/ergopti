@@ -279,6 +279,52 @@ helpers.describe("sqlite_command — diagnostics carry no typed text", function(
 	end)
 end)
 
+helpers.describe("linux-sqlite-exit-receipts", function()
+	for _, status in ipairs({ 1, 7, 23, 127, 137, 255 }) do
+		helpers.it("linux-sqlite-exit-receipts: refuses terminal status " .. status, function()
+			local accepted, diagnostics, reason = Cmd.read_exit_receipt("\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(diagnostics, "")
+			helpers.assert_contains(reason, tostring(status))
+		end)
+	end
+
+	for label, output in pairs({ missing = "", truncated = "\nERGOPTI_SQL_EXIT_STATUS=0",
+		malformed = "\nERGOPTI_SQL_EXIT_STATUS=ok\n", overflow = "\nERGOPTI_SQL_EXIT_STATUS=256\n",
+		trailing = "\nERGOPTI_SQL_EXIT_STATUS=0\ntrailing" }) do
+		helpers.it("linux-sqlite-exit-receipts: refuses a " .. label .. " receipt", function()
+			local accepted, _, reason = Cmd.read_exit_receipt(output)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(type(reason), "string")
+		end)
+	end
+
+	helpers.it("linux-sqlite-exit-receipts: preserves diagnostics separately from successful status", function()
+		local accepted, diagnostics, reason = Cmd.read_exit_receipt("native diagnostic\n\nERGOPTI_SQL_EXIT_STATUS=0\n")
+		helpers.assert_true(accepted)
+		helpers.assert_eq(diagnostics, "native diagnostic\n")
+		helpers.assert_nil(reason)
+	end)
+
+	helpers.it("linux-sqlite-exit-receipts: the last terminal status owns prior marker-looking output", function()
+		local prior = "\nERGOPTI_SQL_EXIT_STATUS=0\n"
+		local accepted, diagnostics, reason = Cmd.read_exit_receipt(prior .. "\nERGOPTI_SQL_EXIT_STATUS=7\n")
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(diagnostics, prior)
+		helpers.assert_contains(reason, "7")
+	end)
+
+	helpers.it("linux-sqlite-exit-receipts: keeps quote-heavy SQL inside the original heredoc", function()
+		local sql = "INSERT INTO t VALUES ('" .. string.rep("a''", 35000) .. "');"
+		local ordinary = assert(Cmd.build("/db/metrics.sqlite", sql))
+		local checked = assert(Cmd.build("/db/metrics.sqlite", sql, { capture_exit = true }))
+		helpers.assert_eq(checked:sub(1, #ordinary), ordinary, "receipt transport cannot re-quote user SQL")
+		helpers.assert_contains(checked:sub(#ordinary + 1), "ERGOPTI_SQL_EXIT_STATUS=", "real shell status must be appended")
+		helpers.assert_true(#checked - #ordinary < 100, "framing overhead must be constant")
+		assert_absent(checked, "mktemp", "this write path needs no temporary receipt file")
+	end)
+end)
+
 
 
 

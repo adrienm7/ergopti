@@ -10,6 +10,42 @@ local helpers = require("tests.helpers")
 local it = require("tests.support.metrics_preferences_fixture").it
 local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 
+helpers.describe("linux-sqlite-writer-receipts", function()
+	for _, status in ipairs({ 1, 7, 23, 127, 255 }) do
+		it("linux-sqlite-writer-receipts: silent status " .. status .. " cannot acknowledge a write", function()
+			local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+			local previous_execute, previous_popen = os.execute, io.popen
+			local path = os.tmpname()
+			local file = assert(io.open(path, "w"))
+			assert(file:write("existing database fixture"))
+			assert(file:close())
+			local terminal_status = 0
+			os.execute = function() return 0 end
+			io.popen = function(command)
+				return {
+					read = function(_, mode)
+						if mode == "*l" then return "CREATE TABLE devices (os CHECK (os IN ('linux')))" end
+						return command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true)
+							and ("\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
+					end,
+					close = function() return true end, -- LuaJIT's ambiguous success is deliberate.
+				}
+			end
+			local ok, err = xpcall(function()
+				helpers.assert_true(writer.open_db(path))
+				terminal_status = status
+				helpers.assert_eq(writer.exec_sql(".exit " .. status), false)
+				terminal_status = 0
+				helpers.assert_true(writer.exec_sql("INSERT INTO receipt VALUES (1);"), "refusal cannot poison the next write")
+			end, debug.traceback)
+			os.execute, io.popen = previous_execute, previous_popen
+			writer.close_db()
+			os.remove(path)
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 helpers.describe("sqlite_writer", function()
 
   -- ==========================================================================
@@ -99,7 +135,8 @@ helpers.describe("sqlite_writer", function()
             if mode == "*l" then
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
-            return ""
+            -- Mirror the shell's actual terminal status, not LuaJIT's pclose.
+            return "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
         }
