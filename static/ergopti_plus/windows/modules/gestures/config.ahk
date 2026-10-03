@@ -472,6 +472,10 @@ _GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
 					LoggerWarn("gestures", "'{1}' was refused before its question: its original window target is no longer owned.", ActionName)
 					return false
 			}
+			if A_IsSuspended {
+				LoggerInfo("gestures", "Confirmed action '{1}' was cancelled before its question: the script is suspended.", ActionName)
+				return false
+			}
 			Label := _GestureActionLabel(ActionName)
 			Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
 			if (Answer != "OK") {
@@ -487,6 +491,10 @@ _GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
 					LoggerWarn("gestures", "'{1}' was refused after its question: its original window target is no longer owned.", ActionName)
 					return false
 			}
+			if A_IsSuspended {
+				LoggerInfo("gestures", "Confirmed action '{1}' was cancelled before focus restoration: the script is suspended.", ActionName)
+				return false
+			}
 			if (IsObject(Target) && !Sys.Activate(Target.Hwnd)) {
 					if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
 							LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
@@ -501,6 +509,10 @@ _GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
 			if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) && !_GestureConfirmedTargetIsLive(Target, Sys) {
 					LoggerWarn("gestures", "'{1}' was refused after focus restoration: its original window target is no longer owned.", ActionName)
 					return false
+			}
+			if A_IsSuspended {
+				LoggerInfo("gestures", "Confirmed action '{1}' was cancelled before dispatch: the script is suspended.", ActionName)
+				return false
 			}
 			_GestureRunAction(ActionName, BindingId, Target, Sys)
 		} catch as Err {
