@@ -66,6 +66,7 @@ from hs_karabiner_config_probe import (
     NativeKarabinerConfigProbe,
     validate_summary as validate_karabiner_summary,
 )
+from hs_native_bootstrap_probe import SupplementaryNativeBootstrap, bounded_refusal
 
 READY_MARKER = "Onboarding wizard opened."
 # The configured boot on a runner without Accessibility waits for the grant
@@ -661,6 +662,7 @@ def run(app, output, scenario, seed_tag):
     diagnostic_errors = []
     native_probe = None
     native_result_key = None
+    native_owner_settled = False
     if scenario == "clean":
         native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN)
         native_result_key = "native_delayed_timer"
@@ -804,6 +806,7 @@ def run(app, output, scenario, seed_tag):
                             )
                         time.sleep(0.05)
                     native_probe.restore()
+                    native_owner_settled = not native_probe.scripting_commands
                     if native_result_key in observation:
                         observation[native_result_key]["preference_restored"] = True
                 except Exception as error:
@@ -842,6 +845,17 @@ def run(app, output, scenario, seed_tag):
     if diagnostic_errors:
         report["diagnostic_errors"] = diagnostic_errors
         report["failures"].extend(diagnostic_errors)
+    if native_probe:
+        # This separate startup measurement cannot satisfy or overwrite any
+        # required original startup, AppleEvent or feature verdict above.
+        try:
+            if not native_owner_settled or processes(launcher) or processes(child):
+                raise RuntimeError("Original native owner debt refuses supplementary startup")
+            report["supplementary_native_bootstrap"] = SupplementaryNativeBootstrap(
+                app, output, HS_DOMAIN, processes
+            ).observe("delayed_timer" if scenario == "clean" else "karabiner_config")
+        except Exception as error:
+            report["supplementary_native_bootstrap_error"] = bounded_refusal(error)
     return report
 
 
@@ -913,6 +927,14 @@ def main(argv=None):
     output.mkdir(parents=True, exist_ok=False)
     report = run(Path(args.app).resolve(), output, args.scenario, args.seed_tag)
     (output / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if report.get("supplementary_native_bootstrap"):
+        print(
+            "supplementary native bootstrap: installed native feature qualified; "
+            "original launch and AppleEvent verdicts remain mandatory"
+        )
+    if report.get("supplementary_native_bootstrap_error"):
+        for line in report["supplementary_native_bootstrap_error"].splitlines():
+            print("supplementary native bootstrap refused: " + line)
     if report["failures"]:
         for annotation in failure_annotations(args.scenario, report["failures"]):
             print(annotation)
