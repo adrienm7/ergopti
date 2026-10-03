@@ -90,6 +90,19 @@ M.assert_type      = _assertions.assert_type
 M.assert_contains  = _assertions.assert_contains
 M.assert_throws    = _assertions.assert_throws
 
+--- Replies with the terminal OpenSSL receipt requested by a composed command.
+--- Recording native doubles use the same wire shape as the actual shell;
+--- unrelated commands retain their original stdout without an invented frame.
+--- @param command string Composed native command.
+--- @param output string Simulated stdout bytes.
+--- @param status number|string|boolean|nil Zero by default; false omits the receipt.
+--- @return string Native stdout including the requested terminal frame.
+function M.openssl_stdout_receipt(command, output, status)
+	local prefix = command:match("ERGOPTI_OPENSSL_EXIT_STATUS_[%w_]+=")
+	if prefix and status ~= false then return output .. "\n" .. prefix .. tostring(status or 0) .. "\n" end
+	return output
+end
+
 
 
 

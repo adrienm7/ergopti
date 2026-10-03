@@ -102,7 +102,7 @@ local function install_shell(opts)
 		-- The one key derivation. Recognised by -pbkdf2, which no per-value
 		-- command carries: re-deriving per value would cost half a second each.
 		if head:find("pbkdf2", 1, true) then
-			return "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n"
+			return helpers.openssl_stdout_receipt(cmd, "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n")
 		end
 		-- The per-row IV, which also goes through the shell.
 		if head:find("dgst", 1, true) then
@@ -113,8 +113,8 @@ local function install_shell(opts)
 		if opts.fail_crypto then return "" end
 		local payload = delivered_stdin(cmd)
 		if payload == nil then return "" end
-		if head:find("enc %-d ") then return from_hex(payload) end
-		return to_hex(payload)
+		if head:find("enc %-d ") then return helpers.openssl_stdout_receipt(cmd, from_hex(payload)) end
+		return helpers.openssl_stdout_receipt(cmd, to_hex(payload))
 	end)
 	return seen
 end
