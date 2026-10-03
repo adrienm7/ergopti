@@ -192,6 +192,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_capture_error_receipts.lua
         timeout-minutes: 1
 
+      - name: Refuse truncated native process names and arguments
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_spawn_nul_receipts.lua
+        timeout-minutes: 1
+
       - name: Check native path existence without opening readable streams
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
