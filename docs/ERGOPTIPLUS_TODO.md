@@ -1541,6 +1541,17 @@ pass; actual file-filter semantics and real folder UI still await native CI.
 
 The Windows file-selection policy test captures bounded labels and selected type only from the unique owned file-type ComboBox descendant1136. Filename-history controls are excluded. Generated diagnostic statements preserve physical LF separators while escaped CR/LF remain inside child string literals; independent source mutations and the actual AHK source producer regression cover this distinction. The original exact filter predicate remains unchanged pending measured native rendering/filter semantics. Native SHBrowse selection/cancellation, all five shared title policies, option-dependent controls, leases and actual HWND retirement now pass in Windows run37097121618 and37097438949 after the separate file case fails. Local diagnostic selected verification passes353 JavaScript checks plus formatting/encoding; this new diagnostic and generated-source unit still require Windows execution.
 
+The original file-picker assertion remains intact while a separately registered
+native family qualifies genuine filtering for all five caption policies. An
+owned UI Automation client observes controlled TXT visible/BIN absent, changes
+the native file type to All Files to observe BIN, and restores the restricted
+filter before selection and cancellation. Exact PID/HWND/control fences, native
+exit/stdout/stderr and retirement receipts stay strict, as does the existing
+15-second process-tree limit. Removing both actual filter arguments must fail
+with the independently fixed controlled-BIN-visible reason. Local source guards
+reject eight mutations; selected JavaScript, formatting and encoding gates pass.
+Actual UIA behavior and the native negative control still require Windows CI.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
