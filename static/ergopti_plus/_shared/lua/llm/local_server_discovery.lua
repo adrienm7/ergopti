@@ -171,6 +171,13 @@ function M.new(options)
 		return options.clock() - checked_at >= options.max_age()
 	end
 
+	--- Invalidates logical tickets and observers while retaining the last cache.
+	--- Native callers separately retain cancellation/cleanup ownership.
+	function controller.invalidate()
+		generation = generation + 1
+		active, checked_at, waiters = false, nil, {}
+	end
+
 	--- Returns logical discovery activity, never physical native retirement.
 	--- @return boolean
 	function controller.is_sweeping() return active end

@@ -187,7 +187,7 @@ end
 --- @param on_changed function|nil Rebuilds the menu.
 --- @param ollama_rows function Returns the Ollama model rows.
 --- @return table rows
-function M.rows(llm, dialogs, on_changed, ollama_rows)
+function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	if type(llm.get_backend) ~= "function" then return ollama_rows() end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
@@ -214,6 +214,12 @@ function M.rows(llm, dialogs, on_changed, ollama_rows)
 		},
 		{ separator = true },
 	}
+	if type(context) == "table" and type(context.is_paused) == "function"
+		and type(llm.can_configure_local_servers) == "function" then
+		for _, row in ipairs(require("ui.menu.local_server_rows").rows(llm, dialogs, changed, context)) do
+			rows[#rows + 1] = row
+		end
+	end
 	if backend ~= "api" then
 		for _, row in ipairs(ollama_rows()) do rows[#rows + 1] = row end
 		return rows

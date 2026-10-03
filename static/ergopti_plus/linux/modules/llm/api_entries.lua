@@ -38,6 +38,7 @@ local O_WRONLY, O_CREAT, O_EXCL = 1, 64, 128
 local _path_override = nil
 local _state = nil
 local _sequence = 0
+local _source_receipts = setmetatable({}, { __mode = "k" })
 
 -- Creates a new file only its owner can read: libc through LuaJIT's FFI,
 -- built on first use, or the primitive a test installed.
@@ -93,7 +94,7 @@ end
 --- @param text string
 --- @param expected table Exact classified disk source captured at load/publication.
 --- @return boolean ok, string|nil err
-local function write_private(path, text, expected)
+local function write_private(path, text, expected, admit)
 	local dir = path:match("^(.*)/[^/]+$")
 	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
 	local tmp = path .. ".tmp"
@@ -104,9 +105,16 @@ local function write_private(path, text, expected)
 		os.remove(tmp)
 		return false, create_err
 	end
-	-- The existing synchronous private-file owner does not yield between this
-	-- exact post-stage check and rename. This fences observed source drift;
-	-- it is not a cross-process kernel compare/exchange or an external lock.
+	if admit then
+		local accepted, allowed = pcall(admit)
+		if not accepted or allowed ~= true then
+			os.remove(tmp)
+			return false, "local API admission changed after private staging"
+		end
+	end
+	-- Admission may run application callbacks. Recheck the physical source only
+	-- after those callbacks, immediately before the synchronous native rename.
+	-- This fences observed drift; it is not a cross-process kernel CAS or lock.
 	local source, status = SourceWriter.read_classified(path)
 	if status ~= expected.status or (status == "ok" and source ~= expected.content) then
 		os.remove(tmp)
@@ -244,9 +252,13 @@ end
 --- A file this build cannot write back whole is never replaced: the write is
 --- refused with its bytes unchanged, since rewriting it would drop keys.
 --- @return boolean
-local function persist()
+local function persist(admit)
 	local current = state()
 	if current.publishing == true then return false end
+	if admit then
+		local accepted, allowed = pcall(admit)
+		if not accepted or allowed ~= true then return false end
+	end
 	if current.write_refusal then
 		Logger.error(LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
 			.. "or rewriting it would lose its keys.", M.path(), current.write_refusal)
@@ -278,7 +290,7 @@ local function persist()
 	current.publishing = true
 	local ok, err = SourceWriter.publish_if_unchanged(M.path(), payload, {
 		read_with_status = SourceWriter.read_classified,
-		write_if_unchanged = write_private,
+		write_if_unchanged = function(path, text, expected) return write_private(path, text, expected, admit) end,
 	}, current.source)
 	current.publishing = false
 	if ok == true then current.source = { status = "ok", content = payload } end
@@ -384,6 +396,102 @@ function M.remove(id)
 		end
 	end
 	return false
+end
+
+--- Captures an opaque receipt for the currently owned physical private source.
+--- Bytes and credentials stay inside the native file owner. An observed source
+--- fence does not claim a cross-process lock or kernel compare/exchange.
+--- @return table|nil
+function M.capture_source()
+	local current = state()
+	if current.write_refusal or current.publishing or not current.source then return nil end
+	local receipt = {}
+	_source_receipts[receipt] = { owner = current, source = current.source, path = M.path() }
+	if not M.source_is_current(receipt) then _source_receipts[receipt] = nil; return nil end
+	return receipt
+end
+
+--- Tests exact receipt identity against the actual current physical source.
+--- @param receipt table
+--- @return boolean
+function M.source_is_current(receipt)
+	local held = type(receipt) == "table" and _source_receipts[receipt] or nil
+	if not held or held.owner ~= state() or held.source ~= state().source or held.path ~= M.path()
+		or state().write_refusal or state().publishing then return false end
+	local text, status = SourceWriter.read_classified(held.path)
+	return status == held.source.status and (status ~= "ok" or text == held.source.content)
+end
+
+--- Publishes an acknowledged local model/configuration selection in its original
+--- row position. Unknown rows, root data and entry fields remain owned by their
+--- original producer. The independent backend preference is selected separately.
+--- @param provider string Catalogue-owned local provider.
+--- @param fields table Closed model/base_url/token updates.
+--- @param source table Opaque physical source receipt.
+--- @param admit function Actual current pause/scope admission.
+--- @param select boolean|nil True for a model choice; false retains the existing active entry.
+--- @return table|nil entry
+--- @return string|nil reason
+function M.upsert_local(provider, fields, source, admit, select)
+	local _, servers = LocalCatalogue.load({})
+	local server = servers[provider]
+	if not server or type(fields) ~= "table" or type(admit) ~= "function"
+		or (select ~= nil and type(select) ~= "boolean")
+		or not M.source_is_current(source) then return nil, "local API source is not current" end
+	for key, value in pairs(fields) do
+		if (key ~= "model" and key ~= "base_url" and key ~= "token") or type(value) ~= "string" then
+			return nil, "local API fields are not supported"
+		end
+	end
+	local accepted, allowed = pcall(admit)
+	if not accepted or allowed ~= true then return nil, "local API mutation is not admitted" end
+	if not M.source_is_current(source) then return nil, "local API source changed during admission" end
+	local current, index, previous_entry = state(), nil, nil
+	for position, entry in ipairs(current.entries) do
+		if entry.provider == provider then index, previous_entry = position, entry; break end
+	end
+	local token = fields.token
+	if token == nil then token = previous_entry and previous_entry.token or "" end
+	local model = fields.model
+	if model == nil then model = previous_entry and previous_entry.model or "" end
+	local base_url = fields.base_url
+	if base_url == nil then
+		base_url = previous_entry and previous_entry.base_url ~= "" and previous_entry.base_url or server.base_url
+	end
+	if model == "" or not AuthPolicy.token_allowed(provider, token, servers)
+		or not require("modules.llm.api_remote").normalize_base_url(base_url) then
+		return nil, "local API model, address or authentication is not supported"
+	end
+	local id = previous_entry and previous_entry.id
+	if not id then
+		local used = {}
+		for _, row in ipairs(current.row_order) do
+			if type(row.raw) == "table" and type(row.raw.id) == "string" then used[row.raw.id] = true end
+		end
+		for _, entry in ipairs(current.entries) do used[entry.id] = true end
+		repeat
+			_sequence = _sequence + 1
+			id = string.format("%s-%d-%d", provider, os.time(), _sequence)
+		until not used[id]
+	end
+	local entry = valid_entry({ id = id, provider = provider, label = previous_entry and previous_entry.label or (provider .. "/" .. model),
+		model = model, token = token, base_url = base_url })
+	if not entry then return nil, "local API entry is not supported" end
+	local previous_active = current.active_id
+	if index then current.entries[index] = entry else current.entries[#current.entries + 1] = entry end
+	local selects = select == true or (select == nil and fields.model ~= nil)
+	if selects then current.active_id = id end
+	-- The captured source is checked before the owner is acquired. Inside this
+	-- synchronous publication, the native owner additionally rechecks admission
+	-- after staging without asking a receipt to validate its own publishing flag.
+	local ok = persist(admit)
+	if not ok then
+		if index then current.entries[index] = previous_entry else table.remove(current.entries) end
+		current.active_id = previous_active
+		return nil, "local API publication was refused"
+	end
+	if selects then current.dangling_active_id = nil end
+	return entry
 end
 
 --- Points the store at another file and forgets the loaded state (tests).

@@ -107,6 +107,76 @@ check(run_until(function() return #requests > before end), "pending request actu
 local cancelled = Remote.cancel()
 check(cancelled == true, "cancellation requires the actual native transport acknowledgement")
 check(run_until(function() return not Http.isActive() end) and not Remote.is_active() and calls == 0, "cancelled owner settles without a late models publication")
+-- The actual discovery/menu consumer uses independent native GET owners, then
+-- the acknowledged private entry and existing chat owner, at this configured URL.
+local Entries = require("modules.llm.api_entries")
+local private_path = os.tmpname(); os.remove(private_path)
+Entries._set_path_for_test(private_path)
+for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
+	check(Entries.add({ provider = id, label = id, token = "", model = "before", base_url = base_url }) ~= nil,
+		"native discovery stores the configured " .. id .. " source through its private owner")
+end
+local Servers = require("modules.llm.local_servers")
+response = { status = 200, body = '{"data":[{"id":"discovered-model"}]}' }
+local discovery_done, discovery_calls = false, 0
+check(Servers.rescan(function() return true end, function()
+	discovery_done, discovery_calls = true, discovery_calls + 1
+end), "native discovery acquires the four actual curl owners")
+check(run_until(function() return discovery_done end), "native discovery jointly settles after actual handle closes")
+check(discovery_calls == 1 and #Servers.detected() == 4 and Servers.result("omlx").models[1] == "discovered-model",
+	"actual strict models receipts populate the catalogue menu")
+local backend, writes = "ollama", 0
+local rows = require("ui.menu.local_server_rows").rows({
+	get_backend = function() return backend end,
+	can_configure_local_servers = function() return true end,
+	set_backend = function(value) backend, writes = value, writes + 1; return true end,
+}, { prompt = function() return nil end, error = function() end }, function() end,
+	{ is_paused = function() return false end })
+local function model_row(items)
+	for _, row in ipairs(items) do
+		if row.label == "discovered-model" then return row end
+		if row.items then local found = model_row(row.items); if found then return found end end
+	end
+end
+local choice = model_row(rows)
+check(choice ~= nil and type(choice.action) == "function", "actual shared/native menu exposes the discovered model")
+local selected = choice and choice.action()
+check(selected and selected.saved == true and selected.selected == true and backend == "api" and writes == 1,
+	"actual model action acknowledges private entry then independent backend owner")
+local selected_entry = Entries.active()
+check(selected_entry and selected_entry.provider == "omlx" and selected_entry.model == "discovered-model",
+	"the actual selected entry supplies the discovered chat target")
+local chat_done, chat_text = false, nil
+check(Remote.chat(selected_entry, nil, {{ role = "user", content = "inert discovery fixture" }}, {}, nil,
+	function(value) chat_text, chat_done = value, true end), "the selected discovery entry acquires the actual chat consumer")
+check(run_until(function() return chat_done end) and chat_text == "native reply",
+	"discovery to model choice to actual curl chat succeeds")
+local reloaded = require("tests.helpers").load_module("modules.llm.api_entries")
+reloaded._set_path_for_test(private_path)
+check(reloaded.active() and reloaded.active().model == "discovered-model",
+	"the acknowledged discovered model survives actual private-file restart")
+-- Drain any post-selection rescan before changing the controlled server response.
+check(run_until(function() return not Servers.is_sweeping() end), "the post-selection discovery owner settles")
+response = { status = 401, body = '{"error":"key required"}' }
+discovery_done = false
+Servers.rescan(function() return true end, function() discovery_done = true end)
+check(run_until(function() return discovery_done end) and Servers.result("omlx").status == "needs_key",
+	"actual native authentication refusal is a key-needed row, never a model")
+response = { status = 200, body = '{"data":{}}' }
+discovery_done = false
+Servers.rescan(function() return true end, function() discovery_done = true end)
+check(run_until(function() return discovery_done end) and #Servers.detected() == 0,
+	"actual malformed models receipt cannot populate native discovery")
+response = { pending = true }
+local discovery_before, cancelled_publications = #requests, 0
+Servers.rescan(function() return true end, function() cancelled_publications = cancelled_publications + 1 end)
+check(run_until(function() return #requests >= discovery_before + 4 end), "all four cancelled probes reached the actual native server")
+local first_cancel = Servers.cancel()
+check(first_cancel == false, "native kill acknowledgement alone does not settle process and close debt")
+check(run_until(function() return Servers.cancel() == true end) and cancelled_publications == 0,
+	"actual native exit and all close callbacks retire discovery without late publication")
+check(Servers.shutdown() == true, "the stopped discovery owner acknowledges all exact native debt")
+os.remove(private_path); os.remove(private_path .. ".tmp"); os.remove(private_path .. ".corrupt")
 for _, socket in ipairs(sockets) do close(socket) end
 close(server)
 uv.run()

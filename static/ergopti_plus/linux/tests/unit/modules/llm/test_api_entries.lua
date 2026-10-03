@@ -435,3 +435,133 @@ helpers.describe("API entry physical source refusals", function()
 		helpers.assert_eq(fresh(true).active().id, first.id, "the one acknowledged owner reaches restart")
 	end)
 end)
+
+
+helpers.describe("local model selections own their physical API source", function()
+	helpers.it("updates a local entry in place and preserves foreign row order and fields across restart", function()
+		fresh()
+		os.execute("mkdir -p '" .. DIR .. "'")
+		local original = [[{"version":1,"active_id":"local","future":{"items":[]},"entries":[{"id":"before","provider":"future","token":17},{"id":"local","provider":"lmstudio","label":"Historical","token":"private bytes ","model":"old","base_url":"http://localhost:4321/v1","future":{"items":[]}},{"id":"after","provider":"unknown","token":null}]}]]
+		external_api_source(original)
+		local entries = fresh(true)
+		local source = entries.capture_source()
+		helpers.assert_true(type(source) == "table")
+		helpers.assert_eq(next(source), nil, "source bytes and credentials are not exposed in an opaque receipt")
+		local selected = entries.upsert_local("lmstudio", { model = "new", token = "private bytes ", base_url = "http://localhost:4321/v1" }, source, function() return true end)
+		helpers.assert_eq(selected and selected.id, "local")
+		helpers.assert_eq(entries.source_is_current(source), false, "a successful publication retires the previous snapshot")
+		local raw = require("json").decode_lossless(physical_api_source())
+		helpers.assert_eq(raw.entries[1].id, "before")
+		helpers.assert_eq(raw.entries[1].token, 17)
+		helpers.assert_eq(raw.entries[2].id, "local")
+		helpers.assert_true(require("json").is_array(raw.entries[2].future.items))
+		helpers.assert_eq(raw.entries[3].id, "after")
+		helpers.assert_true(require("json").is_array(raw.future.items))
+		helpers.assert_eq(fresh(true).active().model, "new")
+		helpers.assert_eq(fresh(true).active().token, "private bytes ")
+	end)
+
+	helpers.it("a held model choice refuses private-source drift and a forged receipt before staging", function()
+		local entries = fresh()
+		assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "old" }))
+		local source = entries.capture_source()
+		external_api_source(FOREIGN_API_SOURCE)
+		local staged = 0
+		entries._set_private_create_for_test(function() staged = staged + 1; return false end)
+		local selected = entries.upsert_local("lmstudio", { model = "new" }, source, function() return true end)
+		helpers.assert_eq(selected, nil)
+		helpers.assert_eq(entries.source_is_current(source), false)
+		helpers.assert_eq(entries.source_is_current({}), false)
+		helpers.assert_eq(staged, 0)
+		helpers.assert_eq(physical_api_source(), FOREIGN_API_SOURCE)
+		helpers.assert_eq(entries.active().model, "old")
+	end)
+
+	helpers.it("requires live admission both before publication and after the actual stage", function()
+		for _, phase in ipairs({ "before", "after" }) do
+			local entries = fresh()
+			local original = assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "old" }))
+			local bytes, source = physical_api_source(), entries.capture_source()
+			local admitted, staged = phase ~= "before", 0
+			entries._set_private_create_for_test(function(path, text)
+				local written, reason = create_without_mode(path, text)
+				staged = staged + 1
+				admitted = false
+				return written, reason
+			end)
+			local selected = entries.upsert_local("lmstudio", { model = "new" }, source, function() return admitted end)
+			helpers.assert_eq(selected, nil, phase)
+			helpers.assert_eq(staged, phase == "before" and 0 or 1, phase)
+			helpers.assert_eq(entries.active().id, original.id)
+			helpers.assert_eq(entries.active().model, "old")
+			helpers.assert_eq(physical_api_source(), bytes)
+			helpers.assert_eq(fresh(true).active().model, "old")
+		end
+	end)
+
+	helpers.it("creates only catalogue-owned typed local entries and preserves the selected model on refusal", function()
+		local entries = fresh()
+		local source = entries.capture_source()
+		for _, fields in ipairs({ { model = "" }, { model = "m", token = false }, { model = "m", base_url = "file:///tmp/not-http" }, { model = "m", future = true } }) do
+			helpers.assert_nil(entries.upsert_local("lmstudio", fields, source, function() return true end))
+		end
+		helpers.assert_nil(entries.upsert_local("openai", { model = "m", token = "" }, source, function() return true end))
+		local selected = entries.upsert_local("lmstudio", { model = "m" }, source, function() return true end)
+		helpers.assert_eq(selected and selected.provider, "lmstudio")
+		helpers.assert_eq(selected and selected.token, "")
+		helpers.assert_eq(fresh(true).active().model, "m")
+	end)
+end)
+
+
+helpers.describe("local server configuration preserves the current prediction target", function()
+	helpers.it("address and credential edits do not select a different saved local model", function()
+		local entries = fresh()
+		local local_entry = assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "m" }))
+		local cloud_entry = assert(entries.add({ provider = "cerebras", token = "cloud", label = "Cloud", model = "c" }))
+		local saved = entries.upsert_local("lmstudio", { base_url = "http://localhost:6543/v1", token = "inert local" },
+			entries.capture_source(), function() return true end, false)
+		helpers.assert_eq(saved and saved.id, local_entry.id)
+		helpers.assert_eq(saved and saved.model, "m")
+		helpers.assert_eq(entries.active().id, cloud_entry.id)
+		local restarted = fresh(true)
+		helpers.assert_eq(restarted.active().id, cloud_entry.id)
+		helpers.assert_eq(restarted.get(local_entry.id).base_url, "http://localhost:6543/v1")
+		helpers.assert_eq(restarted.get(local_entry.id).token, "inert local")
+	end)
+end)
+
+
+helpers.describe("final local API admission cannot borrow physical source authority", function()
+	helpers.it("an admitted post-stage callback replacing disk bytes refuses before native rename", function()
+		local entries = fresh()
+		local original = assert(entries.add({ provider = "lmstudio", token = "", label = "Local", model = "original" }))
+		local source = entries.capture_source()
+		local staged, injected, admissions = false, 0, 0
+		entries._set_private_create_for_test(function(path, text)
+			local written, reason = create_without_mode(path, text)
+			if written then staged = true end
+			return written, reason
+		end)
+		local selected = entries.upsert_local("lmstudio", { model = "candidate" }, source, function()
+			admissions = admissions + 1
+			if staged then injected = injected + 1; external_api_source(FOREIGN_API_SOURCE) end
+			return true
+		end)
+		-- Assertions follow the actual publisher/admission callback and read the
+		-- independent external writer's physical bytes, never a derived golden.
+		helpers.assert_eq(staged, true)
+		helpers.assert_eq(injected, 1)
+		helpers.assert_true(admissions >= 3)
+		helpers.assert_true(physical_api_source() == FOREIGN_API_SOURCE,
+			"an admitted callback cannot authorize replacing an independently changed source")
+		helpers.assert_nil(selected, "foreign disk bytes withhold the actual publication ACK")
+		helpers.assert_eq(entries.active().id, original.id)
+		helpers.assert_eq(entries.active().model, "original")
+		local reader = io.open(PATH .. ".tmp", "rb")
+		local remaining = reader ~= nil
+		if reader then reader:close() end
+		helpers.assert_eq(remaining, false, "the refused candidate's owned stage is retired")
+		helpers.assert_eq(fresh(true).active().id, "external", "restart uses the independent physical source")
+	end)
+end)
