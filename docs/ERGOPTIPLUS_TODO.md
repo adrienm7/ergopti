@@ -318,6 +318,17 @@ These are software implementations; final hardware verification remains below.
   Windows native paths and macOS native image capture do not line-parse mktemp
   paths. This is virtual graphics validation; physical screens, interactive
   regions, Wayland, native cross-OS gates and manual CI remain unexecuted.
+- [~] **L25.** Linux process snapshot receipts: preserve the last successful
+  process set when ps returns partial output then exits nonzero or is signalled.
+  LuaJIT pclose previously returned true, synthesizing quit/relaunch events for
+  an owned process that stayed alive. The existing checked runner now supplies
+  the actual terminal receipt. Twelve native and eight portable cases failed
+  before the fix. Fourteen native cases pass on host and nonroot Debian using
+  real named processes and GNU ps through a controlled fault wrapper that omits
+  one actual row; a genuine launch/quit control remains functional. macOS uses
+  native application-watcher events. Windows currently accepts these callbacks
+  without emitting launch/quit events, an existing capability gap deferred to
+  its owner. Focus/title logic, native cross-OS gates and manual CI are untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
