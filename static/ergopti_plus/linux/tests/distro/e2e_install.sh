@@ -36,6 +36,48 @@ section() { printf '\n=== %s ===\n' "$*"; }
 # X server, PyGObject for the panel stand-in) — never a dependency of the
 # product. The product's own dependencies are the installer's job, and
 # pre-installing one would hide a missing arm in install.sh.
+# Package-manager output can contain private repository details. Drain it with
+# bounded memory and expose only observed, closed English error-token flags.
+# An unexpected locale remains unknown; these flags do not prove a root cause.
+zypper_tooling_flags() {
+	local chunk tail="" text solver=0 download=0 tls=0 unknown=0
+	local solver_pattern='Problem:|nothing provides|conflicts with|cannot install both|No provider of'
+	local download_pattern='Download \(curl\) error:|Download failed:|Failed to download|Error retrieving|Connection failed|Temporary failure in name resolution'
+	local tls_pattern='SSL certificate problem:|certificate verify failed|SSL peer certificate|certificate has expired|SSL connect error'
+	while IFS= read -r -n 4096 chunk || [ -n "$chunk" ]; do
+		text="$tail$chunk"
+		[[ "$text" =~ $solver_pattern ]] && solver=1
+		[[ "$text" =~ $download_pattern ]] && download=1
+		[[ "$text" =~ $tls_pattern ]] && tls=1
+		# A short read ends a line: never assemble a token across that boundary.
+		if [ "${#chunk}" -lt 4096 ]; then
+			tail=""
+		else
+			tail="${text: -256}"
+		fi
+	done
+	[ "$solver$download$tls" = "000" ] && unknown=1
+	printf 'solver=%s download=%s tls=%s unknown=%s ' "$solver" "$download" "$tls" "$unknown"
+}
+
+# Preserve zypper's exact exit independently of the draining classifier. The
+# caller still owns the unchanged environment-failure exit and installer gate.
+prepare_zypper_test_tooling() {
+	local receipt native_exit
+	receipt="$(
+		zypper --non-interactive install -y sudo curl python3 python3-gobject \
+			typelib-1_0-Gio-2_0 dbus-1 dbus-1-daemon xorg-x11-server-Xvfb procps shadow 2>&1 | zypper_tooling_flags
+		native_codes=( "${PIPESTATUS[@]}" )
+		printf 'native_exit=%s' "${native_codes[0]}"
+		exit "${native_codes[0]}"
+	)"
+	native_exit=$?
+	if [ "$native_exit" -ne 0 ]; then
+		printf 'TOOLING: zypper %s\n' "$receipt" >&2
+	fi
+	return "$native_exit"
+}
+
 prepare_test_tooling() {
 	if command -v apt-get >/dev/null 2>&1; then
 		export DEBIAN_FRONTEND=noninteractive
@@ -43,8 +85,7 @@ prepare_test_tooling() {
 		apt-get install -y -qq --no-install-recommends sudo ca-certificates curl \
 			python3 python3-gi gir1.2-glib-2.0 dbus xvfb xauth procps >/dev/null
 	elif command -v zypper >/dev/null 2>&1; then
-		zypper --non-interactive install -y sudo curl python3 python3-gobject \
-			typelib-1_0-Gio-2_0 dbus-1 dbus-1-daemon xorg-x11-server-Xvfb procps shadow >/dev/null
+		prepare_zypper_test_tooling
 	elif command -v dnf >/dev/null 2>&1; then
 		dnf install -y -q sudo curl python3 python3-gobject-base dbus-daemon dbus-tools \
 			xorg-x11-server-Xvfb procps-ng findutils shadow-utils >/dev/null
