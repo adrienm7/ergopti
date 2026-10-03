@@ -505,3 +505,143 @@ _HSDT_ResetRetainsPersonalAndRefusesAtomically() {
 }
 Test("hotstring delimiters: tray restore retains personal strings and refuses without half publication",
 	_HSDT_ResetRetainsPersonalAndRefusesAtomically)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 8/ Shared word-expander commands =======
+; ================================================
+; ================================================
+
+_HSDT_ControlCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\word_expander_controls.json"))
+}
+
+_HSDT_ControlSetAll(Enable, Writer, *) {
+	return _HS_DelimSetAll(Enable, Writer, _HSDT_AcceptReplace, _HSDT_Notify)
+}
+
+_HSDT_ControlRestore(Writer, *) {
+	return _HS_DelimReset(Writer, _HSDT_AcceptReplace, _HSDT_Notify)
+}
+
+_HSDT_ControlCommands(Writer) {
+	return Map(
+		"word_expanders_enable_all", _HSDT_ControlSetAll.Bind(true, Writer),
+		"word_expanders_disable_all", _HSDT_ControlSetAll.Bind(false, Writer),
+		"word_expanders_restore", _HSDT_ControlRestore.Bind(Writer))
+}
+
+_HSDT_NativeControlMenu(Writer) {
+	return _HS_WordExpanderRows(_HSDT_ControlCommands(Writer))[1]["submenu"]
+}
+
+_HSDT_NativeControlCallback(Built, Position) {
+	global _MenuDispatchCallbacks
+	Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the declared control uses the actual native dispatcher")
+	return _MenuDispatchCallbacks[Id]
+}
+
+_HSDT_SharedControlMatrix() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Corpus := _HSDT_ControlCorpus()
+	AssertEqual(3, Corpus["rows"].Length, "every independent control must execute")
+	Modes := ["enable_all", "disable_all", "restore"]
+	Saved := _HSDT_SaveState()
+	try {
+		for Index, Expected in Corpus["rows"] {
+			_HSDT_Seed("shared-control-" . Index, "/¤😀", "¤🔒")
+			Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
+			try {
+				for Position, Row in Corpus["rows"] {
+					AssertEqual(t(Row["i18n"]), _CTC_LabelAt(Built, Position - 1))
+					AssertFalse(_CTC_IsChecked(Built, Position - 1), "a bulk command is not a switch")
+				}
+				Callback := _HSDT_NativeControlCallback(Built, Index - 1)
+				AssertTrue(Callback.Call(), "the actual owned delimiter transaction must acknowledge")
+				State := Corpus["delimiter_states"][Modes[Index]]
+				AssertEqual(State["space"], InStr(_HotstringsWordDelimiters, " ") > 0)
+				AssertEqual(State["slash"], InStr(_HotstringsWordDelimiters, "/") > 0)
+				AssertEqual(State["custom_x"], InStr(_HotstringsWordDelimiters, "x") > 0)
+				AssertTrue(InStr(_HotstringsWordDelimiters, "¤😀") > 0, "personal delimiters survive")
+				AssertTrue(InStr(_HotstringsConsumedDelimiters, "¤🔒") > 0, "personal consumption survives")
+				AssertEqual(_HotstringsWordDelimiters, HSE_WORD_TERMINATORS)
+				AssertEqual(_HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS)
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally _HSDT_Restore(Saved)
+}
+Test("word expanders: shared native controls replay the independent state corpus", _HSDT_SharedControlMatrix)
+
+_HSDT_SharedControlOrderAndRefusal() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	Definitions := _MR_GetManifestRoot()["word_expanders_menu"]
+	SavedDefinitions := Definitions.Clone()
+	Corpus := _HSDT_ControlCorpus()
+	Saved := _HSDT_SaveState()
+	try {
+		Definitions[1] := SavedDefinitions[3]
+		Definitions[3] := SavedDefinitions[1]
+		_HSDT_Seed("shared-control-refusal", "/¤😀", "¤🔒")
+		Built := _HSDT_NativeControlMenu(_HSDT_FalseWriter)
+		try {
+			AssertEqual(t(Corpus["rows"][3]["i18n"]), _CTC_LabelAt(Built, 0))
+			AssertEqual(t(Corpus["rows"][2]["i18n"]), _CTC_LabelAt(Built, 1))
+			AssertEqual(t(Corpus["rows"][1]["i18n"]), _CTC_LabelAt(Built, 2))
+			Callback := _HSDT_NativeControlCallback(Built, 0)
+			AssertFalse(Callback.Call(), "the reordered restore must retain the real writer refusal")
+			AssertEqual("/¤😀", _HotstringsWordDelimiters)
+			AssertEqual("¤🔒", _HotstringsConsumedDelimiters)
+			AssertEqual(1, _HSDT_WriteCalls)
+			AssertEqual(0, _HSDT_ReplaceCalls)
+			AssertEqual(0, _HSDT_NotifyCalls)
+		} finally _CTC_ReleaseMenu(Built)
+	} finally {
+		for Index, Row in SavedDefinitions
+			Definitions[Index] := Row
+		_HSDT_Restore(Saved)
+	}
+}
+Test("word expanders: shared ordering retains the actual native owner refusal", _HSDT_SharedControlOrderAndRefusal)
+
+
+_HSDT_SharedControlRefusesDelayedPause() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	Saved := _HSDT_SaveState()
+	WasSuspended := A_IsSuspended
+	Built := 0
+	try {
+		Suspend(false)
+		_HSDT_Seed("shared-control-delayed-pause", "/¤😀", "¤🔒")
+		Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
+		Callbacks := []
+		loop 3
+			Callbacks.Push(_HSDT_NativeControlCallback(Built, A_Index - 1))
+		Suspend(true)
+		Receipts := []
+		for Callback in Callbacks
+			Receipts.Push(Callback.Call())
+		AssertEqual(3, Receipts.Length, "every captured control must refuse actual suspended delivery")
+		AssertEqual(0, _HSDT_WriteCalls)
+		AssertEqual(0, _HSDT_ReplaceCalls)
+		AssertEqual(0, _HSDT_NotifyCalls)
+		AssertEqual("/¤😀", _HotstringsWordDelimiters)
+		AssertEqual("¤🔒", _HotstringsConsumedDelimiters)
+		for Receipt in Receipts
+			AssertFalse(Receipt, "the current readiness owner refuses before the durable owner")
+	} finally {
+		Suspend(WasSuspended)
+		if Built is Menu
+			_CTC_ReleaseMenu(Built)
+		_HSDT_Restore(Saved)
+	}
+}
+Test("word expanders: shared native controls refuse delayed delivery after pause", _HSDT_SharedControlRefusesDelayedPause)

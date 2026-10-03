@@ -5146,6 +5146,34 @@ id = "hotstrings_reload"
 i18n = "menu.global.reload"
 platforms = ["linux"]
 reason_key = "platform_reason.only_linux_rereads_its_catalogue"
+# The fixed word-expander bulk controls share their labels, order and paused
+# posture. Each native port supplies only its existing acknowledged delimiter
+# owner; the remaining catalogue and personal entries remain provider data.
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_enable_all"
+i18n = "menu.hotstrings.check_all"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_disable_all"
+i18n = "menu.hotstrings.uncheck_all"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "---"
+
+[[menu.word_expanders_menu]]
+type = "list"
+id = "word_expander_entries"
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "word_expanders"

@@ -121,7 +121,10 @@ function M.build_management(ctx)
 		return true
 	end
 
+	local function word_expanders_ready() return ctx.paused ~= true end
+
 	local function bulk_set_terminators(enabled)
+		if not word_expanders_ready() then return false end
 		local changes = {}
 		for _, d in ipairs(defs) do
 			if type(d) == "table" and not d.custom and d.key then
@@ -131,6 +134,7 @@ function M.build_management(ctx)
 		return commit_terminator_changes(changes, "bulk word-expander toggle")
 	end
 	local function reset_terminators()
+		if not word_expanders_ready() then return false end
 		local changes = {}
 		for _, d in ipairs(defs) do
 			if type(d) == "table" and not d.custom and d.key then
@@ -140,10 +144,6 @@ function M.build_management(ctx)
 		end
 		return commit_terminator_changes(changes, "reset word expanders")
 	end
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() return bulk_set_terminators(true)  end or nil }
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() return bulk_set_terminators(false) end or nil }
-	exp_sub[#exp_sub + 1] = { label = i18n.get("common.restore_recommended"), disabled = paused or nil, action = not paused and reset_terminators or nil }
-	exp_sub[#exp_sub + 1] = { separator = true }
 
 	-- Built-in terminators (non-custom), with consume indicator. The shared
 	-- catalogue order IS the menu order; { type = "separator" } entries become
@@ -309,7 +309,18 @@ function M.build_management(ctx)
 		end or nil,
 	}
 
-	exp_item = { label = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, items = exp_sub }
+	local exp_ctx = {
+		commands = {
+			["word_expanders_enable_all"] = function() return bulk_set_terminators(true) end,
+			["word_expanders_disable_all"] = function() return bulk_set_terminators(false) end,
+			["word_expanders_restore"] = reset_terminators,
+		},
+		state_getters = { ["word_expanders_ready"] = word_expanders_ready },
+	}
+	local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
+		exp_ctx, { ["word_expander_entries"] = function() return exp_sub end })
+	exp_item = { label = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil,
+		submenu = rendered_expanders }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)

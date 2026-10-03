@@ -51,6 +51,21 @@ const MANIFEST = path.join(
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 const RESTORE = { id: 'scope_restore', i18n: 'common.restore_recommended' };
 const CLEAR = { id: 'scope_clear', i18n: 'common.clear_to_system' };
+const WORD_EXPANDER_CONTROLS = JSON.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'tests',
+			'corpus',
+			'menus',
+			'word_expander_controls.json'
+		),
+		'utf8'
+	)
+).rows;
 
 // Menus whose clear row the maintainer retired: the first group is the switch
 // and the restore alone, and a clear row there is a regression.
@@ -148,6 +163,13 @@ function scopeKind(row) {
  * @returns {number} Platform projections that showed a scope row.
  */
 function checkMenu(menu, rows, errors) {
+	// This historical bulk-action head owns no settings scope or master switch.
+	// Validate its exact declaration on all three platforms rather than exempting
+	// every restore label outside a scope group from the first-group rule.
+	if (menu === 'word_expanders_menu') {
+		checkWordExpanderMenu(rows, errors);
+		return 0;
+	}
 	let checked = 0;
 	for (const row of rows) {
 		const kind = scopeKind(row);
@@ -204,6 +226,43 @@ function checkMenu(menu, rows, errors) {
 		}
 	}
 	return checked;
+}
+
+/**
+ * The existing three bulk commands, separator and dynamic catalogue must remain
+ * one complete head on every driver. Expectations come from an independent corpus.
+ * @param {object[]} rows Manifest rows.
+ * @param {string[]} errors Collected failures.
+ */
+function checkWordExpanderMenu(rows, errors) {
+	for (const platform of PLATFORMS) {
+		const shown = project(rows, platform);
+		const where = `word_expanders_menu (${platform})`;
+		if (shown.length !== 5) {
+			errors.push(`${where} must retain three bulk commands, a separator and its catalogue.`);
+		}
+		for (const [index, expected] of WORD_EXPANDER_CONTROLS.entries()) {
+			const row = shown[index];
+			if (
+				!row ||
+				row.type !== 'command' ||
+				row.id !== expected.id ||
+				row.i18n !== expected.i18n ||
+				(row.command !== undefined && row.command !== expected.id) ||
+				JSON.stringify(row.disabled_when) !== JSON.stringify(['word_expanders_ready'])
+			) {
+				errors.push(
+					`${where} bulk command ${index + 1} must retain ${expected.id}, its label and readiness owner.`
+				);
+			}
+		}
+		if (!shown[3] || shown[3].type !== '---') {
+			errors.push(`${where} must separate the bulk commands from individual delimiters.`);
+		}
+		if (!shown[4] || shown[4].type !== 'list' || shown[4].id !== 'word_expander_entries') {
+			errors.push(`${where} must retain its native delimiter catalogue provider.`);
+		}
+	}
 }
 
 /**
@@ -270,6 +329,46 @@ function describe(row) {
 	);
 }
 
+// The bounded bulk-head exception must refuse malformed and platform-specific
+// declarations, while all original scope-shape assertions above remain intact.
+{
+	assert.equal(
+		WORD_EXPANDER_CONTROLS.length,
+		3,
+		'the independent corpus covers every bulk command'
+	);
+	const valid = [
+		...WORD_EXPANDER_CONTROLS.map((row) => ({
+			type: 'command',
+			...row,
+			disabled_when: ['word_expanders_ready']
+		})),
+		{ type: '---' },
+		{ type: 'list', id: 'word_expander_entries' }
+	];
+	const run = (rows) => {
+		const errors = [];
+		checkMenu('word_expanders_menu', rows, errors);
+		return errors;
+	};
+	assert.deepEqual(run(valid), []);
+	const mutate = (fn) => {
+		const rows = JSON.parse(JSON.stringify(valid));
+		fn(rows);
+		assert.ok(run(rows).length > 0, 'a changed bulk head must be rejected');
+	};
+	mutate((rows) => rows.splice(0, 1));
+	mutate((rows) => ([rows[0], rows[2]] = [rows[2], rows[0]]));
+	mutate((rows) => (rows[2].i18n = 'common.other'));
+	mutate((rows) => (rows[2].id = 'scope_restore'));
+	mutate((rows) => (rows[0].type = 'toggle'));
+	mutate((rows) => delete rows[0].disabled_when);
+	mutate((rows) => (rows[0].platforms = ['ahk']));
+	mutate((rows) => (rows[3].type = 'command'));
+	mutate((rows) => (rows[4].id = 'missing_catalogue'));
+	mutate((rows) => rows.push({ type: 'command', ...RESTORE }));
+}
+
 // ==================================================
 // ==================================================
 // ======= 3/ The manifest ==========================
@@ -285,6 +384,9 @@ for (const [menu, rows] of Object.entries(manifest)) {
 	const checked = checkMenu(menu, rows, errors);
 	if (checked > 0) menusWithScopes.add(menu);
 	projections += checked;
+}
+if (!Array.isArray(manifest.word_expanders_menu)) {
+	errors.push('word_expanders_menu is missing: the shared bulk-head scan read nothing.');
 }
 for (const menu of EXPECTED_MENUS) {
 	if (!menusWithScopes.has(menu))

@@ -387,5 +387,61 @@ function checkChoiceProjection() {
 	);
 }
 
+function checkWordExpanderControls() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/word_expander_controls.json'), 'utf8')
+	);
+	const definition = JSON.parse(readFileSync(MENU_PATH, 'utf8')).word_expanders_menu;
+	assert.equal(corpus.rows.length, 3, 'every independently captured bulk control executes');
+	assert.equal(definition.length, 5);
+	for (const [index, expected] of corpus.rows.entries()) {
+		assert.equal(definition[index].type, 'command');
+		assert.equal(definition[index].id, expected.id);
+		assert.equal(definition[index].i18n, expected.i18n);
+		assert.deepEqual(definition[index].disabled_when, ['word_expanders_ready']);
+	}
+	assert.equal(definition[3].type, '---');
+	assert.equal(definition[4].type, 'list');
+	assert.equal(definition[4].id, 'word_expander_entries');
+	const native = [
+		[
+			'windows/ui/menu/menu_hotstrings.ahk',
+			'_HS_WordExpanderRows(',
+			'; Toggle a whole catalogue entry'
+		],
+		[
+			'macos/ui/menu/menu_hotstrings_management.lua',
+			'local function bulk_set_terminators',
+			'local delay_menu'
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'["word_expanders"] = function()',
+			'["magic_key_config"] = function()'
+		]
+	];
+	for (const [file, first, last] of native) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first);
+		const end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: actual provider bounds must exist`);
+		const body = source.slice(start, end);
+		assert.match(body, /["']word_expanders_menu["']/);
+		assert.match(body, /["']word_expander_entries["']/);
+		assert.match(body, /submenu/i);
+		for (const expected of corpus.rows) {
+			assert(
+				!body.includes(expected.i18n),
+				`${file}: fixed bulk labels belong to the shared section`
+			);
+		}
+	}
+	console.log(
+		'word-expander controls: three independent rows and every native shared-section consumer qualified.'
+	);
+}
+
 main();
 checkChoiceProjection();
+checkWordExpanderControls();
