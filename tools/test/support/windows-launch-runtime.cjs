@@ -102,9 +102,24 @@ module.exports = function checkWindowsLaunchRuntime() {
 				assert.equal(observation.native_startup.exit_code, 0);
 			} else {
 				assert.notEqual(result.status, 0, scenario + ' must fail the actual native observer');
-				assert.equal(
-					fs.existsSync(evidence),
-					false,
+				const failure = JSON.parse(fs.readFileSync(evidence, 'utf8'));
+				assert.ok(failure.failures.length > 0, scenario + ' must retain failed evidence');
+				assert.throws(
+					() =>
+						require('../desktop-ci-evidence.cjs').verify({
+							platform: 'windows',
+							needs: Object.fromEntries(
+								['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
+									name,
+									{ result: 'success' }
+								])
+							),
+							evidence: [failure],
+							sha: 'a'.repeat(40),
+							scenarios: [],
+							release: false
+						}),
+					/Launch reported failures/,
 					scenario + ' must publish no accepted evidence'
 				);
 				assert.match(
