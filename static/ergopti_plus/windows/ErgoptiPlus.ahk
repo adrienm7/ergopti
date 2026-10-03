@@ -484,6 +484,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
+#Include ../_shared/modules/hotstrings/terminator_scope.ahk
 #Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk

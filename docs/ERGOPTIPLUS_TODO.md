@@ -117,8 +117,18 @@ These are software implementations; final hardware verification remains below.
   changed; both Linux modes return the shipped delimiters to their defaults and
   keep the user's own (user data, as the delimiter submenu does). macOS now
   shares that policy, resets the file, runtime and next-save states, and keeps
-  its exact inverse on refusal. Still open: Windows resets its whole delimiter
-  string, and its recommended-delay rows need native behavioral verification.
+  its exact inverse on refusal.
+  Windows now restoresshipped word and consumed delimiter defaults through one
+  shared AHK policy, preserving personal strings in the tray restore and both
+  admitted Hotstrings scopes. Independent cross-driver vectors preserve
+  Unicode, duplicates, disabled consume-only markers and unknown personal
+  states; the existing journal retains exact inverse recovery on refusal. The
+  eight unchanged source files retain their prior full portable qualification;
+  the two rebased include files passed the selected encoding gate on the
+  current integration. Windows native unit/E2E, packaging and installation
+  validation remains pending. Recommended-delay native verification and
+  editable handwritten [[hotstrings.terminators]] support remain open under
+  item 34.
 - [~] **6.** Complete L4 extension layout geometry and physical magic-key
   behavior. Keep independent base/Shift, AltGr/ShiftAltGr and number-row
   emulation. The physical magic-key setting is item 30.
@@ -320,14 +330,16 @@ remain pending in the next macOS install/launch run.
   personal/unknown parameters and transactional refusal recovery intact.
   Both Lua drivers share shipped-delimiter restoration; macOS applies it to
   file/runtime/next-save state and restores its snapshot on refusal.
-  The recommended-delay slice awaits native Windows qualification; editing
-  hand-written array-of-table delimiters remains unfinished.
+  Windows native units, engine E2E, packaging and installation passed in
+  validation run 37084553184. The overall run remains unsuccessful because of
+  the macOS clean-launch gate. Editing hand-written array-of-table delimiters
+  remains unfinished.
 
 The measured-delay native fixture now isolates the real corpus metadata
 cache from the earlier resolution-cascade double and restores the exact
 prior cache identity. Its original inherited 1.0-second, recommended
-0.5-second, resolver and refusal-recovery assertions remain intact; native
-Windows requalification remains pending.
+0.5-second, resolver and refusal-recovery assertions remain intact and passed
+in the native Windows qualification above.
 
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins

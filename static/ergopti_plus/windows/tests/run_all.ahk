@@ -203,6 +203,7 @@ global _DefaultLogsDir := _LogsDir
 ; is never called here, so its own unseeded global (_PersonalShortcutsRegistry)
 ; is harmless (#Warn VarUnset is off).
 #Include ../infra/personal_features.ahk
+#Include ../../_shared/modules/hotstrings/terminator_scope.ahk
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
@@ -452,6 +453,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk

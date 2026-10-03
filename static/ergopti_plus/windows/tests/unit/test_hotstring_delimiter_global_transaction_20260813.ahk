@@ -443,3 +443,65 @@ Test("hotstring-delimiter-global-transaction-20260813: inherited Critical "
 	. "cannot wrap disk adapters notifications or live rebuild "
 	. "(hotstring-delimiter-inherited-critical)",
 	_HSDT_InheritedCriticalCannotWrapAdaptersOrMenuEffects)
+
+
+
+
+
+; ========================================
+; ========================================
+; ======= 7/ Personal preservation =======
+; ========================================
+; ========================================
+
+_HSDT_RestorePersonalVectors() {
+	global _SharedDir
+	Vectors := JsonParse(FSReadUtf8Exact(_SharedDir .
+		"\tests\corpus\hotstrings\terminator_restoration_vectors.json"))
+	AssertEqual(4, Vectors.Length, "every independent preservation vector executes")
+	for Vector in Vectors {
+		Result := HSE_TerminatorRestoreDefaults(Vector["current_word"], Vector["current_consumed"])
+		AssertEqual(Vector["expected_word"], Result.Word, Vector["id"])
+		AssertEqual(Vector["expected_consumed"], Result.Consumed, Vector["id"])
+		Again := HSE_TerminatorRestoreDefaults(Result.Word, Result.Consumed)
+		AssertEqual(Result.Word, Again.Word, "restoration is idempotent: " . Vector["id"])
+		AssertEqual(Result.Consumed, Again.Consumed, "consumption is idempotent: " . Vector["id"])
+	}
+	; A case-sensitive trigger ownership must not remove the other letter.
+	Catalogue := [Map("chars", ["a"], "default_enabled", true, "consume", true)]
+	Result := HotstringsTerminatorRestore(Catalogue, "Aa😀😃", "Aa")
+	AssertEqual("aA😀😃", Result.Word)
+	AssertEqual("aA", Result.Consumed)
+}
+Test("hotstring delimiters: shared restoration vectors preserve Unicode and personal states", _HSDT_RestorePersonalVectors)
+
+_HSDT_ResetRetainsPersonalAndRefusesAtomically() {
+	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	global _HSDT_ObservedDuringWrite, _HSDT_ObservedDuringReplace
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Saved := _HSDT_SaveState()
+	try {
+		_HSDT_Seed("restore-personal", "/¤😀😃😀", "/¤🔒")
+		AssertFalse(_HS_DelimReset(_HSDT_FalseWriter, _HSDT_AcceptReplace, _HSDT_Notify))
+		AssertEqual("/¤😀😃😀", _HotstringsWordDelimiters)
+		AssertEqual("/¤🔒", _HotstringsConsumedDelimiters)
+		AssertEqual("/¤😀😃😀", HSE_WORD_TERMINATORS)
+		AssertEqual("/¤🔒", HSE_CONSUMED_DELIMITERS)
+		AssertEqual(0, _HSDT_ReplaceCalls)
+		AssertEqual(0, _HSDT_NotifyCalls)
+		_HSDT_ResetFakes()
+		AssertTrue(_HS_DelimReset(_HSDT_AcceptWriter, _HSDT_AcceptReplace, _HSDT_Notify))
+		AssertEqual(" `t`r`n★,;.!?:¤😀😃😀", _HotstringsWordDelimiters)
+		AssertEqual("★¤🔒", _HotstringsConsumedDelimiters)
+		AssertEqual(_HotstringsWordDelimiters, HSE_WORD_TERMINATORS)
+		AssertEqual(_HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS)
+		AssertEqual(1, _HSDT_WriteCalls, "the pair uses one admitted candidate")
+		AssertEqual(1, _HSDT_ReplaceCalls)
+		AssertEqual(1, _HSDT_NotifyCalls)
+		AssertEqual("/¤😀😃😀", _HSDT_ObservedDuringWrite[1].Word)
+		AssertEqual("/¤🔒", _HSDT_ObservedDuringReplace[1].Consumed)
+	} finally _HSDT_Restore(Saved)
+}
+Test("hotstring delimiters: tray restore retains personal strings and refuses without half publication",
+	_HSDT_ResetRetainsPersonalAndRefusesAtomically)
