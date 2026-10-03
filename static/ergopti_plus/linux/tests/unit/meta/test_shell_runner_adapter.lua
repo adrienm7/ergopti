@@ -20,6 +20,50 @@
 local helpers = require("tests.helpers")
 local sh      = helpers.load_module("adapters.shell_runner")
 
+helpers.describe("linux-shell-private-error-receipts", function()
+	for _, failure in ipairs({ "errno7", "errno24", "no errno", "open raised", "read raised", "close raised" }) do
+		helpers.it("linux-shell-private-error-receipts: " .. failure .. " cannot echo command arguments", function()
+			local Logger = require("logger.shim")
+			local shell = helpers.load_module("adapters.shell_runner")
+			local previous_popen, previous_level = io.popen, Logger.get_level()
+			local canary = "SYNTHETIC_PRIVATE_PIPE_ARGUMENT"
+			Logger.set_level("debug")
+			Logger.ring_buffer_clear()
+			io.popen = function(command)
+				local message = command .. ": " .. canary .. " native refusal"
+				if failure == "open raised" then error(message) end
+				if failure == "read raised" or failure == "close raised" then
+					return {
+						read = function()
+							if failure == "read raised" then error(message) end
+							return "0 3\nabc"
+						end,
+						close = function() error(message) end,
+					}
+				end
+				local code = failure == "errno7" and 7 or (failure == "errno24" and 24 or nil)
+				return nil, message, code
+			end
+			local ok, err = xpcall(function()
+				local accepted, output, reason = shell.exec_checked("printf '%s' " .. shell.quote(canary))
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(output, "")
+				for _, line in ipairs(Logger.ring_buffer_snapshot()) do
+					helpers.assert_nil(line:find(canary, 1, true), "logger cannot copy private native errors")
+				end
+				helpers.assert_eq(type(reason), "string")
+				helpers.assert_true(reason ~= "" and #reason < 200, "failure still needs a bounded diagnostic")
+				helpers.assert_nil(reason:find(canary, 1, true), "returned failure cannot carry caller data")
+				if failure == "errno7" then helpers.assert_contains(reason, "errno 7") end
+				if failure == "errno24" then helpers.assert_contains(reason, "errno 24") end
+			end, debug.traceback)
+			io.popen = previous_popen
+			Logger.set_level(previous_level)
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 helpers.describe("linux-checked-output-receipts", function()
 	helpers.it("linux-checked-output-receipts: quotes the owner's complete literal staging directory", function()
 		local dir = "/owned/quote-é'漢\nparent"
