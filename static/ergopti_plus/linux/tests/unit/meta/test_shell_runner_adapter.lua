@@ -20,6 +20,42 @@
 local helpers = require("tests.helpers")
 local sh      = helpers.load_module("adapters.shell_runner")
 
+helpers.describe("linux-checked-output-receipts", function()
+	helpers.it("linux-checked-output-receipts: quotes the owner's complete literal staging directory", function()
+		local dir = "/owned/quote-é'漢\nparent"
+		local previous_popen, command, calls = io.popen, nil, 0
+		io.popen = function(value)
+			command, calls = value, calls + 1
+			return { read = function() return "0 3\nabc" end, close = function() return true end }
+		end
+		local protected, ok, output, reason = pcall(sh.exec_checked, "printf abc", { output_dir = dir })
+		io.popen = previous_popen
+		helpers.assert_true(protected, tostring(ok))
+		helpers.assert_true(ok, tostring(reason))
+		helpers.assert_eq(output, "abc")
+		helpers.assert_eq(calls, 1)
+		helpers.assert_contains(command, sh.quote(dir), "selected staging must cross native argv as one literal word")
+	end)
+	for _, row in ipairs({
+		{ name = "invalid options", options = false },
+		{ name = "numeric directory", options = { output_dir = 42 } },
+		{ name = "empty directory", options = { output_dir = "" } },
+		{ name = "NUL directory", options = { output_dir = "/owned/\0suffix" } },
+	}) do
+		helpers.it("linux-checked-output-receipts: refuses " .. row.name .. " before dispatch", function()
+			local calls = 0
+			sh._set_runner(function() calls = calls + 1; return "abc" end)
+			local protected, ok, output, reason = pcall(sh.exec_checked, "printf abc", row.options)
+			sh._reset_runner()
+			helpers.assert_true(protected, tostring(ok))
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(output, "")
+			helpers.assert_true(type(reason) == "string" and reason ~= "")
+			helpers.assert_eq(calls, 0)
+		end)
+	end
+end)
+
 -- Strings whose characters the shell would otherwise act on. Each one is a
 -- real payload this driver handles: SSIDs, window titles, clipboard content
 -- and hotstring replacements are all user-authored.
