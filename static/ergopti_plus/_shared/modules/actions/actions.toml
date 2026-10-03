@@ -693,13 +693,9 @@ emit_ahk_mods = []
 
 [sg_actions.brightness_up]
 platform = "all"
-emit_ahk_key = "Brightness_Up"
-emit_ahk_mods = []
 
 [sg_actions.brightness_down]
 platform = "all"
-emit_ahk_key = "Brightness_Down"
-emit_ahk_mods = []
 
 [sg_actions.track_play]
 platform = "all"

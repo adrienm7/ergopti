@@ -132,6 +132,9 @@ for _SysActionId, _SysActionFn in Map(
 
 ; Not deferred: Launch returns as soon as the shell accepted the target, and the
 ; binding id must reach the action to name its application.
+GESTURE_ACTIONS["brightness_up"] := { Fn: (*) => ScreenBrightnessRequest("brightness_up") }
+GESTURE_ACTIONS["brightness_down"] := { Fn: (*) => ScreenBrightnessRequest("brightness_down") }
+
 GESTURE_ACTIONS["open_app"] := { Fn: (BindingId := "") => GestureSysOpenApp(BindingId) }
 
 

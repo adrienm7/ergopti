@@ -59,6 +59,7 @@ return {
 	"tests.unit.infra.test_metrics_preferences",
 	"tests.unit.infra.test_llm_preferences",
 	"tests.unit.infra.test_llm_scope",
+	"tests.unit.modules.test_brightness_actions",
 	"tests.unit.modules.llm.test_enable_admission_policy",
 	"tests.unit.modules.llm.test_enable_admission",
 	"tests.unit.modules.llm.test_scope_native_ack",

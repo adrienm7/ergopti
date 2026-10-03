@@ -1018,9 +1018,21 @@ requires CI.
       the `network.failure.*` keys). The Windows and Linux work stayed
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
-- [ ] **63.** Layer actions: add screen brightness up and down (asked as an
-      example for the wheel slots), with its key, action and label on the three
-      drivers and 21 locales.
+- [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
+  through the existing 21-locale action catalogue, and implemented for keyboard
+  layers on all three drivers. Windows and macOS also support their existing
+  wheel-layer sources; Linux pointer-layer sources retain their explicit
+  localized capability refusal. Windows replaces invalid Send key names with
+  a bounded Job-owned WMI backlight worker and requires complete native target
+  readback; absent providers and cleanup debt cannot become success. macOS
+  uses its existing NX/Karabiner producers, and Linux uses native brightness
+  keys or brightnessctl restricted to the backlight class. Independent shared
+  corpus, dispatch and ownership regressions are added. Complete hosted
+  Windows native worker/owner tests and three-OS packaging validation before
+  retiring this item; physical display luminance is not measured by portable
+  or provider-double tests.
+
+The Windows brightness owner also fences cancellation and post-start retirement by the captured request ID: a synchronously acquired successor cannot be retired by its predecessor. Registered native Job/quiescence and synchronous-refusal regressions preserve exact successor identity, generation, action and zero borrowed handles. These native Windows cases remain pending CI.
 
 ## Maintainer requests on 2026-10-01
 

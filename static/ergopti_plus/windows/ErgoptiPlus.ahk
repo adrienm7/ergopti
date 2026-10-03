@@ -389,6 +389,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include ../_shared/modules/actions/brightness.ahk
+#Include adapters/screen_brightness.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")

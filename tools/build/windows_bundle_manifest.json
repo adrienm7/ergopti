@@ -30,7 +30,7 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
-			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall and crash-report workers."
+			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers."
 		}
 	],
 	"exclude": [
@@ -139,6 +139,10 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1",
 			"dest": "vendor/ergopti_crash_worker.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_brightness_worker.ps1",
+			"dest": "vendor/ergopti_brightness_worker.ps1"
 		},
 		{
 			"source": "static/layouts/registry/index.json",
