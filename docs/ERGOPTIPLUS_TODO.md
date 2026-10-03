@@ -1590,6 +1590,8 @@ native Windows execution is pending CI.
   without invoking callbacks during matching. The original circumflex matrix
   and independent historical corpora remain intact; native validation is pending.
 
+TODO 104 remains partial: the shared hotstring reader now retains physical entry order, and common autocorrection consumes it through the three native registry/cache owners. Independent interleaving tests preserve cross-section insertion precedence while French packs and bound-source owners keep their existing declared order. The current caps identity and all 140 historical rules, flags, metadata, delays and common priority remain unchanged. The runtime family split, config/override migration and full hosted parity validation remain outstanding.
+
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples

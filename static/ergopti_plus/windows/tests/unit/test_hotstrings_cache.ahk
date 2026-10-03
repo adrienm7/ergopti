@@ -143,7 +143,7 @@ TestHsCache_EscapeUnescapeHandlesSpecials() {
 }
 
 TestHsCache_PriorityDomainRejectsCorruptRow() {
-	Corrupt := "rolls`tassign`t*?`ta`tb`t0`t0`t0`t101`n"
+	Corrupt := "# source-order-v1`nrolls`tassign`t*?`ta`tb`t0`t0`t0`t101`n"
 	AssertThrows(() => _HotstringsCacheReadTsv(Corrupt),
 		"cache priority above 100 must invalidate the cache instead of reaching registration")
 }
@@ -249,7 +249,7 @@ Test("common autocorrection: cache preserves all 140 independent rules and their
 
 ; Both real section-loading paths must agree with the independent capture. The
 ; cache is installed in memory to avoid touching a live or shared TSV artifact.
-_HsCacheCommonReferenceNative(UseCache) {
+_HsCacheCommonReferenceNative(UseCache, SourceOrdered := false) {
 	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
 	global _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup
 	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED,
@@ -266,7 +266,10 @@ _HsCacheCommonReferenceNative(UseCache) {
 		if UseCache
 			_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)
 		HSE_TestReset()
-		LoadHotstringsSection("autocorrection", "caps", { Enabled: true })
+		if SourceOrdered
+			LoadHotstringsCategory("autocorrection", Map("caps", Map("enabled", true)))
+		else
+			LoadHotstringsSection("autocorrection", "caps", { Enabled: true })
 		Assert(HSE_RegistryByGroup.Has(Key), "the real loader must publish the historical group")
 		Registered := HSE_RegistryByGroup[Key]
 		AssertEqual(140, Registered.Length, "every historical rule registers once")
@@ -295,3 +298,135 @@ Test("common autocorrection: the real cached loader preserves all historical reg
 	_HsCacheCommonReferenceNative.Bind(true))
 Test("common autocorrection: the real TOML fallback preserves all historical registrations (common-autocorrection-reference)",
 	_HsCacheCommonReferenceNative.Bind(false))
+
+
+; Drive the real cache builder, durable TSV round-trip and native registry with
+; an independent interleaved source, without changing a live bundled file.
+_HsCacheSourceOrderNative(ThroughTsv, CapsOnly, BoundMode := "") {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup, _HotstringBoundSources
+	Reference := JSON.Parse(FileRead(_HsCacheTestSharedDir()
+		. "\tests\corpus\hotstrings\source_order_entries.json", "UTF-8"))
+	Root := A_Temp . "\ergopti-source-order-" . A_TickCount . "-" . Random(100000, 999999)
+	DirCreate(Root)
+	Path := Root . "\autocorrection.toml", Tsv := Root . "\cache.tsv", BoundPath := Root . "\bound.toml"
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED,
+		_GENERATED_HOTSTRINGS, _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources]
+	try {
+		FileAppend(Reference["source"], Path, "UTF-8")
+		_HS_CACHE_ROWS := _HotstringsCacheBuildRows(Map("autocorrection", Path))
+		if ThroughTsv {
+			_HotstringsCacheWriteTsv(Tsv, _HS_CACHE_ROWS)
+			_HS_CACHE_ROWS := _HotstringsCacheReadTsv(FileRead(Tsv, "UTF-8"))
+			Assert(_HS_CACHE_ROWS.SourceOrderVersion, "a grouped legacy cache cannot qualify physical order")
+		}
+		_HS_CACHE_LOADED := true
+		_GENERATED_HOTSTRINGS := Map()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		Sections := Map("caps", Map("enabled", true))
+		if !CapsOnly {
+			Sections["terms"] := Map("enabled", true)
+			Sections["abbreviations"] := Map("enabled", true)
+		}
+		Sections["unknown"] := Map("enabled", false)
+		_HotstringBoundSources := Map()
+		if BoundMode != "" {
+			if BoundMode == "bound"
+				FileAppend(Reference["bound_source"], BoundPath, "UTF-8")
+			_HotstringBoundSources["autocorrection"] := Map("path", "", "sections", Map("caps", BoundPath))
+		}
+		HSE_TestReset()
+		if !CapsOnly && BoundMode == "" {
+			; The retained native section owner is the causal grouped-order control.
+			for Key, _Rows in _HS_CACHE_ROWS
+				_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)
+			for Section in Reference["sections"] {
+				if Sections.Has(Section) && Sections[Section].Get("enabled", false)
+					LoadHotstringsSection("autocorrection", Section, Sections[Section])
+			}
+			Legacy := [], LegacyBySequence := Map()
+			for _Key, Entries in HSE_RegistryByGroup
+				for Spec in Entries
+					LegacyBySequence[Spec.Seq] := Spec.Trigger
+			loop LegacyBySequence.Count
+				Legacy.Push(LegacyBySequence[A_Index])
+			Assert(_HsCacheRowsEqual(Legacy, Reference["declared_order"]),
+				"the original real section loader demonstrates grouped insertion order")
+			Assert(!_HsCacheRowsEqual(Legacy, Reference["admitted_source_order"]),
+				"the fixture distinguishes grouped insertion from the intended physical sequence")
+			HSE_TestReset()
+		}
+		LoadHotstringsCategory("autocorrection", Sections, Map("IsPrivate", true))
+		Wanted := BoundMode == "missing" ? []
+			: BoundMode == "bound" ? Reference["bound_caps_order"]
+			: Reference[CapsOnly ? "caps_order" : "admitted_source_order"]
+		BySequence := Map()
+		for Key, Entries in HSE_RegistryByGroup {
+			for Spec in Entries {
+				BySequence[Spec.Seq] := Spec.Trigger
+				AssertEqual(true, Spec.IsPrivate, "native caller extras survive ordered cache registration")
+				Assert(Key != "autocorrection.unknown", "disabled unknown sections do not become registered")
+				if Spec.Trigger == "secondx" {
+					AssertEqual(44, Spec.Priority)
+					AssertEqual(true, Spec.CaseSensitive)
+				} else if Spec.Trigger == "firstx" {
+					AssertEqual(10, Spec.Priority)
+					AssertEqual(true, Spec.FinalResult)
+				}
+			}
+		}
+		AssertEqual(Wanted.Length, BySequence.Count)
+		for Index, Trigger in Wanted
+			AssertEqual(Trigger, BySequence[Index], "cross-section Seq must reflect original physical source order")
+	} finally {
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5]
+		HotstringGroupConfig := Saved[6], _HotstringBoundSources := Saved[7]
+		HotstringsResolveBumpGen()
+		if FileExist(BoundPath)
+			FileDelete(BoundPath)
+		if FileExist(Path)
+			FileDelete(Path)
+		if FileExist(Tsv)
+			FileDelete(Tsv)
+		DirDelete(Root)
+	}
+}
+
+Test("common autocorrection: actual ordered native loader preserves interleaved sections (source-ordered-autocorrection)",
+	_HsCacheSourceOrderNative.Bind(false, false))
+Test("common autocorrection: TSV round-trip preserves interleaved sections and native options (source-ordered-autocorrection)",
+	_HsCacheSourceOrderNative.Bind(true, false))
+Test("common autocorrection: ordered native loader retains the actual caps-only admission (source-ordered-autocorrection)",
+	_HsCacheSourceOrderNative.Bind(true, true))
+
+Test("common autocorrection: the actual ordered category loader preserves all 140 historical registrations (common-autocorrection-reference)",
+	_HsCacheCommonReferenceNative.Bind(true, true))
+
+_HsCacheReadTsvPacket(Packet) {
+	return _HotstringsCacheReadTsv(Packet)
+}
+
+_HsCacheSourceOrderHeaderRefusals() {
+	Row := "autocorrection`tcaps`t`tfirstx`tFirst`t0`t0`t1`t`n"
+	for Prefix in ["", "# source-order-v0`n", "# source-order-v1", "# source-order-v1`r`n",
+		"# SOURCE-ORDER-V1`n", "# Source-Order-v1`n"]
+		AssertThrows(_HsCacheReadTsvPacket.Bind(Prefix . Row),
+			"missing, wrong or truncated header cannot admit an unqualified grouped cache")
+	AssertThrows(() => _HotstringsCacheReadTsv("# source-order-v1`n" . Row . "truncated`trow`n"),
+		"a malformed tail invalidates the whole cache instead of returning an admitted prefix")
+	AssertThrows(() => _HotstringsCacheReadTsv("# source-order-v1`n" . Row . "# source-order-v1`n"),
+		"a second header cannot hide a concatenated or partial cache")
+	Accepted := _HotstringsCacheReadTsv("# source-order-v1`n" . Row)
+	AssertEqual(1, Accepted.SourceOrder.Length)
+	AssertEqual("firstx", Accepted.SourceOrder[1][2][2])
+}
+Test("hotstrings cache: exact source-order header and complete records are required (source-ordered-autocorrection)",
+	_HsCacheSourceOrderHeaderRefusals)
+
+Test("common autocorrection: ordered consumer preserves actual bound caps owner (source-ordered-autocorrection)",
+	_HsCacheSourceOrderNative.Bind(true, true, "bound"))
+Test("common autocorrection: missing bound caps owner cannot use bundled cached rows (source-ordered-autocorrection)",
+	_HsCacheSourceOrderNative.Bind(true, true, "missing"))

@@ -465,6 +465,39 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				CategoryName, SectionName, Loaded)
 }
 
+; Register admitted sections together so physical TOML order survives boundaries.
+; Callers own the admission map; unknown and disabled sections do not register.
+LoadHotstringsCategory(CategoryName, Sections, ExtraOptions := Map()) {
+	global _HS_CACHE_ROWS
+	; Bound sources keep their native section owner and its existing order policy.
+	; A missing bound file never grants permission to use the bundled cache.
+	if HotstringsBoundTomlPath(CategoryName) != "" || HotstringsBoundSections(CategoryName).Count {
+		for Section, Config in Sections {
+			if (Config is Map) && Config.Get("enabled", false)
+				LoadHotstringsSection(CategoryName, Section, Config, ExtraOptions)
+		}
+		return
+	}
+	HotstringsCacheEnsure()
+	Category := StrLower(CategoryName)
+	Configs := Map(), Priorities := Map()
+	for Section, Config in Sections {
+		if !(Config is Map) || !Config.Get("enabled", false)
+			continue
+		Resolved := HotstringsResolve(CategoryName, Section)
+		Configs[Section] := { Enabled: true, TimeActivationSeconds: Resolved.Delay }
+		Priorities[Section] := Resolved.Priority
+	}
+	if !_HS_CACHE_ROWS.HasOwnProp("SourceOrder")
+		throw Error("Hotstring source order is unavailable.")
+	for Record in _HS_CACHE_ROWS.SourceOrder {
+		Parts := StrSplit(Record[1], ".",, 2)
+		if Parts[1] != Category || Parts.Length != 2 || !Configs.Has(Parts[2])
+			continue
+		_HsCacheRegisterRows(Record[1], [Record[2]], Configs[Parts[2]], ExtraOptions, Priorities[Parts[2]])
+	}
+}
+
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
 LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource := unset) {
 		if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)

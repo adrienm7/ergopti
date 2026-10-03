@@ -45,7 +45,7 @@ sections_order = ["alpha"]
 
 helpers.describe("toml_reader: cache-provider hook", function()
 	helpers.it("returns the provider's cached table verbatim on a hit (no parse)", function()
-		local sentinel = { sections = { marker = true }, sections_order = { "marker" } }
+		local sentinel = { sections = { marker = true }, sections_order = { "marker" }, source_entries = {} }
 		local load_calls = 0
 		reader.set_cache_provider({
 			load  = function(_) load_calls = load_calls + 1; return sentinel end,

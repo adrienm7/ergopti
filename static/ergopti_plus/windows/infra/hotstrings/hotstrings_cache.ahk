@@ -406,11 +406,19 @@ _HsCacheUnescape(Value) {
 ; fallback, so the cache reproduces that reference behaviour exactly. Each row is
 ; [flags, trigger(raw, ★ preserved), output, finalResult, isRepeat, isCaseSens,
 ; priorityOverride]. Runs only on a cache miss (first launch or after a TOML edit).
-_HotstringsCacheBuildRows() {
+; SourceOrder carries physical records separately; section rows retain their ABI.
+; An explicit path map lets native tests exercise the same canonical parser.
+_HotstringsCacheBuildRows(CategoryPaths := 0) {
 	global HS_BUNDLED_CATEGORIES, HS_CACHE_MARKER, _HOTSTRING_ENTRY_PATTERN
 	Rows := Map()
-	for Category in HotstringsBundledCategories() {
-		TomlPath := _HotstringsCacheTomlPath(Category)
+	Rows.SourceOrder := []
+	Rows.SourceOrderVersion := true
+	if !(CategoryPaths is Map) {
+		CategoryPaths := Map()
+		for Category in HotstringsBundledCategories()
+			CategoryPaths[Category] := _HotstringsCacheTomlPath(Category)
+	}
+	for Category, TomlPath in CategoryPaths {
 		if !FileExist(TomlPath)
 			continue
 		CategoryLower := StrLower(Category)
@@ -471,7 +479,9 @@ _HotstringsCacheBuildRows() {
 			Key := CategoryLower . "." . CurrentSection
 			if !Rows.Has(Key)
 				Rows[Key] := []
-			Rows[Key].Push([Flags, Trigger, Output, FinalResult, IsRepeat, IsCaseSens, PriorityOverride])
+			Row := [Flags, Trigger, Output, FinalResult, IsRepeat, IsCaseSens, PriorityOverride]
+			Rows[Key].Push(Row)
+			Rows.SourceOrder.Push([Key, Row])
 		}
 	}
 	return Rows
@@ -495,18 +505,20 @@ _HotstringsCacheBuildRows() {
 ; every boot keeps rebuilding from the TOML (mirrors _I18nWriteTsvCache).
 _HotstringsCacheWriteTsv(TsvPath, Rows) {
 	try {
-		Content := ""
-		for Key, RowList in Rows {
-			Parts := StrSplit(Key, ".",, 2)
+		Content := "# source-order-v1`n"
+		if !Rows.HasOwnProp("SourceOrder")
+			throw Error("Hotstring cache source order is unavailable.")
+		Records := Rows.SourceOrder
+		for Record in Records {
+			Parts := StrSplit(Record[1], ".",, 2)
 			Category := Parts[1]
 			Section := Parts.Length >= 2 ? Parts[2] : ""
-			for Row in RowList {
-				Line := Category . "`t" . Section . "`t" . Row[1] . "`t"
-				Line .= _HsCacheEscape(Row[2]) . "`t" . _HsCacheEscape(Row[3]) . "`t"
-				Line .= (Row[4] ? "1" : "0") . "`t" . (Row[5] ? "1" : "0") . "`t"
-				Line .= (Row[6] ? "1" : "0") . "`t" . (Row.Length >= 7 ? Row[7] : "") . "`n"
-				Content .= Line
-			}
+			Row := Record[2]
+			Line := Category . "`t" . Section . "`t" . Row[1] . "`t"
+			Line .= _HsCacheEscape(Row[2]) . "`t" . _HsCacheEscape(Row[3]) . "`t"
+			Line .= (Row[4] ? "1" : "0") . "`t" . (Row[5] ? "1" : "0") . "`t"
+			Line .= (Row[6] ? "1" : "0") . "`t" . (Row.Length >= 7 ? Row[7] : "") . "`n"
+			Content .= Line
 		}
 		; Finish and verify the temporary cache before the write-through atomic
 		; replacement. FileAppend cannot expose a short write, so it could publish a
@@ -523,23 +535,29 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 	}
 }
 
-; Parse a flat .tsv back into a Map(cat.sec → Array of rows). Lines with fewer
-; than the 9 expected columns are skipped defensively. The 9-column requirement
-; also bumps the cache format: an old 8-column .tsv yields zero rows here, so
-; HotstringsCacheEnsure rebuilds it from the TOML (picking up the new priority
-; column) instead of serving a priority-less cache. Only trigger/output are
+; Parse a flat .tsv back into a Map(cat.sec → Array of rows). The exact
+; source-order header fences older grouped caches; every complete record keeps
+; the existing nine-column ABI. Missing headers or malformed tails reject the
+; whole candidate, so ensure rebuilds from TOML instead of admitting a prefix.
+; Only trigger/output are
 ; unescaped; cat/sec/flags/priority are identifier-safe and stored raw. An empty
 ; priority column means "no per-entry override" — the registrar then applies the
 ; resolved section/source priority it receives.
 _HotstringsCacheReadTsv(Content) {
 	Rows := Map()
+	Rows.SourceOrder := []
+	if StrCompare(SubStr(Content, 1, StrLen("# source-order-v1`n")), "# source-order-v1`n", true) != 0
+		throw ValueError("Hotstring cache source-order header is invalid.")
+	Rows.SourceOrderVersion := true
 	loop parse, Content, "`n", "`r" {
 		Line := A_LoopField
+		if A_Index == 1
+			continue
 		if (Line == "")
 			continue
 		Fields := StrSplit(Line, "`t")
-		if Fields.Length < 9
-			continue
+		if Fields.Length != 9
+			throw ValueError("Hotstring cache record has an invalid column count.")
 		Priority := ""
 		if (Fields[9] != "" and (!RegExMatch(Fields[9], "^\d+$")
 			or !TOML_TryParseInteger(Fields[9], &ParsedPriority)
@@ -550,6 +568,7 @@ _HotstringsCacheReadTsv(Content) {
 		if !Rows.Has(Key)
 			Rows[Key] := []
 		Rows[Key].Push(Row)
+		Rows.SourceOrder.Push([Key, Row])
 	}
 	return Rows
 }
@@ -590,7 +609,7 @@ HotstringsCacheEnsure() {
 			Rows := ""
 		}
 	}
-	if !(Rows is Map) or Rows.Count == 0 {
+	if !(Rows is Map) or Rows.Count == 0 or !Rows.SourceOrderVersion {
 		Rows := _HotstringsCacheBuildRows()
 		_HotstringsCacheWriteTsv(TsvPath, Rows)
 		Fast := false
@@ -613,10 +632,15 @@ HotstringsCacheEnsure() {
 ; does on the TOML path. Bound by key into _GENERATED_HOTSTRINGS and invoked from
 ; LoadHotstringsSection.
 _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority := "") {
-	global _HS_CACHE_ROWS, ScriptInformation, HS_CACHE_MARKER, HSE_PRIORITY_COMMON
+	global _HS_CACHE_ROWS
 	if !_HS_CACHE_ROWS.Has(LoaderKey)
 		return
-	RowList := _HS_CACHE_ROWS[LoaderKey]
+	_HsCacheRegisterRows(LoaderKey, _HS_CACHE_ROWS[LoaderKey], FeatureConfig, ExtraOptions, ResolvedPriority)
+}
+
+; Both section and source-ordered registration share the exact per-row native owner.
+_HsCacheRegisterRows(LoaderKey, RowList, FeatureConfig, ExtraOptions, ResolvedPriority := "") {
+	global ScriptInformation, HS_CACHE_MARKER, HSE_PRIORITY_COMMON
 	Parts := StrSplit(LoaderKey, ".",, 2)
 	Category := Parts[1]
 	Section := Parts.Length >= 2 ? Parts[2] : ""

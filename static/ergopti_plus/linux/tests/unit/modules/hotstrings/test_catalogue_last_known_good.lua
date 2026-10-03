@@ -8,11 +8,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Reader = require("toml_codec.reader")
 
 local function parsed(trigger, replacement)
 	return {
 		meta = {},
 		sections_order = { "probe" },
+		source_entries = { { section = "probe", index = 1 } },
 		sections = {
 			probe = {
 				entries = { {
@@ -39,6 +41,7 @@ helpers.describe("hotstring catalogue: last-known-good sources", function()
 		local previous_loader = package.loaded["modules.hotstrings.loader"]
 		local states = {}
 		package.loaded["toml_codec.reader"] = {
+			registration_order = Reader.registration_order,
 			parse = function(path)
 				local state = states[path]
 				if state.raise then error(state.raise) end
