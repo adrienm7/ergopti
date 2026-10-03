@@ -231,18 +231,32 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. 'FilterDescription := ""' . "`n"
 		. 'PickerControlCount := 0' . "`n"
 		. 'PickerControlShapes := ""' . "`n"
+		. 'PickerTypeCombo := 0' . "`n"
 		. 'for ControlHwnd in WinGetControlsHwnd("ahk_id " . Hwnd) {' . "`n"
 		. 'ControlClass := WinGetClass("ahk_id " . ControlHwnd)' . "`n"
 		. 'PickerControlCount += 1' . "`n"
-		. 'if PickerControlCount <= 24 {' . "`n"
 		. 'PickerControlId := DllCall("GetDlgCtrlID", "Ptr", ControlHwnd, "Int")' . "`n"
+		. 'if ControlClass == "ComboBox" && PickerControlId == 1136 {' . "`n"
+		. 'if PickerTypeCombo' . "`n"
+		. 'throw Error("The owned native picker must have one file-type ComboBox")' . "`n"
+		. 'PickerTypeCombo := ControlHwnd' . "`n"
+		. '}' . "`n"
+		. 'if PickerControlCount <= 24 {' . "`n"
 		. 'PickerControlShapes .= (PickerControlShapes == "" ? "" : "|") . SubStr(ControlClass, 1, 48) . ":" . PickerControlId' . "`n"
 		. '}' . "`n"
-		. 'if ControlClass != "ComboBox"' . "`n"
-		. 'continue' . "`n"
-		. 'for Item in ControlGetItems(ControlHwnd)' . "`n"
-		. 'FilterDescription .= Item . "|"' . "`n"
 		. '}' . "`n"
+		. 'if !PickerTypeCombo || !DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerTypeCombo) || WinGetClass("ahk_id " . PickerTypeCombo) != "ComboBox"' . "`n"
+		. 'throw Error("The owned native picker requires its file-type ComboBox")' . "`n"
+		. 'PickerTypeItems := ControlGetItems(PickerTypeCombo)' . "`n"
+		. 'PickerTypeIndex := ControlGetIndex(PickerTypeCombo)' . "`n"
+		. 'PickerTypeChoice := ControlGetChoice(PickerTypeCombo)' . "`n"
+		. 'PickerTypeReceipt := "items=" . PickerTypeItems.Length . ",truncated=" . Max(0, PickerTypeItems.Length - 4) . ",selected=" . PickerTypeIndex' . "`n"
+		. 'for PickerTypeItemIndex, PickerTypeItem in PickerTypeItems {' . "`n"
+		. 'FilterDescription .= PickerTypeItem . "|"' . "`n"
+		. 'if PickerTypeItemIndex <= 4' . "`n"
+		. 'PickerTypeReceipt .= "|" . PickerTypeItemIndex . ":" . SubStr(StrReplace(StrReplace(PickerTypeItem, "``r", "\r"), "``n", "\n"), 1, 128)' . "`n"
+		. '}' . "`n"
+		. 'PickerTypeReceipt .= "|choice:" . SubStr(StrReplace(StrReplace(PickerTypeChoice, "``r", "\r"), "``n", "\n"), 1, 128)' . "`n"
 		. 'SetTimer(_NFPCapture, 0)' . "`n"
 		. 'if _NFPMode == "selected" {' . "`n"
 		. 'OpenButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 1, "Ptr")' . "`n"
@@ -255,6 +269,7 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. 'FileAppend(FilterDescription, _NFPRoot . "\" . _NFPMode . ".filter", "UTF-8-RAW")' . "`n"
 		. 'PickerDiagnostic := "controls=" . PickerControlCount . ",truncated=" . Max(0, PickerControlCount - 24) . ";" . PickerControlShapes' . "`n"
 		. 'FileAppend(PickerDiagnostic, _NFPRoot . "\" . _NFPMode . ".controls", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(PickerTypeReceipt, _NFPRoot . "\" . _NFPMode . ".types", "UTF-8-RAW")' . "`n"
 		. 'return' . "`n"
 		. '}' . "`n"
 		. '}' . "`n"
@@ -265,6 +280,22 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. '#Include ' . Artifact . "`n"
 		. '#Include ' . Owner . "`n"
 }
+
+
+/** Checks actual generated statement boundaries without opening any native UI. */
+_NDT_FilePickerProbeStatementSeparators() {
+	Probe := _NDT_FilePickerProbeSource("Owned policy", "Owned caption owner")
+	StrReplace(Probe, "128)" . "`n", "", , &StatementBoundaries)
+	AssertEqual(2, StatementBoundaries,
+		"both bounded filter receipt statements require real generated LF separators")
+	AssertFalse(InStr(Probe, "128)" . Chr(96) . "n") > 0,
+		"a literal backtick-n cannot separate generated native AHK statements")
+	AssertContains(Probe, '"' . Chr(96) . 'r", "\r"',
+		"the child still escapes captured carriage returns inside its own string literal")
+	AssertContains(Probe, '"' . Chr(96) . 'n", "\n"',
+		"the child still escapes captured linefeeds inside its own string literal")
+}
+Test("native file picker: generated receipt statements retain LF and escaped text", _NDT_FilePickerProbeStatementSeparators)
 
 
 /**
@@ -476,7 +507,9 @@ _NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
 		Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
 			"the actual native picker retains the display label and filter pattern (" . Kind
 				. ", policy " . Index . ", owned HWND control classes/IDs: "
-				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8") . ")")
+				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8")
+				. "; owned file-type ComboBox items/selection: "
+				. FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8") . ")")
 	}
 	AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
 		FileRead(PickerRoot . "\selected.result", "UTF-8"),

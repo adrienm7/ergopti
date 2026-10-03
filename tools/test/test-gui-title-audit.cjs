@@ -224,6 +224,41 @@ const nativePolicySource = fs.readFileSync(
 	'utf8'
 );
 assertNativePolicyFamilyIsolation(nativePolicySource);
+/** Guards statement separators separately from escaped child string contents. */
+function assertNativeProbeStatementSeparators(source) {
+	const body = source.match(/^_NDT_FilePickerProbeSource\([^\n]*\) \{\n([\s\S]*?)^\}/m);
+	assert.ok(body && body[1].trim(), 'the actual file-picker source producer is present');
+	const statements = body[1].split('\n').filter((line) => line.includes('PickerTypeReceipt .= '));
+	assert.equal(statements.length, 2, 'both bounded native type-label receipts participate');
+	for (const statement of statements) {
+		assert.match(
+			statement,
+			/' \. "`n"$/,
+			'generated native statements end with physical LF rather than literal backtick-n'
+		);
+		assert.ok(
+			statement.includes('"``r", "\\r"') && statement.includes('"``n", "\\n"'),
+			'captured text escapes CR/LF inside the native string literal independently'
+		);
+	}
+	return statements;
+}
+const nativeReceiptStatements = assertNativeProbeStatementSeparators(nativePolicySource);
+for (const statement of nativeReceiptStatements) {
+	const mutant = nativePolicySource.replace(statement, statement.replace(/"`n"$/, '"``n"'));
+	assert.notEqual(
+		mutant,
+		nativePolicySource,
+		'each separator mutation targets one actual producer'
+	);
+	assert.throws(
+		() => assertNativeProbeStatementSeparators(mutant),
+		assert.AssertionError,
+		'each original invalid native statement separator is independently rejected'
+	);
+}
+console.log('Native file-picker statement separator mutations: 2/2 passed.');
+
 const nativePolicyMutations = [
 	nativePolicySource.replace(
 		/Test\("native folder picker:[\s\S]*?_NDT_ActualNativeFolderPickerCaptionsAndResults\)/,
