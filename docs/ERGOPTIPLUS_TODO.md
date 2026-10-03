@@ -817,7 +817,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (current baseline: Windows 105, macOS 186, Linux 115, each
+      drivers still build (current baseline: Windows 105, macOS 184, Linux 115, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -959,6 +959,19 @@ Windows native unit, parse and E2E confirmation still requires CI. Items 54 and
 
 The common Show All At Once check is declared in the shared display child. Canonical `llm.display.streaming_multi = true` means progressive display on all three drivers; Windows inverts only at its unchanged native all-at-once boundary. Linux withholds intermediate complete candidates when all-at-once is enabled. Actual native owners retain strict acknowledged writes, live count, pause and master admission. Windows held and real dispatcher-deferred callbacks refuse after an acknowledged master withdrawal. Historical Windows stored booleans now follow the canonical progressive meaning, with no guessed migration or data rewrite. The native census after this tranche is Windows 105, macOS 186, Linux 115. Items 54 and 81 remain partial; actual Windows native execution, packaging and installation require complete three-OS CI. Token-level streaming remains a separate capability follow-up.
 
+The Instant On Word End and After Hotstring checks now share one declared
+trigger child on all three drivers. Native debounce, privacy and application
+providers retain their existing positions and owners. Commands reread effective
+booleans and the live master/pause admission before using the unchanged Windows
+lease transaction, macOS setting transaction or Linux durable trigger setter.
+Linux redraws only after an exact acknowledged write, and retained callbacks no
+longer toggle a captured obsolete value. Trigger settings remain independent
+of prediction count. Independent four-state pairs, actual menu label/order
+mutation, refused writers, restart and held-callback regressions cover the
+native callers. The current census is Windows 105, macOS 184 and Linux 115;
+the Show All census above is a historical checkpoint. Items 54 and 81 remain
+partial, and actual native Windows, packaging and installation require CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -1019,7 +1032,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 105, macOS 186 and Linux 115 rows are still built by the
+      Windows 105, macOS 184 and Linux 115 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:

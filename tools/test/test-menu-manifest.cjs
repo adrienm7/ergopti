@@ -792,6 +792,81 @@ function checkShowAllControl() {
 main();
 checkChoiceProjection();
 checkWordExpanderControls();
+function checkAutomaticTriggerControls() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/automatic_trigger_controls.json'), 'utf8')
+	);
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(corpus.states, [
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true]
+	]);
+	assert.deepEqual(corpus.prediction_counts, [1, 2]);
+	assert.deepEqual(
+		root.llm_trigger_menu.map((row) => row.id),
+		[
+			'llm_trigger_leading',
+			'llm_instant_on_word_end',
+			'llm_after_hotstring',
+			'llm_trigger_remaining'
+		]
+	);
+	for (const [index, expected] of corpus.rows.entries()) {
+		const declaration = root.llm_trigger_menu[index + 1];
+		assert.equal(declaration.type, 'check');
+		assert.equal(declaration.id, expected.id);
+		assert.equal(declaration.i18n, expected.i18n);
+		assert.deepEqual(declaration.checked_when, [expected.id + '_enabled']);
+		assert.deepEqual(declaration.disabled_when, ['llm_trigger_ready']);
+	}
+	for (const [file, first, last] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildTriggerMenu(',
+			'LLM_Menu_BuildLiveModeMenu('
+		],
+		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_trigger"] = function',
+			'dynamic_handlers["llm_live_mode"] = function'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first),
+			end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: real trigger consumer bounds must exist`);
+		const body = source.slice(start, end);
+		for (const owner of [
+			'llm_trigger_menu',
+			'llm_trigger_leading',
+			'llm_trigger_remaining',
+			'llm_instant_on_word_end',
+			'llm_after_hotstring',
+			'llm_instant_on_word_end_enabled',
+			'llm_after_hotstring_enabled',
+			'llm_trigger_ready'
+		]) {
+			assert(
+				body.includes(`"${owner}"`),
+				`${file}: shared trigger owner ${owner} must be consumed`
+			);
+		}
+		for (const expected of corpus.rows)
+			assert(
+				!body.includes(expected.i18n),
+				`${file}: fixed trigger labels belong to the declaration`
+			);
+	}
+	console.log(
+		'Automatic triggers: independent bool pairs and both actual native command owners declared on all drivers.'
+	);
+}
+
 checkInfoBarControl();
 checkAutoTemperatureControl();
 checkShowAllControl();
+checkAutomaticTriggerControls();

@@ -93,29 +93,8 @@ function M.build(ctx)
 	-- ===== 1.2) Instant triggers =====
 	-- =====================================================
 
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.instant_on_word_end"),
-		checked  = state.llm_instant_on_word_end,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_instant_on_word_end",
-				not state.llm_instant_on_word_end,
-				"set_llm_instant_on_word_end")
-		end or nil,
-	}
-
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.after_hotstring"),
-		checked  = state.llm_after_hotstring,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_after_hotstring",
-				not state.llm_after_hotstring,
-				"set_llm_after_hotstring")
-		end or nil,
-	}
+	local leading_rows = rows
+	rows = {}
 
 	rows[#rows + 1] = { separator = true }
 
@@ -173,7 +152,33 @@ function M.build(ctx)
 		items    = exclusion_menu,
 	}
 
-	return ManifestMenu.render_rows(rows, "llm_trigger")
+	local function ready()
+		return state.llm_enabled == true and ctx.is_disabled ~= true
+			and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+	end
+	local shared_ctx = {
+		commands = {
+			["llm_instant_on_word_end"] = function()
+				if not ready() then return false end
+				return apply_setting_transaction(settings_mgr, "llm_instant_on_word_end",
+					not state.llm_instant_on_word_end, "set_llm_instant_on_word_end")
+			end,
+			["llm_after_hotstring"] = function()
+				if not ready() then return false end
+				return apply_setting_transaction(settings_mgr, "llm_after_hotstring",
+					not state.llm_after_hotstring, "set_llm_after_hotstring")
+			end,
+		},
+		state_getters = {
+			["llm_instant_on_word_end_enabled"] = function() return state.llm_instant_on_word_end end,
+			["llm_after_hotstring_enabled"] = function() return state.llm_after_hotstring end,
+			["llm_trigger_ready"] = ready,
+		},
+	}
+	return ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, shared_ctx, {
+		["llm_trigger_leading"] = function() return leading_rows end,
+		["llm_trigger_remaining"] = function() return rows end,
+	})
 end
 
 return M
