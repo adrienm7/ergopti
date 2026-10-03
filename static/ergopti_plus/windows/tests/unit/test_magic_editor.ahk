@@ -97,7 +97,8 @@ Test("magic editor: independent shared vectors and stale-delivery fences", _MET_
 
 _MET_FreshProvenance() {
 	global _IniCache, KeyboardShortcutAssignments
-	Saved := [_IniCache, KeyboardShortcutAssignments]
+	SavedCache := IsSet(_IniCache) ? _IniCache : unset
+	SavedKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	try {
 		KeyboardShortcutAssignments := Map("win_c", "none", "win_d", "none", "magic_editor", "open_hotstrings_editor")
 		Defaults := KeyboardShortcutAssignments.Clone()
@@ -120,7 +121,8 @@ _MET_FreshProvenance() {
 		AssertEqual("copy", _MagicEditorExplicitClaim(Source, _APRL_Layout("00000409"))["action"],
 			"a personal action is never replaced by the default editor")
 	} finally {
-		_IniCache := Saved[1], KeyboardShortcutAssignments := Saved[2]
+		_IniCache := IsSet(SavedCache) ? SavedCache : unset
+		KeyboardShortcutAssignments := IsSet(SavedKeyboard) ? SavedKeyboard : unset
 	}
 }
 Test("magic editor: fresh default provenance differs from actual personal none", _MET_FreshProvenance)
@@ -175,8 +177,25 @@ _MET_RealLayouts() {
 	Selected := MagicEditorSelectSource(FrenchSource, Chr(0xF9), Known)
 	AssertEqual("Quote", Selected["source"]["code"], "French direct u-grave follows its real physical key")
 	AssertEqual(0x28, Selected["source"]["native_code"])
-	AssertEqual("source_missing", MagicEditorSelectSource(UsSource, "*", Known)["reason"],
+	; The full inventory also has a direct NumpadMultiply. Pin the higher-level
+	; Digit8 refusal to that actual position rather than excluding a valid key.
+	ShiftOnly := UsSource.Clone(), ShiftOnly["candidates"] := []
+	for Candidate in UsSource["candidates"] {
+		if Candidate["code"] == "Digit8"
+			ShiftOnly["candidates"].Push(Candidate)
+	}
+	AssertEqual(1, ShiftOnly["candidates"].Length, "the actual neutral Digit8 receipt must be present")
+	AssertEqual("8", ShiftOnly["candidates"][1]["text"], "its direct output is the digit")
+	Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x09, Us), 0x09, Us, true, false)
+	AssertEqual("*", Shifted.Text, "the actual US shifted Digit8 produces the requested glyph")
+	AssertEqual("source_missing", MagicEditorSelectSource(ShiftOnly, "*", Known)["reason"],
 		"US Shift+8 is not direct-tap source evidence")
+	Multiply := MagicEditorSelectSource(UsSource, "*", Known)
+	AssertEqual("", Multiply["reason"], "the actual independent numpad key remains admissible")
+	AssertEqual("NumpadMultiply", Multiply["source"]["code"])
+	AssertEqual(0x37, Multiply["source"]["native_code"])
+	AssertTrue(Multiply["source"]["direct"] && !Multiply["source"]["dead"],
+		"admission requires the numpad key's actual direct, non-dead output")
 	AssertEqual("source_dead", MagicEditorSelectSource(FrenchSource, "^", Known)["reason"],
 		"the actual French circumflex dead key must never capture the contextual shortcut")
 	AssertEqual("source_missing", MagicEditorSelectSource(UsSource, "A", Known)["reason"],
@@ -325,22 +344,24 @@ _MET_RegistrarRetainsCriterion() {
 			"test-physical-broker", Descriptor, Criterion,
 			Map("hotkey", HotkeyPort, "hotif", Select, "probe", Probe))
 		Assert(Handle != "", "the actual registrar must reserve an inert physical owner")
-		Native["#SC027"]["callback"].Call()
+		AssertEqual("#sc027", Descriptor["native_spec"], "the actual descriptor canonicalizes its named scan")
+		AssertTrue(Native.Has(Descriptor["native_spec"]), "the exact installed native spelling owns the callback")
+		Native[Descriptor["native_spec"]]["callback"].Call()
 		AssertEqual(0, Deliveries, "reserved native callbacks lack action authority")
 		AssertTrue(_HotkeyRegistrarActivate(Handle), "activation uses the retained physical context")
-		Native["#SC027"]["callback"].Call()
+		Native[Descriptor["native_spec"]]["callback"].Call()
 		AssertEqual(1, Deliveries)
 		RefuseOff := true
 		AssertFalse(HotkeyRegistrarUnbind(Handle), "a native Off refusal retains the exact owner")
-		Native["#SC027"]["callback"].Call()
+		Native[Descriptor["native_spec"]]["callback"].Call()
 		AssertEqual(2, Deliveries, "refusal preserves prior active authority")
 		RefuseOff := false
 		AssertTrue(HotkeyRegistrarSetEnabled(Handle, false))
-		Native["#SC027"]["callback"].Call()
+		Native[Descriptor["native_spec"]]["callback"].Call()
 		AssertEqual(2, Deliveries, "disabled native callbacks cannot deliver")
 		AssertTrue(HotkeyRegistrarSetEnabled(Handle, true))
 		AssertTrue(HotkeyRegistrarUnbind(Handle))
-		Native["#SC027"]["callback"].Call()
+		Native[Descriptor["native_spec"]]["callback"].Call()
 		AssertEqual(2, Deliveries, "acknowledged retirement rejects stale callback delivery")
 		for Event in Events
 			AssertTrue(Event["context"] == Criterion, "every native probe/On/Off retains the identical criterion")
