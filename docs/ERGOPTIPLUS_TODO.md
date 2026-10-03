@@ -562,6 +562,16 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
       text input for an address or a key.
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
+The native Windows strict version receipts exposed an older test that leaked
+an intentionally unsoldable zero-handle process record into the genuine global
+cleanup ledger. Its synthetic ledger now restores the exact predecessor ledger,
+retry timer, counter, delay and native Critical state even after interruption.
+The refused release and retry still retain their exact synthetic owner; no PID
+reopening, termination, fabricated handle or settlement is allowed. Production
+admission and the physical-wait/foreign-origin assertions remain unchanged.
+Portable gates pass; repaired callbacks await native Windows CI. Explicit
+Windows/Linux start/install and local-server discovery remain unfinished.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
