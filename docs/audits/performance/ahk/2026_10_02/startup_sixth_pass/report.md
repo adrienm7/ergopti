@@ -381,7 +381,8 @@ JS, encoding and convention receipts are retained in the private sixth-pass
 gate files.
 
 Integration rebased all local atomic commits onto remote dev, first at
-221fb7648 and then at 14c9e332b. The measured-span painter retains the new
+221fb7648, then at 14c9e332b and 5e68c8e6a. A fourth rebase onto
+e1a57ab6e adds only remote macOS changes; the checked Windows graph is unchanged. The measured-span painter retains the new
 shared regular/bold emphasis contract; its cached selected/unselected spans
 have a behavioral regression. Retained metrics hosts use the shared native
 window title owner. The hidden browser warm host now uses that same factory,
@@ -389,12 +390,18 @@ and its native fixture verifies its title, retained caption and invisibility.
 Stamp-only migrations retain source records and comments, including an adjacent
 comment, BOM, CRLF, existing metadata and a missing final newline. Migrated
 candidates still have to parse and equal the intended typed model. Other
-migration edits retain the canonical writer; this does not establish general
-byte preservation for mixed successful and skipped copies.
+migration edits now use the remote physical-record renderer. The integration
+retains its physical model/source/target validation. Creating metadata delegates
+to that owner so opaque root records stay outside the new table; prepending
+metadata failed all three new occupied-corpus variants before the correction.
+The final focused migration receipt passes 31/31, including the new remote
+physical-record cases and our existing stamp/comment cases.
 
-The serial whole AHK suite is checked again after these integration changes.
+The serial whole AHK suite passes after the second rebase. The final third
+rebase is verified proportionally through the migration corpus, native shared
+dialog policy, whole-entry compilation and encoding/title checks.
 The virtual-keyboard E2E suite passes 5/5; it does not certify the optional
-interactive keyboard path. Whole-entry compilation, all 1,785 AHK source
+interactive keyboard path. Whole-entry compilation, all 1,787 AHK source
 encodings, the strict conventions and the repository formatter pass.
 
 The complete Windows-host JS attempt records 343/352 passes. Subsequent
@@ -418,4 +425,8 @@ stopped, and an isolated PATH-normalization probe did not repair the behavior.
 The bootstrap gate remains unvalidated. No assertions were weakened or skipped
 to call those platform results green.
 
-Final AHK count: 7,878 passed, zero failed in the final serial receipt.
+Full AHK receipt before the final remote update: 7,878 passed, zero failed.
+The final remote graph registers 7,898 tests; it was not rerun in full after
+the third rebase. The final targeted receipts cover the overlapping owners: migrations 31/31,
+shared native title policies 3/3 and title-audit mutations 46/46. The title
+audit reports zero violations and zero remaining raw-title review items.
