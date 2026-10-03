@@ -862,6 +862,15 @@ same catalogue capability and independent credential/model vectors through
 their existing API owners; actual Windows execution and complete native CI
 remain pending. Automatic local-server discovery remains a separate tranche.
 
+The Linux HTTP port now exposes an optional retained GET operation for
+discovery. Signal acceptance and logical inactivity remain the historical
+boolean ABI; the new operation fences delivery on cancellation and blocks
+same-owner successors until exact process exit and every native handle-close
+callback acknowledge retirement. Independent constructor, refusal, timeout
+and premature-settlement regressions, 70 actual curl streaming/owned-GET
+checks and the unchanged 28 local-API checks qualify this prerequisite
+locally. Automatic discovery and model/menu rows remain unfinished.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
