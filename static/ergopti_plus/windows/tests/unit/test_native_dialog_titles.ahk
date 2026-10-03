@@ -229,8 +229,15 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. 'continue' . "`n"
 		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
 		. 'FilterDescription := ""' . "`n"
+		. 'PickerControlCount := 0' . "`n"
+		. 'PickerControlShapes := ""' . "`n"
 		. 'for ControlHwnd in WinGetControlsHwnd("ahk_id " . Hwnd) {' . "`n"
 		. 'ControlClass := WinGetClass("ahk_id " . ControlHwnd)' . "`n"
+		. 'PickerControlCount += 1' . "`n"
+		. 'if PickerControlCount <= 24 {' . "`n"
+		. 'PickerControlId := DllCall("GetDlgCtrlID", "Ptr", ControlHwnd, "Int")' . "`n"
+		. 'PickerControlShapes .= (PickerControlShapes == "" ? "" : "|") . SubStr(ControlClass, 1, 48) . ":" . PickerControlId' . "`n"
+		. '}' . "`n"
 		. 'if ControlClass != "ComboBox"' . "`n"
 		. 'continue' . "`n"
 		. 'for Item in ControlGetItems(ControlHwnd)' . "`n"
@@ -246,6 +253,8 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
 		. 'FileAppend(Caption, _NFPRoot . "\" . _NFPMode . ".title", "UTF-8-RAW")' . "`n"
 		. 'FileAppend(FilterDescription, _NFPRoot . "\" . _NFPMode . ".filter", "UTF-8-RAW")' . "`n"
+		. 'PickerDiagnostic := "controls=" . PickerControlCount . ",truncated=" . Max(0, PickerControlCount - 24) . ";" . PickerControlShapes' . "`n"
+		. 'FileAppend(PickerDiagnostic, _NFPRoot . "\" . _NFPMode . ".controls", "UTF-8-RAW")' . "`n"
 		. 'return' . "`n"
 		. '}' . "`n"
 		. '}' . "`n"
@@ -442,7 +451,9 @@ _NDT_ActualNativeCaptionsAndResults() {
 				AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
 					"the real file picker caption follows independent policy " . Index)
 				Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
-					"the actual native picker retains the display label and filter pattern")
+					"the actual native picker retains the display label and filter pattern (" . Kind
+						. ", policy " . Index . ", owned HWND control classes/IDs: "
+						. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8") . ")")
 			}
 			AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
 				FileRead(PickerRoot . "\selected.result", "UTF-8"),

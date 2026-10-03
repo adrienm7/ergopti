@@ -1343,6 +1343,15 @@ exact counts remain mandatory. Foreign consumers and failed, empty or
 incomplete discovery are still rejected. Production captions and the real
 30-case Zenity proof are unchanged; fresh CI qualification remains pending.
 
+The native Windows file-picker case now retains a bounded receipt of control
+classes and numeric IDs from its fixture-owned dialog. The original display-label
+and exact filter-pattern predicate remains unchanged; failure includes up to
+24 control records with explicit truncation, without control text or user paths.
+Completed native logs prove the owner parse smoke and native-folder port/lease
+cases pass, but the earlier filter failure prevents the real folder UI cases.
+The next Windows checkpoint must establish the actual control structure before
+repairing its observation; neither the filter cause nor folder UI is qualified.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
