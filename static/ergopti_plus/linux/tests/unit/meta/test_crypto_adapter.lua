@@ -11,6 +11,23 @@ local helpers = require("tests.helpers")
 local crypto  = helpers.load_module("adapters.crypto")
 
 helpers.describe("crypto adapter", function()
+	for _, row in ipairs(require("tests.support.crypto_vectors")) do
+		helpers.it("linux-crypto-byte-receipts: frames " .. row.id .. " without argv NUL", function()
+			local Shell = require("adapters.shell_runner")
+			local command, calls = nil, 0
+			Shell._set_runner(function(value)
+				command, calls = value, calls + 1
+				return "SHA2-256(stdin)= " .. row.sha256 .. "\n"
+			end)
+			local ok, digest = pcall(crypto.sha256, row.input)
+			Shell._reset_runner()
+			helpers.assert_true(ok)
+			helpers.assert_eq(digest, row.sha256)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_true(type(command) == "string" and not command:find("\0", 1, true),
+				"a command passed to exec cannot carry an embedded NUL")
+		end)
+	end
 
   -- ==========================================================================
   -- 1. Module structure

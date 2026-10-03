@@ -26,6 +26,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Shell  = require("adapters.shell_runner")
+local Base64 = require("compat.base64")
 
 local LOG = "adapters.crypto"
 
@@ -44,8 +45,17 @@ local LOG = "adapters.crypto"
 function M.sha256(data)
 	local ok, result = pcall(function()
 		if type(data) ~= "string" then return "" end
-		local output = Shell.exec(string.format(
-			"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)))
+		local output
+		if data:find("\0", 1, true) then
+			-- exec receives a C string: quoting cannot preserve embedded NUL.
+			-- The shared codec makes the shell input textual; OpenSSL restores
+			-- the original bytes before hashing through the existing primitive.
+			output = Shell.exec_exact_stdin(
+				"openssl base64 -d -A | openssl dgst -sha256 -hex 2>/dev/null", Base64.encode(data))
+		else
+			output = Shell.exec(string.format(
+				"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)))
+		end
 		-- openssl output: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
 		local hex = output:match("[0-9a-f]+%s*$") or ""
 		return (hex:gsub("%s+", ""))
