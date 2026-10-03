@@ -118,13 +118,7 @@ local function with_subject(initial_action, scenario)
 
 	local subject
 	local ok, err = xpcall(function()
-		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			json = {
-				decode = function()
-					return {keys = {{id = "a", label = "A"}}}
-				end,
-			},
-		})
+		subject = require("modules.shortcuts.keyboard_shortcuts")
 		helpers.assert_eq(subject.start(), true)
 		scenario(subject, {
 			controls = controls,

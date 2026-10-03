@@ -269,13 +269,15 @@ _LLM_AgentConnector_DeleteEarlierFiles() {
  * list is reused for LLM_AGENT_TOOLS_TTL_MS.
  * @param {Map} Config The decoded agent.json.
  * @param {Boolean} Force Whether to read the folder again now.
+ * @param {Integer} NowTick Optional snapshot tick; defaults to the current clock.
  * @returns {Map} Map("names", Array, "paths", Map(Name -> Path)).
  */
-LLM_AgentConnector_Tools(Config, Force := false) {
+LLM_AgentConnector_Tools(Config, Force := false, NowTick := unset) {
+	Now := IsSet(NowTick) ? NowTick : A_TickCount
 	global _LLM_AgentConnector_Tools, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
 	global LLM_AGENT_TOOL_EXTENSIONS, LLM_AGENT_TOOLS_TTL_MS
 	if !Force && (_LLM_AgentConnector_Tools is Map)
-			&& A_TickCount - _LLM_AgentConnector_Tools["tick"] < LLM_AGENT_TOOLS_TTL_MS
+			&& TickElapsed(_LLM_AgentConnector_Tools["tick"], Now) < LLM_AGENT_TOOLS_TTL_MS
 		return _LLM_AgentConnector_Tools
 	Dir := LLM_AgentConnector_ToolsDir()
 	Ensure := HasMethod(_LLM_AgentConnector_EnsureDirFn, "Call") ? _LLM_AgentConnector_EnsureDirFn
@@ -306,7 +308,7 @@ LLM_AgentConnector_Tools(Config, Force := false) {
 	Kept := Map()
 	for Name in Names
 		Kept[Name] := Paths[Name]
-	_LLM_AgentConnector_Tools := Map("names", Names, "paths", Kept, "tick", A_TickCount)
+	_LLM_AgentConnector_Tools := Map("names", Names, "paths", Kept, "tick", Now)
 	LoggerDebug("LLM", "AI agent: {1} tool(s) in the tools folder.", Names.Length)
 	return _LLM_AgentConnector_Tools
 }

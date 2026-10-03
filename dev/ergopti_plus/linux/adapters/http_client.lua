@@ -184,10 +184,11 @@ local function curl_args(url, headers, body, options)
 		args[#args + 1] = "--max-filesize"
 		args[#args + 1] = tostring(options.max_download_bytes)
 	end
-	if options.buffered then
-		args[#args + 1] = "--write-out"
-		args[#args + 1] = "\n" .. STATUS_MARKER .. "%{http_code}\n"
-	end
+	args[#args + 1] = "--write-out"
+	-- Streaming bodies go directly to NDJSON consumers. Curl's stderr channel
+	-- carries the receipt separately, so split status markers are never data.
+	args[#args + 1] = (options.buffered and "" or "%{stderr}")
+		.. "\n" .. STATUS_MARKER .. "%{http_code}\n"
 	-- Headers, body and URL go through a config read from stdin. On the command
 	-- line they were readable by every local process through /proc/<pid>/cmdline:
 	-- an API key in a header or a Gemini URL, and the typed text in the body.
@@ -233,6 +234,32 @@ local function buffered_result(request)
 	}
 end
 
+--- Converts a completed stream without treating curl exit or stderr as HTTP status.
+--- @param request table
+--- @return table
+local function streaming_result(request)
+	local status = tonumber(request.stderr_tail:match("\n" .. STATUS_MARKER .. "(%d%d%d)\n?$"))
+	local diagnostic = request.stderr_text:gsub("\n" .. STATUS_MARKER .. "%d%d%d\n?$", "")
+	if not status or status == 0 then
+		return { ok = false, status = 0, body = "", error = diagnostic ~= "" and diagnostic
+			or (request.exit_code ~= 0 and "curl exited with code " .. tostring(request.exit_code)
+				or "missing HTTP status") }
+	end
+	local http_success = status >= 200 and status < 300
+	local succeeded = http_success and request.exit_code == 0
+	local failure
+	if not http_success then
+		failure = "HTTP " .. tostring(status)
+	elseif not succeeded then
+		failure = diagnostic ~= "" and diagnostic or "curl exited with code " .. tostring(request.exit_code)
+	end
+	return {
+		ok = succeeded, status = status, body = "",
+		error_body = not http_success and not request.error_body_truncated and request.error_body_text or nil,
+		error = failure,
+	}
+end
+
 --- Completes once both the process and its two output streams ended.
 --- @param request table
 local function maybe_complete(request)
@@ -241,14 +268,8 @@ local function maybe_complete(request)
 	end
 	if request.buffered then
 		finish(request, buffered_result(request))
-	elseif request.exit_code == 0 then
-		finish(request, { ok = true, status = 200, body = "", error = nil })
 	else
-		finish(request, {
-			ok = false, status = 0, body = "",
-			error = request.stderr_text ~= "" and request.stderr_text
-				or "curl exited with code " .. tostring(request.exit_code),
-		})
+		finish(request, streaming_result(request))
 	end
 	close_process(request)
 end
@@ -287,6 +308,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		on_done = on_done,
 		stdout_text = "",
 		stderr_text = "",
+		stderr_tail = "",
+		error_body_text = "",
+		error_body_truncated = false,
 		stdout_eof = false,
 		stderr_eof = false,
 		exited = false,
@@ -386,9 +410,18 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 					ok = false, status = 0, body = "", error = "response body exceeds limit",
 				})
 			end
-		elseif type(request.on_chunk) == "function" then
-			local ok, callback_err = pcall(request.on_chunk, chunk)
-			if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
+		else
+			-- Status is known only at curl completion. Keep a bounded body prefix
+			-- for refused HTTP receipts independently of the caller's parser.
+			local remaining = MAX_DIAGNOSTIC_BYTES - #request.error_body_text
+			-- A prefix can itself be valid JSON while discarded trailing bytes
+			-- invalidate the complete response. Never publish it as evidence.
+			if #chunk > remaining then request.error_body_truncated = true end
+			if remaining > 0 then request.error_body_text = request.error_body_text .. chunk:sub(1, remaining) end
+			if type(request.on_chunk) == "function" then
+				local ok, callback_err = pcall(request.on_chunk, chunk)
+				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
+			end
 		end
 	end)
 	local stderr_ok, stderr_result = pcall(luv.read_start, request.stderr, function(err, chunk)
@@ -400,6 +433,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 			request.stderr_eof = true
 			maybe_complete(request)
 		else
+			-- Preserve the receipt's final bytes even when preceding diagnostics
+			-- exhaust their budget; stderr can split at every marker boundary.
+			request.stderr_tail = (request.stderr_tail .. chunk):sub(-(#STATUS_MARKER + 16))
 			local remaining = MAX_DIAGNOSTIC_BYTES - #request.stderr_text
 			if remaining > 0 then request.stderr_text = request.stderr_text .. chunk:sub(1, remaining) end
 		end

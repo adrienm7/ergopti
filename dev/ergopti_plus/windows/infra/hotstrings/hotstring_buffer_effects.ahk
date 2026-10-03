@@ -69,8 +69,9 @@ global HS_BUFFER_BACKSPACE_PAYLOAD := "i)^\{BackSpace(?:\s+(\d+))?\}$"
 ; The returned token owns every tooltip/analytics side effect. Finish it only
 ; after leaving Critical; those effects may pump the message loop or log to disk.
 ; @param Payload {String} The exact Send/SendInput payload about to be emitted.
+; @param SendFailed {Boolean} Whether an unsuccessful send left its effect unknown.
 ; @return {Object} Post-commit effects token.
-HS_CommitSyntheticEffect(Payload) {
+HS_CommitSyntheticEffect(Payload, SendFailed := false) {
 	global HS_BUFFER_NEUTRAL_PAYLOAD, HS_BUFFER_BACKSPACE_PAYLOAD
 	if !A_IsCritical
 		throw Error("HS_CommitSyntheticEffect requires a Critical send transaction.")
@@ -79,7 +80,7 @@ HS_CommitSyntheticEffect(Payload) {
 		return { Kind: "neutral", Payload: Payload }
 	}
 
-	if RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD, &BsMatch) {
+	if !SendFailed and RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD, &BsMatch) {
 		Reps := (BsMatch[1] != "") ? BsMatch[1] + 0 : 1
 		HasPreviewCommit := IsSet(_PrefixCommitBackspace)
 		BackspaceCommit := 0
@@ -108,16 +109,17 @@ HS_CommitSyntheticEffect(Payload) {
 	; Everything else moves the caret, changes focus, or rewrites the line. What
 	; sits left of the caret is now unknown, so the next typed run must start
 	; fresh — the same verdict the watcher reaches for a physical arrow key.
-	; KnownTerminatorBefore := true because the cursor lands at a position the
-	; next run may legitimately treat as a word start.
+	; A completed caret move permits a new word start. A rejected or partially
+	; emitted edit does not establish a boundary or a precise deletion count.
+	KnownBoundary := !SendFailed
 	if IsSet(_PrefixCommitInputContext) {
-		PrefixCommit := _PrefixCommitInputContext(0, true)
+		PrefixCommit := _PrefixCommitInputContext(0, KnownBoundary)
 		NeedsLegacyPrefixReset := false
 	} else {
 		; Engine-only/unit harness fallback. Production always has the paired
 		; commit above, so no user-reachable path publishes one buffer first.
 		if IsSet(HSE_FeedReset)
-			HSE_FeedReset(true, true)
+			HSE_FeedReset(KnownBoundary, true)
 		PrefixCommit := 0
 		NeedsLegacyPrefixReset := IsSet(_ResetPrefixBuffer)
 	}
@@ -170,6 +172,10 @@ HS_RunSyntheticInputTransaction(Payload, SendFn) {
 		try Result := SendFn.Call()
 		catch as Err
 			SendError := Err
+		; Never roll back a model after a possibly partial native send. Its real
+		; text is unknown; clearing both models prevents a phantom expansion.
+		if IsObject(SendError) or !_SendVerdictSucceeded(Result)
+			Token := HS_CommitSyntheticEffect(Payload, true)
 	} finally {
 		Critical(PreviousCritical)
 	}

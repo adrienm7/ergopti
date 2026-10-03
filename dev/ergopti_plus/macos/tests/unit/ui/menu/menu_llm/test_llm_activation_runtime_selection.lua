@@ -36,8 +36,8 @@ helpers.describe("AI enable installs only its backend's runtime (ai-runtime-enab
 		}, function(action, state, calls)
 			action()
 			helpers.assert_eq(#calls.offer_dialogs, 1, "one error explains and offers the install")
-			helpers.assert_true(calls.offer_dialogs[1].message:find("llm.unreachable.body_missing", 1, true) ~= nil,
-				"the error itself says the AI stays off without Ollama")
+			helpers.assert_true(calls.offer_dialogs[1].message:find("llm.unreachable.body_unconfirmed", 1, true) ~= nil,
+				"the error says readiness is unconfirmed and the AI stays off")
 			helpers.assert_eq(calls.offers, 0, "no second question")
 			helpers.assert_eq(calls.ollama_installs, 0, "a decline never downloads")
 			helpers.assert_eq(state.llm_enabled, false, "a decline keeps the AI off")
@@ -53,13 +53,15 @@ helpers.describe("AI enable installs only its backend's runtime (ai-runtime-enab
 	helpers.it("installs Ollama once when the install is accepted, then checks the model", function()
 		with_activation("ollama", { true }, {
 			ollama_installed = false,
-			offer_pick = function(dialog)
-				helpers.assert_eq(dialog.choices, { "llm.unreachable.install|Ollama" })
-				return 1
-			end,
+			version_receipts = {
+				{ ok = false, status = 0, body = "" },
+				{ ok = true, status = 200, body = '{"version":"post-install-native-fixture"}' },
+			},
+			offer_pick = function() return 1 end,
 		}, function(action, state, calls)
 			action()
 			helpers.assert_eq(#calls.offer_dialogs, 1)
+			helpers.assert_eq(calls.offer_dialogs[1].choices, { "llm.unreachable.install|Ollama" })
 			helpers.assert_eq(calls.offers, 0, "the install button was the consent")
 			helpers.assert_eq(calls.ollama_installs, 1)
 			helpers.assert_eq(calls.bootstrap, 0, "an Ollama enable must not bootstrap MLX")
@@ -67,7 +69,11 @@ helpers.describe("AI enable installs only its backend's runtime (ai-runtime-enab
 				"the model check must wait for the accepted download")
 			helpers.assert_type(calls.bootstrap_callback, "function")
 
+			helpers.assert_eq(calls.saves, 0, "AI remains off until actual repair acknowledgement and a fresh version receipt")
+			helpers.assert_eq(state.llm_enabled, false)
 			calls.bootstrap_callback(true)
+			helpers.assert_eq(calls.service_repairs, 1)
+			helpers.assert_eq(#calls.version_requests, 2)
 			helpers.assert_eq(calls.requirements, 1)
 			helpers.assert_eq(calls.ollama_installs, 1)
 			helpers.assert_eq(state.llm_enabled, true)

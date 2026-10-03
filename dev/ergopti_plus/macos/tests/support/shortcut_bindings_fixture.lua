@@ -209,6 +209,7 @@ function M.with_bindings(callback)
 		factory_args = {}, wheel = { vertical = {}, horizontal = {} } }
 	return helpers.with_stub_scope({
 		"modules.shortcuts.bindings",
+		"adapters.hotkey_registrar",
 		"platform.remap.nav_layer",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
@@ -218,6 +219,7 @@ function M.with_bindings(callback)
 		"infra.i18n",
 		"infra.logger",
 	}, function()
+		package.loaded["adapters.hotkey_registrar"] = nil
 		local facades = build_facades(ctx)
 		package.loaded["modules.shortcuts.actions.text"] = facades.text
 		package.loaded["modules.shortcuts.actions.apps"] = facades.apps

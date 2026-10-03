@@ -275,3 +275,99 @@ _HotstringsScopeLargeCatalogue() {
 	}
 }
 Test("hotstrings-capacity: 32 personal files publish and roll back as one journal", _HotstringsScopeLargeCatalogue)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 1/ Measured delay recommendations =======
+; =================================================
+; =================================================
+
+_HotstringsScopeDelayVectorInherited(Vector, *) {
+	return Vector["inherited"]
+}
+
+_HotstringsScopeDelayVectors() {
+	global _SharedDir
+	Fixture := JsonParse(FSReadUtf8Exact(_SharedDir .
+		"\tests\corpus\hotstrings\scope_override_delay_vectors.json"))
+	for Vector in Fixture["vectors"] {
+		Rows := HotstringsScopeDelayRecommendations(Vector["mode"], Fixture["features"],
+			[Map("id", Vector["id"], "sections", [Vector["section"]],
+				"bundled", Vector["bundled"])], _HotstringsScopeDelayVectorInherited.Bind(Vector))
+		AssertEqual(Vector.Has("expected") ? 1 : 0, Rows.Length, Vector["name"])
+		if Vector.Has("expected") {
+			AssertEqual(Vector["id"], Rows[1]["group"], Vector["name"])
+			AssertEqual(Vector["section"], Rows[1]["section"], Vector["name"])
+			AssertEqual(Vector["expected"], Rows[1]["seconds"], Vector["name"])
+			AssertEqual(Vector["inherited"], Rows[1]["inherited"], Vector["name"])
+		}
+	}
+}
+Test("hotstrings-scope: independent delay vectors agree with both Lua drivers", _HotstringsScopeDelayVectors)
+
+_HotstringsScopeMeasuredDelayRoundTrip() {
+	global _HotstringsOverrides, _HSResolveCache, _HSResolveGen, HotstringGroupConfig
+	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen,
+		groups: HotstringGroupConfig }
+	Fixture := _HotstringsScopeFixture()
+	Fixture.options["sections"] := (Entry) => [{ Name: Entry.IsPersonal ? "words" : "caps" }]
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		; Other resolver fixtures deliberately seed empty metadata. This real-corpus
+		; round trip owns a fresh cache so the actual TOML parser supplies inheritance.
+		HotstringGroupConfig := Map()
+		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", "caps"),
+			"the real corpus makes deletion inherit 1.0 seconds")
+		AssertEqual(0.5, ManifestValueFor("hotstrings.autocorrection.caps.time_activation_seconds", "recommended"),
+			"the real shared manifest recommends 0.5 seconds")
+		for Mode in ["recommended", "clear"] {
+			Fixture.options["stamp"] := "measured-delay-" . Mode
+			Receipt := HotstringsScopeApply(Mode, Fixture.options)
+			AssertEqual("pending", Receipt["status"])
+			Overrides := TOML_ParseFreshFile(Fixture.overrides)
+			if Mode == "recommended"
+				AssertEqual(0.5, Overrides["autocorrection.caps"]["delay"],
+					"the acknowledged candidate explicitly stores the recommendation")
+			else
+				Assert(!Overrides.Has("autocorrection.caps") || !Overrides["autocorrection.caps"].Has("delay"),
+					"clear removes the recommendation and returns to corpus inheritance")
+			_HotstringsOverrides := _ParseOverrides(Fixture.overrides)
+			HotstringsResolveBumpGen()
+			AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
+				HotstringsResolve("autocorrection", "caps").Delay,
+				"the actual native resolver delivers the requested delay")
+			AssertEqual("keep", Overrides["autocorrection"]["unknown"])
+			AssertEqual(9, Overrides["foreign"]["delay"])
+			Personal := TOML_ParseFreshFile(Fixture.personal[1])
+			AssertEqual("Keep corpus", Personal["_meta"]["description"])
+			AssertContains(FSReadUtf8Exact(Fixture.personal[1]), '"abc" = "replacement"')
+			for Path in [Fixture.path, Fixture.overrides, Fixture.personal[1]]
+				Assert(!_ConfigWriteLeaseTryAcquire(Path, "concurrent-delay-editor"))
+			Refusal.Call("native replacement refused measured delay")
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.overrideSource, FSReadUtf8Exact(Fixture.overrides))
+			AssertEqual(Fixture.personalSource, FSReadUtf8Exact(Fixture.personal[1]))
+		}
+	} finally {
+		_HotstringsOverrides := Saved.overrides
+		_HSResolveCache := Saved.cache
+		_HSResolveGen := Saved.generation
+		HotstringGroupConfig := Saved.groups
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+	Assert(HotstringGroupConfig == Saved.groups, "the original metadata cache identity is restored")
+}
+Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal", _HotstringsScopeMeasuredDelayRoundTrip)

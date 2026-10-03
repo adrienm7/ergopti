@@ -20,7 +20,7 @@ local KEYCODE_ESCAPE = 53
 
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
-	"modules.keymap.magic_key_source",
+	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -180,6 +180,37 @@ helpers.describe("magic key source menu: capturing a key", function()
 			helpers.assert_eq(world.notices[#world.notices].body,
 				require("infra.i18n").get("dialog.magic_key_source.not_a_candidate"))
 			helpers.assert_eq(world.notices[#world.notices].kind, "warning")
+		end)
+	end)
+end)
+
+helpers.describe("magic key source menu: configured tap ownership", function()
+	helpers.it("(magic-key-source) selection and capture refuse an assigned source before any save", function()
+		with_menu(function(Menu, world)
+			local Tap = require("modules.shortcuts.tap_keys")
+			local actions = require("modules.gestures.actions")
+			helpers.assert_true(Tap.apply_configuration({ shortcuts = { tap_keys = { number_row_left = "send_text" } } }, actions.is_assignable))
+			local ctx = context(true)
+			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do
+				helpers.assert_eq(Menu.choose(ctx, code), false)
+			end
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_eq(ctx.applied, {})
+			helpers.assert_eq(ctx.state.magic_key_source, "auto")
+			local reason = require("infra.i18n").get(require("keymap.magic_key_source").TAP_CONFLICT_REASON)
+			helpers.assert_eq(world.notices[1].body, reason)
+			local row = nil
+			for _, candidate in ipairs(Menu.rows(ctx)[1].items) do
+				if candidate.label and candidate.label:find("(Backquote)", 1, true) or candidate.label == "Backquote — " .. reason then row = candidate end
+			end
+			helpers.assert_true(row and row.disabled)
+			helpers.assert_nil(row.action)
+			helpers.assert_true(Menu.capture(ctx))
+			helpers.assert_true(world.taps[1].callback(key_down(50)))
+			run_deferred(world)
+			helpers.assert_eq(ctx.saves, 0, "captured conflicts use the same pre-write refusal")
+			helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
+			helpers.assert_true(Menu.choose(ctx, "auto"), "automatic never takes a configured tap")
 		end)
 	end)
 end)

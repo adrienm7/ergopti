@@ -35,6 +35,7 @@ local Vision        = require("llm.vision")
 local JsonCodec     = require("adapters.json_codec")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
+local Brightness = require("brightness_actions").load()
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
@@ -791,8 +792,8 @@ ax("volume",
 	function() sysKey("SOUND_UP") end, true)
 
 ax("brightness", 
-	function() sysKey("BRIGHTNESS_DOWN") end, 
-	function() sysKey("BRIGHTNESS_UP") end, true)
+	function() return sysKey(Brightness.actions.brightness_down.macos_system) end, 
+	function() return sysKey(Brightness.actions.brightness_up.macos_system) end, true)
 
 ax("tracks",     
 	function() sysKey("PREVIOUS") end, 
@@ -1032,8 +1033,8 @@ sg("line_end",              function() return defer_key("line end", {"cmd"}, "ri
 sg("vol_up",                        function() sysKey("SOUND_UP") end)
 sg("vol_down",                      function() sysKey("SOUND_DOWN") end)
 sg("mute",                       function() sysKey("MUTE") end)
-sg("brightness_up",             function() sysKey("BRIGHTNESS_UP") end)
-sg("brightness_down",           function() sysKey("BRIGHTNESS_DOWN") end)
+sg("brightness_up",             function() return sysKey(Brightness.actions.brightness_up.macos_system) end)
+sg("brightness_down",           function() return sysKey(Brightness.actions.brightness_down.macos_system) end)
 sg("track_play",               function() sysKey("PLAY") end)
 sg("track_next",              function() sysKey("NEXT") end)
 sg("track_prev",            function() sysKey("PREVIOUS") end)
@@ -2494,7 +2495,8 @@ local function register_modifier_chords(catalogue)
 	end
 end
 
-register_modifier_chords(load_modifier_chords(_modifier_chords_json))
+local ModifierChordCatalogue = load_modifier_chords(_modifier_chords_json)
+register_modifier_chords(ModifierChordCatalogue)
 
 --- The translated text of one picker heading. Older header values carry a
 --- leading "#" from when the level was spelled inside the text; the level now
@@ -2543,14 +2545,7 @@ end
 --- Every id a binding may name: the listed single actions (modifier chords
 --- included), the axis actions and "none". Built once — the catalogue and the
 --- chord matrix are fixed for the life of the process.
-local ASSIGNABLE = { none = true }
-for _, item in ipairs(Catalogue.sg_items) do
-	if item.kind == "action" then ASSIGNABLE[item.id] = true end
-end
-for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-	for _, action_id in ipairs(group.actions) do ASSIGNABLE[action_id] = true end
-end
-for _, name in ipairs(Catalogue.ax_items) do ASSIGNABLE[name] = true end
+local ASSIGNABLE = require("actions.assignable").build(Catalogue, ModifierChordCatalogue, "macos")
 
 --- True when `name` is an action the catalogue offers on macOS. Bindings are
 --- validated against this, as Windows validates against its registry, so an id

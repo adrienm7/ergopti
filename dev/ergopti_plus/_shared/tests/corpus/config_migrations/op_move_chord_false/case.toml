@@ -1,0 +1,6 @@
+[case]
+description = "Explicit legacy false disables an absent contextual shortcut."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

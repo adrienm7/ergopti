@@ -1,0 +1,6 @@
+[_meta]
+schema_version = 2
+
+[shortcuts.keyboard]
+magic_editor = false
+hs_ctrl_d = "future_action"

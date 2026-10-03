@@ -88,6 +88,7 @@ function M.resolver()
 		entry    = Manifest.find_entry_by_path(M.PATH),
 		registry = registry(),
 		field    = "hs",
+		aliases  = { ISO_FORM },
 	})
 	return _resolver
 end
@@ -97,9 +98,8 @@ end
 --- @param value string A candidate code.
 --- @return table keycodes keycode -> true.
 local function keycodes_of(value)
-	local keycodes = { [M.resolver().native(value)] = true }
-	local iso = registry().keys[value][ISO_FORM]
-	if type(iso) == "table" and type(iso.hs) == "number" then keycodes[iso.hs] = true end
+	local keycodes = {}
+	for _, code in ipairs(M.resolver().native_codes(value)) do keycodes[code] = true end
 	return keycodes
 end
 
@@ -151,6 +151,21 @@ function M.keycode()
 	return _keycode
 end
 
+--- The refusal reason for a candidate reserved by a configured tap assignment.
+--- @param value string Candidate or automatic value.
+--- @return string|nil reason_key
+function M.choice_reason(value)
+	local resolver = M.resolver()
+	if value == resolver.automatic then return nil end
+	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
+	local TapKeys = require("modules.shortcuts.tap_keys")
+	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	if Shared.tap_conflict(resolver, value, TapKeys.keys(), "hs", TapKeys.get_action) then
+		return Shared.TAP_CONFLICT_REASON
+	end
+	return nil
+end
+
 --- Whether a keycode can be the chosen key: the tap's one cheap question.
 --- @param key_code number Virtual keycode of the press.
 --- @return boolean
@@ -166,7 +181,14 @@ end
 --- @return boolean
 function M.remaps(key_code, flags, replace_on)
 	if not M.owns(key_code) then return false end
-	return Shared.unmodified(flags) and replace_on() == true
+	if not Shared.unmodified(flags) or replace_on() ~= true then return false end
+	-- Only the already-loaded, acknowledged dispatcher can own this press.
+	-- No native module, file or layout probe is loaded from the keyDown path.
+	local System = package.loaded["modules.shortcuts.actions.system"]
+	if type(System) == "table" and type(System.has_tap_key_claim) == "function" then
+		return System.has_tap_key_claim(key_code, flags) == false
+	end
+	return true
 end
 
 return M

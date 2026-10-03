@@ -1,0 +1,6 @@
+[case]
+description = "Historical explicit shortcut header hands off its exact native chord."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 
 --- Normalizes a configuration directory through the canonical XDG default.
 --- @param config_paths table Configuration-path authority.
@@ -45,6 +46,7 @@ function M.pick(shell, config_paths, i18n, current)
 	if seed == nil then return nil, "configuration directory is unavailable" end
 	local title = type(i18n) == "table" and type(i18n.get) == "function"
 		and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
+	title = WindowTitles.compose(title)
 	local command
 	if shell.has_command("zenity") then
 		command = "zenity --file-selection --directory --title=" .. shell.quote(title)

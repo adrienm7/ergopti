@@ -261,7 +261,12 @@ local function with_trigger_fixture(options, body)
 			prompt_shortcut = function() return true end,
 		}
 
+		-- Build this fixture's physical map from the actual native stub without
+		-- borrowing the incoming hs sentinel or publishing another cache entry.
+		-- Isolation regressions deliberately enter with hs absent/false/empty.
+		local native_stub = assert(loadfile(helpers.driver_root() .. "/tests/stubs/hs.lua"))()
 		_G.hs = {
+			keycodes = { map = native_stub.keycodes.map },
 			hotkey = {
 				bind = function(mods, key, callback)
 					return backend.create_native(callback, true, table.concat(mods, "+") .. "+" .. key)

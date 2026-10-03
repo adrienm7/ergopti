@@ -1,0 +1,5 @@
+[_meta]
+schema_version = 2
+
+[shortcuts.keyboard]
+magic_editor = "open_config"

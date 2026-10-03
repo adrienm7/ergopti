@@ -168,6 +168,8 @@ M.get_keyboard_slot_groups = function() return KeyboardShortcuts.SLOT_GROUPS end
 M.available_keyboard_slots = KeyboardShortcuts.available_slots
 M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
 M.keyboard_binding_id      = KeyboardShortcuts.binding_id
+M.configure_magic_editor   = KeyboardShortcuts.configure_magic_editor
+M.refresh_magic_editor     = KeyboardShortcuts.refresh_magic_editor
 
 --- Stops independent shortcut children without letting one refusal hide its sibling.
 --- @param steps table[] Ordered `{name, stop}` descriptors.
@@ -346,7 +348,7 @@ end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
 --- @return boolean committed True only when both child starts committed.
-function M.resume_bindings(parent, candidate)
+function M.resume_bindings(parent, candidate, keyboard_claims)
 	local claim = binding_pause_claim(parent)
 	local owned_claim = binding_pause_claims[claim] == true
 	M.release_bindings_pause_claim(claim)
@@ -389,7 +391,7 @@ function M.resume_bindings(parent, candidate)
 		{
 			name = "keyboard_shortcuts",
 			start = function()
-				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)(candidate)
+				return (KeyboardShortcuts.resume_after_pause or KeyboardShortcuts.start)(candidate, keyboard_claims)
 			end,
 			stop = KeyboardShortcuts.pause or KeyboardShortcuts.stop,
 		},

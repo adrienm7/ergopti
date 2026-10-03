@@ -1465,22 +1465,6 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_d",
-										"value": "open_hotstrings_editor",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"text": "Win + D"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.open_hotstrings_editor"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.keyboard.win_g",
 										"value": "open_url",
 										"default": "none",

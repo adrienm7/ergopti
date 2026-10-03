@@ -57,6 +57,54 @@ _MR_GetMenuDef(Key) {
 	return (Arr is Array) ? Arr : []
 }
 
+; Read the shared Dynamic child records through the existing manifest owner.
+; A missing declaration is a boot-model error, never an invented private order.
+_MR_GetDynamicHotstringFamilies() {
+	Root := _MR_GetManifestRoot()
+	Node := Root is Map ? Root.Get("dynamic_hotstring_families", false) : false
+	Rows := Node is Map ? Node.Get("rows", false) : false
+	if !(Rows is Array) || !Rows.Length
+		throw Error("Dynamic hotstring families require their shared menu declaration.")
+	Result := [], Seen := Map()
+	for Row in Rows {
+		if !(Row is Map)
+			throw Error("Dynamic hotstring family must be a record.")
+		if Row.Get("separator", false) {
+			if Row.Has("id")
+				throw Error("Dynamic separator cannot also be a family.")
+		} else {
+			for Key in ["id", "section", "i18n", "legacy_key"] {
+				if !Row.Has(Key) || Type(Row[Key]) != "String" || Row[Key] == ""
+					throw Error("Dynamic hotstring family requires " . Key . ".")
+			}
+			if Seen.Has(Row["id"])
+				throw Error("Duplicate Dynamic hotstring family: " . Row["id"] . ".")
+			Seen[Row["id"]] := true
+		}
+		Result.Push(ManifestCloneValue(Row))
+	}
+	return Result
+}
+
+; Preserve the native legacy identities while sharing every displayed family.
+_MR_DynamicHotstringsKeyMap() {
+	Result := Map()
+	for Row in _MR_GetDynamicHotstringFamilies() {
+		if !Row.Get("separator", false)
+			Result[Row["legacy_key"]] := Row["id"]
+	}
+	return Result
+}
+
+; The tray and headless native fixtures consume this same boot-order owner.
+_MR_DynamicHotstringsOrder() {
+	Result := []
+	for Row in _MR_GetDynamicHotstringFamilies()
+		Result.Push(Row.Get("separator", false) ? "-" : Row["legacy_key"])
+	return Result
+}
+
+
 
 
 
@@ -509,9 +557,10 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 ; added to the feature appears without a driver change. The driver supplies the
 ; current value through ``StateGetters[path]`` and what choosing a value does
 ; through ``Commands[id]``, called with that value. The shared Lua renderer
-; draws the identical row.
+; draws the identical row. Optional show_current_choice fills {1} in the parent
+; caption from its selected leaf, with no competing native label policy.
 ; @returns {Integer} 1 when the row was drawn, 0 otherwise.
-_MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+_MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 	Id := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	Path := _MR_Get(Item, "path")
@@ -522,11 +571,11 @@ _MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	}
 	if (Id == "" or I18nKey == "" or Path == "" or !(Choices is Array) or Choices.Length == 0) {
 		try LoggerError("MenuRenderer", "choice item in '{1}' needs id, i18n, path and choices — skipped.", ManifestKey)
-		return 0
+		return false
 	}
 	if !(Commands is Map and Commands.Has(CmdId)) {
 		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}.{3}' choice — skipped.", CmdId, ManifestKey, Id)
-		return 0
+		return false
 	}
 	; Fails open like checked_when: no value is ticked rather than a guessed one,
 	; and the drift is loud.
@@ -540,18 +589,51 @@ _MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	}
 	Command := Commands[CmdId]
 	Rows := []
+	CurrentLabel := ""
 	for Choice in Choices {
 		Value := _MR_Get(Choice, "value")
+		ChoiceLabel := _MR_Get(Choice, "label")
+		if ChoiceLabel == ""
+			ChoiceLabel := t(_MR_Get(Choice, "i18n"))
+		if HasCurrent and Current == Value {
+			CurrentI18n := _MR_Get(Choice, "current_i18n")
+			CurrentLabel := CurrentI18n == "" ? ChoiceLabel : t(CurrentI18n)
+		}
 		Rows.Push(Map(
-			"label",   t(_MR_Get(Choice, "i18n")),
+			"label",   ChoiceLabel,
 			"checked", HasCurrent and Current == Value,
 			"action",  ((V) => (*) => Command(V))(Value)))
 	}
-	Row := Map("label", t(I18nKey), "items", Rows)
+	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
+	if _MR_Get(Item, "show_current_choice", false) {
+		if CurrentLabel == ""
+			CurrentLabel := String(Current)
+		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
+	}
+	Row := Map("label", Label, "items", Rows)
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 	}
-	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+	return Row
+}
+
+; Returns provider DATA for one published choice, using the ordinary renderer's
+; label, checked-state and mutation policy. Drivers supply only native owners.
+; @returns {Map|Integer} The row data, or false when the declaration is absent.
+MenuRenderer_ChoiceRow(ManifestKey, RowId, Commands, StateGetters) {
+	for Item in _MR_GetMenuDef(ManifestKey) {
+		if (_MR_Get(Item, "type") == "choice" and _MR_Get(Item, "id") == RowId and _MR_IsForPlatform(Item, "ahk"))
+			return _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters)
+	}
+	try LoggerError("MenuRenderer", "Missing declared choice '{1}.{2}' — provider row refused.", ManifestKey, RowId)
+	return false
+}
+
+; Draws the same declared choice DATA used by native list providers.
+; @returns {Integer} The number of drawn rows.
+_MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Row := _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters)
+	return Row is Map ? _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1) : 0
 }
 
 ; The command every master-gated category registers for its switch: flip

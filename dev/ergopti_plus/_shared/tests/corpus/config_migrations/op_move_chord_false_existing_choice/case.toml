@@ -1,0 +1,6 @@
+[case]
+description = "An existing recognized contextual choice wins over legacy disabled handoff."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

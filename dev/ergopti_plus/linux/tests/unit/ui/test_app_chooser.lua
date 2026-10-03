@@ -40,7 +40,7 @@ helpers.describe("open_app application chooser (Linux)", function()
 		local id, err = Chooser.pick(shell, "Open an application")
 		helpers.assert_eq(err, nil)
 		helpers.assert_eq(id, "org.gnome.Nautilus")
-		helpers.assert_eq(commands[1], "zenity --file-selection --title='Open an application'"
+		helpers.assert_eq(commands[1], "zenity --file-selection --title='ErgoptiPlus — Open an application'"
 			.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
 	end)
 
@@ -48,7 +48,7 @@ helpers.describe("open_app application chooser (Linux)", function()
 		local shell, commands = fake_shell({ kdialog = true }, "/usr/share/applications/firefox.desktop")
 		helpers.assert_eq((Chooser.pick(shell, "T")), "firefox")
 		helpers.assert_eq(commands[1], "kdialog --getopenfilename '/usr/share/applications/' '*.desktop'"
-			.. " --title 'T' 2>/dev/null")
+			.. " --title 'ErgoptiPlus — T' 2>/dev/null")
 	end)
 
 	helpers.it("a cancelled dialog, another file or no dialog tool chooses nothing", function()

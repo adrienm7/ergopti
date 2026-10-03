@@ -60,6 +60,7 @@ graph TD
         LINUX_window_info["WindowInfo.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
+        LINUX_xkb_source_probe["XkbSourceProbe.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
@@ -78,6 +79,7 @@ graph TD
         MACOS_json_codec["JsonCodec.lua"]
         MACOS_key_state["KeyState.lua"]
         MACOS_keyboard_hook["KeyboardHook.lua"]
+        MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_log_transport["LogTransport.lua"]
         MACOS_modifier_injector["ModifierInjector.lua"]
         MACOS_mouse_control["MouseControl.lua"]
@@ -122,9 +124,11 @@ graph TD
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
         WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
+        WINDOWS_native_folder_picker["NativeFolderPicker.ahk"]
         WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
+        WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_storage["Storage.ahk"]

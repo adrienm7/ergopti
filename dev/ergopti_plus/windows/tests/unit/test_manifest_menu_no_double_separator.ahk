@@ -26,15 +26,21 @@
 
 ; Returns every misplaced separator of a native menu as a readable string.
 _MMNDS_Defects(TargetMenu, MenuName) {
-	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
+	static MIIM_FTYPE := 0x100, MFT_SEPARATOR := 0x800
 	HMENU := TargetMenu.Handle
 	Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
 	Assert(Count >= 0, "the rendered menu '" . MenuName . "' must expose a usable HMENU")
 	Defects := ""
 	PrevWasSep := true
+	; GetMenuState packs a submenu's child count into the flag word: ten children
+	; set 0x800 without a separator. Query the actual item type independently.
+	ItemInfo := Buffer(A_PtrSize == 8 ? 80 : 48, 0)
+	NumPut("uint", ItemInfo.Size, "uint", MIIM_FTYPE, ItemInfo)
 	loop Count {
-		State := DllCall("GetMenuState", "ptr", HMENU, "uint", A_Index - 1, "uint", MF_BYPOSITION, "uint")
-		IsSep := (State != 0xFFFFFFFF) and (State & MF_SEPARATOR) != 0
+		TypeRead := DllCall("GetMenuItemInfoW", "ptr", HMENU, "uint", A_Index - 1,
+			"int", true, "ptr", ItemInfo, "int")
+		Assert(TypeRead != 0, "the menu item type in '" . MenuName . "' must be acknowledged")
+		IsSep := (NumGet(ItemInfo, 8, "uint") & MFT_SEPARATOR) != 0
 		if (IsSep and PrevWasSep) {
 			Defects .= MenuName . ": separator at position " . A_Index . "; "
 		}
@@ -166,3 +172,50 @@ _MMNDS_NormalizeDropsMisplacedSeparators() {
 }
 Test("menu: _MR_NormalizeSeparators keeps one separator between rows (layout-menu-double-separator)",
 	_MMNDS_NormalizeDropsMisplacedSeparators)
+
+; A native submenu's high byte is a count, while real separator types must still
+; expose every leading, trailing and doubled separator to the same walker.
+_MMNDS_SubmenuCountDoesNotBecomeSeparator() {
+	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
+	for ItemCount in [10, 11] {
+		for Shape in ["only_submenu", "valid_separators", "leading", "trailing", "doubled"] {
+			Child := Menu()
+			loop ItemCount
+				Child.Add("Choice " . A_Index, (*) => 0)
+			Probe := Menu()
+			if (Shape == "valid_separators" or Shape == "doubled") {
+				Probe.Add("Before", (*) => 0)
+				Probe.Add()
+			}
+			if (Shape == "leading" or Shape == "doubled")
+				Probe.Add()
+			Position := DllCall("GetMenuItemCount", "ptr", Probe.Handle, "int")
+			Probe.Add("Choices", Child)
+			if Shape == "valid_separators" {
+				Probe.Add()
+				Probe.Add("After", (*) => 0)
+			} else if Shape == "trailing"
+				Probe.Add()
+			AssertEqual(ItemCount, DllCall("GetMenuItemCount", "ptr", Child.Handle, "int"),
+				"the independent native child menu must contain the exact ten or eleven rows")
+			AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Probe.Handle, "int", Position, "ptr"),
+				"the packed state must belong to the actual child menu")
+			Packed := DllCall("GetMenuState", "ptr", Probe.Handle, "uint", Position,
+				"uint", MF_BYPOSITION, "uint")
+			Assert(Packed != 0xFFFFFFFF, "the actual submenu must expose its packed native state")
+			AssertEqual(ItemCount, (Packed >> 8) & 0xFF, "GetMenuState's high byte must be the native child count")
+			Assert((Packed & MF_SEPARATOR) != 0, "ten and eleven children must reproduce the historical false separator bit")
+			Defects := _MMNDS_Defects(Probe, "count-probe")
+			if (Shape == "only_submenu" or Shape == "valid_separators")
+				AssertEqual("", Defects, "a real submenu count must never become a misplaced separator")
+			else if Shape == "leading"
+				Assert(InStr(Defects, "separator at position 1;") > 0, "an actual leading separator must remain detectable")
+			else if Shape == "trailing"
+				Assert(InStr(Defects, "ends with a separator;") > 0, "an actual trailing separator must remain detectable")
+			else
+				Assert(InStr(Defects, "separator at position 3;") > 0, "an actual doubled separator must remain detectable")
+		}
+	}
+}
+Test("menu: native ten and eleven child counts preserve separator type checks (layout-menu-double-separator)",
+	_MMNDS_SubmenuCountDoesNotBecomeSeparator)

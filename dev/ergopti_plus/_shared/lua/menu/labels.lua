@@ -9,13 +9,10 @@
 --- across all 3 drivers so the tray menu reads identically.
 ---
 --- FEATURES & RATIONALE:
---- 1. log_level_emoji: maps a log severity name to its display emoji. The
----    macOS builder.lua and AHK menu_rebuild.ahk each had their own copy;
----    a third divergent copy existed in Linux menu_builder.lua.
---- 2. fmt_count: formats a large integer with space thousands separators
+--- 1. fmt_count: formats a large integer with space thousands separators
 ---    (French-style "1 234 567"). Duplicated as FmtCount in AHK
 ---    (menu_helpers.ahk) and fmt_grand in macOS (hotstring_counter.lua).
---- 3. decorate_section: wraps a section header label in "— … —" decoration
+--- 2. decorate_section: wraps a section header label in "— … —" decoration
 ---    for disabled menu header items. Duplicated as MenuSectionTitle in AHK
 ---    (menu_helpers.ahk) and i18n.decorate_section in macOS (i18n.lua).
 ---
@@ -28,28 +25,6 @@ local M = {}
 
 
 
--- ====================================================
--- ====================================================
--- ======= 1/ Log-Level Emoji Map =====================
--- ====================================================
--- ====================================================
-
---- Returns the display emoji for a log severity level name.
---- @param level string One of "DEBUG", "INFO", "WARNING", "ERROR".
---- @return string Emoji character.
-function M.log_level_emoji(level)
-	local emojis = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
-	return emojis[level] or "📝"
-end
-
-
-
-
--- ====================================================
--- ====================================================
--- ======= 2/ Count Formatter =========================
--- ====================================================
--- ====================================================
 
 --- Formats a large integer with space thousands separators.
 --- e.g. 1234567 → "1 234 567".

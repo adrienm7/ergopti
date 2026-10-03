@@ -61,7 +61,7 @@ _PBAT_ContextResetSitesUseOneOwner() {
 		"the effects phase must retain the pre-clear buffer for dismissal/near-miss work")
 
 	Assert(InStr(Synthetic, "if IsSet(_PrefixCommitInputContext)") > 0
-		and InStr(Synthetic, "_PrefixCommitInputContext(0, true)") > 0,
+		and InStr(Synthetic, "_PrefixCommitInputContext(0, KnownBoundary)") > 0,
 		"synthetic caret movement must use the same paired in-memory commit")
 	Assert(InStr(Rebuild, "_PrefixInvalidateInputContext(0, false)") > 0
 		and InStr(Rebuild, "HSE_HardReset") == 0

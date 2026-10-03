@@ -134,6 +134,7 @@ global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
+#Include ../infra/startup_smoke.ahk
 #Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/issue_link.ahk
 #Include ../infra/redact.ahk
@@ -171,6 +172,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
 #Include ../infra/config_migrate.ahk
+#Include ../../_shared/modules/config/outdated.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 ; The layer-file loader reads _shared/keymap and the physical-key registry at run
@@ -203,6 +205,7 @@ global _DefaultLogsDir := _LogsDir
 ; is never called here, so its own unseeded global (_PersonalShortcutsRegistry)
 ; is harmless (#Warn VarUnset is off).
 #Include ../infra/personal_features.ahk
+#Include ../../_shared/modules/hotstrings/terminator_scope.ahk
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
@@ -219,6 +222,7 @@ global _DefaultLogsDir := _LogsDir
 ; definitions at top level.
 #Include ../infra/config_io.ahk
 #Include ../infra/config_scope.ahk
+#Include ../../_shared/modules/hotstrings/scope_overrides.ahk
 #Include ../infra/hotstrings/hotstrings_scope.ahk
 #Include ../infra/config_global_scope.ahk
 #Include ../ui/personal_toml_editor.ahk
@@ -297,6 +301,8 @@ InstallHotstringHooks()
 #Include ../adapters/graphics_renderer.ahk
 #Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
+#Include ../../_shared/modules/actions/brightness.ahk
+#Include ../adapters/screen_brightness.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
@@ -451,6 +457,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk
@@ -512,8 +519,8 @@ InstallSendNoOps()
 #Include unit/test_shortcuts.ahk
 #Include unit/test_keepawake_visible_cancellation.ahk
 
-; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
-; registered at top level) so the file is safe to include in the headless runner.
+; Metrics boolean preferences retain their existing transaction owner; ordinary
+; chord syntax tests use the shared parser and registrar without binding hotkeys.
 #Include ../infra/app_picker.ahk
 #Include ../infra/config_shortcuts.ahk
 #Include ../infra/metrics/metrics_filters.ahk
@@ -521,8 +528,6 @@ InstallSendNoOps()
 #Include ../ui/menu/menu_metrics.ahk
 #Include ../ui/menu/menu_metrics_actions.ahk
 #Include unit/test_metrics_shortcut_named_key.ahk
-#Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
-#Include unit/test_metrics_shortcut_transactions.ahk
 #Include unit/test_config_shortcuts_types.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 
@@ -665,6 +670,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
+#Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
 #Include ../ui/menu/menu_gestures.ahk
 #Include ../infra/menu_dispatcher.ahk
@@ -677,6 +683,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk
 #Include unit/test_app_picker_generation.ahk
@@ -726,6 +733,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
 #Include unit/test_system_actions.ahk
+#Include unit/test_screen_brightness.ahk
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
@@ -1278,9 +1286,12 @@ _LogBootProgress("keylogger modules + tests included")
 ; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
 #Include ../infra/chord.ahk
 #Include ../adapters/hotkey_registrar.ahk
+#Include ../../_shared/modules/shortcuts/magic_editor.ahk
+#Include ../infra/magic_editor.ahk
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_hotkey_registrar_modifier_keys.ahk
+#Include unit/test_magic_editor.ahk
 #Include unit/test_keyboard_slot_win_space.ahk
 #Include unit/test_llm_trigger_shortcut_retired.ahk
 #Include unit/test_llm_hotkey_identity.ahk
@@ -1908,6 +1919,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
 #Include unit/test_bundle_skip_validation.ahk
+#Include unit/test_startup_smoke_receipt.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_changelog_network_resilience.ahk

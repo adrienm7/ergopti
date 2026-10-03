@@ -35,6 +35,7 @@ local RI          = require("modules.keymap.registry_index")
 -- RI.setup(core_state) is called from M.init() to wire up _state for the index functions.
 for k, v in pairs(RI) do M[k] = v end
 
+local PersonalFiles = require("hotstrings.personal_files")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
 
@@ -590,6 +591,10 @@ function M.add(trigger, replacement, opts)
 	end
 
 	opts = type(opts) == "table" and opts or {}
+	if opts.personal_source ~= nil and not PersonalFiles.is_descriptor(opts.personal_source) then
+		Logger.error(LOG, "add: invalid personal source descriptor.")
+		return false
+	end
 	local owns_magic = owns_canonical_magic(trigger) or opts.is_magic_trigger == true
 
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
@@ -698,6 +703,7 @@ function M.add(trigger, replacement, opts)
 			existing.plain_repl          = plain_r
 			existing.is_private          = is_private
 			existing.field               = field
+			existing.personal_source     = opts.personal_source and PersonalFiles.copy(opts.personal_source) or nil
 			existing.section             = section
 			existing.priority            = priority
 			existing.group               = current_group
@@ -768,6 +774,7 @@ function M.add(trigger, replacement, opts)
 			-- the shortest fallback for every magic-key press.
 			star_base_tail_char = star_base_tail_char,
 		}
+		entry.personal_source = opts.personal_source and PersonalFiles.copy(opts.personal_source) or nil
 		entry.group = current_group
 		-- group_order is 0 for mappings added outside a load_file/load_toml
 		-- scope (e.g. ad-hoc M.add calls with no active group), which keeps

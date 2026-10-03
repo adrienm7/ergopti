@@ -39,12 +39,13 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 	_LPP_Run(IsSet(Menu) ? Menu : _LPP_Menu(), Buffer, _Inner, true)
 	_Inner(Calls, Lines) {
 		global _LLM_Live, _LLM_Bridge_Active, _LLM_MenuBuildCoordinator, _LLM_Engine
+		global _LLM_Bridge_ReadLiveFocus
 		global _TooltipActiveSurface, _LLM_AcceptInProgress
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
 		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 		global _SR_ActiveTasks
 		Saved := {
-			Live: _LLM_Live, Active: _LLM_Bridge_Active,
+			Live: _LLM_Live, Active: _LLM_Bridge_Active, Focus: _LLM_Bridge_ReadLiveFocus,
 			Coordinator: _LLM_MenuBuildCoordinator, Surface: _TooltipActiveSurface,
 			Accepting: _LLM_AcceptInProgress,
 			Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
@@ -56,6 +57,8 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			LLM_Engine_CancelTimer()
 			_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
 			_LLM_Bridge_Active := true
+			; This scenario owns its typing target; the hosted desktop need not have focus.
+			_LLM_Bridge_ReadLiveFocus := () => Map("hwnd", 101, "control", 102)
 			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
 				(*) => (Builds.Push(1), 1), (*) => false)
 			_TooltipActiveSurface := 0
@@ -79,9 +82,12 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			_LLM_AcceptInProgress := Saved.Accepting
 			_TooltipActiveSurface := Saved.Surface
 			_LLM_MenuBuildCoordinator := Saved.Coordinator
+			_LLM_Bridge_ReadLiveFocus := Saved.Focus
 			_LLM_Bridge_Active := Saved.Active
 			_LLM_Live := Saved.Live
 		}
+		AssertEqual(ObjPtr(Saved.Focus), ObjPtr(_LLM_Bridge_ReadLiveFocus),
+			"the live-mode fixture restores the exact foreground probe identity")
 		AssertEqual(Saved.Tasks, _SR_ActiveTasks.Count,
 			"the live-mode fixture must not launch a native positioning worker")
 	}
@@ -92,19 +98,94 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 ; could paint it: a painted notice is a hotstring-style tooltip, which live
 ; requests wait for.
 _LLV_Toggle(Value, &Notice := "") {
-	global GestureActionParameters, LLV_BINDING, _TooltipActiveSurface
+	global GestureActionParameters, LLV_BINDING
 	GestureActionParameters[GestureActionParameterKey(LLV_BINDING, "llm_live_prompt_toggle")] := Value
-	; Capture and retire this notice before the next-turn render can query the
-	; user's foreground control. This fixture tests the AI owner, not native paint.
+	return _LLV_InvokeAndRetireNotice(GestureInvokeAction.Bind("llm_live_prompt_toggle", LLV_BINDING), &Notice)
+}
+
+/**
+ * Retires this fixture's real notice before releasing its fake typing ports.
+ * The caller keeps its exact critical setting and the actual action outcome.
+ * @param {Func} Action - Actual gesture or menu callback owned by this scenario.
+ * @param {string} Notice - Captured pending notice, including refusal or throw.
+ * @returns {Any} The actual action's unchanged return value.
+ */
+_LLV_InvokeAndRetireNotice(Action, &Notice := "") {
+	global _TooltipActiveSurface
 	PreviousCritical := Critical("On")
 	try {
-		Result := GestureInvokeAction("llm_live_prompt_toggle", LLV_BINDING)
-		Notice := _LPP_PendingNotice()
-		TooltipHide("LiveModeTest", true)
-		_TooltipActiveSurface := 0
-		return Result
+		try {
+			return Action.Call()
+		} finally {
+			try Notice := _LPP_PendingNotice()
+			finally {
+				try TooltipHide("LiveModeTest", true)
+				finally _TooltipActiveSurface := 0
+			}
+		}
 	} finally Critical(PreviousCritical)
 }
+
+/** Exercises real notice cleanup for both refusal and callback interruption. */
+_LLV_NoticeRetirementPreservesForeignOwnership() {
+	_LLV_Run("", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _SR_ActiveTasks, _TooltipPendingRequest, _TooltipActiveSurface
+		PreviousCritical := Critical(37)
+		ForeignId := "live-mode-owned-foreign-receipt"
+		Foreign := {OwnedByAnotherFixture: true}
+		Installed := false
+		try {
+			AssertFalse(_SR_ActiveTasks.Has(ForeignId), "the fixture owns a new foreign-task observation slot")
+			_SR_ActiveTasks[ForeignId] := Foreign
+			Installed := true
+			ExpectedTasks := _SR_ActiveTasks.Count
+			for Interrupted in [false, true] {
+				Observed := []
+				Notice := ""
+				Failure := ""
+				Outcome := true
+				try Outcome := _LLV_InvokeAndRetireNotice(_LLV_NoticeBoundaryAction.Bind(Interrupted, Observed), &Notice)
+				catch as Err {
+					Failure := Err.Message
+				}
+				AssertEqual(Interrupted ? "owned live-mode notice interruption" : "", Failure,
+					"the notice boundary preserves the actual callback exception")
+				if !Interrupted
+					AssertFalse(Outcome, "a refused callback keeps its actual false result")
+				AssertEqual(1, Observed.Length, "the callback publishes one real notice")
+				AssertEqual("Owned live-mode notice", Observed[1].Notice,
+					"the actual pending request exists while the callback runs")
+				Assert(Observed[1].Critical > 0, "notice publication stays inside the owned protected boundary")
+				AssertEqual("Owned live-mode notice", Notice, "cleanup preserves the exact observed notice")
+				AssertFalse(IsObject(_TooltipPendingRequest), "refusal and throw retire the real pending notice")
+				AssertEqual(0, _TooltipActiveSurface, "no notice surface escapes the fixture")
+				AssertEqual(37, A_IsCritical, "the exact caller critical setting is restored")
+				AssertTrue(_SR_ActiveTasks.Has(ForeignId), "cleanup cannot steal an unrelated task")
+				AssertEqual(ObjPtr(Foreign), ObjPtr(_SR_ActiveTasks[ForeignId]),
+					"the unrelated task keeps its exact ownership identity")
+				AssertEqual(ExpectedTasks, _SR_ActiveTasks.Count,
+					"cleanup neither launches a positioning worker nor removes foreign ownership")
+			}
+		} finally {
+			try {
+				if Installed && _SR_ActiveTasks.Has(ForeignId)
+						&& ObjPtr(_SR_ActiveTasks[ForeignId]) == ObjPtr(Foreign)
+					_SR_ActiveTasks.Delete(ForeignId)
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+
+/** Publishes through the actual notice owner; assertions run after it returns. */
+_LLV_NoticeBoundaryAction(Interrupted, Observed) {
+	_LLM_Menu_ShowNotice("Owned live-mode notice")
+	Observed.Push({Notice: _LPP_PendingNotice(), Critical: A_IsCritical})
+	if Interrupted
+		throw Error("owned live-mode notice interruption")
+	return false
+}
+Test("LLM live mode: notice refusal and throw retain caller and foreign ownership", _LLV_NoticeRetirementPreservesForeignOwnership)
 
 ; One keystroke of the automatic trigger: the buffer grows, the engine arms
 ; its debounce through a recorder instead of a real timer.
@@ -447,8 +528,12 @@ _LLV_MenuListsRewritePrompts() {
 
 		; Choosing a prompt turns live mode on with it and the menu's count
 		for Row in Rows {
-			if (Row["label"] == LLM_Menu_GetProfileLabel("translate_ja"))
-				Row["action"].Call()
+			if (Row["label"] == LLM_Menu_GetProfileLabel("translate_ja")) {
+				AssertTrue(_LLV_InvokeAndRetireNotice(Row["action"], &Notice),
+					"the actual menu callback returns its live-mode admission")
+				AssertEqual(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel("translate_ja")), Notice,
+					"the protected menu callback retains its actual localized notice")
+			}
 		}
 		AssertTrue(LLM_Engine_LiveIsActive(), "the row turns live mode on")
 		Override := LLM_Engine_LiveOverride()
@@ -460,7 +545,9 @@ _LLV_MenuListsRewritePrompts() {
 			AssertEqual(Row["label"] == LLM_Menu_GetProfileLabel("translate_ja"), Row["checked"] ? true : false,
 				"only the live prompt is checked: " . Row["label"])
 		; The action and the menu share one state: the menu's Off ends the action's live mode
-		Rows[1]["action"].Call()
+		AssertTrue(_LLV_InvokeAndRetireNotice(Rows[1]["action"], &Notice),
+			"the actual Off callback retains its successful result")
+		AssertEqual(t("llm.live.off"), Notice, "Off retains its actual localized notice")
 		AssertFalse(LLM_Engine_LiveIsActive(), "Off turns live mode off")
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "the active profile never changed")
 	}
@@ -507,7 +594,18 @@ Test("LLM live mode: the live translations take no profile hotkey", _LLV_Transla
 ; An expansion fires first: the live tooltip is dismissed and the request is
 ; re-issued on the text after the expansion.
 _LLV_ExpansionReissuesTheLiveRequest() {
-	_LLV_Run("on se voit dm", _Body)
+	global _LLM_Bridge_ReadLiveFocus
+	SavedFocus := _LLM_Bridge_ReadLiveFocus
+	Unfocused := () => Map("hwnd", 101, "control", 0)
+	Restored := false
+	try {
+		_LLM_Bridge_ReadLiveFocus := Unfocused
+		_LLV_Run("on se voit dm", _Body)
+		Restored := ObjPtr(_LLM_Bridge_ReadLiveFocus) == ObjPtr(Unfocused)
+	} finally {
+		_LLM_Bridge_ReadLiveFocus := SavedFocus
+	}
+	AssertTrue(Restored, "the scenario restores its caller's unknown focused-control probe")
 	_Body(Calls, Lines, Builds) {
 		global _LLM_Bridge_Buffer, _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 		; Outside live mode an expansion arms nothing: next-word prediction is unchanged
@@ -531,6 +629,40 @@ _LLV_ExpansionReissuesTheLiveRequest() {
 }
 Test("LLM live mode: a hotstring expansion wins and the live request follows it",
 	_LLV_ExpansionReissuesTheLiveRequest)
+
+; A deferred expansion still refuses an unknown or changed typing target.
+; These observations run after the actual observer's guarded callback returns.
+_LLV_ExpansionObserverRequiresCurrentFocus() {
+	_LLV_Run("on se voit dm", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_Buffer
+		Focus := Map("hwnd", 101, "control", 0)
+		_LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
+		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
+		Missing := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+		AssertEqual("on se voit demain", _LLM_Bridge_Buffer,
+			"an unknown focus does not discard the committed canonical expansion")
+		AssertFalse(Missing.Active, "an unknown focused control refuses the deferred re-arm")
+		AssertEqual(0, Calls.Length, "an unverified typing target starts no transport")
+		Focus["control"] := 102
+		ChangeTarget() {
+			_HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 0, InsertedText: "" })
+			Focus["control"] := 103
+		}
+		Changed := _LLV_CaptureRealTimer(ChangeTarget)
+		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
+		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
+		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ DeleteFromEnd: 0, InsertedText: "" }))
+		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")
+		_LLV_Fire(Map("fn", Stable.Fn))
+		AssertEqual(1, Calls.Length, "the verified deferred re-arm starts exactly one transport")
+		AssertEqual("on se voit demain", Calls[1]["tail"], "the request uses the canonical expanded text")
+	}
+}
+Test("LLM live mode: expansion observers require an unchanged verified typing target",
+	_LLV_ExpansionObserverRequiresCurrentFocus)
 
 ; While a hotstring tooltip is shown the live tooltip waits, then comes back.
 _LLV_HotstringTooltipIsNotCovered() {
@@ -619,3 +751,83 @@ _LLV_ExplicitActionsTakeOver() {
 }
 Test("LLM live mode: explicit AI actions take over and live mode resumes on typing",
 	_LLV_ExplicitActionsTakeOver)
+
+
+/** A due renderer must not escape the live-menu fixture into native I/O. */
+_LLV_MenuNoticeRetiresBeforeYield() {
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _TooltipPendingRequest
+		State := { Rendered: false }
+		Renderer := (*) => State.Rendered := true
+		Rows := _LLM_Menu_LiveModeRows()
+		AssertTrue(Rows.Length > 1, "the real menu must have a live prompt to invoke")
+		Action() {
+			Rows[2]["action"].Call()
+			Request := _TooltipPendingRequest
+			AssertTrue(IsObject(Request), "the real menu action must publish its notice")
+			; Substitute only the renderer boundary; a failure cannot touch native UI.
+			SetTimer(Request.TimerFn, 0)
+			Request.TimerFn := Renderer
+			SetTimer(Renderer, -1)
+			Sleep(30)
+			return true
+		}
+		try {
+			AssertTrue(_LLV_InvokeAndRetireNotice(Action, &Notice))
+			AssertTrue(LLM_Engine_LiveIsActive(), "the original action actually changed live mode")
+			AssertTrue(Notice != "", "the original notice must be captured")
+			AssertFalse(State.Rendered, "the due renderer must be retired before the fixture yields")
+			AssertFalse(IsObject(_TooltipPendingRequest), "the native notice owner is retired")
+			SetTimer(Renderer, -1)
+			Sleep(30)
+			AssertTrue(State.Rendered, "the substituted renderer can run when no longer fenced")
+		} finally {
+			SetTimer(Renderer, 0)
+			TooltipHide("LiveModeTest", true)
+		}
+	}
+}
+Test("LLM live mode: menu fixture retires due rendering before yielding (live-menu-fixture)",
+	_LLV_MenuNoticeRetiresBeforeYield)
+
+
+/** A failed action must retire its queued renderer before scheduler release. */
+_LLV_FailedMenuNoticeRetiresBeforeYield() {
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _TooltipPendingRequest
+		State := { Rendered: false }
+		Renderer := (*) => State.Rendered := true
+		Rows := _LLM_Menu_LiveModeRows()
+		AssertTrue(Rows.Length > 1, "the real menu must provide an action")
+		Failure := Error("expected live menu action failure")
+		Action() {
+			Rows[2]["action"].Call()
+			Request := _TooltipPendingRequest
+			AssertTrue(IsObject(Request), "the failing action first publishes its actual notice")
+			SetTimer(Request.TimerFn, 0)
+			Request.TimerFn := Renderer
+			SetTimer(Renderer, -1)
+			throw Failure
+		}
+		PreviousCritical := A_IsCritical
+		Caught := 0
+		try {
+			try _LLV_InvokeAndRetireNotice(Action)
+			catch as Err
+				Caught := Err
+			AssertTrue(IsObject(Caught), "the action failure must propagate")
+			AssertEqual(ObjPtr(Failure), ObjPtr(Caught), "cleanup must retain the original error")
+			AssertEqual(PreviousCritical, A_IsCritical, "failure restores the caller's scheduler")
+			Sleep(30)
+			AssertFalse(State.Rendered, "the failing action must cancel its due renderer")
+			AssertFalse(IsObject(_TooltipPendingRequest), "failure retires the native notice owner")
+		} finally {
+			SetTimer(Renderer, 0)
+			TooltipHide("LiveModeTest", true)
+		}
+	}
+}
+Test("LLM live mode: failed menu fixture retires due rendering (live-menu-failure-fixture)",
+	_LLV_FailedMenuNoticeRetiresBeforeYield)

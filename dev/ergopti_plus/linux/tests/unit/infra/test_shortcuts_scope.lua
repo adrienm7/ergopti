@@ -101,6 +101,37 @@ local function with_scope(body, source)
 end
 
 helpers.describe("Linux terminal shortcut scope", function()
+	helpers.it("(magic-editor-scope) distinguishes durable personal None from scope removal and fences unproved sources", function()
+		with_scope(function(scope, owners, _, path)
+			local source = { generation = 1, status = "ready", candidates = {
+				{ code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false },
+			} }
+			package.loaded["modules.hotstrings.magic_key_source"] = {
+				editor_source = function() return source end, known_codes = function() return { KeyJ = true } end,
+			}
+			package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end }
+			local function decision()
+				return owners.keyboard.magic_editor_decision({ master = owners.manager.is_enabled(), paused = false, inhibited = false })
+			end
+			helpers.assert_true(owners.manager.set_enabled(true))
+			helpers.assert_true(owners.keyboard.set_action("super_j", "none"))
+			owners.keyboard._reset()
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard.super_j, "none", "explicit None is durable personal ownership")
+			helpers.assert_eq(decision().reason, "explicit_assignment", "restart cannot turn personal native behavior into the conditional default")
+			helpers.assert_true(scope.apply("clear"))
+			local cleared = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(cleared.shortcuts.keyboard.super_j, nil, "scope removal restores actual absence")
+			helpers.assert_eq(cleared.shortcuts.keyboard.future_physical, "future_action", "unknown keyboard neighbors stay intact")
+			helpers.assert_eq(cleared.unrelated.keep, 42)
+			helpers.assert_eq(decision().active, false, "Clear keeps the shared logical slot and master disabled")
+			helpers.assert_true(owners.keyboard.set_action("magic_editor", "open_hotstrings_editor"))
+			helpers.assert_true(owners.manager.set_enabled(true))
+			helpers.assert_true(decision().active, "owned reactivation uses an acknowledged current source after physical intent removal")
+			source.status, source.candidates, source.generation = "unavailable", {}, 2
+			helpers.assert_eq(decision().reason, "source_unavailable", "removing a claim never invents native source admission")
+		end, '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nfuture_physical = "future_action"\n[unrelated]\nkeep = 42\n')
+	end)
+
 	for _, mode in ipairs({ "clear", "recommended" }) do
 		helpers.it("applies " .. mode .. " through the real owners and preserves other domains", function()
 			with_scope(function(scope, owners, controls, path, backup)

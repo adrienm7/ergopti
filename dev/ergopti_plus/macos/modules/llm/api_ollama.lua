@@ -31,6 +31,7 @@ local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
+local LocalModelPolicy = require("llm.local_model_policy")
 
 -- Ollama bind address. The default port is the single source in
 -- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
@@ -959,6 +960,15 @@ local function ensure_ollama_running(options)
 	return true
 end
 
+--- Reports exact startup admission without retrying or starting a service.
+--- An acknowledged published daemon is stable ownership, not cleanup debt.
+--- @return boolean idle
+function M.startup_idle()
+	return _ollama_start_acquisition_depth == 0 and _ollama_starting ~= true
+		and _ollama_start_transaction == nil and _ollama_start_cleanup_pending ~= true
+		and _ollama_start_resume_pending ~= true and not has_pending_ollama_start_owner()
+end
+
 --- Ensures the Ollama daemon is running.
 --- Must be called by the LLM orchestrator only when the effective backend is
 --- Ollama — calling it unconditionally at require-time launches Ollama even for
@@ -1175,7 +1185,7 @@ end
 
 
 -- The failure reason of a request whose model the local server does not hold
-M.MODEL_MISSING = "model_missing"
+M.MODEL_MISSING = LocalModelPolicy.MODEL_MISSING
 
 -- Longest server error text a log line carries
 local MAX_LOGGED_SERVER_ERROR = 300
@@ -1189,13 +1199,7 @@ local _listed_models = nil
 --- with its implicit ":latest" tag written out.
 --- @param name any
 --- @return string|nil normalized nil for anything but a non-empty string.
-local function normalize_model_name(name)
-	if type(name) ~= "string" or name == "" then return nil end
-	local lowered = name:lower()
-	-- The tag follows a ":" of the last path segment (a registry host may carry a port)
-	if not lowered:match("[^/]*$"):find(":", 1, true) then lowered = lowered .. ":latest" end
-	return lowered
-end
+local normalize_model_name = LocalModelPolicy.normalize
 M.normalize_model_name = normalize_model_name
 
 --- Reads the error a failed answer of the local server carries: its JSON
@@ -1222,10 +1226,7 @@ end
 --- @param status any The HTTP status.
 --- @param error_text string What server_error_text read.
 --- @return string|nil model nil for any other failure.
-local function missing_model_of(status, error_text)
-	if status ~= 404 then return nil end
-	return error_text:match("^model ['\"]([^'\"]+)['\"] not found")
-end
+local missing_model_of = LocalModelPolicy.missing_model
 
 --- Asks the local server which models it holds and records the answer.
 --- @param client table The HTTP client to ask with: the request's own, so a
@@ -1240,23 +1241,17 @@ local function list_models(client, on_done)
 				on_done(nil, "http_" .. tostring(r.status or "unknown"))
 				return
 			end
-			local tags = type(r.body) == "string" and r.body:match("^%s*{") and JsonCodec.decode(r.body) or nil
-			if type(tags) ~= "table" or type(tags.models) ~= "table" then
+			-- A decoded Lua table cannot distinguish an empty JSON object from
+			-- an array. The shared lossless receipt keeps unknown inventories
+			-- separate from a proved empty installation list on every driver.
+			local names, reason = LocalModelPolicy.list_receipt({ ok = true, status = r.status, body = r.body })
+			if names == nil then
 				Logger.error(LOG, "The local server's model list is unreadable (%d byte(s)).", #(r.body or ""))
-				on_done(nil, "unreadable_model_list")
+				on_done(nil, reason)
 				return
 			end
-			local names = {}
-			for _, entry in ipairs(tags.models) do
-				if type(entry) == "table" then
-					for _, field in ipairs({ "name", "model" }) do
-						local name = normalize_model_name(entry[field])
-						if name then names[name] = true end
-					end
-				end
-			end
 			_listed_models = names
-			Logger.debug(LOG, "The local server lists %d model(s).", #tags.models)
+			Logger.debug(LOG, "The local server returned a readable model list.")
 			on_done(names)
 		end)
 	end)

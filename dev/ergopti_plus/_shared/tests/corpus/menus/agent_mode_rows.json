@@ -1,0 +1,32 @@
+{
+	"_comment": "Independent menu expectations captured before the agent-mode declaration migration; do not derive these values from generated menu or feature metadata.",
+	"modes": [
+		{
+			"value": "off",
+			"label_key": "menu.agent.mode_off"
+		},
+		{
+			"value": "action",
+			"label_key": "menu.agent.mode_action"
+		},
+		{
+			"value": "auto",
+			"label_key": "menu.agent.mode_auto"
+		}
+	],
+	"states": [
+		{
+			"selected": "off",
+			"checked": [true, false, false]
+		},
+		{
+			"selected": "action",
+			"checked": [false, true, false]
+		},
+		{
+			"selected": "auto",
+			"checked": [false, false, true]
+		}
+	],
+	"reordered_values": ["auto", "off", "action"]
+}

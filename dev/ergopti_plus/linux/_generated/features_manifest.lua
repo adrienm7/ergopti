@@ -303,7 +303,7 @@ M.features = {
 		path = "llm.agent_system2", id = "agent_system2", section = "llm", default = "", type = "string", description_key = "menu.agent.system2_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
-		path = "llm.agent_mode", id = "agent_mode", section = "llm", default = "off", type = "string", description_key = "menu.agent.mode_title", platforms = { "ahk", "hs", "linux" }, recommended = "off", input_altering = false,
+		path = "llm.agent_mode", id = "agent_mode", section = "llm", default = "off", type = "enum", description_key = "menu.agent.mode_title", platforms = { "ahk", "hs", "linux" }, recommended = "off", input_altering = false, enum_values = { "off", "action", "auto" },
 	},
 	{
 		path = "llm.agent_disabled_apps", id = "agent_disabled_apps", section = "llm", default = {  }, type = "array", description_key = "menu.agent.disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
@@ -430,6 +430,9 @@ M.features = {
 	},
 	{
 		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", input_altering = true, cleared = "none",
+	},
+	{
+		path = "shortcuts.keyboard.magic_editor", id = "magic_editor", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.magic_editor", platforms = { "ahk", "hs", "linux" }, recommended = "open_hotstrings_editor", input_altering = true, cleared = "none",
 	},
 	{
 		path = "shortcuts.keyboard.ctrl_g", id = "ctrl_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", input_altering = true,
@@ -610,12 +613,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.metrics_enabled", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_shortcut_typing", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_shortcut_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
@@ -1129,12 +1126,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.float_colors", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.shortcut", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.apps_shortcut", section = "metrics", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "layout.pause_switch_enabled", section = "layout", reason_key = "", platforms = { "hs" },

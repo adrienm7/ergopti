@@ -67,6 +67,8 @@ helpers.describe("Linux menu uninstall", function()
 		local command = log.commands[3]
 		helpers.assert_true(command:find("systemd-run --user --collect", 1, true) ~= nil)
 		helpers.assert_true(command:find(" --wait-owner '123:987654'", 1, true) ~= nil)
+		helpers.assert_true(command:find(" --gui 'ErgoptiPlus — Uninstall' 'Failed'", 1, true) ~= nil,
+			"the independent worker receives composed chrome and unchanged failure body")
 		helpers.assert_true(command:find(" --setenv='DISPLAY=:7'", 1, true) ~= nil)
 		helpers.assert_true(command:find("/home/user'\\''s files/prefix'", 1, true) ~= nil)
 		helpers.assert_eq(log.quit, 1)

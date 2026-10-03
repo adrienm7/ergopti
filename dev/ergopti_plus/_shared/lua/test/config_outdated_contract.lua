@@ -71,6 +71,32 @@ function M.register(helpers)
 				"a missing file stays a programmer error")
 		end)
 
+
+		helpers.it("replays the independent process-lifetime file warning sequence", function()
+			local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
+				:match("^(.*)/lua/test/[^/]+$")
+			local path = assert(shared, "the shared tree encloses this contract")
+				.. "/tests/corpus/config_outdated/file_warning_vectors.json"
+			local handle = assert(io.open(path, "rb"))
+			local content = handle:read("*a")
+			handle:close()
+			local vectors = assert(require("json").decode(content))
+			helpers.assert_eq(#vectors, 12, "every independent warning observation executes")
+			Outdated.reset_for_tests()
+			local sink, lines = recorder()
+			for _, vector in ipairs(vectors) do
+				local first = Outdated.report_in_file(vector.file, vector.path, vector.detail, sink)
+				helpers.assert_eq(first, vector.first, vector.id)
+				helpers.assert_eq(#lines, vector.reports, vector.id)
+				if first then
+					helpers.assert_eq(lines[#lines], string.format("Outdated entry '%s' in '%s' ignored (%s); "
+						.. "the config cleanup only covers config.toml, so fix or delete it in that file.",
+						vector.path, vector.file, vector.detail), vector.id)
+				end
+			end
+			helpers.assert_eq(#lines, 7, "interleaved reads retain the process-lifetime identities")
+		end)
+
 		helpers.it("partitions known entries, marks exactly them and reports the rest", function()
 			Outdated.reset_for_tests()
 			local marked = {}

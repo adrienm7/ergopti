@@ -129,10 +129,15 @@ function M.with_configurable(callback)
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
 		local bound_callback
+		local Json = require("json")
+		local catalogue_file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local catalogue = Json.decode(catalogue_file:read("*a"))
+		catalogue_file:close()
+		catalogue.keys = {{id = "a", label = "A"}}
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 		package.loaded["adapters.file_system"] = {
-			read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
+			read = function() return Json.encode(catalogue) end,
 			read_with_status = function() return '[shortcuts.keyboard]\ncmd_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
 		}
@@ -154,9 +159,7 @@ function M.with_configurable(callback)
 		package.loaded["infra.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
-		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			json = {decode = function() return {keys = {{id = "a", label = "A"}}} end},
-		})
+		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")
 		return callback({
 			subject = subject, failures = failures,
 			get_bound_callback = function() return bound_callback end,

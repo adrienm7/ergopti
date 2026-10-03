@@ -121,7 +121,7 @@ helpers.describe("Enabling the AI with an unreachable local Ollama (llm-enable-u
 				helpers.assert_eq(#calls.offer_dialogs, 1, "one error names the fixes")
 				local dialog = calls.offer_dialogs[1]
 				helpers.assert_true(has(dialog.title, "Ollama"))
-				helpers.assert_true(has(dialog.message, "llm.unreachable.body_missing|Ollama|" .. OLLAMA_URL),
+				helpers.assert_true(has(dialog.message, "llm.unreachable.body_unconfirmed|Ollama|" .. OLLAMA_URL),
 					"the error says Ollama is missing and where nothing answers: " .. tostring(dialog.message))
 				helpers.assert_true(has(dialog.message, "llm.unreachable.no_server|oMLX, LM Studio"),
 					"the error says no local server answers either")
@@ -142,6 +142,10 @@ helpers.describe("Enabling the AI with an unreachable local Ollama (llm-enable-u
 		function()
 			with_activation("ollama", { true }, {
 				ollama_installed = false,
+				version_receipts = {
+					{ ok = false, status = 0, body = "" },
+					{ ok = true, status = 200, body = '{"version":"fixture-after-install"}' },
+				},
 				offer_pick = pick("llm.unreachable.install"),
 			}, function(action, state, calls)
 				action()
@@ -151,7 +155,11 @@ helpers.describe("Enabling the AI with an unreachable local Ollama (llm-enable-u
 				helpers.assert_eq(calls.requirements, 0, "the model check waits for the download")
 				helpers.assert_type(calls.bootstrap_callback, "function")
 
+				helpers.assert_eq(state.llm_enabled, false, "the AI remains off while its explicit installer owns work")
+				helpers.assert_eq(calls.saves, 0)
 				calls.bootstrap_callback(true)
+				helpers.assert_eq(calls.service_repairs, 1)
+				helpers.assert_eq(#calls.version_requests, 2, "native service publication must precede a fresh version proof")
 				helpers.assert_eq(calls.requirements, 1, "the model is checked, and pulled, once Ollama exists")
 				helpers.assert_eq(calls.ollama_installs, 1)
 				helpers.assert_eq(state.llm_enabled, true)

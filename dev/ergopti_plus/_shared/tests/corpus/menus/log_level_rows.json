@@ -1,0 +1,41 @@
+{
+	"description": "Independent native Debug log-level presentation and acknowledged mutation cases. Technical tokens intentionally retain their log-file spelling in every locale.",
+	"levels": [
+		{
+			"value": "DEBUG",
+			"label": "🐛 DEBUG"
+		},
+		{
+			"value": "INFO",
+			"label": "ℹ️ INFO"
+		},
+		{
+			"value": "WARNING",
+			"label": "⚠️ WARNING"
+		},
+		{
+			"value": "ERROR",
+			"label": "❌ ERROR"
+		}
+	],
+	"states": [
+		{
+			"selected": "DEBUG",
+			"checked": [true, false, false, false]
+		},
+		{
+			"selected": "INFO",
+			"checked": [false, true, false, false]
+		},
+		{
+			"selected": "WARNING",
+			"checked": [false, false, true, false]
+		},
+		{
+			"selected": "ERROR",
+			"checked": [false, false, false, true]
+		}
+	],
+	"reordered_values": ["ERROR", "DEBUG", "WARNING", "INFO"],
+	"refusals": ["false", "nil", "throw"]
+}

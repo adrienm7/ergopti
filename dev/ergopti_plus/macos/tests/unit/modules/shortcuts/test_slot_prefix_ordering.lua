@@ -1,56 +1,77 @@
 --- tests/unit/modules/shortcuts/test_slot_prefix_ordering.lua
 
---- Regression test for shortcuts-core-1: slot_to_hotkey() and slot_label()
---- iterated SLOT_MODS with pairs() which gives non-deterministic order. When
---- "cmd_" happened to be checked before "cmd_shift_", a slot like
---- "cmd_shift_a" matched the shorter prefix and was bound as Cmd+a (wrong)
---- instead of Cmd+Shift+a — a behaviour that changed between Lua VM runs.
----
---- Fix: SLOT_MODS is now an ordered array with longest prefix first; both
---- functions use ipairs() so "cmd_shift_" is always checked before "cmd_".
+--- ==============================================================================
+--- MODULE: Ordinary Shortcut Prefix Admission
+--- DESCRIPTION:
+--- The shared modifier catalogue owns longest-first resolution; display menu
+--- ordering is independent. Drive the real consumer with overlapping prefixes
+--- so a shorter prefix cannot steal a shifted chord or its visible label.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Json = require("json")
 
--- Selected by a declaration unique to modules/shortcuts/keyboard_shortcuts.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local function load_assignments")
-helpers.assert_true(src ~= nil, "modules/shortcuts/keyboard_shortcuts.lua source must be locatable")
+helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
+	helpers.it("keeps both actual resolution loops ordered rather than relying on pairs array traversal", function()
+		local source = helpers.read_driver_source("local function load_assignments")
+		helpers.assert_true(source ~= nil, "ordinary keyboard owner must be locatable")
+		for _, name in ipairs({"slot_to_chord", "slot_label"}) do
+			local body = source:match("local function " .. name .. "%b()%s*(.-)\nend")
+			helpers.assert_true(body ~= nil, "actual resolution function must remain observable")
+			helpers.assert_true(body:find("for _, entry in ipairs(slot_mods()) do", 1, true) ~= nil,
+				name .. " must preserve longest-first declared iteration")
+		end
+	end)
 
--- Test 1: SLOT_MODS is an array (uses { prefix, mods } pairs), not a hash.
--- Pre-fix: `["cmd_"] = {"cmd"}` syntax (hash map).
--- Post-fix: `{ "cmd_", {"cmd"} }` syntax (array entry).
-local has_hash = src:find('["cmd_"]', 1, true) ~= nil or src:find('["cmd_shift_"]', 1, true) ~= nil
-helpers.assert_true(
-	not has_hash,
-	"keyboard_shortcuts.lua SLOT_MODS must not use hash syntax [\"...\"] = ... (shortcuts-core-1)"
-)
+	helpers.it("keeps every declared overlapping prefix longest-first", function()
+		local file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local catalogue = Json.decode(file:read("*a")); file:close()
+		local groups = catalogue.platforms.macos.shortcut_groups
+		helpers.assert_true(type(groups) == "table" and #groups > 0)
+		local indices = {}
+		for index, group in ipairs(groups) do
+			helpers.assert_true(indices[group.prefix] == nil, "one declared owner per prefix")
+			indices[group.prefix] = index
+			for other_index, other in ipairs(groups) do
+				if #group.prefix > #other.prefix and group.prefix:sub(1, #other.prefix) == other.prefix then
+					helpers.assert_true(index < other_index, "longer overlapping prefixes resolve first")
+				end
+			end
+		end
+		helpers.assert_true(indices.cmd_shift_ < indices.cmd_)
+		helpers.assert_true(indices.hs_ctrl_shift_ < indices.hs_ctrl_)
+	end)
 
--- Test 2: cmd_shift_ entry appears BEFORE cmd_ entry in the array.
-local cmd_shift_pos = src:find('"cmd_shift_"', 1, true)
-local cmd_only_pos  = src:find('"cmd_"', 1, true)
-helpers.assert_true(
-	cmd_shift_pos ~= nil,
-	"keyboard_shortcuts.lua SLOT_MODS must contain a \"cmd_shift_\" entry"
-)
-helpers.assert_true(
-	cmd_only_pos ~= nil,
-	"keyboard_shortcuts.lua SLOT_MODS must contain a \"cmd_\" entry"
-)
-helpers.assert_true(
-	cmd_shift_pos < cmd_only_pos,
-	"\"cmd_shift_\" must appear before \"cmd_\" in SLOT_MODS (longest-first ordering — shortcuts-core-1)"
-)
+	helpers.it("binds and labels shifted slots through the real declared prefix consumer", function()
+		return helpers.with_stub_scope({
+			"adapters.file_system", "adapters.hotkey_registrar", "infra.paths", "infra.config_paths",
+			"infra.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
+		}, function()
+			helpers.load_with_stubs("infra.preferences")
+			local observed = {}
+			package.loaded["infra.paths"] = {shared = helpers.shared}
+			package.loaded["adapters.file_system"] = {read = function(path)
+				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close(); return bytes
+			end}
+			package.loaded["adapters.hotkey_registrar"] = {
+				bind = function(chord) observed[chord] = (observed[chord] or 0) + 1; return chord end,
+				unbind = function() return true end,
+			}
+			package.loaded["modules.gestures.actions"] = {
+				is_assignable = function(action) return action == "send_text" or action == "none" end,
+			}
+			require("tests.support.keyboard_config_fixture").install({
+				cmd_shift_a="send_text", cmd_a="send_text", hs_ctrl_shift_a="send_text", hs_ctrl_a="send_text",
+			})
+			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+			local subject = require("modules.shortcuts.keyboard_shortcuts")
+			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(observed, { ["Cmd+Shift+A"]=1, ["Cmd+A"]=1, ["Ctrl+Shift+A"]=1, ["Ctrl+A"]=1 })
+			helpers.assert_eq(subject.get_slot_label("cmd_shift_a"), "⌘ ⇧ A")
+			helpers.assert_eq(subject.get_slot_label("hs_ctrl_shift_a"), "^ ⇧ A")
+			helpers.assert_eq(subject.stop(), true)
+		end)
+	end)
+end)
 
--- Test 3: both iteration sites use ipairs(), not pairs().
--- pairs() on an array still works but loses ordering; ipairs() is the contract.
-local pairs_count = 0
-for _ in src:gmatch("for prefix, mods in pairs%(SLOT_MODS%)") do
-	pairs_count = pairs_count + 1
-end
-helpers.assert_true(
-	pairs_count == 0,
-	"keyboard_shortcuts.lua must use ipairs(SLOT_MODS), not pairs(SLOT_MODS) (shortcuts-core-1)"
-)
-
-print("[PASS] test_slot_prefix_ordering")
+return true

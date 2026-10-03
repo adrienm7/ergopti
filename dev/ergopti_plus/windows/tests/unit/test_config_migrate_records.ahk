@@ -92,11 +92,16 @@ _CMR_OrdinaryWriterKeepsItsCanonicalContract() {
 	Input := '# canonical saves have their own policy`n[source]`nchoice = true # old comment`n'
 	Built := _TOML_BatchWriteImpl("config-records:ordinary-writer", [], [], "build", Input)
 	AssertEqual("ok", Built["status"])
-	AssertFalse(InStr(Built["content"], "# old comment", true), "the ordinary writer retains its canonical-save policy")
+	; Canonical value rendering owns changed assignments, not foreign comments.
+	Expected := Chr(0xFEFF) . '# canonical saves have their own policy`n[source]`nchoice = true # old comment`n'
+	AssertEqual(Expected, Built["content"], "ordinary no-op rendering retains every unowned source record and comment")
+	Typed := TOML_ParseDocument(Built["content"])
+	AssertTrue(Typed["source"]["choice"] is TOML_Bool, "the canonical value remains a Boolean, not numeric one")
+	AssertEqual(1, Typed["source"]["choice"].Value)
 	Assert(ConfigMigrateSameModel(_ConfigMigrateParse(Input, "ordinary before"),
 		_ConfigMigrateParse(Built["content"], "ordinary after")), "ordinary saves keep their typed model")
 }
-Test("config migrate records: ordinary writes retain the canonical contract (config-migrate-record-ordinary)",
+Test("config migrate records: ordinary writes retain typed values and unowned records (config-migrate-record-ordinary)",
 	_CMR_OrdinaryWriterKeepsItsCanonicalContract)
 
 _CMR_CopyRegistry() {

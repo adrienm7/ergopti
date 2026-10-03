@@ -306,6 +306,46 @@ local function assert_all_taps_disabled(fixture, message)
 end
 
 helpers.describe("keymap start: exact native commitment", function()
+	helpers.it("acknowledges effective replacement transitions to the existing ordinary owner", function()
+		helpers.with_stub_scope({ "modules.shortcuts.keyboard_shortcuts", "modules.keymap.magic_key_source" }, function()
+			local fixture, selected
+			local observed = {}
+			package.loaded["modules.keymap.magic_key_source"] = {
+				set = function(value) selected = value; return value end,
+				keycode = function() return selected == "KeyJ" and 38 or nil end,
+			}
+			package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+				refresh_magic_editor = function()
+					observed[#observed + 1] = { effective = fixture.keymap.is_magic_key_replacement_effective() }
+					return true
+				end,
+			}
+			fixture = load_fixture()
+			package.loaded["modules.keymap.registry"].is_group_enabled = function() return true end
+			package.loaded["modules.keymap.registry"].is_section_enabled = function() return true end
+			package.loaded["adapters.synthetic_input"].admission_open = function() return true end
+			helpers.assert_eq(fixture.keymap.start(), true)
+			helpers.assert_eq(fixture.keymap.set_magic_key_source("KeyJ"), true)
+			helpers.assert_eq(fixture.keymap.pause_processing(), true)
+			helpers.assert_eq(fixture.keymap.resume_processing(), true)
+			helpers.assert_eq(observed, { { effective = false }, { effective = true },
+				{ effective = false }, { effective = true } })
+			local tap = fixture.taps[1]
+			local is_enabled, stop = tap.isEnabled, tap.stop
+			tap.isEnabled = function() error("native source ownership unreadable") end
+			helpers.assert_nil(fixture.keymap.is_magic_key_replacement_effective())
+			tap.isEnabled = is_enabled
+			tap.stop = function() return false end
+			helpers.assert_eq(fixture.keymap.stop(), false)
+			helpers.assert_nil(fixture.keymap.is_magic_key_replacement_effective(),
+				"a live tap retained after teardown cannot prove source inactivity")
+			helpers.assert_eq(#observed, 4, "a refused lifecycle edge cannot publish an acknowledgment")
+			tap.stop = stop
+			helpers.assert_eq(fixture.keymap.stop(), true)
+			helpers.assert_eq(observed[5], { effective = false })
+		end)
+	end)
+
 	for _, teardown in ipairs({ false, true }) do
 		helpers.it("(terminator-stop-settle-fence) retains context guards until replay settles, teardown="
 			.. tostring(teardown), function()

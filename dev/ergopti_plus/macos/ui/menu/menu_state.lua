@@ -66,7 +66,7 @@ end
 --- @param saved table The raw saved preferences table.
 --- @param config_absent boolean Must be false: the caller seeds config.toml once
 --- its save transaction exists, never this sync.
---- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, apply_llm_enabled, apply_metrics_shortcut, apply_apps_time_shortcut, _metrics_hk, _apps_time_hk, on_runtime_demotion }.
+--- @param deps table Dependency bag: { keymap, gestures, hotstring_editor, core_mods, apply_llm_enabled, on_runtime_demotion }.
 --- @return boolean committed True only when every feature applied.
 --- @return table report { failures, demotions, unsettled, repairs } per feature.
 function M.sync_state_to_modules(state, saved, config_absent, deps)
@@ -158,8 +158,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	local hotstring_editor = deps.hotstring_editor
 	local core_mods        = deps.core_mods
 	local apply_llm_enabled = deps.apply_llm_enabled
-	local apply_metrics_shortcut   = deps.apply_metrics_shortcut
-	local apply_apps_time_shortcut = deps.apply_apps_time_shortcut
 
 	-- Canonical absence replaces stale derived section settings as well as groups.
 	if keymap and type(keymap.apply_hotstring_preferences) == "function" then
@@ -236,9 +234,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 						break
 					end
 					accepted_keys[ct.key] = true
-					accepted_custom[#accepted_custom + 1] = {
-						key = ct.key, char = ct.char, label = label, consume = consume,
-					}
+					-- Runtime admission validates owned fields; it does not own future
+					-- record metadata that an ordinary preference save must retain.
+					local accepted = clone_value(ct)
+					accepted.label, accepted.consume = label, consume
+					accepted_custom[#accepted_custom + 1] = accepted
 					-- Resolved from the persisted states rather than read off an
 					-- undefined global. `enabled_ct` was never assigned anywhere, so it
 					-- was always nil and this branch never ran: a custom terminator the
@@ -456,11 +456,12 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 
 	local sc = state.custom_editor_shortcut
+	local editor_handoff_committed = true
 	if sc == nil then
-		local def = { mods = {"ctrl"}, key = state.trigger_char }
-		state.custom_editor_shortcut = def
-		if type(hotstring_editor.set_shortcut) == "function" then
-			try_exact("hotstring_editor", "hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key)
+		-- Canonical absence belongs to the ordinary contextual slot. Retire an
+		-- acknowledged legacy owner before that slot may acquire a replacement.
+		if type(hotstring_editor.clear_shortcut) == "function" then
+			editor_handoff_committed = try_exact("hotstring_editor", "hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 		end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
 		if type(hotstring_editor.set_shortcut) == "function" then
@@ -470,33 +471,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		try_exact("hotstring_editor", "hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 	end
 
-	if type(apply_metrics_shortcut) == "function" then
-		if type(state.metrics_shortcut) == "table" then
-			try_exact("metrics", "apply_metrics_shortcut", apply_metrics_shortcut,
-				state.metrics_shortcut.mods, state.metrics_shortcut.key, false)
-		else
-			try_exact("metrics", "apply_metrics_shortcut", apply_metrics_shortcut, nil, nil, false)
-		end
-	end
-	if type(apply_apps_time_shortcut) == "function" then
-		if type(state.apps_time_shortcut) == "table" then
-			try_exact("metrics", "apply_apps_time_shortcut", apply_apps_time_shortcut,
-				state.apps_time_shortcut.mods, state.apps_time_shortcut.key, false)
-		else
-			try_exact("metrics", "apply_apps_time_shortcut", apply_apps_time_shortcut, nil, nil, false)
-		end
-	end
-	-- Re-enable after a brief warm-up delay: on the very first presses after
-	-- a Hammerspoon restart the event tap may not be fully live, so the first
-	-- call above registers the hotkey and this second enable() ensures it is
-	-- active once the tap is stable. 0.1s is enough — the event tap is live
-	-- well before 1s in practice; the original 1.0s was unnecessarily long.
-	DeferredWork.after(0.1, function()
-		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics", "metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
-		if deps._apps_time_hk and deps._apps_time_hk[1] then try("metrics", "apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
-	end, "menu_state.hotkey_warmup")
 
-	-- Sync keylogger engine
 	local kl = core_mods.keylogger
 	if kl then
 		_keylogger_start_generation = _keylogger_start_generation + 1
@@ -723,6 +698,20 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
+	local shortcut_owner = core_mods and core_mods.shortcuts_mod
+	if shortcut_owner and type(shortcut_owner.configure_magic_editor) == "function" then
+		try_exact("shortcuts", "shortcuts.configure_magic_editor", shortcut_owner.configure_magic_editor, {
+			legacy_present = sc ~= nil or not editor_handoff_committed,
+			trigger = function() return keymap.get_trigger_char() end,
+			magic_source = function() return keymap.get_magic_key_source() end,
+			replace_active = function()
+				if type(keymap.is_magic_key_replacement_effective) ~= "function" then return nil end
+				return keymap.is_magic_key_replacement_effective()
+			end,
+			paused = function() return shortcut_owner.is_paused() == true end,
+			inhibited = function() return shortcut_owner.has_bindings_pause_debt() == true end,
+		})
+	end
 	return #report.failures == 0 and #report.unsettled == 0, report
 end
 

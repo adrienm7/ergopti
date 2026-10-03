@@ -307,33 +307,129 @@ _LAG_SystemRows() {
 }
 Test("LLM agent: the System 1 and System 2 submenus list, check and store backends and models", _LAG_SystemRows)
 
+; Snapshot the real native choice, retaining its owned tree until assertions finish.
+_LAG_NativeModeRow(Owned) {
+	global _MenuDispatchCallbacks
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", 0, "ptr")
+	Assert(Handle != 0, "the first declared agent row opens its mode choices")
+	Sub := MenuFromHandle(Handle)
+	Items := []
+	loop TrayMenuItemCount(Sub) {
+		Position := A_Index - 1
+		Id := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id), "each native mode uses the actual dispatcher")
+		Items.Push(Map("label", _CTC_LabelAt(Sub, Position),
+			"checked", _CTC_IsChecked(Sub, Position), "action", _MenuDispatchCallbacks[Id]))
+	}
+	State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+	Assert(State != 0xFFFFFFFF, "the actual mode parent has native flags")
+	return Map("label", _CTC_LabelAt(Built, 0), "items", Items, "disabled", ((State & 0xFF) & 0x3) != 0)
+}
+
+; Read the independently captured three-mode menu matrix.
+_LAG_ModeMenuCorpus() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\menus\agent_mode_rows.json"
+	Assert(FileExist(Path), "the shared independent mode-menu corpus must exist")
+	return JsonParse(FileRead(Path, "UTF-8"))
+}
+
+_LAG_ModeMenuGolden() {
+	Corpus := _LAG_ModeMenuCorpus()
+	AssertEqual(3, Corpus["modes"].Length, "the independent catalogue contains three modes")
+	AssertEqual(3, Corpus["states"].Length, "all three native states must be exercised")
+	for State in Corpus["states"] {
+		_LAG_Run(_LAG_Menu(State["selected"], "cerebras", "cerebras"), _LTN_Screen(""), _Body.Bind(Corpus, State))
+		_Body(Corpus, State, Fx, Lines, Sent) {
+			global _LLM_Menu
+			Owned := []
+			try {
+				Row := _LAG_NativeModeRow(Owned)
+				AssertEqual(3, Row["items"].Length, "all three independent choices are present")
+				AssertFalse(Row["disabled"], "the native parent stays available with its actual command owner")
+				for Index, Expected in Corpus["modes"] {
+					Actual := Row["items"][Index]
+					AssertEqual(t(Expected["label_key"]), Actual["label"], "mode order and label")
+					AssertEqual(State["checked"][Index], Actual["checked"], "one exact native check")
+					if Expected["value"] == State["selected"]
+						AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", Actual["label"]), Row["label"])
+				}
+			} finally {
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+			}
+		}
+	}
+}
+Test("LLM agent: actual native mode choices replay the independent three-state menu matrix", _LAG_ModeMenuGolden)
+
+_LAG_ModeMenuSharedDeclaration() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn
+		Corpus := _LAG_ModeMenuCorpus()
+		Mode := _MR_GetManifestRoot()["agent_menu"][1]
+		Previous := Mode.Get("choices", "")
+		Keys := Map(), Owned := []
+		for Expected in Corpus["modes"]
+			Keys[Expected["value"]] := Expected["label_key"]
+		Mode["choices"] := []
+		for Value in Corpus["reordered_values"]
+			Mode["choices"].Push(Map("value", Value, "i18n", Keys[Value]))
+		try {
+			Row := _LAG_NativeModeRow(Owned)
+			for Index, Value in Corpus["reordered_values"]
+				AssertEqual(t(Keys[Value]), Row["items"][Index]["label"], "the declaration owns actual native order")
+			_LLM_Agent_CommitFn := (*) => false
+			AssertFalse(Row["items"][2]["action"].Call(), "the actual transaction refuses Off")
+			AssertEqual("action", _LLM_Menu["agent_mode"], "runtime state remains unchanged")
+			AssertEqual(0, Fx.Commits.Length, "no write is acknowledged")
+			AssertEqual(0, Fx.Rebuilds, "a refused native choice never redraws as success")
+		} finally {
+			Mode["choices"] := Previous
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared mode declaration controls native rows without bypassing refusal", _LAG_ModeMenuSharedDeclaration)
+
 _LAG_ModeRow() {
 	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		global _LLM_Menu
-		Row := _LLM_Agent_ModeRow()
-		AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", t("menu.agent.mode_action")), Row["label"],
-			"the current mode")
-		AssertEqual(3, Row["items"].Length, "three modes")
-		AssertTrue(Row["items"][2]["checked"] && !Row["items"][1]["checked"] && !Row["items"][3]["checked"],
-			"the current one checked")
-		Row["items"][3]["action"].Call()
-		AssertEqual("action", _LLM_Menu["agent_mode"], "auto is refused without System 1")
-		AssertEqual(t("llm.agent.no_system1"), _LPP_PendingNotice(), "with its notice")
-		AssertEqual(0, Fx.Commits.Length, "and nothing is stored")
-		_LLM_Menu["agent_system1"] := "cerebras"
-		AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns the automatic mode on")
-		AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
-		AssertEqual(t("llm.agent.auto_on"), _LPP_PendingNotice(), "with its notice")
-		AssertTrue(LLM_Agent_ToggleAuto(), "then back")
-		AssertEqual("action", _LLM_Menu["agent_mode"], "to on action")
-		AssertEqual(t("llm.agent.auto_off"), _LPP_PendingNotice(), "with its notice")
-		_LLM_Agent_ModeRow()["items"][1]["action"].Call()
-		AssertEqual("off", _LLM_Menu["agent_mode"], "the off row turns the agent off")
-		AssertTrue(LLM_Agent_ToggleAuto(), "from off the toggle goes to auto")
-		AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
-		Row := _LLM_Agent_AppsRow()
-		AssertEqual(StrReplace(t("menu.agent.disabled_apps"), "{1}", 0), Row["label"], "no excluded application")
+		Owned := []
+		try {
+			Row := _LAG_NativeModeRow(Owned)
+			AssertEqual(StrReplace(t("menu.agent.mode_title"), "{1}", t("menu.agent.mode_action")), Row["label"],
+				"the current mode")
+			AssertEqual(3, Row["items"].Length, "three modes")
+			AssertTrue(Row["items"][2]["checked"] && !Row["items"][1]["checked"] && !Row["items"][3]["checked"],
+				"the current one checked")
+			Row["items"][3]["action"].Call()
+			AssertEqual("action", _LLM_Menu["agent_mode"], "auto is refused without System 1")
+			AssertEqual(t("llm.agent.no_system1"), _LPP_PendingNotice(), "with its notice")
+			AssertEqual(0, Fx.Commits.Length, "and nothing is stored")
+			AssertEqual(0, Fx.Rebuilds, "a refused automatic mode never redraws as success")
+			_LLM_Menu["agent_system1"] := "cerebras"
+			AssertTrue(LLM_Agent_ToggleAuto(), "the toggle turns the automatic mode on")
+			AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
+			AssertEqual(t("llm.agent.auto_on"), _LPP_PendingNotice(), "with its notice")
+			AssertTrue(LLM_Agent_ToggleAuto(), "then back")
+			AssertEqual("action", _LLM_Menu["agent_mode"], "to on action")
+			AssertEqual(t("llm.agent.auto_off"), _LPP_PendingNotice(), "with its notice")
+			_LAG_NativeModeRow(Owned)["items"][1]["action"].Call()
+			AssertEqual("off", _LLM_Menu["agent_mode"], "the off row turns the agent off")
+			AssertTrue(LLM_Agent_ToggleAuto(), "from off the toggle goes to auto")
+			AssertEqual("auto", _LLM_Menu["agent_mode"], "auto")
+			Row := _LLM_Agent_AppsRow()
+			AssertEqual(StrReplace(t("menu.agent.disabled_apps"), "{1}", 0), Row["label"], "no excluded application")
+		} finally {
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
 	}
 }
 Test("LLM agent: the mode submenu and the toggle refuse auto without System 1", _LAG_ModeRow)
@@ -1493,3 +1589,97 @@ _LAG_PauseStopsTheFeed() {
 	}
 }
 Test("LLM agent: a pause stops the typing feed, the resume lets it start again", _LAG_PauseStopsTheFeed)
+
+
+_LAG_MissingLocalModelOffersOnlyCurrentFlow() {
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL, _LLM_Agent_Generation
+		Saved := _LLM_LocalModelOfferPort
+		Offers := []
+		try {
+			_LLM_LocalModelOfferPort := Map("confirm", (Title, Text) => (Offers.Push(Text), false))
+			AssertTrue(_LAG_Invoke("llm_agent_selection"), "the real action starts a local manual agent flow")
+			AssertEqual(1, Fx.Ollama.Length)
+			Request := Fx.Ollama[1]
+			Model := JsonParse(Request["body"])["model"]
+			Request["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "a current manual failure offers a download rather than a bare 404")
+			AssertContains(Offers[1], Model, "the consent names the exact requested model")
+			_LLM_Agent_Generation += 1
+			Request["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "a superseded flow cannot open another prompt")
+			AssertEqual(0, Sent.Length, "a missing model never injects an action")
+		} finally _LLM_LocalModelOfferPort := Saved
+	}
+}
+Test("LLM agent: missing local model offers explicit manual recovery only for current flow (todo-46-local-model)",
+	_LAG_MissingLocalModelOffersOnlyCurrentFlow)
+
+_LAG_AutomaticMissingModelNotifiesWithoutModal() {
+	_LAG_Run(_LAG_Menu("auto", "local", "local"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, LLM_OLLAMA_BASE_URL
+		Saved := Map("port", _LLM_LocalModelOfferPort, "notified", _LLM_LocalModelNotified)
+		State := Map("notices", 0, "confirms", 0, "downloads", 0)
+		try {
+			_LLM_LocalModelNotified := Map()
+			_LLM_LocalModelOfferPort := Map("notify", (*) => (State["notices"] += 1, true),
+				"confirm", (*) => (State["confirms"] += 1, true), "install", (*) => (State["downloads"] += 1, true))
+			Fx.App := "Slack"
+			TooltipHide("AgentTest", true)
+			Pause := _LAG_Type(Fx, LAG_TYPED)
+			AssertTrue(Pause.Call(), "the actual typing pause starts local System 1")
+			AssertEqual(1, Fx.Ollama.Length)
+			Model := JsonParse(Fx.Ollama[1]["body"])["model"]
+			Fx.Ollama[1]["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, State["notices"], "current automatic triage reports its missing model")
+			AssertEqual(0, State["confirms"], "typing must not open a modal")
+			AssertEqual(0, State["downloads"], "typing cannot download without consent")
+			AssertEqual(1, Fx.Ollama.Length, "a failed triage cannot wake System 2")
+		} finally {
+			_LLM_LocalModelOfferPort := Saved["port"]
+			_LLM_LocalModelNotified := Saved["notified"]
+		}
+	}
+}
+Test("LLM agent: actual automatic local triage missing-model notice has no modal or pull (todo-46-local-model)",
+	_LAG_AutomaticMissingModelNotifiesWithoutModal)
+
+/** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
+_LAG_ToolsCacheLifetime(StartTick) {
+	_LAG_RunConnectors("", _Body)
+	_Body(Fx) {
+		global _LLM_AgentConnector_ListFn, LLM_AGENT_TOOLS_TTL_MS
+		State := { Reads: 0, Files: ["C:\tools\old.ps1"] }
+		List(Dir) {
+			State.Reads += 1
+			return State.Files.Clone()
+		}
+		_LLM_AgentConnector_ListFn := List
+		Config := LLM_Agent_Config()
+		Initial := LLM_AgentConnector_Tools(Config, true, StartTick)
+		AssertEqual(1, State.Reads, "initial force actually enumerates the folder")
+		AssertEqual("old", Initial["names"][1])
+		State.Files := ["C:\tools\new.cmd"]
+		Before := (StartTick + LLM_AGENT_TOOLS_TTL_MS - 1) & 0xFFFFFFFF
+		Cached := LLM_AgentConnector_Tools(Config, false, Before)
+		AssertEqual(1, State.Reads, "strictly before expiry the cache is reused")
+		AssertEqual(ObjPtr(Initial), ObjPtr(Cached), "reuse retains the same cache owner")
+		Now := (StartTick + LLM_AGENT_TOOLS_TTL_MS) & 0xFFFFFFFF
+		Refreshed := LLM_AgentConnector_Tools(Config, false, Now)
+		AssertEqual(2, State.Reads, "at the exact TTL the folder must be enumerated again")
+		AssertEqual("new", Refreshed["names"][1], "removed tools disappear from the prompt list")
+		AssertFalse(Refreshed["paths"].Has("old"), "removed tools cannot remain executable")
+		AssertEqual("C:\tools\new.cmd", Refreshed["paths"]["new"])
+		AssertEqual(Now, Refreshed["tick"], "the admitted snapshot uses the same clock observation")
+		State.Files := ["C:\tools\forced.ahk"]
+		Forced := LLM_AgentConnector_Tools(Config, true, Now)
+		AssertEqual(3, State.Reads, "explicit force still bypasses a fresh cache")
+		AssertEqual("forced", Forced["names"][1])
+	}
+}
+Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)",
+	_LAG_ToolsCacheLifetime.Bind(100))
+Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
+	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))

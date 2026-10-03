@@ -318,6 +318,7 @@ input_altering = false
 type = "enum"
 enum_values = ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
 description_key = "menu.script.log_level"
+platforms = ["ahk", "hs", "linux"]
 
 # Whether a logged ERROR may open the error window (_shared/ui/error_dialog/),
 # ticked from the Debug menu. On by default: an error nobody sees is an error
@@ -1146,7 +1147,9 @@ id = "agent_mode"
 default = "off"
 recommended = "off"
 input_altering = false
-type = "string"
+type = "enum"
+enum_values = ["off", "action", "auto"]
+platforms = ["ahk", "hs", "linux"]
 description_key = "menu.agent.mode_title"
 
 # Applications where the automatic mode never looks at what is typed.
@@ -1509,23 +1512,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.metrics.metrics_enabled"
 
-[[features.metrics]]
-id = "metrics_shortcut_typing"
-platforms = ["ahk"]
-default = ""
-recommended = ""
-input_altering = false
-type = "string"
-description_key = "menu.metrics.metrics_shortcut_typing"
 
-[[features.metrics]]
-id = "metrics_shortcut_apps"
-platforms = ["ahk"]
-default = ""
-recommended = ""
-input_altering = false
-type = "string"
-description_key = "menu.metrics.metrics_shortcut_apps"
 
 [[features.metrics]]
 id = "metrics_wpm_menubar_colors"
@@ -2067,6 +2054,17 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
 # ====================================
 # ===== 3.5.8 shortcuts.keyboard =====
+
+[[features.shortcuts.keyboard]]
+id = "magic_editor"
+platforms = ["ahk", "hs", "linux"]
+default = "open_hotstrings_editor"
+recommended = "open_hotstrings_editor"
+input_altering = true
+active_by_default = true
+cleared = "none"
+type = "action"
+description_key = "menu.shortcuts.keyboard.magic_editor"
 # ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
@@ -2101,7 +2099,7 @@ description_key = "menu.shortcuts.keyboard.win_a"
 id = "win_d"
 platforms = ["ahk"]
 default = "none"
-recommended = "open_hotstrings_editor"
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_d"
@@ -3592,12 +3590,61 @@ description_key = "menu.layout.menubar_icon"
 # binds a click on one.
 
 [menu]
-# dynamic_hotstrings_order lived here and was read by nobody. The order that
-# actually renders is _DYNAMIC_HOTSTRINGS_ORDER in windows/ui/tray_menu.ahk,
-# which spells its separator "-" where this spelled it "---" — two sources for
-# one order, disagreeing, one of them dead. Removed rather than reconciled: the
-# live one is the one the menu uses, and a second copy that nothing reads is a
-# trap for whoever edits it next expecting the menu to change.
+# Shared child records drive the Dynamic family order, separators and native
+# section spellings. Drivers add only live dates/counts and the editor action.
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date_long_fr"
+section = "datelongfr"
+i18n = "dynamichotstrings.datelongfr"
+legacy_key = "DateLongFr"
+date_field = "long_fr"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date_fr"
+section = "datefr"
+i18n = "dynamichotstrings.datefr"
+legacy_key = "DateFr"
+date_field = "fr"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date"
+section = "date"
+i18n = "dynamichotstrings.date"
+legacy_key = "Date"
+date_field = "iso"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "phone_prefixes"
+section = "phoneprefixes"
+i18n = "dynamichotstrings.phoneprefixes"
+legacy_key = "PhonePrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "ssn_prefixes"
+section = "ssnprefixes"
+i18n = "dynamichotstrings.ssnprefixes"
+legacy_key = "SsnPrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "iban_prefixes"
+section = "ibanprefixes"
+i18n = "dynamichotstrings.ibanprefixes"
+legacy_key = "IbanPrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+separator = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "text_expansion_personal_information"
+section = "textexpansionpersonalinformation"
+linux_section = "personal_info"
+i18n = "dynamichotstrings.textexpansionpersonalinformation"
+legacy_key = "TextExpansionPersonalInformation"
+is_module_placeholder = true
 
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
@@ -3835,7 +3882,7 @@ platforms = ["ahk", "hs", "linux"]
 
 # The suggestion count ("Nombre de suggestions") is a generation parameter: it
 # is the first row of the generation settings on every driver (the
-# `llm_generation_settings` submenu, or Linux's inline `llm_generation` list),
+# `llm_generation_settings` submenu, or Linux's inline `llm_generation` handler),
 # not a row of this top level.
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3863,7 +3910,7 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
 
 [[menu.llm_menu]]
-type = "list"
+type = "dynamic"
 id = "llm_generation"
 platforms = ["linux"]
 reason_key = "platform_reason.llm_lists_are_inline_on_linux"
@@ -3889,10 +3936,31 @@ platforms = ["ahk", "hs", "linux"]
 #
 # All three drivers show the same block: the version, one channel submenu titled
 # with the subscribed channel and listing every channel of the shared
-# update-channel registry, right before the check row, the check frequency (a
-# `list`, because its rows come from the registry and the updater state), then
+# update-channel registry, right before the check row, the check frequency (another
+# registered choice, using the cadence owner and its snapped state), then
 # Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
+# The updater registry owns the channel ids, stability order and both label forms.
+[[menu.about_update_channel_menu]]
+type = "choice"
+id = "update_channel"
+path = "updater.channel"
+i18n = "menu.about.channel_menu"
+choice_registry = "updater.channels"
+show_current_choice = true
+current_choice_placeholder = "{channel}"
+
+# The cadence registry owns numeric values and duration labels; the shared
+# renderer owns order, ticks and the translated current-choice caption.
+[[menu.about_update_frequency_menu]]
+type = "choice"
+id = "update_check_interval"
+path = "updater.check_interval_seconds"
+i18n = "menu.about.frequency_menu"
+choice_registry = "updater.check_intervals"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"
@@ -3940,13 +4008,82 @@ disabled_reason_key = "menu.about.source_run_reason"
 
 # The AI agent submenu (_shared/modules/llm/agent.json): its mode, the backend
 # and model of System 1 (fast triage) and System 2 (the actions), and the
-# applications the automatic mode ignores. Every row is `dynamic`: the backend
-# lists come from api_providers.json and the stored API entries, and the
-# application picker is each driver's own.
+# applications the automatic mode ignores. The fixed modes belong to the enum
+# feature and its shared choice renderer. The backend lists and application
+# picker remain dynamic: they depend on stored API entries and native apps.
+# The common Info Bar check keeps the native display providers on either side:
+# macOS retains its leading indent selector; the other drivers supply no leading row.
+# The two automatic prediction triggers share row identity, labels and admission.
+# Numeric debounce, privacy filters and application exclusions retain native owners.
+[[menu.llm_trigger_menu]]
+type = "list"
+id = "llm_trigger_leading"
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_instant_on_word_end"
+i18n = "menu.llm.instant_on_word_end"
+checked_when = ["llm_instant_on_word_end_enabled"]
+disabled_when = ["llm_trigger_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_after_hotstring"
+i18n = "menu.llm.after_hotstring"
+checked_when = ["llm_after_hotstring_enabled"]
+disabled_when = ["llm_trigger_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "list"
+id = "llm_trigger_remaining"
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_leading"
+
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_info_bar"
+i18n = "menu.llm.show_info_bar"
+checked_when = ["llm_info_bar_enabled"]
+disabled_when = ["llm_info_bar_ready"]
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_remaining"
+
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_show_all"
+i18n = "menu.llm.show_all_at_once"
+checked_when = ["llm_show_all_enabled"]
+disabled_when = ["llm_show_all_ready"]
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_trailing"
+
+# Generation numeric providers retain their native prompts; the common diversity
+# checkbox has one label, checked state and current readiness owner on every OS.
+[[menu.llm_generation_menu]]
+type = "list"
+id = "llm_generation_values"
+
+[[menu.llm_generation_menu]]
+type = "check"
+id = "llm_auto_raise_temperature"
+i18n = "menu.llm.auto_raise_temp"
+checked_when = ["llm_auto_raise_enabled"]
+disabled_when = ["llm_auto_raise_ready"]
+
 [[menu.agent_menu]]
-type = "dynamic"
+type = "choice"
 id = "agent_mode"
+path = "llm.agent_mode"
 i18n = "menu.agent.mode_title"
+choice_label_prefix = "menu.agent.mode_"
+show_current_choice = true
+disabled_when = ["agent_mode_ready"]
 
 [[menu.agent_menu]]
 type = "---"
@@ -4109,8 +4246,17 @@ type = "---"
 id = "---"
 
 [[menu.debug_menu]]
-type = "list"
+type = "choice"
 id = "log_level"
+i18n = "menu.debug.log_level"
+path = "script.log_level"
+choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]
+# These are the logger's technical tokens, identical in every locale. Their
+# presentation is shared; the durable API still accepts all eight severities.
+choice_label_kind = "log_level_token"
+choice_icons = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
+show_current_choice = true
+current_choice_suffix = " : {1}"
 
 [[menu.debug_menu]]
 type = "command"
@@ -5070,6 +5216,34 @@ id = "hotstrings_reload"
 i18n = "menu.global.reload"
 platforms = ["linux"]
 reason_key = "platform_reason.only_linux_rereads_its_catalogue"
+# The fixed word-expander bulk controls share their labels, order and paused
+# posture. Each native port supplies only its existing acknowledged delimiter
+# owner; the remaining catalogue and personal entries remain provider data.
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_enable_all"
+i18n = "menu.hotstrings.check_all"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_disable_all"
+i18n = "menu.hotstrings.uncheck_all"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "command"
+id = "word_expanders_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expanders_menu]]
+type = "---"
+
+[[menu.word_expanders_menu]]
+type = "list"
+id = "word_expander_entries"
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "word_expanders"
@@ -5657,23 +5831,7 @@ type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
 platforms = ["hs"]
 
-[[features.metrics]]
-id = "shortcut"
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.metrics_shortcut_typing"
-platforms = ["hs"]
 
-[[features.metrics]]
-id = "apps_shortcut"
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.metrics_shortcut_apps"
-platforms = ["hs"]
 
 [[features.layout]]
 id = "pause_switch_enabled"

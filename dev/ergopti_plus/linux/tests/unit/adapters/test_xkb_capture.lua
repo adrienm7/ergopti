@@ -343,3 +343,65 @@ helpers.describe("xkb_capture: the injection table comes from the loaded keymap"
 	end)
 
 end)
+
+helpers.describe("xkb_capture: physical magic editor source receipts", function()
+	local function source_backend()
+		local backend = oracle_backend()
+		backend.source_group = function(session) return session.group end
+		backend.direct_sources = function(session, codes)
+			local rows = {}
+			for _, code in ipairs(codes) do
+				rows[#rows + 1] = { code = code, text = session.group == 1 and ";" or "ù",
+					plain = true, direct = true, dead = false }
+			end
+			return rows
+		end
+		return backend
+	end
+
+	helpers.it("(magic-editor-native) preserves duplicate physical sources and owns the active group epoch", function()
+		local capture = helpers.load_module("adapters.xkb_capture")
+		capture._set_backend(source_backend())
+		helpers.assert_true(capture.load("fr", "C"))
+		local first = capture.source_generation()
+		local rows = capture.direct_sources({ 30, 40 })
+		helpers.assert_eq(#rows, 2, "every actual candidate survives enumeration")
+		helpers.assert_eq(rows[1].text, ";")
+		helpers.assert_eq(rows[2].text, ";", "an inverse map would silently discard this ambiguity")
+		capture.process(30, 1)
+		capture.process(30, 0)
+		helpers.assert_eq(capture.source_generation(), first, "ordinary down/up does not invalidate delivery")
+		capture.process(99, 1)
+		capture.process(99, 0)
+		helpers.assert_true(capture.source_generation() > first)
+		helpers.assert_eq(capture.direct_sources({ 40 })[1].text, "ù", "the same live session proves its new group")
+		local switched = capture.source_generation()
+		helpers.assert_eq(capture.load("invalid", "C"), false)
+		helpers.assert_eq(capture.source_generation(), switched, "a refused keymap leaves its receipt intact")
+		helpers.assert_true(capture.reset_state())
+		helpers.assert_true(capture.source_generation() > switched, "a real state replacement cancels old receipts")
+		capture._reset_backend()
+	end)
+
+	helpers.it("(magic-editor-native) refuses unproved groups, invalid registries and backend failures", function()
+		local capture = helpers.load_module("adapters.xkb_capture")
+		capture._set_backend(oracle_backend())
+		helpers.assert_true(capture.load("us", "C"))
+		helpers.assert_nil(capture.source_generation(), "a first-match inverse table is no active-group proof")
+		helpers.assert_nil(capture.direct_sources({ 30 }))
+		local backend = source_backend()
+		capture._set_backend(backend)
+		helpers.assert_true(capture.load("us", "C"))
+		for _, codes in ipairs({ { 30, 30 }, { -1 }, { 768 }, { 30, extra = 40 } }) do
+			helpers.assert_nil(capture.direct_sources(codes), "invalid codes must never reach native enumeration")
+		end
+		backend.direct_sources = function() error("native enumeration refused") end
+		local rows, why = capture.direct_sources({ 30 })
+		helpers.assert_nil(rows)
+		helpers.assert_contains(why, "native enumeration refused")
+		capture.clear()
+		helpers.assert_nil(capture.source_generation())
+		helpers.assert_nil(capture.direct_sources({ 30 }))
+		capture._reset_backend()
+	end)
+end)

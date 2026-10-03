@@ -580,22 +580,41 @@ _LLM_Menu_MakeDownloadModelHandler(name) {
  *
  * @param {string} name - Catalogue display name (e.g. "Qwen 2.5 3B").
  */
-_LLM_Menu_PullModel(name) {
-	global LLM_MENU_POST_PULL_REBUILD_MS
-	tag := LLM_ResolveOllamaTag(name)
+_LLM_Menu_PullModel(name, IsTag := false, BaseUrl := "", RunFn := 0, ScheduleFn := 0) {
+	global LLM_MENU_POST_PULL_REBUILD_MS, LLM_OLLAMA_BASE_URL
+	tag := IsTag ? name : LLM_ResolveOllamaTag(name)
 	if (tag == "") {
 		Ui_MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
-		return
+		return false
 	}
+	if !(tag is String) || !RegExMatch(tag, "^[A-Za-z0-9_./:-]+$")
+		return false
+	if BaseUrl == ""
+		BaseUrl := LLM_OLLAMA_BASE_URL
+	if BaseUrl != LLM_OLLAMA_BASE_URL || !RegExMatch(BaseUrl, "^http://localhost:[0-9]+$")
+		return false
 	; Open a persistent cmd window so the download progress (layer-by-layer
 	; progress bars) is fully visible. /k keeps it open after completion so
 	; the user can confirm the download succeeded before closing.
-	Run('cmd.exe /k ollama pull "' . tag . '"', , "")
+	Command := 'cmd.exe /k set "OLLAMA_HOST=' . BaseUrl . '"&& ollama pull "' . tag . '"'
+	try {
+		if HasMethod(RunFn, "Call") {
+			if RunFn.Call(Command) != true
+				return false
+		} else
+			Run(Command, , "")
+	} catch as Err {
+		try LoggerWarn("LLM.menu", "Ollama download launch failed: {1}.", Err.Message)
+		return false
+	}
 	; Rebuild after a short delay so the green dot appears once Ollama finishes
 	; (the user will close the window manually; this just keeps the menu fresh
 	; if they glance at it again while the terminal is still open).
-	SetTimer(LLM_Menu_RequestBuild.Bind("post_pull"),
-		-LLM_MENU_POST_PULL_REBUILD_MS)
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(LLM_Menu_RequestBuild.Bind("post_pull"), -LLM_MENU_POST_PULL_REBUILD_MS)
+	else
+		SetTimer(LLM_Menu_RequestBuild.Bind("post_pull"), -LLM_MENU_POST_PULL_REBUILD_MS)
+	return true
 }
 
 _LLM_Menu_MakeOpenUrlHandler(url) {

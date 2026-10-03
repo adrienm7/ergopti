@@ -287,7 +287,7 @@ global GESTURE_APP_CHOOSER_OPTIONS := 1 + 2 + 32
 ; @returns {Map|false} The parameter candidate, false when cancelled or refused.
 _GesturePickApplication(BindingId, ActionName, Prompt) {
 		global GESTURE_APP_CHOOSER_OPTIONS
-		Picked := FileSelect(GESTURE_APP_CHOOSER_OPTIONS, A_ProgramsCommon, Prompt,
+		Picked := Ui_FileSelect(GESTURE_APP_CHOOSER_OPTIONS, A_ProgramsCommon, Prompt,
 				t("dialog.gestures.param_app_filter") . " (*.exe; *.lnk)")
 		if (Picked = "")
 				return false

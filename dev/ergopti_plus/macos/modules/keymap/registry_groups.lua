@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 
+local PersonalFiles = require("hotstrings.personal_files")
 local LOG = "keymap.registry"
 
 local _delay_resolver = nil
@@ -471,7 +472,7 @@ end
 --- @param path string Absolute path to the TOML file.
 --- @param section_sources table|nil Sections other files supply, as { path,
 ---   sections } records; kept with the group so every reload reads them again.
-function M.load_toml(name, path, section_sources)
+function M.load_toml(name, path, section_sources, personal_source)
 	if not require_state("load_toml") then return false end
 	if type(name) ~= "string" or name == "" then
 		Logger.error(LOG, "load_toml: name must be a non-empty string."); return false
@@ -483,6 +484,11 @@ function M.load_toml(name, path, section_sources)
 		Logger.error(LOG, "load_toml: section sources must be { path, sections } records."); return false
 	end
 
+	if personal_source ~= nil and not PersonalFiles.is_descriptor(personal_source) then
+		Logger.error(LOG, "load_toml: personal source descriptor is invalid.")
+		return false
+	end
+	local owned_source = personal_source and PersonalFiles.copy(personal_source) or nil
 	return run_transaction("load_toml:" .. name, function()
 		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
@@ -607,6 +613,7 @@ function M.load_toml(name, path, section_sources)
 					is_case_sensitive_strict = entry.is_case_sensitive_strict,
 					final_result      = entry.final_result,
 					section           = sec_name,
+					personal_source   = owned_source,
 					priority          = _callbacks.resolve_priority(entry.priority, override_priority, nil, name),
 				})
 			end
@@ -655,6 +662,7 @@ function M.load_toml(name, path, section_sources)
 	_state.groups[name] = {
 		path             = path,
 		section_sources  = section_sources,
+		personal_source  = owned_source and PersonalFiles.copy(owned_source) or nil,
 		enabled          = true,
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
@@ -706,12 +714,13 @@ function M.reload_toml(name, path)
 			return false
 		end
 		if group.enabled ~= true then
+			if path ~= group.path then group.personal_source = nil end
 			group.path = path
 			group.kind = "toml"
 			return true
 		end
 		if M.disable_group(name) ~= true then return false end
-		return M.load_toml(name, path, group.section_sources) == true
+		return M.load_toml(name, path, group.section_sources, path == group.path and group.personal_source or nil) == true
 	end)
 end
 
@@ -853,7 +862,7 @@ function M.enable_group(name)
 
 		local loaded
 		if g.kind == "toml" then
-			loaded = M.load_toml(name, g.path, g.section_sources)
+			loaded = M.load_toml(name, g.path, g.section_sources, g.personal_source)
 		else
 			loaded = M.load_file(name, g.path)
 		end

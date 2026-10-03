@@ -182,3 +182,168 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 		restore()
 	end)
 end)
+
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 2/ Shared Automatic Trigger Commands =======
+-- ====================================================
+-- ====================================================
+
+--- Reads independent combinations without deriving expectations from setters.
+--- @return table corpus
+local function trigger_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+--- Exercises real menu projection and the manifest-backed durable setting owner.
+--- @param options table Fixture settings, current admission and writer refusal.
+--- @param body function Assertions outside production callback guards.
+local function with_trigger_menu(options, body)
+	local corpus = trigger_corpus()
+	local initial = {["llm.future_trigger_parameter"] = 42, ["llm.profiles.num_predictions"] = options.count or 1}
+	for index, row in ipairs(corpus.rows) do initial["llm.trigger." .. row.native] = options.states[index] end
+	local settings, storage = load_settings(initial)
+	replace("modules.llm.profile_settings", nil)
+	local profiles = require("modules.llm.profile_settings")
+	local observed = {writes = 0, redraws = 0}
+	local write = storage.set
+	storage.set = function(path, value)
+		observed.writes = observed.writes + 1
+		if options.refusal == "false" then return false end
+		if options.refusal == "nil" then return nil end
+		if options.refusal == "throw" then error("actual trigger writer refused") end
+		return write(path, value)
+	end
+	if options.label or options.first then
+		local renderer = assert(require("menu.renderer").new({
+			platform = "linux",
+			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			json_decode = function(raw)
+				local root = assert(require("json").decode(raw))
+				if options.label then root.llm_trigger_menu[2].i18n = options.label end
+				if options.first then
+					local row = table.remove(root.llm_trigger_menu, 2)
+					table.insert(root.llm_trigger_menu, 1, row)
+				end
+				return root
+			end,
+			i18n = require("infra.i18n"), logger = require("logger.shim"),
+		}))
+		replace("infra.manifest_menu", renderer)
+	end
+	replace("ui.menu.menu_builder", nil)
+	local menu = require("ui.menu.menu_builder").build({
+		is_paused = function() return options.paused == true end,
+		on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
+		llm = {
+			is_enabled = function() return options.enabled ~= false end,
+			toggle = function() return true end,
+			get_models = function() return {} end,
+			get_current_model = function() return nil end,
+		},
+	})
+	local parent
+	local function walk(rows)
+		for _, row in ipairs(rows or {}) do
+			if row.title == require("infra.i18n").get("menu.llm.trigger_menu_title") and type(row.menu) == "table" then parent = row end
+			if row.menu then walk(row.menu) end
+		end
+	end
+	walk(menu)
+	local ok, err = xpcall(function() body(assert(parent), settings, storage, observed, profiles) end, debug.traceback)
+	restore()
+	if not ok then error(err, 0) end
+end
+
+--- Finds a native check by its expected translated identity.
+--- @param parent table Actual trigger submenu.
+--- @param key string Canonical translated label key.
+--- @return table row
+local function trigger_row(parent, key)
+	for _, row in ipairs(parent.menu) do
+		if row.title == require("infra.i18n").get(key) then return row end
+	end
+	error("actual trigger menu omitted " .. key)
+end
+
+helpers.describe("LLM shared automatic trigger controls", function()
+	helpers.it("replays four bool pairs through actual durable controls (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		helpers.assert_eq(#corpus.states, 4)
+		for _, states in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				for index, expected in ipairs(corpus.rows) do
+					with_trigger_menu({states = states, count = count}, function(parent, settings, storage, observed)
+						local row = trigger_row(parent, expected.i18n)
+						helpers.assert_eq(row.checked or false, states[index])
+						helpers.assert_eq(row.disabled or false, false)
+						helpers.assert_eq(row.fn(), true)
+						helpers.assert_eq(settings.get(expected.native), not states[index])
+						settings._reset()
+						helpers.assert_eq(settings.get(expected.native), not states[index], "restart resolves acknowledged sparse value")
+						helpers.assert_eq(storage.get("llm.future_trigger_parameter"), 42)
+						local neighbor = corpus.rows[index == 1 and 2 or 1]
+						helpers.assert_eq(settings.get(neighbor.native), states[index == 1 and 2 or 1])
+						helpers.assert_eq(observed.writes, 1)
+						helpers.assert_eq(observed.redraws, 1)
+					end)
+				end
+			end
+		end
+	end)
+
+	helpers.it("takes shared labels and reordering into actual projection (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		with_trigger_menu({states = {false, true}, label = corpus.alternate_i18n, first = true}, function(parent, _, _, observed)
+			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_true(parent.menu[2].menu ~= nil, "numeric debounce provider follows the reordered shared check")
+			helpers.assert_eq(observed.writes, 0)
+		end)
+	end)
+
+	helpers.it("reads current values and refuses stale commands after pause or master withdrawal (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			local options = {states = {false, false}, count = 2}
+			with_trigger_menu(options, function(parent, settings, storage, observed, profiles)
+				local row = trigger_row(parent, expected.i18n)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(profiles.set("num_predictions", 1), true)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(settings.get(expected.native), false, "held callback toggles the effective current bool")
+				local writes, redraws = observed.writes, observed.redraws
+				options.paused = true
+				helpers.assert_eq(row.fn(), false)
+				options.paused = false
+				options.enabled = false
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(observed.writes, writes)
+				helpers.assert_eq(observed.redraws, redraws)
+				helpers.assert_eq(storage.get("llm.future_trigger_parameter"), 42)
+			end)
+		end
+	end)
+
+	helpers.it("never redraws or publishes refused writes including thrown native errors (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			for _, mode in ipairs({"false", "nil", "throw"}) do
+				with_trigger_menu({states = {false, false}, refusal = mode}, function(parent, settings, storage, observed)
+					local ok, receipt = pcall(trigger_row(parent, expected.i18n).fn)
+					if mode == "throw" then helpers.assert_eq(ok, false) else helpers.assert_eq(ok, true); helpers.assert_eq(receipt, false) end
+					helpers.assert_eq(settings.get(expected.native), false)
+					helpers.assert_eq(storage.get("llm.trigger." .. expected.native), false)
+					helpers.assert_eq(storage.get("llm.future_trigger_parameter"), 42)
+					helpers.assert_eq(observed.writes, 1)
+					helpers.assert_eq(observed.redraws, 0)
+				end)
+			end
+		end
+	end)
+end)

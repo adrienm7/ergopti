@@ -325,6 +325,34 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		end)
 	end)
 
+	helpers.it("brightness wheel emission reports a refused native phase after the tap returns", function()
+		with_fixture(function()
+			local errors, posted = {}, {}
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+			local fixture = load_h01_system({ gestures = {}, logger = logger })
+			fixture.hs.eventtap.event.newSystemKeyEvent = function(key, down)
+				return { post = function(self)
+					posted[#posted + 1] = { key, down }
+					return false
+				end }
+			end
+			fixture.system.bind_layer_wheel(nil, function()
+				return { code = "WheelUp", strokes = { { system = "BRIGHTNESS_UP" } } }
+			end)
+			local taps = fixture.hs.eventtap.__taps
+			enter_layer()
+			helpers.assert_true(taps[#taps].fn(physical_scroll(fixture, 1)))
+			helpers.assert_eq(#posted, 0, "the tap never waits for brightness emission")
+			fire_post_callback_actions(fixture.hs)
+			exit_layer()
+			helpers.assert_eq(posted, { { "BRIGHTNESS_UP", true }, { "BRIGHTNESS_UP", false } })
+			helpers.assert_eq(#errors, 2)
+			helpers.assert_contains(errors[1], "BRIGHTNESS_UP down post was refused")
+			helpers.assert_contains(errors[2], "BRIGHTNESS_UP up post was refused")
+		end)
+	end)
+
 	helpers.it("screenshot target lookup happens after every older fence event (HS-H-01)", function()
 		with_fixture(function()
 			local fixture = load_h01_system()

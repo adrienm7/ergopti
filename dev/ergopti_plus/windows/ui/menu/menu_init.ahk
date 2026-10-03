@@ -479,7 +479,7 @@ _MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 ; checkout has neither the check row nor the frequency picker: it has no release
 ; to update from.
 _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel,
-		IdentityFn := Updater_BuildIdentity) {
+		IdentityFn := Updater_BuildIdentity, SetIntervalFn := 0) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 	Rows := []
 
@@ -502,16 +502,19 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	; The preset in force, which both the live picker and its greyed stand-in name
 	; (a live value outside the presets reads as its nearest preset, the one a
 	; reload would load).
-	CurrentCode := UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Code
-	FrequencyLabel := t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode)
+	FrequencyRow := _MI_FrequencyPickerRow(SetIntervalFn)
 
 	if IsLocal {
 		; A local version has no installation to update, so it checks for nothing.
 		; The two rows are still drawn, greyed with the reason: left out, nobody
 		; could tell whether the automatic update exists.
-		for _, Label in [t("menu.about.check_for_updates"), FrequencyLabel]
+		for _, Label in [t("menu.about.check_for_updates")]
 			Rows.Push(Map("label", Label, "disabled", true,
 				"disabled_reason_key", "menu.about.source_run_reason"))
+		FrequencyRow.Delete("items")
+		FrequencyRow["disabled"] := true
+		FrequencyRow["disabled_reason_key"] := "menu.about.source_run_reason"
+		Rows.Push(FrequencyRow)
 		return Rows
 	}
 
@@ -520,19 +523,18 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"action",   Updater_OneClickUpdate,
 		"disabled", (Updater_GetUpdateState() == "checking")))
 
-	; Same shape for the shared check-frequency presets: one nested row per
-	; preset, the tick and the parent label on the preset in force.
-	FreqRows := []
-	for _, Preset in UpdateSchedule_Presets() {
-		FreqRows.Push(Map(
-			"label",   t("menu.about.frequency." . Preset["code"]),
-			"action",  _MakeFreqSetter(Preset["seconds"]),
-			"checked", (Preset["code"] == CurrentCode)))
-	}
-	Rows.Push(Map(
-		"label", FrequencyLabel,
-		"items", FreqRows))
+	Rows.Push(FrequencyRow)
 	return Rows
+}
+
+/** Supplies the registered cadence row to its acknowledged native owner. */
+_MI_FrequencyPickerRow(SetIntervalFn := 0) {
+	global UPDATER_CHECK_INTERVAL
+	if !IsObject(SetIntervalFn)
+		SetIntervalFn := Updater_SetCheckInterval
+	return MenuRenderer_ChoiceRow("about_update_frequency_menu", "update_check_interval",
+		Map("update_check_interval", SetIntervalFn),
+		Map("updater.check_interval_seconds", () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds))
 }
 
 ; The channel picker: one submenu titled with the subscribed channel's registry
@@ -542,31 +544,22 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 ; follows.
 _MI_ChannelPickerRow(SetChannelFn) {
 	global UPDATER_CHANNEL
-	ChannelRows := []
-	for _, Id in UpdateChannels_Ids()
-		ChannelRows.Push(Map(
-			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
-			"action",  _MI_ChannelSetter(Id, SetChannelFn),
-			"checked", (Id == UPDATER_CHANNEL)))
-	return Map(
-		"label", StrReplace(t("menu.about.channel_menu"), "{channel}", _Updater_ChannelLabel(UPDATER_CHANNEL)),
-		"items", ChannelRows)
+	return MenuRenderer_ChoiceRow("about_update_channel_menu", "update_channel",
+		Map("update_channel", (Id) => SetChannelFn.Call(Id)),
+		Map("updater.channel", () => UPDATER_CHANNEL))
 }
 
-; Binds one channel id per row. A fat arrow written in the loop above would
-; share the loop variable and switch every row to the last channel.
-_MI_ChannelSetter(Id, SetChannelFn) {
-	return (*) => SetChannelFn.Call(Id)
-}
 
 
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
-; Same shape as the Configuration submenu above: every row is a
-; `command` except the log-level picker, whose label carries the CURRENT level
-; and is therefore a `list` — exactly the shape Linux declared for it.
-_MI_BuildDebuggingMenu() {
+; Shared commands and one enum choice: native code supplies only the actual
+; setter and current runtime value, while the manifest owns the row policy.
+_MI_BuildDebuggingMenu(LogLevelCommand := 0) {
+	global LOGGER_MIN_LEVEL
+	if !HasMethod(LogLevelCommand, "Call")
+		LogLevelCommand := LoggerSetLevel
 	Commands := Map(
 		"window_spy",     WindowSpy,
 		"list_vars",      ActivateListVars,
@@ -577,18 +570,12 @@ _MI_BuildDebuggingMenu() {
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
-		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled())
+		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
+		"log_level", LogLevelCommand
 	)
-	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
-	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled)
-	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands, StateGetters)
-}
-
-; List provider: the log-level picker, whose parent row reads the current level.
-_MI_LogLevelRows() {
-	return [Map(
-		"label", _LogLevelMenuLabel(),
-		"items", _MI_LogLevelChoiceRows())]
+	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
+		"script.log_level", (*) => LOGGER_MIN_LEVEL)
+	return MenuRenderer_Build("debug_menu", "Debug", "", "", Map(), Commands, StateGetters)
 }
 
 ; Keep command registration shared by the real menu and its persistence tests.

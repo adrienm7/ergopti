@@ -1,0 +1,7 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["ctrl"], key = "d" }
+keep = "neighbor" # unchanged
+
+[shortcuts.keyboard.hs_ctrl_d]
+future = false

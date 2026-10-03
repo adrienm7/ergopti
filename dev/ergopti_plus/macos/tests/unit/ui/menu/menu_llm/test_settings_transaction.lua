@@ -126,6 +126,13 @@ local function with_fixture(options, callback)
 		llm_secure_field_filter_enabled = false,
 		llm_disabled_apps = {{name = "Old", appPath = "/Old.app"}},
 	}
+	if options.progressive_state ~= nil then state.llm_streaming_multi = options.progressive_state end
+	if options.info_bar_state ~= nil then state.llm_show_info_bar = options.info_bar_state end
+	if options.auto_raise_state ~= nil then state.llm_auto_raise_temp = options.auto_raise_state end
+	if options.prediction_count ~= nil then state.llm_num_predictions = options.prediction_count end
+	if options.trigger_states then
+		state.llm_instant_on_word_end, state.llm_after_hotstring = table.unpack(options.trigger_states)
+	end
 	local runtime = clone_value(state)
 	local persisted = clone_value(state)
 	local rendered = clone_value(state)
@@ -259,6 +266,38 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
+	local display_renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		json_decode = function(raw)
+			local root = assert(require("json").decode(raw))
+			if options.info_label then root.llm_display_menu[2].i18n = options.info_label end
+			for index, row in ipairs(root.llm_display_menu) do
+				if row.id == "llm_show_all" then
+					if options.show_all_label then row.i18n = options.show_all_label end
+					if options.show_all_first then table.remove(root.llm_display_menu, index); table.insert(root.llm_display_menu, 1, row) end
+					break
+				end
+			end
+			if root.llm_generation_menu then
+				if options.auto_label then root.llm_generation_menu[2].i18n = options.auto_label end
+				if options.auto_first then
+					root.llm_generation_menu[1], root.llm_generation_menu[2] = root.llm_generation_menu[2], root.llm_generation_menu[1]
+				end
+			end
+			if options.trigger_label then root.llm_trigger_menu[2].i18n = options.trigger_label end
+			if options.trigger_first then
+				local row = table.remove(root.llm_trigger_menu, 2)
+				table.insert(root.llm_trigger_menu, 1, row)
+			end
+			if options.info_first then
+				root.llm_display_menu[1], root.llm_display_menu[2] = root.llm_display_menu[2], root.llm_display_menu[1]
+			end
+			return root
+		end,
+		i18n = { get = function(key) return key end, section = function(key) return key end },
+		logger = Logger,
+	}))
 	package.loaded["infra.manifest_menu"] = {
 		render_rows = function(rows)
 			local items = {}
@@ -273,7 +312,10 @@ local function with_fixture(options, callback)
 			end
 			return items
 		end,
-		build = function(_, _, handlers)
+		build = function(key, category, handlers, groups, ctx, providers)
+			if key == "llm_display_menu" or key == "llm_generation_menu" or key == "llm_trigger_menu" then
+				return display_renderer.build(key, category, handlers, groups, ctx, providers)
+			end
 			local items = {}
 			for _, id in ipairs({
 				"llm_generation_settings",
@@ -469,6 +511,7 @@ local function with_fixture(options, callback)
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
+				is_paused = function() return options.paused == true end,
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
@@ -476,7 +519,7 @@ local function with_fixture(options, callback)
 		end,
 		temperature_menu = function()
 			local rows = {}
-			TemperaturePanel.build({
+			local generation_ctx = TemperaturePanel.build({
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
@@ -484,6 +527,11 @@ local function with_fixture(options, callback)
 				update_menu = update_menu,
 				settings_mgr = manager,
 			}, rows)
+			if generation_ctx then
+				return package.loaded["infra.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+					["llm_generation_values"] = function() return rows end,
+				})
+			end
 			return package.loaded["infra.manifest_menu"].render_rows(rows)
 		end,
 		top_level_callbacks = build_top_level_callbacks,
@@ -492,6 +540,7 @@ local function with_fixture(options, callback)
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
+				is_paused = function() return options.paused == true end,
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
@@ -1047,5 +1096,333 @@ helpers.describe("HS-026 missed LLM setting callbacks share the owner", function
 			helpers.assert_eq(fixture.runtime.llm_nav_modifiers, {"cmd"})
 			helpers.assert_eq(fixture.runtime.llm_val_modifiers, {"alt"})
 		end)
+	end)
+end)
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 8/ Shared Info Bar Control =======
+-- ==========================================
+-- ==========================================
+
+--- Reads the independently captured toggle states and shared label identity.
+--- @return table corpus
+local function info_bar_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/info_bar_control.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared Info Bar control", function()
+	helpers.it("replays both checked states through the actual acknowledged setting owner", function()
+		local corpus = info_bar_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, selected in ipairs(corpus.states) do
+			with_fixture({info_bar_state = selected}, function(fixture)
+				local menu = fixture.streaming_menu()
+				local row = assert(find_item(menu, corpus.row.i18n))
+				helpers.assert_eq(menu[1].title, "menu.llm.indent_label", "the existing leading provider stays first")
+				helpers.assert_eq(menu[2], row, "the shared check stays between its native providers")
+				helpers.assert_eq(row.checked or false, selected)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(fixture.state.llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.persisted().llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.runtime.llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.calls.save, 1)
+				helpers.assert_eq(fixture.calls.menu, 1)
+			end)
+		end
+	end)
+
+	helpers.it("moves the real check when its shared declaration precedes the leading provider", function()
+		with_fixture({info_first = true}, function(fixture)
+			local menu = fixture.streaming_menu()
+			helpers.assert_eq(menu[1].title, info_bar_corpus().row.i18n)
+			helpers.assert_eq(menu[2].title, "menu.llm.indent_label")
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("uses the shared label while a refused writer preserves every publication", function()
+		local corpus = info_bar_corpus()
+		with_fixture({info_label = corpus.alternate_i18n, failures = {{name = "save", mode = "false"}}}, function(fixture)
+			local menu = fixture.streaming_menu()
+			local row = assert(find_item(menu, corpus.alternate_i18n), "the real native check must read the changed declaration")
+			helpers.assert_eq(find_item(menu, corpus.row.i18n), nil, "no stale native label remains")
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_show_info_bar, true)
+			helpers.assert_eq(fixture.runtime.llm_show_info_bar, true)
+			helpers.assert_eq(fixture.persisted().llm_show_info_bar, true)
+			helpers.assert_eq(fixture.rendered().llm_show_info_bar, true)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 9/ Shared Automatic Temperature Check =======
+-- =====================================================
+-- =====================================================
+
+--- Reads independent checkbox states and useful prediction counts.
+--- @return table corpus
+local function auto_raise_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/auto_raise_temperature.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared automatic temperature control", function()
+	helpers.it("replays both states and prediction counts through the actual setting owner (shared-auto-raise)", function()
+		local corpus = auto_raise_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		helpers.assert_eq(#corpus.prediction_counts, 2)
+		for _, selected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_fixture({auto_raise_state = selected, prediction_count = count}, function(fixture)
+					local menu = fixture.temperature_menu()
+					local row = assert(find_item(menu, corpus.row.i18n))
+					helpers.assert_eq(row.checked or false, selected)
+					helpers.assert_eq(row.disabled or false, count < 2)
+					local result = row.fn()
+					helpers.assert_eq(result, count >= 2)
+					local expected = selected
+					if count >= 2 then expected = not selected end
+					helpers.assert_eq(fixture.state.llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, expected)
+					helpers.assert_eq(fixture.calls.save, count >= 2 and 1 or 0)
+					helpers.assert_eq(fixture.calls.menu, count >= 2 and 1 or 0)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("follows the changed shared label and order without rewriting numeric controls (shared-auto-raise)", function()
+		local corpus = auto_raise_corpus()
+		with_fixture({auto_label = corpus.alternate_i18n, auto_first = true}, function(fixture)
+			local menu = fixture.temperature_menu()
+			helpers.assert_eq(menu[1].title, corpus.alternate_i18n)
+			helpers.assert_true(menu[2].title:find("menu.llm.temperature_label", 1, true) ~= nil)
+			helpers.assert_eq(find_item(menu, corpus.row.i18n), nil)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("refuses a delayed command after the actual prediction count becomes one (shared-auto-raise)", function()
+		with_fixture({auto_raise_state = true, prediction_count = 2}, function(fixture)
+			local row = assert(find_item(fixture.temperature_menu(), auto_raise_corpus().row.i18n))
+			fixture.state.llm_num_predictions = 1
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("keeps every publication after the existing writer refuses the command (shared-auto-raise)", function()
+		with_fixture({auto_raise_state = true, failures = {{name = "save", mode = "false"}}}, function(fixture)
+			local row = assert(find_item(fixture.temperature_menu(), auto_raise_corpus().row.i18n))
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.runtime.llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.persisted().llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.rendered().llm_auto_raise_temp, true)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 6/ Show-All Parity =======
+-- ==================================
+-- ==================================
+
+--- Loads explicit historical display semantics independently of native policy.
+--- @return table
+local function show_all_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/show_all_control.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared Show-all check", function()
+	helpers.it("replays both progressive polarities through acknowledged native publication (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, expected in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				with_fixture({progressive_state = expected.progressive, prediction_count = count}, function(fixture)
+					local row = assert(find_item(fixture.streaming_menu(), corpus.row.i18n))
+					helpers.assert_eq(row.checked, expected.show_all)
+					helpers.assert_eq(row.disabled == true, count < 2)
+					local changed = row.fn()
+					helpers.assert_eq(changed, count >= 2)
+					local value = expected.progressive
+					if count >= 2 then value = not expected.progressive end
+					helpers.assert_eq(fixture.state.llm_streaming_multi, value)
+					helpers.assert_eq(fixture.runtime.llm_streaming_multi, value)
+					helpers.assert_eq(fixture.persisted().llm_streaming_multi, value)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("consumes the common Show-all label and row order (shared-show-all)", function()
+		local corpus = show_all_corpus()
+		with_fixture({progressive_state = true, show_all_label = corpus.alternate_i18n, show_all_first = true}, function(fixture)
+			local rows = fixture.streaming_menu()
+			helpers.assert_eq(rows[1].title, corpus.alternate_i18n)
+			helpers.assert_eq(rows[1].checked, false)
+			helpers.assert_eq(rows[2].title, "menu.llm.indent_label")
+		end)
+	end)
+
+	helpers.it("refuses delayed Show-all changes when the current count loses its second slot (shared-show-all)", function()
+		local options = {progressive_state = true, prediction_count = 2}
+		with_fixture(options, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), show_all_corpus().row.i18n))
+			fixture.state.llm_num_predictions = 1
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_streaming_multi, true)
+			helpers.assert_eq(fixture.runtime.llm_streaming_multi, true)
+			helpers.assert_eq(fixture.persisted().llm_streaming_multi, true)
+			helpers.assert_eq(fixture.calls.save, 0)
+			fixture.state.llm_num_predictions = 2
+			options.paused = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, 0)
+		end)
+	end)
+
+	helpers.it("keeps runtime, durable and rendered polarity after false, nil or throwing writers (shared-show-all)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_fixture({progressive_state = true, failures = {{name = "save", mode = mode}}}, function(fixture)
+				local row = assert(find_item(fixture.streaming_menu(), show_all_corpus().row.i18n))
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.state.llm_streaming_multi, true)
+				helpers.assert_eq(fixture.runtime.llm_streaming_multi, true)
+				helpers.assert_eq(fixture.persisted().llm_streaming_multi, true)
+				helpers.assert_eq(fixture.rendered().llm_streaming_multi, true)
+				helpers.assert_eq(fixture.calls.menu, 0)
+			end)
+		end
+	end)
+end)
+
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 11/ Shared Automatic Triggers =======
+-- =============================================
+-- =============================================
+
+--- Reads independent automatic-trigger states and declaration identity.
+--- @return table corpus
+local function trigger_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/automatic_trigger_controls.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared automatic trigger controls", function()
+	helpers.it("replays every bool pair through actual durable setters independently of count (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		helpers.assert_eq(#corpus.states, 4)
+		for _, states in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				for index, expected in ipairs(corpus.rows) do
+					with_fixture({trigger_states = states, prediction_count = count}, function(fixture)
+						local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+						helpers.assert_eq(row.checked or false, states[index])
+						helpers.assert_eq(row.disabled or false, false)
+						helpers.assert_eq(row.fn(), true)
+						helpers.assert_eq(fixture.state[expected.state], not states[index])
+						helpers.assert_eq(fixture.runtime[expected.state], not states[index])
+						helpers.assert_eq(fixture.persisted()[expected.state], not states[index])
+						local neighbor = corpus.rows[index == 1 and 2 or 1]
+						helpers.assert_eq(fixture.persisted()[neighbor.state], states[index == 1 and 2 or 1])
+						helpers.assert_eq(fixture.calls.save, 1)
+						helpers.assert_eq(fixture.calls.menu, 1)
+					end)
+				end
+			end
+		end
+	end)
+
+	helpers.it("honors declaration label and order without publishing sibling settings (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		with_fixture({trigger_label = corpus.alternate_i18n, trigger_first = true}, function(fixture)
+			local rows = fixture.trigger_menu()
+			helpers.assert_eq(rows[1].title, corpus.alternate_i18n)
+			helpers.assert_true(rows[2].title:find("menu.llm.debounce_label", 1, true) ~= nil)
+			helpers.assert_eq(find_item(rows, corpus.rows[1].i18n), nil)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("rereads current values and refuses old callbacks after pause or master withdrawal (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			local options = {trigger_states = {false, false}, prediction_count = 2}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+				helpers.assert_eq(row.fn(), true)
+				fixture.state.llm_num_predictions = 1
+				helpers.assert_eq(row.fn(), true, "changing variant count does not revoke a trigger setting")
+				helpers.assert_eq(fixture.state[expected.state], false)
+				local saves, runtime_calls = fixture.calls.save, fixture.calls.runtime
+				options.paused = true
+				helpers.assert_eq(row.fn(), false)
+				options.paused = false
+				fixture.state.llm_enabled = false
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.calls.save, saves)
+				helpers.assert_eq(fixture.calls.runtime, runtime_calls)
+				helpers.assert_eq(fixture.persisted()[expected.state], false)
+			end)
+		end
+	end)
+
+	helpers.it("preserves all publication boundaries on false nil and throwing writers (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			for _, mode in ipairs({"false", "nil", "throw"}) do
+				with_fixture({failures = {{name = "save", mode = mode}}}, function(fixture)
+					local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+					helpers.assert_eq(row.fn(), false)
+					helpers.assert_eq(fixture.state[expected.state], false)
+					helpers.assert_eq(fixture.runtime[expected.state], false)
+					helpers.assert_eq(fixture.persisted()[expected.state], false)
+					helpers.assert_eq(fixture.rendered()[expected.state], false)
+					helpers.assert_eq(fixture.calls.menu, 0)
+				end)
+			end
+		end
 	end)
 end)

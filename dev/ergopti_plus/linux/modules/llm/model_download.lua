@@ -79,7 +79,7 @@ local function consume_chunk(request, chunk, flush)
 	end
 end
 
-local function dispatch(request)
+local function dispatch(request, admission)
 	local url = HttpBridge.ollama_endpoint(request.base_url, "pull")
 	local ok_body, body = pcall(Json.encode, { name = request.tag, stream = true })
 	if not url or not ok_body or type(body) ~= "string" then
@@ -87,6 +87,13 @@ local function dispatch(request)
 		return false
 	end
 	_active = request
+	if type(admission) == "function" then
+		local ok, allowed = pcall(admission)
+		if not ok or allowed ~= true then
+			finish(request, false, translated("menu.llm.download_failed"))
+			return false
+		end
+	end
 	local dispatched = HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, body, {
 		owner = OWNER,
 		timeout_ms = MODEL_PULL_TIMEOUT_MS,
@@ -114,8 +121,9 @@ end
 --- @param tag string Ollama-native model identity.
 --- @param label string Human-readable catalogue name.
 --- @param on_done function|nil
+--- @param admission function|nil Current initial consent, rechecked after native UI creation.
 --- @return boolean
-function M.start(base_url, tag, label, on_done)
+function M.start(base_url, tag, label, on_done, admission)
 	if _active then
 		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
 		return false
@@ -143,7 +151,7 @@ function M.start(base_url, tag, label, on_done)
 	})
 	if not request.session_id then return false end
 	_active = request
-	return dispatch(request)
+	return dispatch(request, admission)
 end
 
 --- Cancels the exact owned curl process group.

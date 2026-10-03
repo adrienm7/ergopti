@@ -50,8 +50,15 @@ _SMGU_KeyboardGroupsUniqueAndPopulated() {
 		}
 		; Every shipped slot lands in exactly one group (the longest prefix wins).
 		Placed := 0
-		for _, Row in Rows
-			Placed += Row["items"].Length - 1
+		for Index, Row in Rows {
+			; Contextual has its one editable logical slot and no Add command.
+			if KEYBOARD_SLOT_GROUPS[Index]["prefix"] == "magic_" {
+				AssertEqual(1, Row["items"].Length, "the contextual declaration appears exactly once")
+				Placed += Row["items"].Length
+			} else {
+				Placed += Row["items"].Length - 1
+			}
+		}
 		Active := 0
 		for _, Action in Shipped
 			Active += (Action != "none")

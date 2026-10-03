@@ -42,13 +42,20 @@ _VDSB_SurfacesReadTheOwner() {
 	Assert(Row != "", "_MI_AboutUpdateRows must be readable")
 	AssertEqual(0, InStr(Row, "BUNDLE_VERSION"),
 		"_MI_AboutUpdateRows must never display the raw stamp, which carries +build metadata")
-	Assert(RegExMatch(_DriverSourceNoComments(), "s)_MI_AboutUpdateRows\([^{]*IdentityFn := Updater_BuildIdentity\)") > 0,
+	Assert(RegExMatch(_DriverSourceNoComments(), "s)_MI_AboutUpdateRows\([^{]*IdentityFn := Updater_BuildIdentity(?:, SetIntervalFn := 0)?\)") > 0,
 		"the About row must read the build identity owner by default")
 	Snapshot := HealthCheck_Run()
 	AssertEqual(Updater_CurrentVersion(), Snapshot["sections"]["versions"]["ergopti_version"],
 		"the diagnostics version is the owner's")
 	Assert(InStr(HealthCheck_FormatPlain(Snapshot), "`r`nversions.ergopti_version: " . Updater_CurrentVersion() . "`r`n") > 0,
 		"the plain-text diagnostics must show exactly the owner's version")
+
+	Identity := Updater_BuildIdentity()
+	Rows := _MI_AboutUpdateRows(true)
+	Assert(Rows is Array and Rows.Length > 0, "the actual default About provider must return its version row")
+	AssertEqual(Updater_VersionRowLabel(Identity["kind"], Identity["version"], Identity["commit"]),
+		Rows[1]["label"], "the actual About provider must display exactly its default build identity owner's version")
+	AssertEqual(true, Rows[1]["disabled"], "a source-run version remains an informational row")
 }
 
 Test("version display: build metadata is stripped at the owner (version-display-build-metadata)",

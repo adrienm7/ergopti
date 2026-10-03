@@ -22,8 +22,8 @@
 ;
 ; INTEGRATION:
 ; The two public toggles ``KLUI_ToggleTyping`` / ``KLUI_ToggleApps`` are
-; bound to user-configurable hotkeys via infra/metrics_shortcuts.ahk and
-; wired into the tray menu by ErgoptiPlus.ahk.
+; exposed by the shared open_metrics_typing/open_metrics_apps actions in
+; ordinary Shortcuts and Gestures, and by the Metrics tray menu.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+

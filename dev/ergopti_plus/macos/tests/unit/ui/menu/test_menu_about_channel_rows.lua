@@ -167,3 +167,91 @@ helpers.describe("menu_about: one titled submenu for the update channels", funct
 		end
 	end)
 end)
+
+
+--- Reads the pre-migration two-channel presentation without consulting the registry.
+--- @return table corpus
+local function channel_corpus()
+	local handle = assert(io.open(helpers.shared("tests/corpus/menus/update_channel_rows.json"), "rb"))
+	local raw = handle:read("*a")
+	handle:close()
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+helpers.describe("macOS published About channel choices", function()
+	helpers.it("follows a reordered shared declaration through the actual About provider", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local previous = root.about_update_channel_menu
+		local i18n = require("infra.i18n")
+		local previous_get = i18n.get
+		local expected, choices = channel_corpus(), {}
+		for _, value in ipairs(expected.reordered_values) do
+			for _, choice in ipairs(expected.choices) do
+				if choice.value == value then choices[#choices + 1] = choice end
+			end
+		end
+		root.about_update_channel_menu = { {
+			type = "choice", id = "update_channel", path = "updater.channel",
+			i18n = "menu.about.channel_menu", show_current_choice = true,
+			current_choice_placeholder = "{channel}", choices = choices,
+		} }
+		local ok, detail = pcall(function()
+			local owner, requests = fake_owner("main")
+			local rows, catalogue = build(owner)
+			local prefix = catalogue["menu.about.channel_menu"]:match("^(.-){channel}")
+			local row
+			for _, entry in ipairs(rows) do
+				if entry.title:find(prefix, 1, true) == 1 then row = entry end
+			end
+			helpers.assert_not_nil(row, "the actual About provider must draw its declared channel choice")
+			helpers.assert_eq(#row.menu, 2, "the captured two choices remain complete")
+			for index, choice in ipairs(choices) do
+				helpers.assert_eq(row.menu[index].title, catalogue[choice.i18n],
+					"the real provider must consume the published order")
+				row.menu[index].fn()
+			end
+			helpers.assert_eq(requests, expected.reordered_values)
+		end)
+		root.about_update_channel_menu, i18n.get = previous, previous_get
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+
+helpers.describe("macOS captured About channel states", function()
+	helpers.it("retains both original short captions, full leaves and exclusive ticks", function()
+		local corpus = channel_corpus()
+		for index, state in ipairs(corpus.states) do
+			local rows, catalogue = build((fake_owner(state.selected)))
+			local row = picker(rows, catalogue)
+			helpers.assert_eq(row.title, corpus.locales.fr.captions[index])
+			helpers.assert_eq(#row.menu, 2)
+			for at, leaf in ipairs(row.menu) do
+				helpers.assert_eq(leaf.title, corpus.locales.fr.leaf_labels[at])
+				helpers.assert_eq(leaf.checked, state.checked[at])
+			end
+		end
+	end)
+
+	helpers.it("retains the preference owner's refusal and exception behavior", function()
+		for _, refusal in ipairs(channel_corpus().refusals) do
+			local owner, requests = fake_owner("main")
+			owner.set = function(id)
+				requests[#requests + 1] = id
+				if refusal == "throw" then error("refused channel write") end
+				if refusal == "false" then return false end
+				return nil
+			end
+			local rows, catalogue = build(owner)
+			local row = picker(rows, catalogue)
+			local ok, result = pcall(row.menu[2].fn)
+			helpers.assert_eq(ok, refusal ~= "throw")
+			if ok then helpers.assert_eq(result, nil, "the existing Mac callback returns no mutation receipt") end
+			helpers.assert_eq(requests, { "dev" })
+			helpers.assert_eq(owner.get(), "main", "refusal must not publish a guessed preference")
+			local rebuilt, translated = build(owner)
+			helpers.assert_eq(picker(rebuilt, translated).title, channel_corpus().locales.fr.captions[1])
+		end
+	end)
+end)

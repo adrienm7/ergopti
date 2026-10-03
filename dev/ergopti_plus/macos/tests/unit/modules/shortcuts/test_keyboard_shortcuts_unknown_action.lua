@@ -71,13 +71,7 @@ local function with_subject(store, scenario)
 
 	local subject
 	local ok, err = xpcall(function()
-		subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			json = {
-				decode = function()
-					return { keys = { { id = "a", label = "A" }, { id = "b", label = "B" } } }
-				end,
-			},
-		})
+		subject = require("modules.shortcuts.keyboard_shortcuts")
 		scenario(subject, observed)
 	end, debug.traceback)
 

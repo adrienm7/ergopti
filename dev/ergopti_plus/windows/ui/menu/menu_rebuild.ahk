@@ -825,34 +825,3 @@ _LoggerSetLevelPublish(Level) {
 	LOGGER_MIN_LEVEL := Level
 	_LoggerRefreshFastFlags()
 }
-
-; Returns the label shown for the log-level submenu entry, including the
-; active level so the user can see the current setting without opening the submenu.
-_LogLevelMenuLabel() {
-	global LOGGER_MIN_LEVEL
-	return t("menu.debug.log_level") . " : " . _LogLevelEmoji(LOGGER_MIN_LEVEL) . " " . LOGGER_MIN_LEVEL
-}
-
-; The log-level choices, as row DATA: one row per severity level
-; (DEBUG / INFO / WARNING / ERROR), the currently active one ticked.
-_MI_LogLevelChoiceRows() {
-	global LOGGER_MIN_LEVEL
-	Rows := []
-	for _, Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
-		Rows.Push(Map(
-			"label",   _LogLevelEmoji(Level) . " " . Level,
-			"checked", (LOGGER_MIN_LEVEL == Level),
-			"action",  ((_l) => (*) => LoggerSetLevel(_l))(Level)))
-	}
-	return Rows
-}
-
-_LogLevelEmoji(Level) {
-	switch Level {
-		case "DEBUG":   return "🐛"
-		case "INFO":    return "ℹ️"
-		case "WARNING": return "⚠️"
-		case "ERROR":   return "❌"
-		default:        return "📝"
-	}
-}

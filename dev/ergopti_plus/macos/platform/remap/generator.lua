@@ -2378,12 +2378,14 @@ local function equivalent_legacy_action_alias(first, second)
 	return true
 end
 
---- Builds a unique string-field index and rejects ambiguous catalogue labels.
+--- Validates catalogue string fields. Actions retain distinct label candidates;
+--- other catalogues require globally unique labels. Unused action ambiguity is
+--- not ownership evidence and cannot block unrelated personal rules.
 --- @param items table Dense catalogue array.
 --- @param field string String field used as the key.
 --- @param catalogue_name string Diagnostic catalogue name.
 --- @param allow_equivalent_action_aliases boolean|nil Coalesce exact non-semantic action aliases.
---- @return table|nil index Unique item lookup.
+--- @return table|nil index Unique item lookup, or action-label candidate buckets.
 --- @return string|nil error_message Validation failure.
 local function unique_catalogue_index(items, field, catalogue_name, allow_equivalent_action_aliases)
 	if not is_dense_array(items) then return nil, catalogue_name .. " must be a dense array" end
@@ -2393,12 +2395,23 @@ local function unique_catalogue_index(items, field, catalogue_name, allow_equiva
 		if type(key) ~= "string" or key == "" then
 			return nil, string.format("%s item %d lacks a non-empty %s", catalogue_name, item_index, field)
 		end
-		if index[key]
-			and not (allow_equivalent_action_aliases
-				and equivalent_legacy_action_alias(index[key], item)) then
-			return nil, string.format("%s has duplicate %s '%s'", catalogue_name, field, key)
+		if allow_equivalent_action_aliases then
+			local candidates = index[key] or {}
+			local equivalent = false
+			for _, candidate in ipairs(candidates) do
+				if equivalent_legacy_action_alias(candidate, item) then
+					equivalent = true
+					break
+				end
+			end
+			if not equivalent then candidates[#candidates + 1] = item end
+			index[key] = candidates
+		else
+			if index[key] then
+				return nil, string.format("%s has duplicate %s '%s'", catalogue_name, field, key)
+			end
+			index[key] = item
 		end
-		if not index[key] then index[key] = item end
 	end
 	return index
 end
@@ -2503,10 +2516,22 @@ local function prepare_legacy_context(context)
 	}
 end
 
+--- Resolves only one proven-equivalent action class. A historical rule which
+--- references a label shared by distinct native outputs remains unproven, even
+--- when its output happens to resemble one of them.
+--- @param action_by_label table Validated label-to-candidate buckets.
+--- @param label string Historical description label.
+--- @return table|nil action The sole equivalent class, otherwise nil.
+local function resolve_legacy_action_label(action_by_label, label)
+	local candidates = action_by_label[label]
+	if type(candidates) ~= "table" or #candidates ~= 1 then return nil end
+	return candidates[1]
+end
+
 --- Parses the action pair encoded by a historical rule description.
 --- @param description string Existing rule description.
 --- @param prefix string Exact generator-owned prefix.
---- @param action_by_label table Unique action lookup.
+--- @param action_by_label table Validated label-to-candidate buckets.
 --- @return table|nil pair Resolved tap and hold actions.
 --- @return string|nil error_message Parse failure.
 local function parse_legacy_action_pair(description, prefix, action_by_label)
@@ -2522,10 +2547,10 @@ local function parse_legacy_action_pair(description, prefix, action_by_label)
 	end
 	local tap_label = body:sub(1, split_at - 1)
 	local hold_label = body:sub(split_at + #delimiter)
-	local tap_action = action_by_label[tap_label]
-	local hold_action = action_by_label[hold_label]
+	local tap_action = resolve_legacy_action_label(action_by_label, tap_label)
+	local hold_action = resolve_legacy_action_label(action_by_label, hold_label)
 	if not tap_action or not hold_action then
-		return nil, "legacy action-pair description names an unknown action"
+		return nil, "legacy action-pair description names an unknown or ambiguous action"
 	end
 	return { tap = tap_action, hold = hold_action }
 end
@@ -2533,7 +2558,7 @@ end
 --- Reconstructs one tap/hold setting from its historical rule.
 --- @param rule table Historical rule candidate.
 --- @param key_def table Tap/hold catalogue entry at this fixed position.
---- @param action_by_label table Unique action lookup.
+--- @param action_by_label table Validated label-to-candidate buckets.
 --- @return table|nil config Reconstructed tap, hold, and optional timeout.
 --- @return string|nil error_message Parse failure.
 local function parse_legacy_tap_hold_rule(rule, key_def, action_by_label)
@@ -2583,7 +2608,7 @@ local function parse_legacy_combo_rule(rule, prepared)
 			local chord_suffix = " [chord]"
 			if starts_with(description, chord_prefix) and ends_with(description, chord_suffix) then
 				local action_label = description:sub(#chord_prefix + 1, #description - #chord_suffix)
-				local action = prepared.action_by_label[action_label]
+				local action = resolve_legacy_action_label(prepared.action_by_label, action_label)
 				if action then
 					matches[#matches + 1] = {
 						combo_index = combo_index,

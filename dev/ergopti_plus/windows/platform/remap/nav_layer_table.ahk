@@ -48,7 +48,9 @@ global NAV_LAYER_ALTGR_LABELS := ["~SC01D & ~SC138", "*SC138"]
 global NAV_LAYER_MODIFIER_CHORD_NAMES := Map("ctrl", "ctrl", "alt", "alt", "shift", "shift", "meta", "cmd")
 ; The driver-native handlers a call:<handler> resolution may name on Windows;
 ; must cover [call_handlers].windows in _shared/keymap/layer_actions.toml.
-global NAV_LAYER_CALL_HANDLERS := Map("maximize_window", _NavLayer_MaximizeWindow)
+global NAV_LAYER_CALL_HANDLERS := Map("maximize_window", _NavLayer_MaximizeWindow,
+	"brightness_up", (*) => ScreenBrightnessRequest("brightness_up"),
+	"brightness_down", (*) => ScreenBrightnessRequest("brightness_down"))
 
 global _NavLayerRegistered := false
 global _NavLayerRegistrationAttempted := false

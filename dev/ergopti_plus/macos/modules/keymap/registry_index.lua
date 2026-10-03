@@ -83,8 +83,8 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 --- @param section_sources table|nil Sections a layout extension's files supply.
-function M.load_toml(name, path, section_sources)
-	return Groups.load_toml(name, path, section_sources)
+function M.load_toml(name, path, section_sources, personal_source)
+	return Groups.load_toml(name, path, section_sources, personal_source)
 end
 
 --- Atomically replaces one enabled TOML group while preserving a deliberately

@@ -13,6 +13,17 @@
 [corpus]
 control = "control"
 rejected = [
+	"chord_missing_action",
+	"chord_missing_platform",
+	"chord_wrong_platform",
+	"chord_platform_not_string",
+	"chord_conditional_key_not_bare",
+	"chord_action_not_string",
+	"chord_disabled_action_empty",
+	"chord_same_section",
+	"chord_unknown_field",
+	"chord_missing_conditional_key",
+
 	"chain_gap",
 	"misnamed_step",
 	"step_skips_a_version",

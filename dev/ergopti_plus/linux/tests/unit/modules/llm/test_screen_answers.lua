@@ -40,7 +40,7 @@ local GEMINI = { id = "gemini-1", provider = "gemini", label = "Gemini", token =
 local RELOADED = {
 	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
 	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote", "modules.llm.vision_request",
+	"modules.llm.api_remote", "modules.llm.vision_request", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
 }
 local FAKED = {
 	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
@@ -82,7 +82,7 @@ local function scenario(opts, body)
 		local previous = {}
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
-		local world = { posts = {}, ollama = {}, notices = {}, captures = {}, shown = nil, typed = {},
+		local world = { posts = {}, probes = {}, model_offers = {}, model_installs = {}, ollama = {}, notices = {}, captures = {}, shown = nil, typed = {},
 			cancelled_owners = {} }
 		local entries = opts.entries or { CEREBRAS, OPENAI }
 		package.loaded["adapters.secure_field_detector"] = {
@@ -91,6 +91,10 @@ local function scenario(opts, body)
 			isUrlBar = function() return false end,
 		}
 		package.loaded["adapters.http_client"] = {
+			get = function(url, headers, options, callback)
+				world.probes[#world.probes + 1] = { url = url, owner = options.owner, callback = callback }
+				return true
+			end,
 			post = function(url, headers, request_body, callback, options)
 				world.posts[#world.posts + 1] = { url = url, headers = headers, body = Json.decode(request_body),
 					callback = callback, owner = type(options) == "table" and options.owner or nil }
@@ -119,6 +123,17 @@ local function scenario(opts, body)
 			cancel = function() return true end,
 		}
 
+		require("modules.llm.local_model_offer")._reset_for_test({
+			confirm = function(title, text)
+				world.model_offers[#world.model_offers + 1] = { title = title, text = text }
+				return opts.download_choice == true
+			end,
+			install = function(base_url, model)
+				world.model_installs[#world.model_installs + 1] = { base_url = base_url, model = model }
+				return true
+			end,
+			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
+		})
 		local scheduler = Fakes.timer_scheduler()
 		local engine = require("modules.llm.prediction_engine")
 		engine.init({
@@ -185,6 +200,86 @@ local function scenario(opts, body)
 		if not ok then error(err, 0) end
 	end, { initial = stored })
 end
+
+helpers.describe("screen answers: missing local model admission", function()
+	helpers.it("offers the absent vision model before transmitting the screenshot", function()
+		scenario({ download_choice = true }, function(world)
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "local"))
+			local capture = world.captures[1]
+			capture.on_done({ status = "ok", scaled = true })
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.probes, 1)
+			world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.model_offers, 1)
+			helpers.assert_eq(#world.model_installs, 1)
+			helpers.assert_eq(world.model_installs[1].model, world.config.default_models["local"])
+			helpers.assert_eq(exists(capture.path), false, "the private capture remains deleted")
+			helpers.assert_eq(exists(capture.dir), false)
+			helpers.assert_eq(#world.typed, 0)
+		end)
+	end)
+
+	helpers.it("a withdrawn vision preflight cannot offer its missing model", function()
+		scenario({ download_choice = true }, function(world)
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "local"))
+			world.captures[1].on_done({ status = "ok", scaled = true })
+			local probe = world.probes[1]
+			world.engine.withdraw()
+			local cancelled = false
+			for _, owner in ipairs(world.cancelled_owners) do cancelled = cancelled or owner == "llm_vision" end
+			helpers.assert_true(cancelled, "Escape withdraws the actual vision HTTP owner")
+			probe.callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.model_offers, 0)
+			helpers.assert_eq(#world.model_installs, 0)
+		end)
+	end)
+end)
+
+helpers.describe("screen answers: native preflight refusal ownership", function()
+	helpers.it("a refused cancellation cannot replace the existing vision request or its model", function()
+		local names = { "adapters.http_client", "modules.llm.local_model_probe", "modules.llm.vision_request" }
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+		local probes, posts, refused = {}, {}, true
+		package.loaded["adapters.http_client"] = {
+			get = function(url, _, options, callback)
+				probes[#probes + 1] = { url = url, owner = options.owner, callback = callback }
+				return true
+			end,
+			post = function(_, _, encoded, callback)
+				posts[#posts + 1] = { body = Json.decode(encoded), callback = callback }
+				return true
+			end,
+			cancel = function() return not refused end,
+		}
+		local ok, err = xpcall(function()
+			local Request = require("modules.llm.vision_request")
+			local target = { base_url = "http://127.0.0.1:11434", format = "ollama",
+				url = "http://127.0.0.1:11434/api/chat", headers = {} }
+			local completed, displaced = {}, 0
+			helpers.assert_true(Request.send(target, { model = "first" },
+				function(text, failure) completed[#completed + 1] = { text = text, failure = failure } end))
+			helpers.assert_eq(Request.cancel(), false)
+			helpers.assert_eq(Request.send(target, { model = "second" }, function() displaced = displaced + 1 end), false)
+			helpers.assert_eq(#probes, 1, "refusal preserves the existing native lease")
+			helpers.assert_eq(probes[1].owner, "llm_vision")
+			probes[1].callback({ ok = true, status = 200, body = '{"models":[{"name":"first"}]}' })
+			helpers.assert_eq(#posts, 1)
+			helpers.assert_eq(posts[1].body.model, "first")
+			posts[1].callback({ ok = true, status = 200, body = '{"message":{"content":"original answer"}}' })
+			helpers.assert_eq(#completed, 1)
+			helpers.assert_eq(completed[1].text, "original answer")
+			helpers.assert_nil(completed[1].failure)
+			helpers.assert_eq(displaced, 0)
+			refused = false
+			helpers.assert_true(Request.cancel())
+		end, debug.traceback)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(err, 0) end
+	end)
+end)
 
 --- Compares two decoded JSON values structurally.
 --- @return boolean equal, string|nil where
@@ -315,6 +410,11 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 		scenario({ stored = { ["llm.models.selected"] = "ollama" } }, function(world)
 			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "local"), true)
 			world.captures[1].on_done({ status = "ok", scaled = true })
+			helpers.assert_eq(#world.posts, 0, "the local model must be acknowledged first")
+			helpers.assert_eq(#world.probes, 1)
+			helpers.assert_eq(world.probes[1].owner, "llm_vision")
+			world.probes[1].callback({ ok = true, status = 200,
+				body = Json.encode({ models = { { name = world.config.default_models["local"] } } }) })
 			local vision = world.posts[1]
 			helpers.assert_eq(vision.url, "http://127.0.0.1:11434/api/chat")
 			helpers.assert_eq(vision.body.model, world.config.default_models["local"])

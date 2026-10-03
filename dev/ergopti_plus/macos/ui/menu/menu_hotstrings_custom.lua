@@ -101,6 +101,54 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	end
 end
 
+--- Captures declared external module owners selected by the actual shared index.
+--- Placeholders without a binding remain outside this scope; an unsupported
+--- declared module refuses before any category, module or file can change.
+--- @param ctx table Native menu context.
+--- @param group_names table Selected registry group identities.
+--- @return table choices Exact runtime and sparse menu-state inverses.
+local function category_module_choices(ctx, group_names)
+	local choices, selected = {}, {}
+	for _, group in ipairs(group_names) do
+		local modules = type(ctx.module_sections) == "table" and ctx.module_sections[group]
+		if type(modules) == "table" then
+			for _, section in ipairs(ctx.keymap.get_sections(group) or {}) do
+				local binding = modules[section.name]
+				local id = type(binding) == "table" and binding.mod_id or binding
+				if section.is_module_placeholder and id ~= nil then
+					assert(id == "personal_info", "selected hotstring module has no scope owner")
+					if not selected[id] then
+						local owner = ctx[id]
+						assert(type(owner) == "table" and type(owner.set_enabled) == "function"
+							and type(owner.is_enabled) == "function", "hotstring module acknowledgement owner is unavailable")
+						local enabled = owner.is_enabled()
+						assert(type(enabled) == "boolean", "hotstring module snapshot must be boolean")
+						selected[id] = true
+						choices[#choices + 1] = { id = id, owner = owner, enabled = enabled, state = ctx.state[id] }
+					end
+				end
+			end
+		end
+	end
+	return choices
+end
+
+--- Applies only explicit external-module choices through their acknowledged owner.
+--- @param choices table Captured native module choices.
+--- @param enabled boolean|nil nil restores each independent runtime snapshot.
+--- @return boolean committed
+local function apply_category_modules(choices, enabled)
+	for _, choice in ipairs(choices) do
+		local value = enabled
+		if value == nil then value = choice.enabled end
+		if (enabled ~= nil or choice.attempted) and choice.owner.is_enabled() ~= value then
+			choice.attempted = true
+			if choice.owner.set_enabled(value) ~= true or choice.owner.is_enabled() ~= value then return false end
+		end
+	end
+	return true
+end
+
 --- Commits a category gate and its section choices in the registry transaction.
 --- The canonical save participates in that transaction; a failed save cannot
 --- leave the live category changed or rebuild the tray as though it succeeded.
@@ -114,11 +162,14 @@ function M.category_scope_fn(ctx, group_names, enabled)
 		for _, name in ipairs(group_names) do
 			prior[#prior + 1] = { name = name, value = ctx.state.hotstrings[name] }
 		end
-		local scope_committed = false
+		local scope_committed, module_choices = false, {}
 		local committed = KeymapLifecycle.commit_mutation(ctx, "set hotstring category scope", function()
 			local km = ctx.keymap
 			if not km or type(km.set_category_scope_enabled) ~= "function" then return false end
+			module_choices = category_module_choices(ctx, group_names)
 			local result = km.set_category_scope_enabled(group_names, enabled, function()
+				if apply_category_modules(module_choices, enabled) ~= true then return false end
+				for _, choice in ipairs(module_choices) do ctx.state[choice.id] = enabled end
 				for _, name in ipairs(group_names) do ctx.state.hotstrings[name] = enabled end
 				if ctx.save_prefs() ~= true then return false end
 				return true
@@ -128,6 +179,12 @@ function M.category_scope_fn(ctx, group_names, enabled)
 		end, function() ctx.updateMenu() end)
 		-- A refresh failure cannot undo an acknowledged file and registry choice.
 		if not scope_committed then
+			if #module_choices > 0 then
+				KeymapLifecycle.commit_mutation(ctx, "restore hotstring module choices", function()
+					return apply_category_modules(module_choices)
+				end)
+				for _, choice in ipairs(module_choices) do ctx.state[choice.id] = choice.state end
+			end
 			for _, choice in ipairs(prior) do ctx.state.hotstrings[choice.name] = choice.value end
 		end
 		return committed
@@ -152,6 +209,9 @@ function M.all_sections_on(ctx, group_names)
 			if not (section_on and section_on(name, section)) then return false end
 		end
 	end
+	local ok, choices = pcall(category_module_choices, ctx, group_names)
+	if not ok then return false end
+	for _, choice in ipairs(choices) do if not choice.enabled then return false end end
 	return true
 end
 
@@ -300,12 +360,13 @@ function M.build_custom(ctx, counts)
 	local function sc_label()
 		local sc = state.custom_editor_shortcut
 		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
+		if type(sc) ~= "table" then return i18n.get("menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment") end
 		if sc_is_default(sc) then
 			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
 		end
 		local mods_str = table.concat(coerce_mods(sc.mods), "+")
-		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
-				or (sc.key or "?"):upper()
+		return mods_str ~= "" and (mods_str .. " + " .. tostring(sc.key or "?"):upper())
+				or tostring(sc.key or "?"):upper()
 	end
 
 	local function apply_shortcut(mods, key)
@@ -334,7 +395,7 @@ function M.build_custom(ctx, counts)
 			-- concatenating that field directly here would throw, same as the
 			-- sc_is_default/sc_label call sites it already protects (PF-7 fix).
 			current_str = table.concat(coerce_mods(state.custom_editor_shortcut.mods), "+")
-				.. "+" .. (state.custom_editor_shortcut.key or "")
+				.. "+" .. tostring(state.custom_editor_shortcut.key or "")
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
 			i18n.get("hotstrings.shortcut_custom"),
@@ -474,12 +535,6 @@ function M.build_custom(ctx, counts)
 		},
 		{ separator = true },
 		{
-			-- Clicking this item directly opens the shortcut customisation dialog
-			label    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
-			disabled = paused or nil,
-			action       = not paused and sc_fn or nil,
-		},
-		{
 			label = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
 			items  = cat_menu,
 		},
@@ -497,6 +552,15 @@ function M.build_custom(ctx, counts)
 			disabled = paused or nil,
 		},
 	}
+	-- An unsupported legacy chord retains its acknowledged owner and editing
+	-- surface until the ordinary-slot migration can prove a replacement.
+	if state.custom_editor_shortcut ~= nil then
+		table.insert(menu_items, 4, {
+			label = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
+			disabled = paused or nil,
+			action = not paused and sc_fn or nil,
+		})
+	end
 
 	local ext_tree = { folders = {}, files = {} }
 	local function scope_menu(names, file_rows, section_rows)

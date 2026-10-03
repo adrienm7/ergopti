@@ -1154,8 +1154,13 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 		"the ordinary editor opening command remains in the Personal menu")
 	AssertEqual("none", ManifestDefaultFor("shortcuts.keyboard.win_d"),
 		"an empty configuration must never install the editor recommendation")
-	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.win_d"),
-		"the shared recommendation remains an ordinary editable Win slot")
+	AssertEqual("none", ManifestRecommendedFor("shortcuts.keyboard.win_d"),
+		"Win+D remains available for personal assignments instead of a fixed recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestDefaultFor("shortcuts.keyboard.magic_editor"),
+		"the physical conditional slot owns the editor recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.magic_editor"))
+	AssertEqual("none", ManifestValueFor("shortcuts.keyboard.magic_editor", "cleared"),
+		"clearing the ordinary contextual owner persists explicit none")
 }
 Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
 	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)

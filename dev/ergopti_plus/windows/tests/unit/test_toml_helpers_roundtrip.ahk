@@ -209,3 +209,65 @@ _TTHRT_HeterogeneousArray() {
 	AssertEqual(true, Result[3], "mixed array third value keeps its true value")
 }
 Test("toml_helpers: TOML mixed arrays preserve every typed value", _TTHRT_HeterogeneousArray)
+
+_TTHRT_QuotedKeyCases() {
+	return ["a=b", 'a"b', "a\b", "a#b", "clé ★", "", "O'Brien", "simple", "a.b"]
+}
+
+_TTHRT_QuotedKeysReadBack() {
+	KeyCases := _TTHRT_QuotedKeyCases()
+	KeyImage := "[future]`n"
+	for KeyIndex, OriginalKey in KeyCases
+		KeyImage .= TOML_RenderKey(OriginalKey) . ' = "kept-' . KeyIndex . '"' . "`n"
+	KeyData := _ParseTomlFileImpl("quoted-key-fixture", false, false, KeyImage)["future"]
+	AssertEqual(KeyCases.Length, KeyData.Count, "every rendered key must retain its identity")
+	for KeyIndex, OriginalKey in KeyCases {
+		Assert(KeyData.Has(OriginalKey), "rendered key must decode exactly: " . OriginalKey)
+		AssertEqual("kept-" . KeyIndex, KeyData[OriginalKey])
+	}
+	LiteralData := _ParseTomlFileImpl("literal-key-fixture", false, false,
+		"[metrics]`n'metrics_enabled' = false`n'editor#1=work' = 'kept' # trailing comment`n")
+	AssertEqual(false, LiteralData["metrics"]["metrics_enabled"])
+	AssertEqual("kept", LiteralData["metrics"]["editor#1=work"])
+}
+Test("toml keys: rendered and literal spellings decode exactly (toml-quoted-key-identity)",
+	_TTHRT_QuotedKeysReadBack)
+
+_TTHRT_QuotedKeysSurviveRepeatedWrites() {
+	KeyPath := A_Temp . "\ergopti_quoted_keys_" . A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	KeyCases := _TTHRT_QuotedKeyCases()
+	KeyImage := "[future]`n"
+	for KeyIndex, OriginalKey in KeyCases
+		KeyImage .= TOML_RenderKey(OriginalKey) . ' = "kept-' . KeyIndex . '"' . "`n"
+	try {
+		Assert(FSWriteCreateDurable(KeyPath, KeyImage) == 1)
+		loop 2 {
+			Assert(TOML_BatchWrite(KeyPath,
+				[{ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(false) }]))
+			KeyData := TOML_ParseFreshFile(KeyPath)
+			AssertEqual(false, KeyData["metrics"]["metrics_enabled"])
+			AssertEqual(KeyCases.Length, KeyData["future"].Count,
+				"an unrelated metrics save must neither add nor lose future settings")
+			for KeyIndex, OriginalKey in KeyCases {
+				Assert(KeyData["future"].Has(OriginalKey), "save must preserve the key: " . OriginalKey)
+				AssertEqual("kept-" . KeyIndex, KeyData["future"][OriginalKey])
+			}
+		}
+	} finally FSDelete(KeyPath)
+}
+Test("toml keys: unrelated writes preserve escaped keys twice (toml-quoted-key-identity)",
+	_TTHRT_QuotedKeysSurviveRepeatedWrites)
+
+_TTHRT_EmptyQuotedKeyOwnsMultilineArray() {
+	EmptyKeyData := _ParseTomlFileImpl("empty-key-fixture", false, false,
+		'[future]`n"" = [`n "first",`n "second",`n]`nafter = "retained"`n')
+	Assert(EmptyKeyData["future"].Has(""), "a legal empty quoted key must own its continuation")
+	EmptyKeyValue := EmptyKeyData["future"][""]
+	Assert(EmptyKeyValue is Array, "an empty key must not act as the no-pending-array sentinel")
+	AssertEqual(2, EmptyKeyValue.Length)
+	AssertEqual("first", EmptyKeyValue[1])
+	AssertEqual("second", EmptyKeyValue[2])
+	AssertEqual("retained", EmptyKeyData["future"]["after"])
+}
+Test("toml keys: an empty quoted key retains its multiline array (toml-quoted-key-identity)",
+	_TTHRT_EmptyQuotedKeyOwnsMultilineArray)

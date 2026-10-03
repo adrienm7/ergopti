@@ -46,19 +46,19 @@ local PICKER_ROUTE_CASES = {
 	},
 	{
 		setter = "set_combo_combo_action",
-		parent_prefix = "Shift pair  :",
+		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_chord",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
-		parent_prefix = "Shift pair  :",
+		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_hold_tap",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
-		parent_prefix = "Shift pair  :",
+		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_hold_hold",
 		expected_id = "shift_pair",
 	},

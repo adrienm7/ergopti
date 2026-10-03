@@ -1,11 +1,10 @@
 --- tests/unit/ui/menu/test_menu_state_hotkey_commit_gate.lua
 
 --- ==============================================================================
---- MODULE: Menu State Hotkey Commit Gate Regressions
+--- MODULE: Menu State Retired Metrics Binding Regressions
 --- DESCRIPTION:
---- Ensures global preference synchronization propagates exact failures from the
---- two menu-owned metric hotkey transactions. A false green here lets boot or a
---- persistence rollback report success while native shortcut state stayed stale.
+--- Historical dashboard fields and callbacks have no native owner. Their values
+--- must neither acquire a binding nor block synchronization of active modules.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -60,15 +59,15 @@ local function run_sync(target, mode)
 	return committed, calls
 end
 
-helpers.describe("menu state requires exact metric hotkey synchronization", function()
+helpers.describe("menu state ignores retired metric hotkey synchronization", function()
 	for _, target in ipairs({ "metrics", "apps" }) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
-			helpers.it("propagates " .. mode .. " from the " .. target .. " shortcut owner", function()
+			helpers.it("ignores retired " .. target .. " shortcut callbacks returning " .. mode, function()
 				local committed, calls = run_sync(target, mode)
-				helpers.assert_eq(committed, false,
-					"global synchronization must reject an uncommitted hotkey owner")
-				helpers.assert_eq(calls.count, 1,
-					"the refusing owner must be invoked exactly once")
+				helpers.assert_eq(committed, true,
+					"retired shortcut data must never gate synchronization of active owners")
+				helpers.assert_eq(calls.count, 0,
+					"global synchronization must never call the retired native owner")
 			end)
 		end
 	end
