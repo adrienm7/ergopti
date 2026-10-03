@@ -119,7 +119,9 @@ local function _snapshot_processes()
 	if not accepted then return nil end
 	local snapshot = {}
 	for line in (output .. "\n"):gmatch("([^\n]*)\n") do
-		local name = line:match("^%s*(.-)%s*$")
+		-- The final headerless comm column is unpadded. Spaces are native name
+		-- bytes; trimming merges distinct processes and loses whitespace names.
+		local name = line
 		if name and name ~= "" then
 			snapshot[name] = true
 		end
