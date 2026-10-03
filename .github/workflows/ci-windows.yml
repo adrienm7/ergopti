@@ -953,7 +953,11 @@ jobs:
                   $catalogJson = & python -c 'import json,pathlib,sys,tomllib; c=tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); w=c["logs"]["windows"]; f=c["logs"]["files"]; print(json.dumps({"base":w["base"],"segments":[v.replace("{app}",c["app"]["folder_name"]) for v in w["segments"]],"prefix":f["unified_prefix"],"extension":f["extension"]}))' "$env:GITHUB_WORKSPACE\static\ergopti_plus\_shared\modules\paths\app_dirs.toml"
                   if ($LASTEXITCODE -ne 0) { throw "The native log catalogue could not be read (python exit $LASTEXITCODE)." }
                   $catalog = $catalogJson | ConvertFrom-Json -ErrorAction Stop
-                  $logsDir = [Environment]::GetEnvironmentVariable($catalog.base)
+                  $logsDir = if (-not [string]::IsNullOrEmpty($env:ERGOPTI_STARTUP_SMOKE_DIR)) {
+                      $env:ERGOPTI_STARTUP_SMOKE_DIR
+                  } else {
+                      [Environment]::GetEnvironmentVariable($catalog.base)
+                  }
                   if ([string]::IsNullOrEmpty($logsDir)) { throw "The native log base environment is unavailable." }
                   foreach ($segment in $catalog.segments) { $logsDir = Join-Path $logsDir $segment }
                   $logNames = @('bootstrap.log', ($catalog.prefix + (Get-Date -Format 'yyyy-MM-dd') + $catalog.extension))
