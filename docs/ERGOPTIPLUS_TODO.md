@@ -406,6 +406,8 @@ Actual macOS Cocoa observations now prove that the owned NSError and independent
 
 The compiled native fixture now admits a real 8.3 alias only when Framework-normalized input and independently obtained native canonical image agree and both identify the same physical file. Absolute regular canonical output remains mandatory; drive-relative, root-relative and dot spellings are refused, with actual same-file negative controls. All original native alias/foreign/launch/status/cleanup assertions remain. The prior hosted failure exposed a Framework input-spelling contradiction; portable source qualification passes, while actual corrected Framework/Win32 execution and complete native acceptance remain required.
 
+Actual Windows native C# short-alias identity controls now pass, but the following compiled startup fixture used the short TEMP directory spelling while its strict process-bound observer returned the native long path. The fixture now resolves only its acquired private directory through Node native realpath and verifies independent BigInt volume/file identities before constructing package paths. The product recorder, native observer and C# validator remain unchanged. Portable real filesystem alias and strict-recorder controls pass and reject the original policy plus foreign or unavailable identity; actual Windows compiled startup qualification remains required.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
