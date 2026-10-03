@@ -157,6 +157,46 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
 	_CPC_EveryDirectTomlWriterConsumesItsBoolean)
 
+; Audit the privacy publisher independently before admitting its private call.
+_CPC_PrivacyPublisherRetainsSourceAndStrictResult() {
+	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PrivacyWrite"))
+	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetPrivacy"))
+	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PrivacyCommand"))
+	Assert(Writer != "" && Action != "" && Command != "", "the real privacy owners must exist")
+	Lines := StrSplit(Writer, "`n", "`r")
+	Calls := 0
+	for Index, Line in Lines {
+		if !InStr(Line, "_TOML_BatchWriteImpl(")
+			continue
+		Calls += 1
+		Assert(_CPC_LineConsumesResult(Lines, Index), "privacy publication must return its native ACK")
+		Assert(InStr(Line, 'Path, Owned, [], "write", Content, 1') > 0,
+			"the native publisher must receive only the owned leaf and retained source")
+		Discarded := Lines.Clone()
+		Discarded[Index] := StrReplace(Line, "return ", "")
+		AssertFalse(_CPC_LineConsumesResult(Discarded, Index), "discarded privacy ACK must fail")
+		Assigned := Lines.Clone()
+		Assigned[Index] := StrReplace(Line, "return ", "Ignored := ")
+		AssertFalse(_CPC_LineConsumesResult(Assigned, Index), "an untested privacy ACK must fail")
+	}
+	AssertEqual(1, Calls, "one independently audited privacy publisher joins the private census")
+	ReadPos := InStr(Writer, "Content := FSReadUtf8Exact(Path)")
+	SourcePos := InStr(Writer, "_LLM_Menu_EnableReadSource()",, ReadPos)
+	PublishPos := InStr(Writer, 'return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)')
+	Assert(ReadPos > 0 && SourcePos > ReadPos && PublishPos > SourcePos,
+		"the privacy publisher revalidates the retained image after the final native read")
+	Assert(InStr(Writer, "return WriterFn.Call(Path, Owned, Content, 1)") > 0,
+		"native and injected terminal writers share the retained source and result boundary")
+	Assert(InStr(Action, "return LLM_Menu_CommitMutation(") > 0
+		&& InStr(Action, "_LLM_Menu_PrivacyWrite.Bind(Expected, Key)") > 0,
+		"privacy publication remains under the existing borrowed lease")
+	Assert(InStr(Command, 'Command.Call(Key, Decision["value"], Expected) == true') > 0
+		&& InStr(Command, 'LLM_Menu_SetPrivacy(Key, Decision["value"], Expected) == true') > 0,
+		"neither injected nor production malformed receipts can acknowledge privacy intent")
+}
+Test("AHK-15-persistence: privacy publication retains its source and rejects discarded-result mutations",
+	_CPC_PrivacyPublisherRetainsSourceAndStrictResult)
+
 _CPC_InternalTomlPublishersConsumeResult() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "internal publisher inventory requires actual readable production source")
@@ -171,7 +211,9 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	}
 	; The two canonical TOML gateways retain their result; the Info Bar writer
 	; adds one exact-source publication beneath its existing borrowed lease.
-	AssertEqual(3, Calls, "audit every internal publisher before changing its complete inventory")
+	; Privacy adds one more publisher, audited above against actual native source
+	; and independently exercised by the retained-source race regression.
+	AssertEqual(4, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))

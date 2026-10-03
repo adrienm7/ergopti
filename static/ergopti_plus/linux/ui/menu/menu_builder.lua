@@ -37,6 +37,7 @@ local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
+local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
@@ -1880,19 +1881,45 @@ local function _build_llm(ctx)
 		rows[#rows + 1] = { separator = true }
 		local leading_rows = rows
 		rows = {}
-		for _, setting in ipairs({
-			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
-			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
-		}) do
-			local checked = TriggerSettings.get(setting.name)
-			rows[#rows + 1] = {
-				label = i18n_safe(setting.key),
-				checked = checked,
-				action = function()
-					TriggerSettings.set(setting.name, not checked)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
+		local Preferences = require("infra.llm_preferences")
+		local function privacy_snapshot(name)
+			local snapshot = {owner = TriggerSettings, generation = 0,
+				value = TriggerSettings.get(name), enabled = llm.is_enabled(),
+				paused = true, blocked = true}
+			local ok, detail = xpcall(function()
+				local path = "llm.trigger." .. name
+				local values, source = Preferences.get_many({"llm.enabled", "llm.models.selected", path})
+				snapshot.source = source
+				snapshot.preferences_generation = Preferences.generation()
+				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
+				snapshot.generation = llm.streaming_revision()
+				local revision = snapshot.preferences_generation
+				if type(revision) ~= "number" or revision ~= revision or revision == math.huge
+					or revision < 0 or revision % 1 ~= 0 then error("Invalid preference revision") end
+				snapshot.backend = llm.get_backend()
+				snapshot.paused = ctx.paused == true or ctx.is_paused()
+				snapshot.blocked = Preferences.admit() ~= true
+					or values["llm.enabled"] ~= snapshot.enabled
+					or values["llm.models.selected"] ~= snapshot.backend or values[path] ~= snapshot.value
+			end, debug.traceback)
+			if not ok then
+				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
+				snapshot.blocked = true
+			end
+			return snapshot
+		end
+		local url_source = privacy_snapshot("url_bar_filter_enabled")
+		local secure_source = privacy_snapshot("secure_filter_enabled")
+		local function privacy_command(expected, name)
+			local current = privacy_snapshot(name)
+			local decision = PrivacyPolicy.intent(expected, current)
+			if expected.preferences_generation ~= current.preferences_generation
+				or decision.admitted ~= true or type(expected.source) ~= "table" or type(current.source) ~= "table"
+				or expected.source.status ~= current.source.status
+				or expected.source.content ~= current.source.content then return false end
+			if TriggerSettings.set(name, decision.value, expected.source) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end
 		local function ready()
 			return llm.is_enabled() == true and ctx.paused ~= true
@@ -1906,10 +1933,16 @@ local function _build_llm(ctx)
 		end
 		local trigger_ctx = {
 			commands = {
+				["llm_url_bar_filter"] = function() return privacy_command(url_source, "url_bar_filter_enabled") end,
+				["llm_secure_field_filter"] = function() return privacy_command(secure_source, "secure_filter_enabled") end,
 				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
 				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
 			},
 			state_getters = {
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get("url_bar_filter_enabled") end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get("secure_filter_enabled") end,
+				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
+				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
 				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
 				["llm_trigger_ready"] = ready,

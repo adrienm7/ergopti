@@ -223,6 +223,43 @@ LLM_Menu_ToggleBool(key) {
 ; ==================================
 ; ==================================
 
+/** Changes one privacy leaf through the retained configuration lease owner. */
+LLM_Menu_SetPrivacy(Key, Value, Expected) {
+	return LLM_Menu_CommitMutation("the LLM privacy filter",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, Key, Value),
+		_LLM_Menu_ApplyStandardCommitted, _LLM_Menu_PrivacyWrite.Bind(Expected, Key))
+}
+
+/** Rechecks source and live intent after pending saves settle inside the lease. */
+_LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
+	Current := _LLM_Menu_PrivacySnapshot(Key)
+	Decision := LLM_TriggerPrivacyIntent(Expected, Current)
+	if !Decision["admitted"]
+			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+	Owned := []
+	for Update in Updates {
+		if Update.Section == "llm.trigger" && Update.Key == NativeKey
+			Owned.Push(Update)
+	}
+	if Owned.Length != 1
+		return false
+	OwnedValue := Owned[1].HasOwnProp("Delete") && Owned[1].Delete == 1
+		? ManifestDefaultFor("llm.trigger." . NativeKey) : Owned[1].Value
+	if OwnedValue is TOML_Bool
+		OwnedValue := OwnedValue.Value
+	if !ManifestValuesEqual(OwnedValue, Decision["value"])
+		return false
+	Content := FSReadUtf8Exact(Path)
+	if !(Content is String)
+			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], _LLM_Menu_EnableReadSource())
+		return false
+	if HasMethod(WriterFn, "Call")
+		return WriterFn.Call(Path, Owned, Content, 1)
+	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+}
+
 LLM_Menu_SetBackend(id) {
 	return LLM_Menu_CommitMutation("the LLM backend selection",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "backend", id),

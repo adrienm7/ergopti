@@ -497,6 +497,31 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
+			"type": "check",
+			"id": "llm_url_bar_filter",
+			"i18n": "menu.llm.disable_url_bars",
+			"checked_when": [
+				"llm_url_bar_filter_enabled"
+			],
+			"disabled_when": [
+				"llm_url_bar_filter_ready"
+			]
+		},
+		{
+			"type": "check",
+			"id": "llm_secure_field_filter",
+			"i18n": "menu.llm.disable_password_fields",
+			"checked_when": [
+				"llm_secure_field_filter_enabled"
+			],
+			"disabled_when": [
+				"llm_secure_field_filter_ready"
+			]
+		},
+		{
 			"type": "list",
 			"id": "llm_trigger_remaining"
 		}
