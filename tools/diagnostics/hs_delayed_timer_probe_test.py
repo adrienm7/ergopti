@@ -350,6 +350,224 @@ class NativeControlTests(unittest.TestCase):
             self.assertEqual(owner.scripting_commands, [pending])
 
 
+class PidControlTests(unittest.TestCase):
+    """Keep native transport construction distinct from portable child proofs."""
+
+    def owner(self, folder):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+        )
+        owner.nonce = NONCE
+        return owner
+
+    def test_distinct_pid_control_targets_same_event_without_path_resolution(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            launched = []
+
+            def launch(arguments, **options):
+                launched.append(arguments)
+                return native_popen([sys.executable, "-c", "print(" + repr(NONCE) + ")"], **options)
+
+            with mock.patch.object(probe.subprocess, "Popen", side_effect=launch):
+                path = owner.control(42, lambda _: [42])
+                alternative = owner.control_pid(42, lambda _: [42])
+            self.assertEqual(launched[0][:2], ["/usr/bin/osascript", "-e"])
+            self.assertIn(str(owner.app), launched[0][2])
+            arguments = launched[1]
+            self.assertEqual(arguments[:4], ["/usr/bin/osascript", "-l", "JavaScript", "-e"])
+            self.assertEqual(arguments[-2:], ["42", 'return "' + NONCE + '"'])
+            source = arguments[4]
+            self.assertIn("descriptorWithProcessIdentifier(pid)", source)
+            self.assertIn("Number(target.descriptorType) !== 0x6b706964", source)
+            self.assertIn("0x486d5370, 0x45584543, target, -1, 0", source)
+            self.assertIn("descriptorWithString(argv[1]), 0x2d2d2d2d", source)
+            self.assertIn("sendEventWithOptionsTimeoutError(3, 10, error)", source)
+            self.assertIn("paramDescriptorForKeyword(0x6572726e)", source)
+            self.assertIn("Number(errorNumber.int32Value) !== 0", source)
+            self.assertIn("paramDescriptorForKeyword(0x2d2d2d2d)", source)
+            self.assertNotIn(str(owner.app), source)
+            self.assertNotIn("Application(", source)
+            self.assertNotIn("bundleIdentifier", source)
+            probe.validate_pid_control_summary(alternative, path)
+            with self.assertRaises(ValueError):
+                probe.validate_control_summary(alternative)
+            with self.assertRaises(ValueError):
+                probe.validate_pid_control_summary(path)
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertFalse(owner.started)
+            self.assertEqual(owner.diagnostic_receipts[0]["phase"], "pid_control")
+
+    def test_pid_control_rejects_strict_reply_and_nonterminal_child(self):
+        for stdout, status in (
+            ("", 0),
+            (NONCE, 0),
+            ("b" * 32 + "\n", 0),
+            (" " + NONCE + "\n", 0),
+            (NONCE + " \n", 0),
+            (NONCE + "\n\n", 0),
+            (NONCE + "\n", 1),
+            (NONCE + "\n", None),
+        ):
+            with (
+                self.subTest(stdout=stdout, status=status),
+                tempfile.TemporaryDirectory() as folder,
+            ):
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=status)
+                child.communicate.return_value = (stdout, "native refusal")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+                    with self.assertRaises(RuntimeError):
+                        owner.control_pid(42, lambda _: [42])
+                self.assertEqual(child.communicate.call_args, mock.call(timeout=10))
+                self.assertEqual(owner.scripting_commands, [child] if status is None else [])
+
+    def test_pid_control_timeout_reaps_real_owned_child_before_retry(self):
+        native_popen = subprocess.Popen
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            children = []
+
+            def launch(arguments, **options):
+                source = (
+                    "import time; time.sleep(5)" if not children else "print(" + repr(NONCE) + ")"
+                )
+                child = native_popen([sys.executable, "-c", source], **options)
+                children.append(child)
+                return child
+
+            try:
+                with (
+                    mock.patch.object(probe.subprocess, "Popen", side_effect=launch),
+                    mock.patch.object(
+                        owner, "sample_scripting_command", return_value=["owned child sampled"]
+                    ),
+                    mock.patch.object(
+                        owner, "sample_native_runtime", return_value=["modeled native server"]
+                    ),
+                    mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
+                        owner.control_pid(42, lambda _: [42])
+                    self.assertIsNotNone(children[0].returncode)
+                    self.assertEqual(owner.scripting_commands, [])
+                    summary = owner.control_pid(42, lambda _: [42])
+                probe.validate_pid_control_summary(summary)
+                self.assertEqual(len(children), 2)
+                self.assertIsNotNone(children[1].returncode)
+            finally:
+                for child in children:
+                    if child.poll() is None:
+                        child.kill()
+                    child.communicate(timeout=2)
+
+    def test_pid_control_contract_identity_and_diagnostics_are_bounded(self):
+        valid = {
+            "schema_version": 1,
+            "contract": "hs.applescript.pid-control",
+            "phase": "pid_control",
+            "acknowledged": True,
+            "nonce": NONCE,
+            "pid": 42,
+            "executable": str(EXECUTABLE),
+        }
+        for field, value in (
+            ("schema_version", True),
+            ("contract", "hs.applescript.control"),
+            ("phase", "control"),
+            ("acknowledged", 1),
+            ("nonce", "foreign"),
+            ("pid", True),
+            ("executable", "relative"),
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                probe.validate_pid_control_summary(dict(valid, **{field: value}))
+        with self.assertRaises(ValueError):
+            probe.validate_pid_control_summary(dict(valid, extra="unowned"))
+        with self.assertRaises(ValueError):
+            probe.validate_pid_control_summary(valid, dict(valid, pid=43))
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            cause = subprocess.TimeoutExpired(["osascript", "SOURCE_ARG_MUST_NOT_LEAK"], 10)
+            error = RuntimeError("wrapper containing SOURCE_ARG_MUST_NOT_LEAK")
+            error.__cause__ = cause
+            detail = owner.pid_control_error_diagnostic(error)
+            self.assertIn("TimeoutExpired", detail)
+            self.assertNotIn("SOURCE_ARG_MUST_NOT_LEAK", detail)
+            detail = owner.pid_control_error_diagnostic(
+                RuntimeError("/private/user/path " + "line\n" * 4000)
+            )
+            self.assertNotIn("/private/user/path", detail)
+            self.assertIn("[path redacted]", detail)
+            self.assertLessEqual(len(detail), probe.SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT)
+            self.assertLessEqual(len(detail.splitlines()), probe.SCRIPT_DIAGNOSTIC_LINE_LIMIT)
+            self.assertIn("[native diagnostic truncated]", detail)
+
+    def test_pid_control_refuses_unbound_changed_foreign_or_debted_dispatch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with mock.patch.object(probe.subprocess, "Popen") as native:
+                with self.assertRaisesRegex(RuntimeError, "no bound"):
+                    owner.execute("return 'unowned'", phase="pid_control", _target_pid=42)
+                owner.bind_runtime(42, lambda _: [42])
+                for target in (True, 0, 43, None):
+                    with (
+                        self.subTest(target=target),
+                        self.assertRaisesRegex(RuntimeError, "target differs"),
+                    ):
+                        owner.execute("return 'unowned'", phase="pid_control", _target_pid=target)
+                owner.runtime_owner = (42, lambda _: [43])
+                with self.assertRaisesRegex(RuntimeError, "target differs"):
+                    owner.execute("return 'unowned'", phase="pid_control", _target_pid=42)
+                owner.scripting_commands.append(mock.Mock())
+                with self.assertRaisesRegex(RuntimeError, "has not settled"):
+                    owner.control_pid(42, lambda _: [42])
+                with self.assertRaisesRegex(ValueError, "reserved"):
+                    owner.scripting_commands.clear()
+                    owner.execute("return 'unowned'", phase="control", _target_pid=42)
+            native.assert_not_called()
+
+    def test_pid_control_rechecks_owner_before_dispatch_and_after_reply(self):
+        for observations in ([[42], [43]], [[42], [42], [43]]):
+            with self.subTest(observations=observations), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                child = mock.Mock(returncode=0)
+                child.communicate.return_value = (NONCE + "\n", "")
+                with mock.patch.object(probe.subprocess, "Popen", return_value=child) as native:
+                    with self.assertRaisesRegex(RuntimeError, "target differs|process changed"):
+                        owner.control_pid(42, mock.Mock(side_effect=observations))
+                self.assertEqual(native.call_count, 0 if len(observations) == 2 else 1)
+                self.assertEqual(owner.scripting_commands, [])
+
+    def test_pid_control_refusal_cleanup_retains_debt_and_blocks_successor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            primary = subprocess.TimeoutExpired(["osascript"], 10)
+            cleanup = subprocess.TimeoutExpired(["osascript"], 2)
+            child = mock.Mock(pid=43, returncode=None)
+            child.poll.return_value = None
+            child.communicate.side_effect = [primary, cleanup]
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child) as native,
+                mock.patch.object(owner, "sample_scripting_command", return_value=["owned sample"]),
+                mock.patch.object(
+                    owner, "sample_native_runtime", return_value=["owned server sample"]
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
+                    owner.control_pid(42, lambda _: [42])
+                self.assertEqual(owner.scripting_commands, [child])
+                with self.assertRaisesRegex(RuntimeError, "has not settled"):
+                    owner.control_pid(42, lambda _: [42])
+                self.assertEqual(native.call_count, 1)
+            child.kill.assert_called_once_with()
+            self.assertEqual(
+                child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
+            )
+            self.assertEqual(owner.diagnostic_receipts[0]["phase"], "pid_control")
+
+
 class ObservationFailureTests(unittest.TestCase):
     """Cleanup refusal must neither replace the primary cause nor admit success."""
 
@@ -537,10 +755,12 @@ class ScriptingLifecycleTests(unittest.TestCase):
             owner.scripting_command_number = 3
             owner.retain_diagnostics(["actual cleanup sample"], phase="cleanup")
             owner.scripting_command_number = 4
+            owner.retain_diagnostics(["actual PID control sample"], phase="pid_control")
+            owner.scripting_command_number = 5
             owner.retain_diagnostics(["extra request"])
             self.assertEqual(len(owner.diagnostic_receipts), probe.SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT)
             self.assertTrue(owner.diagnostic_receipts[-1]["additional_commands_omitted"])
-            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "cleanup")
+            self.assertEqual(owner.diagnostic_receipts[-1]["phase"], "pid_control")
 
     def test_cleanup_refusal_keeps_lua_arguments_out_of_plain_sample_receipts(self):
         primary = subprocess.TimeoutExpired(["osascript", "PRIMARY_LUA_ARGUMENT"], 10)

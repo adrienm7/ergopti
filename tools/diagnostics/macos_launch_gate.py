@@ -709,6 +709,20 @@ def run(app, output, scenario, seed_tag):
                     observation["native_transport_control_error"] = (
                         f"{type(error).__name__}: {error}"
                     )
+                try:
+                    observation["native_pid_transport_control"] = native_probe.control_pid(
+                        child_pids[0], processes
+                    )
+                except Exception as error:
+                    # This separate diagnostic cannot replace either original
+                    # proof. Retained scripting-child debt refuses its dispatch.
+                    detail = native_probe.pid_control_error_diagnostic(error)
+                    observation["native_pid_transport_control_error"] = detail
+                    if not any(
+                        receipt["phase"] == "pid_control"
+                        for receipt in native_probe.diagnostic_receipts
+                    ):
+                        native_probe.retain_diagnostics([detail], phase="pid_control")
                 # The control never replaces the original feature proof. Attempt
                 # it independently even after refusal; retained transport debt
                 # may itself refuse this call, which is a second honest failure.
@@ -783,6 +797,11 @@ def run(app, output, scenario, seed_tag):
     if native_probe:
         report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
         report["native_transport_control"] = observation.get("native_transport_control")
+        report["native_pid_transport_control"] = observation.get("native_pid_transport_control")
+        if observation.get("native_pid_transport_control_error"):
+            report["native_pid_transport_control_error"] = observation[
+                "native_pid_transport_control_error"
+            ]
         if observation.get("native_transport_control_error"):
             report["native_transport_control_error"] = observation["native_transport_control_error"]
         report[native_result_key] = observation.get(native_result_key)
