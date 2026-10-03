@@ -14,6 +14,84 @@
 local helpers = require("tests.helpers")
 local el      = helpers.load_module("adapters.event_loop")
 
+--- Models libuv stop admission while an independently owned handle stays live.
+local function stop_fixture(source)
+	local state = { handles = {}, stops = 0, waited = false }
+	local backend = {}
+	local function new_handle(kind)
+		local handle = { kind = kind, active = false }
+		state.handles[#state.handles + 1] = handle
+		return handle
+	end
+	function backend.new_idle() return new_handle("idle") end
+	function backend.new_timer() return new_handle("timer") end
+	function backend.idle_start(handle, callback) handle.active, handle.callback = true, callback; return 0 end
+	function backend.timer_start(handle, _, _, callback) handle.active, handle.callback = true, callback; return 0 end
+	function backend.idle_stop(handle) handle.active = false; return 0 end
+	function backend.timer_stop(handle) handle.active = false; return 0 end
+	function backend.close(handle) handle.closed = true end
+	function backend.stop() state.stops = state.stops + 1 end
+	function backend.run()
+		local stops_before = state.stops
+		for _, handle in ipairs(state.handles) do
+			if not handle.closed and handle.kind == (source == "periodic" and "timer" or "idle") then
+				handle.callback()
+				break
+			end
+		end
+		-- Stopping the adapter's own idle/timer cannot retire a foreign owner.
+		state.waited = state.stops == stops_before
+	end
+	local previous_backend, previous_loop = package.loaded.luv, package.loaded["adapters.event_loop"]
+	package.loaded.luv, package.loaded["adapters.event_loop"] = backend, nil
+	local ok, loop = pcall(require, "adapters.event_loop")
+	package.loaded.luv, package.loaded["adapters.event_loop"] = previous_backend, previous_loop
+	if not ok then error(loop, 0) end
+	return loop, state
+end
+
+helpers.describe("linux-event-stop-receipts", function()
+	for _, source in ipairs({ "idle", "periodic", "deferred" }) do
+		helpers.it("linux-event-stop-receipts: " .. source .. " signals native stop without stealing handles", function()
+			local loop, state = stop_fixture(source)
+			local calls = 0
+			local function stop() calls = calls + 1; loop.stop(); loop.stop() end
+			local options = {}
+			if source == "idle" then options.onIdle = stop
+			elseif source == "periodic" then options.onPeriodic = stop
+			else
+				helpers.assert_true(loop.defer(stop))
+				options.onIdle = function() end
+			end
+			loop.run(options)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(state.stops, 1, "native run needs explicit stop while foreign owners remain")
+			helpers.assert_true(not state.waited)
+			helpers.assert_true(not loop.isRunning())
+			for _, handle in ipairs(state.handles) do
+				helpers.assert_true(handle.closed and not handle.active, "adapter releases its own handles")
+			end
+		end)
+	end
+	helpers.it("linux-event-stop-receipts: repeated runs acquire independent stop ownership", function()
+		local loop, state = stop_fixture("idle")
+		for _ = 1, 2 do
+			loop.run({ onIdle = function() loop.stop() end })
+			helpers.assert_true(not state.waited)
+		end
+		helpers.assert_eq(state.stops, 2)
+		helpers.assert_true(not loop.isRunning())
+		for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+	end)
+	helpers.it("linux-event-stop-receipts: inactive stop cannot interrupt the native owner", function()
+		local loop, state = stop_fixture("idle")
+		loop.stop()
+		loop.stop()
+		helpers.assert_eq(state.stops, 0)
+		helpers.assert_eq(#state.handles, 0)
+	end)
+end)
+
 helpers.describe("event_loop adapter", function()
 
   -- ==========================================================================

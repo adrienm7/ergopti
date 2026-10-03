@@ -285,6 +285,16 @@ These are software implementations; final hardware verification remains below.
   activation. Windows does not use libuv fs_event_start. Only generic Linux
   activation changed; TOML persistence, personal-menu logic, native cross-OS
   suites and manual CI remain untouched.
+- [~] **L22.** Linux event-loop stop ownership: explicitly request libuv to
+  return after stopping this adapter's idle/periodic callbacks. Previously a
+  foreign socket, inotify watch or timer kept run() blocked after stop(). Twelve
+  native cases and four portable cases failed before the fix. Fourteen native
+  cases now cover idle/periodic/deferred stop, restart, ordinary cleanup and
+  inactive-stop isolation, preserving foreign handles for their own owner.
+  Five portable cases cover stop admission and owned callback retirement. Only
+  Linux owns this luv.run adapter; Windows and macOS use their host event loops.
+  Shutdown owners still need their normal resource cleanup. No physical keyboard,
+  native cross-OS gate or manual CI was exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
