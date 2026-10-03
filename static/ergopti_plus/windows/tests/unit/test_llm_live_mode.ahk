@@ -98,19 +98,92 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 ; could paint it: a painted notice is a hotstring-style tooltip, which live
 ; requests wait for.
 _LLV_Toggle(Value, &Notice := "") {
-	global GestureActionParameters, LLV_BINDING, _TooltipActiveSurface
+	global GestureActionParameters, LLV_BINDING
 	GestureActionParameters[GestureActionParameterKey(LLV_BINDING, "llm_live_prompt_toggle")] := Value
-	; Capture and retire this notice before the next-turn render can query the
-	; user's foreground control. This fixture tests the AI owner, not native paint.
+	return _LLV_InvokeAndRetireNotice(GestureInvokeAction.Bind("llm_live_prompt_toggle", LLV_BINDING), &Notice)
+}
+
+/**
+ * Retires this fixture's real notice before releasing its fake typing ports.
+ * The caller keeps its exact critical setting and the actual action outcome.
+ * @param {Func} Action - Actual gesture or menu callback owned by this scenario.
+ * @param {string} Notice - Captured pending notice, including refusal or throw.
+ * @returns {Any} The actual action's unchanged return value.
+ */
+_LLV_InvokeAndRetireNotice(Action, &Notice := "") {
+	global _TooltipActiveSurface
 	PreviousCritical := Critical("On")
 	try {
-		Result := GestureInvokeAction("llm_live_prompt_toggle", LLV_BINDING)
-		Notice := _LPP_PendingNotice()
-		TooltipHide("LiveModeTest", true)
-		_TooltipActiveSurface := 0
-		return Result
+		try {
+			return Action.Call()
+		} finally {
+			try Notice := _LPP_PendingNotice()
+			finally {
+				try TooltipHide("LiveModeTest", true)
+				finally _TooltipActiveSurface := 0
+			}
+		}
 	} finally Critical(PreviousCritical)
 }
+
+/** Exercises real notice cleanup for both refusal and callback interruption. */
+_LLV_NoticeRetirementPreservesForeignOwnership() {
+	_LLV_Run("", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _SR_ActiveTasks, _TooltipPendingRequest, _TooltipActiveSurface
+		PreviousCritical := Critical(37)
+		ForeignId := "live-mode-owned-foreign-receipt"
+		Foreign := {OwnedByAnotherFixture: true}
+		Installed := false
+		try {
+			AssertFalse(_SR_ActiveTasks.Has(ForeignId), "the fixture owns a new foreign-task observation slot")
+			_SR_ActiveTasks[ForeignId] := Foreign
+			Installed := true
+			ExpectedTasks := _SR_ActiveTasks.Count
+			for Interrupted in [false, true] {
+				Observed := []
+				Notice := ""
+				Failure := ""
+				Outcome := true
+				try Outcome := _LLV_InvokeAndRetireNotice(_LLV_NoticeBoundaryAction.Bind(Interrupted, Observed), &Notice)
+				catch as Err Failure := Err.Message
+				AssertEqual(Interrupted ? "owned live-mode notice interruption" : "", Failure,
+					"the notice boundary preserves the actual callback exception")
+				if !Interrupted
+					AssertFalse(Outcome, "a refused callback keeps its actual false result")
+				AssertEqual(1, Observed.Length, "the callback publishes one real notice")
+				AssertEqual("Owned live-mode notice", Observed[1].Notice,
+					"the actual pending request exists while the callback runs")
+				Assert(Observed[1].Critical > 0, "notice publication stays inside the owned protected boundary")
+				AssertEqual("Owned live-mode notice", Notice, "cleanup preserves the exact observed notice")
+				AssertFalse(IsObject(_TooltipPendingRequest), "refusal and throw retire the real pending notice")
+				AssertEqual(0, _TooltipActiveSurface, "no notice surface escapes the fixture")
+				AssertEqual(37, A_IsCritical, "the exact caller critical setting is restored")
+				AssertTrue(_SR_ActiveTasks.Has(ForeignId), "cleanup cannot steal an unrelated task")
+				AssertEqual(ObjPtr(Foreign), ObjPtr(_SR_ActiveTasks[ForeignId]),
+					"the unrelated task keeps its exact ownership identity")
+				AssertEqual(ExpectedTasks, _SR_ActiveTasks.Count,
+					"cleanup neither launches a positioning worker nor removes foreign ownership")
+			}
+		} finally {
+			try {
+				if Installed && _SR_ActiveTasks.Has(ForeignId)
+						&& ObjPtr(_SR_ActiveTasks[ForeignId]) == ObjPtr(Foreign)
+					_SR_ActiveTasks.Delete(ForeignId)
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+
+/** Publishes through the actual notice owner; assertions run after it returns. */
+_LLV_NoticeBoundaryAction(Interrupted, Observed) {
+	_LLM_Menu_ShowNotice("Owned live-mode notice")
+	Observed.Push({Notice: _LPP_PendingNotice(), Critical: A_IsCritical})
+	if Interrupted
+		throw Error("owned live-mode notice interruption")
+	return false
+}
+Test("LLM live mode: notice refusal and throw retain caller and foreign ownership", _LLV_NoticeRetirementPreservesForeignOwnership)
 
 ; One keystroke of the automatic trigger: the buffer grows, the engine arms
 ; its debounce through a recorder instead of a real timer.
@@ -453,8 +526,12 @@ _LLV_MenuListsRewritePrompts() {
 
 		; Choosing a prompt turns live mode on with it and the menu's count
 		for Row in Rows {
-			if (Row["label"] == LLM_Menu_GetProfileLabel("translate_ja"))
-				Row["action"].Call()
+			if (Row["label"] == LLM_Menu_GetProfileLabel("translate_ja")) {
+				AssertTrue(_LLV_InvokeAndRetireNotice(Row["action"], &Notice),
+					"the actual menu callback returns its live-mode admission")
+				AssertEqual(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel("translate_ja")), Notice,
+					"the protected menu callback retains its actual localized notice")
+			}
 		}
 		AssertTrue(LLM_Engine_LiveIsActive(), "the row turns live mode on")
 		Override := LLM_Engine_LiveOverride()
@@ -466,7 +543,9 @@ _LLV_MenuListsRewritePrompts() {
 			AssertEqual(Row["label"] == LLM_Menu_GetProfileLabel("translate_ja"), Row["checked"] ? true : false,
 				"only the live prompt is checked: " . Row["label"])
 		; The action and the menu share one state: the menu's Off ends the action's live mode
-		Rows[1]["action"].Call()
+		AssertTrue(_LLV_InvokeAndRetireNotice(Rows[1]["action"], &Notice),
+			"the actual Off callback retains its successful result")
+		AssertEqual(t("llm.live.off"), Notice, "Off retains its actual localized notice")
 		AssertFalse(LLM_Engine_LiveIsActive(), "Off turns live mode off")
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "the active profile never changed")
 	}
