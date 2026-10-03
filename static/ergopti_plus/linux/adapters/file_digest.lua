@@ -12,6 +12,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local LibuvExit = require("infra.libuv_exit")
 local LOG = "adapters.file_digest"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -214,9 +215,9 @@ function M.sha256(path, options, callback)
 		args = argv,
 		stdio = { nil, request.stdout, request.stderr },
 		detached = true,
-	}, function(code)
+	}, function(code, signal)
 		request.exited = true
-		request.exit_code = tonumber(code) or -1
+		request.exit_code = LibuvExit.status(code, signal)
 		maybe_complete(request)
 		close_process(request)
 	end)
