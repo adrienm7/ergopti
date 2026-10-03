@@ -399,3 +399,57 @@ helpers.describe("dynamic rule families: the rows", function()
 	end)
 
 end)
+
+helpers.describe("dynamic menu shared family order", function()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/dynamic_hotstrings/menu_vectors.json"), "rb"))
+	local corpus = assert(require("json").decode(file:read("*a")))
+	file:close()
+	helpers.it("keeps the independent published family metadata and returns detached records", function()
+		local menu = require("infra.manifest_menu")
+		local root = assert(menu.get_root())
+		helpers.assert_eq(root.dynamic_hotstring_families.rows, corpus.rows,
+			"the pre-centralization metadata snapshot must remain exact")
+		local first = menu.get_dynamic_hotstring_families()
+		local second = menu.get_dynamic_hotstring_families()
+		for index, expected in ipairs(corpus.rows) do
+			helpers.assert_eq(second[index].date_field, expected.date_field)
+			helpers.assert_eq(second[index].is_prefix, expected.is_prefix)
+			helpers.assert_eq(second[index].i18n, expected.i18n)
+			helpers.assert_eq(second[index].is_module_placeholder, expected.is_module_placeholder)
+			helpers.assert_eq(second[index].linux_section, expected.linux_section)
+			helpers.assert_eq(second[index].legacy_key, expected.legacy_key)
+		end
+		first[1].section = "changed-in-first-caller"
+		first[#first + 1] = { separator = true }
+		helpers.assert_eq(second[1].section, "datelongfr")
+		helpers.assert_eq(#second, 8)
+		helpers.assert_eq(root.dynamic_hotstring_families.rows, corpus.rows,
+			"native callers cannot mutate the manifest cache")
+	end)
+	for _, vector in ipairs(corpus.vectors) do
+		helpers.it("consumes the actual published family order: " .. vector.id, function()
+			local menu = require("infra.manifest_menu")
+			local root = assert(menu.get_root())
+			local previous = root.dynamic_hotstring_families
+			local rows = {}
+			for _, index in ipairs(vector.indices) do rows[#rows + 1] = corpus.rows[index] end
+			root.dynamic_hotstring_families = { rows = rows }
+			local called, observed = xpcall(function()
+				with_storage()
+				local dh = manager()
+				local result = {}
+				for _, family in ipairs(dh.rule_families()) do
+					result[#result + 1] = family.separator and "-" or family.section
+				end
+				return result
+			end, debug.traceback)
+			root.dynamic_hotstring_families = previous
+			drop_storage()
+			helpers.assert_true(called, tostring(observed))
+			helpers.assert_eq(observed, vector.linux,
+				"the real native family publisher must use the shared child records, including separators")
+		end)
+	end
+end)
+
+return true

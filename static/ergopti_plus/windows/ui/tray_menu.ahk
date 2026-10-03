@@ -97,27 +97,10 @@ global _LegacyTopCategoryMap := Map(
 	"Personal",           "hotstrings.personal",
 )
 
-; DynamicHotstrings menu id (PascalCase, the curated render order below) -> v2
-; manifest id under [hotstrings.dynamic]. Relocated from path_translator.ahk;
-; consumed only by _BuildDynamicHotstringsSubmenu.
-global _LegacyDynamicHotstringsKeyMap := Map(
-	"Date",                              "date",
-	"DateFr",                            "date_fr",
-	"DateLongFr",                        "date_long_fr",
-	"IbanPrefixes",                      "iban_prefixes",
-	"PhonePrefixes",                     "phone_prefixes",
-	"SsnPrefixes",                       "ssn_prefixes",
-	"TextExpansionPersonalInformation",  "text_expansion_personal_information",
-)
-
-; Custom render order for the ``DynamicHotstrings`` submenu — the manifest
-; doesn't yet model menu order or separators, so the curated UX layout is
-; pinned here as a sidecar. Each entry is either a v1 PascalCase feature id
-; or "-" (separator). When the manifest grows ``menu_order`` /
-; ``menu_separator`` metadata this constant can move into the codegen.
-global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
-	"PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-",
-	"TextExpansionPersonalInformation"]
+; Native aliases and render order are both derived from the shared child rows.
+; The generic manifest reader is initialized before this tray boot owner.
+global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()
+global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 
 
 #Include menu/menu_hotstring_switches.ahk

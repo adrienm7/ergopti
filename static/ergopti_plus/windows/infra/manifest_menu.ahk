@@ -57,6 +57,54 @@ _MR_GetMenuDef(Key) {
 	return (Arr is Array) ? Arr : []
 }
 
+; Read the shared Dynamic child records through the existing manifest owner.
+; A missing declaration is a boot-model error, never an invented private order.
+_MR_GetDynamicHotstringFamilies() {
+	Root := _MR_GetManifestRoot()
+	Node := Root is Map ? Root.Get("dynamic_hotstring_families", false) : false
+	Rows := Node is Map ? Node.Get("rows", false) : false
+	if !(Rows is Array) || !Rows.Length
+		throw Error("Dynamic hotstring families require their shared menu declaration.")
+	Result := [], Seen := Map()
+	for Row in Rows {
+		if !(Row is Map)
+			throw Error("Dynamic hotstring family must be a record.")
+		if Row.Get("separator", false) {
+			if Row.Has("id")
+				throw Error("Dynamic separator cannot also be a family.")
+		} else {
+			for Key in ["id", "section", "i18n", "legacy_key"] {
+				if !Row.Has(Key) || Type(Row[Key]) != "String" || Row[Key] == ""
+					throw Error("Dynamic hotstring family requires " . Key . ".")
+			}
+			if Seen.Has(Row["id"])
+				throw Error("Duplicate Dynamic hotstring family: " . Row["id"] . ".")
+			Seen[Row["id"]] := true
+		}
+		Result.Push(ManifestCloneValue(Row))
+	}
+	return Result
+}
+
+; Preserve the native legacy identities while sharing every displayed family.
+_MR_DynamicHotstringsKeyMap() {
+	Result := Map()
+	for Row in _MR_GetDynamicHotstringFamilies() {
+		if !Row.Get("separator", false)
+			Result[Row["legacy_key"]] := Row["id"]
+	}
+	return Result
+}
+
+; The tray and headless native fixtures consume this same boot-order owner.
+_MR_DynamicHotstringsOrder() {
+	Result := []
+	for Row in _MR_GetDynamicHotstringFamilies()
+		Result.Push(Row.Get("separator", false) ? "-" : Row["legacy_key"])
+	return Result
+}
+
+
 
 
 
