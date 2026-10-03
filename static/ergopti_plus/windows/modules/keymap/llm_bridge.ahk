@@ -753,8 +753,8 @@ LLM_Tooltip_ScheduleSlotAcceptance(Record, Surface, SlotIdx) {
 			"record", Record, "surface", Surface, "slot", SlotIdx,
 			"poll_ms", TimingsGet("llm", "val_chord_release_poll_ms"),
 			"delay_ms", TimingsGet("llm", "val_chord_insert_delay_ms"),
-			"deadline", A_TickCount
-				+ TimingsGet("llm", "val_chord_release_timeout_ms"))
+			"started_at", A_TickCount,
+			"timeout_ms", TimingsGet("llm", "val_chord_release_timeout_ms"))
 	} finally Critical(PreviousCritical)
 	SetTimer(_LLM_SlotAccept_Tick.Bind(State), -State["poll_ms"])
 	return true
@@ -764,9 +764,11 @@ LLM_Tooltip_ScheduleSlotAcceptance(Record, Surface, SlotIdx) {
 _LLM_SlotAccept_Step(State, CurrentGeneration, ModifierDown, Now) {
 	if !(State is Map) || State["generation"] != CurrentGeneration
 		return "drop"
+	if TickExpired(State["started_at"], State["timeout_ms"], Now)
+		return "drop"
 	if !ModifierDown
 		return "insert"
-	return (Now - State["deadline"]) >= 0 ? "drop" : "wait"
+	return "wait"
 }
 
 _LLM_SlotAccept_Tick(State) {
@@ -782,7 +784,7 @@ _LLM_SlotAccept_Tick(State) {
 	}
 	if Step == "drop" {
 		if State is Map && State["generation"] == _LLM_SlotAccept_Generation
-			try LoggerWarn("LLM", "Validation chord did not insert prediction {1}: a modifier was still held at the deadline.", State["slot"])
+			try LoggerWarn("LLM", "Validation chord expired before prediction {1} could be inserted.", State["slot"])
 		return
 	}
 	SetTimer(_LLM_SlotAccept_Insert.Bind(State), -State["delay_ms"])
