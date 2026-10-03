@@ -704,17 +704,25 @@ the complete three-OS checkpoint remain pending.
       a new runtime fault from the supplied unpublished snapshot.
 - [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
   branch on 2026-09-30; agents must not create `backup/*` branches again. The
-  finished agent worktrees under `.claude/worktrees/` can be removed; the
-  uncommitted test edit left in the `wip/win-tooltip-border-fix` worktree
-  (tooltip DPI radius) is the only unsaved change among them.
+  historical `wip/win-tooltip-border-fix` worktree was reported to contain an
+  uncommitted tooltip DPI-radius test edit. Its exact bytes are unavailable in
+  this container and have not been claimed as recovered. The committed tooltip
+  border tests now cover DPI geometry; this proves current coverage rather than
+  the provenance of that historical edit.
 
 The 2026-10-03 branch cleanup removed 131 obsolete `codex/ci-*` refs after
 checking reachability, open pull requests and active manual validations. The
 remaining remote branches are `main`, `dev`, `gh-pages`, `sparkle-appcasts`,
 `fix/linux` and the single reusable `codex/ci-validation`. Future manual runs
 use that CI ref with distinct run groups, so advancing it cannot cancel an
-older validation. No registered worktree or uncommitted source was removed;
-worktree hygiene remains unfinished.
+older validation. No registered worktree or uncommitted source was removed by
+that branch cleanup. A fresh 2026-10-03 inspection found only the main checkout
+registered, with neither `.claude/worktrees/` nor `.git/worktrees/` present.
+Active validation checkouts and evidence remain owned work; there is no
+registered worktree to remove in this checkout. Item 39 remains partial for the
+unavailable historical edit's provenance.
+
+[The overnight handoff](handovers/2026-09-29-overnight/README.md) now marks its former backup, force-push and release instructions as superseded.
 
 - [~] **40.** The packaged-launch gate never builds a Karabiner configuration:
   the CI runners have no Karabiner-Elements, so dev.148 passed every launch

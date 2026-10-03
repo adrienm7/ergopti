@@ -2,11 +2,18 @@
 
 # Overnight handoff of 2026-09-29
 
-Read this first if you resume the ErgoptiPlus overhaul. It records where every
-piece of work lives, what is still in flight, the maintainer's decisions and
-the only safe release procedure. The ordered checklist stays in
-[the TODO](../../ERGOPTIPLUS_TODO.md); the maintainer's decisions are in
-[DECISIONS.md](DECISIONS.md); the HS-274 plan is in
+> Historical snapshot of 2026-09-29, archived on 2026-10-03. Follow
+> [AGENTS.md](../../../AGENTS.md) and
+> [the current continuation checklist](../../ERGOPTIPLUS_TODO.md) for ongoing
+> work. The branch table and commands below record the overnight operation;
+> its backup, force-push and release instructions are superseded. Preserve
+> existing changes, create no `backup/*` branches and use no force-push.
+> Current manual validations use `codex/ci-validation`, with an independent
+> concurrency group per run and release publication disabled.
+
+This handoff records the branches, in-flight work, maintainer decisions and
+release procedure as they stood on 2026-09-29. Its decisions are in
+[DECISIONS.md](DECISIONS.md); its HS-274 plan is in
 [hs274-delivery-plan.md](hs274-delivery-plan.md).
 
 ## Context
