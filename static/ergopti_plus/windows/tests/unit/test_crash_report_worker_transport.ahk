@@ -309,6 +309,60 @@ _CRWT_DelayedWorkerDoesNotBlockParent() {
 	}
 }
 
+_CRWT_CimObservation() {
+	return Map("spawn_calls", 0, "completion_calls", 0,
+		"exit_code", "unobserved", "stdout_utf8_bytes", "unobserved", "stderr_utf8_bytes", "unobserved")
+}
+
+_CRWT_CimCompletion(Observation, Done, ExitCode, Stdout, Stderr) {
+	Observation["completion_calls"] += 1
+	if Observation["completion_calls"] = 1 {
+		if ExitCode is Integer
+			Observation["exit_code"] := ExitCode
+		if Stdout is String
+			Observation["stdout_utf8_bytes"] := StrPut(Stdout, "UTF-8") - 1
+		if Stderr is String
+			Observation["stderr_utf8_bytes"] := StrPut(Stderr, "UTF-8") - 1
+	}
+	; Forward the exact receipt to its original owner after retaining closed facts.
+	return Done.Call(ExitCode, Stdout, Stderr)
+}
+
+_CRWT_CimDiagnosticSpawn(Observation, Executable, Args, Done) {
+	Observation["spawn_calls"] += 1
+	Callback := Observation["spawn_calls"] = 1
+		? _CRWT_CimCompletion.Bind(Observation, Done) : Done
+	return _CrashReportWorkerSpawnOwned(Executable, Args, Callback)
+}
+
+_CRWT_CimInteger(Value) {
+	return Value is Integer ? String(Value) : "unobserved"
+}
+
+_CRWT_CimDiagnostic(Observation, Result, Fault, TasksCreated) {
+	if !(Fault is String) || (StrCompare(Fault, "os", true) != 0 && StrCompare(Fault, "cpu", true) != 0)
+		throw ValueError("Crash CIM diagnostic fault must be an owned selector")
+	Owner := Result["owner"]
+	Errors := Result["report"].Get("enrichment_errors", [])
+	DeadlineMarker := false
+	if Errors is Array {
+		for _, Entry in Errors {
+			if Entry is String && StrCompare(Entry, "primary worker deadline exceeded", true) = 0
+				DeadlineMarker := true
+		}
+	}
+	return "fault=" . Fault
+		. "; primary_completion_calls=" . _CRWT_CimInteger(Observation.Get("completion_calls", "unobserved"))
+		. "; primary_exit=" . _CRWT_CimInteger(Observation.Get("exit_code", "unobserved"))
+		. "; primary_stdout_utf8_bytes=" . _CRWT_CimInteger(Observation.Get("stdout_utf8_bytes", "unobserved"))
+		. "; primary_stderr_utf8_bytes=" . _CRWT_CimInteger(Observation.Get("stderr_utf8_bytes", "unobserved"))
+		. "; deadline_expired=" . _CRWT_CimInteger(Owner.Get("deadline_expired", "unobserved"))
+		. "; deadline_marker=" . String(DeadlineMarker)
+		. "; owner_attempt=" . _CRWT_CimInteger(Owner.Get("attempt", "unobserved"))
+		. "; spawn_calls=" . _CRWT_CimInteger(Observation.Get("spawn_calls", "unobserved"))
+		. "; tasks_created=" . _CRWT_CimInteger(TasksCreated)
+}
+
 _CRWT_IndependentEnrichmentFaultsStillWrite() {
 	global _ConfigDir
 	OldConfigDir := _ConfigDir
@@ -322,10 +376,13 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 			for Key in ["cpu_name", "cpu_cores", "os_build", "ram_total_gb", "ram_free_gb"]
 				Snapshot[Key] := "UNENRICHED"
 			BeforeTasks := Scope.Tasks.Count
+			Observation := _CRWT_CimObservation()
+			Spawn := _CRWT_CimDiagnosticSpawn.Bind(Observation)
 			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault . ",git"),
-				0, _CRWT_WaitUntil, A_ScriptDir . "\support\crash_cim_boundary.ps1")
+				Spawn, _CRWT_WaitUntil, A_ScriptDir . "\support\crash_cim_boundary.ps1")
+			Diagnostic := _CRWT_CimDiagnostic(Observation, Result, Fault, Scope.Tasks.Count - BeforeTasks)
 			AssertEqual("primary", Result["owner"]["phase"],
-				"a fallback cannot prove that independent enrichment continued")
+				"a fallback cannot prove that independent enrichment continued; " . Diagnostic)
 			AssertEqual(BeforeTasks + 1, Scope.Tasks.Count, "each case must run one primary worker")
 			AssertTrue(Result["owner"]["mapping"]["closed"], "the snapshot mapping must be released")
 			for _, Key in _CRWT_RequiredKeys()
@@ -581,3 +638,59 @@ _CRWT_NewMappingsAndShutdownDrainOldDebt() {
 }
 Test("crash mapping ownership: admission and shutdown drain cleanup debt (crash-mapping-cleanup-ownership)",
 	_CRWT_NewMappingsAndShutdownDrainOldDebt)
+
+_CRWT_CimObservationForwardsExactReceipt() {
+	Observation := _CRWT_CimObservation()
+	DoneState := Map()
+	Done := _CRWT_RecordDone.Bind(DoneState)
+	Stdout := "private-output-" . Chr(0x00E9)
+	Stderr := "private-error-" . Chr(0x2605)
+	_CRWT_CimCompletion(Observation, Done, 23, Stdout, Stderr)
+	AssertEqual(1, Observation["completion_calls"], "the actual primary callback must be observed once")
+	AssertEqual(23, Observation["exit_code"], "the integer primary status must remain exact")
+	AssertEqual(StrPut(Stdout, "UTF-8") - 1, Observation["stdout_utf8_bytes"],
+		"the closed stdout count describes received UTF-8 bytes, not characters")
+	AssertEqual(StrPut(Stderr, "UTF-8") - 1, Observation["stderr_utf8_bytes"],
+		"the closed stderr count describes received UTF-8 bytes, not characters")
+	AssertTrue(DoneState["called"], "the observation must forward to the actual completion owner")
+	AssertEqual(23, DoneState["exit_code"])
+	AssertEqual(Stdout, DoneState["stdout"], "the original owner must receive unchanged stdout")
+	AssertEqual(Stderr, DoneState["stderr"], "the original owner must receive unchanged stderr")
+	Result := Map("owner", Map("deadline_expired", 1, "attempt", 2),
+		"report", Map("enrichment_errors", ["primary worker deadline exceeded", Stderr]))
+	Diagnostic := _CRWT_CimDiagnostic(Observation, Result, "cpu", 2)
+	AssertContains(Diagnostic, "primary_exit=23")
+	AssertContains(Diagnostic, "deadline_expired=1")
+	AssertContains(Diagnostic, "deadline_marker=1")
+	AssertContains(Diagnostic, "owner_attempt=2")
+	AssertContains(Diagnostic, "tasks_created=2")
+	AssertFalse(InStr(Diagnostic, Stdout), "public diagnostics must not contain stdout payload")
+	AssertFalse(InStr(Diagnostic, Stderr), "public diagnostics must not contain stderr payload")
+}
+
+_CRWT_CimObservationKeepsMissingAndMalformedFactsClosed() {
+	Observation := _CRWT_CimObservation()
+	Result := Map("owner", Map("deadline_expired", "private-invalid", "attempt", Map()),
+		"report", Map("enrichment_errors", ["PRIMARY WORKER DEADLINE EXCEEDED", "private-invalid"]))
+	Diagnostic := _CRWT_CimDiagnostic(Observation, Result, "os", 0)
+	AssertContains(Diagnostic, "primary_completion_calls=0")
+	AssertContains(Diagnostic, "primary_exit=unobserved")
+	AssertContains(Diagnostic, "deadline_expired=unobserved")
+	AssertContains(Diagnostic, "deadline_marker=0", "only the exact owned deadline marker may classify the report")
+	AssertContains(Diagnostic, "owner_attempt=unobserved")
+	AssertFalse(InStr(Diagnostic, "private-invalid"), "unknown native facts must stay closed")
+	DoneState := Map()
+	_CRWT_CimCompletion(Observation, _CRWT_RecordDone.Bind(DoneState), "0", Map(), ["private-invalid"])
+	AssertEqual("unobserved", Observation["exit_code"], "a textual zero cannot become native success")
+	AssertEqual("unobserved", Observation["stdout_utf8_bytes"])
+	AssertEqual("unobserved", Observation["stderr_utf8_bytes"])
+	AssertEqual("0", DoneState["exit_code"], "the observation must preserve even refused owner receipts")
+	AssertTrue(DoneState["exit_code"] is String, "a malformed receipt must not be coerced while forwarding")
+	AssertTrue(DoneState["stdout"] is Map)
+	AssertTrue(DoneState["stderr"] is Array)
+}
+
+Test("crash CIM diagnostic: observes and forwards the exact primary completion without payload disclosure",
+	_CRWT_CimObservationForwardsExactReceipt)
+Test("crash CIM diagnostic: missing and malformed primary receipts cannot manufacture success",
+	_CRWT_CimObservationKeepsMissingAndMalformedFactsClosed)
