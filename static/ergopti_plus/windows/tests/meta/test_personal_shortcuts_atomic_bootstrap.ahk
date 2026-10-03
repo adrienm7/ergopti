@@ -346,6 +346,15 @@ _PSAB_CheckBootstrapCase(Compiled, Smoke, Kind, Failure, ExpectedReceipt) {
 	DirCreate(Root)
 	Ownership := {CanRetire: true}
 	try {
+		; A_Temp may use an 8.3 alias while the native child's A_ScriptDir
+		; resolves its long spelling. Expected forwarding bytes must use that
+		; same native identity, independently of the generated stub's contents.
+		CanonicalBuffer := Buffer(65536, 0)
+		CanonicalLength := DllCall("GetLongPathNameW", "Str", Root,
+			"Ptr", CanonicalBuffer, "UInt", 32768, "UInt")
+		Assert(CanonicalLength > 0 && CanonicalLength < 32768,
+			"the created private bootstrap directory must resolve to its native long spelling")
+		Root := StrGet(CanonicalBuffer, CanonicalLength, "UTF-16")
 		Personal := Root . "\personal.ahk"
 		Stub := Root . "\_generated\personal_shortcuts.ahk"
 		ExpectedSource := Kind == "missing" ? Chr(0xFEFF) . PersonalShortcutsTemplate()
