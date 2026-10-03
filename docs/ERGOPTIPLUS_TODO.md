@@ -369,6 +369,15 @@ Controlled package-manager regressions retain the exact native return,
 original outer refusal and unchanged install arguments; a fresh hosted
 failure is still needed to identify the original cause.
 
+Checkpoint 37132404823 completes the actual Linux update and restart step,
+while five ordinary conditional HTTP 304 responses produced error annotations.
+The observational probe now reports those responses as notices; cache admission
+still belongs to the unchanged updater manager. Exact transport response,
+callback and cleanup receipts are preserved, and an updater refusal keeps its
+original nonzero verdict. Registered native-adapter regressions reproduce the
+old diagnostic level and retain missing headers and empty-body evidence.
+Complete three-OS qualification remains pending.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
