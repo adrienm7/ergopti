@@ -449,6 +449,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
 #Include infra/first_boot.ahk
+#Include ../_shared/modules/config/outdated.ahk
 #Include platform/remap/tap_hold_loader.ahk
 #Include platform/remap/tap_hold_writer.ahk
 ; Tap-hold timing constants must load HERE, before infra/boot.ahk calls

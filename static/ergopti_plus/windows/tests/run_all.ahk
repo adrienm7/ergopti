@@ -171,6 +171,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
 #Include ../infra/config_migrate.ahk
+#Include ../../_shared/modules/config/outdated.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 ; The layer-file loader reads _shared/keymap and the physical-key registry at run
