@@ -1406,18 +1406,106 @@ for (const [what, rel, from, to] of [
 	mustCatch(what, rel, from, to, namingProblems);
 }
 
-/** Keeps every manual validation independent while superseding automatic branch runs. */
+/** Keeps the approved root group as the pipeline's only concurrency owner. */
 function concurrencyProblems(files) {
-	const text = codeOf(files.find((entry) => entry.rel === ENTRY).text).split('\njobs:')[0];
-	const blocks = [...text.matchAll(/^concurrency:\n((?: {2}[^\n]*\n|[ \t]*\n)*)/gm)];
+	const problems = [];
 	const expected =
 		"group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}\n" +
 		'  cancel-in-progress: true';
-	return blocks.length === 1 && blocks[0][1].trim() === expected
-		? []
-		: [
-				'manual CI must have a unique run group; automatic branch runs must still supersede each other'
-			];
+	for (const entry of files) {
+		const text = codeOf(entry.text);
+		// Top-level keys and job fields have fixed columns. Text inside run: |
+		// remains more deeply indented and must never acquire YAML ownership.
+		const roots = [...text.matchAll(/^(?:concurrency|'concurrency'|"concurrency")[ \t]*:/gm)];
+		if (entry.rel === ENTRY) {
+			const header = text.split('\njobs:')[0];
+			const blocks = [...header.matchAll(/^concurrency:\n((?: {2}[^\n]*\n|[ \t]*\n)*)/gm)];
+			if (roots.length !== 1 || blocks.length !== 1 || blocks[0][1].trim() !== expected)
+				problems.push(
+					'manual CI must have one unique run group; automatic branch runs must still supersede each other'
+				);
+		} else if (roots.length !== 0) {
+			problems.push(`${entry.rel}: a called workflow must not add its own concurrency group`);
+		}
+		for (const job of pipeline.jobsOfText(entry.text, entry.rel)) {
+			if (/^ {4}(?:concurrency|'concurrency'|"concurrency")[ \t]*:/m.test(codeOf(job.body)))
+				problems.push(
+					`${entry.rel} job ${job.id}: a job must not add a concurrency group that cancels an independent manual run`
+				);
+		}
+	}
+	return problems;
+}
+
+// A caller or called lane can otherwise cancel one OS of an independent run.
+for (const [what, rel, from, to] of [
+	[
+		'Windows caller concurrency collision',
+		ENTRY,
+		"  windows:\n    name: 'Windows'",
+		"  windows:\n    concurrency:\n      group: ci-windows-${{ github.ref }}\n      cancel-in-progress: true\n    name: 'Windows'"
+	],
+	[
+		'called macOS workflow concurrency collision',
+		MACOS_BOX,
+		'jobs:\n',
+		'concurrency:\n  group: ci-macos-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n'
+	],
+	[
+		'called Linux job concurrency collision',
+		LINUX_BOX,
+		'  linux-ok:\n',
+		'  linux-ok:\n    concurrency:\n      group: ci-linux-${{ github.ref }}\n      cancel-in-progress: true\n'
+	],
+	[
+		'quoted caller concurrency collision',
+		ENTRY,
+		"  windows:\n    name: 'Windows'",
+		"  windows:\n    'concurrency':\n      group: ci-windows-${{ github.ref }}\n      cancel-in-progress: true\n    name: 'Windows'"
+	]
+]) {
+	mustCatch(what, rel, from, to, concurrencyProblems);
+}
+
+const rootConcurrencyBlock = pipeline
+	.file(ENTRY)
+	.match(/^concurrency:\n(?: {2}[^\n]*\n|[ \t]*\n)*/m)?.[0];
+if (rootConcurrencyBlock === undefined) {
+	errors.push(
+		'the approved root concurrency block is missing; self-check fixtures have no source owner'
+	);
+} else {
+	mustCatch('missing root concurrency', ENTRY, rootConcurrencyBlock, '', concurrencyProblems);
+	mustCatch(
+		'duplicate root concurrency',
+		ENTRY,
+		rootConcurrencyBlock,
+		rootConcurrencyBlock + rootConcurrencyBlock,
+		concurrencyProblems
+	);
+}
+
+// A shell body may legitimately print or write this text. Scan YAML fields,
+// rather than interpreting a script's embedded content as another group.
+const concurrencyScriptAnchor = '      - name: Install Lua 5.4 + luarocks\n        run: |\n';
+const concurrencyScriptSource = pipeline.file(MACOS_BOX);
+if (concurrencyScriptSource.split(concurrencyScriptAnchor).length - 1 !== 1) {
+	errors.push('the actual macOS run block must uniquely own the script-text concurrency fixture');
+} else {
+	const scriptFixture = pipeline.files().map((entry) =>
+		entry.rel === MACOS_BOX
+			? {
+					rel: entry.rel,
+					text: entry.text.replace(
+						concurrencyScriptAnchor,
+						concurrencyScriptAnchor +
+							'          concurrency:\n            group: literal-script-content\n            cancel-in-progress: true\n'
+					)
+				}
+			: entry
+	);
+	if (concurrencyProblems(scriptFixture).length !== 0)
+		errors.push('a run block containing concurrency text must not be scanned as a YAML group');
 }
 
 errors.push(...concurrencyProblems(pipeline.files()));
