@@ -443,6 +443,22 @@ These are software implementations; final hardware verification remains below.
   with a Lua binary string. No cross-OS binary hardware claim is made. Shared
   key/IV/envelope policy, native cross-OS gates and manual CI remain unchanged
   or unexecuted; no physical typing device was used.
+- [~] **L36.** Linux at-rest OpenSSL exit receipts: key derivation,
+  encryption and decryption require a successful terminal native receipt before
+  accepting useful stdout. Per-call framing preserves binary and marker-looking
+  bytes without output files or double quoting the stdin payload. Sixteen native
+  and eighteen portable cases failed before the fix. Nineteen native cases pass
+  on host and nonroot Debian using real OpenSSL behind an explicit fault wrapper
+  that delegates unchanged argv/stdin, then exits nonzero or signals itself;
+  actual SQLite rejects a failed encrypted typing batch and admits a healthy
+  retry. Eight portable protocol controls cover empty/binary output, stale or
+  malformed receipts, bounds and rejection before execution. A draft helper's
+  captured shell owner became stale in reload fixtures; resolving that owner
+  at execution fixes the failures without weakening any assertions. macOS also
+  ignores synchronous command success in its shell adapter, an unvalidated
+  source-level concern deferred to its native owner; Windows uses checked native
+  crypto status codes. Shared key/envelope policy, native cross-OS gates and
+  manual CI remain unchanged or unexecuted; no physical typing device was used.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

