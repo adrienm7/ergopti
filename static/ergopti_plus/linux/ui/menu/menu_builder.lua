@@ -3950,14 +3950,6 @@ local function _build_quit(ctx)
 	}
 end
 
---- Builds the debug submenu.
---- The log levels the debug submenu offers, in increasing severity.
----
---- Not translated: DEBUG / INFO / WARNING / ERROR are the tokens the logger
---- itself prints and the user greps for, so a localised menu label would name
---- something that appears nowhere in the file it filters.
-local DEBUG_LOG_LEVELS = { "DEBUG", "INFO", "WARNING", "ERROR" }
-
 --- Builds the debug submenu from the shared manifest.
 ---
 --- WHAT THIS REPLACED. Three rows written out by hand, while the manifest
@@ -3990,28 +3982,10 @@ local function _build_debug(ctx)
 		end
 	end
 
-	-- Bracketed key on purpose: it is what makes the id greppable, and the
-	-- coverage gate that pairs every declared `list` with a provider resolves
-	-- them by exactly that spelling.
-	local providers = {
-		["log_level"] = function()
-			local rows = {}
-			for _, level in ipairs(DEBUG_LOG_LEVELS) do
-				rows[#rows + 1] = {
-					label   = level,
-					checked = ctx.log_level == level,
-					action = function()
-						if type(ctx.on_set_log_level) == "function" then ctx.on_set_log_level(level) end
-					end,
-				}
-			end
-			return { { label = i18n_safe("menu.debug.log_level"), items = rows } }
-		end,
-	}
-
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["log_level"]      = ctx.on_set_log_level,
 		["open_logs"]      = call_ctx("on_open_logs"),
 		["open_today_log"] = call_ctx("on_open_today_log"),
 		["open_error_log"] = call_ctx("on_open_error_log"),
@@ -4024,11 +3998,12 @@ local function _build_debug(ctx)
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["script.log_level"] = function() return ctx.log_level end
 	render_ctx.state_getters["error_dialog_enabled"] = function()
 		return require("ui.error_dialog.bridge").is_enabled()
 	end
 
-	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)
+	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, {})
 	return { label = i18n_safe("menu.debug.title"), submenu = rows }
 end
 

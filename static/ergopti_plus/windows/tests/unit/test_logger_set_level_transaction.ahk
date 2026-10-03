@@ -186,3 +186,113 @@ _LSLT_InheritedCriticalStopsAtLoggerAction() {
 Test("logger level: action defuses inherited Critical through post-commit menu "
 	. "rebuild (logger-level-postcommit-inherited-critical)",
 	_LSLT_InheritedCriticalStopsAtLoggerAction)
+
+; Reads expectations independent of the generated severity menu.
+_LSLT_MenuCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\log_level_rows.json", "UTF-8"))
+}
+
+; Returns the real Win32 choice and dispatcher callbacks, preserving its owner.
+_LSLT_NativeRow(Owned, Command := 0) {
+	global _MenuDispatchCallbacks
+	Built := _MI_BuildDebuggingMenu(Command)
+	Owned.Push(Built)
+	loop TrayMenuItemCount(Built) {
+		Position := A_Index - 1
+		if InStr(_CTC_LabelAt(Built, Position), t("menu.debug.log_level")) != 1
+			continue
+		Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+		Assert(Handle != 0, "the actual Debug parent opens its declared choices")
+		Sub := MenuFromHandle(Handle)
+		Items := []
+		loop TrayMenuItemCount(Sub) {
+			ChildPosition := A_Index - 1
+			Id := DllCall("GetMenuItemID", "ptr", Handle, "int", ChildPosition, "uint")
+			Assert(_MenuDispatchCallbacks.Has(Id), "each severity uses the real dispatcher")
+			Items.Push(Map("label", _CTC_LabelAt(Sub, ChildPosition),
+				"checked", _CTC_IsChecked(Sub, ChildPosition), "action", _MenuDispatchCallbacks[Id]))
+		}
+		return Map("label", _CTC_LabelAt(Built, Position), "items", Items)
+	}
+	throw Error("the declared Debug log-level parent is missing")
+}
+
+_LSLT_MenuMatrix() {
+	global LOGGER_MIN_LEVEL
+	SavedLevel := LOGGER_MIN_LEVEL
+	Corpus := _LSLT_MenuCorpus()
+	AssertEqual(4, Corpus["levels"].Length)
+	AssertEqual(4, Corpus["states"].Length)
+	Owned := []
+	try {
+		for State in Corpus["states"] {
+			LOGGER_MIN_LEVEL := State["selected"]
+			Row := _LSLT_NativeRow(Owned)
+			AssertEqual(4, Row["items"].Length)
+			for Index, Expected in Corpus["levels"] {
+				Actual := Row["items"][Index]
+				AssertEqual(Expected["label"], Actual["label"])
+				AssertEqual(State["checked"][Index], Actual["checked"])
+				if Expected["value"] == State["selected"]
+					AssertEqual(t("menu.debug.log_level") . " : " . Expected["label"], Row["label"])
+			}
+		}
+	} finally {
+		LOGGER_MIN_LEVEL := SavedLevel
+		for Built in Owned
+			_CTC_ReleaseMenu(Built)
+	}
+}
+Test("logger level: actual native Debug choices replay the independent four-state matrix", _LSLT_MenuMatrix)
+
+_LSLT_MenuCommit(Level) {
+	return LoggerSetLevel(Level, _LSLT_Writer, _LSLT_Notify, _LSLT_Rebuild)
+}
+
+_LSLT_MenuOrderAndRefusal() {
+	global LOGGER_MIN_LEVEL, ConfigurationFile, _LSLT_WriterResult
+	global _LSLT_RebuildCalls, _LSLT_SeenUpdates
+	SavedLevel := LOGGER_MIN_LEVEL
+	SavedPath := ConfigurationFile
+	Corpus := _LSLT_MenuCorpus()
+	Declaration := 0
+	for Row in _MR_GetManifestRoot()["debug_menu"] {
+		if Row.Get("id", "") == "log_level" {
+			Declaration := Row
+			break
+		}
+	}
+	Assert(Declaration is Map, "the actual shared log-level declaration must exist")
+	Previous := Declaration["choices"]
+	Labels := Map(), Owned := []
+	for Expected in Corpus["levels"]
+		Labels[Expected["value"]] := Expected["label"]
+	Declaration["choices"] := []
+	for Value in Corpus["reordered_values"]
+		Declaration["choices"].Push(Map("value", Value, "label", Labels[Value]))
+	try {
+		_LSLT_Reset()
+		ConfigurationFile := A_Temp . "\ergopti_logger_menu_refusal.toml"
+		LOGGER_MIN_LEVEL := "INFO"
+		_LoggerRefreshFastFlags()
+		Row := _LSLT_NativeRow(Owned, _LSLT_MenuCommit)
+		for Index, Value in Corpus["reordered_values"]
+			AssertEqual(Labels[Value], Row["items"][Index]["label"], "the shared declaration owns native order")
+		_LSLT_WriterResult := false
+		AssertFalse(Row["items"][1]["action"].Call(), "the actual assignment owner refuses ERROR")
+		AssertEqual("ERROR", _LSLT_SeenUpdates[1].Value)
+		AssertEqual("INFO", LOGGER_MIN_LEVEL, "refusal cannot publish the candidate threshold")
+		AssertEqual(0, _LSLT_RebuildCalls, "refusal cannot rebuild a successful-looking tree")
+		AssertEqual(t("menu.debug.log_level") . " : " . Labels["INFO"], _LSLT_NativeRow(Owned)["label"])
+	} finally {
+		Declaration["choices"] := Previous
+		ConfigurationFile := SavedPath
+		LOGGER_MIN_LEVEL := SavedLevel
+		_LoggerRefreshFastFlags()
+		for Built in Owned
+			_CTC_ReleaseMenu(Built)
+		_LSLT_Reset()
+	}
+}
+Test("logger level: shared Debug ordering preserves the actual writer refusal", _LSLT_MenuOrderAndRefusal)

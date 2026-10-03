@@ -1235,8 +1235,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
+			local ok, committed = pcall(Storage.set, "log_level", level)
+			if not ok or committed ~= true then
+				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
+				return false
+			end
 			L.set_level(level)
-			Storage.set("log_level", level)
 			L.info("menu", "Log level set to %s.", level)
 			-- The menubar tree is cached and only rebuilt when _menu_dirty is set.
 			-- Without this the Debug submenu kept showing the previous level and
@@ -1244,6 +1248,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- no longer has.
 			_menu_dirty = true
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+			return true
 		end,
 		toggle_error_dialog       = function()
 			local ErrorDialog = require("ui.error_dialog")

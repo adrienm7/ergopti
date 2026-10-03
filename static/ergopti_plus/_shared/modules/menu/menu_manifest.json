@@ -562,8 +562,30 @@
 			"id": "---"
 		},
 		{
-			"type": "list",
-			"id": "log_level"
+			"type": "choice",
+			"id": "log_level",
+			"i18n": "menu.debug.log_level",
+			"path": "script.log_level",
+			"show_current_choice": true,
+			"current_choice_suffix": " : {1}",
+			"choices": [
+				{
+					"value": "DEBUG",
+					"label": "🐛 DEBUG"
+				},
+				{
+					"value": "INFO",
+					"label": "ℹ️ INFO"
+				},
+				{
+					"value": "WARNING",
+					"label": "⚠️ WARNING"
+				},
+				{
+					"value": "ERROR",
+					"label": "❌ ERROR"
+				}
+			]
 		},
 		{
 			"type": "command",
