@@ -404,6 +404,18 @@ These are software implementations; final hardware verification remains below.
   payloads and independent retirement. macOS uses native application names;
   Windows' existing missing app-event producer remains deferred. Focus/window
   title code, native cross-OS gates and manual CI remain untouched or unexecuted.
+- [~] **L33.** Linux desktop notification operands: terminate native
+  notify-send option parsing before caller titles and bodies. Quoted option-like
+  text previously suppressed notifications or changed native option values.
+  Ten native and eight portable cases failed before the fix. Twelve real Dunst
+  cases pass on host and nonroot Debian with private D-Bus and Xvfb, including
+  literal short/long options, separators, Unicode/newlines and four severity
+  controls. Native Gio history verifies exact summary/body, application,
+  urgency and timeout; portable cases verify both operands follow the native
+  boundary. macOS and Windows pass text to native APIs without CLI option
+  parsing. This is virtual graphical validation; physical desktops, Wayland,
+  native cross-OS gates and manual CI remain unexecuted. Shared notification
+  policy and the twenty-one translated product catalogues are unchanged.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
