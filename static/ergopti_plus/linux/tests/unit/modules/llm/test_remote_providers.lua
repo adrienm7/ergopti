@@ -105,10 +105,14 @@ end
 
 helpers.describe("New providers: listed in catalogue order, each where it can serve", function()
 	local catalogue = read_shared("modules/llm/api_providers.json")
+	local local_ids = { "omlx", "lmstudio", "llamacpp", "jan" }
+	local expected_order = {}
+	for _, id in ipairs(catalogue.provider_order) do expected_order[#expected_order + 1] = id end
+	for _, id in ipairs(local_ids) do expected_order[#expected_order + 1] = id end
 
 	helpers.it("every provider of the shared order is loaded, in that order", function()
 		with_remote(function(remote)
-			helpers.assert_eq(ids(remote.providers()), table.concat(catalogue.provider_order, ","))
+			helpers.assert_eq(ids(remote.providers()), table.concat(expected_order, ","))
 		end)
 	end)
 
@@ -120,9 +124,14 @@ helpers.describe("New providers: listed in catalogue order, each where it can se
 				if format ~= "decisions" then chat[#chat + 1] = id end
 				if format ~= "decisions" and format ~= "backboard" then vision[#vision + 1] = id end
 			end
+			for _, id in ipairs(local_ids) do
+				chat[#chat + 1] = id
+				vision[#vision + 1] = id
+				helpers.assert_true(remote.serves(id, "chat") and remote.serves(id, "vision") and remote.serves(id, "system1"))
+			end
 			helpers.assert_eq(ids(remote.providers_for("chat")), table.concat(chat, ","))
 			helpers.assert_eq(ids(remote.providers_for("vision")), table.concat(vision, ","))
-			helpers.assert_eq(ids(remote.providers_for("system1")), table.concat(catalogue.provider_order, ","))
+			helpers.assert_eq(ids(remote.providers_for("system1")), table.concat(expected_order, ","))
 			helpers.assert_true(not remote.serves("typesafe", "chat") and not remote.serves("openrouter_jev", "chat"))
 			helpers.assert_true(remote.serves("backboard", "chat") and not remote.serves("backboard", "vision"))
 		end)

@@ -26,6 +26,8 @@ local Logger = require("logger.shim")
 local Json = require("json")
 local ConfigPaths = require("infra.config_paths")
 local ConfigOutdated = require("config_outdated")
+local LocalCatalogue = require("modules.llm.local_server_catalogue")
+local AuthPolicy = require("llm.local_server_auth")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -113,9 +115,14 @@ end
 --- @return table|nil
 local function valid_entry(raw)
 	if type(raw) ~= "table" then return nil end
-	for _, key in ipairs({ "id", "provider", "label", "token" }) do
+	for _, key in ipairs({ "id", "provider", "label" }) do
 		if type(raw[key]) ~= "string" or raw[key] == "" then return nil end
 	end
+	for _, key in ipairs({ "model", "base_url" }) do
+		if raw[key] ~= nil and type(raw[key]) ~= "string" then return nil end
+	end
+	local _, servers = LocalCatalogue.load({})
+	if not AuthPolicy.token_allowed(raw.provider, raw.token, servers) then return nil end
 	return {
 		id = raw.id,
 		provider = raw.provider,
@@ -155,12 +162,12 @@ end
 --- @return table state
 local function state()
 	if _state then return _state end
-	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {} }
+	_state = { version = VERSION, entries = {}, active_id = "", outdated = {}, extras = {}, row_order = {}, root_extras = {} }
 	local fh = io.open(M.path(), "r")
 	if not fh then return _state end
 	local text = fh:read("*a")
 	fh:close()
-	local root = Json.decode(text)
+	local root = Json.decode_lossless(text)
 	if type(root) ~= "table" or type(root.entries) ~= "table" then
 		local aside = M.path() .. ".corrupt"
 		os.rename(M.path(), aside)
@@ -169,11 +176,21 @@ local function state()
 	end
 	if root.version ~= nil and root.version ~= VERSION then
 		_state.write_refusal = "it has version " .. tostring(root.version) .. ", which this build does not write"
-	elseif not is_list(root.entries) then
+	elseif not Json.is_array(root.entries) or not is_list(root.entries) then
 		_state.write_refusal = "its entries are not a list, as this build writes them"
 	end
+	if root.active_id ~= nil and type(root.active_id) ~= "string" then
+		_state.write_refusal = "its selection has a type this build does not write"
+	end
+	for key, value in pairs(root) do
+		if key ~= "version" and key ~= "entries" and key ~= "active_id" then _state.root_extras[key] = value end
+	end
+	local ids = {}
 	for index, raw in ipairs(root.entries) do
 		local entry = valid_entry(raw)
+		_state.row_order[#_state.row_order + 1] = { id = entry and entry.id or nil, raw = raw }
+		if entry and ids[entry.id] then _state.write_refusal = "it contains duplicate API entry identities" end
+		if entry then ids[entry.id] = true end
 		if entry then
 			_state.entries[#_state.entries + 1] = entry
 			-- Fields a later build added travel back with the entry.
@@ -181,7 +198,7 @@ local function state()
 		else
 			_state.outdated[#_state.outdated + 1] = raw
 			ConfigOutdated.report_in_file(M.path(), entry_name(raw, index),
-				"it lacks a text id, provider, label or token this build needs")
+				"its entry fields do not match this build's supported text types")
 		end
 	end
 	if type(root.active_id) == "string" and M.get(root.active_id) then
@@ -216,12 +233,25 @@ local function persist()
 		return false
 	end
 	local entries = {}
-	for _, entry in ipairs(current.entries) do entries[#entries + 1] = stored_form(entry) end
-	for _, raw in ipairs(current.outdated) do entries[#entries + 1] = raw end
+	local pending = {}
+	for _, entry in ipairs(current.entries) do pending[entry.id] = entry end
+	for _, row in ipairs(current.row_order) do
+		if row.id then
+			local entry = pending[row.id]
+			if entry then entries[#entries + 1] = stored_form(entry); pending[row.id] = nil end
+		else
+			entries[#entries + 1] = row.raw
+		end
+	end
+	-- New entries have no historical row yet; append in the user's order.
+	for _, entry in ipairs(current.entries) do
+		if pending[entry.id] then entries[#entries + 1] = stored_form(entry); pending[entry.id] = nil end
+	end
 	local active = current.active_id ~= "" and current.active_id or current.dangling_active_id or ""
-	local ok, err = write_private(M.path(), Json.encode({
-		version = VERSION, entries = entries, active_id = active,
-	}))
+	local image = {}
+	for key, value in pairs(current.root_extras) do image[key] = value end
+	image.version, image.entries, image.active_id = VERSION, Json.array(entries), active
+	local ok, err = write_private(M.path(), Json.encode(image))
 	if not ok then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
 end

@@ -827,12 +827,31 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
       reserved curl slot declares its transitory tags-owner fields before
       acquisition. Timer delivery/cancellation and the real dispatcher have
       added regressions; the repaired native Windows gate remains pending.
-- [ ] **47.** Running local OpenAI-compatible servers (oMLX, LM Studio,
-      llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`) are AI
-      backends on macOS only (`local-openai-backends`). Windows and Linux need an
-      asynchronous probe (WinHTTP, curl), keyless API entries (Linux
-      `api_remote.lua` refuses an empty key) and menu rows; the Linux tray has no
-      text input for an address or a key.
+- [~] **47.** **Partial: catalogue-owned optional authentication.** Manually configured
+  OpenAI-compatible entries for oMLX, LM Studio, llama-server/LocalAI and Jan
+  can use an explicitly empty key on all three drivers. The shared local
+  catalogue owns that capability; cloud, generic and unknown providers still
+  require a typed key. Configured HTTP(S) addresses and provided secret bytes
+  remain authoritative, and empty credentials do not create Authorization
+  headers. Linux keeps foreign row order and unknown fields during private
+  saves; Windows refuses unsupported source replacement under the existing
+  transaction owner. Linux already supports address, key and model text
+  prompts. Independent credential/models fixtures, actual entry restart and
+  configurable curl loopback models/chat/refusal/cancellation regressions
+  qualify this prerequisite locally. Native Windows/macOS application and
+  complete three-OS CI remain pending. Remaining work: Windows/Linux automatic
+  asynchronous discovery and model/menu rows matching the existing macOS
+  local-server owner, with source fencing and physical acceptance. This
+  tranche does not install or start a server.
+
+The controlled Linux HTTP lane independently qualifies unauthenticated models
+and chat requests, supplied secret bytes, authentication refusal, cancellation,
+source changes and complete task retirement. Its original 55 streaming checks
+remain mandatory beside the 28 new local-API checks. macOS and Windows use the
+same catalogue capability and independent credential/model vectors through
+their existing API owners; actual Windows execution and complete native CI
+remain pending. Automatic local-server discovery remains a separate tranche.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked

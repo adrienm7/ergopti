@@ -63,6 +63,7 @@ local ResponseClassifier = require("modules.llm.remote_response_classifier")
 local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
+local AuthPolicy     = require("llm.local_server_auth")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -300,6 +301,7 @@ register_local_servers()
 function M.is_local_server(provider_id)
 	local provider = type(provider_id) == "string" and M.PROVIDERS[provider_id] or nil
 	return type(provider) == "table" and provider.local_server == true
+		and AuthPolicy.token_allowed(provider_id, "", LocalServers.SERVERS)
 end
 
 --- Tells whether an entry cannot be sent without a key: every provider needs
@@ -307,8 +309,9 @@ end
 --- @param entry table API entry.
 --- @return boolean missing
 local function key_missing(entry)
-	if M.is_local_server(entry.provider) then return false end
-	return type(entry.token) ~= "string" or entry.token == ""
+	if type(entry) ~= "table" then return true end
+	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
+	return not AuthPolicy.token_allowed(entry.provider, entry.token, servers)
 end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in

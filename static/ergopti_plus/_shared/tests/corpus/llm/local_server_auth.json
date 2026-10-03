@@ -1,0 +1,434 @@
+{
+	"auth_cases": [
+		{
+			"name": "omlx-empty",
+			"provider": "omlx",
+			"token": "",
+			"allowed": true
+		},
+		{
+			"name": "omlx-provided",
+			"provider": "omlx",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "omlx-boolean",
+			"provider": "omlx",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "omlx-number",
+			"provider": "omlx",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "omlx-object",
+			"provider": "omlx",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "omlx-null",
+			"provider": "omlx",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "lmstudio-empty",
+			"provider": "lmstudio",
+			"token": "",
+			"allowed": true
+		},
+		{
+			"name": "lmstudio-provided",
+			"provider": "lmstudio",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "lmstudio-boolean",
+			"provider": "lmstudio",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "lmstudio-number",
+			"provider": "lmstudio",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "lmstudio-object",
+			"provider": "lmstudio",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "lmstudio-null",
+			"provider": "lmstudio",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "llamacpp-empty",
+			"provider": "llamacpp",
+			"token": "",
+			"allowed": true
+		},
+		{
+			"name": "llamacpp-provided",
+			"provider": "llamacpp",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "llamacpp-boolean",
+			"provider": "llamacpp",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "llamacpp-number",
+			"provider": "llamacpp",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "llamacpp-object",
+			"provider": "llamacpp",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "llamacpp-null",
+			"provider": "llamacpp",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "jan-empty",
+			"provider": "jan",
+			"token": "",
+			"allowed": true
+		},
+		{
+			"name": "jan-provided",
+			"provider": "jan",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "jan-boolean",
+			"provider": "jan",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "jan-number",
+			"provider": "jan",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "jan-object",
+			"provider": "jan",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "jan-null",
+			"provider": "jan",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "openai-empty",
+			"provider": "openai",
+			"token": "",
+			"allowed": false
+		},
+		{
+			"name": "openai-provided",
+			"provider": "openai",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "openai-boolean",
+			"provider": "openai",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "openai-number",
+			"provider": "openai",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "openai-object",
+			"provider": "openai",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "openai-null",
+			"provider": "openai",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "openai_compat-empty",
+			"provider": "openai_compat",
+			"token": "",
+			"allowed": false
+		},
+		{
+			"name": "openai_compat-provided",
+			"provider": "openai_compat",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "openai_compat-boolean",
+			"provider": "openai_compat",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "openai_compat-number",
+			"provider": "openai_compat",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "openai_compat-object",
+			"provider": "openai_compat",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "openai_compat-null",
+			"provider": "openai_compat",
+			"token": null,
+			"allowed": false
+		},
+		{
+			"name": "future-provider-empty",
+			"provider": "future-provider",
+			"token": "",
+			"allowed": false
+		},
+		{
+			"name": "future-provider-provided",
+			"provider": "future-provider",
+			"token": " provided bytes ",
+			"allowed": true
+		},
+		{
+			"name": "future-provider-boolean",
+			"provider": "future-provider",
+			"token": false,
+			"allowed": false
+		},
+		{
+			"name": "future-provider-number",
+			"provider": "future-provider",
+			"token": 123,
+			"allowed": false
+		},
+		{
+			"name": "future-provider-object",
+			"provider": "future-provider",
+			"token": {},
+			"allowed": false
+		},
+		{
+			"name": "future-provider-null",
+			"provider": "future-provider",
+			"token": null,
+			"allowed": false
+		}
+	],
+	"models_cases": [
+		{
+			"name": "valid-two",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[{\"id\":\"model-z\"},{\"id\":\"model-a\",\"future\":{\"flag\":true}}]}",
+				"body_truncated": false
+			},
+			"admitted": true,
+			"models": ["model-z", "model-a"]
+		},
+		{
+			"name": "valid-empty",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": true,
+			"models": []
+		},
+		{
+			"name": "object-not-array",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":{}}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "invalid-row",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[{}]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "bad-json",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "foreign-service",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":\"fixture\"}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "auth-required",
+			"response": {
+				"ok": false,
+				"status": 401,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "forbidden",
+			"response": {
+				"ok": false,
+				"status": 403,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "redirect",
+			"response": {
+				"ok": true,
+				"status": 302,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "transport-failed",
+			"response": {
+				"ok": false,
+				"status": 200,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "body-truncated",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[]}",
+				"body_truncated": true
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "empty-id",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[{\"id\":\"\"}]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "numeric-id",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[{\"id\":7}]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "array-root",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "[{\"id\":\"model\"}]",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "row-is-array",
+			"response": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"data\":[[\"model\"]]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		},
+		{
+			"name": "created-not-listed",
+			"response": {
+				"ok": true,
+				"status": 201,
+				"body": "{\"data\":[]}",
+				"body_truncated": false
+			},
+			"admitted": false,
+			"models": []
+		}
+	]
+}

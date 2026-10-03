@@ -1304,12 +1304,24 @@ Test("api_remote: trim detaches owner before reentrant callback (async-trim-deta
 _RemoteCatalog_LoadedFromShared() {
 	AssertTrue(LLM_API_PROVIDERS.Has("openai"))
 	AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
-	; The shipped catalogue is the reference, never a restated count
+	; Preserve the complete cloud prefix and independently name the new local suffix.
 	Shipped := JsonParse(FileRead(_SharedDir . "\modules\llm\api_providers.json", "UTF-8"))
-	AssertEqual(Shipped["provider_order"].Length, LLM_API_PROVIDER_ORDER.Length,
-		"every shipped provider publishes, the Backboard and decisions formats included")
+	LocalIds := ["omlx", "lmstudio", "llamacpp", "jan"]
+	ShippedLocal := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
+	AssertEqual(4, ShippedLocal["server_order"].Length,
+		"the optional-auth catalogue declares exactly the four independently named local providers")
+	AssertEqual(Shipped["provider_order"].Length + 4, LLM_API_PROVIDER_ORDER.Length,
+		"every shipped cloud and local provider publishes, the Backboard and decisions formats included")
 	for Index, ProviderId in Shipped["provider_order"]
 		AssertEqual(ProviderId, LLM_API_PROVIDER_ORDER[Index], "the catalogue keeps provider_order")
+	for Index, ProviderId in LocalIds {
+		AssertEqual(ProviderId, ShippedLocal["server_order"][Index],
+			"the local catalogue retains its independently named provider order")
+		AssertEqual(ProviderId, LLM_API_PROVIDER_ORDER[Shipped["provider_order"].Length + Index],
+			"local providers append after the unchanged complete cloud prefix")
+		AssertTrue(LLM_API_PROVIDERS.Has(ProviderId), "each local provider reaches the actual request registry")
+		AssertTrue(LLM_LOCAL_API_SERVERS.Has(ProviderId), "each local provider retains its optional-auth capability")
+	}
 	AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("gpt-4o-mini"))
 }
 Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
@@ -1317,7 +1329,15 @@ Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_Loade
 
 _RemoteCatalog_InvalidScalarsNeverPublish() {
 	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
-	global LLM_REMOTE_DECISIONS_TEST
+	global LLM_REMOTE_DECISIONS_TEST, LLM_LOCAL_API_SERVERS
+	oldLocalServers := LLM_LOCAL_API_SERVERS
+	oldLocalServerState := []
+	for ProviderId, Descriptor in oldLocalServers {
+		Fields := Map()
+		for Key, Value in Descriptor
+			Fields[Key] := Value
+		oldLocalServerState.Push(Map("id", ProviderId, "descriptor", Descriptor, "fields", Fields))
+	}
 	oldDecisionsTest := LLM_REMOTE_DECISIONS_TEST
 	oldProviders := LLM_API_PROVIDERS
 	oldOrder := LLM_API_PROVIDER_ORDER
@@ -1360,7 +1380,21 @@ _RemoteCatalog_InvalidScalarsNeverPublish() {
 		LLM_REMOTE_MODEL_PRICES := oldPrices
 		LLM_REMOTE_TEST_REQUEST := oldTestRequest
 		LLM_REMOTE_DECISIONS_TEST := oldDecisionsTest
+		LLM_LOCAL_API_SERVERS := oldLocalServers
 		try DirDelete(testRoot, true)
+	}
+	AssertEqual(ObjPtr(oldLocalServers), ObjPtr(LLM_LOCAL_API_SERVERS),
+		"catalogue reload fixture restores the exact predecessor optional-auth registry")
+	AssertEqual(oldLocalServerState.Length, LLM_LOCAL_API_SERVERS.Count,
+		"the synthetic catalogue must not leak or remove predecessor local providers")
+	for Row in oldLocalServerState {
+		Descriptor := LLM_LOCAL_API_SERVERS[Row["id"]]
+		AssertEqual(ObjPtr(Row["descriptor"]), ObjPtr(Descriptor),
+			"restoration keeps each predecessor capability descriptor identity")
+		AssertEqual(Row["fields"].Count, Descriptor.Count,
+			"the predecessor capability descriptor retains all of its fields")
+		for Key, Value in Row["fields"]
+			AssertEqual(Value, Descriptor[Key], "the predecessor capability field is unchanged: " . Key)
 	}
 }
 Test("api_providers.json: invalid descriptor and price scalars never publish", _RemoteCatalog_InvalidScalarsNeverPublish)

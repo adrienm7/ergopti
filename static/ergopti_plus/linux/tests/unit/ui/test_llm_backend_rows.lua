@@ -176,7 +176,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		find(build(), "➕ Cerebras").action()
 		helpers.assert_true(state.prompts[1].hidden, "the key is typed into a masked field")
 		helpers.assert_eq(state.prompts[2].initial, "qwen", "the model defaults to the provider's")
-		helpers.assert_eq(state.entries[1].token, "csk-123", "surrounding blanks from a paste are dropped")
+		helpers.assert_eq(state.entries[1].token, "  csk-123  ", "provided secret bytes remain authoritative")
 		helpers.assert_eq(state.entries[1].model, "", "the provider default is stored as no override")
 		helpers.assert_eq(state.backend, "api")
 		helpers.assert_eq(#state.tests, 1, "the new entry is tested at once")
@@ -305,4 +305,30 @@ helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function(
 		helpers.assert_eq(#state.entries, 0, "its own removal")
 	end)
 
+end)
+
+
+helpers.describe("Local API optional-auth tray consumer", function()
+	helpers.it("stores an explicitly empty local key and tests the selected model (local-api-optional-auth-ui)", function()
+		local build, state, restore = setup("api")
+		local remote = package.loaded["modules.llm.api_remote"]
+		local provider = { id = "lmstudio", label = "LM Studio", base_url = "http://localhost:1234/v1", default_model = "" }
+		local providers, lookup = remote.providers, remote.provider
+		local _, servers = require("modules.llm.local_server_catalogue").load({})
+		remote.providers = function() local list = providers(); list[#list + 1] = provider; return list end
+		remote.provider = function(id) return id == provider.id and provider or lookup(id) end
+		remote.token_allowed = function(id, token) return require("llm.local_server_auth").token_allowed(id, token, servers) end
+		state.answers = { "", "fixture-model" }
+		local action = find(build(), "➕ LM Studio")
+		local ok, failure = xpcall(function() action.action() end, debug.traceback)
+		restore()
+		if not ok then error(failure) end
+		helpers.assert_eq(#state.entries, 1)
+		helpers.assert_eq(state.entries[1].token, "")
+		helpers.assert_eq(state.entries[1].provider, "lmstudio")
+		helpers.assert_eq(state.entries[1].model, "fixture-model")
+		helpers.assert_eq(state.tests[1], state.entries[1])
+		helpers.assert_eq(state.backend, "api")
+		helpers.assert_eq(state.prompts[1].hidden, true)
+	end)
 end)

@@ -278,7 +278,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		try return _LLM_Menu_PromptApiEntry(EditId)
 		finally Critical(InheritedCritical)
 	}
-	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
+	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
 	existing := ""
 	if (EditId != "") {
 		for e in _LLM_Menu["api_entries"] {
@@ -319,7 +319,9 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
-	ib := Ui_InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_window_title"),
+	KeyPrompt := LocalServerAuthTokenAllowed(provider_id, "", LLM_LOCAL_API_SERVERS)
+		? Format(t("dialog.local_servers.key_prompt"), provider["Label"]) : t("menu.llm.api_prompt_token")
+	ib := Ui_InputBox(KeyPrompt, t("menu.llm.api_window_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
 		return
@@ -1063,6 +1065,33 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	return true
 }
 
+; Unknown entry fields cannot be serialized losslessly by this six-field writer.
+; Refuse replacement rather than interpreting future fields or losing their bytes.
+_LLM_Menu_ApiEntriesFieldsOwned(Entry) {
+	if !(Entry is Map)
+		return false
+	for Field in Entry {
+		if !(Field is String) || !RegExMatch(Field, "^(Id|Name|Provider|BaseUrl|Token|Model)$")
+			return false
+	}
+	return _LLM_Menu_ApiEntryFieldsAreSafe(Entry)
+}
+
+_LLM_Menu_ApiSourceOwned(Raw) {
+	global LLM_API_PROVIDERS
+	try Entries := JsonParse(Raw)
+	catch
+		return false
+	if !(Entries is Array) || !_LLM_Menu_ApiEntryIdsAreUnique(Entries)
+		return false
+	for Entry in Entries {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(Entry)
+				|| !LLM_API_PROVIDERS.Has(Entry["Provider"])
+			return false
+	}
+	return true
+}
+
 ; Builds the exact api_entries.json image for a detached menu candidate. Token
 ; encryption therefore happens before the WAL captures either new target; no
 ; CRUD action ever writes this sibling store independently of config.toml.
@@ -1073,6 +1102,8 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 	entries := MenuState["api_entries"]
 	lines := []
 	for e in entries {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(e)
+			return false
 		fields := []
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
 			val := _LLM_MenuApiEntryGet(e, field, "")
