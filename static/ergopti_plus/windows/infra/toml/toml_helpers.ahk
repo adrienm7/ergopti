@@ -23,9 +23,9 @@
 ;    ``Map<Section, Map<Key, Value>>`` so that a startup with hundreds of
 ;    lookups never reopens the file. Mirrors ``ParseIniFile``'s shape so the
 ;    cache-aware accessor (``IniCacheGet``) keeps working.
-; 4. Section-scoped batch write: ``TOML_BatchWrite`` rewrites every section
-;    in one go (read once, modify in memory, write once). Representable sources
-;    keep canonical formatting. A loss-sensitive no-op keeps the exact source;
+; 4. Section-scoped batch write: owned assignment rows retain canonical
+;    rendering while unmatched physical records and comments remain user data.
+;    Detached candidates and ordinary publication share one qualified image;
 ;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
@@ -689,8 +689,9 @@ TOML_WriteRefusal(Path) {
 }
 
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
-; Preserves keys we did not touch and renders the complete result canonically
-; (sorted sections/keys and stable spacing) before the one atomic replace.
+; Renders explicitly owned rows canonically and retains foreign physical records
+; and comments before the one atomic replace. A wholly owned, uncommented source
+; keeps the existing complete canonical serializer and stable spacing.
 ; It must not call SaveFullConfig afterward: targeted writers persist before
 ; publishing their candidate globals, so a nested full save would serialize
 ; the stale live state back over the just-committed values.
@@ -719,7 +720,7 @@ _TOML_RemoveOwnedStage(Path) {
 	return false
 }
 
-; A successful Write call is not proof that the complete canonical image
+; A successful Write call is not proof that the complete qualified image
 ; reached the stage. Read it back exactly before any rename can make it live.
 _TOML_StageMatches(Path, Expected, ReadFn := 0) {
 	try {
@@ -731,7 +732,7 @@ _TOML_StageMatches(Path, Expected, ReadFn := 0) {
 	return (Actual is String) && StrCompare(Actual, Expected, true) == 0
 }
 
-; Builds the same canonical image used by TOML_BatchWrite without publishing a
+; Builds the same qualified image used by TOML_BatchWrite without publishing a
 ; target. Multi-file transactions need the complete new bytes before their WAL
 ; can capture the old image; routing both modes through one renderer prevents a
 ; subtly different onboarding serializer from drifting from ordinary saves.
@@ -952,6 +953,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					"content", Admitted["content"])
 		}
 
+		; Admission may retain foreign physical records around canonical owned rows.
+		; Both detached and ordinary modes publish this one qualified image.
+		body := SubStr(Admitted["content"], 2)
+
 		if Admitted["preserve_source"] {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
@@ -961,7 +966,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				return true
 		}
 
-		; A canonical image already on disk needs no stage or atomic replacement.
+		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
 		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
 				global _ParseTomlCache

@@ -172,20 +172,25 @@ _TOML_DocumentContainer(Root, Parts, Limit, Arrays, Sealed) {
  * Reads exact semantic namespaces without replacing the native flat cache.
  * @param {String} Source - TOML source observed by its existing I/O owner.
  * @param {Array} Records - Receives typed assignment identities and raw values.
+ * @param {Array} Physical - Receives exact lexical record spans in source order.
  * @returns {Map} Case-sensitive semantic document; malformed namespaces throw.
  */
-TOML_ParseDocument(Source, &Records := 0) {
+TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
 	Declared := Map(), Dotted := Map(), Arrays := Map(), Sealed := Map()
-	Records := [], Position := 1
+	Records := [], Physical := [], Position := 1
 	while Position <= StrLen(Source) {
+		Start := Position
 		Record := _TOML_DocumentToken(Source, &Position, Chr(10))
-		if Record == ""
+		RawRecord := SubStr(Source, Start, Position - Start)
+		if Record == "" {
+			Physical.Push({ Kind: "trivia", Section: NativeSection, Text: RawRecord })
 			continue
+		}
 		if SubStr(Record, 1, 1) == "[" {
 			ArrayHeader := SubStr(Record, 1, 2) == "[["
 			Width := ArrayHeader ? 2 : 1
@@ -213,12 +218,15 @@ TOML_ParseDocument(Source, &Records := 0) {
 				Declared[Current] := true
 			}
 			CurrentPath := Parts
+			Physical.Push({ Kind: "header", Section: NativeSection, Text: RawRecord })
 			continue
 		}
 		SplitPosition := 1
 		KeyText := _TOML_DocumentToken(Record, &SplitPosition, "=", &Separated)
-		if !Separated
+		if !Separated {
+			Physical.Push({ Kind: "opaque", Section: NativeSection, Text: RawRecord })
 			continue
+		}
 		Parts := TOML_ParseKeyPath(KeyText, true)
 		Raw := Trim(SubStr(Record, SplitPosition), " " . Chr(9) . Chr(13) . Chr(10))
 		Node := Current
@@ -248,6 +256,7 @@ TOML_ParseDocument(Source, &Records := 0) {
 			NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
 		Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
 			NativeSection: NativeSection, NativeKey: NativeKey })
+		Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
 	}
 	return Root
 }
@@ -368,11 +377,127 @@ TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records)
 	Projection := _TOML_FlatDocument(Before)
 	TOML_ParseDocument(Candidate)
-	if TOML_SameValue(Document, Projection)
-		return Map("content", Candidate, "preserve_source", false)
+	if TOML_SameValue(Document, Projection) {
+		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
+		if !TOML_SameValue(TOML_ParseDocument(Content), _TOML_FlatDocument(After))
+			throw ValueError("The physical TOML candidate differs from the requested model")
+		return Map("content", Content, "preserve_source", false)
+	}
 	; Only a semantic no-op can authorize retaining an unrepresentable source.
 	; Flat equality alone misses deletes and aliases the old reader cannot see.
 	if !_TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updates, Prefixes)
 		throw ValueError("The canonical TOML writer cannot preserve the source namespaces")
 	return Map("content", Source, "preserve_source", true)
+}
+
+
+; Only an explicit assignment or namespace replacement owns a physical value.
+; The same case-insensitive native Maps select the actual flat writer targets;
+; semantic source admission independently rejects collapsed namespace aliases.
+_TOML_RecordSectionDropped(Section, Prefixes) {
+	for Prefix in Prefixes {
+		if Section = Prefix || InStr(Section, Prefix . ".") == 1
+			return true
+	}
+	return false
+}
+
+_TOML_RecordOwned(Record, Owners, Prefixes) {
+	return _TOML_RecordSectionDropped(Record.Section, Prefixes)
+		|| (Owners.Has(Record.Section) && Owners[Record.Section].Has(Record.Key))
+}
+
+; Unmatched physical records are user data. Keep their complete lexical spans,
+; including comments inside multiline arrays, instead of re-encoding values.
+; Explicitly owned rows still come from the existing canonical serializer.
+_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
+	TOML_ParseDocument(Source, , &Physical)
+	TOML_ParseDocument(Candidate, , &Canonical)
+	Owners := Map(), Rows := Map(), Headers := Map(), Order := []
+	Spacing := "", Separator := ""
+	for Update in Updates {
+		if !Owners.Has(Update.Section)
+			Owners[Update.Section] := Map()
+		Owners[Update.Section][Update.Key] := Update
+	}
+	Foreign := false
+	for Record in Physical {
+		if Record.Kind == "assignment" && !_TOML_RecordOwned(Record, Owners, Prefixes)
+			Foreign := true
+		else if Record.Kind == "trivia" && Trim(Record.Text, " " . Chr(9) . Chr(13) . Chr(10)) != ""
+			Foreign := true
+		else if Record.Kind == "header" && !_TOML_RecordSectionDropped(Record.Section, Prefixes) {
+			if !Owners.Has(Record.Section)
+					|| Trim(TOML_StripInlineComment(Record.Text), " " . Chr(9) . Chr(13) . Chr(10))
+						!= Trim(Record.Text, " " . Chr(9) . Chr(13) . Chr(10))
+				Foreign := true
+		} else if Record.Kind == "opaque"
+			throw ValueError("Cannot retain an unclassified TOML source record")
+	}
+	if !Foreign
+		return Candidate
+	for Record in Canonical {
+		if Record.Kind == "trivia" {
+			Spacing .= Record.Text
+			continue
+		}
+		if Record.Kind == "header" {
+			if Spacing != "" && Separator == ""
+				Separator := Spacing
+			Spacing := ""
+			Headers[Record.Section] := Record.Text
+			Rows[Record.Section] := Map()
+			Order.Push(Record.Section)
+		} else if Record.Kind == "assignment"
+			Rows[Record.Section][Record.Key] := Record.Text
+	}
+	Content := "", Seen := Map(), Current := ""
+	Append(Text) {
+		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+			Content .= "`n"
+		Content .= Text
+	}
+	Flush(Section) {
+		if !Rows.Has(Section)
+			return
+		Keys := []
+		for Key in Rows[Section]
+			Keys.Push(Key)
+		for Key in SortArray(Keys)
+			Append(Rows[Section][Key])
+		Rows[Section].Clear()
+	}
+	for Record in Physical {
+		if Record.Kind == "header" {
+			if Seen.Has(Current)
+				Flush(Current)
+			Current := Record.Section
+			if !_TOML_RecordSectionDropped(Current, Prefixes) {
+				Append(Record.Text)
+				Seen[Current] := true
+			}
+		} else if Record.Kind == "assignment" {
+			if _TOML_RecordSectionDropped(Record.Section, Prefixes)
+				continue
+			if _TOML_RecordOwned(Record, Owners, Prefixes) {
+				if Rows.Has(Record.Section) && Rows[Record.Section].Has(Record.Key)
+					Append(Rows[Record.Section][Record.Key])
+			} else
+				Append(Record.Text)
+			if Rows.Has(Record.Section) && Rows[Record.Section].Has(Record.Key)
+				Rows[Record.Section].Delete(Record.Key)
+		} else
+			Append(Record.Text)
+	}
+	if Seen.Has(Current)
+		Flush(Current)
+	for Section in Order {
+		if Seen.Has(Section)
+			continue
+		if Content != "" && Separator != ""
+			Append(Separator)
+		Append(Headers[Section])
+		Flush(Section)
+	}
+	return Chr(0xFEFF) . Content
 }

@@ -578,3 +578,8 @@ noop_vectors_file:close()
 require("test.toml_noop_contract")(helpers, noop_vectors)
 
 require("test.toml_dotted_keys_contract")(helpers)
+
+local source_vectors_file = assert(io.open(helpers.shared("tests/corpus/config_source_preservation/vectors.json"), "rb"))
+local source_vectors = assert(require("json").decode(source_vectors_file:read("*a")))
+source_vectors_file:close()
+require("test.toml_source_preservation_contract")(helpers, source_vectors)
