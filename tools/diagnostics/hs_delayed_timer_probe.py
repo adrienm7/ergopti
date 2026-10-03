@@ -459,6 +459,7 @@ class NoPromptDiagnosticScope:
             "scalar.json",
             "decoder.json",
             "calibration.json",
+            "getter.json",
         }
         self.allowed_names |= {name + ".pending" for name in self.allowed_names}
         self.directory_identity = (self.path.stat().st_dev, self.path.stat().st_ino)
@@ -595,6 +596,77 @@ class NoPromptDiagnosticScope:
                 )
         return "; ".join(observations) if observations else "not_observed"
 
+    def getter_evidence(self):
+        """Observe native integer getter provenance without admitting converted statuses."""
+        packet = self._owned_packet("getter.json", "hs.applescript.integer-getter", {"facts"})
+        if packet is None:
+            return "not_observed"
+        facts = packet["facts"]
+        if (
+            not isinstance(facts, dict)
+            or not facts
+            or not set(facts) <= {"calibration", "constructor", "send"}
+        ):
+            raise ValueError("Supplemental integer getter names are not closed")
+        fields = {
+            "raw_type",
+            "owner_native",
+            "converted_integer",
+            "box_native",
+            "box_raw_type",
+            "box_integer",
+            "box_matches",
+            "control_matches",
+        }
+        summaries = []
+        for name in ("calibration", "constructor", "send"):
+            if name not in facts:
+                continue
+            fact = facts[name]
+            if not isinstance(fact, dict) or set(fact) != fields:
+                raise ValueError("Supplemental integer getter facts are not closed")
+            for key in ("raw_type", "box_raw_type"):
+                if type(fact[key]) is not str or fact[key] not in SUPPLEMENTAL_PRIMITIVE_TYPES:
+                    raise ValueError("Supplemental integer getter type is not closed")
+            for key in fields - {"raw_type", "box_raw_type", "control_matches"}:
+                if type(fact[key]) is not bool:
+                    raise ValueError("Supplemental integer getter flag is not Boolean")
+            if (name == "send" and fact["control_matches"] is not None) or (
+                name != "send" and type(fact["control_matches"]) is not bool
+            ):
+                raise ValueError("Supplemental integer getter control is not closed")
+            if fact["box_matches"] and not (
+                fact["box_native"] and fact["box_integer"] and fact["converted_integer"]
+            ):
+                raise ValueError("Supplemental integer getter match has no typed provenance")
+            summaries.append(
+                name
+                + "("
+                + ",".join(
+                    key
+                    + "="
+                    + (
+                        "not_applicable"
+                        if fact[key] is None
+                        else str(fact[key]).lower()
+                        if type(fact[key]) is bool
+                        else fact[key]
+                    )
+                    for key in (
+                        "raw_type",
+                        "owner_native",
+                        "converted_integer",
+                        "box_native",
+                        "box_raw_type",
+                        "box_integer",
+                        "box_matches",
+                        "control_matches",
+                    )
+                )
+                + ")"
+            )
+        return "; ".join(summaries)
+
     def calibration_evidence(self):
         """Qualify a separate Cocoa out-slot without authorizing any AppleEvent."""
         packet = self._owned_packet(
@@ -711,12 +783,14 @@ function calibrateOwnedNSError(event) {
         if (key !== undefined) facts[key] = fact;
         publish('pending');
     }
-    function inspect(result, error) {
+    function inspect(result, error, observationName) {
         var absent = result.isNil() === true;
         var identified = error !== undefined && error !== null
             && typeof error.isNil === 'function' && error.isNil() === false
             && typeof error.isKindOfClass === 'function' && error.isKindOfClass($.NSError) === true;
-        var code = identified ? Number(error.code) : NaN;
+        var raw = identified ? error.code : undefined;
+        var code = identified ? Number(raw) : NaN;
+        if (observationName !== undefined) observeOwnedIntegerGetter(observationName, error, raw, 3840);
         var domain = identified ? ObjC.unwrap(error.domain) : undefined;
         return {nil_result:absent,nserror:identified,code:integerFact(code),
             domain:{type:typeof domain,matches:domain === 'NSCocoaErrorDomain'}};
@@ -744,7 +818,7 @@ function calibrateOwnedNSError(event) {
         var objectResult = $.NSJSONSerialization.JSONObjectWithDataOptionsError(data, 0, object);
         stage('object_call_returned');
         stage('object_read_entered');
-        var objectFact = inspect(objectResult, object);
+        var objectFact = inspect(objectResult, object, 'calibration');
         stage('object_read_returned', 'object', objectFact);
         stage('nullable_entered');
         var descriptor = event.paramDescriptorForKeyword(0x6572726e);
@@ -942,6 +1016,7 @@ function calibrateOwnedNSError(event) {
         return {
             **self.scalar_evidence(terminal=terminal, native=native),
             "nserror_calibration": self.calibration_evidence(),
+            "integer_getter": self.getter_evidence(),
             "server": "completed"
             if len(present) == 2
             else "entered"
@@ -1014,6 +1089,41 @@ function publishOwnedPacket(name, contract, stages, facts, branch) {
     if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__ROOT__ + '/' + name, true))
         throw new Error('Supplemental packet write refused');
 }
+var getterFacts = {};
+function observeOwnedIntegerGetter(name, owner, raw, expected) {
+    // This diagnostic never authorizes a converted status or invokes a callable getter.
+    var fact = {raw_type:typeof raw,owner_native:false,converted_integer:false,
+        box_native:false,box_raw_type:'undefined',box_integer:false,box_matches:false,
+        control_matches:expected === null ? null : false};
+    var converted, boxed;
+    try {
+        ObjC.castObjectToRef(owner);
+        fact.owner_native = owner.isNil() === false && owner.isKindOfClass($.NSError) === true;
+        converted = Number(raw);
+        fact.converted_integer = Number.isInteger(converted);
+        if (expected !== null) fact.control_matches = fact.converted_integer && converted === expected;
+        var box = $.NSNumber.numberWithInteger(raw);
+        ObjC.castObjectToRef(box);
+        fact.box_native = box.isNil() === false && box.isKindOfClass($.NSNumber) === true;
+        if (fact.box_native) {
+            var boxRaw = box.integerValue;
+            fact.box_raw_type = typeof boxRaw;
+            boxed = Number(boxRaw);
+            fact.box_integer = Number.isInteger(boxed);
+            fact.box_matches = fact.converted_integer && fact.box_integer && boxed === converted;
+        }
+    } catch (error) { /* Preserve a closed failed projection; do not admit the original status. */ }
+    getterFacts[name] = fact;
+    try {
+        var data = {schema_version:1,contract:'hs.applescript.integer-getter',nonce:__NONCE__,
+            target_pid:__PID__,sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),facts:getterFacts};
+        var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (!encoded || encoded.isNil()) throw new Error('Supplemental getter encoding refused');
+        var size = Number(encoded.length);
+        if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__ROOT__ + '/getter.json', true))
+            throw new Error('Supplemental getter write refused');
+    } catch (writeError) { /* An absent observation cannot authorize the AppleEvent. */ }
+}
 function integerFact(value) { return {type:typeof value,integer:Number.isInteger(value) ? value : null}; }
 function projectOwnedDescriptor(descriptor) {
     ObjC.castObjectToRef(descriptor);
@@ -1038,8 +1148,10 @@ function qualifyOwnedScalars(reply) {
     var nativeError = $.NSError.errorWithDomainCodeUserInfo('NSOSStatusErrorDomain', -1712, $());
     recordScalar('nserror_construct_returned');
     recordScalar('nserror_code_entered');
-    var code = Number(nativeError.code);
+    var constructorRawCode = nativeError.code;
+    var code = Number(constructorRawCode);
     recordScalar('nserror_code_returned','code',integerFact(code));
+    observeOwnedIntegerGetter('constructor', nativeError, constructorRawCode, -1712);
     recordScalar('nserror_domain_entered');
     var domain = ObjC.unwrap(nativeError.domain);
     recordScalar('nserror_domain_returned','domain',{type:typeof domain,matches:domain === 'NSOSStatusErrorDomain'});
@@ -1395,7 +1507,7 @@ function run(argv) {
         )
         script = script.replace(
             "        status = Number(nativeError.code);",
-            "        recordDecoderBoundary('send', 'code_entered');\n        var rawCode = nativeError.code;\n        status = Number(rawCode);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));",
+            "        recordDecoderBoundary('send', 'code_entered');\n        var rawCode = nativeError.code;\n        status = Number(rawCode);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));\n        observeOwnedIntegerGetter('send', nativeError, rawCode, null);",
             1,
         )
         script = script.replace(
@@ -1452,6 +1564,7 @@ function run(argv) {
                         f"Supplemental constructor scalars: {evidence['scalar_facts']}",
                         f"Supplemental decoder scalars: {evidence['decoder_facts']}",
                         f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
+                        f"Supplemental integer getter: {evidence['integer_getter']}",
                     ],
                     "pid_no_prompt",
                 )
@@ -1466,6 +1579,7 @@ function run(argv) {
                     f"Supplemental constructor scalars: {evidence['scalar_facts']}",
                     f"Supplemental decoder scalars: {evidence['decoder_facts']}",
                     f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
+                    f"Supplemental integer getter: {evidence['integer_getter']}",
                 ],
                 "pid_no_prompt",
             )

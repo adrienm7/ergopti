@@ -398,6 +398,8 @@ Partial native qualification: the Windows indentation fixture now retains closed
 
 Partial native qualification: the Windows transaction fixture now supplies the mandatory system_multi string in its stored profile. The actual stored-profile serializer and complete full-save collector are exercised with that valid image and an independently detached missing-field refusal. Existing native indentation writer-count, source, refusal and one-owned-leaf assertions remain unchanged. Hosted Windows qualification is still required.
 
+TODO 16 remains partial. Add bounded owned native NSError integer-getter observations for the inert Cocoa calibration, known constructor and actual no-prompt sender. Record raw getter type, NSError/NSNumber native provenance and closed integer projection agreement without admitting callable getters or changing native deadlines, phases, result predicates or status policy. The exact diagnostic has 102 portable Python/Node-port tests, an original-source missing-receipt red case and three failing ownership/scanner mutations. Actual Foundation getter/NSNumber qualification and full cold/warm/compiled macOS validation remain pending hosted CI.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

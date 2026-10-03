@@ -1137,7 +1137,11 @@ class NoPromptControlTests(unittest.TestCase):
                 self.assertEqual(arguments[-3:], ["42", 'return "' + NONCE + '"', NONCE])
                 self.assertTrue(arguments[4].startswith(owner.pid_event_constructor()))
                 self.assertIn("sendEventWithOptionsTimeoutError(131075, 8, error)", arguments[4])
-                self.assertIn("Number(nativeError.code)", arguments[4])
+                self.assertIn("var constructorRawCode = nativeError.code;", arguments[4])
+                self.assertIn("Number(constructorRawCode)", arguments[4])
+                self.assertEqual(
+                    arguments[4].count("var constructorRawCode = nativeError.code;"), 1
+                )
                 self.assertIn("Number(errorNumber.int32Value)", arguments[4])
                 self.assertEqual(owner.scripting_commands, [])
                 self.assertFalse(owner.started)
@@ -2467,6 +2471,7 @@ const fs=require('fs');
 const mode=__MODE__;
 const native=new WeakSet();
 let parses=0,sends=0;
+function callableInteger(value) { const getter=()=>{throw Error('Scalar getters must not be invoked');}; getter.valueOf=()=>value; return getter; }
 function wrapper(nil, klass) {
     const value=function(){throw Error('Native wrappers are not JS callbacks');};
     native.add(value);
@@ -2485,14 +2490,23 @@ $.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
     return {isNil:()=>false,length:Buffer.byteLength(text),utf8:text,writeToFileAtomically:(path,atomic)=>{
         if(atomic!==true) throw Error('Expected atomic publication');
         if(mode==='write_refusal'&&path.endsWith('calibration.json')) return false;
+        if(mode==='getter_write_refusal'&&path.endsWith('getter.json')) return false;
         fs.writeFileSync(path,text); return true;
     }};
 }})};
 $.NSError=NSError;
+$.NSNumber={numberWithInteger:raw=>{
+    if(mode==='box_refusal') throw Error('Owned NSNumber constructor refused');
+    if(mode==='box_forged') return {isNil:()=>false,isKindOfClass:()=>true,integerValue:Number(raw)};
+    const box=wrapper(false,mode==='box_wrong_class'?null:$.NSNumber);
+    const integer=mode==='box_mismatch'?Number(raw)+1:Number(raw);
+    box.integerValue=mode==='box_callable'?callableInteger(integer):integer;
+    return box;
+}};
 $.NSError.errorWithDomainCodeUserInfo=(domain,code,userInfo)=>{
     if(domain!=='NSOSStatusErrorDomain'||code!==-1712||!native.has(userInfo)||!userInfo.isNil())
         throw Error('Constructor control changed');
-    return error(-1712,'NSOSStatusErrorDomain');
+    return error(mode==='send_callable'?callableInteger(-1712):-1712,'NSOSStatusErrorDomain');
 };
 $.NSJSONSerialization={JSONObjectWithDataOptionsError:(data,options,out)=>{
     if(data.utf8!=='['||options!==0) throw Error('Expected independent inert UTF8 payload');
@@ -2504,6 +2518,7 @@ $.NSJSONSerialization={JSONObjectWithDataOptionsError:(data,options,out)=>{
         out.isNil=()=>false;
         out.isKindOfClass=klass=>mode==='wrong_class'?false:klass===NSError;
         out.code=mode==='wrong_status'?3841:mode==='boolean_status'?true:3840;
+        if(mode==='send_callable') out.code=callableInteger(3840);
         out.domain=mode==='wrong_domain'?'private-secret-marker':'NSCocoaErrorDomain';
     }
     return mode==='nonnil_result'?wrapper(false,null):nil;
@@ -2545,6 +2560,7 @@ $.NSAppleEventDescriptor={
             out.isNil=()=>mode==='send_nil';
             out.isKindOfClass=klass=>mode!=='send_wrong_class'&&klass===NSError;
             out.code=mode==='send_boolean'?true:mode==='send_string'?'-1712':mode==='send_valid'||mode==='send_wrong_class'||mode==='send_nil'||mode==='send_other_domain'||mode==='send_missing_domain'?-1712:NaN;
+            if(mode==='send_callable') out.code=callableInteger(-1712);
             out.domain=mode==='send_other_domain'?'NSCocoaErrorDomain':mode==='send_missing_domain'?'':mode.startsWith('send_')?'NSOSStatusErrorDomain':undefined;
             return nil;
         }
@@ -2569,6 +2585,128 @@ process.stdout.write(JSON.stringify({parses:parses,sends:sends,...(__CAPTURE__?{
         )
         self.assertEqual(result.returncode, 0, "The independent source executor crashed")
         return json.loads(result.stdout)
+
+    def test_raw_callable_integer_is_observed_with_native_box_but_remains_a_refusal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            observed = self.run_source(scope, "send_callable", capture=True)
+            self.assertEqual(observed, {"parses": 2, "sends": 1, "output": None, "refused": True})
+            packet = scope.read("getter.json")
+            self.assertIsNotNone(packet, "Exact emitted source did not record the raw getter")
+            self.assertEqual(set(packet["facts"]), {"calibration", "constructor", "send"})
+            for name in ("calibration", "constructor", "send"):
+                fact = packet["facts"][name]
+                self.assertEqual(fact["raw_type"], "function")
+                for flag in (
+                    "owner_native",
+                    "converted_integer",
+                    "box_native",
+                    "box_integer",
+                    "box_matches",
+                ):
+                    self.assertIs(fact[flag], True, (name, flag))
+                self.assertIs(fact["control_matches"], None if name == "send" else True)
+            script = probe.NativeDelayedTimerProbe.no_prompt_script(scope)
+            self.assertIn("typeof rawCode !== 'number' || !Number.isInteger(rawCode)", script)
+            self.assertIn("typeof rawInt32 !== 'number' || !Number.isInteger(rawInt32)", script)
+            self.assertEqual(script.count("sendEventWithOptionsTimeoutError("), 1)
+            evidence = scope.getter_evidence()
+            self.assertIn(
+                "send(raw_type=function,owner_native=true,converted_integer=true", evidence
+            )
+            for private in (NONCE, folder, "-1712", "3840", "NSOSStatusErrorDomain"):
+                self.assertNotIn(private, evidence)
+            self.assertEqual(scope.observe()["server"], "not_observed")
+            scope.cleanup()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_native_number_projection_requires_real_class_and_exact_integer_match(self):
+        for mode, native, matches, raw_type in (
+            ("box_forged", False, False, "undefined"),
+            ("box_wrong_class", False, False, "undefined"),
+            ("box_refusal", False, False, "undefined"),
+            ("box_mismatch", True, False, "number"),
+            ("box_callable", True, True, "function"),
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                observed = self.run_source(scope, mode, capture=True)
+                self.assertEqual((observed["parses"], observed["sends"]), (2, 1))
+                self.assertIs(observed["refused"], True)
+                fact = scope.read("getter.json")["facts"]["constructor"]
+                self.assertIs(fact["box_native"], native)
+                self.assertIs(fact["box_matches"], matches)
+                self.assertEqual(fact["box_raw_type"], raw_type)
+                self.assertIn("qualified=true", scope.calibration_evidence())
+                scope.getter_evidence()
+                scope.cleanup()
+
+    def test_getter_owner_closed_shape_and_native_match_refuse_fabricated_packets(self):
+        mutations = (
+            lambda p: p.update(sender_pid=43),
+            lambda p: p.update(nonce="b" * 32),
+            lambda p: p["facts"].update(foreign={}),
+            lambda p: p["facts"]["send"].update(raw_type="private-secret-marker"),
+            lambda p: p["facts"]["send"].update(control_matches=True),
+            lambda p: p["facts"]["constructor"].update(box_native=False, box_matches=True),
+            lambda p: p["facts"]["constructor"].update(owner_native=1),
+            lambda p: p["facts"]["constructor"].update(raw_value="private-secret-marker"),
+        )
+        for edit in mutations:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as folder:
+                scope = self.scope(folder)
+                self.run_source(scope, "send_callable")
+                path = scope.path / "getter.json"
+                packet = scope.read("getter.json")
+                edit(packet)
+                path.write_text(json.dumps(packet) + "\n")
+                with self.assertRaises(ValueError) as failure:
+                    scope.getter_evidence()
+                self.assertNotIn("private-secret-marker", str(failure.exception))
+                scope.cleanup()
+
+    def test_getter_publication_refusal_preserves_original_send_and_controls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            observed = self.run_source(scope, "getter_write_refusal", capture=True)
+            self.assertEqual((observed["parses"], observed["sends"]), (2, 1))
+            self.assertIs(observed["refused"], True)
+            self.assertEqual(scope.getter_evidence(), "not_observed")
+            self.assertIn("qualified=true", scope.calibration_evidence())
+            self.assertTrue(scope.scalar_evidence()["scalar_qualified"])
+            self.assertIsNotNone(scope.read("decoder.json"))
+            scope.cleanup()
+
+    def test_original_numeric_send_status_is_unchanged_by_supplemental_getter(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            observed = self.run_source(scope, "send_valid", capture=True)
+            self.assertEqual((observed["parses"], observed["sends"]), (2, 1))
+            self.assertIs(observed["refused"], False)
+            native = json.loads(observed["output"])
+            self.assertEqual(
+                (native["status"], native["error_origin"], native["error_domain"]),
+                (-1712, "send", "NSOSStatusErrorDomain"),
+            )
+            self.assertIn("send(raw_type=number,owner_native=true", scope.getter_evidence())
+            scope.cleanup()
+
+    def test_getter_receipt_remains_bounded_nonfollowing_and_cleanup_owned(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = self.scope(folder)
+            self.run_source(scope, "send_callable")
+            path = scope.path / "getter.json"
+            self.assertLessEqual(path.stat().st_size, probe.SUPPLEMENTAL_RECEIPT_LIMIT)
+            neighbour = Path(folder) / "foreign.json"
+            neighbour.write_text("private-secret-marker\n")
+            path.unlink()
+            path.symlink_to(neighbour)
+            with self.assertRaises(ValueError) as failure:
+                scope.getter_evidence()
+            self.assertNotIn("private-secret-marker", str(failure.exception))
+            scope.cleanup()
+            self.assertEqual(neighbour.read_text(), "private-secret-marker\n")
+            self.assertEqual(list(Path(folder).iterdir()), [neighbour])
 
     def scope(self, folder):
         scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
