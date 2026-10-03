@@ -66,6 +66,22 @@ TOML_ParseKeyPath(Text, Strict := false) {
 	return Parts
 }
 
+/**
+ * Decodes one key token using the same string codec as its rendered value.
+ * @param Token {String} Bare, basic-quoted or literal-quoted key.
+ * @param Strict {Boolean} Require the inline-table bare-key grammar.
+ * @returns {String} The original key identity, with basic escapes decoded once.
+ */
+TOML_DecodeKey(Token, Strict := false) {
+	if RegExMatch(Token, '^"(?:[^"\\]|\\.)*"$')
+		return TOML_UnescapeBasicStringContents(SubStr(Token, 2, StrLen(Token) - 2))
+	if RegExMatch(Token, "^'[^']*'$")
+		return SubStr(Token, 2, StrLen(Token) - 2)
+	if Strict && !RegExMatch(Token, "^[A-Za-z0-9_-]+$")
+		throw ValueError("Invalid TOML inline table key")
+	return Token
+}
+
 /** Parses inline members using the caller's scalar and array decoder. */
 TOML_ParseInlineTable(Raw, Coerce) {
 	Raw := Trim(Raw)
