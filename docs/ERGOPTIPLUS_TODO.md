@@ -536,6 +536,11 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
       Complete the three-OS native CI, packaging and installation validations
       before removing this item. Cloud loopback transport and scripted owner
       regressions do not qualify physical desktop input.
+      The Windows native run 37088969640 exposed two contract regressions:
+      deferred preflight now declares one-shot/cancel timer semantics, and each
+      reserved curl slot declares its transitory tags-owner fields before
+      acquisition. Timer delivery/cancellation and the real dispatcher have
+      added regressions; the repaired native Windows gate remains pending.
 - [ ] **47.** Running local OpenAI-compatible servers (oMLX, LM Studio,
       llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`) are AI
       backends on macOS only (`local-openai-backends`). Windows and Linux need an
