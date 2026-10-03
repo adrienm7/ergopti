@@ -206,6 +206,10 @@ GestureSysToggleDarkMode(Sys := 0) {
 		Light := Sys.ReadDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme")
 		; Absent is Windows' own default, the light theme.
 		NewLight := (Light = "" || Light != 0) ? 0 : 1
+		if A_IsSuspended {
+			LoggerInfo("gestures", "toggle_dark_mode was cancelled before its theme change: the script is suspended.")
+			return false
+		}
 		Sys.WriteDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme", NewLight)
 		Sys.WriteDword(GESTURE_SYS_PERSONALIZE_KEY, "SystemUsesLightTheme", NewLight)
 		if !Sys.BroadcastSettingChange(GESTURE_SYS_COLOR_SETTING_AREA)
@@ -221,6 +225,10 @@ GestureSysMicMuteToggle(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	try {
 		Muted := !Sys.CaptureMuted()
+		if A_IsSuspended {
+			LoggerInfo("gestures", "mic_mute_toggle was cancelled before its endpoint change: the script is suspended.")
+			return false
+		}
 		Sys.SetCaptureMuted(Muted)
 		LoggerInfo("gestures", Muted ? "Microphone muted." : "Microphone unmuted.")
 	} catch as Err {
@@ -327,6 +335,10 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		return
 	}
 	if GestureSysIsSharedHost(Active, Sys.ShellPid()) {
+		if A_IsSuspended {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before its shared window close: the script is suspended.")
+			return false
+		}
 		if Sys.PostClose(Active.Hwnd)
 			LoggerInfo("gestures", "Asked the active window of shared process {1} to close.", Active.Pid)
 		else
@@ -334,8 +346,13 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		return
 	}
 	Closed := 0
-	for Hwnd in Sys.WindowsOfProcess(Active.Pid)
+	for Hwnd in Sys.WindowsOfProcess(Active.Pid) {
+		if A_IsSuspended {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before a process window close: the script is suspended.")
+			return false
+		}
 		Closed += Sys.PostClose(Hwnd) ? 1 : 0
+	}
 	LoggerInfo("gestures", "Asked process {1} to close its {2} window(s).", Active.Pid, Closed)
 }
 
