@@ -172,17 +172,8 @@ ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 `;
 		const result = spawnSync(
 			bashExecutable(),
-			[
-				'-c',
-				script,
-				'replay',
-				posix,
-				options.base64,
-				options.password,
-				options.dr ?? '',
-				options.failOn ?? ''
-			],
-			{ encoding: 'utf8', timeout: 20000 }
+			['-s', '--', posix, options.base64, options.password, options.dr ?? '', options.failOn ?? ''],
+			{ input: script, encoding: 'utf8', timeout: 20000 }
 		);
 		const logPath = path.join(tmp, 'calls.log');
 		const calls = fs.existsSync(logPath)
