@@ -95,7 +95,8 @@ function luaCallers(driver, pattern) {
 		const text = fs.readFileSync(file, 'utf8');
 		for (const line of text.split('\n')) {
 			if (/^\s*--/.test(line)) continue;
-			if (pattern.test(line)) found.add(path.relative(path.join(DRIVERS, driver), file));
+			if (pattern.test(line))
+				found.add(path.relative(path.join(DRIVERS, driver), file).replaceAll('\\', '/'));
 		}
 	}
 	return [...found].sort();
