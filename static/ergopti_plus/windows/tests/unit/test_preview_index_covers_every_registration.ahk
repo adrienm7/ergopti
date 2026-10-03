@@ -335,9 +335,13 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 			AssertEqual(Packs[1]["PersonalSource"]["id"], OwnedSpec.PersonalSource["id"], "the actual live spec retains discovery identity")
 			AssertEqual(OwnedSpec.PersonalSource["id"], Preview.PersonalSource["id"], "the real preview row retains the same source")
 			Assert(OwnedSpec.PersonalSource != Preview.PersonalSource, "live and preview never share mutable provenance")
+			Assert(OwnedSpec.PersonalSource != Packs[1]["PersonalSource"], "each registered variant owns its discovery descriptor snapshot")
 			AssertEqual(OwnedSpec.Priority, Preview.Priority)
 			AssertEqual(OwnedSpec.Replacement, Preview.Output)
 		}
+		Packs[1]["PersonalSource"]["components"][1] := "changed.toml"
+		for OwnedSpec in Specs
+			AssertTrue(PersonalFileDescriptorValid(OwnedSpec.PersonalSource), "mutating discovery never corrupts any simple or inline registered variant")
 		AssertTrue(Specs[4].Star && Specs[4].CaseSensitive && Specs[4].FinalResult)
 		AssertFalse(Specs[4].InWord)
 		AssertTrue(Specs[5].Star && Specs[5].InWord && Specs[5].CaseConform)
