@@ -626,6 +626,14 @@ Windows 110 to 109 and macOS 195 to 194; Linux stays at 121. Items 54 and 81
 remain partial while the other native/provider rows still exist. Windows
 native unit/E2E, packaging and installation validation is pending CI.
 
+The Windows Mode corpus reader now uses the initialized `_SharedDir` owner
+shared by the real boot entry point and native test stubs. Checkpoint
+[37092132946](https://github.com/adrienm7/ergopti/actions/runs/37092132946)
+failed both native Mode cases before they could replay their corpus because
+`SharedDir` was unset. The explicit directory separator, independent three-mode
+expectations, native flags, shared-order mutations and refusal assertions remain
+unchanged. Native Windows replay still requires the next non-release checkpoint.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

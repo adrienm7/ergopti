@@ -330,8 +330,8 @@ _LAG_NativeModeRow(Owned) {
 
 ; Read the independently captured three-mode menu matrix.
 _LAG_ModeMenuCorpus() {
-	global SharedDir
-	Path := SharedDir . "\tests\corpus\menus\agent_mode_rows.json"
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\menus\agent_mode_rows.json"
 	Assert(FileExist(Path), "the shared independent mode-menu corpus must exist")
 	return JsonParse(FileRead(Path, "UTF-8"))
 }
