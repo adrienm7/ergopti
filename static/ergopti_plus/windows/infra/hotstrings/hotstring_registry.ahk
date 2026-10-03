@@ -275,7 +275,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 			IsCaseSensitive := (Match[3] == "true")
 			IsStrict := (Match.Count >= 4 and Match[4] == "true")
 			Individual := _ParseEntryPriority(Line, "")
-		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
+		} else if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
 			; The engine's second accepted shape: a bare `key = "value"` line, which
 			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
 			; preview side ignored it entirely, so those entries expanded without

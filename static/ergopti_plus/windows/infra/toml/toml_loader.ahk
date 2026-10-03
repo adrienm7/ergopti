@@ -160,7 +160,7 @@ _TomlWarmFileCounts(FilePath) {
 				; displayed count could exceed the registered/cached row count.
 				if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
 						if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
-						or RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
+						or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
 								Counts[CurrentSec] := Counts[CurrentSec] + 1
 						}
 				}
@@ -545,7 +545,7 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 						continue
 				}
 				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-						if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
+						if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
 								Trigger := UnescapeTomlString(
 									(SimpleM[1] != "") ? SimpleM[1] : SimpleM[2])
 								Output  := UnescapeTomlString(SimpleM[3])

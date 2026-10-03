@@ -903,3 +903,55 @@ TestTL_SelectedExtensionKeepsResolvedOwner() {
 	}
 }
 Test("LoadExtTomlFile: selected official sections keep delay priority and derived activation ownership", TestTL_SelectedExtensionKeepsResolvedOwner)
+
+
+; A comment is not part of a simple assignment's quoted output value.
+_TestTL_SimpleEntryComments(Suffix) {
+	global _HotstringRegistrar, HSE_RegistryByGroup, HSE_PRIORITY_PACKAGE
+	Root := A_Temp . "\ergopti_simple_comment_" . ProcessExist() . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the fixture requires an unowned temporary path")
+	DirCreate(Root)
+	Path := Root . "\source.toml"
+	SavedRegistrar := _HotstringRegistrar
+	try {
+		FileAppend('[[chosen]]`n"cmtx" = "quoted#value"' . Suffix
+			. '`n[_meta]`ndescription = "excluded"' . Suffix
+			. '`n[[foreign]]`nforeign = "untouched"`n', Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Descriptor := PersonalFileDescribe(["source.toml"])
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(2, LoadExtTomlFile(Path, "owned", "", Descriptor), "both actual source assignments register")
+		AssertEqual(1, HSE_RegistryByGroup.Count, "the pack retains its single activation owner")
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(6, Specs.Length, "each simple source assignment retains its three case variants")
+		for Position, Spec in Specs {
+			AssertEqual(Position <= 3 ? "chosen" : "foreign", Spec.Section)
+			if Position == 1 || Position == 4
+				AssertEqual(Position == 1 ? "quoted#value" : "untouched", Spec.Replacement)
+			AssertEqual(HSE_PRIORITY_PACKAGE, Spec.Priority)
+			AssertEqual(Descriptor["id"], Spec.PersonalSource["id"], "comments preserve exact native source identity")
+		}
+		AssertEqual(1, CountTomlSection("owned", "chosen", Path), "the actual counter retains the commented assignment")
+		AssertEqual(0, CountTomlSection("owned", "_meta", Path), "metadata stays excluded")
+		Index := Map(), TriggerSet := Map()
+		AssertEqual(2, _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, "", Descriptor))
+		AssertEqual("quoted#value", Index["cmtx"][1].Output)
+		AssertEqual(Descriptor["id"], TriggerSet["cmtx"].PersonalSource["id"])
+		SelectedIndex := Map(), SelectedSet := Map()
+		AssertEqual(1, _RegisterExtPackTriggers(Path, "owned", SelectedIndex, SelectedSet, "chosen", Descriptor))
+		AssertTrue(SelectedSet.Has("cmtx"), "selection retains its source row")
+		AssertFalse(SelectedSet.Has("foreign"), "another declared section stays excluded")
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			_HotstringRegistrar := SavedRegistrar
+			HSE_RegistryClear()
+			HSE_FeedReset(true)
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_simple_comment_" . ProcessExist() . "_") == 1, "cleanup stays inside the process-owned root")
+			DirDelete(Root, true)
+		}
+	}
+}
+for _TestTL_SimpleSuffix in [" # note", '# note with "quotes"', "#comment", ""]
+	Test("TOML simple entry retains trailing comment: " . _TestTL_SimpleSuffix . " (simple-entry-comments)", _TestTL_SimpleEntryComments.Bind(_TestTL_SimpleSuffix))
