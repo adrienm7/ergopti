@@ -292,6 +292,8 @@ TODO 16 / 40 remains partial. The native Karabiner probe now projects exact gene
 
 TODO 16 remains partial. The shared Node test reporter now lets forwarded stdout/stderr and final failure annotations drain before natural shutdown, preserving wrapped process statuses and the existing fitting-detail assertions. Actual slow-reader CLI regressions cover native child and PARSE_FILE failure, complete bounded notices and all full error annotations, exact JSON counts, large stderr, success, spawn refusal and usage refusal. This fixes diagnostic transport truncation only; application/native failures retain their original mandatory verdicts. Windows/macOS execution of the portable Node lifecycle tests remains pending CI.
 
+The CI pipeline keeps one approved concurrency owner in ci.yml: workflow_dispatch uses its own run ID, while automatic runs supersede the previous automatic run on the same ref. The wiring guard now refuses extra groups in reusable-workflow callers and every called OS workflow/job, including quoted YAML keys, so one native lane cannot silently cancel a different manual validation. Real Windows-caller, macOS-workflow and Linux-verdict mutations demonstrate the prior hole; missing and duplicate root groups are refused, while embedded run-block text is not interpreted as a YAML key. Release conditions, permissions and secret gating remain unchanged. This follow-up is qualified by local proportional format and JavaScript gates; complete three-OS validation remains under the existing native checkpoint requirements.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
@@ -593,6 +595,15 @@ the complete three-OS checkpoint remain pending.
   finished agent worktrees under `.claude/worktrees/` can be removed; the
   uncommitted test edit left in the `wip/win-tooltip-border-fix` worktree
   (tooltip DPI radius) is the only unsaved change among them.
+
+The 2026-10-03 branch cleanup removed 131 obsolete `codex/ci-*` refs after
+checking reachability, open pull requests and active manual validations. The
+remaining remote branches are `main`, `dev`, `gh-pages`, `sparkle-appcasts`,
+`fix/linux` and the single reusable `codex/ci-validation`. Future manual runs
+use that CI ref with distinct run groups, so advancing it cannot cancel an
+older validation. No registered worktree or uncommitted source was removed;
+worktree hygiene remains unfinished.
+
 - [ ] **40.** The packaged-launch gate never builds a Karabiner configuration:
       the CI runners have no Karabiner-Elements, so dev.148 passed every launch
       scenario while every real Mac refused the deploy (« generated rule 1
