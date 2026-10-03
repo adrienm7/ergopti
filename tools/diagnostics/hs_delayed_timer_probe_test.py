@@ -297,6 +297,7 @@ class ScriptingLifecycleTests(unittest.TestCase):
             owner = probe.NativeDelayedTimerProbe(
                 Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
             )
+            owner.bind_runtime(42, lambda _: [42])
 
             def launch(arguments, **options):
                 calls.append(("launch", arguments))
@@ -310,10 +311,22 @@ class ScriptingLifecycleTests(unittest.TestCase):
                 if arguments[0] == "/usr/bin/osascript":
                     raise subprocess.TimeoutExpired(arguments, options["timeout"])
                 pid = int(arguments[1])
+                if pid == 42:
+                    # This server port is explicitly modeled; the scripting
+                    # child remains a real process and must still be alive.
+                    os.kill(children[0].pid, 0)
+                    calls.append(("server", pid, options["timeout"]))
+                    Path(arguments[-1]).write_text(
+                        f"Process: Hammerspoon [42]\nPath: {owner.executable}\nCall graph:\n"
+                        "HSAppleScriptRunString (fixture server frame)\n"
+                        "Binary Images:\ncom.apple.TCC (loaded image only)\n"
+                    )
+                    return subprocess.CompletedProcess(arguments, 0, "", "")
                 os.kill(pid, 0)
                 calls.append(("sample", pid, options["timeout"]))
                 Path(arguments[-1]).write_text(
                     "Owned fixture process observed before retirement\nAESendMessage (fixture frame)\n"
+                    "Binary Images:\ncom.apple.TCC (loaded image only)\n"
                 )
                 return subprocess.CompletedProcess(arguments, 0, "", "")
 
@@ -328,11 +341,16 @@ class ScriptingLifecycleTests(unittest.TestCase):
                 self.assertIsInstance(raised.exception.__cause__, subprocess.TimeoutExpired)
                 self.assertIn("sample-osascript-1.txt", str(raised.exception))
                 self.assertIn("AESendMessage (fixture frame)", str(raised.exception))
+                self.assertIn(
+                    "HSAppleScriptRunString (fixture server frame)", str(raised.exception)
+                )
+                self.assertNotIn("loaded image only", str(raised.exception))
                 self.assertEqual(calls[0][1][0], "/usr/bin/osascript")
                 self.assertIn(str(owner.app), calls[0][1][2])
                 self.assertEqual(
                     calls[1], ("sample", children[0].pid, probe.SCRIPT_CLEANUP_TIMEOUT_SECONDS)
                 )
+                self.assertEqual(calls[2], ("server", 42, probe.SCRIPT_CLEANUP_TIMEOUT_SECONDS))
                 self.assertIsNotNone(
                     children[0].returncode, "the original child must actually be reaped"
                 )
@@ -342,6 +360,122 @@ class ScriptingLifecycleTests(unittest.TestCase):
                     if child.poll() is None:
                         child.kill()
                     child.communicate(timeout=2)
+
+    def test_runtime_binding_requires_the_single_exact_live_integer_pid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            for pid, observed in ((True, [True]), (0, [0]), (42, []), (42, [43]), (42, [42, 43])):
+                with self.subTest(pid=pid, observed=observed):
+                    with self.assertRaisesRegex(RuntimeError, "foreign or changed"):
+                        owner.bind_runtime(pid, lambda _: observed)
+                    self.assertIsNone(owner.runtime_owner)
+
+    def test_server_sampler_never_observes_a_changed_or_unbound_process(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            with mock.patch.object(probe.subprocess, "run") as native:
+                self.assertIn("no qualified owner", owner.sample_native_runtime()[0])
+                owner.bind_runtime(42, lambda _: [42])
+                owner.runtime_owner = (42, lambda _: [43])
+                self.assertIn("exact owner changed", owner.sample_native_runtime()[0])
+            native.assert_not_called()
+
+    def test_native_server_sample_identity_and_post_sample_owner_are_required(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+            )
+            for process, path, post_owner in (
+                ("Hammerspoon [43]", str(owner.executable), [42]),
+                ("Hammerspoon [42]", "/foreign/Hammerspoon", [42]),
+                ("Hammerspoon [42]", str(owner.executable), [43]),
+            ):
+                with self.subTest(process=process, path=path, post_owner=post_owner):
+                    owner.bind_runtime(42, lambda _: [42])
+                    owner.runtime_owner = (42, mock.Mock(side_effect=[[42], post_owner]))
+
+                    def sample(arguments, **options):
+                        Path(arguments[-1]).write_text(
+                            f"Process: {process}\nPath: {path}\nCall graph:\nHSAppleScriptRunString (unqualified)\n"
+                        )
+                        return subprocess.CompletedProcess(arguments, 0, "", "")
+
+                    with mock.patch.object(probe.subprocess, "run", side_effect=sample):
+                        messages = owner.sample_native_runtime()
+                    self.assertIn("unqualified", messages[0])
+                    self.assertNotIn("unqualified)", " ".join(messages))
+
+    def test_loaded_native_images_alone_are_never_reported_as_stack_frames(self):
+        text = "Call graph:\nCFRunLoopRun (actual frame)\nBinary Images:\ncom.apple.TCC\ncom.apple.LaunchServices\n"
+        self.assertEqual(
+            probe.NativeDelayedTimerProbe.observed_sample_frames(text, ("TCC", "LaunchServices")),
+            [],
+        )
+        self.assertEqual(
+            probe.NativeDelayedTimerProbe.observed_sample_frames(text, ("CFRunLoop", "TCC")),
+            ["CFRunLoopRun (actual frame)"],
+        )
+
+    def test_server_sampler_refusal_preserves_primary_timeout_and_actual_child_cleanup(self):
+        primary = subprocess.TimeoutExpired(["osascript"], probe.SCRIPTING_TIMEOUT_SECONDS)
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+            command = mock.Mock(pid=43, returncode=None)
+            command.poll.return_value = None
+            command.communicate.side_effect = [primary, ("", "")]
+            command.kill.side_effect = lambda: setattr(command, "returncode", -9)
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=command),
+                mock.patch.object(
+                    owner, "sample_scripting_command", return_value=["owned client sampled"]
+                ),
+                mock.patch.object(
+                    probe.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess(
+                        [], 2, "", "actual server sampler denied"
+                    ),
+                ) as native,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "actual server sampler denied") as raised:
+                    owner.execute("return 'fixture'")
+            self.assertIs(raised.exception.__cause__, primary)
+            self.assertIn("TimeoutExpired", str(raised.exception))
+            self.assertEqual(native.call_args.args[0][1], "42")
+            self.assertEqual(native.call_args.kwargs["timeout"], 2)
+            self.assertEqual(owner.scripting_commands, [])
+            command.kill.assert_called_once_with()
+            self.assertEqual(
+                command.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
+            )
+
+    def test_server_modal_frame_remains_visible_beyond_generic_main_loop_frames(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+
+            def sample(arguments, **options):
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\nCall graph:\n"
+                    + "\n".join(f"mach_msg fixture{i}" for i in range(10))
+                    + "\nNSAlert runModal (actual modal frame)\nBinary Images:\ncom.apple.TCC (image only)\n"
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            with mock.patch.object(probe.subprocess, "run", side_effect=sample):
+                messages = owner.sample_native_runtime()
+            self.assertIn("actual modal frame", messages[1])
+            self.assertNotIn("image only", " ".join(messages))
 
     def test_sampling_and_retirement_failures_keep_primary_and_owner_debt(self):
         primary = subprocess.TimeoutExpired(["osascript"], probe.SCRIPTING_TIMEOUT_SECONDS)

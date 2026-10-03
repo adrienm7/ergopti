@@ -220,6 +220,7 @@ class NativeDelayedTimerProbe:
         self.started = False
         self.scripting_commands = []
         self.scripting_command_number = 0
+        self.runtime_owner = None
 
     @staticmethod
     def executable_path(app):
@@ -272,6 +273,12 @@ class NativeDelayedTimerProbe:
                 except Exception as sampling:
                     diagnostics.append(
                         f"native scripting sample failed: {type(sampling).__name__}: {sampling}"
+                    )
+                try:
+                    diagnostics.extend(self.sample_native_runtime())
+                except Exception as sampling:
+                    diagnostics.append(
+                        f"native Hammerspoon server sample failed: {type(sampling).__name__}: {sampling}"
                     )
             try:
                 self.retire_scripting_command(command)
@@ -335,17 +342,87 @@ class NativeDelayedTimerProbe:
                     "NSAppleScript",
                     "LaunchServices",
                 )
-                frames = list(
-                    dict.fromkeys(
-                        line.strip()
-                        for line in sample_text.splitlines()
-                        if any(marker in line for marker in markers)
-                    )
-                )[:SCRIPT_SAMPLE_FRAME_LIMIT]
+                frames = self.observed_sample_frames(sample_text, markers)
                 if frames:
                     diagnostics.append("observed native scripting frames: " + " | ".join(frames))
         except Exception as error:
             diagnostics.append(f"native scripting sample failed: {type(error).__name__}: {error}")
+        return diagnostics
+
+    @staticmethod
+    def observed_sample_frames(sample_text, markers):
+        """Binary-image presence is not evidence that a stack executes there."""
+        stacks = sample_text.split("Binary Images:", 1)[0]
+        return list(
+            dict.fromkeys(
+                line.strip()
+                for line in stacks.splitlines()
+                if any(marker in line for marker in markers)
+            )
+        )[:SCRIPT_SAMPLE_FRAME_LIMIT]
+
+    def bind_runtime(self, pid, processes):
+        """Retain the exact installed server owner already admitted by the gate."""
+        if type(pid) is not int or pid <= 0 or processes(self.executable) != [pid]:
+            raise RuntimeError("The native probe cannot bind a foreign or changed runtime owner")
+        self.runtime_owner = (pid, processes)
+
+    def sample_native_runtime(self):
+        """Observe the qualified server before retirement; never infer TCC causality."""
+        if self.runtime_owner is None:
+            return ["native Hammerspoon server sample unavailable: no qualified owner"]
+        pid, processes = self.runtime_owner
+        if processes(self.executable) != [pid]:
+            return ["native Hammerspoon server sample unavailable: exact owner changed"]
+        sample = self.output / f"sample-hammerspoon-{self.scripting_command_number}.txt"
+        result = subprocess.run(
+            ["/usr/bin/sample", str(pid), str(SCRIPT_SAMPLE_SECONDS), "-file", str(sample)],
+            capture_output=True,
+            text=True,
+            timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS,
+        )
+        if result.returncode or not sample.is_file():
+            return [
+                f"native Hammerspoon server sample refused (exit {result.returncode}): {result.stderr.strip()[:1000]}"
+            ]
+        if processes(self.executable) != [pid]:
+            return ["native Hammerspoon server sample unqualified: owner changed before admission"]
+        with sample.open(encoding="utf-8", errors="replace") as handle:
+            sample_text = handle.read(SCRIPT_SAMPLE_READ_LIMIT)
+        header = sample_text.split("Call graph:", 1)[0]
+        fields = {
+            line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip()
+            for line in header.splitlines()
+            if ":" in line
+        }
+        if (
+            fields.get("Path") != str(self.executable)
+            or fields.get("Process") != f"{self.executable.name} [{pid}]"
+        ):
+            return [
+                "native Hammerspoon server sample unqualified: native Process/Path identity differs"
+            ]
+        diagnostics = [f"native Hammerspoon server sample retained: {sample.name}"]
+        critical_frames = self.observed_sample_frames(
+            sample_text,
+            (
+                "TCC",
+                "AppleEvent",
+                "AEWait",
+                "NSAppleScript",
+                "HSAppleScript",
+                "NSAlert",
+                "runModal",
+                "lua_pcall",
+                "dispatch_semaphore_wait",
+            ),
+        )
+        context_frames = self.observed_sample_frames(
+            sample_text, ("com.apple.main-thread", "CFRunLoop", "mach_msg")
+        )
+        frames = list(dict.fromkeys(critical_frames + context_frames))[:SCRIPT_SAMPLE_FRAME_LIMIT]
+        if frames:
+            diagnostics.append("observed native Hammerspoon server frames: " + " | ".join(frames))
         return diagnostics
 
     def retire_scripting_command(self, command):
@@ -369,6 +446,7 @@ class NativeDelayedTimerProbe:
             raise RuntimeError(
                 "The native delayed-timer runtime is not the launcher's exact live process"
             )
+        self.bind_runtime(pid, processes)
         source = "return dofile({}).run({}, {})".format(
             json.dumps(str(fixture), ensure_ascii=False),
             json.dumps(str(receipt), ensure_ascii=False),
