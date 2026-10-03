@@ -1124,6 +1124,31 @@ function observeOwnedIntegerGetter(name, owner, raw, expected) {
             throw new Error('Supplemental getter write refused');
     } catch (writeError) { /* An absent observation cannot authorize the AppleEvent. */ }
 }
+function projectOwnedNSErrorInteger(owner, rawCode) {
+    ObjC.castObjectToRef(owner);
+    if (owner.isNil() !== false || owner.isKindOfClass($.NSError) !== true || owner.code !== rawCode)
+        throw new Error('Native NSError integer owner refused');
+    if (typeof rawCode !== 'number' || !Number.isInteger(rawCode)) {
+        if (typeof rawCode !== 'string' || !/^-?(?:0|[1-9][0-9]*)$/.test(rawCode))
+            throw new Error('Native NSError integer representation refused');
+        var converted = Number(rawCode);
+        if (!Number.isSafeInteger(converted)) throw new Error('Native NSError integer precision refused');
+        var box = $.NSNumber.numberWithInteger(rawCode);
+        ObjC.castObjectToRef(box);
+        if (box.isNil() !== false || box.isKindOfClass($.NSNumber) !== true)
+            throw new Error('Native NSNumber integer owner refused');
+        var rawBox = box.integerValue;
+        if ((typeof rawBox !== 'number' && typeof rawBox !== 'string')
+            || (typeof rawBox === 'string' && !/^-?(?:0|[1-9][0-9]*)$/.test(rawBox)))
+            throw new Error('Native NSNumber integer representation refused');
+        var boxed = Number(rawBox);
+        if (!Number.isSafeInteger(boxed) || boxed !== converted || owner.code !== rawCode)
+            throw new Error('Native NSNumber integer match refused');
+        return boxed;
+    }
+    if (!Number.isSafeInteger(rawCode)) throw new Error('Native NSError integer precision refused');
+    return rawCode;
+}
 function integerFact(value) { return {type:typeof value,integer:Number.isInteger(value) ? value : null}; }
 function projectOwnedDescriptor(descriptor) {
     ObjC.castObjectToRef(descriptor);
@@ -1512,7 +1537,7 @@ function run(argv) {
         )
         script = script.replace(
             "        domain = ObjC.unwrap(nativeError.domain);",
-            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});\n        if (typeof rawCode !== 'number' || !Number.isInteger(rawCode))\n            throw new Error('Native NSError integer unavailable');\n        if (typeof domain !== 'string' || domain.length === 0)\n            throw new Error('Native NSError domain unavailable');",
+            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});\n        status = projectOwnedNSErrorInteger(nativeError, rawCode);\n        if (typeof domain !== 'string' || domain.length === 0)\n            throw new Error('Native NSError domain unavailable');",
             1,
         )
         script = script.replace(
