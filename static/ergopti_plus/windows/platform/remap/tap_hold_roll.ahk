@@ -338,7 +338,7 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 			_TapHoldRollResolve("tap", , Ports)
 			return
 		}
-		if (!IsDown.Call(Sc) || Tick.Call() - State["down_at"] > State["threshold_ms"]) {
+		if (!IsDown.Call(Sc) || TickElapsed(State["down_at"], Tick.Call()) > State["threshold_ms"]) {
 			_TapHoldRollResolve("hold", , Ports)
 			return
 		}
