@@ -66,7 +66,8 @@ end
 --- Terminates the run's whole process group.
 --- @param run table
 local function terminate_group(run)
-	if run.exited or not run.pid or type(luv.kill) ~= "function" then return end
+	-- Reaping the leader does not release descendants or their inherited pipes.
+	if not run.pid or type(luv.kill) ~= "function" then return end
 	pcall(luv.kill, -run.pid, "sigterm")
 	pcall(luv.kill, -run.pid, "sigkill")
 end

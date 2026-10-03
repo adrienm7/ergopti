@@ -116,6 +116,36 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		helpers.assert_eq(answers, 0)
 	end)
 
+	helpers.it("stops descendants after their leader exits (linux-orphaned-process-group)", function()
+		local luv, state = fake_luv()
+		local runner = fresh_runner(luv)
+		local answers = {}
+		runner.run_async("sh", { "-c", "sleep 30 &" }, { timeout_ms = 10 },
+			function(result) answers[#answers + 1] = result end)
+		state.on_exit(0, 0)
+		helpers.assert_eq(#answers, 0, "the descendant still owns the pipes")
+		state.timer.callback()
+		helpers.assert_eq(state.kills[1], { pid = -4321, signal = "sigterm" },
+			"a reaped leader does not mean the process group is empty")
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].error, "timeout")
+		state.finish(0)
+		helpers.assert_eq(#answers, 1, "late EOF must not publish twice")
+	end)
+
+	helpers.it("cancels descendants after their leader exits (linux-orphaned-process-group)", function()
+		local luv, state = fake_luv()
+		local runner = fresh_runner(luv)
+		local answers = 0
+		local handle = runner.run_async("sh", { "-c", "sleep 30 &" }, { timeout_ms = 1000 },
+			function() answers = answers + 1 end)
+		state.on_exit(0, 0)
+		handle.cancel()
+		helpers.assert_eq(state.kills[1], { pid = -4321, signal = "sigterm" })
+		state.finish(0)
+		helpers.assert_eq(answers, 0)
+	end)
+
 	helpers.it("refuses a run without a positive deadline", function()
 		local luv = fake_luv()
 		local runner = fresh_runner(luv)
