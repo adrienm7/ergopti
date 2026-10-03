@@ -3,6 +3,63 @@
 	"_comment2": "platforms field: omit or 'both' = all platforms, 'ahk' = Windows only, 'hs' = macOS only.",
 	"_comment3": "item types: 'toggle' = a category's first-row checkbox (its master gate, one i18n key), 'feature' = manifest-path toggle, 'action' = stateless button, 'dynamic' = rendered by platform code, 'group' = named submenu, 'section_header' = disabled label, '---' = separator, 'list' = rows supplied at build time by a named provider, 'letter_picker' = the A-Z chooser. The last two were in use and undocumented here, which matters because 'list' is the ONLY type that moves a row from the driver into the renderer — 'dynamic' hands the rendering straight back to platform code. 'choice' = one enum feature (path) as one row with its values beneath it; its 'choices' are projected from the feature's enum_values by this generator.",
 	"_comment4": "unavailable (rows restricted by platforms only): 'hide' = not applicable where the row is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported there, drawn disabled with its label and its translated reason_key. A restricted row without the field is hidden, as before the field existed. disabled_reason_key (command rows with disabled_when): why disabled_when greys the row where it is drawn, rendered like a 'grey' row: « label — head of the reason », with nothing to run.",
+	"dynamic_hotstring_families": {
+		"rows": [
+			{
+				"id": "date_long_fr",
+				"section": "datelongfr",
+				"i18n": "dynamichotstrings.datelongfr",
+				"legacy_key": "DateLongFr",
+				"date_field": "long_fr"
+			},
+			{
+				"id": "date_fr",
+				"section": "datefr",
+				"i18n": "dynamichotstrings.datefr",
+				"legacy_key": "DateFr",
+				"date_field": "fr"
+			},
+			{
+				"id": "date",
+				"section": "date",
+				"i18n": "dynamichotstrings.date",
+				"legacy_key": "Date",
+				"date_field": "iso"
+			},
+			{
+				"id": "phone_prefixes",
+				"section": "phoneprefixes",
+				"i18n": "dynamichotstrings.phoneprefixes",
+				"legacy_key": "PhonePrefixes",
+				"is_prefix": true
+			},
+			{
+				"id": "ssn_prefixes",
+				"section": "ssnprefixes",
+				"i18n": "dynamichotstrings.ssnprefixes",
+				"legacy_key": "SsnPrefixes",
+				"is_prefix": true
+			},
+			{
+				"id": "iban_prefixes",
+				"section": "ibanprefixes",
+				"i18n": "dynamichotstrings.ibanprefixes",
+				"legacy_key": "IbanPrefixes",
+				"is_prefix": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"id": "text_expansion_personal_information",
+				"section": "textexpansionpersonalinformation",
+				"linux_section": "personal_info",
+				"i18n": "dynamichotstrings.textexpansionpersonalinformation",
+				"legacy_key": "TextExpansionPersonalInformation",
+				"is_module_placeholder": true
+			}
+		]
+	},
 	"gesture_slots": {
 		"2": [
 			"tap_2",

@@ -3605,12 +3605,61 @@ description_key = "menu.layout.menubar_icon"
 # binds a click on one.
 
 [menu]
-# dynamic_hotstrings_order lived here and was read by nobody. The order that
-# actually renders is _DYNAMIC_HOTSTRINGS_ORDER in windows/ui/tray_menu.ahk,
-# which spells its separator "-" where this spelled it "---" — two sources for
-# one order, disagreeing, one of them dead. Removed rather than reconciled: the
-# live one is the one the menu uses, and a second copy that nothing reads is a
-# trap for whoever edits it next expecting the menu to change.
+# Shared child records drive the Dynamic family order, separators and native
+# section spellings. Drivers add only live dates/counts and the editor action.
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date_long_fr"
+section = "datelongfr"
+i18n = "dynamichotstrings.datelongfr"
+legacy_key = "DateLongFr"
+date_field = "long_fr"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date_fr"
+section = "datefr"
+i18n = "dynamichotstrings.datefr"
+legacy_key = "DateFr"
+date_field = "fr"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "date"
+section = "date"
+i18n = "dynamichotstrings.date"
+legacy_key = "Date"
+date_field = "iso"
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "phone_prefixes"
+section = "phoneprefixes"
+i18n = "dynamichotstrings.phoneprefixes"
+legacy_key = "PhonePrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "ssn_prefixes"
+section = "ssnprefixes"
+i18n = "dynamichotstrings.ssnprefixes"
+legacy_key = "SsnPrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "iban_prefixes"
+section = "ibanprefixes"
+i18n = "dynamichotstrings.ibanprefixes"
+legacy_key = "IbanPrefixes"
+is_prefix = true
+
+[[menu.dynamic_hotstring_families.rows]]
+separator = true
+
+[[menu.dynamic_hotstring_families.rows]]
+id = "text_expansion_personal_information"
+section = "textexpansionpersonalinformation"
+linux_section = "personal_info"
+i18n = "dynamichotstrings.textexpansionpersonalinformation"
+legacy_key = "TextExpansionPersonalInformation"
+is_module_placeholder = true
 
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]

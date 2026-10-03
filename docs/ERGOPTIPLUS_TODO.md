@@ -917,7 +917,17 @@ exact-boolean regressions also pass the focused runner.
   validate their manifest families and restore previously set or unset state.
   All ten native cases retain their ownership, pause and refusal assertions;
   production still uses its curated boot order. The corrected native CI is
-  pending. Shared dynamic row ordering remains a separate follow-up.
+  pending. The Dynamic child rows now have one canonical declaration in the shared menu
+  manifest. Windows derives both its legacy family aliases and tray order from
+  those records; macOS and Linux retain their native live dates, prefix counts,
+  preference owners and personal-information section names. An independent
+  pre-centralization snapshot retains all seven families, their separator and
+  metadata. Both Lua native callers first failed the deliberately reordered
+  manifest case, then followed it; native Windows cases inspect actual row
+  positions, the separator and personal-information editor. Portable local
+  validation is recorded separately. Full native Windows and complete three-OS
+  packaging, installation and launch qualification remain pending. The personal
+  file identity/gate and macOS placeholder-admission remainders are unchanged.
   Linux Dynamic now consumes the same explicit command pair and shared bulk
   planner. Its existing transaction commits the declared dynamic master and
   seven manifest families as one conditional cohort under both real leases,

@@ -563,16 +563,21 @@ local function build_sections()
 	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
 	desc_date = desc_date:gsub("{date}", text_utils.escape_gsub_replacement(dates.iso))
 
-	return {
-		{ name = "datelongfr", description = desc_datelongfr, count = 1 },
-		{ name = "datefr", description = desc_datefr, count = 1 },
-		{ name = "date", description = desc_date, count = 1 },
-		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"), count = 0 },
-		{ name = "ssnprefixes", description = loc("dynamichotstrings.ssnprefixes"), count = 0 },
-		{ name = "ibanprefixes", description = loc("dynamichotstrings.ibanprefixes"), count = 0 },
-		{ name = "-" },
-		{ name = "textexpansionpersonalinformation", count = 0, is_module_placeholder = true },
-	}
+	local descriptions = { date_long_fr = desc_datelongfr, date_fr = desc_datefr, date = desc_date }
+	local out = {}
+	for _, family in ipairs(require("infra.manifest_menu").get_dynamic_hotstring_families()) do
+		if family.separator then
+			out[#out + 1] = { name = "-" }
+		else
+			out[#out + 1] = {
+				name = family.section,
+				description = not family.is_module_placeholder and (descriptions[family.id] or loc(family.i18n)) or nil,
+				count = family.date_field and 1 or 0,
+				is_module_placeholder = family.is_module_placeholder,
+			}
+		end
+	end
+	return out
 end
 
 

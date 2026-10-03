@@ -845,6 +845,40 @@ function M.new(deps)
 	end
 
 
+	--- Returns independently owned Dynamic family child records in manifest order.
+	--- Callers select their native section alias and supply only live state.
+	--- @return table[] families
+	function R.get_dynamic_hotstring_families()
+		local root = get_manifest_root()
+		local node = root and root.dynamic_hotstring_families
+		local rows = type(node) == "table" and node.rows
+		if type(rows) ~= "table" or #rows == 0 then
+			error("Dynamic hotstring families require their shared menu declaration", 2)
+		end
+		local out, seen = {}, {}
+		for _, row in ipairs(rows) do
+			if type(row) ~= "table" then error("Dynamic hotstring family must be a record", 2) end
+			local copy = require("toml_codec.leaf_rows").clone_value(row)
+			if row.separator == true then
+				if row.id ~= nil then error("Dynamic separator cannot also be a family", 2) end
+			else
+				for _, key in ipairs({ "id", "section", "i18n", "legacy_key" }) do
+					if type(row[key]) ~= "string" or row[key] == "" then
+						error("Dynamic hotstring family requires " .. key, 2)
+					end
+				end
+				if seen[row.id] then error("Duplicate Dynamic hotstring family: " .. row.id, 2) end
+				seen[row.id] = true
+				if row.linux_section ~= nil and (type(row.linux_section) ~= "string" or row.linux_section == "") then
+					error("Dynamic hotstring Linux section must be a nonempty string", 2)
+				end
+			end
+			out[#out + 1] = copy
+		end
+		return out
+	end
+
+
 
 
 	-- ==================================================

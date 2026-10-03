@@ -744,17 +744,10 @@ end
 --- here all the same, because a user does not care which matcher answers them —
 --- they care that the dynamic-hotstrings submenu has one line per family, as it
 --- does on the other two drivers.
-local RULE_FAMILIES = {
-	{ id = "date_long_fr",                        section = "datelongfr" },
-	{ id = "date_fr",                             section = "datefr" },
-	{ id = "date",                                section = "date" },
-	{ id = "phone_prefixes",                      section = "phoneprefixes",  is_prefix = true },
-	{ id = "ssn_prefixes",                        section = "ssnprefixes",    is_prefix = true },
-	{ id = "iban_prefixes",                       section = "ibanprefixes",   is_prefix = true },
-	{ separator = true },
-	{ id = "text_expansion_personal_information", section = "personal_info",
-	  label_key = "dynamichotstrings.textexpansionpersonalinformation" },
-}
+local RULE_FAMILIES = require("infra.manifest_menu").get_dynamic_hotstring_families()
+for _, family in ipairs(RULE_FAMILIES) do
+	if not family.separator then family.section = family.linux_section or family.section end
+end
 
 -- Each family's canonical leaf is `hotstrings.dynamic.<id>.enabled`, the path
 -- its manifest row declares. Only a departure from the neutral leaf is stored.
@@ -762,26 +755,18 @@ local function family_path(family_id)
 	return "hotstrings.dynamic." .. family_id .. ".enabled"
 end
 
--- Which live date each label's "{date}" placeholder stands for. The label
--- promises what the rule inserts, so it must be resolved from the same engine
--- that inserts it rather than re-derived here.
-local DATE_FIELD_FOR_SECTION = {
-	date        = "iso",
-	datefr      = "fr",
-	datelongfr  = "long_fr",
-}
-
 M.RULE_FAMILIES = RULE_FAMILIES
 
 --- Resolves one family's menu label, with today's date substituted in.
 --- @param family table An entry of RULE_FAMILIES.
 --- @return string
 local function _family_label(family)
-	local key = family.label_key or ("dynamichotstrings." .. family.section)
+	local key = family.i18n
 	local ok_i18n, i18n = pcall(require, "infra.i18n")
 	local label = ok_i18n and i18n and i18n.get(key) or key
 
-	local field = DATE_FIELD_FOR_SECTION[family.section]
+	-- The published date field names the same engine value the rule inserts.
+	local field = family.date_field
 	if not field or not label:find("{date}", 1, true) then return label end
 
 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")

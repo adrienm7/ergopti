@@ -347,10 +347,12 @@ _HSCS_WithDynamicBootState(Body) {
 	try {
 		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
 		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap")
-		_LegacyDynamicHotstringsKeyMap := _HSCS_TrayMapLiteral(Source, "_LegacyDynamicHotstringsKeyMap")
-		if !RegExMatch(Source, "ms)^global _DYNAMIC_HOTSTRINGS_ORDER := (\[.*?\])", &Found)
-			throw Error("The tray boot owner has no dynamic hotstring order declaration.")
-		_DYNAMIC_HOTSTRINGS_ORDER := JsonParse(Found[1])
+		Assert(InStr(Source, "global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()"),
+			"the real tray must consume the shared family alias owner")
+		Assert(InStr(Source, "global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()"),
+			"the real tray must consume the shared family order owner")
+		_LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()
+		_DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 		Assert(_DYNAMIC_HOTSTRINGS_ORDER is Array, "the real tray order must be an array")
 		for Id in _DYNAMIC_HOTSTRINGS_ORDER {
 			if Id == "-"
@@ -528,3 +530,69 @@ _HSCS_DynamicMenuHead() {
 }
 Test("hotstring dynamic submenu: explicit shared command head (hotstring-dynamic-menu-head)",
 	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuHead))
+
+
+; The golden records were captured from the native owners before centralization.
+; Injecting another published order must reach the actual native Menu object.
+_HSCS_DynamicSharedOrder(Corpus, Vector) {
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the real shared menu declaration must be readable")
+	Previous := Root["dynamic_hotstring_families"]
+	Rows := []
+	for Index in Vector["indices"]
+		Rows.Push(Corpus["rows"][Index])
+	Root["dynamic_hotstring_families"] := Map("rows", Rows)
+	try _HSCS_WithDynamicBootState(Check)
+	finally Root["dynamic_hotstring_families"] := Previous
+	Check() {
+		global _DYNAMIC_HOTSTRINGS_ORDER, _LegacyDynamicHotstringsKeyMap
+		Expected := Vector["windows"]
+		AssertEqual(Expected.Length, _DYNAMIC_HOTSTRINGS_ORDER.Length)
+		for Index, Id in Expected
+			AssertEqual(Id, _DYNAMIC_HOTSTRINGS_ORDER[Index], "the boot order must follow the independent vector")
+		Built := _BuildDynamicHotstringsSubmenu()
+		try {
+			AssertEqual(12, TrayMenuItemCount(Built), "all shared commands, families, separators and editor survive")
+			Position := 3
+			for Index, Id in Expected {
+				if Id == "-" {
+					State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+					Assert(State != 0xFFFFFFFF && (State & 0x800), "the independent separator remains in its exact position")
+				} else {
+					ExpectedId := Corpus["rows"][Vector["indices"][Index]]["id"]
+					AssertEqual(ExpectedId, _LegacyDynamicHotstringsKeyMap[Id], "the published alias keeps its canonical feature")
+					Entry := ManifestFindEntryByPath("hotstrings.dynamic." . ExpectedId)
+					Assert(Entry is Map, "the independently named native row requires a real feature")
+					Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
+					Assert(Row is Map, "the independent family must produce its native row")
+					AssertEqual(Row["label"], _CTC_LabelAt(Built, Position), "the actual native menu must follow the shared order")
+					if ExpectedId == "text_expansion_personal_information" {
+						Position += 1
+						AssertEqual(t("menu.shortcuts.edit_personal_info"), _CTC_LabelAt(Built, Position),
+							"the native editor follows the personal-information family")
+					}
+				}
+				Position += 1
+			}
+			AssertEqual(12, Position, "every native row is accounted for")
+		} finally _CTC_ReleaseMenu(Built)
+	}
+}
+
+_HSCS_DynamicSharedMetadata() {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))
+	Root := _MM_GetManifestRoot()
+	AssertEqual(KL_JsonEncode(Corpus["rows"]), KL_JsonEncode(Root["dynamic_hotstring_families"]["rows"]),
+		"the independently captured published metadata stays exact")
+	First := _MR_GetDynamicHotstringFamilies(), Second := _MR_GetDynamicHotstringFamilies()
+	First[1]["section"] := "changed-in-first-caller"
+	First.Push(Map("separator", true))
+	AssertEqual("datelongfr", Second[1]["section"])
+	AssertEqual(8, Second.Length)
+	AssertEqual(KL_JsonEncode(Corpus["rows"]), KL_JsonEncode(Root["dynamic_hotstring_families"]["rows"]),
+		"native callers cannot mutate the manifest cache")
+}
+Test("hotstring dynamic shared metadata: independent and detached", _HSCS_DynamicSharedMetadata)
+for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))["vectors"]
+	Test("hotstring dynamic shared order: " . _HSCS_MenuVector["id"],
+		_HSCS_DynamicSharedOrder.Bind(JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8")), _HSCS_MenuVector))
