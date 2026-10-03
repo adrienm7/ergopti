@@ -1618,6 +1618,8 @@ TODO 104 remains partial: the shared hotstring reader now retains physical entry
 
 Windows native qualification follow-up: the new ordered-cache fixtures now use the existing JsonParse owner. Privacy/options and two-sided magic-marker source guards inspect the shared native row registrar and explicitly verify both the legacy generated-section and source-ordered category routes, including the bound-source fallback. Two additional native route cases preserve privacy, preview snapshots, both marker replacements and caller-map independence. Portable source/convention/encoding checks pass; actual Windows CI qualification remains required. TODO104 remains partial: the runtime family split and owned migration are not implemented.
 
+Partial: Windows source-order regression inputs now use independently authored legal native inline-table fields and explicit flags, preserving the frozen shared interleaving expectations, metadata, defaults and historical 140-rule corpus. The real parser must admit every fixture record before cache and registry order are judged. Portable controls reproduce the old zero-row admission and qualify all six interleaved/four bound inputs; actual native AHK and full three-OS CI remain pending. No production parser or registration policy changed.
+
 - [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
       macOS and Linux, separately from the ordinary hotstrings editor. Provide
       a documented user-code entry point under "Dynamic hotstrings", examples

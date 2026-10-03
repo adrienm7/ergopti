@@ -300,6 +300,69 @@ Test("common autocorrection: the real TOML fallback preserves all historical reg
 	_HsCacheCommonReferenceNative.Bind(false))
 
 
+; This independent native input spells every flag in the fixed inline-table
+; grammar accepted by both real Windows loaders. The shared source/expectation
+; corpus remains unchanged; its broader Lua grammar is not an AHK admission proof.
+_HsCacheNativeSourceOrderText(Bound := false) {
+	if Bound {
+		Lines := [
+			'[_meta]',
+			'sections_order = ["caps"]',
+			'[[caps]]',
+			'"boundfirst" = { output = "First bound", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }',
+			'[[caps]]',
+			'"boundsecond" = { output = "Second bound", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }',
+			'[[caps]]',
+			'"boundthird" = { output = "Third bound", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }',
+			'[[caps]]',
+			'"boundfourth" = { output = "Fourth bound", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }']
+	} else {
+		Lines := [
+			'[_meta]',
+			'sections_order = ["abbreviations", "caps", "terms", "unknown"]',
+			'delay = 0.5',
+			'[_meta.section_delays]',
+			'caps = 0.2',
+			'terms = 0.3',
+			'abbreviations = 0.4',
+			'[[caps]]',
+			'"firstx" = { output = "First", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }',
+			'[[terms]]',
+			'"secondx" = { output = "Second", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true, priority = 44 }',
+			'[[caps]]',
+			'"thirdx" = { output = "Third", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }',
+			'[[abbreviations]]',
+			'"fourthx" = { output = "Fourth", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }',
+			'[[unknown]]',
+			'"unknownx" = { output = "Unknown", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }',
+			'[[caps]]',
+			'"sixthx" = { output = "Sixth", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }']
+	}
+	Text := ""
+	for Line in Lines
+		Text .= Line . "`n"
+	return Text
+}
+
+; Refuse a fixture that cannot reach the actual parser before testing registry
+; order. Trigger/count expectations remain supplied by the frozen shared corpus.
+_HsCacheAssertNativeSourceOrderInput(Text, ExpectedTriggers) {
+	global _HOTSTRING_ENTRY_PATTERN
+	Index := 0
+	loop parse, Text, "`n", "`r" {
+		Line := Trim(A_LoopField)
+		if SubStr(Line, 1, 1) != Chr(34)
+			continue
+		Assert(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Entry),
+			"every native fixture entry must be admitted by the real loader grammar")
+		Index += 1
+		Assert(Index <= ExpectedTriggers.Length, "no extra native input entry may replace a missing fixture")
+		AssertEqual(ExpectedTriggers[Index], UnescapeTomlString(Entry[1]),
+			"the native legal input preserves the independently captured physical sequence")
+	}
+	AssertEqual(ExpectedTriggers.Length, Index, "all independent fixture inputs must reach the native parser")
+}
+
 ; Drive the real cache builder, durable TSV round-trip and native registry with
 ; an independent interleaved source, without changing a live bundled file.
 _HsCacheSourceOrderNative(ThroughTsv, CapsOnly, BoundMode := "") {
@@ -313,8 +376,16 @@ _HsCacheSourceOrderNative(ThroughTsv, CapsOnly, BoundMode := "") {
 	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED,
 		_GENERATED_HOTSTRINGS, _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources]
 	try {
-		FileAppend(Reference["source"], Path, "UTF-8")
+		NativeSource := _HsCacheNativeSourceOrderText()
+		_HsCacheAssertNativeSourceOrderInput(NativeSource, Reference["source_order"])
+		FileAppend(NativeSource, Path, "UTF-8")
 		_HS_CACHE_ROWS := _HotstringsCacheBuildRows(Map("autocorrection", Path))
+		for Section, ExpectedCount in Reference["counts"] {
+			Key := "autocorrection." . Section
+			Assert(_HS_CACHE_ROWS.Has(Key), "every fixture section must reach the real cache parser")
+			AssertEqual(ExpectedCount, _HS_CACHE_ROWS[Key].Length)
+		}
+		AssertEqual(Reference["source_order"].Length, _HS_CACHE_ROWS.SourceOrder.Length)
 		if ThroughTsv {
 			_HotstringsCacheWriteTsv(Tsv, _HS_CACHE_ROWS)
 			_HS_CACHE_ROWS := _HotstringsCacheReadTsv(FileRead(Tsv, "UTF-8"))
@@ -332,8 +403,11 @@ _HsCacheSourceOrderNative(ThroughTsv, CapsOnly, BoundMode := "") {
 		Sections["unknown"] := Map("enabled", false)
 		_HotstringBoundSources := Map()
 		if BoundMode != "" {
-			if BoundMode == "bound"
-				FileAppend(Reference["bound_source"], BoundPath, "UTF-8")
+			if BoundMode == "bound" {
+				BoundSource := _HsCacheNativeSourceOrderText(true)
+				_HsCacheAssertNativeSourceOrderInput(BoundSource, Reference["bound_caps_order"])
+				FileAppend(BoundSource, BoundPath, "UTF-8")
+			}
 			_HotstringBoundSources["autocorrection"] := Map("path", "", "sections", Map("caps", BoundPath))
 		}
 		HSE_TestReset()
