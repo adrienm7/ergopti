@@ -565,3 +565,43 @@ helpers.describe("final local API admission cannot borrow physical source author
 		helpers.assert_eq(fresh(true).active().id, "external", "restart uses the independent physical source")
 	end)
 end)
+
+
+helpers.describe("malformed API source quarantine acknowledgement", function()
+	helpers.it("a refused source-to-corrupt rename cannot authorize replacement of foreign bytes", function()
+		fresh()
+		os.execute("mkdir -p '" .. DIR .. "'")
+		local malformed = '{"future": [ incomplete private source'
+		external_api_source(malformed)
+		local entries = fresh(true)
+		local rename, rename_calls, stages = os.rename, 0, 0
+		os.rename = function(from, to)
+			if from == PATH and to == PATH .. ".corrupt" then
+				rename_calls = rename_calls + 1
+				return false, "owned quarantine refusal"
+			end
+			return rename(from, to)
+		end
+		entries._set_private_create_for_test(function(path, text)
+			stages = stages + 1
+			return create_without_mode(path, text)
+		end)
+		local called, added = pcall(entries.add, { provider = "lmstudio", token = "", label = "Local", model = "model" })
+		os.rename = rename
+		-- The actual failed quarantine is observed before any private publication,
+		-- and assertions follow the owner's return and exact wrapper restoration.
+		helpers.assert_eq(called, true)
+		helpers.assert_true(physical_api_source() == malformed, "refused quarantine preserves the exact original foreign bytes")
+		helpers.assert_nil(added)
+		helpers.assert_eq(rename_calls, 1)
+		helpers.assert_eq(stages, 0)
+		helpers.assert_eq(physical_api_source(), malformed)
+		helpers.assert_eq(#entries.list(), 0)
+		helpers.assert_nil(entries.active())
+		local staged = io.open(PATH .. ".tmp", "rb")
+		local staging_exists = staged ~= nil
+		if staged then staged:close() end
+		helpers.assert_eq(staging_exists, false)
+		helpers.assert_eq(os.rename, rename)
+	end)
+end)
