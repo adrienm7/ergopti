@@ -751,3 +751,42 @@ _LLV_ExplicitActionsTakeOver() {
 }
 Test("LLM live mode: explicit AI actions take over and live mode resumes on typing",
 	_LLV_ExplicitActionsTakeOver)
+
+
+/** A due renderer must not escape the live-menu fixture into native I/O. */
+_LLV_MenuNoticeRetiresBeforeYield() {
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _TooltipPendingRequest
+		State := { Rendered: false }
+		Renderer := (*) => State.Rendered := true
+		Rows := _LLM_Menu_LiveModeRows()
+		AssertTrue(Rows.Length > 1, "the real menu must have a live prompt to invoke")
+		Action() {
+			Rows[2]["action"].Call()
+			Request := _TooltipPendingRequest
+			AssertTrue(IsObject(Request), "the real menu action must publish its notice")
+			; Substitute only the renderer boundary; a failure cannot touch native UI.
+			SetTimer(Request.TimerFn, 0)
+			Request.TimerFn := Renderer
+			SetTimer(Renderer, -1)
+			Sleep(30)
+			return true
+		}
+		try {
+			AssertTrue(_LLV_InvokeAndRetireNotice(Action, &Notice))
+			AssertTrue(LLM_Engine_LiveIsActive(), "the original action actually changed live mode")
+			AssertTrue(Notice != "", "the original notice must be captured")
+			AssertFalse(State.Rendered, "the due renderer must be retired before the fixture yields")
+			AssertFalse(IsObject(_TooltipPendingRequest), "the native notice owner is retired")
+			SetTimer(Renderer, -1)
+			Sleep(30)
+			AssertTrue(State.Rendered, "the substituted renderer can run when no longer fenced")
+		} finally {
+			SetTimer(Renderer, 0)
+			TooltipHide("LiveModeTest", true)
+		}
+	}
+}
+Test("LLM live mode: menu fixture retires due rendering before yielding (live-menu-fixture)",
+	_LLV_MenuNoticeRetiresBeforeYield)
