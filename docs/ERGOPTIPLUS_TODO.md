@@ -194,6 +194,13 @@ remains explicitly unavailable and cannot qualify window behavior; the five
 application criteria, native timer assertions and primary/cleanup errors
 remain strict. Fifty Python regressions pass; native CI remains pending.
 
+A refused live Linux update retains the same sanitized HTTP response and
+underlying child/owner verdict before fixture cleanup. The probe preserves
+transport arguments, callback returns and failure status; unavailable
+headers are reported explicitly rather than inferred to be a rate limit.
+Registered CLI regressions, Linux units and portable E2E pass; the actual
+updater response and complete native checkpoint remain pending.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

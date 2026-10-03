@@ -349,10 +349,24 @@ jobs:
       # next login.
       - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
+        env:
+          ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
         run: |
           sudo apt-get install -y --no-install-recommends lua-luv
           bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
         timeout-minutes: 10
+
+      # A refused release check is diagnostic evidence, never a passed E2E
+      # receipt. Keep its actual response and owner verdict after a failure.
+      - name: Upload live updater diagnostic evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-updater-live-diagnostics
+          overwrite: true
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-updater-live
+          if-no-files-found: error
 
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport
