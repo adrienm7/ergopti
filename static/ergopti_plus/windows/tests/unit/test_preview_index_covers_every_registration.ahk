@@ -331,6 +331,7 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 			Preview := PreviewRows[OwnedSpec.Trigger]
 			AssertEqual(OwnedSpec.Category, Preview.Category)
 			AssertEqual(OwnedSpec.Section, Preview.Section)
+			AssertTrue(OwnedSpec.HasOwnProp("PersonalSource"), "native factory variant " . Position . " must retain admitted personal provenance")
 			AssertEqual(Packs[1]["PersonalSource"]["id"], OwnedSpec.PersonalSource["id"], "the actual live spec retains discovery identity")
 			AssertEqual(OwnedSpec.PersonalSource["id"], Preview.PersonalSource["id"], "the real preview row retains the same source")
 			Assert(OwnedSpec.PersonalSource != Preview.PersonalSource, "live and preview never share mutable provenance")
@@ -444,19 +445,31 @@ _PICR_DistinctDiscoveredSources() {
 		for RelativeFile in SourceFiles
 			FileAppend('[probe]`n"pqx" = "Owned"`n', OwnedRoot . "\" . RelativeFile, "UTF-8")
 		FileAppend('[probe]`n"pqx" = "Canonical"`n', OwnedRoot . "\personal_hotstrings.toml", "UTF-8")
-		ScriptInformation["PersonalHotstringsDir"] := OwnedRoot
-		Packs := HS_EnumeratePersonalExtFiles()
-		AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
-		SeenSources := Map()
-		for Pack in Packs {
-			RelativeFile := SubStr(Pack["Path"], StrLen(OwnedRoot) + 2)
-			AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
-			AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
-			AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
-			AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
-			SeenSources[Pack["PersonalSource"]["id"]] := true
+		; The OS expands short A_Temp aliases during Loop Files. Resolve the
+		; expected fixture boundary independently, before reading native discovery.
+		SourceRootBuffer := Buffer(32768 * 2, 0)
+		SourceRootLength := DllCall("GetLongPathNameW", "Str", OwnedRoot,
+			"Ptr", SourceRootBuffer, "UInt", 32768, "UInt")
+		AssertTrue(SourceRootLength > 0 && SourceRootLength < 32768,
+			"Win32 must resolve the owned source root without truncation")
+		CanonicalSourceRoot := StrGet(SourceRootBuffer, SourceRootLength, "UTF-16")
+		for RootSpelling in [OwnedRoot, CanonicalSourceRoot] {
+			ScriptInformation["PersonalHotstringsDir"] := RootSpelling
+			Packs := HS_EnumeratePersonalExtFiles()
+			AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
+			SeenSources := Map()
+			for Pack in Packs {
+				Assert(SubStr(Pack["Path"], 1, StrLen(CanonicalSourceRoot) + 1) == CanonicalSourceRoot . "\",
+					"native enumeration remains inside the independently resolved fixture boundary")
+				RelativeFile := SubStr(Pack["Path"], StrLen(CanonicalSourceRoot) + 2)
+				AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
+				AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
+				AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
+				AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
+				SeenSources[Pack["PersonalSource"]["id"]] := true
+			}
+			AssertEqual(8, SeenSources.Count)
 		}
-		AssertEqual(8, SeenSources.Count)
 	} finally {
 		if HadRoot
 			ScriptInformation["PersonalHotstringsDir"] := PriorRoot

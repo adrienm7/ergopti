@@ -1421,6 +1421,15 @@ the Windows additional-file default group that has no exclusive file gate.
       qualification also awaits the separate inline descriptor transport and
       canonical-path fixture repairs; their original assertions remain intact.
 
+Windows additional personal TOML entries now carry their validated source
+descriptor through both simple and inline native factories. Historical
+flags, priorities, delays, registration order and default-group activation
+are preserved. Original live/preview identity and copy-ownership assertions
+remain intact. The eight-file discovery test independently resolves its
+fixture root with bounded Win32 GetLongPathNameW and replays short/canonical
+spellings under an exact root fence. TODO 102 remains partial; corrected
+native Windows execution is pending CI.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
