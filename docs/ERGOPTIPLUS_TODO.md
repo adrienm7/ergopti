@@ -212,6 +212,16 @@ These are software implementations; final hardware verification remains below.
   general race-free no-clobber publication or dangling-link classification.
   Windows registry and macOS hs.settings do not use this JSON backup path.
   TOML ownership, native cross-OS validation and manual CI remain untouched.
+- [~] **L15.** Linux ordinary file path receipts: the five canonical methods
+  reject embedded NUL before native C-string APIs can select a different prefix
+  file. A real invalid delete removed the prefix file, and invalid read exposed
+  its bytes. Sixteen of forty native cases failed before the fix. The matrix now
+  covers NUL positions, unchanged prefix files and valid literal POSIX names;
+  twenty portable cases require refusal before any native I/O. This is the Linux
+  native binding guard, without changing classified/TOML extension ownership.
+  Windows built-ins and macOS native paths have no explicit matching NUL guard
+  at their public boundary; native reproductions and fixes are deferred to their
+  owners. No native cross-OS suite or manual CI was launched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
