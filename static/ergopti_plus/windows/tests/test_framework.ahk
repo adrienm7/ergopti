@@ -677,11 +677,16 @@ RunTests() {
 		StartedMs := _TestClockMs()
 		try {
 			try TestEntry.callback.Call()
-			finally DurationMs := _TestClockMs() - StartedMs
-            if (A_IsCritical != 0) {
-                Critical("Off") ; Reset for the next tests
-                throw Error("Test LEAKED Critical: " . TestEntry.name)
-            }
+			finally {
+				; A throwing callback must release its thread-scoped Critical state
+				; before reporting failure or running any following test/timer.
+				LeakedCritical := A_IsCritical != 0
+				if LeakedCritical
+					Critical("Off")
+				DurationMs := _TestClockMs() - StartedMs
+			}
+			if LeakedCritical
+				throw Error("Test LEAKED Critical: " . TestEntry.name)
 		} catch as e {
 			Status := "not ok"
 			; Point [file:line] at the test's own call site, not the assert helper
