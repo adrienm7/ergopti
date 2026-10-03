@@ -65,6 +65,7 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../../infra/ui_style.ahk
 #Include ../../_generated/app_dirs.ahk
 #Include ../../infra/logger.ahk
+#Include ../../infra/hotpath_profiler.ahk
 
 #Include ../../infra/window_utils.ahk
 #Include ../../infra/text_utils.ahk

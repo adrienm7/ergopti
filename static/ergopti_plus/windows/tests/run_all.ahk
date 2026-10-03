@@ -117,6 +117,8 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
 #Include ../infra/tray_bootstrap.ahk
+#Include ../adapters/tray_startup_click.ahk
+#Include ../adapters/tray_startup_commands.ahk
 #Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../_generated/window_titles.ahk
@@ -249,6 +251,7 @@ global _DefaultLogsDir := _LogsDir
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
+#Include ../adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
 #Include ../infra/uninstall.ahk
 #Include ../infra/start_at_login.ahk
@@ -299,8 +302,10 @@ InstallHotstringHooks()
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
+; Contract tests must not launch a provider against the user's foreground app.
+; Worker behavior is covered separately with explicit owned-process fixtures.
 SFD_ConfigureUiaWorker(
-	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
+	(Context, Terminal) => false, () => false, UIASW_ContextMatches)
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
@@ -370,6 +375,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk
+#Include unit/test_tooltip_position_refinement.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_llm_tooltip_layout.ahk
@@ -387,6 +393,7 @@ InstallSendNoOps()
 #Include unit/test_gesture_unhook_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/test_boot_menu_wait_clock.ahk
 #Include unit/test_llm_menu_build_coordinator.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
@@ -590,6 +597,7 @@ _LogBootProgress("loading LLM modules")
 ; llm_bridge.ahk is needed by the canonical HSE -> LLM effect behaviour tests.
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
+#Include unit/test_prefix_char_admission.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
@@ -1214,6 +1222,10 @@ _LogBootProgress("keylogger modules + tests included")
 ; statements, no includes — so pulling it in is side-effect free, and it lets
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../infra/manifest_menu.ahk
+#Include unit/test_menu_population.ahk
+#Include unit/test_menu_startup_commands.ahk
+#Include unit/test_config_registry_cache.ahk
+#Include unit/test_llm_runtime_activation.ahk
 ; The tray root builder: its top-level dispatcher and the id → builder table.
 ; Function definitions only, and the table names only its own _MI_ builders,
 ; so pulling it in stages nothing and resolves no menu dependency at load.
@@ -1756,6 +1768,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
+#Include unit/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include ../ui/healthcheck/probes.ahk
 #Include ../ui/healthcheck/report.ahk
@@ -1905,6 +1918,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_suspend_boundary.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_latency_statistics.ahk
 #Include unit/test_hotpath_breakdown_reentry.ahk
 #Include unit/test_hook_timing_input_privacy.ahk
 #Include unit/test_hotpath_per_segment_threshold.ahk

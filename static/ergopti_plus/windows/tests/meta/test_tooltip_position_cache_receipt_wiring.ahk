@@ -13,8 +13,14 @@ _TPCRW_ResolverUsesEnvironmentReceipt() {
 
 	Writer := _DriverFuncBody("_TooltipCachePosition")
 	Assert(Writer != "", "the production tooltip cache writer must exist")
-	Assert(InStr(Writer, '"environment", _TooltipReadPositionReceipt(Hwnd)') > 0,
+	Assert(InStr(Writer, '"environment", Context is Map ? Context["Environment"]') > 0
+		and InStr(Writer, "_TooltipReadPositionReceipt(Hwnd)") > 0,
 		"every cached position must retain the environment receipt used by later hits")
+	Present := _DriverFuncBody("_TooltipPresentStack")
+	Assert(Present != "", "the final pixel owner must exist")
+	Assert(InStr(Present, "_TooltipPreparedPositionStillCurrent(PositionContext)") > 0
+		and InStr(Present, "if DeadlinesLive && PositionCurrent") > 0,
+		"a prepared worker receipt must be revalidated after GUI preparation at the pixel commit")
 }
 
 Test("meta tooltip position receipt: resolver validates and writer stores environment (ahk2-17)",

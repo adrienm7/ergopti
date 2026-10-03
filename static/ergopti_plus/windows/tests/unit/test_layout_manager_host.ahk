@@ -25,6 +25,36 @@
 
 _LMH_Index() => JsonParse(FileRead(_StaticDir . "\layouts\registry\index.json", "UTF-8-RAW"))
 
+_LMH_ReadyOncePerEpoch() {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_ReadyEpoch, _LayoutCatalogueLast
+	SavedEpoch := _LayMgrWeb_SessionEpoch
+	SavedReady := _LayMgrWeb_ReadyEpoch
+	SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LMH_TempDir()
+	try {
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		_LayMgrWeb_SessionEpoch := 9876
+		_LayMgrWeb_ReadyEpoch := 0
+		Log := []
+		Deps := _LMH_Deps(Dir, Log)
+		AssertTrue(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertFalse(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertEqual(1, _LMH_Calls(Log).Length, "page and native ready refresh only once")
+		_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "refresh"), Deps)
+		AssertEqual(2, _LMH_Calls(Log).Length, "explicit refresh remains available")
+		_LayMgrWeb_SessionEpoch += 1
+		AssertFalse(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertTrue(_LayMgrWeb_SessionCall(9877, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertEqual(3, _LMH_Calls(Log).Length, "replacement window receives its own initial refresh")
+	} finally {
+		_LayMgrWeb_SessionEpoch := SavedEpoch
+		_LayMgrWeb_ReadyEpoch := SavedReady
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+	}
+}
+Test("layout manager: dual ready signals refresh once per epoch (layout-ready-once)", _LMH_ReadyOncePerEpoch)
+
 _LMH_TempDir() {
 	Dir := A_Temp . "\ergopti_layout_manager_" . A_TickCount . "_" . Random(1000, 9999) . "\"
 	DirCreate(Dir)

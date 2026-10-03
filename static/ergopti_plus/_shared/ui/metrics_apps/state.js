@@ -5,6 +5,7 @@
 
 window.updateUserCategories = function (newCategories) {
 	userCategories = newCategories || {};
+	invalidateAggregationCache();
 	renderDashboard();
 };
 
@@ -16,7 +17,61 @@ function getAppCategory(appName, nativeCategory) {
 	return { type: translateCategory(nativeCategory || 'Général'), score: 0 };
 }
 
+// Current query, its comparator and two recent filters fit without retaining
+// an unbounded history of manifest-sized results.
+const AGGREGATION_CACHE_LIMIT = 4;
+const aggregationCache = new Map();
+let aggregationManifestOwner = null;
+let aggregationCategoriesOwner = null;
+let aggregationTranslationsOwner = null;
+window.appsFilterPerformance = { hits: 0, misses: 0, lastAggregationMs: 0, entries: 0 };
+
+/** Retires projections before an accepted native mutation, including in-place live pushes. */
+function invalidateAggregationCache() {
+	aggregationCache.clear();
+	aggregationManifestOwner = manifestData;
+	aggregationCategoriesOwner = userCategories;
+	aggregationTranslationsOwner = window._i18n_strings;
+	window.appsFilterPerformance.entries = 0;
+}
+
+/** Returns a read-only projection; display-only changes still render from this data. */
 function getAggregatedData() {
+	if (
+		aggregationManifestOwner !== manifestData ||
+		aggregationCategoriesOwner !== userCategories ||
+		aggregationTranslationsOwner !== window._i18n_strings
+	)
+		invalidateAggregationCache();
+	const key = JSON.stringify([
+		currentPeriod,
+		currentSelectedDate,
+		currentCategoryFilter === null ? null : [...currentCategoryFilter].sort(),
+		currentWeekdayFilter === null ? null : [...currentWeekdayFilter].sort(),
+		currentCountAwake,
+		window._i18n_locale
+	]);
+	if (aggregationCache.has(key)) {
+		const result = aggregationCache.get(key);
+		aggregationCache.delete(key);
+		aggregationCache.set(key, result);
+		window.appsFilterPerformance.hits++;
+		window.appsFilterPerformance.lastAggregationMs = 0;
+		return result;
+	}
+	const started = Date.now();
+	const result = buildAggregatedData();
+	aggregationCache.set(key, result);
+	if (aggregationCache.size > AGGREGATION_CACHE_LIMIT)
+		aggregationCache.delete(aggregationCache.keys().next().value);
+	window.appsFilterPerformance.misses++;
+	window.appsFilterPerformance.lastAggregationMs = Date.now() - started;
+	window.appsFilterPerformance.entries = aggregationCache.size;
+	return result;
+}
+
+/** Builds one query without mutating the source manifest or a retained projection. */
+function buildAggregatedData() {
 	const result = {
 		apps: {},
 		_sys: { wifi: {}, power: {}, sleep: 0, unlock: 0, spaces: 0 },

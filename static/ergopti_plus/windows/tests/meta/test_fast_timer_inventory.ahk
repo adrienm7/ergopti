@@ -80,6 +80,7 @@ _FTI_Inventory() {
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keylogger buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch
+		"_TooltipPositionWarmPump",     "300",   ; idle-only async bounds prewarm, priority -1, canceled with preview owner
 		"_Updater_MonitorStagingWorker", "250",  ; only armed while staging an update
 		"KLHook.context_timer",         "250",   ; memory-only projection of shared focus snapshot
 		"KLMouse.park_timer_fn",        "250",   ; mouse park detection

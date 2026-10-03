@@ -24,9 +24,9 @@
 ; replayed lines are simply missing, and the profiler looks like it was never
 ; wired up rather than like it lost its data.
 ;
-; SCOPE: source introspection. infra/boot_profiler.ahk is not loaded by the
-; headless runner (it has no test-visible entry point and its only observable
-; effect is log output), so the invariants are asserted against its source.
+; SCOPE: source introspection. The headless runner loads the profiler for its
+; pure menu-wait clock tests; early include-order wiring and replay ownership
+; are asserted against production source rather than the runner's boot order.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -139,3 +139,16 @@ _BPS_TheFlatSubmenuLoopIsAttributed() {
 }
 Test("meta boot-stamps: the flat-submenu loop is attributed per category (menu-flat-submenu-loop-unattributed)",
 	_BPS_TheFlatSubmenuLoopIsAttributed)
+
+; Timing arguments are the evidence, so their formatted body must be the repeat
+; key. A shared template hid all but the first of 37 different menu phases.
+_BPS_TimingsRemainVisible() {
+	for Name in ["BootProfile_Mark", "_BootProfileReplayStamps"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist")
+		Assert(InStr(Body, 'LoggerInfo("BootProfile", Format(') > 0,
+			Name . " must format the phase before INFO repeat collapsing (tray-startup-2026-10-02)")
+	}
+}
+Test("meta boot-stamps: distinct timing evidence survives repeat collapsing (tray-startup-2026-10-02)",
+	_BPS_TimingsRemainVisible)

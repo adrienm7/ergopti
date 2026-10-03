@@ -514,6 +514,8 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
     }
     if filtered {
 		KL_RecordPrivacyHit()
+		if Keylogger._shutting_down
+			try LoggerWarn("Keylogger", Format("Shutdown event '{1}' refused by the current privacy predicate.", entry["type"]))
         return false
 	}
     ; MF_ShouldFilter() above evaluated MetricsFocusCache, which MF_RefreshFocus
@@ -1169,7 +1171,21 @@ KL_CancelShutdown() {
 	}
 }
 
+/** Emits shutdown stage resources without including event contents or foreground context. */
+_KL_StopTimingMark(Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Shutdown." . Phase, Elapsed, 5)
+	try LoggerInfo("Keylogger", Format(
+		"Shutdown stage '{1}': wall={2:.3f} ms, process_cpu={3} ms.", Phase, Elapsed, CpuText))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+}
+
 KL_Stop(Token := 0) {
+	Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs() }
 	if !KL_DataSqlShutdownReady() {
 		try LoggerError("Keylogger", "Shutdown retained pending SQL append compensation.")
 		return false
@@ -1200,13 +1216,20 @@ KL_Stop(Token := 0) {
 	    ; ledger missing the closing batch.
 	    try KL_Mig_Cancel()
 		PrefetchStopped := KLPF_CancelAll()
+		_KL_StopTimingMark("prepare", Timing)
 	    ; Release the keystroke hook FIRST so no late event lands in a
 	    ; buffer we are about to flush + serialise.
 	    try KL_Hook_Stop()
+		catch as Err
+			try LoggerError("Keylogger", "Shutdown hook teardown failed: {1}.", Err.Message)
+		_KL_StopTimingMark("hook", Timing)
 	    ; Drain idle / session state and unhook OnMessage handlers so the
 	    ; JSONL never ends with a dangling session_start / idle_start.
 		WatchersStopped := false
 		try WatchersStopped := KL_Watchers_Stop()
+		catch as Err
+			try LoggerError("Keylogger", "Shutdown watcher teardown failed: {1}.", Err.Message)
+		_KL_StopTimingMark("watchers", Timing)
 	    try KL_Mouse_Stop()
 		SensorsStopped := false
 		try SensorsStopped := KL_Sensors_Stop()
@@ -1222,10 +1245,12 @@ KL_Stop(Token := 0) {
 		TimersStopped := KL_TimerGroupStop(Keylogger,
 			["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
 			SetTimer, "core")
+		_KL_StopTimingMark("sensors_and_timers", Timing)
 	    ; _shutting_down was raised at the top of this function (see the comment
 	    ; there) so the module drains above could emit their closing events too.
 		FlushComplete := KL_FlushBuffer()
 		JournalResult := _KL_JournalPendingEntries(0, Scope.Token)
+		_KL_StopTimingMark("flush_and_journal", Timing)
 		if !FlushComplete or !JournalResult["ok"] {
 			try LoggerError("Keylogger",
 				"Shutdown retained durable debt (flush={1}, journal={2}).",
@@ -1237,6 +1262,7 @@ KL_Stop(Token := 0) {
 				"Shutdown retained pending app-category persistence debt.")
 			return false
 		}
+		_KL_StopTimingMark("categories", Timing)
 	    ; force := true — the typing-idle guard would otherwise return before the
 	    ; pending drain, and there is no next tick left to defer to. Looped because
 	    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
@@ -1256,7 +1282,9 @@ KL_Stop(Token := 0) {
 			}
 	    }
 		StateSaved := KL_SaveState()
+		_KL_StopTimingMark("ingest_and_state", Timing)
 		HandleClosed := KL_CloseTodayFh(Scope.Token)
+		_KL_StopTimingMark("handle", Timing)
 		if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
 			or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
 			or !IngestComplete or !StateSaved or !HandleClosed {

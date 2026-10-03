@@ -66,16 +66,24 @@ class _TooltipRevealNative {
 ; background+text are on screen BEFORE the border is revealed and the two surfaces
 ; appear as one. The border is raised last so it always stacks directly above
 ; its content, whichever of the two HWNDs was created first.
-_TooltipRevealPreparedSurfaces(Surface, Native := _TooltipRevealNative) {
+_TooltipRevealPreparedSurfaces(Surface, Native := _TooltipRevealNative, Breakdown := 0) {
+		if !(Breakdown is Array)
+				Breakdown := HotPath_BreakdownBegin()
 		if (Surface.Rows.Length > 0) {
 				ContentHwnd := Surface.Rows[1].Gui.Hwnd
+				ContentStart := HotPath_Now()
 				if !Native.ShowOnTop(ContentHwnd)
 						throw OSError(A_LastError, "SetWindowPos (tooltip content reveal)")
+				HotPath_BreakdownMark("reveal_content", ContentStart, Breakdown)
+				PaintStart := HotPath_Now()
 				Native.PaintNow(ContentHwnd)
+				HotPath_BreakdownMark("reveal_paint", PaintStart, Breakdown)
 		}
 		if Surface.Border {
+				BorderStart := HotPath_Now()
 				if !Native.ShowOnTop(Surface.Border.Hwnd)
 						throw OSError(A_LastError, "SetWindowPos (tooltip border reveal)")
+				HotPath_BreakdownMark("reveal_border", BorderStart, Breakdown)
 		}
 }
 
@@ -417,7 +425,8 @@ _UiOracleReportError(Message) {
 ; keystroke callback.
 _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 	ClearDequeue := false, ExpectedRequestSerial := -1,
-	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset) {
+	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset, PositionContext := 0) {
+		; A provider receipt must survive GUI preparation, not just worker return.
 		global _TOOLTIP_SAFETY_SEC
 		global _TooltipActiveSurface
 		global _TooltipGeneration, _TooltipTimerGeneration
@@ -489,6 +498,11 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 				DecisionCurrent := _TooltipDecisionItemsStillCurrent(PublishItems)
 				HotPath_BreakdownMark("decision", _hpDecision, Breakdown)
 				if DecisionCurrent {
+					_hpPositionContext := HotPath_Now()
+					PositionCurrent := _TooltipPreparedPositionStillCurrent(PositionContext)
+					HotPath_BreakdownMark("position_context", _hpPositionContext, Breakdown)
+					if !PositionCurrent
+						Selection.Committed := false
 					; Deadline is the last predicate before commit/reveal. A row with 1 ms
 					; remaining cannot expire while a slower decision oracle runs afterward.
 					_hpAbsoluteDeadline := HotPath_Now()
@@ -502,7 +516,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 					if DeadlineBounds.Expired
 						DeadlinesLive := false
 					HotPath_BreakdownMark("deadline", _hpDeadline, Breakdown)
-					if DeadlinesLive {
+					if DeadlinesLive && PositionCurrent {
 						RetiredSurface := Selection.Retired
 
 						; Attach all semantic ownership to the detached candidate before
@@ -596,8 +610,9 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 						}
 
 						_hpReveal := HotPath_Now()
-						_TooltipRevealPreparedSurfaces(PreparedSurface)
-						HotPath_BreakdownMark("reveal", _hpReveal, Breakdown)
+						_TooltipRevealPreparedSurfaces(PreparedSurface, _TooltipRevealNative, Breakdown)
+						; This total contains the preceding three reveal_* children.
+						HotPath_BreakdownMark("reveal_total", _hpReveal, Breakdown)
 
 						_hpPublish := HotPath_Now()
 						Published := _TooltipPublishVisibleDecisions(PublishItems)
@@ -620,8 +635,14 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 
 		; Metrics and LLM scheduling may yield, so they are explicitly post-commit.
 		_hpPostPresent := HotPath_Now()
-		if CommitAllowed
+		if CommitAllowed {
+			_TooltipNoteRenderPresented()
+			HotPath_BreakdownMark("accounting", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
 			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
+			HotPath_BreakdownMark("notify", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
+		}
 		if IsSet(_LLM_TooltipScheduleMetricDrain)
 			_LLM_TooltipScheduleMetricDrain()
 		HotPath_BreakdownMark("post_present", _hpPostPresent, Breakdown)
@@ -1604,11 +1625,17 @@ _TooltipNoteRenderPresented() {
 		_TooltipRenderCount += 1
 		if (Mod(_TooltipRenderCount, _TOOLTIP_STATS_LOG_EVERY) != 0)
 				return
+		_TooltipLogRenderAccounting("periodic")
+}
+
+; A shutdown snapshot makes short sessions observable without per-render I/O.
+_TooltipLogRenderAccounting(Reason) {
+		global _TooltipRenderCount, _TooltipResolveExits
 		Parts := ""
 		for Stage, Count in _TooltipResolveExits
 				Parts .= (Parts == "" ? "" : ", ") . Stage . "=" . Count
-		try LoggerInfo("Tooltip", "{1} render(s) presented; position cascade exits: {2}.",
-				_TooltipRenderCount, (Parts == "") ? "none" : Parts)
+		try LoggerInfo("Tooltip", Format("{1} render(s) presented; position cascade exits: {2}; snapshot={3}.",
+				_TooltipRenderCount, (Parts == "") ? "none" : Parts, Reason))
 }
 
 _TooltipCurrentUiaContext() {
@@ -1732,7 +1759,7 @@ _TooltipCaretHeightPx() {
 		return Round(_TooltipMeasureText("Ag").H * _TooltipDpiScale())
 }
 
-_TooltipResolvePosition() {
+_TooltipResolvePosition(DeferUia := false) {
 		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
 		global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
 		global _TooltipPositionCache, TOOLTIP_POSITION_CACHE_MS
@@ -1749,13 +1776,15 @@ _TooltipResolvePosition() {
 		if (GotCaret and (Cx != 0 or Cy != 0)) {
 				_TooltipCountResolveExit("caret")
 				return _TooltipCachePosition(WinExist("A"),
-						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx() })
+						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx(),
+							NativeCaret: true })
 		}
 
 		ActiveHwnd := WinExist("A")
 		CurrentEnvironment := _TooltipReadPositionReceipt(ActiveHwnd)
 		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, ActiveHwnd,
-				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS) {
+				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS,
+				WIGetFocusedControlToken()) {
 				_TooltipCountResolveExit("cache")
 				return { Type: _TooltipPositionCache["type"],
 						X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"],
@@ -1766,9 +1795,9 @@ _TooltipResolvePosition() {
 		ProcName := ""
 		try ProcName := WinGetProcessName("ahk_id " . ActiveHwnd)
 		UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
-		UiaAllowed := !UiaSkippedForIdle
+		UiaAllowed := !DeferUia && !UiaSkippedForIdle
 				and !_TooltipUiaProcessIsHostile(ProcName)
-		UiaProbeDeferred := UiaSkippedForIdle
+		UiaProbeDeferred := DeferUia || UiaSkippedForIdle
 		if UiaAllowed {
 				Context := _TooltipCurrentUiaContext()
 				if (Context is Map) && Context["Hwnd"] = ActiveHwnd
@@ -1827,16 +1856,18 @@ _TooltipCacheUnlessProbePending(Hwnd, Pos, ProbePending) {
 		return _TooltipCachePosition(Hwnd, Pos)
 }
 
-_TooltipCachePosition(Hwnd, Pos) {
+_TooltipCachePosition(Hwnd, Pos, Context := 0) {
 		global _TooltipPositionCache
 		_TooltipPositionCache := Map(
 				"hwnd", Hwnd,
+				"control", Context is Map ? Context["Control"] : WIGetFocusedControlToken(),
 				"type", Pos.Type,
 				"x", Pos.X,
 				"y", Pos.Y,
 				"h", Pos.H,
 				"tick", A_TickCount,
-				"environment", _TooltipReadPositionReceipt(Hwnd)
+				"environment", Context is Map ? Context["Environment"]
+					: _TooltipReadPositionReceipt(Hwnd)
 		)
 		return Pos
 }

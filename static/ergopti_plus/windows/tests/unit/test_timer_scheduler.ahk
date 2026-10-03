@@ -488,3 +488,31 @@ _TSTest_CancelAllLeavesNoHandles() {
 		"cancelAll must leave no handle behind; a leaked one keeps an OS timer armed for the life of the process")
 }
 Test("TimerScheduler: 200 timers all register and cancelAll clears every one", _TSTest_CancelAllLeavesNoHandles)
+
+_TSTest_NativeCallbackKeepsIdentity() {
+	Calls := 0
+	Callback() => (++Calls)
+	PreviousCritical := Critical("On")
+	try {
+		TimerSetCallback(Callback, -1)
+		TimerSetCallback(Callback, 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	try {
+		Sleep(30)
+		AssertEqual(0, Calls, "cancellation retires the exact callback which was armed")
+		TimerSetCallback(Callback, -1)
+		Started := A_TickCount
+		while Calls == 0 && ((A_TickCount - Started) & 0xFFFFFFFF) < 500
+			Sleep(-1)
+		AssertEqual(1, Calls, "the same callback can be rearmed once after cancellation")
+		AssertThrows(() => TimerSetCallback(0, -1))
+		AssertThrows(() => TimerSetCallback(Callback, 1.5))
+		AssertThrows(() => TimerSetCallback(Callback, 0x100000000))
+	} finally {
+		TimerSetCallback(Callback, 0)
+	}
+}
+Test("TimerScheduler: native callback identity survives cancel and rearm (prefix-char-admission)",
+	_TSTest_NativeCallbackKeepsIdentity)

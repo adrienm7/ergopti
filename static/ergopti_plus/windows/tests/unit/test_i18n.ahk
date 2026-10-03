@@ -26,6 +26,7 @@ _I18nTestReset() {
 	global _I18nCacheEn, _I18nCacheEnLoaded
 	global _I18nCacheFr, _I18nCacheFrLoaded
 	global _I18nFallbacksWarmed
+	global _I18nActiveCacheIdentity
 	_I18nCache        := Map()
 	_I18nCacheLoaded  := false
 	_I18nCacheEn      := Map()
@@ -33,6 +34,7 @@ _I18nTestReset() {
 	_I18nCacheFr      := Map()
 	_I18nCacheFrLoaded := false
 	_I18nFallbacksWarmed := false
+	_I18nActiveCacheIdentity := false
 }
 
 ; Pause/suspend regression for i18n (locales must load even if script paused; t() fallback must work)
@@ -490,6 +492,45 @@ _I18nInitResetsCacheLoadedFlag() {
 	AssertFalse(_I18nCacheLoaded)
 }
 Test("i18n I18nInit: resets cache loaded flag", _I18nInitResetsCacheLoadedFlag)
+
+_I18nInitRetainsVerifiedCache() {
+	global _SharedDir, _I18nLocale, _I18nCache, _I18nCacheLoaded, ScriptInformation
+	SavedShared := _SharedDir
+	SavedLocale := _I18nLocale
+	SavedMagic := ScriptInformation.Get("MagicKey", "★")
+	Directory := A_Temp . "\ergopti-locale-reuse-" . A_ScriptHwnd . "-" . A_TickCount
+	DirCreate(Directory . "\data\locales")
+	Path := Directory . "\data\locales\fr.json"
+	try {
+		_I18nTestReset()
+		_SharedDir := Directory
+		_I18nLocale := "fr"
+		ScriptInformation["MagicKey"] := "old"
+		FileAppend('{"hint": "Press ★", "other": "old stays literal"}', Path, "UTF-8-RAW")
+		_I18nLoadFile(Path)
+		Cache := _I18nCache
+		ScriptInformation["MagicKey"] := "new"
+		I18nInit(Map("script", Map("locale", "fr")))
+		AssertTrue(_I18nCacheLoaded)
+		AssertTrue(_I18nCache == Cache, "unchanged source keeps the verified locale map")
+		AssertEqual("Press new", t("hint"), "raw templates update only the configured glyph")
+		AssertEqual("old stays literal", t("other"), "literal text never undergoes old-token replacement")
+		Timestamp := FileGetTime(Path, "M")
+		FileDelete(Path)
+		FileAppend('{"hint": "Other ★", "other": "old stays literal"}', Path, "UTF-8-RAW")
+		FileSetTime(Timestamp, Path, "M")
+		I18nInit(Map("script", Map("locale", "fr")))
+		AssertFalse(_I18nCacheLoaded, "same timestamp and size cannot conceal changed source bytes")
+		AssertEqual("Other new", t("hint"), "a detected source edit must also bypass a stale timestamp-valid TSV")
+	} finally {
+		_SharedDir := SavedShared
+		_I18nLocale := SavedLocale
+		ScriptInformation["MagicKey"] := SavedMagic
+		_I18nTestReset()
+		DirDelete(Directory, true)
+	}
+}
+Test("i18n I18nInit: verified cache survives glyph changes and rejects exact source changes", _I18nInitRetainsVerifiedCache)
 
 
 

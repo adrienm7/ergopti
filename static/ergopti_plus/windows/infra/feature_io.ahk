@@ -66,7 +66,25 @@ FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 	if (Parts.Length < 1)
 		return false
 
-	Node := FeaturesMap
+	return _FeatureLocateParts(FeaturesMap, Parts, Prop)
+}
+
+; Read-only intent lookup selects one root without cloning the entire view.
+FeatureDesiredLocateV2(FeaturesSource, V2Path) {
+	if !(FeaturesSource is Map)
+		return false
+	Parts := StrSplit(V2Path, ".")
+	if !Parts.Length
+		return false
+	Desired := MasterGateState()
+	Root := Parts[1]
+	Source := Desired["initialized"] && (Root == "layout" || Root == "shortcuts" || Root == "hotstrings")
+		&& Desired["features"].Has(Root) ? Desired["features"] : FeaturesSource
+	return _FeatureLocateParts(Source, Parts, "")
+}
+
+; Canonical traversal keeps plain leaves and alpha-property path semantics alike.
+_FeatureLocateParts(Node, Parts, Prop) {
 	Parent := false
 	LastKey := ""
 	Idx := 0
@@ -267,7 +285,7 @@ ReadFeatureStateV2(V2Path) {
 	State := Map()
 	if !IsSet(Features) or !(Features is Map)
 		return State
-	Loc := FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)
+	Loc := FeatureDesiredLocateV2(Features, V2Path)
 	if (Loc == false)
 		return State
 	Node := Loc["v2_node"]

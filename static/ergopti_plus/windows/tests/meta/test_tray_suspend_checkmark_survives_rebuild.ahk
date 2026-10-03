@@ -37,11 +37,12 @@
 ; ===========================================================
 
 _TSC_StagedSuspendRowReassertsItsCheck() {
-	Src := _DriverSourceNoComments()
-	Anchor := InStr(Src, "TrayMenuStage_AddAction(MenuSuspend, ToggleSuspend)")
+	Src := _DriverFuncBody("_MI_StageSuspend")
+	Assert(Src != "", "the suspend row's staging owner must exist")
+	Anchor := InStr(Src, 'TrayMenuStage_AddAction(MenuSuspend, MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("suspend", ToggleSuspend)))')
 	Assert(Anchor > 0, "the suspend tray row must still be staged via TrayMenuStage_AddAction")
 
-	Seg := SubStr(Src, Anchor, 250)
+	Seg := SubStr(Src, Anchor)
 	Assert(InStr(Seg, "A_IsSuspended") > 0 and InStr(Seg, "TrayMenuStage_Check(MenuSuspend)") > 0,
 		"the staged suspend row must re-assert its checked state when A_IsSuspended. "
 		. "TrayMenuStage_Publish deletes and rebuilds the whole tray root, so a rebuild while paused "

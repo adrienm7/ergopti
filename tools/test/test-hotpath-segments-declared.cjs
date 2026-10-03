@@ -42,8 +42,23 @@ const INVENTORY = {
 	OnChar: 'the character event both the hotstring engine and the LLM bridge consume',
 	'HSE.FeedChar': 'the hotstring engine consuming one character',
 	'HSE.Dispatch': 'the hotstring engine deciding and firing an expansion',
+	'HSE.Preflight':
+		'resolving the frozen expansion and its live admission gates before output ownership',
+	'HSE.OutputHost':
+		'the fresh foreground identity and title probe before any expansion mutates input',
+	'HSE.NativeSend':
+		'the native atomic or paste send, distinguished from preparation and buffer commit',
 	'LLM.OnChar':
 		'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
+	'LLM.PrefixObservers':
+		'the deferred AI agent and prediction observers, separated from ordered prefix input admission',
+	'LLM.PrefixMirror':
+		'the synchronous bounded AI context edit before canonical hotstring admission',
+	'Prefix.FocusAdmission':
+		'the focused-control ownership check before accepting a physical character',
+	'Prefix.PreviewDecisions':
+		'the canonical engine decisions collected before tooltip metadata and GUI construction',
+	'Prefix.PreviewMetadata': 'the metadata attached to accepted preview decisions before rendering',
 	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
 	'KL.RoiPrune':
 		'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
@@ -56,6 +71,10 @@ const INVENTORY = {
 	'Tooltip.DequeuePresent':
 		'the same present from the destack rebuild, so a slow row expiry is not mistaken for a slow render',
 	'Tooltip.LlmPresent': 'presenting an LLM prediction preview',
+	'Tooltip.LlmBuild':
+		'measuring and building rich prediction controls before position resolution and presentation',
+	'LLM.Render':
+		'the rich tooltip call through its publication receipt; excludes preceding display-slot preparation and the generation chain',
 	'Tooltip.BorderPixelLoop':
 		'the per-pixel border draw, the one step that scales with tooltip size',
 	'Gesture.Invoke':
@@ -64,6 +83,8 @@ const INVENTORY = {
 		'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
 	'Config.TomlBuild':
 		'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
+	'Menu.populate_leaf':
+		'prepared native leaf registration before popup paint or in one-shot background work, so menu construction stalls are attributed separately from startup',
 	'Updater.Poll':
 		'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
 	'Webview.Eval':
@@ -126,14 +147,28 @@ for (const [name, where] of declared) {
 // ==================================================
 // ==================================================
 
-// The five stamps taken BEFORE BootProfile_Begin, when the logger does not exist
+// The stamps taken BEFORE BootProfile_Begin, when the logger does not exist
 // yet: they record a tick only, and are replayed as log lines once it does.
 // Without them the whole span from process creation to BootProfile_Begin is one
 // opaque "script parse + load: ~N ms" with no attribution inside it.
 const BOOT_STAMPS = [
+	'Auto-execute entered', // Separate source loading from executable initializers.
+	'Single-owner gate completed', // Attribute contention with the previous driver.
 	'Bundle extracted',
+	'UIA include initialised', // Attribute the selection dependency's include work.
+	'Diagnostics and core state initialised', // Bound core auto-execute state.
+	'Adapters initialised', // Bound native adapter state initialization.
+	'Hotstring and TOML state initialised', // Bound parser and engine declarations.
+	'Manifest, updater and locale state initialised', // Attribute data-backed defaults.
+	'WebView and metrics UI state initialised', // Detect eager UI initialization.
+	'Keylogger modules initialised', // Separate sensor state from registration.
+	'LLM defaults loaded', // Attribute shared model defaults parsing.
 	'Module includes initialised',
+	'Paths and shared configuration loaded', // Attribute locator and shared defaults.
 	'Tray reset + onboarding',
+	'Configuration migration checked', // Attribute migration registry parsing.
+	'Configuration TOML snapshot parsed', // Attribute the cached configuration read.
+	'Script preferences applied', // Separate preference application from locale load.
 	'Config parsed (TOML + i18n)',
 	'Hotstring engine initialised'
 ];

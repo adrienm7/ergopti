@@ -83,13 +83,15 @@ const includesOf = (source) =>
 	[...source.matchAll(/^#Include\s+(\S+)\s*$/gm)].map((m) => m[1].replace(/\\/g, '/'));
 
 /**
- * Returns the body of an AHK function declared at column 0.
+ * Returns the body of an AHK function, including continued argument lists.
  * @param {string} source AHK source text.
  * @param {string} name Function name.
  * @returns {string} Body text, "" when absent.
  */
 const bodyOf = (source, name) => {
-	const start = source.search(new RegExp(`^${name}\\(.*\\{\\s*$`, 'm'));
+	const start = source.search(
+		new RegExp('^PLACEHOLDER\\([\\s\\S]*?\\)\\s*\\{\\s*$'.replace('PLACEHOLDER', name), 'm')
+	);
 	if (start < 0) return '';
 	const end = source.indexOf('\n}', start);
 	return end < 0 ? '' : source.slice(start, end);
@@ -507,12 +509,19 @@ for (const name of [
 ]) {
 	check(bodyOf(agentPort, name) !== '', `agent.ahk must port ${name}`);
 }
-check(
-	['LLM_Bridge_OnChar', 'LLM_Bridge_OnBackspace'].every((name) =>
-		bodyOf(bridge, name).includes('LLM_Agent_OnTyping(_LLM_Bridge_Buffer)')
-	),
-	"every typed character and Backspace must reach the agent's automatic mode"
+const typingBodies = Object.fromEntries(
+	[
+		'LLM_Bridge_OnChar',
+		'LLM_Bridge_OnBackspace',
+		'_LLM_Bridge_NotifyChar',
+		'LLM_Bridge_FeedCharForPrefix',
+		'_LLM_Bridge_SchedulePrefixObserver',
+		'_LLM_Bridge_RunPrefixObserver'
+	].map((name) => [name, bodyOf(bridge, name)])
 );
+for (const [name, body] of Object.entries(typingBodies)) {
+	check(body !== '', `the typing observer's declared owner ${name} must exist`);
+}
 check(
 	bridge.includes('Handler := _LLM_Bridge_AcceptedSlotHandler(Transaction)') &&
 		bodyOf(bridge, '_LLM_Bridge_AcceptedSlotHandler').includes('"OnAccept"'),

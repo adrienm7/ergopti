@@ -774,51 +774,32 @@ function recompute_speed_kpi() {
  * re-renders the current table. Called after data fetch completes or when
  * a toggle filter changes.
  */
+// Retain only the current and previous projection, so toggling back is cheap
+// without keeping every possible copy of the n-gram dictionaries.
+const TYPING_PROJECTION_CACHE_LIMIT = 2;
+const typing_projection_cache = new Map();
+let typing_historical_owner = null;
+let typing_live_owner = null;
+window.typingFilterPerformance = { hits: 0, misses: 0, lastAggregationMs: 0, entries: 0 };
+
+/** Retires projections when an accepted payload or in-place live update changes the source. */
+function invalidate_typing_projection_cache() {
+	typing_projection_cache.clear();
+	typing_historical_owner = app_state.historical_cache;
+	typing_live_owner = app_state.today_live_data;
+	window.typingFilterPerformance.entries = 0;
+}
+
 function apply_local_filters() {
 	if (!app_state.historical_cache && !app_state.today_live_data) return;
-
-	app_state.data = {
-		c: {},
-		bg: {},
-		tg: {},
-		qg: {},
-		pg: {},
-		hx: {},
-		hp: {},
-		w: {},
-		sc: {},
-		sc_bg: {},
-		sc_tg: {},
-		sc_qg: {},
-		sc_pg: {},
-		w_bg: {},
-		w_tg: {},
-		w_qg: {},
-		w_pg: {},
-		kc: {}
-	};
-
+	if (
+		typing_historical_owner !== app_state.historical_cache ||
+		typing_live_owner !== app_state.today_live_data
+	)
+		invalidate_typing_projection_cache();
 	const { show_manual, show_hs, show_llm } = get_source_mode_flags();
 	const show_spaces = true; // Espaces toujours visibles (bouton supprimé)
 	const case_sensitive = document.getElementById('btn_case_sensitive').classList.contains('active');
-
-	const merge_source = (source_cache) => {
-		if (!source_cache) return;
-		Object.keys(app_state.data).forEach((tab) => {
-			merge_dict(
-				app_state.data[tab],
-				source_cache[tab],
-				case_sensitive,
-				show_spaces,
-				show_hs,
-				show_llm,
-				show_manual,
-				tab
-			);
-		});
-	};
-
-	merge_source(app_state.historical_cache);
 
 	// Merge today's live data if it falls within the selected date range
 	const start_val = document.getElementById('date_start').value;
@@ -829,6 +810,8 @@ function apply_local_filters() {
 	if (start_val && today_str < start_val) include_today = false;
 	if (end_val && today_str > end_val) include_today = false;
 
+	// Discover live apps before keying ALL/UNINITIALIZED selection. Otherwise
+	// the first projection would be stored under its pre-discovery selection.
 	if (include_today && app_state.today_live_data) {
 		Object.keys(app_state.today_live_data).forEach((app_name) => {
 			if (app_name === '_sys' || app_name === '_system') return;
@@ -844,14 +827,55 @@ function apply_local_filters() {
 				}
 				update_app_btn_text();
 			}
+		});
+	}
+	const key = JSON.stringify([
+		show_manual,
+		show_hs,
+		show_llm,
+		case_sensitive,
+		start_val,
+		end_val,
+		today_str,
+		app_state.app_selection_mode,
+		[...app_state.selected_apps].sort()
+	]);
+	if (typing_projection_cache.has(key)) {
+		app_state.data = typing_projection_cache.get(key);
+		typing_projection_cache.delete(key);
+		typing_projection_cache.set(key, app_state.data);
+		window.typingFilterPerformance.hits++;
+		window.typingFilterPerformance.lastAggregationMs = 0;
+	} else {
+		const started = Date.now();
 
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+		app_state.data = {
+			c: {},
+			bg: {},
+			tg: {},
+			qg: {},
+			pg: {},
+			hx: {},
+			hp: {},
+			w: {},
+			sc: {},
+			sc_bg: {},
+			sc_tg: {},
+			sc_qg: {},
+			sc_pg: {},
+			w_bg: {},
+			w_tg: {},
+			w_qg: {},
+			w_pg: {},
+			kc: {}
+		};
 
-			const app_data = app_state.today_live_data[app_name];
+		const merge_source = (source_cache) => {
+			if (!source_cache) return;
 			Object.keys(app_state.data).forEach((tab) => {
 				merge_dict(
 					app_state.data[tab],
-					app_data[tab],
+					source_cache[tab],
 					case_sensitive,
 					show_spaces,
 					show_hs,
@@ -860,9 +884,41 @@ function apply_local_filters() {
 					tab
 				);
 			});
-		});
+		};
+
+		merge_source(app_state.historical_cache);
+
+		if (include_today && app_state.today_live_data) {
+			Object.keys(app_state.today_live_data).forEach((app_name) => {
+				if (app_name === '_sys' || app_name === '_system') return;
+
+				if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+
+				const app_data = app_state.today_live_data[app_name];
+				Object.keys(app_state.data).forEach((tab) => {
+					merge_dict(
+						app_state.data[tab],
+						app_data[tab],
+						case_sensitive,
+						show_spaces,
+						show_hs,
+						show_llm,
+						show_manual,
+						tab
+					);
+				});
+			});
+		}
+		typing_projection_cache.set(key, app_state.data);
+		if (typing_projection_cache.size > TYPING_PROJECTION_CACHE_LIMIT)
+			typing_projection_cache.delete(typing_projection_cache.keys().next().value);
+		window.typingFilterPerformance.misses++;
+		window.typingFilterPerformance.lastAggregationMs = Date.now() - started;
+		window.typingFilterPerformance.entries = typing_projection_cache.size;
 	}
 
+	// Pause thresholds, layout and manifest KPIs are not merge inputs. Always
+	// recompute their presentation, even when the n-gram projection is retained.
 	render_repetitions_kpi();
 	render_sfb_kpi();
 	render_distance_kpi();
@@ -3336,6 +3392,7 @@ function render_wellness_kpi() {
  * host keeps Reset ahead of range delivery until the actual purge completes.
  */
 function request_cache_reset() {
+	invalidate_typing_projection_cache();
 	complete_range_request(app_state.active_range_request_id, 'superseded');
 	window._prefetch_data = null;
 	if (window.chrome?.webview) {
@@ -3537,6 +3594,7 @@ function receive_range_data(payload, request_id = null) {
 		return false;
 	}
 	if (!payload) return false;
+	invalidate_typing_projection_cache();
 	app_state.historical_cache = payload.historical;
 	app_state.today_live_data = payload.today;
 	apply_local_filters();
@@ -3549,6 +3607,7 @@ function receive_range_data(payload, request_id = null) {
  * @param {Object} today_idx - The current session's live n-gram data.
  */
 window.receive_live_update = function (today_idx) {
+	invalidate_typing_projection_cache();
 	app_state.today_live_data = today_idx;
 	if (app_state.live_update_timer) clearTimeout(app_state.live_update_timer);
 	app_state.live_update_timer = setTimeout(() => {

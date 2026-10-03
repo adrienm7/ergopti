@@ -25,8 +25,18 @@
 ; ========================================
 
 _SFD_IsSecureField_Callable() {
-	local result := SFD_IsSecureField()
-	AssertTrue(result = 0 || result = 1)
+	global _SR_ActiveTasks
+	TasksBefore := _SR_ActiveTasks.Count
+	PreviousCritical := Critical("On")
+	try {
+		Result := SFD_IsSecureField()
+		AssertTrue(Result = 0 || Result = 1)
+	} finally {
+		AssertTrue(SFD_Stop(), "the native focus hook belongs to this fixture")
+		Critical(PreviousCritical)
+	}
+	Sleep(20)
+	AssertEqual(TasksBefore, _SR_ActiveTasks.Count, "the contract probe must not leak a real UIA worker")
 }
 Test("SFD_IsSecureField: callable, returns 0 or 1", _SFD_IsSecureField_Callable)
 

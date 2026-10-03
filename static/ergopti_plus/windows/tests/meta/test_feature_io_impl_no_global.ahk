@@ -112,13 +112,13 @@ Test("config_io: every WriteFeatureBatchV2 caller resolves Features explicitly (
 ; ReadFeatureStateV2 is read-only (never mutates Features or config.toml), so
 ; feedback_loader_target_explicit's own carve-out for read-only accessors
 ; applies -- it may bind the global itself, as long as it then passes it
-; explicitly into FeatureLocateV2 rather than relying on a delegating wrapper.
+; explicitly into the desired-state locator rather than cloning the whole view.
 _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly() {
 	Body := _DriverFuncBody("ReadFeatureStateV2")
 	Assert(Body != "", "ReadFeatureStateV2 must exist in infra/feature_io.ahk")
 	Assert(InStr(Body, "global Features") > 0,
 		"ReadFeatureStateV2 is the documented read-only-accessor exception and may bind global Features itself")
-	Assert(InStr(Body, "FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)") > 0,
-		"ReadFeatureStateV2 must pass its explicit desired view into the locator")
+	Assert(InStr(Body, "FeatureDesiredLocateV2(Features, V2Path)") > 0,
+		"ReadFeatureStateV2 must pass its explicit source into the desired-state locator")
 }
-Test("feature_io: ReadFeatureStateV2 binds global Features (documented read-only exception) but calls FeatureLocateV2 explicitly (F43)", _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly)
+Test("feature_io: ReadFeatureStateV2 binds global Features but passes its explicit source to the desired locator (F43)", _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly)

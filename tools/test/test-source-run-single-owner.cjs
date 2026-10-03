@@ -96,6 +96,7 @@ const WINDOWS_MECHANICS = {
 	'ErgoptiPlus.ahk': 'the compiled exe extracts and recovers its bundle',
 	'infra/boot.ahk': 'where each launch mode keeps paths.toml',
 	'infra/bundle.ahk': 'only the exe carries an embedded bundle',
+	'infra/config_registry_cache.ahk': 'fingerprint the executable when parser sources are embedded',
 	'infra/lifecycle.ahk': 'which executable a reload relaunches',
 	'infra/toml/toml_helpers.ahk': "the compiled exe's former paths.toml location",
 	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',

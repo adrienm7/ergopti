@@ -893,6 +893,8 @@ _LoggerRequeue(Pending, PendingErr) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
+		if IsSet(HotPath_StopStatistics)
+			HotPath_StopStatistics()
 		; If the very last log call before shutdown was itself a suppressed
 		; duplicate, its streak's "N more identical lines" summary is still
 		; pending — the streak only ever gets flushed when a DIFFERENT line
@@ -1325,9 +1327,12 @@ _LoggerRepeatDisable() {
 
 _LoggerRepeatForget() {
 	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST
-	_LOGGER_REPEAT_STREAKS := Map()
-	_LOGGER_REPEAT_DATE := ""
-	_LOGGER_REPEAT_OLDEST := ""
+	PreviousCritical := Critical("On")
+	try {
+		_LOGGER_REPEAT_STREAKS := Map()
+		_LOGGER_REPEAT_DATE := ""
+		_LOGGER_REPEAT_OLDEST := ""
+	} finally Critical(PreviousCritical)
 }
 
 ; Emits the summaries that are due. The periodic form (Force false) closes the
@@ -1360,17 +1365,20 @@ _LoggerFlushRepeats(Force) {
 _LoggerExpireRepeatStreaks(Now, Stamp) {
 	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST, LOGGER_REPEAT_WINDOW_MS
 	Date := SubStr(Stamp, 1, 10)
-	if (_LOGGER_REPEAT_STREAKS.Count == 0) {
-		_LOGGER_REPEAT_DATE := Date
-		return
-	}
-	if (Date !== _LOGGER_REPEAT_DATE) {
-		_LoggerCloseRepeatStreaks(Now, true, Stamp)
-		_LOGGER_REPEAT_DATE := Date
-	} else if (_LOGGER_REPEAT_OLDEST != ""
-			and _LoggerElapsedMs(Now, _LOGGER_REPEAT_OLDEST) >= LOGGER_REPEAT_WINDOW_MS) {
-		_LoggerCloseRepeatStreaks(Now, false, Stamp)
-	}
+	Closing := []
+	PreviousCritical := Critical("On")
+	try {
+		if (_LOGGER_REPEAT_STREAKS.Count == 0) {
+			_LOGGER_REPEAT_DATE := Date
+		} else if (Date !== _LOGGER_REPEAT_DATE) {
+			Closing := _LoggerTakeRepeatStreaks(Now, true)
+			_LOGGER_REPEAT_DATE := Date
+		} else if (_LOGGER_REPEAT_OLDEST != ""
+				and _LoggerElapsedMs(Now, _LOGGER_REPEAT_OLDEST) >= LOGGER_REPEAT_WINDOW_MS) {
+			Closing := _LoggerTakeRepeatStreaks(Now, false)
+		}
+	} finally Critical(PreviousCritical)
+	_LoggerSummariseRepeatStreaks(Closing, Stamp)
 }
 
 ; Closes every streak whose window has elapsed at Now, or all of them, and emits
@@ -1378,27 +1386,42 @@ _LoggerExpireRepeatStreaks(Now, Stamp) {
 ; BEFORE any summary is emitted, so nothing re-entering the logger can observe a
 ; half-closed table.
 _LoggerCloseRepeatStreaks(Now, Everything, Stamp) {
+	Closing := _LoggerTakeRepeatStreaks(Now, Everything)
+	_LoggerSummariseRepeatStreaks(Closing, Stamp)
+}
+
+; Claim and detach the complete snapshot before a timer or sink can re-enter.
+; No callbacks or file I/O belong inside this short registry transaction.
+_LoggerTakeRepeatStreaks(Now, Everything) {
 	global _LOGGER_REPEAT_STREAKS, LOGGER_REPEAT_WINDOW_MS
 	Closing := []
-	for _, Streak in _LOGGER_REPEAT_STREAKS {
-		if (Everything or _LoggerElapsedMs(Now, Streak.Start) >= LOGGER_REPEAT_WINDOW_MS)
-			Closing.Push(Streak)
-	}
-	if (Closing.Length == 0)
-		return
-	; Insertion sort by creation order: at most LOGGER_REPEAT_CAPACITY entries
-	loop Closing.Length - 1 {
-		Current := Closing[A_Index + 1]
-		Slot := A_Index
-		while (Slot >= 1 and Closing[Slot].Seq > Current.Seq) {
-			Closing[Slot + 1] := Closing[Slot]
-			Slot -= 1
+	PreviousCritical := Critical("On")
+	try {
+		for _, Streak in _LOGGER_REPEAT_STREAKS {
+			if (Everything or _LoggerElapsedMs(Now, Streak.Start) >= LOGGER_REPEAT_WINDOW_MS)
+				Closing.Push(Streak)
 		}
-		Closing[Slot + 1] := Current
-	}
-	for _, Streak in Closing
-		_LOGGER_REPEAT_STREAKS.Delete(Streak.Key)
-	_LoggerRecomputeOldestStreak(Now)
+		if (Closing.Length == 0)
+			return Closing
+		; Preserve creation order within the bounded table.
+		loop Closing.Length - 1 {
+			Current := Closing[A_Index + 1]
+			Slot := A_Index
+			while (Slot >= 1 and Closing[Slot].Seq > Current.Seq) {
+				Closing[Slot + 1] := Closing[Slot]
+				Slot -= 1
+			}
+			Closing[Slot + 1] := Current
+		}
+		for _, Streak in Closing
+			_LOGGER_REPEAT_STREAKS.Delete(Streak.Key)
+		_LoggerRecomputeOldestStreak(Now)
+		return Closing
+	} finally Critical(PreviousCritical)
+}
+
+; Detached streaks own their summaries; emission never holds the registry lock.
+_LoggerSummariseRepeatStreaks(Closing, Stamp) {
 	for _, Streak in Closing {
 		if (Streak.Count > 0)
 			_LoggerEmitRepeatSummary(Streak, Stamp)
@@ -1421,9 +1444,9 @@ _LoggerRecomputeOldestStreak(Now) {
 	_LOGGER_REPEAT_OLDEST := Oldest
 }
 
-; Evicts the least recently used streak to make room for a new one, reporting its
-; count first so a bounded table never loses a withheld occurrence.
-_LoggerEvictLeastRecentStreak(Now, Stamp) {
+; Detaches the least recently used streak inside the caller's critical transaction.
+; The caller publishes its replacement before emitting this victim's summary.
+_LoggerEvictLeastRecentStreak(Now) {
 	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_OLDEST
 	Victim := 0
 	for _, Streak in _LOGGER_REPEAT_STREAKS {
@@ -1433,8 +1456,7 @@ _LoggerEvictLeastRecentStreak(Now, Stamp) {
 	_LOGGER_REPEAT_STREAKS.Delete(Victim.Key)
 	if (Victim.Start == _LOGGER_REPEAT_OLDEST)
 		_LoggerRecomputeOldestStreak(Now)
-	if (Victim.Count > 0)
-		_LoggerEmitRepeatSummary(Victim, Stamp)
+	return Victim
 }
 
 ; Decides whether one line is a repeat to withhold, recording it when it is and
@@ -1447,27 +1469,31 @@ _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now) {
 		return false
 	Text := (LOGGER_REPEAT_KEY_BY[Level] == "template") ? String(Msg) : Body
 	Key := Level . Chr(31) . Tag . Chr(31) . Text
-	_LOGGER_REPEAT_USE += 1
-
-	if _LOGGER_REPEAT_STREAKS.Has(Key) {
-		Streak := _LOGGER_REPEAT_STREAKS[Key]
-		Streak.Count += 1
-		if (Streak.Count == 1)
-			Streak.FirstStamp := Stamp
-		Streak.LastStamp := Stamp
-		Streak.LastBody := Body
-		Streak.Used := _LOGGER_REPEAT_USE
-		return true
-	}
-
-	if (_LOGGER_REPEAT_STREAKS.Count >= LOGGER_REPEAT_CAPACITY)
-		_LoggerEvictLeastRecentStreak(Now, Stamp)
-	_LOGGER_REPEAT_SEQ += 1
-	_LOGGER_REPEAT_STREAKS[Key] := {Key: Key, Level: Level, Tag: Tag, Text: Text, Start: Now,
-		Seq: _LOGGER_REPEAT_SEQ, Used: _LOGGER_REPEAT_USE, Count: 0,
-		FirstStamp: "", LastStamp: "", LastBody: ""}
-	if (_LOGGER_REPEAT_OLDEST == "")
-		_LOGGER_REPEAT_OLDEST := Now
+	Evicted := 0
+	PreviousCritical := Critical("On")
+	try {
+		_LOGGER_REPEAT_USE += 1
+		if _LOGGER_REPEAT_STREAKS.Has(Key) {
+			Streak := _LOGGER_REPEAT_STREAKS[Key]
+			Streak.Count += 1
+			if (Streak.Count == 1)
+				Streak.FirstStamp := Stamp
+			Streak.LastStamp := Stamp
+			Streak.LastBody := Body
+			Streak.Used := _LOGGER_REPEAT_USE
+			return true
+		}
+		if (_LOGGER_REPEAT_STREAKS.Count >= LOGGER_REPEAT_CAPACITY)
+			Evicted := _LoggerEvictLeastRecentStreak(Now)
+		_LOGGER_REPEAT_SEQ += 1
+		_LOGGER_REPEAT_STREAKS[Key] := {Key: Key, Level: Level, Tag: Tag, Text: Text, Start: Now,
+			Seq: _LOGGER_REPEAT_SEQ, Used: _LOGGER_REPEAT_USE, Count: 0,
+			FirstStamp: "", LastStamp: "", LastBody: ""}
+		if (_LOGGER_REPEAT_OLDEST == "")
+			_LOGGER_REPEAT_OLDEST := Now
+	} finally Critical(PreviousCritical)
+	if IsObject(Evicted) and Evicted.Count > 0
+		_LoggerEmitRepeatSummary(Evicted, Stamp)
 	return false
 }
 

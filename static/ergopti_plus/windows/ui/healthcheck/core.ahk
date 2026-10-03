@@ -463,10 +463,50 @@ global _HC_ResetDone := false
 ; The page session of the open window: its epoch, its snapshot, whether
 ; details are included and the mode it opened in (0 when closed).
 global _HC_Session := 0
+; One retained controller; navigation renews the document and every session.
+global _HC_ReuseKey := ""
+global _HC_OpenStarted := 0
+global _HC_Opening := false
+global _HC_PendingMode := unset
+global _HC_RequestSerial := 0
+global _HC_PendingSerial := 0
+global _HC_CloseDuringOpen := false
+global _HC_Retiring := false
+
+_HC_CanReuse(Key) {
+	global _HC_Gui, _HC_Controller, _HC_WebView, _HC_ResetDone, _HC_ReuseKey
+	if _HC_ResetDone || !IsSet(_HC_Gui) || !IsSet(_HC_Controller) || !IsSet(_HC_WebView)
+		return false
+	return _HC_ReuseKey == Key && WMHandleExists(_HC_Gui.Hwnd)
+}
+
+/** A newer open or close supersedes a request queued during native setup. */
+_HC_ResumePending(Mode, Serial) {
+	global _HC_RequestSerial
+	if Serial != _HC_RequestSerial
+		return
+	HealthCheck_ShowWindow(Mode)
+}
 
 ; Keep native title construction with the GUI owner, independent of diagnostics collection.
 _HC_NewWindow() {
 	return Gui_Create("+Resize +MinSize640x480", t("menu.debug.healthcheck"))
+}
+
+/** Attributes diagnostics opening without retaining snapshot or foreground contents. */
+_HC_OpenTimingMark(Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	MenuWait := BootProfile_MenuWaitMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Diagnostics." . Phase, Elapsed, 5)
+	try LoggerInfo("Healthcheck", Format(
+		"Diagnostics stage '{1}': wall={2:.3f} ms, process_cpu={3} ms, native_menu_wait={4:.3f} ms.",
+		Phase, Elapsed, CpuText, Max(0, MenuWait - Timing.MenuWait)))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+	Timing.MenuWait := MenuWait
 }
 
 ; Opens the diagnostics window, replacing any previous one.
@@ -474,75 +514,139 @@ _HC_NewWindow() {
 HealthCheck_ShowWindow(Mode := "") {
 	global _VendorDir, _SharedDir, _I18nLocale, HC_WIDTH, HC_HEIGHT, HC_VHOST, HC_HOST_ACCESS_ALLOW
 	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone, _HC_Gui
-	global _HC_WindowEpoch, _HC_Session
+	global _HC_WindowEpoch, _HC_Session, _HC_ReuseKey, _HC_OpenStarted
 
-	LoggerStart("Healthcheck", "Opening the diagnostics window…")
-	; Close any previous singleton before opening a new one.
-	_HC_Close()
-	Snapshot := HealthCheck_Run()
+	global _HC_Opening, _HC_PendingMode, _HC_CloseDuringOpen, _HC_Retiring
+	global _HC_RequestSerial, _HC_PendingSerial
+	_HC_RequestSerial += 1
+	if _HC_Opening || _HC_Retiring {
+		_HC_PendingMode := Mode
+		_HC_PendingSerial := _HC_RequestSerial
+		LoggerDebug("Healthcheck", "Diagnostics opening already in progress; latest request retained.")
+		return
+	}
+	_HC_Opening := true
+	_HC_CloseDuringOpen := false
+	try {
+		LoggerStart("Healthcheck", "Opening the diagnostics window…")
+		_HC_OpenStarted := _HealthCheck_NowMs()
+		Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
+		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		ReuseKey := _SharedDir . "`n" . Locale
+		Reuse := _HC_CanReuse(ReuseKey)
+		if Reuse
+			_HealthCheck_CloseGui(_HC_Gui, false)
+		else
+			_HC_Close()
+		Snapshot := HealthCheck_Run()
+		_HC_OpenTimingMark("snapshot", Timing)
 
-	G := _HC_NewWindow()
-	G.MarginX := 0
-	G.MarginY := 0
-	ContentCtl := G.Add("Text", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT, "")
-	G.WVC := 0
-	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
-	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
-	G.OnEvent("Size",   _HC_OnSize.Bind(ContentCtl))
-	G.Show("w" . HC_WIDTH . " h" . HC_HEIGHT)
-	; Publish the host window so the next open can actually destroy this one.
-	_HC_Gui := G
-
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-	if UseWV {
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		WVC := 0
-		try {
-			WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
-			G.WVC := WVC
-		} catch as Err {
-			LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing structured native diagnostics.", Err.Message)
+		if Reuse {
+			G := _HC_Gui
+			ContentCtl := G.ContentCtl
+			G.Show()
+		} else {
+			G := _HC_NewWindow()
+			G.MarginX := 0
+			G.MarginY := 0
+			ContentCtl := G.Add("Text", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT, "")
+			G.ContentCtl := ContentCtl
+			G.WVC := 0
+			G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
+			G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
+			G.OnEvent("Size",   _HC_OnSize.Bind(ContentCtl))
+			G.Show("w" . HC_WIDTH . " h" . HC_HEIGHT)
 		}
+		; Publish the host window so the next open can actually destroy this one.
+		_HC_Gui := G
+		LoggerInfo("Healthcheck", "Diagnostics host shown in {1} ms (reused={2}).",
+			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
+		_HC_OpenTimingMark("host", Timing)
 
-		if WVC {
-			_HC_Controller := WVC
-			_HC_WebView    := WVC.CoreWebView2
-			_HC_ResetDone  := false
-			_HC_WindowEpoch += 1
-			WindowEpoch := _HC_WindowEpoch
-			_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "mode", Mode)
-
+		UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+		if UseWV {
+			loader := _VendorDir . "\64bit\WebView2Loader.dll"
+			WVC := 0
 			try {
-				s := _HC_WebView.Settings
-				s.AreDevToolsEnabled              := false
-				s.AreDefaultContextMenusEnabled   := false
-				s.IsStatusBarEnabled              := false
-				s.AreBrowserAcceleratorKeysEnabled := false
+				Environment := WebView_SharedEnvironment(loader)
+				_HC_OpenTimingMark("environment", Timing)
+				WVC := Reuse ? _HC_Controller : WebView2.create(ContentCtl.Hwnd, , Environment)
+				_HC_OpenTimingMark("controller_create", Timing)
+				WVC.IsVisible := false
+				; Virtual-host subresources survive navigation, including same-size edits.
+				WebView_ClearDocumentCache(WVC.CoreWebView2)
+				_HC_OpenTimingMark("document_cache", Timing)
+				G.WVC := WVC
+			} catch as Err {
+				if Reuse
+					_HC_Reset()
+				else if WVC
+					WVC.Close()
+				WVC := 0
+				G.WVC := 0
+				LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing structured native diagnostics.", Err.Message)
 			}
 
-			; The locale base and code before the page scripts run: i18n.js fetches
-			; the strings through the virtual host
-			Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
-			try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
-				"window.__i18n_base='https://" . HC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
+			_HC_OpenTimingMark("controller", Timing)
+			if WVC {
+				_HC_Controller := WVC
+				_HC_WebView    := WVC.CoreWebView2
+				_HC_ResetDone  := false
+				_HC_ReuseKey := ReuseKey
+				_HC_WindowEpoch += 1
+				WindowEpoch := _HC_WindowEpoch
+				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
+				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "mode", Mode,
+					"page_url", PageUrl)
 
-			; The subscription is bound to this window's epoch, so a late message of
-			; a closed window cannot reach its replacement through the globals.
-			_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
+				try {
+					s := _HC_WebView.Settings
+					s.AreDevToolsEnabled              := false
+					s.AreDefaultContextMenusEnabled   := false
+					s.IsStatusBarEnabled              := false
+					s.AreBrowserAcceleratorKeysEnabled := false
+				}
 
-			; Map the virtual host BEFORE navigating.
-			try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
-			try _HC_WebView.Navigate("https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount)
-			try _HC_Controller.Fill()
+				; The locale base and code before the page scripts run: i18n.js fetches
+				; the strings through the virtual host
+				if !Reuse
+					try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
+						"window.__i18n_base='https://" . HC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
 
-			LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
-			return
+				; The subscription is bound to this window's epoch, so a late message of
+				; a closed window cannot reach its replacement through the globals.
+				_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
+				_HC_OpenTimingMark("bindings", Timing)
+
+				; Map the virtual host BEFORE navigating.
+				try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
+				try _HC_WebView.Navigate(PageUrl)
+				try _HC_Controller.Fill()
+				if _HC_CloseDuringOpen
+					_HealthCheck_CloseGui(G, false)
+				LoggerInfo("Healthcheck", "Diagnostics controller prepared in {1} ms (reused={2}).",
+					Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
+				_HC_OpenTimingMark("navigate", Timing)
+
+				LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
+				return
+			}
+		}
+
+		ContentCtl.Visible := false
+		_HC_ShowNativeSnapshot(G, Snapshot)
+		_HC_OpenTimingMark("native_controls", Timing)
+		LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
+	} finally {
+		if IsSet(Timing)
+			HotPath_RecordLatency("Diagnostics.total", _HealthCheck_NowMs() - _HC_OpenStarted, 5)
+		_HC_Opening := false
+		if IsSet(_HC_PendingMode) {
+			PendingMode := _HC_PendingMode
+			_HC_PendingMode := unset
+			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
 		}
 	}
-
-	ContentCtl.Visible := false
-	_HC_ShowNativeSnapshot(G, Snapshot)
-	LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
 }
 
 ; Builds a readable native view when the installed browser really cannot open.
@@ -603,15 +707,41 @@ _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
 		try _HC_Controller.Fill()
 }
 
-_HealthCheck_CloseGui(G) {
-	global _HC_Gui
-	_HC_Reset()
-	if G.HasProp("WVC") && G.WVC
-		try G.WVC.Close()
-	try G.Destroy()
-	; Drop the singleton handle so a later _HC_Close cannot Destroy() a window
-	; that is already gone.
-	_HC_Gui := unset
+_HealthCheck_CloseGui(G, UserRequest := true) {
+	global _HC_Gui, _HC_Controller, _HC_MsgSub, _HC_WindowEpoch, _HC_Session
+	global _HC_Opening, _HC_CloseDuringOpen, _HC_Retiring, _HC_PendingMode
+	global _HC_RequestSerial, _HC_PendingSerial
+	if !IsSet(_HC_Gui) || !(G == _HC_Gui) || _HC_Retiring
+		return 1
+	if UserRequest {
+		_HC_RequestSerial += 1
+		_HC_PendingMode := unset
+	}
+	if _HC_Opening && UserRequest
+		_HC_CloseDuringOpen := true
+	_HC_Retiring := true
+	try {
+		_HC_WindowEpoch += 1
+		_HC_Session := 0
+		HealthCheck_CancelProbes()
+		_HC_MsgSub := unset
+		if IsSet(_HC_Controller)
+			_HC_Controller.IsVisible := false
+		G.Hide()
+		LoggerDebug("Healthcheck", "Diagnostics session retired; native host retained.")
+	} catch as Err {
+		_HC_Close()
+		LoggerError("Healthcheck", "Diagnostics host retention failed: {1}.", Err.Message)
+		throw Err
+	} finally {
+		_HC_Retiring := false
+		if !_HC_Opening && IsSet(_HC_PendingMode) {
+			PendingMode := _HC_PendingMode
+			_HC_PendingMode := unset
+			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
+		}
+	}
+	return 1
 }
 
 ; ── WebView2 messages ───────────────────────────────────────────────────────
@@ -622,10 +752,14 @@ _HealthCheck_CloseGui(G) {
 ; diagnostics page changes nothing ErgoptiPlus does, and the pause is often why
 ; the user opened it, so every action stays available while suspended.
 _HC_OnWebMessage(WindowEpoch, Handler, Args) {
-	global _HC_WindowEpoch, _HC_ResetDone
-	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch)
+	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session
+	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
 		return
-	try Raw := Args.TryGetWebMessageAsString()
+	try {
+		if !(Args.Source == _HC_Session["page_url"])
+			return
+		Raw := Args.TryGetWebMessageAsString()
+	}
 	catch as Err {
 		LoggerWarn("Healthcheck", "A diagnostics page message could not be read: {1}.", Err.Message)
 		return
@@ -639,13 +773,15 @@ _HC_OnWebMessage(WindowEpoch, Handler, Args) {
 ; @param WindowEpoch {Integer} The window that received it.
 ; @param Raw {String} The message as the page posted it.
 _HC_HandleMessage(WindowEpoch, Raw) {
-	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session
+	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session, _HC_Controller, _HC_OpenStarted
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
 		return
 	if (Raw == "ready") {
-		LoggerInfo("Healthcheck", "Diagnostics page ready.")
+		LoggerInfo("Healthcheck", "Diagnostics page ready in {1} ms.",
+			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2))
 		try {
 			_HC_Send(WindowEpoch, _HC_InitJson(_HC_Session))
+			_HC_Controller.IsVisible := true
 			_HC_RestartProbes(WindowEpoch)
 		} catch as Err {
 			LoggerError("Healthcheck", "The diagnostics page could not be initialised: {1}", Err.Message)
@@ -684,7 +820,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 	global _HC_Session
 	switch Action["action"] {
 		case "close":
-			_HC_Close()
+			global _HC_Gui
+			_HealthCheck_CloseGui(_HC_Gui)
 		case "refresh":
 			_HC_Session["detailed"] := Action["detailed"]
 			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"])
@@ -721,10 +858,12 @@ _HC_InitJson(Session) {
 ; @param WindowEpoch {Integer}
 ; @param Json {String} The message, as JSON.
 _HC_Send(WindowEpoch, Json) {
-	global _HC_WebView, _HC_WindowEpoch, _HC_ResetDone
-	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView)
+	global _HC_WebView, _HC_WindowEpoch, _HC_ResetDone, _HC_Session
+	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView) || !(_HC_Session is Map)
 		return
-	WebView_RunScriptAsync(_HC_WebView, "if(window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")",
+	WebView_RunScriptAsync(_HC_WebView,
+		"if(location.href===" . JsonStringLiteral(_HC_Session["page_url"])
+			. "&&window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")",
 		"HealthCheck")
 }
 
@@ -816,13 +955,14 @@ _HC_Close() {
 
 _HC_Reset() {
 	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone
-	global _HC_WindowEpoch, _HC_Session
+	global _HC_WindowEpoch, _HC_Session, _HC_ReuseKey
 
 	if _HC_ResetDone
 		return
 	_HC_ResetDone := true
 	_HC_WindowEpoch += 1
 	_HC_Session := 0
+	_HC_ReuseKey := ""
 	HealthCheck_CancelProbes()
 
 	try {

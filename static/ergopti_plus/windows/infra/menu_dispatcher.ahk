@@ -73,6 +73,7 @@
 ; ==============================================================================
 
 #Include menu_command_origin.ahk
+#Include menu_startup_commands.ahk
 
 
 
@@ -424,7 +425,7 @@ _TrackedDispatch(TrackedObj, Args*) {
 				and _MenuDispatchTokens.Has(TrackedObj.ItemId)
 				and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
 				_MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
-				MenuCommandRun(TrackedObj.Callback, Args)
+				MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0, TrackedObj)
 		}
 }
 
@@ -442,11 +443,14 @@ _TrackedDispatch(TrackedObj, Args*) {
 ; @param Attempt {Integer} Looks made so far; 0 for the click itself.
 ; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
 ; @param ArmFn {Func} Test seam for the one-shot timer, TimerArmOneShotMs by default.
+; @param Registration {Object|Integer} Optional native item identity for startup retirement checks.
 ; @returns {Any} What the command returned, "" when it was deferred.
-MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0) {
+MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registration := 0) {
 		global MENU_COMMAND_DEFERRAL_RETRY_MS, MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS
 		if !HasMethod(Callback, "Call")
 				throw TypeError("A menu command must be callable.")
+		if MenuStartupCommands_Defer(Callback, Args, Registration)
+			return ""
 		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigWriteLeaseBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
@@ -713,12 +717,14 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
 				return
 		}
 		Callback := _MenuDispatchCallbacks[ItemId]
+		Registration := _MenuDispatchTokens.Has(ItemId)
+			? {ItemId: ItemId, Token: _MenuDispatchTokens[ItemId]} : 0
 		_MenuDispatchLastFire[ItemId] := A_TickCount
 		Critical "Off"   ; Release before the callback so the keyboard hook is never starved.
 		try LoggerInfo("MenuDispatcher",
 				"AHK drop detected for ItemId={1} — firing bypass_dispatch.", ItemId)
 		try {
-				MenuCommandRun(Callback, ["", 0, 0])
+				MenuCommandRun(Callback, ["", 0, 0], 0, 0, 0, Registration)
 		} catch as Err {
 				try LoggerError("MenuDispatcher",
 						"Bypass dispatch for ItemId={1} threw: {2}.", ItemId, Err.Message)

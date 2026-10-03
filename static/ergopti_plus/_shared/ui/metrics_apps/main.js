@@ -176,12 +176,14 @@ window.bootstrapMetricsAppsData = function (newManifest, newCategories, newIcons
 	manifestData = newManifest || {};
 	userCategories = newCategories || {};
 	appIcons = newIcons || {};
+	invalidateAggregationCache();
 	initDashboard();
 };
 
 window.receive_live_update = function (newManifest) {
 	if (!newManifest) return;
 	Object.keys(newManifest).forEach((k) => (manifestData[k] = newManifest[k]));
+	invalidateAggregationCache();
 	initDashboard();
 };
 
