@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../../../../_shared/modules/llm/trigger_policy.ahk
 
 
 
@@ -78,20 +79,30 @@ _LLM_Menu_NRows() {
  * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
-LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
+LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, PrivacyCommands := 0) {
 	global _LLM_Menu
 	if !IsSet(InstantCommand)
 		InstantCommand := LLM_Menu_OnInstantToggle
 	if !IsSet(AfterCommand)
 		AfterCommand := (*) => LLM_Menu_ToggleBool("after_hotstring")
+	UrlSource := _LLM_Menu_PrivacySnapshot("disable_url_bars")
+	SecureSource := _LLM_Menu_PrivacySnapshot("disable_password_fields")
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
 		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
 			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
 		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
-			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call()),
+			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
+			"llm_url_bar_filter", (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
+				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
+			"llm_secure_field_filter", (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
+				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
 		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu["instant_on_word_end"],
 			"llm_after_hotstring_enabled", (*) => _LLM_Menu["after_hotstring"],
-			"llm_trigger_ready", _LLM_Menu_TriggerReady))
+			"llm_trigger_ready", _LLM_Menu_TriggerReady,
+			"llm_url_bar_filter_enabled", (*) => _LLM_Menu["disable_url_bars"],
+			"llm_secure_field_filter_enabled", (*) => _LLM_Menu["disable_password_fields"],
+			"llm_url_bar_filter_ready", (*) => LLM_TriggerPrivacyReady(UrlSource),
+			"llm_secure_field_filter_ready", (*) => LLM_TriggerPrivacyReady(SecureSource)))
 }
 
 /**
@@ -101,6 +112,60 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
 _LLM_Menu_TriggerReady(*) {
 	global _LLM_Menu
 	return _LLM_Menu["enabled"] && !A_IsSuspended
+}
+
+/** Captures actual privacy runtime and exact canonical file without publication. */
+_LLM_Menu_PrivacySnapshot(Key) {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "value", _LLM_Menu.Get(Key, ""),
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"blocked", true, "source", 0)
+	if Key != "disable_url_bars" && Key != "disable_password_fields"
+		return Snapshot
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Snapshot["blocked"] := !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has(Key)
+			|| !ManifestValuesEqual(_LLM_Engine["enabled"], Snapshot["enabled"])
+			|| !(_LLM_Engine["backend"] is String)
+			|| StrCompare(_LLM_Engine["backend"], Snapshot["backend"], true) != 0
+			|| !ManifestValuesEqual(_LLM_Engine[Key], Snapshot["value"])
+		NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+		for Field, Path in Map("enabled", "llm.enabled", "backend", "llm.models.selected",
+				"value", "llm.trigger." . NativeKey) {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Field != "backend" && Read["found"] && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			if Read["blocked"] || (Field == "backend"
+				? !(Value is String) || StrCompare(Value, Snapshot[Field], true) != 0
+				: !ManifestValuesEqual(Value, Snapshot[Field]))
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch as Err {
+		LoggerWarn("LLM", "Privacy row source is unavailable: {1}.", Err.Message)
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses a retained privacy checkbox before the acknowledged native setter. */
+_LLM_Menu_PrivacyCommand(Expected, Key, Command := 0) {
+	Current := _LLM_Menu_PrivacySnapshot(Key)
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_TriggerPrivacyIntent(Expected, Current)
+	if !Decision["admitted"]
+		return false
+	return HasMethod(Command, "Call")
+		? Command.Call(Key, Decision["value"], Expected) == true
+		: LLM_Menu_SetPrivacy(Key, Decision["value"], Expected) == true
 }
 
 /**
@@ -125,20 +190,6 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	LeadingRows := Rows
 	Rows := []
-
-	Rows.Push(Map("separator", true))
-
-	; URL bar filter
-	Rows.Push(Map(
-		"label",   t("menu.llm.disable_url_bars"),
-		"checked", _LLM_Menu["disable_url_bars"],
-		"action",  (*) => LLM_Menu_ToggleBool("disable_url_bars")))
-
-	; Password field filter
-	Rows.Push(Map(
-		"label",   t("menu.llm.disable_password_fields"),
-		"checked", _LLM_Menu["disable_password_fields"],
-		"action",  (*) => LLM_Menu_ToggleBool("disable_password_fields")))
 
 	; App exclusion picker
 	n := _LLM_Menu["disabled_apps"].Length

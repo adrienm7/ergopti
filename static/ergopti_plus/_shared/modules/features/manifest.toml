@@ -4015,7 +4015,8 @@ disabled_reason_key = "menu.about.source_run_reason"
 # The common Info Bar check keeps the native display providers on either side:
 # macOS retains its leading indent selector; the other drivers supply no leading row.
 # The two automatic prediction triggers share row identity, labels and admission.
-# Numeric debounce, privacy filters and application exclusions retain native owners.
+# Numeric debounce and application exclusions retain native row owners.
+# Privacy checks use shared identity and native source-fenced transactions.
 [[menu.llm_trigger_menu]]
 type = "list"
 id = "llm_trigger_leading"
@@ -4033,6 +4034,23 @@ id = "llm_after_hotstring"
 i18n = "menu.llm.after_hotstring"
 checked_when = ["llm_after_hotstring_enabled"]
 disabled_when = ["llm_trigger_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "---"
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_url_bar_filter"
+i18n = "menu.llm.disable_url_bars"
+checked_when = ["llm_url_bar_filter_enabled"]
+disabled_when = ["llm_url_bar_filter_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_secure_field_filter"
+i18n = "menu.llm.disable_password_fields"
+checked_when = ["llm_secure_field_filter_enabled"]
+disabled_when = ["llm_secure_field_filter_ready"]
 
 [[menu.llm_trigger_menu]]
 type = "list"

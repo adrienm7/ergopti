@@ -1183,6 +1183,8 @@ Partial: the personal hotstring editor command now shares its declaration, trans
 
 TODO 54/81: The already shared Info Bar row now resolves retained clicks through one shared live-owner policy on all three drivers. Single predictions and every backend remain supported. macOS retains its pre-owned complete source and own-ACK compensation receipt; Linux uses its existing sparse source CAS; Windows publishes one typed leaf under the existing configuration lease and binds the canonical publisher to the admitted source. Paused, disabled, replaced, stale and sparse runtime owners refuse publication. Actual native AHK menu/publisher qualification remains pending the hosted Windows run; no additional native row was introduced or retired.
 
+Privacy controls also retain the Linux prediction engine admission epoch separately from the canonical preference revision. A real pause/resume or master OFF/ON cycle retires held callbacks; invalid or unavailable native epochs leave controls disabled. Independent Linux regressions reproduce the old pause/resume acknowledgement gap and preserve both epochs at the floating-point boundary. Complete native CI and the remaining Trigger/AI menu work are still pending.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

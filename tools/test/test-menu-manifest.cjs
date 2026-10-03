@@ -1021,6 +1021,9 @@ function checkAutomaticTriggerControls() {
 			'llm_trigger_leading',
 			'llm_instant_on_word_end',
 			'llm_after_hotstring',
+			undefined,
+			'llm_url_bar_filter',
+			'llm_secure_field_filter',
 			'llm_trigger_remaining'
 		]
 	);
@@ -1238,6 +1241,66 @@ function checkNumericChoiceSchema() {
 }
 
 checkNumericChoiceSchema();
+
+function checkPrivacyTriggerControls() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/privacy_trigger_controls.json'), 'utf8')
+	);
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(corpus.states, [
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true]
+	]);
+	assert.deepEqual(corpus.prediction_counts, [1, 2]);
+	assert.equal(root.llm_trigger_menu[3].type, '---');
+	for (const [index, expected] of corpus.rows.entries()) {
+		const declaration = root.llm_trigger_menu[index + 4];
+		assert.equal(declaration.type, 'check');
+		assert.equal(declaration.id, expected.id);
+		assert.equal(declaration.i18n, expected.i18n);
+		assert.deepEqual(declaration.checked_when, [expected.id + '_enabled']);
+		assert.deepEqual(declaration.disabled_when, [expected.id + '_ready']);
+	}
+	for (const [file, startToken, endToken] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildTriggerMenu(',
+			'LLM_Menu_BuildLiveModeMenu('
+		],
+		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_trigger"] = function',
+			'dynamic_handlers["llm_live_mode"] = function'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(startToken),
+			end = source.indexOf(endToken, start);
+		assert(start >= 0 && end > start, file + ': actual privacy consumer bounds');
+		const body = source.slice(start, end);
+		for (const expected of corpus.rows) {
+			for (const key of [expected.id, expected.id + '_enabled', expected.id + '_ready'])
+				assert(
+					body.includes('"' + key + '"'),
+					file + ': shared privacy command and predicates are wired'
+				);
+			assert(
+				!body.includes(expected.i18n),
+				file + ': static privacy labels remain in shared declarations'
+			);
+		}
+		assert(
+			body.includes('privacy_snapshot') || body.includes('_LLM_Menu_PrivacySnapshot'),
+			file + ': native snapshots are current'
+		);
+	}
+}
+
+checkPrivacyTriggerControls();
 
 // The personal editor command is shared even while the native input master is off.
 {
