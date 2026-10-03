@@ -394,6 +394,16 @@ These are software implementations; final hardware verification remains below.
   and uninstall assertions; native libc restores both without changing those
   reserved tests. Classified TOML paths, native cross-OS gates and manual CI
   remain unchanged or unexecuted.
+- [~] **L32.** Linux process-name identity: preserve every byte of GNU ps's
+  headerless final comm column, including leading/trailing spaces and names made
+  entirely of spaces. Trimming it collapsed distinct processes and emitted the
+  wrong launch/quit names. Five native and five portable cases failed before
+  the fix. Twenty native cases pass on host and nonroot Debian using real
+  prctl-named processes, independently checked ps bytes and separate lifetimes
+  for two names differing only by spaces. Portable cases cover exact event
+  payloads and independent retirement. macOS uses native application names;
+  Windows' existing missing app-event producer remains deferred. Focus/window
+  title code, native cross-OS gates and manual CI remain untouched or unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

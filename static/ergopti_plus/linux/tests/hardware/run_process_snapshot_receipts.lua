@@ -17,6 +17,12 @@ local real_ps = assert(Shell.exec_line("command -v ps"), "procps must be install
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-process-snapshot-XXXXXX"))
 local previous_path = assert(os.getenv("PATH"))
 local marker_a, marker_b = "epA" .. root:sub(-6), "epB" .. root:sub(-6)
+local literal_names = { " ep lead", "ep trail ", " ep both ", "   " }
+local tracked_names = { [marker_a] = true, [marker_b] = true, COMMAND = true, ["ep pair"] = true, [" ep pair "] = true }
+for _, name in ipairs(literal_names) do
+	tracked_names[name] = true
+	tracked_names[name:match("^%s*(.-)%s*$")] = true -- also observe old parser aliases.
+end
 local children = {}
 local checks, failures = 0, 0
 
@@ -62,8 +68,8 @@ assert(uv.fs_chmod(root .. "/ps", 448))
 assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 local child_a = spawn(marker_a)
 local launched, quit = {}, {}
-Life.onAppLaunch(function(name) if name == marker_a or name == marker_b or name == "COMMAND" then launched[#launched + 1] = name end end)
-Life.onAppQuit(function(name) if name == marker_a or name == marker_b or name == "COMMAND" then quit[#quit + 1] = name end end)
+Life.onAppLaunch(function(name) if tracked_names[name] then launched[#launched + 1] = name end end)
+Life.onAppQuit(function(name) if tracked_names[name] then quit[#quit + 1] = name end end)
 
 local function mode(value) write(root .. "/mode", value) end
 
@@ -135,6 +141,36 @@ check("actual process named COMMAND is data, never a header", function()
 	retire(command)
 	Life.tick(16)
 	assert(#quit == 1 and quit[1] == "COMMAND", "header-like process retirement was never observed")
+end)
+
+for index, name in ipairs(literal_names) do
+	check("actual process whitespace name " .. index .. " retains its native bytes", function()
+		mode("success")
+		Life.start()
+		local child = spawn(name)
+		local accepted, output = Shell.exec_checked(Shell.quote(real_ps) .. " -p " .. child.handle:get_pid() .. " -o comm=")
+		assert(accepted and output == name .. "\n", "native ps must prove these are data bytes, not padding")
+		Life.tick(8)
+		assert(#launched == 1 and launched[1] == name, "process launch changed or discarded native whitespace")
+		retire(child)
+		Life.tick(16)
+		assert(#quit == 1 and quit[1] == name, "process retirement changed or discarded native whitespace")
+	end)
+end
+
+check("distinct native whitespace names cannot collapse into one process identity", function()
+	mode("success")
+	local plain = spawn("ep pair")
+	Life.start()
+	local spaced = spawn(" ep pair ")
+	Life.tick(8)
+	assert(#launched == 1 and launched[1] == " ep pair ", "second native identity collapsed into its trimmed neighbor")
+	retire(spaced)
+	Life.tick(16)
+	assert(#quit == 1 and quit[1] == " ep pair ", "neighbor masked the real process exit")
+	retire(plain)
+	Life.tick(24)
+	assert(#quit == 2 and quit[2] == "ep pair", "remaining native identity did not retire independently")
 end)
 
 Life.stop()
