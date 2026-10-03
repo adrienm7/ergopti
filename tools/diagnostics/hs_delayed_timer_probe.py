@@ -22,9 +22,10 @@ SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
 SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
 SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT = 8192
 SCRIPT_DIAGNOSTIC_LINE_LIMIT = 128
-SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = 3
-SCRIPTING_PHASES = ("control", "observation", "cleanup")
+SCRIPTING_PHASES = ("control", "pid_control", "observation", "cleanup")
+SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = len(SCRIPTING_PHASES)
 CONTROL_CONTRACT = "hs.applescript.control"
+PID_CONTROL_CONTRACT = "hs.applescript.pid-control"
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -44,13 +45,23 @@ def unique_object(pairs):
 
 def validate_control_summary(summary, feature=None):
     """Require exact owned control identity without treating it as feature proof."""
+    _validate_owned_control(summary, CONTROL_CONTRACT, "control", feature)
+
+
+def validate_pid_control_summary(summary, feature=None):
+    """Qualify only the separate PID diagnostic, never a path or feature proof."""
+    _validate_owned_control(summary, PID_CONTROL_CONTRACT, "pid_control", feature)
+
+
+def _validate_owned_control(summary, contract, phase, feature):
+    """Check one explicitly named control's acknowledgement and native identity."""
     fields = {"schema_version", "contract", "phase", "acknowledged", "nonce", "pid", "executable"}
     if not isinstance(summary, dict) or set(summary) != fields:
         raise ValueError("The native AppleEvent control receipt is incomplete")
     for key, expected in {
         "schema_version": 1,
-        "contract": CONTROL_CONTRACT,
-        "phase": "control",
+        "contract": contract,
+        "phase": phase,
         "acknowledged": True,
     }.items():
         if type(summary[key]) is not type(expected) or summary[key] != expected:
@@ -284,8 +295,8 @@ class NativeDelayedTimerProbe:
             )
         self.preference.enable()
 
-    def execute(self, source, phase="observation"):
-        """Target the already running installed bundle and require its exact reply."""
+    def execute(self, source, phase="observation", _target_pid=None):
+        """Require the owned reply; PID addressing is exclusive to its diagnostic."""
         if phase not in SCRIPTING_PHASES:
             raise ValueError("The native scripting phase is unknown")
         if self.scripting_commands:
@@ -295,8 +306,26 @@ class NativeDelayedTimerProbe:
             f"tell application {json.dumps(str(self.app))}\n"
             "return execute lua code (item 1 of argv)\nend tell\nend run"
         )
+        arguments = ["/usr/bin/osascript", "-e", script, source]
+        if phase == "pid_control":
+            if self.runtime_owner is None:
+                raise RuntimeError("The PID control has no bound native runtime")
+            pid, processes = self.runtime_owner
+            if (
+                type(_target_pid) is not int
+                or _target_pid != pid
+                or processes(self.executable) != [pid]
+            ):
+                raise RuntimeError("The PID control target differs from its exact live owner")
+            # The sender remains osascript. Only the address changes: a raw kernel
+            # PID bypasses application-path resolution while HmSp/EXEC still
+            # reaches the pinned NSScriptCommand and its enabled preference.
+            script = self.pid_control_script()
+            arguments = ["/usr/bin/osascript", "-l", "JavaScript", "-e", script, str(pid), source]
+        elif _target_pid is not None:
+            raise ValueError("A PID address is reserved for its distinct diagnostic")
         command = subprocess.Popen(
-            ["/usr/bin/osascript", "-e", script, source],
+            arguments,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -338,7 +367,9 @@ class NativeDelayedTimerProbe:
             )
         self.scripting_commands.remove(command)
         acknowledged = (
-            stdout == self.nonce + "\n" if phase == "control" else stdout.strip() == self.nonce
+            stdout == self.nonce + "\n"
+            if phase in ("control", "pid_control")
+            else stdout.strip() == self.nonce
         )
         if command.returncode != 0 or not acknowledged:
             raise RuntimeError(
@@ -368,17 +399,77 @@ class NativeDelayedTimerProbe:
             "executable": str(self.executable),
         }
 
-    def retain_diagnostics(self, diagnostics, phase="observation"):
-        """Retain bounded native observations independently of error annotations."""
-        if not diagnostics:
-            return
-        if len(self.diagnostic_receipts) >= SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT:
-            self.diagnostic_receipts[-1]["additional_commands_omitted"] = True
-            return
-        # Control, observation and cleanup each own their independent native
-        # sampling replies. Do not include the Lua source or the primary error;
-        # either could contain unrelated user data. Redact native source paths.
-        observations = self.sample_frame_text("\n".join(diagnostics))
+    @staticmethod
+    def pid_control_script():
+        """Send the pinned direct-text command to a kernel PID from osascript."""
+        return """ObjC.import('Foundation');
+function run(argv) {
+    if (argv.length !== 2) throw new Error('PID control arguments refused');
+    var pid = Number(argv[0]);
+    if (!Number.isInteger(pid) || pid <= 0) throw new Error('PID control target refused');
+    var target = $.NSAppleEventDescriptor.descriptorWithProcessIdentifier(pid);
+    if (target.isNil() || Number(target.descriptorType) !== 0x6b706964)
+        throw new Error('Native kernel-PID address refused');
+    var event = $.NSAppleEventDescriptor.appleEventWithEventClassEventIDTargetDescriptorReturnIDTransactionID(
+        0x486d5370, 0x45584543, target, -1, 0);
+    event.setParamDescriptorForKeyword($.NSAppleEventDescriptor.descriptorWithString(argv[1]), 0x2d2d2d2d);
+    var error = Ref();
+    var reply = event.sendEventWithOptionsTimeoutError(3, __SCRIPTING_TIMEOUT_SECONDS__, error);
+    if (!reply || reply.isNil()) {
+        var nativeError = error[0];
+        var status = nativeError && !nativeError.isNil() ? Number(nativeError.code) : 'unavailable';
+        throw new Error('Native PID AppleEvent send refused (status ' + status + ')');
+    }
+    var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);
+    if (!errorNumber.isNil() && Number(errorNumber.int32Value) !== 0)
+        throw new Error('Native PID AppleEvent handler refused (status ' + Number(errorNumber.int32Value) + ')');
+    var result = reply.paramDescriptorForKeyword(0x2d2d2d2d);
+    if (result.isNil()) throw new Error('Native PID AppleEvent result missing');
+    return ObjC.unwrap(result.stringValue);
+}
+""".replace("__SCRIPTING_TIMEOUT_SECONDS__", json.dumps(SCRIPTING_TIMEOUT_SECONDS))
+
+    def control_pid(self, pid, processes):
+        """Compare exact-PID delivery without admitting the original feature gate."""
+        self.bind_runtime(pid, processes)
+        acknowledgement = self.execute(
+            "return " + json.dumps(self.nonce), phase="pid_control", _target_pid=pid
+        )
+        if type(acknowledgement) is not str or acknowledgement != self.nonce:
+            raise RuntimeError("The native PID control did not acknowledge its nonce")
+        if processes(self.executable) != [pid]:
+            raise RuntimeError("The native PID control process changed before receipt admission")
+        receipt = {
+            "schema_version": 1,
+            "contract": PID_CONTROL_CONTRACT,
+            "phase": "pid_control",
+            "acknowledged": True,
+            "nonce": self.nonce,
+            "pid": pid,
+            "executable": str(self.executable),
+        }
+        validate_pid_control_summary(receipt)
+        self.retain_diagnostics(
+            ["Exact owned kernel-PID control acknowledged its nonce"], phase="pid_control"
+        )
+        return receipt
+
+    def pid_control_error_diagnostic(self, error):
+        """Bound the alternate control error without publishing its script argv."""
+        if isinstance(error, subprocess.TimeoutExpired) or isinstance(
+            error.__cause__, subprocess.TimeoutExpired
+        ):
+            detail = (
+                "TimeoutExpired: the owned PID scripting command exceeded its unchanged deadline"
+            )
+        else:
+            detail = f"{type(error).__name__}: {error}"
+        return self.bounded_diagnostic_text(detail)
+
+    @staticmethod
+    def bounded_diagnostic_text(text):
+        """Apply the one shared source-redaction and receipt-size policy."""
+        observations = NativeDelayedTimerProbe.sample_frame_text(text)
         lines = observations.splitlines()
         if (
             len(observations) > SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT
@@ -387,6 +478,19 @@ class NativeDelayedTimerProbe:
             marker = "\n[native diagnostic truncated]"
             observations = "\n".join(lines[: SCRIPT_DIAGNOSTIC_LINE_LIMIT - 1])
             observations = observations[: SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT - len(marker)] + marker
+        return observations
+
+    def retain_diagnostics(self, diagnostics, phase="observation"):
+        """Retain bounded native observations independently of error annotations."""
+        if not diagnostics:
+            return
+        if len(self.diagnostic_receipts) >= SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT:
+            self.diagnostic_receipts[-1]["additional_commands_omitted"] = True
+            return
+        # Path control, PID control, observation and cleanup own independent native
+        # sampling replies. Do not include the Lua source or the primary error;
+        # either could contain unrelated user data. Redact native source paths.
+        observations = self.bounded_diagnostic_text("\n".join(diagnostics))
         self.diagnostic_receipts.append(
             {
                 "command": self.scripting_command_number,

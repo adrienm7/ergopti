@@ -252,6 +252,9 @@ class VerdictTests(unittest.TestCase):
                     mock.patch.object(
                         owner, "control", side_effect=RuntimeError("control refused")
                     ) as control,
+                    mock.patch.object(
+                        owner, "control_pid", return_value={"diagnostic": "only"}
+                    ) as pid_control,
                     mock.patch.object(owner, "observe", side_effect=observe_native),
                     mock.patch.object(owner, "restore"),
                     mock.patch.object(gate, "processes", side_effect=processes) as resolver,
@@ -266,6 +269,8 @@ class VerdictTests(unittest.TestCase):
                     report = gate.run(app, output, scenario, "")
                 self.assertEqual(report["native_probe_diagnostics"], owner.diagnostic_receipts)
                 control.assert_called_once_with(42, resolver)
+                pid_control.assert_called_once_with(42, resolver)
+                self.assertEqual(report["native_pid_transport_control"], {"diagnostic": "only"})
                 self.assertEqual(len(report["failures"]), 2)
                 self.assertIn("control refused", report["failures"][0])
                 self.assertIn("primary refusal", report["failures"][1])
@@ -295,6 +300,36 @@ class VerdictTests(unittest.TestCase):
                     ),
                 )
                 self.assertTrue(any("control" in value for value in failures))
+
+    def test_pid_diagnostic_cannot_replace_path_control_or_original_feature(self):
+        alternative = dict(
+            control_summary(), contract="hs.applescript.pid-control", phase="pid_control"
+        )
+        for scenario, feature in (
+            ("clean", "native_delayed_timer"),
+            ("karabiner_config", "native_karabiner_config"),
+        ):
+            with self.subTest(scenario=scenario):
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_pid_transport_control=alternative,
+                        native_transport_control_error="original path refusal",
+                        **{feature + "_error": "original feature refusal"},
+                    ),
+                )
+                self.assertTrue(any("original path refusal" in value for value in failures))
+                self.assertTrue(any("original feature refusal" in value for value in failures))
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_transport_control=alternative,
+                        native_pid_transport_control=alternative,
+                        **{feature: None},
+                    ),
+                )
+                self.assertTrue(any("control" in value for value in failures))
+                self.assertTrue(any("proof is incomplete" in value for value in failures))
 
     def test_control_receipt_cannot_substitute_for_missing_native_feature_proofs(self):
         for scenario, field in (
