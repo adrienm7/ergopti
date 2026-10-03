@@ -1044,6 +1044,311 @@ for (const [name, condition] of [
 	}
 }
 
+/** Negative launch evidence must survive the original strict native verdict. */
+function windowsFailureEvidenceProblems(smoke, upload) {
+	const problems = [];
+	if (pipeline.stepField(upload, 'if') !== 'always()') {
+		problems.push('Windows launch evidence must upload on success or failure with always()');
+	}
+	if (pipeline.stepField(upload, 'continue-on-error') !== null) {
+		problems.push('Windows launch evidence must not forgive publication failure');
+	}
+	if (
+		pipeline.stepField(upload, 'uses') !== 'actions/upload-artifact@v4' ||
+		!/^ {10}path: \$\{\{ runner\.temp \}\}\/evidence\.json$/m.test(upload) ||
+		!/^ {10}if-no-files-found: error$/m.test(upload)
+	) {
+		problems.push(
+			'Windows launch evidence must retain only its exact owned JSON and refuse absence'
+		);
+	}
+	try {
+		const code = (pipeline.runOf(smoke) ?? []).filter((line) => !line.trimStart().startsWith('#'));
+		const trimmed = code.map((line) => line.trim());
+		const initial = pipeline.scriptBlock(code, '$startupEvidence = [ordered]@{');
+		for (const statement of [
+			"failures = @('startup_incomplete')",
+			"failure_phase = 'probe_setup'",
+			'package_sha256 = $null',
+			'readiness_acknowledged = $false',
+			'native_exit_code = $null',
+			'native_descendant_observations = @()'
+		]) {
+			if (!initial.some((line) => line.trim() === statement)) {
+				problems.push(`Windows incomplete startup evidence lost ${statement}`);
+			}
+		}
+		const save = pipeline.scriptBlock(code, 'function Save-StartupFailureEvidence');
+		if (
+			!save.some(
+				(line) =>
+					line.trim() ===
+					'$startupEvidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8'
+			)
+		) {
+			problems.push('Windows startup failure evidence must persist its owned bounded JSON');
+		}
+		if (
+			!save.some((line) =>
+				line.includes(
+					"Write-Warning 'Startup failure evidence publication failed (detail omitted).' -WarningAction Continue"
+				)
+			)
+		) {
+			problems.push('Windows startup failure evidence must retain the primary native error');
+		}
+		if (save.some((line) => /Exception\.Message|CommandLine|\$stdout|\$stderr/.test(line))) {
+			problems.push('Windows startup failure publication must not expose raw private output');
+		}
+		const firstSave = trimmed.indexOf('Save-StartupFailureEvidence');
+		const probeSetup = trimmed.findIndex((line) => line.startsWith('Add-Type '));
+		const spawn = trimmed.findIndex((line) => line.startsWith('$proc = Start-Process '));
+		if (
+			firstSave < 0 ||
+			probeSetup < 0 ||
+			spawn < 0 ||
+			firstSave >= probeSetup ||
+			probeSetup >= spawn
+		) {
+			problems.push(
+				'Windows negative startup evidence must be fresh before probe setup and compiled spawn'
+			);
+		}
+		const parent = pipeline.scriptBlock(code, 'if ($launchOwner.identity_qualified) {');
+		if (
+			!parent.some(
+				(line) =>
+					line.trim() ===
+					'$startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable'
+			)
+		) {
+			problems.push('Windows failure evidence must disclose only the qualified owned executable');
+		}
+		for (const statement of [
+			'$startupEvidence.native_parent.pid = $launchOwner.pid',
+			'$startupEvidence.native_parent.start_utc = $launchOwner.start_utc',
+			'$startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified',
+			'pid = $receipt.pid',
+			'parent_pid = $receipt.parent_pid',
+			'created_utc = $receipt.created_utc',
+			'lineage_qualified = $receipt.lineage_qualified',
+			'same_executable = $receipt.same_executable',
+			'depth = $receipt.depth'
+		]) {
+			if (!trimmed.includes(statement))
+				problems.push(`Windows closed native observation lost ${statement}`);
+		}
+		if (
+			trimmed.some((line) =>
+				/\$startupEvidence.*(?:CommandLine|\.Exception\.Message|\$tail|\$stdout|\$stderr|ready\s*=\s*\$true)/.test(
+					line
+				)
+			)
+		) {
+			problems.push('Windows failure evidence must not copy private output or authorize readiness');
+		}
+		const failure = pipeline.scriptBlock(code, WINDOWS_SMOKE_VERDICT).map((line) => line.trim());
+		const saves = failure
+			.map((line, index) => (line === 'Save-StartupFailureEvidence' ? index : -1))
+			.filter((index) => index >= 0);
+		const diagnostics = failure.indexOf('Write-LaunchDiagnostics $proc $seconds $stagingSeconds');
+		const stop = failure.indexOf('Stop-LaunchedApp $proc');
+		const error = failure.findIndex((line) => line.startsWith('Write-Error '));
+		if (
+			saves.length !== 2 ||
+			diagnostics < 0 ||
+			stop < 0 ||
+			error < 0 ||
+			saves[0] >= diagnostics ||
+			saves[1] <= stop ||
+			saves[1] >= error
+		) {
+			problems.push(
+				'Windows failure receipt must precede diagnostics and retain observations before its original error'
+			);
+		}
+		for (const statement of [
+			"$startupEvidence.failures = @('startup_guard_failed')",
+			"$startupEvidence.failure_phase = 'verdict'",
+			'$startupEvidence.marker_seen = $markerSeen',
+			'$startupEvidence.crashed_early = $crashedEarly',
+			'$startupEvidence.native_exit_code = $exitCode',
+			'$startupEvidence.elapsed_seconds = [math]::Round($seconds, 3)',
+			'$startupEvidence.staging_seconds = $stagingSeconds',
+			'$startupEvidence.dialog_seen = $dialogSeen'
+		]) {
+			if (!failure.includes(statement))
+				problems.push(`Windows failed startup evidence lost ${statement}`);
+		}
+	} catch (error) {
+		problems.push(`Windows startup failure evidence is absent or ambiguous: ${error.message}`);
+	}
+	return problems;
+}
+
+let windowsLaunchUpload = null;
+try {
+	const found = pipeline.findStep('Upload mandatory launch evidence');
+	if (found.file !== WINDOWS_BOX || found.job !== 'launch-windows') {
+		errors.push('Windows mandatory launch evidence must belong to its actual launch job');
+	} else windowsLaunchUpload = found.body;
+} catch (error) {
+	errors.push(`Windows mandatory launch evidence is missing: ${error.message}`);
+}
+if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
+	errors.push(...windowsFailureEvidenceProblems(windowsSmokeStep, windowsLaunchUpload));
+	for (const [name, before, after, target] of [
+		['implicit success upload', '        if: always()\n', '', 'upload'],
+		['conditional failure upload', '        if: always()\n', '        if: failure()\n', 'upload'],
+		['conditional success upload', '        if: always()\n', '        if: success()\n', 'upload'],
+		[
+			'forgiven evidence publication',
+			'        uses: actions/upload-artifact@v4',
+			'        continue-on-error: true\n        uses: actions/upload-artifact@v4',
+			'upload'
+		],
+		[
+			'unowned raw payload upload',
+			'${{ runner.temp }}/evidence.json',
+			'${{ runner.temp }}/*',
+			'upload'
+		],
+		[
+			'success-only evidence',
+			'          Save-StartupFailureEvidence\n\n          # Compiled',
+			'\n          # Compiled',
+			'smoke'
+		],
+		[
+			'positive incomplete receipt',
+			"failures = @('startup_incomplete')",
+			'failures = @()',
+			'smoke'
+		],
+		['lost failure publication', '              Save-StartupFailureEvidence\n', '', 'smoke'],
+		[
+			'guessed parent qualification',
+			'$startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified',
+			'$startupEvidence.native_parent.identity_qualified = $true',
+			'smoke'
+		],
+		[
+			'lost native exit',
+			'$startupEvidence.native_exit_code = $exitCode',
+			'$startupEvidence.native_exit_code = 0',
+			'smoke'
+		],
+		[
+			'copied foreign executable',
+			'$startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable',
+			'$startupEvidence.native_parent.observed_executable = $actualLaunchPath',
+			'smoke'
+		],
+		['private argv receipt', 'pid = $receipt.pid', 'pid = $receipt.CommandLine', 'smoke'],
+		[
+			'private publication exception',
+			"Write-Warning 'Startup failure evidence publication failed (detail omitted).'",
+			'Write-Warning $_.Exception.Message',
+			'smoke'
+		],
+		[
+			'claimed readiness',
+			'readiness_acknowledged = $false',
+			'readiness_acknowledged = $true',
+			'smoke'
+		]
+	]) {
+		const original = target === 'upload' ? windowsLaunchUpload : windowsSmokeStep;
+		const changed = original.replaceAll(before, after);
+		const problems =
+			target === 'upload'
+				? windowsFailureEvidenceProblems(windowsSmokeStep, changed)
+				: windowsFailureEvidenceProblems(changed, windowsLaunchUpload);
+		if (changed === original || problems.length === 0)
+			errors.push(`Windows failure-artifact guard missed ${name}`);
+	}
+}
+
+// The actual aggregate must reject incomplete/failed receipts even if a caller
+// incorrectly supplies green jobs or observes a same-executable descendant.
+{
+	const assert = require('node:assert/strict');
+	const desktop = require('./desktop-ci-evidence.cjs');
+	const needs = Object.fromEntries(
+		['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
+			name,
+			{ result: 'success' }
+		])
+	);
+	const sha = 'a'.repeat(40);
+	const positive = {
+		schema_version: 1,
+		platform: 'windows',
+		sha,
+		runner: 'windows-latest',
+		scenario: 'startup',
+		package_sha256: 'b'.repeat(64),
+		marker_seen: true,
+		crashed_early: false,
+		marker_seconds: 1,
+		failures: []
+	};
+	const verify = (record, jobs = needs) =>
+		desktop.verify({
+			platform: 'windows',
+			needs: jobs,
+			evidence: [record],
+			sha,
+			scenarios: [],
+			release: false
+		});
+	assert.doesNotThrow(
+		() => verify(positive),
+		'the unchanged original successful receipt still passes'
+	);
+	for (const record of [
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: null,
+			failures: ['startup_incomplete'],
+			failure_phase: 'probe_setup',
+			native_exit_code: null
+		},
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: true,
+			failures: ['startup_guard_failed'],
+			native_exit_code: 0,
+			native_descendant_observations: [
+				{ pid: 2, parent_pid: 1, lineage_qualified: true, same_executable: true }
+			],
+			readiness_acknowledged: false
+		},
+		{ ...positive, marker_seen: false, dialog_seen: true, failures: ['startup_guard_failed'] },
+		{ ...positive, marker_seen: false, elapsed_seconds: 120, failures: ['startup_guard_failed'] },
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: true,
+			failures: [],
+			native_descendant_observations: [{ lineage_qualified: true, same_executable: true }],
+			readiness_acknowledged: true
+		},
+		{ ...positive, package_sha256: null, marker_seen: false, failures: ['startup_incomplete'] }
+	])
+		assert.throws(
+			() => verify(record),
+			'actual mandatory aggregate refuses failed/incomplete native observations'
+		);
+	assert.throws(
+		() => verify(positive, { ...needs, 'launch-windows': { result: 'failure' } }),
+		/launch-windows did not succeed/,
+		'an artifact cannot override the original failed launch job'
+	);
+}
+
 if (errors.length > 0) {
 	console.error('[ERROR] Release packaging workflow is unsafe:');
 	for (const error of errors) console.error(`  - ${error}`);

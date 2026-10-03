@@ -734,6 +734,51 @@ jobs:
           # Six times the slowest green smoke measured when this bound was set.
           $hangBoundSeconds = 120
 
+          # A failed or incomplete launch must leave fresh negative evidence;
+          # diagnostic publication never changes the original native verdict.
+          $startupEvidence = [ordered]@{
+              schema_version = 1
+              platform = 'windows'
+              sha = $env:GITHUB_SHA
+              runner = 'windows-latest'
+              scenario = 'startup'
+              package_sha256 = $null
+              marker_seen = $false
+              crashed_early = $null
+              marker_seconds = $null
+              failures = @('startup_incomplete')
+              failure_phase = 'probe_setup'
+              native_exit_code = $null
+              elapsed_seconds = $null
+              staging_seconds = $null
+              dialog_seen = $null
+              readiness_acknowledged = $false
+              native_parent = [ordered]@{
+                  pid = $null
+                  expected_executable = [IO.Path]::GetFullPath($exe)
+                  observed_executable = $null
+                  start_utc = $null
+                  identity_qualified = $false
+              }
+              native_descendant_observations = @()
+              native_observer_status = 'not_observed'
+          }
+          function Save-StartupFailureEvidence {
+              try {
+                  $startupEvidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
+              } catch {
+                  # Retain the primary native exception/exit; do not copy private
+                  # filesystem errors into a failure artifact or its annotation.
+                  Write-Warning 'Startup failure evidence publication failed (detail omitted).' -WarningAction Continue
+              }
+          }
+          try {
+              $startupEvidence.package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          } catch {
+              # Unavailable remains null and cannot pass the mandatory verdict.
+          }
+          Save-StartupFailureEvidence
+
           # Compiled before the launch, so its one-off cost stays out of the timings.
           Add-Type -TypeDefinition @'
           using System;
@@ -860,14 +905,26 @@ jobs:
                               $sameExecutable = $null -ne $row.ExecutablePath -and [string]::Equals($row.ExecutablePath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)
                               $receipt = [ordered]@{ pid = [int]$row.ProcessId; parent_pid = [int]$row.ParentProcessId; created_utc = $created; executable = $observedPath; lineage_qualified = [bool]$qualified; same_executable = [bool]$sameExecutable; depth = $depth + 1 }
                               Write-Host ($receipt | ConvertTo-Json -Compress)
+                              # Closed observations are not native handoff or
+                              # readiness acknowledgements; omit foreign paths.
+                              $startupEvidence.native_descendant_observations += [ordered]@{
+                                  pid = $receipt.pid
+                                  parent_pid = $receipt.parent_pid
+                                  created_utc = $receipt.created_utc
+                                  lineage_qualified = $receipt.lineage_qualified
+                                  same_executable = $receipt.same_executable
+                                  depth = $receipt.depth
+                              }
                               $next += [pscustomobject]@{ Id = [int]$row.ProcessId; Created = $created; Until = [DateTime]::UtcNow; Qualified = $qualified }
                           }
                       }
                       $frontier = $next
                   }
                   if ($frontier.Count -gt 0) { $truncated = $true }
+                  $startupEvidence.native_observer_status = 'observed'
                   Write-Host (@{ descendant_observations = $observed; truncated = $truncated; status = 'observed' } | ConvertTo-Json -Compress)
               } catch {
+                  $startupEvidence.native_observer_status = 'unavailable'
                   Write-Host (@{ status = 'unavailable'; cause = (Format-StartupEvidenceText $_.Exception.Message) } | ConvertTo-Json -Compress)
               }
               Write-Host "---- native startup log bytes; bounded tails never prove readiness ----"
@@ -983,6 +1040,15 @@ jobs:
               $launchOwner.identity_error = Format-StartupEvidenceText $_.Exception.Message
           }
 
+          $startupEvidence.failure_phase = 'wait'
+          $startupEvidence.native_parent.pid = $launchOwner.pid
+          $startupEvidence.native_parent.start_utc = $launchOwner.start_utc
+          $startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified
+          if ($launchOwner.identity_qualified) {
+              $startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable
+          }
+          Save-StartupFailureEvidence
+
           $markerSeen = $false
           $dialogSeen = $false
           $stagingSeconds = $null
@@ -1003,8 +1069,18 @@ jobs:
           if ($crashedEarly) { $exitCode = $proc.ExitCode }
 
           if ($crashedEarly -or -not $markerSeen) {
+              $startupEvidence.failure_phase = 'verdict'
+              $startupEvidence.failures = @('startup_guard_failed')
+              $startupEvidence.marker_seen = $markerSeen
+              $startupEvidence.crashed_early = $crashedEarly
+              $startupEvidence.native_exit_code = $exitCode
+              $startupEvidence.elapsed_seconds = [math]::Round($seconds, 3)
+              $startupEvidence.staging_seconds = $stagingSeconds
+              $startupEvidence.dialog_seen = $dialogSeen
+              Save-StartupFailureEvidence
               Write-LaunchDiagnostics $proc $seconds $stagingSeconds
               Stop-LaunchedApp $proc
+              Save-StartupFailureEvidence
               if ($crashedEarly) {
                   Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
               } elseif ($dialogSeen) {
@@ -1034,6 +1110,7 @@ jobs:
           $evidence | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
 
       - name: Upload mandatory launch evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-launch-evidence
