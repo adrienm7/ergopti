@@ -225,6 +225,57 @@ end)
 -- =========================================
 -- =========================================
 
+helpers.describe("text_cipher — default machine-ID candidate receipts", function()
+	local cases = {
+		{ primary = false, fallback = "synthetic-dbus", expected = "/var/lib/dbus/machine-id" },
+		{ primary = "", fallback = "synthetic-dbus", expected = "/var/lib/dbus/machine-id" },
+		{ primary = " \t", fallback = "synthetic-dbus", expected = "/var/lib/dbus/machine-id" },
+		{ primary = "synthetic-primary", fallback = "synthetic-dbus", expected = "/etc/machine-id" },
+		{ primary = "synthetic-primary", fallback = false, expected = "/etc/machine-id" },
+		{ primary = false, fallback = false, expected = false },
+	}
+	for index, case in ipairs(cases) do
+		helpers.it("uses the canonical native machine-ID candidate " .. index .. " (machine-id-fallback-receipts)", function()
+			local previous_open = io.open
+			local previous_shell = package.loaded["adapters.shell_runner"]
+			local previous_cipher = package.loaded["modules.keylogger.text_cipher"]
+			local shell = helpers.load_module("adapters.shell_runner")
+			local commands, closed = {}, 0
+			shell._set_runner(function(command) commands[#commands + 1] = command; return "key=" .. KEY .. "\n" end)
+			io.open = function(path, mode)
+				local value
+				if path == "/etc/machine-id" then value = case.primary
+				elseif path == "/var/lib/dbus/machine-id" then value = case.fallback
+				elseif path:match("/machine%-id$") then return nil
+				else return previous_open(path, mode) end
+				if not value then return nil end
+				return { read = function() return value end, close = function() closed = closed + 1; return true end }
+			end
+			local ok, err = pcall(function()
+				local cipher = helpers.load_module("modules.keylogger.text_cipher")
+				helpers.assert_eq(cipher.is_available(), case.expected ~= false)
+				if case.expected then
+					helpers.assert_eq(#commands, 1, "derive once from the first usable native candidate")
+					helpers.assert_true(commands[1]:find("file:" .. case.expected, 1, true) ~= nil)
+					helpers.assert_true(cipher.is_available())
+					helpers.assert_eq(#commands, 1, "availability retains the derived session key")
+					helpers.assert_eq(closed, case.primary and case.primary:match("%S") and 1 or (case.primary and 2 or 1),
+						"every successfully opened native candidate is closed")
+				else
+					helpers.assert_eq(#commands, 0)
+					cipher.set_enabled(true)
+					helpers.assert_eq(cipher.encrypt("synthetic-device", 1, "Synthetic caller text"), nil,
+						"missing identities must keep encryption fail-closed")
+				end
+			end)
+			io.open = previous_open
+			package.loaded["adapters.shell_runner"] = previous_shell
+			package.loaded["modules.keylogger.text_cipher"] = previous_cipher
+			helpers.assert_true(ok, tostring(err))
+		end)
+	end
+end)
+
 helpers.describe("text_cipher — disabled means untouched", function()
 	helpers.it("returns the plaintext and spawns nothing", function()
 		local cipher = fresh_cipher()
