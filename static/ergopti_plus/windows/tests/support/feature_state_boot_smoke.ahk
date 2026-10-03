@@ -158,8 +158,21 @@ _FeatureStateSmokeNeutral() {
 		AssertedScriptSlots += 1
 	}
 	_FeatureStateSmokeAssert(4, AssertedScriptSlots, "the four script shortcut slots")
-	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
-		_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
+	; The contextual editor is an ordinary declared default behind the closed
+	; Shortcuts master. Its presence does not authorize a native binding at boot.
+	_FeatureStateSmokeAssert(false, CategoryEnabled["Shortcuts"], "empty shortcut master remains closed")
+	AssertedContextual := 0
+	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS {
+		if Slot == "magic_editor" {
+			_FeatureStateSmokeAssert("open_hotstrings_editor", Action, "the declared contextual editor default")
+			_FeatureStateSmokeAssert(ManifestDefaultFor("shortcuts.keyboard.magic_editor"), Action,
+				"the contextual default comes from its actual manifest owner")
+			AssertedContextual += 1
+		} else {
+			_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
+		}
+	}
+	_FeatureStateSmokeAssert(1, AssertedContextual, "exactly one contextual default remains inert behind its master")
 	; Not an activation: "auto" lets the layout's own probe name the AltGr key.
 	; A neutral false forced the standard family on every Kana-style layout.
 	_FeatureStateSmokeAssert("auto", ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
