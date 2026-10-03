@@ -89,6 +89,41 @@ _CPC_ResultConsumptionRecognizesTestedReturns() {
 Test("AHK-15-persistence: result scan distinguishes tested and discarded status",
 	_CPC_ResultConsumptionRecognizesTestedReturns)
 
+; Audit the new caller before admitting it into the whole-class census.
+; Mutations use the real return line, so an assigned or discarded native result
+; cannot pass merely because this fixture knows the expected caller count.
+_CPC_IndentWriterReturnsItsNativeStatus() {
+	Body := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_IndentWrite"))
+	Assert(Body != "", "the actual indentation writer must be readable")
+	Lines := StrSplit(Body, "`n", "`r")
+	Calls := 0
+	for Index, Line in Lines {
+		if !InStr(Line, "TOML_BatchWrite(")
+			continue
+		Calls += 1
+		Assert(_CPC_LineConsumesResult(Lines, Index), "the indentation writer must return its native ACK")
+		Assert(InStr(Line, "WriterFn.Call(Path, Owned)") > 0,
+			"the injected and production writers must share the same owned leaf and result boundary")
+		Discarded := Lines.Clone()
+		Discarded[Index] := StrReplace(Line, "return ", "")
+		AssertFalse(_CPC_LineConsumesResult(Discarded, Index),
+			"discarding the actual native ACK must fail the caller guard")
+		Assigned := Lines.Clone()
+		Assigned[Index] := StrReplace(Line, "return ", "Ignored := ")
+		AssertFalse(_CPC_LineConsumesResult(Assigned, Index),
+			"assigning without testing the actual native ACK must fail the caller guard")
+	}
+	AssertEqual(1, Calls, "one independently audited native writer joins the census")
+	Borrowed := _StripFullLineComments(_DriverFuncBody("ConfigCommitBorrowedUpdates"))
+	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(InStr(Borrowed, "if !_ConfigInvokeCommitWriter(") > 0,
+		"the borrowed lease must classify the native writer before acknowledging the mutation")
+	Assert(InStr(Ack, "if !((Written is Integer) && Written == 1)") > 0,
+		"only a strict Integer-1 native receipt may acknowledge the owned write")
+}
+Test("AHK-15-persistence: the indentation caller returns its native ACK and rejects discarded-result mutations",
+	_CPC_IndentWriterReturnsItsNativeStatus)
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
@@ -114,7 +149,9 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; false return precedes reload, covered by the real refused-write case.
 	; SetKeyCombinationHold and ClearKeyCombination (infra/key_combinations.ahk)
 	; added two: each returns false before its reload when the commit is refused.
-	AssertEqual(28, Calls,
+	; _LLM_Menu_IndentWrite adds one leaf-owned caller: its native status is
+	; returned unchanged to the borrowed lease's strict Integer-1 ACK gate.
+	AssertEqual(29, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
