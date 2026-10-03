@@ -249,7 +249,7 @@ local original_get = function(url, headers, sent_options, callback)
  else
   assert(not native.config:find(os.getenv('GITHUB_TOKEN'), 1, true), 'native stdin authenticated a foreign request')
  end
- local response_body = os.getenv('UPDATER_ECHO_CI_TOKEN') == 'true'
+ local response_body = http_status == 304 and '' or os.getenv('UPDATER_ECHO_CI_TOKEN') == 'true'
   and Json.encode({ message = 'controlled refusal: Bearer ' .. os.getenv('GITHUB_TOKEN')
    .. ' repeated ' .. os.getenv('GITHUB_TOKEN') .. ' suffix kept' })
   or '{"message":"actual refused response"}'
@@ -319,6 +319,16 @@ end
 			cases: [[releaseOrigin, true]],
 			status: 302,
 			name: 'redirect-refusal'
+		},
+		{
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [
+				[releaseOrigin, true],
+				[`${releaseOrigin}?per_page=20&page=2`, true]
+			],
+			status: 304,
+			name: 'conditional-cache-observation'
 		},
 		...[
 			['short-response-echo', 'short'],
@@ -390,6 +400,18 @@ end
 		assert.ok(
 			JSON.parse(captured).responses.every((response) => response.status === variant.status)
 		);
+		if (variant.status === 304) {
+			assert.strictEqual(
+				(authenticated.stderr.match(/^::notice title=Linux updater live HTTP::/gm) || []).length,
+				variant.cases.length,
+				'conditional responses are observations; the updater owns cache admission'
+			);
+			assert.doesNotMatch(authenticated.stderr, /^::error title=Linux updater live HTTP::/m);
+			for (const response of JSON.parse(captured).responses) {
+				assert.strictEqual(response.body, '', 'a 304 response has no body');
+				assert.strictEqual(response.headers_available, false, 'absent headers stay unavailable');
+			}
+		}
 		if (variant.echo) {
 			const response = JSON.parse(captured).responses[0];
 			assert.strictEqual(response.status, 403);

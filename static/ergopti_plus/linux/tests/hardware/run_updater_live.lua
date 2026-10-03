@@ -96,7 +96,7 @@ local function safe_detail(value)
 	return text:sub(1, limit) .. " <truncated>"
 end
 
---- Records only the same refused response that the actual updater consumes.
+--- Records the same non-success transport response that the updater consumes.
 --- Missing header metadata is named rather than guessed to be a rate limit.
 local function observe_response(result)
 	if type(result) ~= "table" or result.ok == true then return end
@@ -120,7 +120,10 @@ local function observe_response(result)
 		local detail = receipt.error .. "; " .. receipt.message
 		if not receipt.headers_available then detail = detail .. "; response headers unavailable" end
 		detail = detail:gsub("%%", "%%25"):gsub("\r", "%%0D"):gsub("\n", "%%0A")
-		io.stderr:write("::error title=Linux updater live HTTP::" .. detail .. "\n")
+		-- A conditional 304 carries no body; only the manager can admit its
+		-- cached page. The original check still determines the failed verdict.
+		local level = receipt.status == 304 and "notice" or "error"
+		io.stderr:write("::" .. level .. " title=Linux updater live HTTP::" .. detail .. "\n")
 	end
 end
 
