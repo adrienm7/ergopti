@@ -15,7 +15,8 @@
 local M = {}
 
 local Logger = require("logger.shim")
-local Shell  = require("adapters.shell_runner")
+local OpenSSL = require("infra.openssl_command")
+local Shell = require("adapters.shell_runner")
 local Base64 = require("compat.base64")
 local NativeDigest = require("infra.openssl_digest")
 
@@ -49,16 +50,20 @@ function M.sha256(data)
 			fallback_reported = true
 			Logger.warn(LOG, "Native OpenSSL binding unavailable; CLI hashing is subject to exec argument limits")
 		end
-		local output
+		local output, native_error
 		if data:find("\0", 1, true) then
 			-- exec receives a C string: quoting cannot preserve embedded NUL.
 			-- The shared codec makes the shell input textual; OpenSSL restores
 			-- the original bytes before hashing through the existing primitive.
-			output = Shell.exec_exact_stdin(
-				"openssl base64 -d -A | openssl dgst -sha256 -hex 2>/dev/null", Base64.encode(data))
+			output, native_error = OpenSSL.exec(
+				"openssl base64 -d -A | openssl dgst -sha256 -hex 2>/dev/null", Base64.encode(data), { pipefail = true })
 		else
-			output = Shell.exec(string.format(
-				"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)))
+			output, native_error = OpenSSL.exec(string.format(
+				"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)), nil, { pipefail = true })
+		end
+		if type(output) ~= "string" then
+			Logger.error(LOG, "sha256(): CLI digest failed: %s", native_error or "missing output")
+			return ""
 		end
 		-- openssl output: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
 		local hex = output:match("[0-9a-f]+%s*$") or ""

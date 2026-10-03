@@ -10,6 +10,8 @@
 --- Existing exact-stdin framing and its argv budget remain intact.
 --- ==============================================================================
 
+local Heredoc = require("shell.heredoc")
+
 local M = {}
 local next_id = 0
 
@@ -38,9 +40,10 @@ function M.exec(command, input, options)
 	local Shell = require("adapters.shell_runner")
 	if options and options.pipefail then
 		if not Shell.has_command("bash") then return nil, "missing OpenSSL pipeline supervisor" end
-		-- Supervise every native stage. Quote only the composed command, leaving
-		-- the exact-stdin payload outside this wrapper and its argument budget.
-		framed = "bash -o pipefail -c " .. Shell.quote(framed)
+		-- Keep textual stdin outside the quoted command. A command that already
+		-- owns its input becomes a script without expanding its quoted argv again.
+		if input ~= nil then framed = "bash -o pipefail -c " .. Shell.quote(framed)
+		else framed = Heredoc.with_stdin("bash -o pipefail", framed) end
 	end
 	local output
 	if input ~= nil then output = Shell.exec_exact_stdin(framed, input)
