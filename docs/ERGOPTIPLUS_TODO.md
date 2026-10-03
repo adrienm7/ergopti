@@ -437,9 +437,26 @@ settings through the existing preference transaction and permits explicit retry.
 Eight regressions first failed against the original caller, then passed; the
 selected portable suites passed 353 JavaScript checks, 13,177 macOS unit cases
 and 101 E2E checks. Linux and Windows retain their existing acknowledged owners.
-Direct macOS menu-edit coverage for hand-written delimiter arrays, including
-unowned record metadata, and complete native three-OS qualification remain
-pending. Linux table-array editing is covered by item 42.
+Five real-owner regressions now cover macOS Add/Delete and publication-refusal
+recovery for independently hand-written delimiter arrays. Boot replay retains
+unknown nested fields in each admitted record and normalizes only its owned
+label/consume defaults. Untouched valid neighbors, standalone comments and
+foreign array-of-table siblings survive the actual preference writer. The same
+five cases fail against the original replay. Linux already merges untouched
+stored records; Windows manages delimiter strings in its existing override
+transaction instead of projecting custom record fields.
+
+The shared writer intentionally replaces a changed array-of-table list with an
+inline list. Its inline record comments normalize with that rewritten value;
+standalone comments and foreign table bytes remain preserved. Complete native
+three-OS qualification remains pending, so item 34 stays partial. Item 42
+retains its separate parser and outdated-setting decisions.
+
+The selected source gate passed 353 JS checks, 13,191 portable macOS unit cases
+and 101 E2E checks; its two code files remain byte-identical. Fresh composition
+with the shared Word menu passes five preservation and eight Delete transaction
+cases; the existing Linux persistence case also passes. Native qualification
+remains pending.
 
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins

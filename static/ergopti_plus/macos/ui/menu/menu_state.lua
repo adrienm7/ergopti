@@ -236,9 +236,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 						break
 					end
 					accepted_keys[ct.key] = true
-					accepted_custom[#accepted_custom + 1] = {
-						key = ct.key, char = ct.char, label = label, consume = consume,
-					}
+					-- Runtime admission validates owned fields; it does not own future
+					-- record metadata that an ordinary preference save must retain.
+					local accepted = clone_value(ct)
+					accepted.label, accepted.consume = label, consume
+					accepted_custom[#accepted_custom + 1] = accepted
 					-- Resolved from the persisted states rather than read off an
 					-- undefined global. `enabled_ct` was never assigned anywhere, so it
 					-- was always nil and this branch never ran: a custom terminator the
