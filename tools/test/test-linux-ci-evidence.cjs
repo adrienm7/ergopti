@@ -249,7 +249,11 @@ local original_get = function(url, headers, sent_options, callback)
  else
   assert(not native.config:find(os.getenv('GITHUB_TOKEN'), 1, true), 'native stdin authenticated a foreign request')
  end
- native.pipes[2].read(nil, '{"message":"actual refused response"}\\nERGOPTI_HTTP_STATUS:' .. http_status .. '\\n')
+ local response_body = os.getenv('UPDATER_ECHO_CI_TOKEN') == 'true'
+  and Json.encode({ message = 'controlled refusal: Bearer ' .. os.getenv('GITHUB_TOKEN')
+   .. ' repeated ' .. os.getenv('GITHUB_TOKEN') .. ' suffix kept' })
+  or '{"message":"actual refused response"}'
+ native.pipes[2].read(nil, response_body .. '\\nERGOPTI_HTTP_STATUS:' .. http_status .. '\\n')
  native.pipes[2].read(nil, nil)
  native.pipes[3].read(nil, nil)
  native.exit(http_status >= 400 and 22 or 0, 0)
@@ -315,10 +319,43 @@ end
 			cases: [[releaseOrigin, true]],
 			status: 302,
 			name: 'redirect-refusal'
-		}
+		},
+		...[
+			['short-response-echo', 'short'],
+			['punctuated-response-echo', 'OPAQUE.valid-~_+/123=='],
+			['long-response-echo', 'LONG_ECHO_' + 'Ab09-._~+/'.repeat(300) + '==']
+		].map(([name, token]) => ({
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [[releaseOrigin, true]],
+			status: 403,
+			name,
+			token,
+			echo: true
+		})),
+		// These inert values are valid RFC 6750 credentials. The original probe
+		// wrongly rejected short values, >255 bytes, and opaque punctuation.
+		...[
+			['short-token', 'short'],
+			['old-length-boundary', 'x'.repeat(256)],
+			['opaque-token', 'OPAQUE.valid-~_+/123=='],
+			['long-opaque-token', 'LONG_OPAQUE_' + 'Ab09-._~+/'.repeat(100) + '==']
+		].map(([name, token]) => ({
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [
+				[releaseOrigin, true],
+				[customOrigin, false],
+				['https://release-assets.githubusercontent.com/package.tar.gz', false]
+			],
+			status: 403,
+			name,
+			token
+		}))
 	];
 	for (const variant of authVariants) {
 		const { ci } = variant;
+		const token = variant.token || fixtureToken;
 		const evidence = path.join(updaterScratch, `authentication-${variant.name}`);
 		fs.mkdirSync(evidence);
 		const authenticated = spawnSync(
@@ -330,11 +367,12 @@ end
 					...process.env,
 					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 					GITHUB_ACTIONS: ci,
-					GITHUB_TOKEN: fixtureToken,
+					GITHUB_TOKEN: token,
 					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
 					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
 					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
 					UPDATER_HTTP_STATUS: String(variant.status),
+					UPDATER_ECHO_CI_TOKEN: variant.echo ? 'true' : 'false',
 					UPDATER_AUTH_CASES: JSON.stringify(variant.cases)
 				}
 			}
@@ -352,7 +390,36 @@ end
 		assert.ok(
 			JSON.parse(captured).responses.every((response) => response.status === variant.status)
 		);
-		for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+		if (variant.echo) {
+			const response = JSON.parse(captured).responses[0];
+			assert.strictEqual(response.status, 403);
+			assert.strictEqual(
+				response.message,
+				'controlled refusal: Bearer <secret> repeated <secret> suffix kept'
+			);
+			assert.strictEqual(JSON.parse(response.body).message, response.message);
+			assert.ok(response.error.includes('HTTP 403'), 'real HTTP refusal detail was lost');
+			assert.ok(
+				authenticated.stderr.includes('controlled refusal:'),
+				'echo sanitization dropped all response evidence'
+			);
+			if (variant.name === 'long-response-echo') {
+				assert.ok(
+					token.length > 2048,
+					'long credential must cross the actual diagnostic clip bound'
+				);
+				assert.ok(!captured.includes(token.slice(0, 32)), 'clipping exposed a credential fragment');
+				assert.ok(
+					!authenticated.stdout.includes(token.slice(0, 32)),
+					'stdout exposed a credential fragment'
+				);
+				assert.ok(
+					!authenticated.stderr.includes(token.slice(0, 32)),
+					'stderr exposed a credential fragment'
+				);
+			}
+		}
+		for (const privateText of [token, 'Authorization', 'original-etag', 'user:password']) {
 			assert.ok(!authenticated.stdout.includes(privateText), 'stdout leaked private request state');
 			assert.ok(!authenticated.stderr.includes(privateText), 'stderr leaked private request state');
 			assert.ok(!captured.includes(privateText), 'artifact leaked private request state');
@@ -360,12 +427,19 @@ end
 	}
 	for (const token of [
 		'',
-		'short',
 		fixtureToken + '\n',
 		fixtureToken + '\r',
 		fixtureToken + ' ',
 		fixtureToken + 'é',
-		'x'.repeat(256)
+		fixtureToken + '\t',
+		fixtureToken + '\x01',
+		fixtureToken + '\x7f',
+		'=',
+		fixtureToken + '=interior',
+		fixtureToken + '"',
+		fixtureToken + '\\',
+		fixtureToken + '\r\nX-Injected: true',
+		fixtureToken + '"\nurl = "https://foreign.invalid"'
 	]) {
 		const refused = spawnSync(
 			nativeLua,
