@@ -636,8 +636,42 @@ console.log(
 	'[OK] Desktop verdicts reject incomplete launches; shared core gates run independently.'
 );
 
+/** Requires the actual zero-status assertion, excluding quoted and commented decoys. */
+function checkNativeIdentityStatusAssertion(runtime) {
+	const code = runtime.replace(
+		/\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|\/(?![/*])(?:\\[^\r\n]|\[(?:\\[^\r\n]|[^\]\\])*\]|[^/\\\r\n])+\/[dgimsuvy]*|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|`(?:\\[\s\S]|[^`\\])*`/g,
+		(literal) => literal.replace(/[^\r\n]/g, ' ')
+	);
+	assert.match(
+		code,
+		/^[\t ]*assert\s*\.\s*equal\s*\(\s*identity\s*\.\s*status\s*,\s*0\s*[,)]/m,
+		'the native own-image status must be asserted equal to integer zero'
+	);
+}
+
+for (const actual of [
+	"assert.equal(identity.status, 0, 'native own-image status');",
+	"assert.equal(\n\tidentity.status,\n\t0,\n\t'native own-image status'\n);"
+])
+	checkNativeIdentityStatusAssertion(actual);
+for (const decoy of [
+	'assert.equal(result.status, 0);',
+	'assert.equal(identity.status, 1);',
+	'assert.equal(identity.status, 0.5);',
+	"assert.equal(identity.status, '0');",
+	'assert.ok(identity.status === 0);',
+	'assert.notEqual(identity.status, 0);',
+	'other.assert.equal(identity.status, 0);',
+	'// assert.equal(identity.status, 0);',
+	'/*\nassert.equal(identity.status, 0);\n*/',
+	"const text = 'assert.equal(identity.status, 0);';",
+	'const text = `\nassert.equal(identity.status, 0);\n`;'
+])
+	assert.throws(() => checkNativeIdentityStatusAssertion(decoy), decoy);
+
 /** The native fixture must report its own canonical image without relaxing admission. */
 function checkCompiledFixtureNormalization(source, runtime) {
+	checkNativeIdentityStatusAssertion(runtime);
 	for (const token of [
 		'if (args.Length != 0 && args[0].StartsWith("--", StringComparison.Ordinal))',
 		'CanonicalExistingFile(Process.GetCurrentProcess().MainModule.FileName)',
@@ -682,7 +716,6 @@ function checkCompiledFixtureNormalization(source, runtime) {
 		'script.includes(\'-ArgumentList "/ErrorStdOut"\')',
 		' --identity-controls ',
 		' --unknown; exit $LASTEXITCODE',
-		'assert.equal(identity.status, 0',
 		"assert.equal(identity.stderr, ''",
 		'assert.notEqual(unknownMode.status, 0',
 		'assert.notEqual(result.status, 0',
@@ -732,6 +765,9 @@ for (const [from, to] of [
 	);
 }
 for (const [from, to] of [
+	['identity.status,\n\t\t\t0,', 'result.status,\n\t\t\t0,'],
+	['identity.status,\n\t\t\t0,', 'identity.status,\n\t\t\t1,'],
+	['assert.equal(\n\t\t\tidentity.status,', 'assert.notEqual(\n\t\t\tidentity.status,'],
 	["'foreign-executable'", "'ready'"],
 	[' --identity-controls ', ' --unused '],
 	["assert.equal(identity.stderr, ''", "assert.ok(identity.stderr === ''"]
@@ -742,6 +778,100 @@ for (const [from, to] of [
 		from
 	);
 }
+// Native stderr is diagnostic input only; it cannot supply success or raw payload.
+{
+	const describe = require('./support/windows-launch-runtime.cjs').describeNativeIdentityFailure;
+	assert.equal(
+		typeof describe,
+		'function',
+		'the actual native status owner must expose its closed classifier'
+	);
+	const known = 'The native short alias must differ from the long module path.';
+	const raw = 'private-error-payload-marker';
+	const native = {
+		stderr:
+			'Unhandled Exception: System.InvalidOperationException: ' +
+			known +
+			'\r\n' +
+			'   at WindowsLaunchChild.IdentityControls(String[] args) in C:\\' +
+			raw +
+			':line 1\r\n',
+		stdout: raw
+	};
+	const closed = JSON.parse(describe(native, compiledFixture));
+	assert.equal(closed.exception_type, 'System.InvalidOperationException');
+	assert.equal(closed.fixture_refusal, known);
+	assert.equal(
+		JSON.parse(
+			describe(
+				{ stderr: 'native.exe : Unhandled Exception: System.InvalidOperationException: ' + known },
+				compiledFixture
+			)
+		).fixture_refusal,
+		known
+	);
+	assert.deepEqual(closed.fixture_frames, ['IdentityControls']);
+	assert.equal(closed.stderr_characters, native.stderr.length);
+	assert.equal(closed.stdout_characters, raw.length);
+	assert(!describe(native, compiledFixture).includes(raw));
+	assert.equal(
+		JSON.parse(
+			describe(
+				{ stderr: 'Unhandled Exception: System.InvalidOperationException: ' + raw },
+				compiledFixture
+			)
+		).fixture_refusal,
+		'unobserved'
+	);
+	assert.equal(
+		JSON.parse(
+			describe(
+				{ stderr: 'Unhandled Exception: System.InvalidOperationException: ' + known + raw },
+				compiledFixture
+			)
+		).fixture_refusal,
+		'unobserved'
+	);
+	assert.equal(
+		JSON.parse(describe({ stderr: 'System.Private' + raw + ': ' + raw }, compiledFixture))
+			.exception_type,
+		'unobserved'
+	);
+	assert.equal(
+		JSON.parse(
+			describe(
+				{ stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw },
+				compiledFixture
+			)
+		).exception_type,
+		'System.ComponentModel.Win32Exception'
+	);
+	assert.equal(
+		JSON.parse(
+			describe(
+				{ stderr: 'Unhandled Exception: System.ComponentModel.Win32Exception: ' + raw },
+				compiledFixture
+			)
+		).fixture_refusal,
+		'unobserved'
+	);
+	assert.deepEqual(
+		JSON.parse(describe({ stderr: 'at Private.' + raw + '()' }, compiledFixture)).fixture_frames,
+		[]
+	);
+	assert.deepEqual(JSON.parse(describe({ stderr: { raw }, stdout: { raw } }, compiledFixture)), {
+		exception_type: 'unobserved',
+		fixture_refusal: 'unobserved',
+		fixture_frames: [],
+		stderr_characters: 0,
+		stdout_characters: 0
+	});
+	assert(
+		compiledRuntime.includes('describeNativeIdentityFailure(identity, fixtureSource)'),
+		'the actual status assertion must consume the closed native stderr classifier'
+	);
+}
+
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();

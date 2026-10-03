@@ -10,6 +10,57 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('../ci-pipeline.cjs');
 
+/** Classifies a failed native fixture without projecting its stderr payload. */
+function describeNativeIdentityFailure(result, fixture) {
+	const stderr = typeof result.stderr === 'string' ? result.stderr : '';
+	const stdout = typeof result.stdout === 'string' ? result.stdout : '';
+	const types = [
+		'System.InvalidOperationException',
+		'System.ComponentModel.Win32Exception',
+		'System.IO.IOException',
+		'System.UnauthorizedAccessException',
+		'System.ArgumentException',
+		'System.DllNotFoundException',
+		'System.EntryPointNotFoundException',
+		'System.TypeInitializationException'
+	];
+	const observedType =
+		types.find((type) => stderr.includes('Unhandled Exception: ' + type + ':')) || 'unobserved';
+	const messages = [
+		...fixture.matchAll(/throw new InvalidOperationException\("([^"\n]+)"\)/g),
+		...fixture.matchAll(/Require\([^\n]*,\s*"([^"\n]+)"\);/g),
+		...fixture.matchAll(/^\s*"([^"\n]+)"\);$/gm)
+	].map((match) => match[1]);
+	const refusal =
+		observedType === 'System.InvalidOperationException'
+			? messages.find((message) =>
+					stderr
+						.split(/\r?\n/)
+						.some((line) =>
+							line.trim().endsWith('Unhandled Exception: ' + observedType + ': ' + message)
+						)
+				) || 'unobserved'
+			: 'unobserved';
+	const frames = [
+		'CanonicalExistingFile',
+		'SamePhysicalFile',
+		'OwnExecutable',
+		'IdentityControls',
+		'Main'
+	].filter((method) =>
+		stderr
+			.split(/\r?\n/)
+			.some((line) => line.trim().startsWith('at WindowsLaunchChild.' + method + '('))
+	);
+	return JSON.stringify({
+		exception_type: observedType,
+		fixture_refusal: refusal,
+		fixture_frames: frames,
+		stderr_characters: stderr.length,
+		stdout_characters: stdout.length
+	});
+}
+
 module.exports = function checkWindowsLaunchRuntime() {
 	if (process.platform !== 'win32') {
 		console.log('[SKIP] native Windows launch refusal fixtures require Windows');
@@ -62,7 +113,16 @@ module.exports = function checkWindowsLaunchRuntime() {
 			{},
 			30000
 		);
-		assert.equal(identity.status, 0, 'the real native module alias controls must pass');
+		const fixtureSource = fs.readFileSync(
+			path.join(root, 'tools/test/fixtures/windows_launch_child.cs'),
+			'utf8'
+		);
+		assert.equal(
+			identity.status,
+			0,
+			'the real native module alias controls must pass; closed native diagnostics: ' +
+				describeNativeIdentityFailure(identity, fixtureSource)
+		);
 		assert.equal(identity.stderr, '', 'native identity controls must emit no stderr');
 		assert.equal(
 			identity.stdout.trim(),
@@ -166,3 +226,5 @@ module.exports = function checkWindowsLaunchRuntime() {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
 };
+
+module.exports.describeNativeIdentityFailure = describeNativeIdentityFailure;
