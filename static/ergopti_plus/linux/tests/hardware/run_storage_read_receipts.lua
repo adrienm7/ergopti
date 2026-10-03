@@ -128,6 +128,46 @@ check("fresh owner recovers after native permissions are repaired", function()
 	assert(fresh(config).get("preserve") == "original")
 end)
 
+for _, suffix in ipairs({ 0, 1, 3 }) do
+	for _, inaccessible in ipairs({ true, false }) do
+		check("corrupt backup suffix " .. suffix .. (inaccessible and " is protected after refusal" or " is preserved before recovery"), function()
+			local config = mkdir(root .. "/backup-" .. suffix .. (inaccessible and "-denied" or "-readable"))
+			local parent = mkdir(config .. "/ergopti_plus")
+			local store = parent .. "/storage.json"
+			local broken = "{ broken current bytes"
+			write(store, broken)
+			local backups = {}
+			for index = 0, suffix do
+				local path = store .. ".corrupt" .. (index == 0 and "" or "." .. index)
+				local bytes = "{ older recovery bytes " .. index
+				write(path, bytes)
+				backups[#backups + 1] = { path = path, bytes = bytes }
+			end
+			local blocked_path = backups[#backups].path
+			if inaccessible then assert(uv.fs_chmod(blocked_path, 0)) end
+			local storage = fresh(config)
+			assert(storage.get("any", "default") == "default")
+			local recovery = storage.recovery_status()
+			restore_permissions()
+			for _, backup in ipairs(backups) do
+				assert(read(backup.path) == backup.bytes, "older corrupt-store backup was overwritten")
+			end
+			if inaccessible then
+				assert(read(store) == broken, "failed backup classification moved the source")
+				assert(storage.set("replacement", true) == false)
+				assert(recovery and recovery.path == store and recovery.preserved == false)
+			else
+				local path = store .. ".corrupt." .. (suffix + 1)
+				files[#files + 1] = path
+				assert(recovery and recovery.path == path and recovery.preserved == true)
+				assert(read(path) == broken)
+				assert(storage.set("replacement", true))
+				assert(fresh(config).get("replacement") == true)
+			end
+		end)
+	end
+end
+
 if previous_xdg then assert(uv.os_setenv("XDG_CONFIG_HOME", previous_xdg))
 else assert(uv.os_unsetenv("XDG_CONFIG_HOME")) end
 for index = #files, 1, -1 do

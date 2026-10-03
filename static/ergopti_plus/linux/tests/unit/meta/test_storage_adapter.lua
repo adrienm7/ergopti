@@ -86,6 +86,54 @@ helpers.describe("storage native open receipts", function()
 	end
 end)
 
+helpers.describe("storage backup open receipts", function()
+	for _, receipt in ipairs({ 13, 5, "unknown", "throw" }) do
+		helpers.it("linux-storage-backup-receipts: preserves prior backup after " .. receipt, function()
+			local root = make_temp_config_root()
+			local path = root .. "/ergopti_plus/storage.json"
+			local backup = path .. ".corrupt"
+			local originals = { [path] = "{ broken current bytes", [backup] = "{ older recovery bytes" }
+			for target, bytes in pairs(originals) do
+				local file = assert(io.open(target, "wb"))
+				assert(file:write(bytes) and file:close())
+			end
+			local real_getenv, real_open = os.getenv, io.open
+			os.getenv = function(name)
+				if name == "XDG_CONFIG_HOME" then return root end
+				return real_getenv(name)
+			end
+			io.open = function(target, mode)
+				if target == backup and mode == "r" then
+					if receipt == "throw" then error("native backup open raised") end
+					return nil, "native backup open refused", type(receipt) == "number" and receipt or nil
+				end
+				return real_open(target, mode)
+			end
+			local ok, err = xpcall(function()
+				local storage = helpers.load_module("adapters.storage")
+				helpers.assert_eq(storage.get("any", "fallback"), "fallback")
+				helpers.assert_eq(storage.set("replacement", true), false)
+				local recovery = storage.recovery_status()
+				helpers.assert_eq(recovery.path, path)
+				helpers.assert_eq(recovery.preserved, false)
+			end, debug.traceback)
+			os.getenv, io.open = real_getenv, real_open
+			package.loaded["adapters.storage"] = nil
+			local preserved = {}
+			for target in pairs(originals) do
+				local file = io.open(target, "rb")
+				if file then preserved[target] = file:read("*a"); assert(file:close()) end
+				os.remove(target)
+			end
+			os.remove(path .. ".tmp")
+			os.remove(root .. "/ergopti_plus")
+			os.remove(root)
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(preserved, originals, "both byte histories must remain intact")
+		end)
+	end
+end)
+
 
 
 

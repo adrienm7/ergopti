@@ -79,13 +79,14 @@ local function _close(fh)
 end
 
 --- Finds a recovery path without overwriting an older corrupt-store backup.
---- @return string
+--- @return string|nil Unoccupied path, or nil when absence cannot be proven.
 local function _next_recovery_path()
 	local candidate = _CORRUPT_PATH
 	local suffix = 0
 	while true do
-		local fh = io.open(candidate, "r")
-		if not fh then return candidate end
+		local ok, fh, _, errno = pcall(io.open, candidate, "r")
+		if not ok then return nil end
+		if not fh then return errno == ENOENT and candidate or nil end
 		_close(fh)
 		suffix = suffix + 1
 		candidate = _CORRUPT_PATH .. "." .. suffix
@@ -96,7 +97,8 @@ end
 --- @param reason string Stable recovery reason.
 local function _preserve_corrupt_store(reason)
 	local recovery_path = _next_recovery_path()
-	local ok, renamed = pcall(os.rename, _STORE_PATH, recovery_path)
+	local ok, renamed = false, false
+	if recovery_path then ok, renamed = pcall(os.rename, _STORE_PATH, recovery_path) end
 	if ok and renamed == true then
 		_recovery = { reason = reason, path = recovery_path, preserved = true }
 		Logger.error(LOG, "Corrupt storage preserved at '%s'; starting with an empty store.", recovery_path)

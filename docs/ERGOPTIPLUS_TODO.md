@@ -202,6 +202,16 @@ These are software implementations; final hardware verification remains below.
   and thrown receipts. Windows uses per-key registry writes and macOS hs.settings;
   neither has this whole-file JSON load-and-replace path. No TOML owner, personal
   menu, native cross-OS suite or manual CI was changed or executed.
+- [~] **L14.** Linux JSON recovery backup receipts: choose a recovery filename
+  only after proven ENOENT and block recovery on other open refusals instead of
+  replacing an unreadable older backup. Three actual permission regressions
+  failed before the fix at backup suffixes 0, 1 and 3. The extended native store
+  matrix passes 24 cases, including readable backup chains and independent
+  preservation of both byte histories; four portable cases cover errno, unknown
+  and thrown refusals. This fixes read-refusal classification, without claiming
+  general race-free no-clobber publication or dangling-link classification.
+  Windows registry and macOS hs.settings do not use this JSON backup path.
+  TOML ownership, native cross-OS validation and manual CI remain untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
