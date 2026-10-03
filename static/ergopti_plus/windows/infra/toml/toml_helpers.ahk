@@ -24,9 +24,9 @@
 ;    lookups never reopens the file. Mirrors ``ParseIniFile``'s shape so the
 ;    cache-aware accessor (``IniCacheGet``) keeps working.
 ; 4. Section-scoped batch write: ``TOML_BatchWrite`` rewrites every section
-;    in one go (read once, modify in memory, write once). Comments are not
-;    preserved because the file is fully driver-managed; section ORDER is
-;    stable across writes.
+;    in one go (read once, modify in memory, write once). Representable sources
+;    keep canonical formatting. A loss-sensitive no-op keeps the exact source;
+;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -742,7 +742,7 @@ TOML_BuildUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
 		return Map("status", "error", "kind", "source_unreadable",
 			"content", "")
 	Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",
-		SourceBytes)
+		SourceBytes, SourcePresent)
 	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
 }
 
@@ -763,8 +763,14 @@ TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := []) {
 		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")
 }
 
+; Fresh source authority is checked independently of candidate equality. A
+; concurrent writer cannot turn a stale candidate into an acknowledged no-op.
+_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+	return SourcePresent ? FSUtf8ExactMatches(Path, SourceBytes) : !FileExist(Path)
+}
+
 _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
-		ProvidedContent := unset) {
+		ProvidedContent := unset, ProvidedPresence := unset) {
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
@@ -789,9 +795,21 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; that felt stuck. Two QPC reads, gated by the profiler floor.
 		_hpTomlWrite := HotPath_Now()
 
-		Parsed := BuildOnly && IsSet(ProvidedContent)
-			? _ParseTomlFileImpl(Path, false, false, ProvidedContent, true, &DiscardedArrays)
-			: _ParseTomlFileImpl(Path, false, false, , true, &DiscardedArrays)
+		if IsSet(ProvidedPresence) && (!(ProvidedPresence is Integer)
+				|| (ProvidedPresence != 0 && ProvidedPresence != 1))
+				throw TypeError("Provided source presence must be Integer 0 or 1")
+		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(Path) ? 1 : 0)
+		SourceBytes := IsSet(ProvidedContent) ? ProvidedContent
+			: (SourcePresent ? FSReadUtf8Exact(Path) : "")
+		if !(SourceBytes is String) {
+				global _TomlReadFailures, _TomlUnreadableFiles
+				_TomlReadFailures[Path] := true
+				if SourcePresent
+						_TomlUnreadableFiles[Path] := true
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': its exact source image could not be read. No file was changed.", Mode, Path)
+				return false
+		}
+		Parsed := _ParseTomlFileImpl(Path, false, false, SourceBytes, true, &DiscardedArrays)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with
@@ -907,6 +925,23 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				for _, k in SortedKeys
 						body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
 		}
+		try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
+			Updates, ExactSectionPrefixes)
+		catch as Err {
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
+				return false
+		}
+		if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+				; Detached builds never own the live reader cache. An ordinary
+				; write must retire its now-stale snapshot after actual source drift.
+				if !BuildOnly {
+						global _ParseTomlCache
+						if _ParseTomlCache.Has(Path)
+								_ParseTomlCache.Delete(Path)
+				}
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': the source changed during candidate preparation. No file was changed.", Mode, Path)
+				return false
+		}
 		if BuildOnly {
 				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
 					Updates.Length . " update(s)")
@@ -914,7 +949,16 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				; identical byte image so the transition does not silently change the
 				; repository's canonical encoding policy.
 				return Map("status", "ok", "kind", "rendered",
-					"content", Chr(0xFEFF) . body)
+					"content", Admitted["content"])
+		}
+
+		if Admitted["preserve_source"] {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					"unchanged source namespaces; " . Updates.Length . " operation(s)")
+				return true
 		}
 
 		; A canonical image already on disk needs no stage or atomic replacement.
@@ -985,6 +1029,15 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				_TOML_RemoveOwnedStage(tmp)
 				return false
 		}
+	if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
+		try LoggerError("TomlWrite", "Refusing TOML publication for '{1}': the exact source changed after staging. No file was replaced.", Path)
+		_TOML_RemoveOwnedStage(tmp)
+		return false
+	}
+
 	; Publish only through the same-volume write-through adapter. The WAL may
 	; promote immediately after this return, so a merely visible rename is not a
 	; sufficient durability boundary.

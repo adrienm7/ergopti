@@ -179,7 +179,7 @@ TOML_ParseDocument(Source, &Records := 0) {
 		throw TypeError("TOML document source must be a String")
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
-	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := []
+	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
 	Declared := Map(), Dotted := Map(), Arrays := Map(), Sealed := Map()
 	Records := [], Position := 1
 	while Position <= StrLen(Source) {
@@ -191,7 +191,8 @@ TOML_ParseDocument(Source, &Records := 0) {
 			Width := ArrayHeader ? 2 : 1
 			if SubStr(Record, -Width) != (ArrayHeader ? "]]" : "]")
 				throw ValueError("Malformed TOML table header")
-			Parts := TOML_ParseKeyPath(SubStr(Record, Width + 1, StrLen(Record) - 2 * Width), true)
+			NativeSection := Trim(SubStr(Record, Width + 1, StrLen(Record) - 2 * Width), " " . Chr(9))
+			Parts := TOML_ParseKeyPath(NativeSection, true)
 			Parent := _TOML_DocumentContainer(Root, Parts, Parts.Length - 1, Arrays, Sealed)
 			Key := Parts[Parts.Length]
 			if ArrayHeader {
@@ -242,7 +243,136 @@ TOML_ParseDocument(Source, &Records := 0) {
 		Path := CurrentPath.Clone()
 		for Part in Parts
 			Path.Push(Part)
-		Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key })
+		NativeKey := KeyText
+		if StrLen(NativeKey) >= 2 && SubStr(NativeKey, 1, 1) == Chr(34) && SubStr(NativeKey, -1) == Chr(34)
+			NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
+		Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
+			NativeSection: NativeSection, NativeKey: NativeKey })
 	}
 	return Root
+}
+
+
+; The semantic reader and migration share one typed value owner. Native Boolean
+; sentinels retain their intent, while integers and floats compare by value.
+_TOML_ValueKind(Value) {
+	if Value is TOML_Bool
+		return "boolean"
+	if Value is String
+		return "string"
+	if Value is Integer || Value is Float
+		return "number"
+	if Value is Array
+		return "array"
+	if Value is Map
+		return "table"
+	return "unknown"
+}
+
+/** Compares native typed TOML values without coercing strings or Booleans. */
+TOML_SameValue(Left, Right) {
+	Kind := _TOML_ValueKind(Left)
+	if Kind != _TOML_ValueKind(Right)
+		return false
+	switch Kind {
+		case "boolean": return !!Left.Value == !!Right.Value
+		case "string": return StrCompare(Left, Right, true) == 0
+		case "number": return Left = Right
+		case "array":
+			if Left.Length != Right.Length
+				return false
+			for Index, Item in Left {
+				if !TOML_SameValue(Item, Right[Index])
+					return false
+			}
+			return true
+		case "table":
+			if Left.Count != Right.Count
+				return false
+			for Key, Item in Left {
+				if !Right.Has(Key) || !TOML_SameValue(Item, Right[Key])
+					return false
+			}
+			return true
+	}
+	return false
+}
+
+; This is the existing flat model's semantic projection, not a second physical
+; writer. Rendering values through the canonical owner exposes literal-dot keys,
+; ignored root records and collapsed table-array generations before publication.
+_TOML_FlatDocument(Sections) {
+	Image := ""
+	for Section, Entries in Sections {
+		Image .= "[" . Section . "]`n"
+		for Key, Value in Entries
+			Image .= TOML_RenderKey(Key) . " = " . TOML_RenderValue(Value) . "`n"
+	}
+	return TOML_ParseDocument(Image)
+}
+
+_TOML_DocumentLookup(Document, Parts) {
+	Node := Document
+	for Part in Parts {
+		if !(Node is Map)
+			return Map("found", false, "blocked", true)
+		if !Node.Has(Part)
+			return Map("found", false, "blocked", false)
+		Node := Node[Part]
+	}
+	return Map("found", true, "blocked", false, "value", Node)
+}
+
+; Native flat identities are only a projection. Verify every requested effect
+; against actual source assignments or a strict semantic destination, including
+; deletes that the old reader reports missing because it ignores root records.
+_TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updates, Prefixes) {
+	for Prefix in Prefixes {
+		Parts := TOML_ParseKeyPath(Prefix, true)
+		Existing := _TOML_DocumentLookup(Document, Parts)
+		if Existing["blocked"]
+			return false
+		if Existing["found"] {
+			Projected := _TOML_DocumentLookup(Projection, Parts)
+			if !Projected["found"] || !TOML_SameValue(Existing["value"], Projected["value"])
+					|| !TOML_SameValue(Before, After)
+				return false
+		}
+	}
+	for Update in Updates {
+		Deleting := Update.HasOwnProp("Delete") && Update.Delete == 1
+		Matched := false
+		for Record in Records {
+			if StrCompare(Record.NativeSection, Update.Section, true) != 0
+					|| StrCompare(Record.NativeKey, Update.Key, true) != 0
+				continue
+			Matched := true
+			if Deleting || !TOML_SameValue(Record.Value, Update.Value)
+				return false
+		}
+		if Matched
+			continue
+		Parts := TOML_ParseKeyPath(Update.Section, true)
+		Parts.Push(Update.Key)
+		Existing := _TOML_DocumentLookup(Document, Parts)
+		if Existing["blocked"] || (Deleting && Existing["found"])
+			return false
+		if !Deleting && (!Existing["found"] || !TOML_SameValue(Existing["value"], Update.Value))
+			return false
+	}
+	return true
+}
+
+/** Admits the canonical writer only when its source namespaces survive. */
+TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
+	Document := TOML_ParseDocument(Source, &Records)
+	Projection := _TOML_FlatDocument(Before)
+	TOML_ParseDocument(Candidate)
+	if TOML_SameValue(Document, Projection)
+		return Map("content", Candidate, "preserve_source", false)
+	; Only a semantic no-op can authorize retaining an unrepresentable source.
+	; Flat equality alone misses deletes and aliases the old reader cannot see.
+	if !_TOML_DocumentUpdatesAreNoOp(Document, Projection, Records, Before, After, Updates, Prefixes)
+		throw ValueError("The canonical TOML writer cannot preserve the source namespaces")
+	return Map("content", Source, "preserve_source", true)
 }

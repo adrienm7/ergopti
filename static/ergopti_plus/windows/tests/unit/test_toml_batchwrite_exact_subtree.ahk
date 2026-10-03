@@ -146,3 +146,46 @@ _TBES_RegisterNoOpVectors() {
 		Test("toml-noop-parity " . Vector["id"], _TBES_NoOpVector.Bind(Vector))
 }
 _TBES_RegisterNoOpVectors()
+
+
+_TBES_NamespaceAdmissionRetainsPhysicalSource() {
+	for Vector in _TBUI_NamespaceLossVectors() {
+		Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			FileSetTime("20000101000000", Path, "M")
+			BeforeTime := FileGetTime(Path, "M")
+			AssertTrue(TOML_BatchWrite(Path,
+				[{ Section: "settings", Key: Vector.Key, Value: Vector.Value }]))
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "ordinary no-op retains every byte: " . Vector.Id)
+			AssertEqual(BeforeTime, FileGetTime(Path, "M"), "a source-retaining no-op performs no physical replacement")
+			for Updates in [[{ Section: "settings", Key: Vector.Key, Value: 2 }],
+				[{ Section: "settings", Key: Vector.Key, Delete: 1 }],
+				[{ Section: "settings", Key: "other", Value: "unrelated" }]] {
+				AssertFalse(TOML_BatchWrite(Path, Updates), "refuse source identity loss: " . Vector.Id)
+				AssertTrue(FSUtf8ExactMatches(Path, Source))
+				AssertEqual(BeforeTime, FileGetTime(Path, "M"), "refusal precedes all publication")
+			}
+			Stages := 0
+			Loop Files, Path . ".*.tmp"
+				Stages += 1
+			AssertEqual(0, Stages, "refused changes own no staging file or cleanup debt")
+		} finally FSDelete(Path)
+	}
+}
+Test("toml writer admission: native no-op inode and refusal publication preserve source namespaces (toml-writer-document)",
+	_TBES_NamespaceAdmissionRetainsPhysicalSource)
+
+_TBES_DuplicateSemanticSourceRefuses() {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . '[settings]`nowned=1`n[future]`na.b=1`na."b"=2`n'
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		AssertFalse(TOML_BatchWrite(Path, [{ Section: "settings", Key: "owned", Value: 2 }]))
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "an unrelated update cannot publish from an ambiguous source")
+		AssertFalse(TOML_BatchWrite(Path, [{ Section: "settings", Key: "owned", Value: 1 }]),
+			"equal flat cells are not proof of a valid semantic no-op")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally FSDelete(Path)
+}
+Test("toml writer admission: malformed semantic aliases refuse even a flat no-op (toml-writer-document)",
+	_TBES_DuplicateSemanticSourceRefuses)

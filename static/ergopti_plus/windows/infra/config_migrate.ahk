@@ -285,50 +285,12 @@ ConfigMigrateStampNewFile(Updates, Path) {
 ; The comparison class of a typed value: integers and floats compare by value,
 ; every other value only within its own kind.
 _ConfigMigrateKind(Value) {
-	if (Value is TOML_Bool)
-		return "boolean"
-	if (Value is String)
-		return "string"
-	if (Value is Integer) || (Value is Float)
-		return "number"
-	if (Value is Array)
-		return "array"
-	if (Value is Map)
-		return "table"
-	return "unknown"
+	return _TOML_ValueKind(Value)
 }
 
-; Type-strict deep equality, the Lua engine's same_value; strings compare with
-; their case.
+; The document reader owns typed equality for both migration and ordinary saves.
 ConfigMigrateSameValue(Left, Right) {
-	Kind := _ConfigMigrateKind(Left)
-	if (Kind != _ConfigMigrateKind(Right))
-		return false
-	switch Kind {
-		case "boolean":
-			return !!Left.Value == !!Right.Value
-		case "string":
-			return StrCompare(Left, Right, true) == 0
-		case "number":
-			return Left = Right
-		case "array":
-			if (Left.Length != Right.Length)
-				return false
-			for Index, Item in Left {
-				if !ConfigMigrateSameValue(Item, Right[Index])
-					return false
-			}
-			return true
-		case "table":
-			if (Left.Count != Right.Count)
-				return false
-			for Key, Item in Left {
-				if !Right.Has(Key) || !ConfigMigrateSameValue(Item, Right[Key])
-					return false
-			}
-			return true
-	}
-	return false
+	return TOML_SameValue(Left, Right)
 }
 
 ; Whether two models hold the same configuration: a section without keys and
