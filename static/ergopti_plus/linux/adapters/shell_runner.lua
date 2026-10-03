@@ -205,13 +205,19 @@ end
 --- Use this wherever an empty successful result has a different meaning from a
 --- failed command, such as snapshotting an empty clipboard before replacement.
 --- @param cmd string Fully composed shell command (quote every interpolation).
+--- @param options table|nil { output_dir? } Native receipt staging directory.
 --- @return boolean ok
 --- @return string output Captured stdout, including the empty string.
 --- @return string|nil error_message
-function M.exec_checked(cmd)
+function M.exec_checked(cmd, options)
 	if type(cmd) ~= "string" or cmd == "" then
 		Logger.warn(LOG, "exec_checked(): empty command — ignored.")
 		return false, "", "empty command"
+	end
+	if options ~= nil and type(options) ~= "table" then return false, "", "invalid checked command options" end
+	local output_dir = options and options.output_dir
+	if output_dir ~= nil and (type(output_dir) ~= "string" or output_dir == "" or output_dir:find("\0", 1, true)) then
+		return false, "", "invalid checked output directory"
 	end
 	if _test_runner then
 		local result = _test_runner(cmd)
@@ -231,8 +237,10 @@ function M.exec_checked(cmd)
 		-- shell, buffer stdout in an atomically-created file, and frame the result
 		-- with an unambiguous status/byte-count header. The length check makes a
 		-- failed or truncated cat an explicit failure too.
+		-- An owner with a selected runtime directory can stage its receipt there,
+		-- independently of a different TMPDIR that may be unavailable.
 		local wrapper = table.concat({
-			"output=$(mktemp) || exit 125",
+			output_dir and 'output=$(mktemp -p "$2") || exit 125' or "output=$(mktemp) || exit 125",
 			"trap 'rm -f -- \"$output\"' EXIT HUP INT TERM",
 			"sh -c \"$1\" >\"$output\"",
 			"status=$?",
@@ -242,6 +250,7 @@ function M.exec_checked(cmd)
 		}, "\n")
 		local framed_command = "sh -c " .. M.quote(wrapper)
 			.. " ergopti-exec-checked " .. M.quote(cmd)
+		if output_dir then framed_command = framed_command .. " " .. M.quote(output_dir) end
 		local pipe, open_error = io.popen(framed_command, "r")
 		if not pipe then return false, "", tostring(open_error or "pipe open failed") end
 		local framed = pipe:read("*a")

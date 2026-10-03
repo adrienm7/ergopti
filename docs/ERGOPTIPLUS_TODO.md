@@ -306,6 +306,18 @@ These are software implementations; final hardware verification remains below.
   receipts; macOS file fan-out ignores write/flush returns and needs native
   diagnosis of this same failure class. No shared logger policy, macOS logger,
   native cross-OS gate or manual CI changed.
+- [~] **L24.** Linux private screenshot path receipts: retain mktemp's complete
+  literal pathname, stripping only its final protocol newline, and refuse a
+  failed creation receipt. The checked runner can stage its output in the same
+  selected runtime directory so an unrelated invalid TMPDIR does not override
+  XDG_RUNTIME_DIR. Five actual Xvfb captures and eleven portable cases fail
+  against the prior production owners. Nine virtual X11 cases now pass through
+  real maim, PNG bytes, directory permissions and mktemp on host and nonroot
+  Debian; fifteen portable cases cover literal paths, refusals and native argv.
+  A reuse of the old checked runner also reproduced a runtime-precedence failure.
+  Windows native paths and macOS native image capture do not line-parse mktemp
+  paths. This is virtual graphics validation; physical screens, interactive
+  regions, Wayland, native cross-OS gates and manual CI remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
