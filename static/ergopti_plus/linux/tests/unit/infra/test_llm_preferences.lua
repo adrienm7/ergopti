@@ -25,6 +25,35 @@ local function with_config(source, body)
 end
 
 helpers.describe("canonical Linux AI settings", function()
+	helpers.it("round-trips the agent-mode enum through the real durable owner without changing neighbors", function()
+		with_config('[llm]\nagent_mode = "auto"\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_eq(preferences.get("llm.agent_mode"), "auto")
+			helpers.assert_eq(preferences.set("llm.agent_mode", "action"), true)
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.llm.agent_mode, "action")
+			helpers.assert_eq(document.llm.future, "keep")
+			helpers.assert_eq(document.other.value, 42)
+			package.loaded["infra.llm_preferences"] = nil
+			preferences = require("infra.llm_preferences")
+			helpers.assert_eq(preferences.get("llm.agent_mode"), "action", "a fresh reader owns the durable value")
+			helpers.assert_eq(preferences.set("llm.agent_mode", "off"), true)
+			helpers.assert_nil(Codec.decode(Sandbox.read_bytes(path)).llm.agent_mode, "the neutral default remains sparse")
+		end)
+	end)
+
+	helpers.it("refuses nonmember agent-mode values and preserves actual configuration bytes", function()
+		with_config('[llm]\nagent_mode = "action"\nfuture = "keep"\n', function(path)
+			local preferences = require("infra.llm_preferences")
+			local before = Sandbox.read_bytes(path)
+			for _, invalid in ipairs({ "AUTO", "sometimes", false, 1, {} }) do
+				helpers.assert_eq(preferences.set("llm.agent_mode", invalid), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), before)
+			end
+			helpers.assert_eq(preferences.get("llm.agent_mode"), "action")
+		end)
+	end)
+
 	helpers.it("cleanup retains consumed AI leaves and lists unknown neighbors", function()
 		with_config('[llm.generation]\ntemperature = 0.9\nfuture = 42\n[llm.trigger]\nafter_hotstring = false\n'
 			.. '[llm.display]\nshow_info_bar = false\n[llm.navigation]\nval_modifiers = ["ctrl"]\n', function(path)

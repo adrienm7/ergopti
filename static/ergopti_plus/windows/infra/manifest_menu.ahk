@@ -509,7 +509,8 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 ; added to the feature appears without a driver change. The driver supplies the
 ; current value through ``StateGetters[path]`` and what choosing a value does
 ; through ``Commands[id]``, called with that value. The shared Lua renderer
-; draws the identical row.
+; draws the identical row. Optional show_current_choice fills {1} in the parent
+; caption from its selected leaf, with no competing native label policy.
 ; @returns {Integer} 1 when the row was drawn, 0 otherwise.
 _MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	Id := _MR_Get(Item, "id")
@@ -540,14 +541,23 @@ _MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	}
 	Command := Commands[CmdId]
 	Rows := []
+	CurrentLabel := ""
 	for Choice in Choices {
 		Value := _MR_Get(Choice, "value")
+		if HasCurrent and Current == Value
+			CurrentLabel := t(_MR_Get(Choice, "i18n"))
 		Rows.Push(Map(
 			"label",   t(_MR_Get(Choice, "i18n")),
 			"checked", HasCurrent and Current == Value,
 			"action",  ((V) => (*) => Command(V))(Value)))
 	}
-	Row := Map("label", t(I18nKey), "items", Rows)
+	Label := t(I18nKey)
+	if _MR_Get(Item, "show_current_choice", false) {
+		if CurrentLabel == ""
+			CurrentLabel := String(Current)
+		Label := StrReplace(Label, "{1}", CurrentLabel)
+	}
+	Row := Map("label", Label, "items", Rows)
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 	}

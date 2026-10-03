@@ -777,17 +777,25 @@ function M.new(deps)
 				end
 
 				local sub = {}
+				local current_label = nil
 				for _, choice in ipairs(choices) do
 					local value = choice.value
+					if current == value then current_label = i18n.get(choice.i18n) end
 					sub[#sub + 1] = {
 						title   = i18n.get(choice.i18n),
 						checked = current == value,
 						fn      = function() return fn(value) end,
 					}
 				end
+				local title = i18n.get(i18n_key)
+				-- Caption interpolation is declared alongside the shared choice, so
+				-- native consumers provide no competing mode-label policy.
+				if item.show_current_choice == true then
+					title = title:gsub("{1}", function() return current_label or tostring(current or "") end)
+				end
 				flush_sep()
 				table.insert(result, {
-					title    = i18n.get(i18n_key),
+					title    = title,
 					menu     = sub,
 					disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
 				})

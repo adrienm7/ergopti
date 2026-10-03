@@ -172,7 +172,68 @@ end)
 -- ======================================
 -- ======================================
 
+--- Reads independent mode expectations rather than generated menu data.
+local function mode_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	local corpus = assert(require("json").decode(raw))
+	helpers.assert_eq(#corpus.modes, 3)
+	helpers.assert_eq(#corpus.states, 3)
+	return corpus
+end
+
 helpers.describe("AI agent menu: a top-level submenu", function()
+
+	for _, vector in ipairs(mode_corpus().states) do
+		helpers.it("replays the independent mode menu matrix for " .. vector.selected, function()
+			Scenario.run({ stored = { ["llm.agent_mode"] = vector.selected, ["llm.agent_system1"] = "cerebras" } }, function(world)
+				local rows = build_menu(world, {})
+				world.restore_prompt()
+				local agent = find(rows, i18n.get("menu.agent.title"))
+				local row = agent.menu[1]
+				local corpus = mode_corpus()
+				helpers.assert_eq(row.disabled == true, false, "the actual live mode command remains available")
+				helpers.assert_eq(#row.menu, 3)
+				for index, expected in ipairs(corpus.modes) do
+					local actual = row.menu[index]
+					helpers.assert_eq(actual.title, i18n.get(expected.label_key))
+					helpers.assert_eq(actual.checked == true, vector.checked[index])
+					if expected.value == vector.selected then
+						helpers.assert_eq(row.title, Scenario.text("menu.agent.mode_title", { actual.title }))
+					end
+				end
+			end)
+		end)
+	end
+
+	helpers.it("uses reordered shared choices and preserves persistence refusal without redraw", function()
+		Scenario.run({}, function(world)
+			local renderer = require("infra.manifest_menu")
+			local mode = renderer.get_root().agent_menu[1]
+			local previous = mode.choices
+			local corpus, keys = mode_corpus(), {}
+			for _, expected in ipairs(corpus.modes) do keys[expected.value] = expected.label_key end
+			mode.choices = {}
+			for _, value in ipairs(corpus.reordered_values) do
+				mode.choices[#mode.choices + 1] = { value = value, i18n = keys[value] }
+			end
+			local ok, err = pcall(function()
+				local rows = build_menu(world, {})
+				world.restore_prompt()
+				local row = find(rows, i18n.get("menu.agent.title")).menu[1]
+				for index, value in ipairs(corpus.reordered_values) do
+					helpers.assert_eq(row.menu[index].title, i18n.get(keys[value]), "the declaration owns every choice")
+				end
+				require("infra.llm_preferences").set = function() return false end
+				helpers.assert_eq(row.menu[2].fn(), false, "the native durable owner refuses")
+				helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action", "persisted value is unchanged")
+				helpers.assert_eq(world.redraws or 0, 0, "a refused choice never redraws as success")
+			end)
+			mode.choices = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
 
 	helpers.it("lists Off then every backend for each system, checks the current one, and stores a choice", function()
 		Scenario.run({ stored = { ["llm.agent_system1"] = "local|qwen3:14b" } }, function(world)
@@ -238,6 +299,7 @@ helpers.describe("AI agent menu: a top-level submenu", function()
 			find(mode.menu, i18n.get("menu.agent.mode_auto")).fn()
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action", "refused without System 1")
 			helpers.assert_eq(world.notices[1], Scenario.text("llm.agent.no_system1"))
+			helpers.assert_eq(world.redraws or 0, 0, "refused automatic mode never redraws as success")
 			find(mode.menu, i18n.get("menu.agent.mode_off")).fn()
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), nil, "off is the default")
 		end)

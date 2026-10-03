@@ -43,6 +43,11 @@ end
 local function validate(definition, value)
 	if value == nil then return end
 	local kind = definition.type
+	if kind == "enum" then
+		local fits, detail = ConfigOutdated.manifest_value_fits(definition, value, "linux")
+		assert(fits, "invalid AI preference enum: " .. definition.path .. " (" .. tostring(detail) .. ")")
+		return
+	end
 	assert(type(value) == (kind == "array" and "table" or kind), "invalid AI preference type: " .. definition.path)
 	if kind == "number" then
 		assert(value == value and value ~= math.huge and value ~= -math.huge, "AI preferences require finite numbers")
