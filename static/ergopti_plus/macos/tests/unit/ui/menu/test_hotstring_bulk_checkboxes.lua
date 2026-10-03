@@ -261,23 +261,33 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 	end
 	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
-		local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
-		local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
-		ctx.state.trigger_char = "★"
-		ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
-		ctx.hotstring_editor = { open = function() end }
-		local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
-		local file
-		for _, row in ipairs(rows) do if row.title == "work" then file = row end end
-		helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
-		helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
-		helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
-		helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
-		helpers.assert_eq(file.menu[4].title, "-")
-		helpers.assert_eq(file.menu[5].title, "one")
-		helpers.assert_eq(file.menu[1].fn(), true)
-		helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
-		helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
+		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+			-- This projection fixture owns a synthetic acknowledged group. Actual
+			-- provenance, native route and refusal behavior have their own owner test.
+			local bindings = 0
+			package.loaded["infra.personal_file_scope"] = { bind = function()
+				bindings = bindings + 1
+				return function() return true end
+			end }
+			local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
+			ctx.state.trigger_char = "★"
+			ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
+			ctx.hotstring_editor = { open = function() end }
+			local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+			local file
+			for _, row in ipairs(rows) do if row.title == "work" then file = row end end
+			helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
+			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+			helpers.assert_eq(file.menu[4].title, "-")
+			helpers.assert_eq(file.menu[5].title, "one")
+			helpers.assert_eq(file.menu[1].fn(), true)
+			helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
+			helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
+			helpers.assert_eq(bindings, 1, "one native admission binding per rendered file")
+		end)
 	end)
 
 end)

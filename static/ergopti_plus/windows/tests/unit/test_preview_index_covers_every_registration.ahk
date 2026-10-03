@@ -296,6 +296,14 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 		AssertTrue(HSE_RegistryByGroup.Has("default"))
 		Specs := HSE_RegistryByGroup["default"]
 		AssertEqual(8, Specs.Length, "simple and inline case families retain their original registration counts")
+		ActualPersonalBinding := Map("source", Specs[1].PersonalSource, "owner", Specs[1].Group, "path", Packs[1]["Path"])
+		ActualPersonalEvidence := [Map("source", Specs[1].PersonalSource, "owner", Specs[1].Group, "path", Packs[1]["Path"],
+			"admitted", true, "exclusive", false)]
+		AssertEqual("default", ActualPersonalBinding["owner"], "the registered owner remains the historical shared default")
+		RefusedPersonalBinding := PersonalScopeAdmit(ActualPersonalEvidence, ActualPersonalBinding, &PersonalBindingRefusal)
+		AssertFalse(RefusedPersonalBinding, "actual additional-file registration grants no exclusive file gate")
+		AssertEqual("unavailable-owner", PersonalBindingRefusal)
+		AssertEqual(8, HSE_RegistryByGroup["default"].Length, "admission never mutates live specs or activation")
 		ExpectedTriggers := ["psx", "PSX", "Psx", "plx", "pcx" . ScriptInformation["MagicKey"], "pex", "PEX", "Pex"]
 		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "owned conform", "explicit", "EXPLICIT", "Explicit"]
 		Index := Map()
@@ -458,3 +466,5 @@ _PICR_DistinctDiscoveredSources() {
 	}
 }
 Test("personal-file descriptors: recursive native discovery retains distinct exact paths", _PICR_DistinctDiscoveredSources)
+
+#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk

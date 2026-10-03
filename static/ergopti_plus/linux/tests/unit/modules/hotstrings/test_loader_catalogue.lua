@@ -341,6 +341,22 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 					return result
 				end
 				local team_loser = team_winner == "home/team.toml" and "work/team.toml" or "home/team.toml"
+				local Policy = require("hotstrings.personal_scope")
+				local evidence, selected = {}, {}
+				for _, item in ipairs(Config.personal_file_sources()) do
+					local relative = item.path:sub(#root + 2)
+					if relative == team_winner or relative == team_loser then
+						local live = match(files[relative])
+						evidence[#evidence + 1] = { source = item.descriptor, owner = "team", path = item.path,
+							admitted = live ~= nil and live.personal_source_id == item.descriptor.id, exclusive = true }
+						selected[relative] = { source = item.descriptor, owner = "team", path = item.path }
+					end
+				end
+				helpers.assert_eq(#evidence, 2, "both actual sources provide independent admission evidence")
+				local denied, reason = Policy.admit(evidence, selected[team_loser])
+				helpers.assert_nil(denied); helpers.assert_eq(reason, "unadmitted-source")
+				local accepted, refusal = Policy.admit(evidence, selected[team_winner])
+				helpers.assert_nil(refusal); helpers.assert_eq(accepted.source.id, sources[team_winner])
 				helpers.assert_nil(match(files[team_loser]), "the old last same-stem winner remains the only live team source")
 				helpers.assert_nil(match("dottedx"), "this transport prerequisite does not silently change persisted gate addressability")
 				for _, relative in ipairs({ "a__b.toml", "a/b.toml", team_winner, "Équipe/mémoire.toml", "rolls.toml" }) do

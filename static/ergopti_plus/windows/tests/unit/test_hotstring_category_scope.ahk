@@ -596,3 +596,25 @@ Test("hotstring dynamic shared metadata: independent and detached", _HSCS_Dynami
 for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring dynamic shared order: " . _HSCS_MenuVector["id"],
 		_HSCS_DynamicSharedOrder.Bind(JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8")), _HSCS_MenuVector))
+
+#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+
+; Every platform replays the same independent admission decisions.
+_HSCS_PersonalAdmission(Vector) {
+	Before := KL_JsonEncode(Vector)
+	Admitted := PersonalScopeAdmit(Vector["inventory"], Vector["selected"], &Reason)
+	if Vector.Has("refusal") {
+		AssertFalse(Admitted)
+		AssertEqual(Vector["refusal"], Reason)
+	} else {
+		Assert(Admitted is Map)
+		AssertEqual("", Reason)
+		AssertEqual(KL_JsonEncode(Vector["expected"]), KL_JsonEncode(Admitted))
+		Assert(Admitted["source"] != Vector["selected"]["source"])
+		Assert(Admitted["source"]["components"] != Vector["selected"]["source"]["components"])
+	}
+	AssertEqual(Before, KL_JsonEncode(Vector), "admission cannot mutate caller evidence")
+}
+
+for _HSCS_AdmissionVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\personal_scope_admission.json", "UTF-8"))["vectors"]
+	Test("personal-file-admission: " . _HSCS_AdmissionVector["name"], _HSCS_PersonalAdmission.Bind(_HSCS_AdmissionVector))

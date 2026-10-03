@@ -167,8 +167,10 @@ end
 --- Builds the menubar and wires its owners.
 --- @param extension_packs table|nil The boot's extension discovery catalogue, whose
 ---   loaded packs the Hotstrings menu lists under their extension.
+--- @param personal_files table|nil Actual boot-loaded personal source records.
+--- @param personal_root string|nil Configured route that admitted those sources.
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths,
-	extension_packs)
+	extension_packs, personal_files, personal_root)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
@@ -1357,6 +1359,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- The packs this boot discovered and registered; the counter groups their
 		-- loaded categories under each extension from it.
 		extension_packs          = extension_packs,
+		personal_files           = PreferencesTransaction.clone(personal_files or {}),
+		personal_root            = personal_root,
 		module_sections          = module_sections,
 		hotstring_editor         = hotstring_editor,
 		personal_info            = core_mods.dyn_hot_mod,
