@@ -428,6 +428,17 @@ prior cache identity. Its original inherited 1.0-second, recommended
 0.5-second, resolver and refusal-recovery assertions remain intact and passed
 in the native Windows qualification above.
 
+macOS custom-delimiter deletion now requires exact runtime acknowledgement
+before changing state or saving preferences. Runtime refusal preserves the
+original definition and source; disk refusal restores the real registry and
+settings through the existing preference transaction and permits explicit retry.
+Eight regressions first failed against the original caller, then passed; the
+selected portable suites passed 353 JavaScript checks, 13,177 macOS unit cases
+and 101 E2E checks. Linux and Windows retain their existing acknowledged owners.
+Direct macOS menu-edit coverage for hand-written delimiter arrays, including
+unowned record metadata, and complete native three-OS qualification remain
+pending. Linux table-array editing is covered by item 42.
+
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins
   STOPPED, exact native unregistration and the persisted OFF/rule removal.
