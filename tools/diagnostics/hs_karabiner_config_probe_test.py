@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 import hs_karabiner_config_probe as probe
+import hs_native_bootstrap_probe as bootstrap
 
 NONCE = "a" * 32
 EXECUTABLE = probe.NativeDelayedTimerProbe.executable_path(Path("/Applications/ErgoptiPlus.app"))
@@ -119,6 +120,175 @@ class NativeReceiptTests(unittest.TestCase):
                 changed[field] = replacement
                 with self.assertRaises(ValueError):
                     self.judge(changed)
+
+    def observe_refusal(self, value):
+        """Exercise the real file reader and validator before the gate's privacy owner."""
+        observed = []
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owner = probe.NativeKarabinerConfigProbe(
+                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
+            )
+            owner.nonce = NONCE
+
+            def execute(_source):
+                observed.append(owner.runtime_owner[0])
+                (output / "native-karabiner-config.json").write_text(json.dumps(value))
+
+            with mock.patch.object(owner, "execute", side_effect=execute):
+                with self.assertRaises(ValueError) as caught:
+                    owner.observe(42, lambda _: [42])
+            self.assertEqual(observed, [42])
+            self.assertIs(type(caught.exception), ValueError)
+            self.assertIsNone(caught.exception.__cause__)
+            return caught.exception, bootstrap.bounded_refusal(caught.exception)
+
+    def test_incomplete_actual_receipt_exposes_only_admitted_native_failure_evidence(self):
+        value = receipt()
+        value.update(
+            complete=False,
+            variants=[],
+            errors=[
+                "/private/native-source.lua:66: Native rule build refused: "
+                "generated rule 3 manipulator 12 has inconsistent managed conditions\n"
+                "stack traceback: private-child-argv https://host/path?signature=secret"
+            ],
+        )
+        failure, detail = self.observe_refusal(value)
+        self.assertTrue(
+            str(failure).startswith("Native Karabiner identity or observation differs: complete")
+        )
+        self.assertIn("native_failure=", detail)
+        summary = json.loads(detail.split("native_failure=", 1)[1])
+        self.assertEqual(summary["variant_count"], 0)
+        self.assertEqual(summary["variant_expected"], 8)
+        self.assertEqual(summary["error_count"], 1)
+        self.assertEqual(summary["flags"]["complete"], False)
+        self.assertEqual(summary["flags"]["private_source_restored"], True)
+        self.assertEqual(
+            summary["errors"],
+            [
+                "Native rule build refused: generated rule 3 manipulator 12 has inconsistent managed conditions"
+            ],
+        )
+        for private in (
+            "/private/native-source.lua",
+            "private-child-argv",
+            "https://host",
+            "signature=secret",
+        ):
+            self.assertNotIn(private, detail)
+
+    def test_foreign_or_malformed_identity_never_exposes_receipt_failure_details(self):
+        for field, replacement in {
+            "schema_version": 2,
+            "contract": "foreign",
+            "nonce": "b" * 32,
+            "pid": 43,
+            "executable": "/private/foreign",
+            "bundle_id": "foreign",
+            "version": "0.0.0",
+            "publication_scope": "runtime-active",
+            "private_extra": "secret",
+        }.items():
+            with self.subTest(field=field):
+                value = receipt()
+                value.update(complete=False, errors=["Native merge refused: private-user-contents"])
+                value[field] = replacement
+                _, detail = self.observe_refusal(value)
+                self.assertNotIn("native_failure=", detail)
+                self.assertNotIn("Native merge refused", detail)
+                self.assertNotIn("private-user-contents", detail)
+
+    def test_failure_summary_omits_unowned_text_and_bounds_actual_error_inventory(self):
+        value = receipt()
+        value.update(
+            complete=False,
+            codec_independent="private-flag",
+            variants=[{"config": "private-configuration"}],
+            errors=[
+                "Native publication refused: private-user-contents\r\n::error::injected"
+                + " secret " * 1000
+                for _ in range(200)
+            ],
+        )
+        _, detail = self.observe_refusal(value)
+        self.assertIn("native_failure=", detail)
+        summary = json.loads(detail.split("native_failure=", 1)[1])
+        self.assertEqual(summary["error_count"], 200)
+        self.assertEqual(summary["variant_count"], 1)
+        self.assertEqual(summary["flags"]["codec_independent"], "invalid")
+        self.assertEqual(summary["errors"], ["Native publication refused (detail omitted)"] * 4)
+        self.assertEqual(summary["errors_omitted"], 196)
+        self.assertLessEqual(len(detail), 2048)
+        for private in (
+            "private-user-contents",
+            "private-configuration",
+            "private-flag",
+            "::error::",
+            "secret",
+        ):
+            self.assertNotIn(private, detail)
+
+    def test_malformed_failure_observations_do_not_render_arbitrary_json_values(self):
+        for changes in (
+            {"errors": {"private-map": "secret"}},
+            {"variants": "private-variants", "errors": [None, {"private-map": "secret"}, 7]},
+            {"errors": ["unowned private sentence"]},
+        ):
+            with self.subTest(changes=changes):
+                value = receipt()
+                value.update(complete=False, **changes)
+                _, detail = self.observe_refusal(value)
+                self.assertIn("native_failure=", detail)
+                self.assertNotIn("private-", detail)
+                self.assertNotIn("private sentence", detail)
+                self.assertNotIn("secret", detail)
+                self.assertLessEqual(len(detail), 2048)
+
+    def test_supplementary_owner_keeps_primary_evidence_after_exact_cleanup(self):
+        from hs_native_bootstrap_probe_test import NativeFixture
+
+        with tempfile.TemporaryDirectory() as folder:
+            fixture = NativeFixture(Path(folder))
+            fixture.feature_mutation = lambda value: value.update(
+                complete=False,
+                variants=[],
+                errors=["Identical native rules were not confirmed unchanged"],
+            )
+            with self.assertRaises(ValueError) as caught:
+                fixture.observe(self, "karabiner_config")
+            self.assertIs(type(caught.exception), ValueError)
+            self.assertIsNone(caught.exception.__cause__)
+            detail = bootstrap.bounded_refusal(caught.exception)
+            self.assertIn("Identical native rules were not confirmed unchanged", detail)
+            self.assertEqual(fixture.owners, [])
+            self.assertEqual(
+                fixture.preferences[bootstrap.CONFIG_KEY], fixture.initial[bootstrap.CONFIG_KEY]
+            )
+            self.assertEqual(fixture.preferences["late-unrelated"], "keep")
+
+    def test_supplementary_cleanup_debt_stays_fatal_with_original_cause(self):
+        from hs_native_bootstrap_probe_test import NativeFixture
+
+        with tempfile.TemporaryDirectory() as folder:
+            fixture = NativeFixture(Path(folder))
+            fixture.feature_mutation = lambda value: value.update(
+                complete=False, variants=[], errors=["The actual merge source receipt differs"]
+            )
+            cleanup = RuntimeError("exact owner retirement refused")
+            with mock.patch.object(fixture.owner, "retire", side_effect=cleanup):
+                with self.assertRaises(RuntimeError) as caught:
+                    fixture.observe(self, "karabiner_config")
+            self.assertIs(type(caught.exception), RuntimeError)
+            self.assertIs(caught.exception.__cause__, cleanup)
+            detail = bootstrap.bounded_refusal(caught.exception)
+            self.assertIn("The actual merge source receipt differs", detail)
+            self.assertIn("cleanup refused: exact owner retirement refused", detail)
+            self.assertEqual(fixture.owners, [42])
+            self.assertNotEqual(
+                fixture.preferences[bootstrap.CONFIG_KEY], fixture.initial[bootstrap.CONFIG_KEY]
+            )
 
     def test_duplicate_or_missing_variant_never_counts_as_full_coverage(self):
         for change in (lambda v: v.pop(), lambda v: v.__setitem__(0, copy.deepcopy(v[1]))):
