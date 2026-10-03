@@ -16,8 +16,8 @@
 ---    return false. No exceptions propagate to the caller.
 --- 3. Defensive pcall: every io.open call is wrapped in pcall because
 ---    permission errors and locked files can panic the Lua runtime.
---- 4. exists() via lfs: LuaFileSystem (lfs) is the idiomatic way to stat a
----    path on Linux; the adapter falls back to io.open when lfs is absent.
+--- 4. exists() uses metadata only: LuaFileSystem, libuv or native libc, then the
+---    shell's test builtin on plain Lua. No readable stream is required.
 --- ==============================================================================
 
 local M = {}
@@ -58,6 +58,26 @@ end
 -- TODO(linux): declare lfs in vendor/ so it is always available.
 local ok_lfs, lfs = pcall(require, "lfs")
 if not ok_lfs then lfs = nil end
+
+local native_stat = lfs and type(lfs.attributes) == "function" and lfs.attributes or nil
+if not native_stat then
+	local ok_uv, uv = pcall(require, "luv")
+	if ok_uv and type(uv) == "table" and type(uv.fs_stat) == "function" then native_stat = uv.fs_stat end
+end
+
+-- LuaJIT always has FFI, even when its optional C-module path omits luv/lfs.
+-- Keep daemon reload metadata in-process on that normal runtime as well.
+local native_exists
+if not native_stat then
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if ok_ffi and type(ffi) == "table" and pcall(ffi.cdef, "int faccessat(int fd, const char *path, int mode, int flags);") then
+		local ok_symbol, call = pcall(function() return ffi.C.faccessat end)
+		if ok_symbol then
+			local AT_FDCWD, F_OK, AT_EACCESS = -100, 0, 512 -- Linux libc ABI.
+			native_exists = function(path) return call(AT_FDCWD, path, F_OK, AT_EACCESS) == 0 end
+		end
+	end
+end
 
 
 -- ========================================
@@ -177,19 +197,23 @@ end
 function M.exists(path)
 	if not valid_native_path(path) then return false end
 
-	-- Prefer lfs.attributes which performs a stat() syscall directly.
-	if lfs then
-		local ok, attrs = pcall(lfs.attributes, path)
+	-- Metadata does not need read permission and never waits on a FIFO/socket.
+	if native_stat then
+		local ok, attrs = pcall(native_stat, path)
 		return ok and attrs ~= nil
 	end
-
-	-- Fallback: attempt to open the path as a regular file.
-	local ok, fh = pcall(io.open, path, "r")
-	if ok and fh then
-		fh:close()
-		return true
+	if native_exists then
+		local ok, present = pcall(native_exists, path)
+		return ok and present == true
 	end
-	return false
+
+	-- Minimal Lua installations still have the POSIX shell's metadata builtin.
+	-- Opening the path here mistook unreadability for absence and blocked FIFOs.
+	local ok, present = pcall(function()
+		local Shell = require("adapters.shell_runner")
+		return Shell.run("test -e " .. Shell.quote(path) .. " 2>/dev/null")
+	end)
+	return ok and present == true
 end
 
 --- Deletes a file. Returns true if the file was deleted or was already absent.

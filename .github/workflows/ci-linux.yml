@@ -143,7 +143,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends lua-luv curl openssl python3
+          sudo apt-get install -y --no-install-recommends lua-luv lua5.4 curl openssl python3
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
         timeout-minutes: 1
 
@@ -173,6 +173,13 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_capture_error_receipts.lua
+        timeout-minutes: 1
+
+      - name: Check native path existence without opening readable streams
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_exists_receipts.lua
         timeout-minutes: 1
 
       - name: Delete files using native permission and symlink receipts
