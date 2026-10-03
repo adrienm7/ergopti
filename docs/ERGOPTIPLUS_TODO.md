@@ -309,19 +309,29 @@ remain pending in the next macOS install/launch run.
 
 ## Remaining work after the 2026-09-30 releases
 
-- [ ] **33.** Config policy for the files other than config.toml (the former
-      item 25): Published in the second 2026-09-30 release for the files the review
-      listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
-      sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
-      (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
-      layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-      plain string (saves refused with a generic ERROR), Linux layers.toml refused
-      as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
-      whole-file installed.json refusal, repeated Windows tap_hold unknown-field
-      warnings, and the macOS boot-time unread-entries scan cost (36-56 ms on the
-      main thread). Two maintainer decisions are pending: config_migrate's
-      fail-closed guard for invalid stamps (site 108) and a migrations.toml
-      exception for key removals handled by the cleanup (site 112).
+- [~] **33.** Config policy for the files other than config.toml (the former
+  item 25): Published in the second 2026-09-30 release for the files the review
+  listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
+  sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
+  (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
+  layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
+  plain string (saves refused with a generic ERROR), Linux layers.toml refused
+  as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
+  whole-file installed.json refusal, and the macOS boot-time unread-entries
+  scan cost (36-56 ms on the
+  main thread). Two maintainer decisions are pending: config_migrate's
+  fail-closed guard for invalid stamps (site 108) and a migrations.toml
+  exception for key removals handled by the cleanup (site 112).
+
+  Windows tap_hold.toml now reports each obsolete entry once per exact file,
+  rendered path and reason during the process, through the shared warning
+  owner. Repeated real reads retain valid bindings and preserve unknown
+  scalars, arrays and inline tables byte-for-byte. Known-field ERROR/refusal
+  behavior is unchanged. An independent twelve-observation corpus runs on
+  all three drivers; portable unit/E2E checks pass. Logger callbacks retain
+  their caller's Critical state and reentry observes the claimed report.
+  Native Windows and complete three-OS acceptance remain pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

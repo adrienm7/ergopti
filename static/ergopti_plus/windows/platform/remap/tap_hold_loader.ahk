@@ -243,9 +243,9 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			; outdated-entry rule, as on Linux). A known field of the wrong type
 			; still disables its key below (AHK-134).
 			if (ExpectedKind == "") {
-				try LoggerWarn("TapHoldLoader",
-					"Outdated entry '[{1}].{2}' in '{3}' ignored (no tap-hold key has this field); the config cleanup only covers config.toml, so fix or delete it in that file.",
-					CurrentPath, Key, FilePath)
+				ConfigOutdatedReportInFile(FilePath, CurrentPath . "." . Key,
+					"no tap-hold key has this field",
+					(Message, Args*) => LoggerWarn("TapHoldLoader", Message, Args*))
 				continue
 			}
 			if (LiteralKind != ExpectedKind) {
