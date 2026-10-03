@@ -30,7 +30,7 @@ end
 local function find_delete(rows)
 	for _, row in ipairs(rows or {}) do
 		if row.label == "menu.hotstrings.delete_expander" then return row end
-		local nested = find_delete(row.items)
+		local nested = find_delete(row.items or row.submenu)
 		if nested then return nested end
 	end
 end
@@ -53,7 +53,10 @@ local function with_fixture(outcome, callback)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return "button.delete" end }
 		package.loaded["infra.manifest_menu"] = {
-			build = function(_, _, _, _, _, providers) return providers.word_expanders() end,
+			build = function(section, _, _, _, _, providers)
+				if section == "word_expanders_menu" then return providers.word_expander_entries() end
+				return providers.word_expanders()
+			end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
 		package.loaded["infra.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }

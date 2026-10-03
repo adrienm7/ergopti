@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local function find_row(rows, predicate)
 	for _, row in ipairs(rows or {}) do
 		if predicate(row) then return row end
-		local nested = find_row(row.items, predicate)
+		local nested = find_row(row.items or row.submenu, predicate)
 		if nested then return nested end
 	end
 	return nil
@@ -90,7 +90,8 @@ local function run_action(mode, outcome)
 		end,
 	}
 	package.loaded["infra.manifest_menu"] = {
-		build = function(_, _, _, _, _, providers)
+		build = function(section, _, _, _, _, providers)
+			if section == "word_expanders_menu" then return providers.word_expander_entries() end
 			local rows = {}
 			for _, id in ipairs({ "word_expanders", "magic_key_config" }) do
 				for _, row in ipairs(providers[id]()) do rows[#rows + 1] = row end

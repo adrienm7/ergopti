@@ -995,6 +995,10 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
+			local function word_expanders_ready()
+				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+			end
+
 			--- Captures enough catalogue state to undo a persistence failure.
 			--- @return table
 			local function snapshot()
@@ -1067,40 +1071,31 @@ local function _manifest_hotstring_rows(ctx, config)
 			--- @return function
 			local function set_all(on)
 				return function()
+					if not word_expanders_ready() then return false end
 					local saved = snapshot()
 					local changes = {}
 					for _, key in ipairs(all_keys()) do
 						changes[key] = on
 					end
-					if Terminators.set_terminators_enabled(changes) then commit(saved) end
+					if Terminators.set_terminators_enabled(changes) ~= true then return false end
+					return commit(saved)
 				end
 			end
 
 			local sub = {}
 
-			-- The bulk rows first. A user turning delimiters off does it wholesale —
-			-- the point of the feature is "expand only on the key I chose" — and
-			-- clicking through twenty rows to get there is not an interface.
-			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.check_all"),   action = set_all(true) }
-			sub[#sub + 1] = { label = i18n_safe("menu.hotstrings.uncheck_all"), action = set_all(false) }
-			-- The way back. Both other drivers put it beside the two bulk rows, and
-			-- without it a user who clicked "Tout décocher" had no route to the
-			-- shipped set short of editing storage by hand — 15 of the 25 catalogue
-			-- delimiters ship disabled, so "check all" is not that route either.
-			sub[#sub + 1] = {
-				label = i18n_safe("common.restore_recommended"),
-				action    = function()
-					local saved = snapshot()
-					local changes = {}
-					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
-						if def.key and not def.custom then
-							changes[def.key] = def.default_enabled ~= false
-						end
+			local function reset_terminators()
+				if not word_expanders_ready() then return false end
+				local saved = snapshot()
+				local changes = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and not def.custom then
+						changes[def.key] = def.default_enabled ~= false
 					end
-					if Terminators.set_terminators_enabled(changes) then commit(saved) end
-				end,
-			}
-			sub[#sub + 1] = { separator = true }
+				end
+				if Terminators.set_terminators_enabled(changes) ~= true then return false end
+				return commit(saved)
+			end
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.type == "separator" then
@@ -1185,7 +1180,17 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 			}
 
-			return { { label = i18n_safe("menu.hotstrings.word_expanders"), items = sub } }
+			local exp_ctx = {
+				commands = {
+					["word_expanders_enable_all"] = set_all(true),
+					["word_expanders_disable_all"] = set_all(false),
+					["word_expanders_restore"] = reset_terminators,
+				},
+				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
+			}
+			local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
+				exp_ctx, { ["word_expander_entries"] = function() return sub end })
+			return { { label = i18n_safe("menu.hotstrings.word_expanders"), submenu = rendered_expanders } }
 		end,
 		["magic_key_config"] = function()
 			local rows = {}

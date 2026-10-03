@@ -54,7 +54,8 @@ const RESTORE_IDS = new Set([
 	'restore_recommended',
 	'restore_defaults',
 	'reset_defaults',
-	'scope_restore'
+	'scope_restore',
+	'word_expanders_restore'
 ]);
 const CLEAR_IDS = new Set(['disable_all', 'clear_to_system', 'scope_clear']);
 
@@ -71,7 +72,8 @@ const EXPECTED_ROWS = {
 	metrics_menu: [1, 0],
 	script_control_group: [1, 1],
 	shortcuts_menu: [1, 1],
-	tap_holds_menu: [1, 1]
+	tap_holds_menu: [1, 1],
+	word_expanders_menu: [1, 0]
 };
 
 const RETIRED_KEYS = [
@@ -82,14 +84,11 @@ const RETIRED_KEYS = [
 	'tap_hold.disable_all'
 ];
 
-// The reset rows the drivers still build by hand (word delimiters and the
-// wrapping-symbol list), by file.
+// Remaining native wrapping-symbol restore rows must retain their shared key.
+// The word-delimiter controls now delegate to a shared child menu below.
 const DRIVER_BUILT_RESETS = [
-	'macos/ui/menu/menu_hotstrings_management.lua',
 	'macos/ui/menu/menu_shortcuts.lua',
-	'windows/ui/menu/menu_hotstrings.ahk',
-	'windows/ui/menu/menu_shortcuts.ahk',
-	'linux/ui/menu/menu_builder.lua'
+	'windows/ui/menu/menu_shortcuts.ahk'
 ];
 
 const errors = [];
@@ -173,6 +172,21 @@ for (const rel of DRIVER_BUILT_RESETS) {
 	const text = fs.readFileSync(path.join(SP, rel), 'utf8');
 	if (!text.includes(`"${RESTORE_KEY}"`)) {
 		errors.push(`${rel} builds a reset row without the shared ${RESTORE_KEY} key.`);
+	}
+}
+
+// Every migrated native consumer must still delegate its actual restore callback
+// to the declaration checked above; removing a native label must not remove coverage.
+for (const rel of [
+	'macos/ui/menu/menu_hotstrings_management.lua',
+	'windows/ui/menu/menu_hotstrings.ahk',
+	'linux/ui/menu/menu_builder.lua'
+]) {
+	const text = fs.readFileSync(path.join(SP, rel), 'utf8');
+	for (const owner of ['word_expanders_menu', 'word_expanders_restore', 'word_expander_entries']) {
+		if (!text.includes(`"${owner}"`)) {
+			errors.push(`${rel} does not delegate its word-delimiter restore through ${owner}.`);
+		}
 	}
 }
 

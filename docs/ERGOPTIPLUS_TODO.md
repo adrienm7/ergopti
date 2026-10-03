@@ -631,7 +631,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (baseline: Windows 122, macOS 204, Linux 127, each
+      drivers still build (current baseline: Windows 105, macOS 189, Linux 116, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -686,6 +686,20 @@ callback identities and proves menu construction does not invoke them. The
 independent four-state matrix, shared ordering, native captions and refused
 writer assertions remain intact; actual Windows replay is still pending.
 
+The Word Expander menu's three bulk commands and separator now have one shared
+child declaration, followed by each driver's existing entry provider. Independent
+historical vectors preserve order, labels, custom consumption and shipped states;
+reordered declarations reach the real Lua providers. Native callbacks preserve
+their durable owners and recheck current readiness, including pause, before any
+mutation. Lua refusal cases retain exact source and runtime state. The native
+row census falls by four on every driver to Windows 105, macOS 189 and Linux 116.
+The original full local run passed 13,189 macOS and 4,886 Linux unit cases plus
+101/144 E2E checks; its three static integration failures were then closed by
+353 passing JavaScript checks on the exact final delta, without weakening the
+original guards. Native Windows stale-pause/transaction cases and complete
+three-OS packaging and installation still require CI. Items 54 and 81 remain
+partial for the other native menu groups.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -732,7 +746,7 @@ is committed; one request is one commit with its regression test.
       `category_enabled.french_magickey` was false.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 122, macOS 204 and Linux 127 rows are still built by the
+      Windows 105, macOS 189 and Linux 116 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:
