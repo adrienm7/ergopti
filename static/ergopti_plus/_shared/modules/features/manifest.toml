@@ -5243,6 +5243,12 @@ reason_key = "platform_reason.only_linux_rereads_its_catalogue"
 # The fixed word-expander bulk controls share their labels, order and paused
 # posture. Each native port supplies only its existing acknowledged delimiter
 # owner; the remaining catalogue and personal entries remain provider data.
+[[menu.personal_hotstring_commands]]
+type = "command"
+id = "personal_hotstring_open_editor"
+i18n = "menu.hotstrings.open_editor"
+disabled_when = ["personal_hotstring_editor_ready"]
+
 [[menu.word_expanders_menu]]
 type = "command"
 id = "word_expanders_enable_all"

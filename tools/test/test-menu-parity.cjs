@@ -87,6 +87,8 @@ const OPENS_SUBMENU = {
 	metrics: 'metrics_menu',
 	keyboard_layout: 'layout_menu',
 	hotstrings: 'hotstrings_menu',
+	// The personal provider renders the shared editor command head on every driver.
+	hotstring_personal: 'personal_hotstring_commands',
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: 'gestures_menu',
@@ -128,10 +130,55 @@ const OPENS_SUBMENU = {
 	agent: 'agent_menu'
 };
 
+/**
+ * The native personal provider must actually consume its declared command head.
+ * A graph edge alone would conceal a provider that stopped rendering the row.
+ * @param {string} text Native provider source.
+ * @param {string} driver Host source syntax.
+ * @returns {boolean}
+ */
+function personalCommandReference(text, driver) {
+	const method = driver === 'windows' ? 'MenuRenderer_CommandRow' : 'ManifestMenu\\.command_row';
+	return new RegExp(
+		method + '\\(\\s*"personal_hotstring_commands"\\s*,\\s*"personal_hotstring_open_editor"\\s*,'
+	).test(text.replace(/^\s*(?:;|--).*$/gm, ''));
+}
+
+// Independent call shapes also reject the right command under the wrong head.
+for (const [driver, method] of [
+	['windows', 'MenuRenderer_CommandRow'],
+	['macos', 'ManifestMenu.command_row'],
+	['linux', 'ManifestMenu.command_row']
+]) {
+	const call = `${method}("personal_hotstring_commands", "personal_hotstring_open_editor", commands)`;
+	if (!personalCommandReference(call, driver))
+		throw new Error(`Missed ${driver} command reference.`);
+	for (const broken of [
+		call.replace('personal_hotstring_commands', 'another_menu'),
+		call.replace('personal_hotstring_open_editor', 'another_command'),
+		call.replace(method, 'UnownedCommandRow'),
+		(driver === 'windows' ? '; ' : '-- ') + call
+	]) {
+		if (personalCommandReference(broken, driver))
+			throw new Error(`Admitted broken ${driver} reference.`);
+	}
+}
+
 const errors = [];
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k]));
+
+for (const [driver, relative] of [
+	['windows', 'windows/ui/menu/menu_hotstrings.ahk'],
+	['macos', 'macos/ui/menu/menu_hotstrings_custom.lua'],
+	['linux', 'linux/ui/menu/menu_builder.lua']
+]) {
+	if (!personalCommandReference(fs.readFileSync(path.join(SP, relative), 'utf8'), driver))
+		errors.push(
+			`${driver}: the personal provider no longer renders its shared editor command head.`
+		);
+}
 
 // Floors. A parse that silently yielded nothing would make every comparison
 // below vacuously true, and the suite would go green on an empty menu.

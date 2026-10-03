@@ -740,6 +740,24 @@ _HS_PersonalSectionsAllOn(TomlData) {
 	return _HS_ScopeAllOn(["Personal"], Paths)
 }
 
+; The editor has no input-master prerequisite. Its live pause owner admits both
+; the rendered leaf and a callback retained before suspension.
+_HS_PersonalEditorReady(PausedFn) {
+	try {
+		Paused := PausedFn.Call()
+		return (Paused is Integer) && Paused == 0
+	} catch
+		return false
+}
+
+_HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
+	if !IsObject(PausedFn)
+		PausedFn := (*) => A_IsSuspended
+	return MenuRenderer_CommandRow("personal_hotstring_commands", "personal_hotstring_open_editor",
+		Map("personal_hotstring_open_editor", OpenFn),
+		Map("personal_hotstring_editor_ready", _HS_PersonalEditorReady.Bind(PausedFn)))
+}
+
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_PersonalRows(Options := unset) {
 	if !IsSet(Options)
@@ -776,7 +794,7 @@ _HS_PersonalRows(Options := unset) {
 		PersonalMenu       := Menu()
 		DefaultSectionMenu := Menu()
 		PersonalRows := []
-		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
+		PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
 		PersonalRows.Push(Map("separator", true))
 

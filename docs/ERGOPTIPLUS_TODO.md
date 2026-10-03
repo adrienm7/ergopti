@@ -944,7 +944,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 104, macOS 181, Linux 112, each
+  drivers still build (current baseline: Windows 103, macOS 180, Linux 111, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -1152,6 +1152,8 @@ partial for the other native/provider rows.
 
 TODO54 remains integrated pending full native qualification. Repair the Windows indentation test corpus reader to use the existing UTF-8 JSON owner, follow the shared declared choice after retiring the raw provider, and audit the new leaf writer before admitting the exact 29-caller census. Preserve all numeric, checked-state and command assertions; add real command-value receipts and strict refusal of truthy non-Integer-1 writer statuses. Native Windows execution is pending.
 
+Partial: the personal hotstring editor command now shares its declaration, translated label and readiness key across Windows, macOS and Linux. Native providers preserve the personal settings, default sections, extension tree and existing file/scope mutation owners. Held callbacks recheck the live pause owner; macOS also rechecks after acknowledged deferred scheduling. The canonical native-row inventory decreases from 104/181/112 to 103/180/111 on the authored baseline. Focused owner and regression gates passed; composed verify-change and actual three-OS CI remain required before completion. TODO 54/81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -1239,7 +1241,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 104, macOS 181 and Linux 112 rows are still built by the
+  Windows 103, macOS 180 and Linux 111 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
