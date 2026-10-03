@@ -259,6 +259,147 @@ for (const statement of nativeReceiptStatements) {
 }
 console.log('Native file-picker statement separator mutations: 2/2 passed.');
 
+/** Guards actual native shell-view proof and its independent no-filter control. */
+function assertNativeFileFilterBehavior(source) {
+	const body = (name) => {
+		const found = source.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n([\\s\\S]*?)^\\}`, 'm'));
+		assert.ok(found && found[1].trim(), `${name} participates in the native behavioral proof`);
+		return found[1];
+	};
+	assert.match(
+		source,
+		/^Test\("native file filter:[^"\n]+\(shared-window-titles\)"[,]\s*_NDT_ActualNativeFileFilterBehavior\)/m,
+		'genuine filter behavior registers independently of the original friendly-label case'
+	);
+	assert.equal(
+		body('_NDT_ActualNativeFileFilterBehavior').trim(),
+		'_NDT_RunPolicyFamily("file_filter_behavior", _NDT_CheckFileFilterBehaviorPolicy)',
+		'the behavioral family retains all five real generated caption policies'
+	);
+	assert.ok(
+		source.indexOf('Test("native file filter:') > source.indexOf('Test("native file picker:'),
+		'the original exact label failure cannot prevent the independent behavioral case running'
+	);
+	const checks = body('_NDT_CheckFileFilterBehaviorPolicy');
+	for (const invariant of [
+		'_NDT_FileFilterObserverSource(_NDT_FileFilterUiaOwner())',
+		'_NDT_FileFilterBehaviorProbeSource(Artifact, Owner, FilterObserver)',
+		'for FilterKind in ["selected", "cancelled"]',
+		'FileRead(FilterRoot . "\\" . FilterKind . ".observer.behavior", "UTF-8")',
+		'FileRead(FilterRoot . "\\" . FilterKind . ".retirement", "UTF-8")',
+		'"Array|0"',
+		'"\\selected.result"',
+		'if Index != 5',
+		'StrReplace(FilterSource, \'"Owned files (*.txt)"\', \'""\', , &FilterMutations)',
+		'AssertEqual(2, FilterMutations',
+		'"Owned BIN visible under the restricted file filter", _NDT_RunChild(A_AhkPath,',
+		'["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2)'
+	])
+		assert.ok(checks.includes(invariant), `the real positive/control cases retain ${invariant}`);
+	assert.ok(
+		checks.indexOf('if Index != 5') > checks.indexOf('"Array|0"'),
+		'all positive policies and modal assertions precede the no-filter control'
+	);
+	const observer = body('_NDT_FileFilterObserverSource');
+	for (const invariant of [
+		'ObserverProcess == DllCall("GetCurrentProcessId", "UInt")',
+		'UIA.ElementFromHandle(ObserverView, , false)',
+		'UIA.ConnectionTimeout := 500',
+		'UIA.TransactionTimeout := 500',
+		'ObserverElement.ProcessId != ObserverProcess',
+		'"shell32\\SHCreateItemFromParsingName"',
+		'ComCall(5, ObserverItem, "UInt", 0, "Ptr*", &ObserverDisplay)',
+		'return ObserverName == ObserverTypedName ? [ObserverName] : [ObserverName, ObserverTypedName]',
+		'OwnerElement.FindElements([{Type: "ListItem", Name: OwnerName}, {Type: "DataItem", Name: OwnerName}])',
+		'OwnerMatch.ProcessId != OwnerProcess',
+		'if !OwnerMatch.IsOffscreen',
+		'WinGetPID("ahk_id " . OwnerHandle) != OwnerProcess',
+		'DllCall("GetDlgCtrlID", "Ptr", OwnerView, "Int") != 1121',
+		'DllCall("GetDlgCtrlID", "Ptr", OwnerType, "Int") != 1136',
+		'ControlChooseIndex(2, ObserverType)',
+		'ControlChooseIndex(1, ObserverType)',
+		'((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= 4000',
+		'txt-visible|bin-hidden|all-files-bin-visible|restored-txt-visible|restored-bin-hidden|separate-client|owner-fenced',
+		'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")'
+	])
+		assert.ok(observer.includes(invariant), `the separate native client retains ${invariant}`);
+	assert.equal(
+		observer.includes('InStr('),
+		false,
+		'no loose filename substring can prove file visibility'
+	);
+	assert.equal(
+		observer.includes('GetChildren('),
+		false,
+		'the client never dumps unrelated view children'
+	);
+	const capture = body('_NDT_FileFilterCaptureSource');
+	for (const invariant of [
+		'DllCall("GetDlgCtrlID", "Ptr", PickerViewCandidate, "Int") == 1121',
+		'DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerShellView)',
+		'PickerObserverHandle := ComObject("WScript.Shell").Exec(PickerObserverCommand)',
+		'PickerObserverHandle.StdOut.ReadAll()',
+		'PickerObserverHandle.StdErr.ReadAll()',
+		'if PickerObserverErrors != ""',
+		'PickerObserverHandle.Terminate()',
+		'((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000',
+		'if PickerObserverExit != 0',
+		'PickerObserverOutput != "owned-filter-observed" || PickerObserverFailure != ""',
+		'FileRead(PickerObserverReceipt . ".ack", "UTF-8") != "owned-filter-observed"'
+	])
+		assert.ok(capture.includes(invariant), `the modal owner retains ${invariant}`);
+	assert.equal(
+		capture.includes('GetDlgItem'),
+		false,
+		'the real shell view is found among owned descendants'
+	);
+	const probe = body('_NDT_FileFilterBehaviorProbeSource');
+	for (const invariant of [
+		'BehaviorSource := _NDT_FilePickerProbeSource(Artifact, Owner)',
+		'DirCreate(_NFPRoot . "\\items")',
+		'"\\items\\visible-filter-owned.txt"',
+		'"\\items\\hidden-filter-owned.bin"',
+		'_NDT_FileFilterCaptureSource() . ObserverBoundary',
+		'AssertEqual(1, ObserverBoundaries',
+		'DllCall("IsWindow", "Ptr", _NFPLastHwnd)',
+		'AssertEqual(1, RetirementBoundaries'
+	])
+		assert.ok(probe.includes(invariant), `the actual native producer retains ${invariant}`);
+	assert.match(
+		body('_NDT_RunChild'),
+		/TickElapsed\(Started\) < 15000/,
+		'the native proof never widens the original owned process deadline'
+	);
+}
+assertNativeFileFilterBehavior(nativePolicySource);
+const nativeBehaviorMutations = [
+	nativePolicySource.replace('Test("native file filter:', 'DisabledCase("native file filter:'),
+	nativePolicySource.replace('Name: OwnerName}', 'Name: OwnerName, mm: "SubString"}'),
+	nativePolicySource.replace(
+		'ControlChooseIndex(2, ObserverType)',
+		'ControlChooseIndex(1, ObserverType)'
+	),
+	nativePolicySource.replace('ObserverProcess == DllCall("GetCurrentProcessId", "UInt")', 'false'),
+	nativePolicySource.replace('if Index != 5', 'if Index != 1'),
+	nativePolicySource.replace('if PickerObserverErrors != ""', 'if false'),
+	nativePolicySource.replace('PickerObserverHandle.Terminate()', 'PickerObserverHandle.Status'),
+	nativePolicySource.replace(
+		'Ownership, 2),\n\t\t"removing the real native filter',
+		'Ownership, 0),\n\t\t"removing the real native filter'
+	)
+];
+for (const mutant of nativeBehaviorMutations) {
+	assert.notEqual(
+		mutant,
+		nativePolicySource,
+		'each native behavior mutation targets an actual owner'
+	);
+	assert.throws(() => assertNativeFileFilterBehavior(mutant), assert.AssertionError);
+}
+console.log(
+	`Native file-filter behavior mutations: ${nativeBehaviorMutations.length}/${nativeBehaviorMutations.length} passed.`
+);
+
 const nativePolicyMutations = [
 	nativePolicySource.replace(
 		/Test\("native folder picker:[\s\S]*?_NDT_ActualNativeFolderPickerCaptionsAndResults\)/,
