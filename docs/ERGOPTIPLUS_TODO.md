@@ -213,6 +213,13 @@ updater response and complete native checkpoint remain pending.
 
 Native scripting timeouts now retain a bounded read-only sample of the exact installed Hammerspoon server before retiring the owned client. Exact PID/executable identity is checked before and after sampling, native Process/Path headers must match, and loaded binary images do not qualify stack frames. Fifty-six portable Python cases pass. The selected format gate and 351 JS checks pass; the remaining standalone-uninstall check passes unchanged with its fixture outside protected checkout ancestors. The real server sample and all 18 timer measurements still require the next non-release macOS CI checkpoint.
 
+The Windows live-expansion fixture now owns its foreground-focus probe and
+restores the exact prior port. Actual deferred observers still reject absent
+or changed focused controls and re-arm only for a stable verified target.
+Checkpoint 37085309234 exposed a host-dependent re-arm failure; its exact
+native guard branch was not emitted. All original expansion and transport
+assertions remain, with native Windows requalification pending.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
