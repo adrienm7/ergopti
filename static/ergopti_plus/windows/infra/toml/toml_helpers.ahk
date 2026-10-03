@@ -209,6 +209,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 		Section     := ""
 		PendingKey  := ""   ; key whose value spans multiple lines
+		HasPendingValue := false ; an empty quoted key is still a valid owner
 		PendingVal  := ""   ; accumulated raw characters of the multi-line value
 		PendingDepth := 0
 		PendingQuote := ""
@@ -218,7 +219,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				Line := Trim(A_LoopField)
 
 				; --- Continuation of a multi-line array ---
-				if (PendingKey != "") {
+				if HasPendingValue {
 						; Drop any comment on this line before it is accumulated. Skipping
 						; only whole-comment lines let a TRAILING comment on an element line
 						; become part of the value, and it was then persisted as a real
@@ -237,6 +238,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								DiscardedArrays += 1
 								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
 								PendingKey := ""
+								HasPendingValue := false
 								PendingVal := ""
 								Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
 								if !Sections.Has(Section)
@@ -253,6 +255,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
 										PreserveBooleanLiterals)
 								PendingKey := ""
+								HasPendingValue := false
 								PendingVal := ""
 						}
 						continue
@@ -275,14 +278,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						continue
 				}
 
-				eq := InStr(Line, "=")
+				eq := _TOML_AssignmentDelimiter(Line)
 				if !eq
 						continue
-				key := Trim(SubStr(Line, 1, eq - 1))
+				key := TOML_DecodeKey(Trim(SubStr(Line, 1, eq - 1)))
 				val := Trim(SubStr(Line, eq + 1))
-				; Quoted key: "Foo.Enabled" → Foo.Enabled
-				if (StrLen(key) >= 2 && SubStr(key, 1, 1) = '"' && SubStr(key, -1) = '"')
-						key := SubStr(key, 2, StrLen(key) - 2)
 				if (Section = "")
 						continue
 
@@ -297,6 +297,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						? _TOML_ArrayScanFragment(val, 0, &PendingQuote, &PendingEscaped) : 0
 				if (PendingDepth > 0) {
 						PendingKey := key
+						HasPendingValue := true
 						PendingVal := val
 						continue
 				}
@@ -305,13 +306,39 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				; erases it into integer 0/1. Ordinary readers keep native values.
 				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
 		}
-		if (PendingKey != "") {
+		if HasPendingValue {
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
 		}
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
+}
+
+; The assignment separator belongs outside quoted keys. A value may itself
+; contain equals signs, so stop at the first unquoted separator rather than
+; splitting the entire line into a presumed pair.
+_TOML_AssignmentDelimiter(Line) {
+	KeyQuote := ""
+	KeyEscaped := false
+	Loop Parse Line {
+		KeyChar := A_LoopField
+		if KeyEscaped {
+			KeyEscaped := false
+		} else if KeyQuote == '"' && KeyChar == "\" {
+			KeyEscaped := true
+		} else if KeyQuote != "" {
+			if KeyChar == KeyQuote
+				KeyQuote := ""
+		} else if KeyChar == '"' || (KeyChar == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+			KeyQuote := KeyChar
+		} else if KeyChar == "=" {
+			return A_Index
+		} else if KeyChar == "#" {
+			return 0
+		}
+	}
+	return 0
 }
 
 ; Split only at the current array level. All three decoders consume these raw
