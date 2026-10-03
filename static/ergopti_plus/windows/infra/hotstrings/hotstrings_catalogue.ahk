@@ -643,6 +643,11 @@ HotstringsConfigPath() {
 ; enabled state — and the generated HSE_Terminators catalogue. No I/O here;
 ; callers persist the returned string via HotstringsSetWordDelimiters.
 
+/** Restores only generated shipped definitions, excluding runtime custom rows. */
+HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed) {
+	return HotstringsTerminatorRestore(Terminators().all(), CurrentWord, CurrentConsumed)
+}
+
 ; Default word-terminator string — the chars of every catalogue entry that is
 ; enabled by default. This is the single source for the AHK default set, kept in
 ; lock-step with macOS (both read the same catalogue). Separators are skipped.

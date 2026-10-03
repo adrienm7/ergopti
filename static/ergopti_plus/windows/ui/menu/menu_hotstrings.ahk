@@ -337,13 +337,10 @@ _HS_DelimSetAll(Enable, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
-; Reset all delimiters to the built-in defaults.
+; Restore shipped defaults without deleting personal word or consumed markers.
 _HS_DelimReset(WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
-	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
-		Consumed: CurrentConsumed
-	}
+	BuildFn := (CurrentWord, CurrentConsumed) =>
+		HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed)
 	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 

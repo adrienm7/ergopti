@@ -287,8 +287,24 @@ class HotstringsScopeFiles {
 			for Field in _PersonalTomlOverrideFields()
 				RowsByPath[this.overrides].Push({ Section: Category, Key: Field, Delete: 1 })
 		}
-		for Field in ["word_delimiters", "consumed_delimiters"]
-			RowsByPath[this.overrides].Push({ Section: "__global__", Key: Field, Delete: 1 })
+		; Read after admission, independently of the live engine and UI caches.
+		DelimiterSourcePresent := FSStrictExists(this.overrides)
+		DelimiterSource := DelimiterSourcePresent ? FSReadUtf8Exact(this.overrides) : ""
+		if !(DelimiterSource is String)
+			throw Error("The admitted hotstring delimiter source is unreadable.")
+		Stored := _ParseTomlFileImpl(this.overrides, false, false, DelimiterSource)
+		GlobalSettings := Stored.Get("__global__", Map())
+		Delimiters := HSE_TerminatorRestoreDefaults(
+			GlobalSettings.Get("word_delimiters", ""), GlobalSettings.Get("consumed_delimiters", ""))
+		for Field, Pair in Map("word_delimiters", [Delimiters.Word, Delimiters.DefaultWord],
+				"consumed_delimiters", [Delimiters.Consumed, Delimiters.DefaultConsumed]) {
+			Row := { Section: "__global__", Key: Field }
+			if Pair[1] == Pair[2]
+				Row.Delete := 1
+			else
+				Row.Value := Pair[1]
+			RowsByPath[this.overrides].Push(Row)
+		}
 		Candidates := []
 		for Path, Rows in RowsByPath {
 			; Several TOML sources may share an extension override category.
@@ -302,6 +318,10 @@ class HotstringsScopeFiles {
 			}
 			if Path == this.overrides {
 				Image := TOML_BuildUpdatedContent(Path, Unique)
+				if Image.Get("status", "") == "ok"
+						&& (Image["source_present"] != DelimiterSourcePresent
+						|| !(Image["source_content"] == DelimiterSource))
+					throw Error("The admitted hotstring delimiter source changed during planning.")
 			} else {
 				Present := FSStrictExists(Path)
 				Original := Present ? FSReadUtf8Exact(Path) : ""
