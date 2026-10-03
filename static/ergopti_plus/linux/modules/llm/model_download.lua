@@ -37,7 +37,7 @@ local function finish(request, succeeded, message)
 	if _active ~= request or request.terminal then return end
 	request.terminal = true
 	_active = nil
-	_retry_request = succeeded and nil or request
+	_retry_request = not succeeded and request or nil
 	DownloadWindow.complete(request.session_id, succeeded, message)
 	if type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, succeeded, request.tag)
