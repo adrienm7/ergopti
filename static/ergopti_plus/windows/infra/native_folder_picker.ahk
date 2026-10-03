@@ -229,12 +229,12 @@ _Ui_FolderSelect(RootDir, Options, Prompt, Caption, OwnerHwnd, Native := 0) {
 			throw ValueError("The native folder ABI owner must be an object or default zero")
 		Native := _Ui_FolderNative
 	}
-	Process := Native.ProcessId(), Thread := Native.ThreadId()
-	if OwnerHwnd && !Native.MatchesWindow(OwnerHwnd, Process, Thread)
+	OwnerProcessId := Native.ProcessId(), OwnerThreadId := Native.ThreadId()
+	if OwnerHwnd && !Native.MatchesWindow(OwnerHwnd, OwnerProcessId, OwnerThreadId)
 		throw ValueError("The native folder owner belongs to another window context")
 	Paths := _Ui_FolderPaths(RootDir)
 	State := { Native: Native, Caption: Caption, Initial: Paths.Initial,
-		Process: Process, Thread: Thread, Cookie: Buffer(A_PtrSize, 0),
+		Process: OwnerProcessId, Thread: OwnerThreadId, Cookie: Buffer(A_PtrSize, 0),
 		Active: false, Window: 0, Failure: 0, ComOwned: false,
 		RootPidl: 0, SelectedPidl: 0, Callback: 0, CallbackFunction: 0,
 		Info: 0, Body: 0, Display: 0 }

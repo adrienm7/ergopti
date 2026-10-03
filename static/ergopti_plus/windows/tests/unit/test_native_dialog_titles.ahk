@@ -50,6 +50,63 @@ _NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0) {
 }
 
 /**
+ * Finds the production caption owner by its public symbol, surviving file moves.
+ * @returns {string} The sole source owning every native dialog delegate.
+ */
+_NDT_NativeDialogOwner() {
+	global _StaticDir
+	Owners := []
+	Loop Files, _StaticDir . "\ergopti_plus\windows\*.ahk", "R" {
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
+			continue
+		Source := FileRead(A_LoopFileFullPath, "UTF-8")
+		if !_DriverFindFunctionDefinition(&Source, "Ui_MsgBox")
+			continue
+		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, "Ui_InputBox")),
+			"the public input delegate belongs to the same native caption owner")
+		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, "Ui_DirSelect")),
+			"the public folder delegate belongs to the same native caption owner")
+		Owners.Push(A_LoopFileFullPath)
+	}
+	AssertEqual(1, Owners.Length, "the native caption delegates have one production owner")
+	return Owners[1]
+}
+
+
+/**
+ * Parses the actual dialog include graph before opening any native window.
+ * Strict stdout retains #Warn diagnostics rather than filtering them away.
+ */
+_NDT_NativeOwnersParseWithoutWarnings() {
+	global _StaticDir
+	Root := A_Temp . "\ergopti_dialog_parse_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the native parse fixture must be privately owned")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		Artifact := _StaticDir . "\ergopti_plus\windows\_generated\window_titles.ahk"
+		Owner := _NDT_NativeDialogOwner()
+		Harness := Root . "\parse_dialog_owners.ahk"
+		FileAppend('#Requires AutoHotkey v2.0' . "`n"
+			. '#SingleInstance Off' . "`n"
+			. '#Warn All, StdOut' . "`n"
+			. 'Thread("NoTimers", false)' . "`n"
+			. 'FileAppend("dialog-owners-parsed", "*", "UTF-8-RAW")' . "`n"
+			. 'ExitApp(0)' . "`n"
+			. '#Include ' . Artifact . "`n"
+			. '#Include ' . Owner . "`n", Harness, "UTF-8")
+		AssertEqual("dialog-owners-parsed", _NDT_RunChild(A_AhkPath,
+			["/ErrorStdOut", Harness], Ownership),
+			"the real native owners preserve Thread() and parse with no #Warn output")
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native dialogs: actual owners parse without shadowing built-in Thread", _NDT_NativeOwnersParseWithoutWarnings)
+
+
+/**
  * Builds a private probe which includes the real dialog owner without copying it.
  * Its timer records observations only; assertions belong to the completed parent.
  * @param {string} Artifact - Privately generated shared policy.
@@ -324,7 +381,7 @@ _NDT_ActualNativeCaptionsAndResults() {
 		Generator := _StaticDir . "\..\tools\codegen\codegen-window-titles.cjs"
 		AssertEqual("5", _NDT_RunChild("node.exe", [Bootstrap, Root, Generator], Ownership),
 			"the actual generator owns every private dialog policy")
-		Owner := _StaticDir . "\ergopti_plus\windows\infra\native_dialogs.ahk"
+		Owner := _NDT_NativeDialogOwner()
 		for Index, Spec in Cases {
 			Fixture := Root . "\" . Index
 			Artifact := Fixture . "\static\ergopti_plus\windows\_generated\window_titles.ahk"
