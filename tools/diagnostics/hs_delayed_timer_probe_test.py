@@ -615,6 +615,70 @@ SENDER_STAGES = [
 ]
 
 
+SCALAR_STAGES = [
+    "nserror_construct_entered",
+    "nserror_construct_returned",
+    "nserror_code_entered",
+    "nserror_code_returned",
+    "nserror_domain_entered",
+    "nserror_domain_returned",
+    "descriptor_construct_entered",
+    "descriptor_construct_returned",
+    "descriptor_int32_entered",
+    "descriptor_int32_returned",
+    "nil_ref_entered",
+    "nil_ref_returned",
+    "absent_errn_entered",
+    "absent_errn_returned",
+]
+DECODER_STAGES = {
+    "send": [
+        "reference_entered",
+        "reference_returned",
+        "code_entered",
+        "code_returned",
+        "domain_entered",
+        "domain_returned",
+    ],
+    "handler": ["errn_entered", "errn_returned", "int32_entered", "int32_returned"],
+}
+
+
+def supplemental_scalar_packets(scope, sender_pid, status):
+    """Independent native constructor and branch goldens, not production-derived values."""
+    identity = {"schema_version": 1, "nonce": NONCE, "target_pid": 42, "sender_pid": sender_pid}
+    scalar = dict(
+        identity,
+        contract="hs.applescript.scalar-controls",
+        stages=SCALAR_STAGES,
+        facts={
+            "code": {"type": "number", "integer": -1712},
+            "domain": {"type": "string", "matches": True},
+            "int32": {"type": "number", "integer": -50},
+            "nil_ref": {"type": "undefined", "absent": True},
+            "absent_errn": {"type": "object", "absent": True},
+        },
+    )
+    branch = "send" if status != 0 else "handler"
+    decoder = dict(
+        identity,
+        contract="hs.applescript.decoder-boundaries",
+        branch=branch,
+        stages=DECODER_STAGES[branch]
+        if status != 0
+        else ["errn_entered", "errn_returned", "absent_errn"],
+        facts={
+            "code": {"type": "number", "integer": status},
+            "domain": {"type": "string", "recognized": True},
+        }
+        if status != 0
+        else {"errn": {"type": "object", "absent": True}},
+    )
+    for name, packet in (("scalar.json", scalar), ("decoder.json", decoder)):
+        if name in scope.allowed_names:
+            (scope.path / name).write_text(json.dumps(packet) + "\n")
+
+
 def publish_supplemental_fixture(
     owner, sender_pid, status, server="completed", stages=None, mutation=None
 ):
@@ -632,6 +696,7 @@ def publish_supplemental_fixture(
         "stages": stages,
     }
     (scope.path / "sender.json").write_text(json.dumps(sender) + "\n")
+    supplemental_scalar_packets(scope, sender_pid, status)
     phases = (
         ["entry", "completion"]
         if server == "completed"
@@ -2043,6 +2108,243 @@ lua_pcallk image only
                     with self.assertRaisesRegex(RuntimeError, "did not acknowledge"):
                         owner.execute("return 'fixture'")
                 self.assertEqual(owner.scripting_commands, [command] if code is None else [])
+
+
+class SupplementalScalarBranchTests(unittest.TestCase):
+    """Native scalar facts must be closed, bound, and separate from admission."""
+
+    owner = SupplementalReadinessTests.owner
+    invoke = SupplementalReadinessTests.invoke
+
+    def mutate_packet(self, name, edit):
+        def mutate(folder):
+            file = folder / name
+            if file.exists():
+                data = json.loads(file.read_text())
+                edit(data)
+                file.write_text(json.dumps(data) + "\n")
+
+        return mutate
+
+    def test_scalar_and_branch_missing_receipts_refuse_terminal_reply(self):
+        for name in ("scalar.json", "decoder.json"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+
+                def remove(path):
+                    (path / name).unlink(missing_ok=True)
+
+                with self.assertRaises(ValueError):
+                    self.invoke(owner, mutation=remove)
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_scalar_native_getter_mismatch_refuses_without_status_substitution(self):
+        changes = [
+            lambda d: d["facts"]["code"].update(integer=None, type="object"),
+            lambda d: d["facts"]["int32"].update(integer=-49),
+            lambda d: d["facts"]["domain"].update(matches=False),
+            lambda d: d["facts"]["nil_ref"].update(absent=False),
+            lambda d: d["facts"]["absent_errn"].update(absent=False),
+            lambda d: d["facts"]["nil_ref"].update(type="boolean", absent=True),
+            lambda d: d["facts"]["absent_errn"].update(type="number", absent=True),
+            lambda d: d.update(sender_pid=42),
+            lambda d: d.update(nonce="b" * 32),
+            lambda d: d["stages"].append("future"),
+            lambda d: d["facts"]["code"].update(integer=True),
+            lambda d: d["facts"].update(private="secret-marker"),
+        ]
+        for edit in changes:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                with self.assertRaises(ValueError):
+                    self.invoke(owner, mutation=self.mutate_packet("scalar.json", edit))
+                self.assertNotIn("secret-marker", str(owner.diagnostic_receipts))
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_decoder_closed_branch_prefix_and_status_match_are_mandatory(self):
+        changes = [
+            lambda d: d.update(branch="future"),
+            lambda d: d.update(stages=["errn_returned"]),
+            lambda d: d.update(sender_pid=True),
+            lambda d: d["facts"]["errn"].update(absent=False),
+            lambda d: d["facts"].update(code={"type": "number", "integer": 0}),
+        ]
+        for edit in changes:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                with self.assertRaises(ValueError):
+                    self.invoke(owner, mutation=self.mutate_packet("decoder.json", edit))
+                self.assertEqual(list(Path(folder).iterdir()), [])
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with self.assertRaises(ValueError):
+                self.invoke(
+                    owner,
+                    status=-1712,
+                    mutation=self.mutate_packet(
+                        "decoder.json", lambda d: d["facts"]["code"].update(integer=-50)
+                    ),
+                )
+
+    def test_partial_decoder_crash_retains_closed_read_boundary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+
+            def truncate(d):
+                d.update(
+                    stages=["reference_entered", "reference_returned", "code_entered"], facts={}
+                )
+
+            with self.assertRaisesRegex(RuntimeError, "exit -11"):
+                self.invoke(
+                    owner,
+                    status=-1712,
+                    code=-11,
+                    mutation=self.mutate_packet("decoder.json", truncate),
+                )
+            self.assertIn(
+                "decoder branch: send; boundary: code_entered", str(owner.diagnostic_receipts)
+            )
+            self.assertNotIn("denied", str(owner.diagnostic_receipts))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_generated_supplemental_script_contains_exact_native_scalar_calls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            script = probe.NativeDelayedTimerProbe.no_prompt_script(scope)
+            for expression in (
+                "$.NSError.errorWithDomainCodeUserInfo",
+                "$.NSAppleEventDescriptor.descriptorWithInt32(-50)",
+                "Number(nativeError.code)",
+                "ObjC.unwrap(nativeError.domain)",
+                "Number(errorNumber.int32Value)",
+                "recordDecoderBoundary('send', 'code_entered')",
+                "recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status))",
+            ):
+                self.assertIn(expression, script)
+            self.assertEqual(script.count("event.sendEventWithOptionsTimeoutError("), 1)
+            scope.cleanup()
+
+    def test_present_scalar_packets_require_actual_bound_sender_but_missing_does_not(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            owner = mock.Mock(no_prompt_scope=scope)
+            # A physically present receipt with null sender matches the old expected None.
+            publish_supplemental_fixture(owner, None, 0)
+            with self.assertRaisesRegex(ValueError, "actual bound sender"):
+                scope.observe()
+            scope.cleanup()
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            self.assertEqual(scope.observe()["sender_stage"], "not_observed")
+            self.assertIsNone(scope.sender_pid)
+            scope.cleanup()
+
+    def run_native_source_port(self, scope, mode):
+        """Execute exact generated source against independent Foundation ports, never Cocoa."""
+        port = r"""
+const fs = require('fs');
+const nil = {isNil:()=>true};
+const mode = __MODE__;
+let sends = 0;
+function $(...args) { if(args.length) throw Error('Unexpected nil constructor'); return nil; }
+$.NSUTF8StringEncoding=4;
+$.NSProcessInfo={processInfo:{processIdentifier:31415}};
+$.NSString={stringWithString:text=>({dataUsingEncoding:encoding=>{
+    if(encoding!==4) throw Error('Encoding changed');
+    return {isNil:()=>false,length:Buffer.byteLength(text),writeToFileAtomically:(path,atomic)=>{
+        if(atomic!==true) throw Error('Atomic write changed');
+        if(mode==='write_refusal' && path.endsWith('scalar.json')) return false;
+        fs.writeFileSync(path,text); return true;
+    }};
+}})};
+function nativeError(code) { return {isNil:()=>false,code:code,domain:'NSOSStatusErrorDomain'}; }
+$.NSError={errorWithDomainCodeUserInfo:(domain,code,userInfo)=>{
+    if(domain!=='NSOSStatusErrorDomain'||code!==-1712||userInfo!==nil) throw Error('NSError constructor changed');
+    return nativeError(mode==='invalid_scalar'?undefined:code);
+}};
+$.NSAppleEventDescriptor={
+    descriptorWithProcessIdentifier:pid=>({isNil:()=>false,descriptorType:0x6b706964}),
+    descriptorWithString:text=>({isNil:()=>false,stringValue:text}),
+    descriptorWithInt32:value=>{
+        if(value!==-50) throw Error('Int32 constructor changed');
+        return {isNil:()=>false,int32Value:value};
+    },
+    appleEventWithEventClassEventIDTargetDescriptorReturnIDTransactionID:(klass,id,target,rid,tid)=>{
+        if(klass!==0x486d5370||id!==0x45584543||rid!==-1||tid!==0) throw Error('Bridge changed');
+        return {setParamDescriptorForKeyword:()=>{},paramDescriptorForKeyword:key=>{
+            if(key!==0x6572726e) throw Error('Absent errn key changed'); return nil;
+        },sendEventWithOptionsTimeoutError:(options,timeout,error)=>{
+            if(options!==131075||timeout!==8) throw Error('Native deadline/options changed'); sends++;
+            if(mode==='handler') return {isNil:()=>false,paramDescriptorForKeyword:key=>{
+                if(key!==0x6572726e) throw Error('Handler errn key changed');
+                return {isNil:()=>false,int32Value:-50};
+            }};
+            error[0]=nativeError(mode==='invalid_send'?undefined:-1712); return nil;
+        }};
+    }
+};
+const ObjC={import:name=>{if(name!=='Foundation') throw Error('Import changed');},unwrap:value=>value};
+const Ref=()=>({});
+__SCRIPT__
+try { const result=run(['42','return "fixture"',__NONCE__]); process.stdout.write(result+'\n'); }
+catch(error) { process.stdout.write(JSON.stringify({closed_failure:true,sends:sends})+'\n'); process.exitCode=1; }
+"""
+        source = (
+            port.replace("__MODE__", json.dumps(mode))
+            .replace("__SCRIPT__", probe.NativeDelayedTimerProbe.no_prompt_script(scope))
+            .replace("__NONCE__", json.dumps(NONCE))
+        )
+        return subprocess.run(
+            ["node", "-"], input=source, text=True, capture_output=True, timeout=5
+        )
+
+    def test_actual_generated_native_constructor_and_both_decoder_ports(self):
+        for mode, expected_status, branch in (("send", -1712, "send"), ("handler", -50, "handler")):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+                scope.bind_sender(SENDER_PID)
+                result = self.run_native_source_port(scope, mode)
+                self.assertEqual(result.returncode, 0, "The generated native port refused")
+                native = json.loads(result.stdout)
+                self.assertEqual(native["status"], expected_status)
+                self.assertEqual(native["error_origin"], branch)
+                self.assertIsNotNone(
+                    scope.read("scalar.json"), "The generated source omitted native scalar controls"
+                )
+                evidence = scope.observe(terminal=True, native=native)
+                self.assertTrue(evidence["scalar_qualified"])
+                self.assertEqual(evidence["decoder_branch"], branch)
+                self.assertEqual(scope.read("scalar.json")["facts"]["code"]["integer"], -1712)
+                self.assertEqual(scope.read("scalar.json")["facts"]["int32"]["integer"], -50)
+                scope.cleanup()
+
+    def test_actual_generated_native_port_keeps_invalid_scalars_and_write_refusal_closed(self):
+        for mode in ("invalid_scalar", "invalid_send", "write_refusal"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+                scope.bind_sender(SENDER_PID)
+                result = self.run_native_source_port(scope, mode)
+                if mode == "invalid_scalar":
+                    self.assertEqual(result.returncode, 0)
+                    self.assertIsNotNone(
+                        scope.read("scalar.json"),
+                        "The native constructor control was not exercised",
+                    )
+                    with self.assertRaises(ValueError):
+                        scope.observe(terminal=True, native=json.loads(result.stdout))
+                    self.assertIsNone(scope.read("scalar.json")["facts"]["code"]["integer"])
+                else:
+                    self.assertEqual(result.returncode, 1, "The native port must refuse")
+                    self.assertTrue(json.loads(result.stdout)["closed_failure"])
+                    evidence = scope.observe()
+                    if mode == "invalid_send":
+                        self.assertIn("decoder_boundary", evidence)
+                        self.assertEqual(evidence["decoder_boundary"], "domain_returned")
+                        self.assertIsNone(scope.read("decoder.json")["facts"]["code"]["integer"])
+                    else:
+                        self.assertEqual(json.loads(result.stdout)["sends"], 0)
+                scope.cleanup()
 
 
 if __name__ == "__main__":
