@@ -387,7 +387,9 @@ end
 --- Stops a child's whole process group.
 --- @param request table
 local function stop_group(request)
-	if request.exited or not request.pid then return end
+	-- A descendant can retain the pipes after libuv reaps the group leader.
+	-- The deadline and cancellation still own that group until terminal cleanup.
+	if not request.pid then return end
 	local ok = pcall(luv.kill, -request.pid, "sigterm")
 	if not ok then Logger.error(LOG, "run_async(): could not stop pid %s.", tostring(request.pid)) end
 end

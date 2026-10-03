@@ -147,4 +147,20 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		helpers.assert_contains(results[1].error, "argument 2")
 		helpers.assert_eq(#state.spawns, 0, "a refusal must cost no process")
 	end)
+
+	helpers.it("kills descendants after their leader exits (linux-orphaned-process-group)", function()
+		local runner, state = fresh_runner()
+		local _, results = start(runner, "sh", { "-c", "sleep 30 &" }, { timeout_ms = 10 })
+		state.exit_callback(0, 0)
+		helpers.assert_eq(#results, 0, "the descendant still owns the pipes")
+		state.timer.callback()
+		helpers.assert_eq(state.kills, {
+			{ pid = -7001, signal = "sigterm" },
+			{ pid = -7001, signal = "sigkill" },
+		}, "a reaped leader does not mean the process group is empty")
+		helpers.assert_eq(#results, 1)
+		helpers.assert_contains(results[1].error, "did not finish")
+		state.finish(0)
+		helpers.assert_eq(#results, 1, "late EOF must not publish twice")
+	end)
 end)

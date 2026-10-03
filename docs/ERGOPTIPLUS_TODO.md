@@ -101,6 +101,13 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [~] **L5.** Linux asynchronous process-group teardown: deadlines and shell
+  cancellation now signal descendants even after libuv reaps their leader.
+  The three native fork/pipe/process-group regressions failed before the fix
+  and pass after it; portable adapter regressions cover late EOF and exactly-once
+  delivery. The native harness is registered in the Linux CI lane. Windows uses
+  native process handles and macOS uses Hammerspoon tasks, so neither contains
+  the Linux libuv exited-leader guard. Complete three-OS CI remains pending.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
