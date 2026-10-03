@@ -955,3 +955,89 @@ _TestTL_SimpleEntryComments(Suffix) {
 }
 for _TestTL_SimpleSuffix in [" # note", '# note with "quotes"', "#comment", ""]
 	Test("TOML simple entry retains trailing comment: " . _TestTL_SimpleSuffix . " (simple-entry-comments)", _TestTL_SimpleEntryComments.Bind(_TestTL_SimpleSuffix))
+
+
+; Only actual inline members own registration options, never quoted output text.
+_TestTL_EntryPriorityLexical(RawOutput, PrioritySuffix, ExpectedPriority, Comment := "") {
+	global _HotstringRegistrar, HSE_RegistryByGroup
+	Root := A_Temp . "\ergopti_entry_priority_" . ProcessExist() . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the fixture requires an unowned temporary path")
+	DirCreate(Root)
+	Path := Root . "\source.toml"
+	SavedRegistrar := _HotstringRegistrar
+	try {
+		Line := '"prlx" = { output = "' . RawOutput . '", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false' . PrioritySuffix . ' }' . Comment
+		FileAppend('[[chosen]]`n' . Line . '`n[_meta]`ndescription = "excluded"`n', Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Descriptor := PersonalFileDescribe(["source.toml"])
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(1, LoadExtTomlFile(Path, "owned", "", Descriptor))
+		AssertEqual(1, HSE_RegistryByGroup.Count)
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(1, Specs.Length)
+		Spec := Specs[1]
+		AssertEqual(ExpectedPriority, Spec.Priority, "only the structural member may override the package fallback")
+		AssertEqual(UnescapeTomlString(RawOutput), Spec.Replacement, "the real factory retains the quoted output")
+		AssertTrue(Spec.IsWord, "quoted option-like text cannot change word matching")
+		AssertFalse(Spec.Star, "quoted option-like text cannot enable auto expansion")
+		AssertFalse(Spec.FinalResult, "quoted option-like text cannot change final result")
+		AssertEqual("chosen", Spec.Section)
+		AssertEqual(Descriptor["id"], Spec.PersonalSource["id"])
+		Index := Map(), TriggerSet := Map()
+		AssertEqual(1, _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, "", Descriptor))
+		AssertEqual(ExpectedPriority, TriggerSet["prlx"].Priority, "catalogue and actual registration share structural priority")
+		AssertEqual(UnescapeTomlString(RawOutput), TriggerSet["prlx"].Output)
+		AssertEqual(Descriptor["id"], TriggerSet["prlx"].PersonalSource["id"])
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			_HotstringRegistrar := SavedRegistrar
+			HSE_RegistryClear()
+			HSE_FeedReset(true)
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_entry_priority_" . ProcessExist() . "_") == 1, "cleanup stays inside the process-owned root")
+			DirDelete(Root, true)
+		}
+	}
+}
+Test("TOML priority ignores comma in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", priority = 80", "", 30))
+Test("TOML priority ignores brace in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("{ priority = 80", "", 30))
+Test("TOML priority ignores escaped quote in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical('\" , priority = 80', "", 30))
+Test("TOML priority ignores trailing comment (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", "", 30, " # , priority = 80"))
+Test("TOML true priority wins after deceptive output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", priority = 80", ", priority = 67", 67))
+Test("TOML quoted options preserve real flags (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = true, priority = 80", "", 30))
+Test("TOML structural field casing stays admitted (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", PrIoRiTy = 67", 67))
+Test("TOML priority zero remains valid (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 0", 0))
+Test("TOML priority maximum remains valid (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 100", 100))
+Test("TOML invalid priority keeps source default (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 101", 30))
+
+
+; Invalid priority source types retain inheritance without string-coercing maps.
+_TestTL_PrioritySourceType(RawTable, Fallback, Expected) {
+	Fields := TOML_ParseInlineTable(RawTable, (Raw) => Raw)
+	AssertTrue(Fields is Map, "the source is valid structural TOML")
+	AssertEqual(Expected, _ParseEntryPriority('"owned" = ' . RawTable, Fallback),
+		"only an integer priority source token may override its inherited default")
+}
+for _TestTL_PrioritySourceCase in [
+	{Name: "dotted map", Raw: "{ priority.note = 80 }", Fallback: 30, Expected: 30},
+	{Name: "casefold dotted map", Raw: "{ PrIoRiTy.note = 80 }", Fallback: 30, Expected: 30},
+	{Name: "dotted map preserves unset override", Raw: "{ priority.note = 80 }", Fallback: "", Expected: ""},
+	{Name: "basic string", Raw: '{ priority = "80" }', Fallback: 30, Expected: 30},
+	{Name: "literal string", Raw: "{ priority = '80' }", Fallback: 30, Expected: 30},
+	{Name: "array", Raw: "{ priority = [80] }", Fallback: 30, Expected: 30},
+	{Name: "nested table", Raw: "{ priority = { note = 80 } }", Fallback: 30, Expected: 30},
+	{Name: "float", Raw: "{ priority = 80.5 }", Fallback: 30, Expected: 30},
+	{Name: "boolean", Raw: "{ priority = true }", Fallback: 30, Expected: 30},
+	{Name: "negative", Raw: "{ priority = -1 }", Fallback: 30, Expected: 30},
+	{Name: "out of bounds", Raw: "{ priority = 101 }", Fallback: 30, Expected: 30},
+	{Name: "integer overflow", Raw: "{ priority = 9223372036854775808 }", Fallback: 30, Expected: 30},
+	{Name: "quoted key", Raw: '{ "priority" = 67 }', Fallback: 30, Expected: 67},
+	{Name: "zero", Raw: "{ priority = 0 }", Fallback: 30, Expected: 0},
+	{Name: "maximum", Raw: "{ priority = 100 }", Fallback: 30, Expected: 100},
+	{Name: "missing key", Raw: '{ output = "quoted#value" }', Fallback: 30, Expected: 30}
+] {
+	Test("TOML priority source type: " . _TestTL_PrioritySourceCase.Name . " (priority-source-type)",
+		_TestTL_PrioritySourceType.Bind(_TestTL_PrioritySourceCase.Raw,
+			_TestTL_PrioritySourceCase.Fallback, _TestTL_PrioritySourceCase.Expected))
+}

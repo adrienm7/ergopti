@@ -69,16 +69,23 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 ; ========================================================
 ; ========================================================
 
-; Extract an individual per-hotstring priority from a TOML entry line, or return
-; Fallback when the entry carries no `priority = N` key. The key must be preceded
-; by `{` or `,` so it is matched only as a real inline-table key and can never
-; collide with the word "priority" appearing inside the output string. This is
-; the top level of the priority cascade (individual > section > file > source).
+; Extract the structural priority member through the shared quote-aware owner.
+; Output text and trailing comments cannot participate in the priority cascade.
 _ParseEntryPriority(Line, Fallback) {
-		if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
-				if TOML_TryParseInteger(PrioM[1], &ParsedPriority)
+		if !InStr(Line, "priority", false)
+				return Fallback
+		Delimiter := _TOML_AssignmentDelimiter(Line)
+		if !Delimiter
+				return Fallback
+		RawTable := Trim(TOML_StripInlineComment(SubStr(Line, Delimiter + 1)))
+		Fields := TOML_ParseInlineTable(RawTable, (Raw) => Raw)
+		for Key, Raw in Fields {
+				if StrLower(Key) != "priority"
+						continue
+				if Raw is String && RegExMatch(Raw, "^[0-9]+$") && TOML_TryParseInteger(Raw, &ParsedPriority)
 						and HotstringsTryPriority(ParsedPriority, &Priority)
 						return Priority
+				return Fallback
 		}
 		return Fallback
 }
