@@ -37,6 +37,8 @@ const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const WORKFLOW = pipeline.file(LINUX_BOX);
 const GATE = pipeline.locate('linux-ok');
 const SHA = '0123456789abcdef';
+// Native Lua stdio uses host text mode; Bash tee receipts below remain byte-exact.
+const NATIVE_LUA_EOL = process.platform === 'win32' ? '\r\n' : '\n';
 
 // The real live-updater probe must expose the same refused HTTP response while
 // its original assertion and exit remain red. No release or network is faked as
@@ -329,9 +331,20 @@ end
 		assert.doesNotMatch(rejectedOwner.stdout, /installed |scoped request and cleanup/);
 		assert.ok(!rejectedOwner.stderr.includes(fixtureToken));
 	}
+	// Binary fixture bytes avoid native getenv transcoding the UTF-8 response.
+	const responseFile = path.join(updaterScratch, 'response.json');
+	fs.writeFileSync(responseFile, refusal);
+	const boundedResponseFile = path.join(updaterScratch, 'bounded-response.json');
+	fs.writeFileSync(
+		boundedResponseFile,
+		JSON.stringify({ message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000) })
+	);
 	const injected = `
 package.preload.luv = function() return { run = function() error('a synchronous refusal needs no event loop') end } end
-local response = { ok = false, status = 403, error = 'HTTP 403', error_body = os.getenv('UPDATER_RESPONSE') }
+local response_file = assert(io.open(os.getenv('UPDATER_RESPONSE_FILE'), 'rb'))
+local fixture_response = assert(response_file:read('*a'))
+assert(response_file:close())
+local response = { ok = false, status = 403, error = 'HTTP 403', error_body = fixture_response }
 local headers, options = { Authorization = 'Bearer ORIGINAL_REQUEST_SECRET' }, { owner = 'updater' }
 local original_get = function(url, sent_headers, sent_options, callback)
  assert(url == 'https://api.github.com/owned/releases')
@@ -347,7 +360,7 @@ local manager = { _http_client = { get = original_get }, init = function() end,
 manager.check_for_updates = function(_, callback)
  assert(manager._http_client.get('https://api.github.com/owned/releases', headers, options, function(received, receipt)
   assert(receipt == 'owned callback receipt', 'the wrapper changed callback arguments')
-  assert(received == response and received.error_body == os.getenv('UPDATER_RESPONSE'), 'the wrapper changed the result')
+  assert(received == response and received.error_body == fixture_response, 'the wrapper changed the result')
   callback(false, nil, received.error)
   return 'callback return preserved'
  end) == true, 'the wrapper changed the transport return')
@@ -371,7 +384,7 @@ end
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
-				UPDATER_RESPONSE: refusal
+				UPDATER_RESPONSE_FILE: responseFile
 			}
 		}
 	);
@@ -381,10 +394,17 @@ end
 		1,
 		'the original failed release-check assertion remains nonzero'
 	);
-	assert.match(probe.stdout, /transport stdout preserved\n/);
-	assert.match(probe.stderr, /transport stderr preserved\n/);
-	assert.match(probe.stderr, /probe lifecycle cleanup preserved\n/);
-	assert.match(probe.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.ok(probe.stdout.includes('transport stdout preserved' + NATIVE_LUA_EOL));
+	assert.ok(probe.stderr.includes('transport stderr preserved' + NATIVE_LUA_EOL));
+	assert.ok(probe.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
+	assert.ok(
+		probe.stdout.includes(
+			'  check: nil HTTP 403' +
+				NATIVE_LUA_EOL +
+				'  FAIL the newest release is found' +
+				NATIVE_LUA_EOL
+		)
+	);
 	assert.match(
 		probe.stderr,
 		/::error title=Linux updater live HTTP::.*HTTP 403.*API rate limit exceeded/
@@ -426,15 +446,13 @@ end
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
-				UPDATER_RESPONSE: JSON.stringify({
-					message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000)
-				})
+				UPDATER_RESPONSE_FILE: boundedResponseFile
 			}
 		}
 	);
 	assert.ifError(bounded.error);
 	assert.strictEqual(bounded.status, 1);
-	assert.match(bounded.stderr, /probe lifecycle cleanup preserved\n/);
+	assert.ok(bounded.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
 	assert.match(bounded.stderr, /100%25%0D%0A::error::foreign/);
 	assert.strictEqual(
 		(bounded.stderr.match(/^::error/gm) || []).length,
@@ -445,6 +463,10 @@ end
 		.responses[0].message;
 	assert.ok(Buffer.byteLength(boundedMessage) <= 2061, 'response body evidence is bounded');
 	assert.ok(boundedMessage.endsWith(' <truncated>'));
+	assert.ok(
+		boundedMessage.startsWith('refused 100%\r\n::error::foreign é'),
+		'the actual response retains its UTF-8 prefix'
+	);
 	assert.ok(!boundedMessage.includes('�'), 'bounded evidence retains complete UTF-8 characters');
 
 	// A refused evidence write cannot replace the actual HTTP failure or
@@ -462,14 +484,21 @@ end
 				GITHUB_ACTIONS: 'true',
 				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
-				UPDATER_RESPONSE: refusal
+				UPDATER_RESPONSE_FILE: responseFile
 			}
 		}
 	);
 	assert.ifError(blocked.error);
 	assert.strictEqual(blocked.status, 1);
-	assert.match(blocked.stderr, /probe lifecycle cleanup preserved\n/);
-	assert.match(blocked.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.ok(blocked.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
+	assert.ok(
+		blocked.stdout.includes(
+			'  check: nil HTTP 403' +
+				NATIVE_LUA_EOL +
+				'  FAIL the newest release is found' +
+				NATIVE_LUA_EOL
+		)
+	);
 	assert.match(blocked.stderr, /HTTP refusal evidence could not be captured/);
 
 	// Execute the actual Bash owner with controlled build/install/interpreter
