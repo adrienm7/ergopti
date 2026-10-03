@@ -3956,6 +3956,16 @@ platforms = ["ahk", "hs", "linux"]
 # `list`, because its rows come from the registry and the updater state), then
 # Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
+# The updater registry owns the channel ids, stability order and both label forms.
+[[menu.about_update_channel_menu]]
+type = "choice"
+id = "update_channel"
+path = "updater.channel"
+i18n = "menu.about.channel_menu"
+choice_registry = "updater.channels"
+show_current_choice = true
+current_choice_placeholder = "{channel}"
+
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"

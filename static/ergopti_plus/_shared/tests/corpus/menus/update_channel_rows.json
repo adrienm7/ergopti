@@ -1,0 +1,39 @@
+{
+	"description": "Independent two-channel About presentation captured from unchanged registry and native pickers before shared-choice migration. No expectation generator.",
+	"choices": [
+		{
+			"value": "main",
+			"i18n": "updater.channel.main_menu",
+			"current_i18n": "updater.channel.main"
+		},
+		{
+			"value": "dev",
+			"i18n": "updater.channel.dev_menu",
+			"current_i18n": "updater.channel.dev"
+		}
+	],
+	"states": [
+		{
+			"selected": "main",
+			"checked": [true, false]
+		},
+		{
+			"selected": "dev",
+			"checked": [false, true]
+		}
+	],
+	"reordered_values": ["dev", "main"],
+	"locales": {
+		"en": {
+			"parent_template": "Update channel: {channel}",
+			"captions": ["Update channel: Stable", "Update channel: Dev"],
+			"leaf_labels": ["Stable channel", "Dev channel (pre-releases)"]
+		},
+		"fr": {
+			"parent_template": "Canal de mise à jour : {channel}",
+			"captions": ["Canal de mise à jour : Stable", "Canal de mise à jour : Dev"],
+			"leaf_labels": ["Canal stable", "Canal dev (préversions)"]
+		}
+	},
+	"refusals": ["false", "nil", "throw"]
+}

@@ -542,22 +542,11 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 ; follows.
 _MI_ChannelPickerRow(SetChannelFn) {
 	global UPDATER_CHANNEL
-	ChannelRows := []
-	for _, Id in UpdateChannels_Ids()
-		ChannelRows.Push(Map(
-			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
-			"action",  _MI_ChannelSetter(Id, SetChannelFn),
-			"checked", (Id == UPDATER_CHANNEL)))
-	return Map(
-		"label", StrReplace(t("menu.about.channel_menu"), "{channel}", _Updater_ChannelLabel(UPDATER_CHANNEL)),
-		"items", ChannelRows)
+	return MenuRenderer_ChoiceRow("about_update_channel_menu", "update_channel",
+		Map("update_channel", (Id) => SetChannelFn.Call(Id)),
+		Map("updater.channel", () => UPDATER_CHANNEL))
 }
 
-; Binds one channel id per row. A fat arrow written in the loop above would
-; share the loop variable and switch every row to the last channel.
-_MI_ChannelSetter(Id, SetChannelFn) {
-	return (*) => SetChannelFn.Call(Id)
-}
 
 
 

@@ -744,6 +744,21 @@ original guards. Native Windows stale-pause/transaction cases and complete
 three-OS packaging and installation still require CI. Items 54 and 81 remain
 partial for the other native menu groups.
 
+The About update-channel submenu now consumes one shared choice declaration,
+projected from the existing validated updater registry rather than a second enum.
+The registry owns its stability order and separate short-caption/full-leaf labels;
+all 21 existing translations are retained. Each driver supplies its current
+subscription and existing durable setter. Linux redraw and Versions publication
+still follow an accepted write, while false/nil/throwing refusals preserve the
+subscription. An independently captured two-state corpus and alternate published
+order are replayed through the real menu providers; Windows also observes Win32
+checked flags and registered dispatcher callbacks. Current focused About/Word contracts and all source
+checks pass; unchanged updater runtime bodies are linked to the earlier full
+portable unit/E2E component receipts. Native Windows, packaging and installation
+qualification remain pending the next non-release CI. The native-row census is unchanged because these
+pickers already returned provider data. Items 54 and 81 remain open for the other
+native and fixed provider policies.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

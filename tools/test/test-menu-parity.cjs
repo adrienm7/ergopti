@@ -112,6 +112,8 @@ const OPENS_SUBMENU = {
 	// The About submenu, declared 2026-08-07. Visible on all three, with the same
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
+	// The About updater provider renders the registry-backed channel choice.
+	about_updates: 'about_update_channel_menu',
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six

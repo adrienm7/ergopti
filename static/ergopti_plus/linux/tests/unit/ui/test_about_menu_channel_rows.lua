@@ -257,3 +257,97 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		if not ok then error(err, 0) end
 	end)
 end)
+
+
+--- Independent presentation captured before replacing the native picker.
+local function channel_corpus()
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_channel_rows.json", "rb"))
+	local raw = handle:read("*a")
+	handle:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("tray (linux): published About channel choices", function()
+	helpers.it("retains the captured two states through the actual About provider", function()
+		local corpus = channel_corpus()
+		local i18n = require("infra.i18n")
+		local prior = i18n.get
+		local ok, detail = pcall(function()
+			for _, locale in ipairs({ "en", "fr" }) do
+				local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. locale .. ".json", "rb"))
+				local labels = assert(require("json").decode(handle:read("*a")))
+				handle:close()
+				i18n.get = function(key) return labels[key] or key end
+				for index, state in ipairs(corpus.states) do
+					local rows = submenu_of(build((fake_updater(state.selected))), "menu.about.title")
+					local row = rows[CHANNEL_AT]
+					helpers.assert_eq(row.title, corpus.locales[locale].captions[index])
+					helpers.assert_eq(#row.menu, 2)
+					for at, leaf in ipairs(row.menu) do
+						helpers.assert_eq(leaf.title, corpus.locales[locale].leaf_labels[at])
+						helpers.assert_eq(leaf.checked, state.checked[at])
+					end
+				end
+			end
+		end)
+		i18n.get = prior
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("consumes alternate published order instead of a private registry loop", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local previous = root.about_update_channel_menu
+		local corpus, choices = channel_corpus(), {}
+		for _, value in ipairs(corpus.reordered_values) do
+			for _, choice in ipairs(corpus.choices) do
+				if choice.value == value then choices[#choices + 1] = choice end
+			end
+		end
+		root.about_update_channel_menu = { {
+			type = "choice", id = "update_channel", path = "updater.channel",
+			i18n = "menu.about.channel_menu", show_current_choice = true,
+			current_choice_placeholder = "{channel}", choices = choices,
+		} }
+		local ok, detail = pcall(function()
+			local up, requests = fake_updater("main")
+			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT]
+			helpers.assert_eq(#row.menu, 2)
+			for index, choice in ipairs(choices) do
+				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				row.menu[index].fn()
+			end
+			helpers.assert_eq(requests.set, corpus.reordered_values)
+		end)
+		root.about_update_channel_menu = previous
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("does not redraw or update Versions after refused preference writes", function()
+		local previous_bridge = package.loaded["ui.changelog.bridge"]
+		local pushed = {}
+		package.loaded["ui.changelog.bridge"] = { push_subscribed_channel = function(id) pushed[#pushed + 1] = id end }
+		local ok, detail = pcall(function()
+			for _, refusal in ipairs(channel_corpus().refusals) do
+				local up, requests = fake_updater("main")
+				up.set_channel = function(id)
+					requests.set[#requests.set + 1] = id
+					if refusal == "throw" then error("refused channel write") end
+					if refusal == "false" then return false end
+					return nil
+				end
+				local changed = { count = 0 }
+				local row = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT]
+				local accepted, result = pcall(row.menu[2].fn)
+				helpers.assert_eq(accepted, refusal ~= "throw")
+				if accepted then helpers.assert_eq(result, nil) end
+				helpers.assert_eq(requests.set, { "dev" })
+				helpers.assert_eq(up.get_channel(), "main")
+				helpers.assert_eq(changed.count, 0)
+				helpers.assert_eq(#pushed, 0)
+			end
+		end)
+		package.loaded["ui.changelog.bridge"] = previous_bridge
+		if not ok then error(detail, 0) end
+	end)
+end)

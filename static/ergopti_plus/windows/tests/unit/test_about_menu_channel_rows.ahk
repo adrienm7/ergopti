@@ -199,3 +199,135 @@ _AMCR_LocalCheckoutGreysTheUpdateRows() {
 }
 Test("About menu: a local checkout draws the update rows greyed with their reason (update-rows-greyed-on-local-2026-10-01)",
 	_AMCR_LocalCheckoutGreysTheUpdateRows)
+
+
+; Captured labels and state are independent of the generated choice projection.
+_AMCR_ChannelCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\update_channel_rows.json", "UTF-8"))
+}
+
+_AMCR_PublishedChannelOrder() {
+	global UPDATER_CHANNEL
+	Root := _MR_GetManifestRoot()
+	Previous := Root["about_update_channel_menu"]
+	SavedChannel := UPDATER_CHANNEL
+	Owned := []
+	Corpus := _AMCR_ChannelCorpus()
+	Choices := []
+	for Value in Corpus["reordered_values"] {
+		for Choice in Corpus["choices"] {
+			if Choice["value"] == Value
+				Choices.Push(Choice)
+		}
+	}
+	Root["about_update_channel_menu"] := [Map(
+		"type", "choice", "id", "update_channel", "path", "updater.channel",
+		"i18n", "menu.about.channel_menu", "show_current_choice", true,
+		"current_choice_placeholder", "{channel}", "choices", Choices)]
+	try {
+		UPDATER_CHANNEL := "main"
+		State := { Calls: [] }
+		Picker := _AMCR_NativeChannelPicker(Owned, _AMCR_RecordChannel.Bind(State))
+		AssertEqual(2, Picker["items"].Length, "the independent two-channel corpus stays complete")
+		for Index, Choice in Choices {
+			Leaf := Picker["items"][Index]
+			AssertEqual(t(Choice["i18n"]), Leaf["label"], "the native provider consumes published order")
+			AssertEqual(Choice["value"] == "main", Leaf["checked"], "reordered state follows identity")
+			Leaf["action"].Call("", Index, 0)
+		}
+		for Index, Value in Corpus["reordered_values"]
+			AssertEqual(Value, State.Calls[Index], "the native callback retains its own channel")
+	} finally {
+		Root["about_update_channel_menu"] := Previous
+		UPDATER_CHANNEL := SavedChannel
+		for Built in Owned
+			_CTC_ReleaseMenu(Built)
+	}
+}
+Test("About menu: native channel provider consumes the published alternate order", _AMCR_PublishedChannelOrder)
+
+; Captures the actual Win32 provider submenu and dispatcher, not mirrored rows.
+_AMCR_NativeChannelPicker(Owned, Setter) {
+	global _MenuDispatchCallbacks
+	Built := Menu()
+	Owned.Push(Built)
+	MenuRenderer_AppendRows(Built, "about_menu", "about_updates", _MI_AboutUpdateRows(false, Setter))
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", 2, "ptr")
+	Assert(Handle != 0, "the actual About provider opens the declared channel submenu")
+	Sub := MenuFromHandle(Handle)
+	Items := []
+	loop TrayMenuItemCount(Sub) {
+		Position := A_Index - 1
+		Id := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id), "the channel leaf uses the actual dispatcher")
+		Items.Push(Map("label", _CTC_LabelAt(Sub, Position),
+			"checked", _CTC_IsChecked(Sub, Position), "action", _MenuDispatchCallbacks[Id]))
+	}
+	return Map("label", _CTC_LabelAt(Built, 2), "items", Items)
+}
+
+; Refusals leave the actual native preference untouched; callbacks retain the
+; existing setter's receipt or exception rather than manufacture a success.
+_AMCR_RefusedChannel(State, Kind, Id) {
+	State.Calls.Push(Id)
+	if Kind == "throw"
+		throw Error("refused channel write")
+	return false
+}
+
+_AMCR_RefusedChannelOwner() {
+	global UPDATER_CHANNEL
+	SavedChannel := UPDATER_CHANNEL
+	Owned := []
+	try {
+		for Kind in ["false", "throw"] {
+			UPDATER_CHANNEL := "main"
+			State := { Calls: [] }
+			Picker := _AMCR_NativeChannelPicker(Owned, _AMCR_RefusedChannel.Bind(State, Kind))
+			Thrown := false
+			Result := true
+			try Result := Picker["items"][2]["action"].Call("", 2, 0)
+			catch Error as Err {
+				Thrown := true
+				AssertEqual("refused channel write", Err.Message, "the native refusal propagates unchanged")
+			}
+			AssertEqual(Kind == "throw", Thrown, "only the owner's exception throws")
+			if !Thrown
+				AssertEqual(false, Result, "the owner's false receipt survives the renderer")
+			AssertEqual(1, State.Calls.Length, "one click invokes the owner once")
+			AssertEqual("dev", State.Calls[1], "the second leaf selects dev")
+			AssertEqual("main", UPDATER_CHANNEL, "refusal never publishes a guessed channel")
+		}
+	} finally {
+		UPDATER_CHANNEL := SavedChannel
+		for Built in Owned
+			_CTC_ReleaseMenu(Built)
+	}
+}
+Test("About menu: native channel callbacks retain preference refusal receipts", _AMCR_RefusedChannelOwner)
+
+
+_AMCR_CapturedChannelStates() {
+	global UPDATER_CHANNEL
+	SavedChannel := UPDATER_CHANNEL
+	Owned := []
+	Corpus := _AMCR_ChannelCorpus()
+	try {
+		for State in Corpus["states"] {
+			UPDATER_CHANNEL := State["selected"]
+			Picker := _AMCR_NativeChannelPicker(Owned, _AMCR_RecordChannel.Bind({ Calls: [] }))
+			AssertEqual(2, Picker["items"].Length, "the captured two choices remain complete")
+			for Index, Choice in Corpus["choices"] {
+				Leaf := Picker["items"][Index]
+				AssertEqual(t(Choice["i18n"]), Leaf["label"], "the independent legacy full-label key is retained")
+				AssertEqual(State["checked"][Index], Leaf["checked"], "the captured exclusive tick is retained")
+			}
+		}
+	} finally {
+		UPDATER_CHANNEL := SavedChannel
+		for Built in Owned
+			_CTC_ReleaseMenu(Built)
+	}
+}
+Test("About menu: the independent two-channel states remain unchanged", _AMCR_CapturedChannelStates)

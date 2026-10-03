@@ -3661,31 +3661,19 @@ end
 --- @param up table The updater module.
 --- @return table row A provider row with its items.
 local function _channel_picker(ctx, up)
-	local channel = up.get_channel()
-	local rows = {}
-	for _, id in ipairs(up.CHANNELS.ids()) do
-		rows[#rows + 1] = {
-			label   = i18n_safe(up.CHANNELS.channel(id).menu_label_key),
-			checked = channel == id,
-			action  = function()
-				if not up.set_channel(id) then return end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				-- An open Versions page follows, so its banner never offers the
-				-- channel the user just chose here.
-				local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
-				if ok_bridge then
-					Changelog.push_subscribed_channel(id)
-				else
-					Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
-				end
-			end,
-		}
-	end
-	return {
-		label = _fill(i18n_safe("menu.about.channel_menu"), "{channel}",
-			i18n_safe(up.CHANNELS.channel(channel).label_key)),
-		items = rows,
-	}
+	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+		update_channel = function(id)
+			if not up.set_channel(id) then return end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			-- An open Versions page follows only an acknowledged subscription.
+			local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
+			if ok_bridge then
+				Changelog.push_subscribed_channel(id)
+			else
+				Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
+			end
+		end,
+	}, { ["updater.channel"] = function() return up.get_channel() end })
 end
 
 --- The updater block of the About submenu, as provider DATA: the version, the

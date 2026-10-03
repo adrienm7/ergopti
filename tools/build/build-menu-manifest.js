@@ -7,6 +7,8 @@
 //
 // Input:
 //   static/ergopti_plus/_shared/modules/features/manifest.toml  ([menu.*] tables)
+//   static/ergopti_plus/_shared/modules/updater/channels.json  (registry choices)
+//   static/ergopti_plus/_shared/ui/update_channels.js  (canonical registry validator)
 //
 // Output:
 //   static/ergopti_plus/_shared/modules/menu/menu_manifest.json
@@ -14,7 +16,7 @@
 // Both drivers read the generated JSON at runtime unchanged. The emitted data
 // is a verbatim projection of the [menu.*] tables (only the leading _comment
 // header fields are added, and each `choice` row gains the `choices` of its
-// enum feature), so behavior is identical to the previous
+// enum feature or registered settings owner), so behavior is identical to the previous
 // hand-maintained file — guaranteed by the menu drift gate
 // (tools/test/test-menu-manifest.cjs) and the build:domain regeneration check.
 //
@@ -26,6 +28,7 @@ import { parse as parseToml } from 'smol-toml';
 import { readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
 
 const { shared } = sharedPaths;
@@ -53,7 +56,7 @@ const HEADER = {
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
 		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
-		"'choices' are projected from the feature's enum_values by this generator.",
+		"'choices' are projected from the feature's enum_values or registered owner by this generator.",
 	_comment4:
 		"unavailable (rows restricted by platforms only): 'hide' = not applicable where the row " +
 		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
@@ -118,8 +121,22 @@ function validateGreyedRows(menu) {
 	}
 }
 
+/** Projects the updater's actual validated registry without inventing a feature enum. */
+function updaterChannelChoices() {
+	const source = shared('modules/updater/channels.json');
+	const matcher = shared('ui/update_channels.js');
+	const window = {};
+	runInNewContext(readFileSync(matcher, 'utf8'), { window }, { filename: matcher });
+	const registry = window.createUpdateChannels(JSON.parse(readFileSync(source, 'utf8')));
+	return Array.from(registry.ids, (value) => ({
+		value,
+		i18n: registry.channel(value).menuLabelKey,
+		current_i18n: registry.channel(value).labelKey
+	}));
+}
+
 /**
- * Projects each `choice` row's values from the enum feature its `path` names.
+ * Projects each `choice` row's values from its enum feature or registered settings owner.
  *
  * A choice row is one setting with a fixed set of values, drawn as one row with
  * the values beneath it. The values belong to the feature (its `enum_values`),
@@ -129,7 +146,8 @@ function validateGreyedRows(menu) {
  * established label keys. The logger alone may expose its existing technical
  * tokens with source-owned emoji; these are not untranslated natural language.
  * `show_current_choice` lets the shared renderer fill
- * {1} in the parent caption from the selected leaf's label.
+ * a declared placeholder (default {1}) from the selected label.
+ * Registered updater choices carry distinct short and full locale keys.
  * A row whose path is not an enum feature, that lists its choices by hand, or
  * that is shown on a platform the feature does not
  * declare fails the build instead of drawing a row no driver can store.
@@ -152,7 +170,19 @@ function projectChoices(menu, raw) {
 		for (const row of rows) {
 			if (!row || typeof row !== 'object' || row.type !== 'choice') continue;
 			const where = `menu.${key} choice "${row.id}"`;
-			const feature = enums.get(row.path);
+			let projectedRegistry;
+			let feature = enums.get(row.path);
+			if (row.choice_registry !== undefined) {
+				if (row.choice_registry !== 'updater.channels' || row.path !== 'updater.channel')
+					throw new Error(`${where}: unknown choice_registry or registry-owned path`);
+				if (row.choice_values !== undefined || row.choice_label_prefix !== undefined)
+					throw new Error(`${where}: registry choices own their values, order and label keys`);
+				projectedRegistry = updaterChannelChoices();
+				feature = {
+					enum_values: projectedRegistry.map((entry) => entry.value),
+					platforms: PLATFORMS
+				};
+			}
 			if (!feature) throw new Error(`${where} names "${row.path}", which is no enum feature`);
 			if (row.choices !== undefined)
 				throw new Error(`${where} lists its choices by hand; they come from the feature`);
@@ -171,6 +201,21 @@ function projectChoices(menu, raw) {
 				throw new Error(`${where}: choice_label_prefix must be a non-empty locale-key prefix`);
 			if (row.show_current_choice !== undefined && typeof row.show_current_choice !== 'boolean')
 				throw new Error(`${where}: show_current_choice must be a boolean`);
+			if (
+				row.current_choice_placeholder !== undefined &&
+				(typeof row.current_choice_placeholder !== 'string' ||
+					row.show_current_choice !== true ||
+					!/^\{(?:[1-9]\d*|[a-z][a-z0-9_]*)\}$/.test(row.current_choice_placeholder))
+			)
+				throw new Error(
+					`${where}: current_choice_placeholder needs one token and show_current_choice`
+				);
+			if (
+				row.current_choice_suffix !== undefined &&
+				row.current_choice_placeholder !== undefined &&
+				row.current_choice_placeholder !== '{1}'
+			)
+				throw new Error(`${where}: current_choice_suffix uses the {1} placeholder`);
 			const values = row.choice_values === undefined ? feature.enum_values : row.choice_values;
 			if (
 				!Array.isArray(values) ||
@@ -213,11 +258,14 @@ function projectChoices(menu, raw) {
 				throw new Error(
 					`${where}: current_choice_suffix needs punctuation, one {1} and show_current_choice`
 				);
-			row.choices = values.map((value) =>
-				technical
-					? { value, label: `${icons[value]} ${value}` }
-					: { value, i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}` }
-			);
+			row.choices =
+				projectedRegistry ||
+				values.map((value) =>
+					technical
+						? { value, label: `${icons[value]} ${value}` }
+						: { value, i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}` }
+				);
+			delete row.choice_registry;
 			delete row.choice_values;
 			delete row.choice_label_kind;
 			delete row.choice_icons;
