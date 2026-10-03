@@ -312,6 +312,23 @@ _LLM_Menu_GenerationRows() {
 ; ==================================
 ; ==================================
 
+; This initializer belongs beside the display rows so both the resident entry
+; and the definitions-only native harness initialize the same catalogue.
+; Indent level options for multi-prediction display. Range mirrors the HS
+; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
+; build_indent_menu): negative values produce a leading deletion of N chars so
+; the prediction lines up at column-N relative to the original cursor, while
+; positive values insert N spaces before each line. Built lazily at startup
+; so the integer array stays a single source of truth.
+global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
+_LLMMenuBuildIndentRange() {
+    out := []
+    Loop 15 {
+        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
+    }
+    return out
+}
+
 /**
  * Builds the display settings submenu.
  * Mirrors HS display_menu: info bar, streaming, show-all-at-once, indent.
