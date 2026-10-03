@@ -9,6 +9,7 @@
 --- device or display server is required (linux-orphaned-process-group).
 --- A real ENOENT spawn also proves refusal does not publish a second outcome.
 --- SIGTERM-resistant descendants must settle on deadlines and cancellation.
+--- A child actually killed by a signal must never report successful completion.
 --- ==============================================================================
 
 local uv = require("luv")
@@ -164,6 +165,28 @@ else
 		tostring(handle), tostring(reason), callbacks, tostring(settled)))
 end
 
+local signalled_args = { "-c", "import os, signal; os.kill(os.getpid(), signal.SIGTERM)" }
+for _, runner in ipairs({ "shell", "process" }) do
+	local result, answers = nil, 0
+	local callback = function(value) result, answers = value, answers + 1 end
+	local dispatched
+	if runner == "shell" then
+		dispatched = ShellRunner.run_async("python3", signalled_args, { timeout_ms = TIMEOUT_MS }, callback)
+	else
+		dispatched = ProcessRunner.run("python3", signalled_args, { timeout_ms = TIMEOUT_MS }, callback)
+	end
+	local settled_signal = await(function() return result ~= nil and not uv.loop_alive() end)
+	local exit_code = result and (result.code or result.exit_code)
+	if dispatched and settled_signal and answers == 1 and exit_code == 143
+		and result.error ~= nil and result.ok ~= true then
+		print("PASS " .. runner .. "-signal-exit (native SIGTERM reports failure and exit code 143)")
+	else
+		failures = failures + 1
+		io.stderr:write(string.format("FAIL %s-signal-exit: exit_code=%s callbacks=%d settled=%s\n",
+			runner, tostring(exit_code), answers, tostring(settled_signal)))
+	end
+end
+
 assert(uv.fs_rmdir(directory))
-print(string.format("Native process groups: %d passed, %d failed", 7 - failures, failures))
+print(string.format("Native process groups: %d passed, %d failed", 9 - failures, failures))
 os.exit(failures == 0 and 0 or 1)

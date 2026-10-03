@@ -42,6 +42,7 @@ local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
 local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
+local LibuvExit = require("infra.libuv_exit")
 
 local LOG = "adapters.shell_runner"
 
@@ -460,9 +461,9 @@ function M.run_async(executable, args, options, callback)
 	end)
 	local spawned, process, pid = pcall(luv.spawn, executable, {
 		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
-	}, function(code)
+	}, function(code, signal)
 		request.exited = true
-		request.code = tonumber(code) or -1
+		request.code = LibuvExit.status(code, signal)
 		maybe_finish(request)
 		if request.terminal then close_handle(request.process) end
 	end)

@@ -117,6 +117,12 @@ These are software implementations; final hardware verification remains below.
   argv runner. Native descendants that acknowledge SIGTERM-ignore readiness
   no longer outlive a deadline or cancellation; both regressions failed before
   this fix. Physical keyboard validation remains unavailable in the container.
+  Both argv runners now decode libuv's separate termination-signal receipt
+  through one native helper: a real SIGTERM exit reports status 143 and failure,
+  rather than a manufactured successful zero. Two portable regressions and both
+  native signal cases failed before the fix. Windows receives its native process
+  exit status and macOS its Hammerspoon task status; neither consumes this libuv
+  receipt. Native Windows/macOS suites and manual CI are deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
