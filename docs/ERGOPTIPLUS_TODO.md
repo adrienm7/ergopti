@@ -155,6 +155,16 @@ These are software implementations; final hardware verification remains below.
   its pull in an independent terminal; macOS uses native task and progress
   ownership rather than this retained-request expression. Native cross-OS
   validation and manual CI remain deferred by request.
+- [~] **L9.** Linux deletion receipts: plain file deletion now calls the native
+  removal directly and admits failed removal only on proven ENOENT. Inaccessible
+  paths cannot masquerade as absent, broken links are removed, and unreadable
+  files remain deletable when their parent permits unlink. Native regressions
+  failed before the fix with and without optional LuaFileSystem; the ten-case
+  real permissions/symlink matrix and nine portable receipt cases pass after it.
+  Windows already classifies DeleteFileW receipts. macOS still has the analogous
+  ambiguous existence guard before its native removal owner; removing that guard
+  and reproducing denied-path/broken-link controls is a deferred native diagnosis.
+  No macOS files, conditional TOML owner or manual CI were changed or executed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

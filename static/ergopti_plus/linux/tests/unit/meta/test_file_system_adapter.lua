@@ -17,6 +17,38 @@ os.remove(tmp_base)
 local tmp_file = tmp_base .. "_test.txt"
 local tmp_utf8 = tmp_base .. "_utf8.txt"
 
+helpers.describe("linux-native-delete-receipts", function()
+	for _, case in ipairs({
+		{ name = "deleted file", result = true, accepted = true },
+		{ name = "proven ENOENT", errno = 2, accepted = true },
+		{ name = "permission denied", errno = 13, accepted = false },
+		{ name = "operation forbidden", errno = 1, accepted = false },
+		{ name = "non-directory ancestor", errno = 20, accepted = false },
+		{ name = "nonempty directory", errno = 39, accepted = false },
+		{ name = "read-only filesystem", errno = 30, accepted = false },
+		{ name = "unclassified refusal", accepted = false },
+		{ name = "native throw", raises = true, accepted = false },
+	}) do
+		helpers.it("linux-native-delete-receipts: " .. case.name .. " requires native evidence", function()
+			local original_remove, original_exists = os.remove, fs.exists
+			local removals = 0
+			fs.exists = function() return false end
+			os.remove = function(path)
+				if path ~= "owned-delete-receipt" then return original_remove(path) end
+				removals = removals + 1
+				if case.raises then error("native remove failed") end
+				if case.result then return true end
+				return nil, "native refusal", case.errno
+			end
+			local ok, result = pcall(fs.delete, "owned-delete-receipt")
+			os.remove, fs.exists = original_remove, original_exists
+			helpers.assert_eq(result, case.accepted, "deletion must follow the native receipt")
+			helpers.assert_true(ok, "native errors are contained")
+			helpers.assert_eq(removals, 1, "an ambiguous existence probe cannot bypass native deletion")
+		end)
+	end
+end)
+
 helpers.describe("linux-native-write-receipts", function()
 	for _, method in ipairs({ "write", "append" }) do
 		for _, failure in ipairs({ "write_return", "write_throw", "close_return", "close_throw" }) do

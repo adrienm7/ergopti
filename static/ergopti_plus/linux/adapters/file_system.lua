@@ -25,6 +25,7 @@ local M = {}
 local Logger = require("logger.shim")
 
 local LOG = "adapters.file_system"
+local ENOENT = 2 -- Native Linux errno: a failed unlink proves absence only here.
 
 --- Reads exact bytes while distinguishing absence from a failed read.
 --- @param path string Source path.
@@ -193,15 +194,13 @@ function M.delete(path)
 		return false
 	end
 
-	-- Already absent — contract says this is a no-op success.
-	if not M.exists(path) then return true end
-
-	local ok, result = pcall(os.remove, path)
-	if not ok or not result then
-		Logger.error(LOG, "delete(): os.remove failed for '%s' — %s", path, tostring(result))
-		return false
-	end
-	return true
+	-- A stat/open refusal is ambiguous and follows symlinks. Delete the path
+	-- itself and classify the native receipt instead of racing an existence probe.
+	local ok, removed, detail, errno = pcall(os.remove, path)
+	if ok and (removed == true or errno == ENOENT) then return true end
+	Logger.error(LOG, "delete(): os.remove failed for '%s' — %s", path,
+		tostring(ok and detail or removed))
+	return false
 end
 
 return M
