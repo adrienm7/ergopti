@@ -1287,6 +1287,14 @@ partial-acquisition and refusal ownership. Five actual generated-policy
 folder probes and independent native-port refusal cases retain their strict
 assertions; portable checks do not qualify this new native ABI at runtime.
 
+Native checkpoint 37090610890 isolated a folder-picker parse warning: its
+local Thread identity shadowed the built-in Thread function. The scoped
+identity locals now use explicit owner names without changing callback state,
+window leases or retirement. A separate actual-child parse regression keeps
+strict warnings, exact ASCII acknowledgement, zero exit, empty stderr and
+owned process-tree retirement. Portable verification cannot execute AHK;
+native Windows qualification remains pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
