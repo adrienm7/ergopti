@@ -511,3 +511,5 @@ console.log(
 	'[OK] Desktop verdicts reject incomplete launches; shared core gates run independently.'
 );
 require('./support/windows-launch-runtime.cjs')();
+
+require('./support/windows-startup-log-runtime.cjs')();
