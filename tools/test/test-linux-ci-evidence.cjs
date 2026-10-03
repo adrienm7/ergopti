@@ -363,10 +363,10 @@ end
 			token
 		}))
 	];
-	for (const variant of authVariants) {
+	for (const [caseIndex, variant] of authVariants.entries()) {
 		const { ci } = variant;
 		const token = variant.token || fixtureToken;
-		const evidence = path.join(updaterScratch, `authentication-${variant.name}`);
+		const evidence = path.join(updaterScratch, `authentication-${caseIndex}-${variant.name}`);
 		fs.mkdirSync(evidence);
 		const authenticated = spawnSync(
 			nativeLua,
