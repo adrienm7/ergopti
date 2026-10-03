@@ -1745,3 +1745,90 @@ Test("HSE Map group authority retains independent named and missing-owner golden
     () => _TestHSE_GroupAuthorityGoldens(true))
 Test("HSE object group authority retains independent named and missing-owner goldens",
     () => _TestHSE_GroupAuthorityGoldens(false))
+
+
+TestHSE_MagicCompletionDoesNotOpenWord() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, HSE_Terminators
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+    SavedWords := HSE_WORD_TERMINATORS
+    SavedConsumed := HSE_CONSUMED_DELIMITERS
+    SavedCapacity := HSE_MAX_BUFFER_LEN
+    SavedCatalogue := HSE_Terminators
+    Magic := ""
+    for Entry in HSE_Terminators.all()
+        if Entry["key"] == "star"
+            Magic := Entry["chars"][1]
+    Assert(Magic != "", "the shipped catalogue must own a magic completion slot")
+    try {
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        for Flags in ["*", ""] {
+            HSE_TestReset()
+            HSE_Register(Flags, "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Magic . "the")
+                Match := HSE_FeedChar(Char)
+            if Flags == ""
+                Match := HSE_FeedChar(" ")
+            AssertEqual("", Match, "magic-completion-word-boundary: the selector is word text")
+        }
+        AssertEqual(Magic . "the", _PrefixWordTail(Magic . "the"),
+            "preview must not offer a suffix the matcher refuses")
+        HSE_TestReset()
+        HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+        AssertEqual("", HSE_PreviewNextDecision(Magic . "th", "e"),
+            "the real preview decision must reject the same suffix")
+        for Boundary in [" ", ".", "-", "'", Chr(0x2019), Chr(0xA0), Chr(0x202F)] {
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters() . Boundary
+            HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters() . " "
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Boundary . "the")
+                Match := HSE_FeedChar(Char)
+            Assert(IsObject(Match), "configured punctuation, whitespace and quotes still open words")
+        }
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        HSE_TestReset()
+        HSE_Register("", "foo", (*) => 0, { Replacement: "BAR" })
+        for Char in StrSplit("foo" . Magic)
+            Match := HSE_FeedChar(Char)
+        Assert(IsObject(Match), "magic must remain an end-character selector")
+        Effect := HSE_ApplyExpansion(Match, "BAR", Magic)
+        AssertEqual("BAR", HSE_Buffer, "the selector is consumed after completion")
+        AssertFalse(Effect.KnownBoundaryAfter)
+        HSE_TestReset()
+        HSE_Register("*", "foo", (*) => 0, { Replacement: Magic })
+        for Char in StrSplit("foo")
+            Match := HSE_FeedChar(Char)
+        Effect := HSE_ApplyExpansion(Match, Magic)
+        AssertFalse(Effect.KnownBoundaryAfter, "inserted magic text cannot invent a boundary")
+        HSE_MAX_BUFFER_LEN := 3
+        HSE_Buffer := Magic . "the"
+        HSE_StartIsWordBoundary := true
+        _HSE_TrimBufferToCapacity()
+        AssertEqual("the", HSE_Buffer)
+        AssertFalse(HSE_StartIsWordBoundary, "eviction must retain the real preceding word character")
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_Terminators := Terminators()
+        for SlotChar in ["§", "-"] {
+            HSE_Terminators.updateMagicKey(SlotChar)
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(SlotChar . "the")
+                Match := HSE_FeedChar(Char)
+            if SlotChar == "-"
+                Assert(IsObject(Match), "an ASCII magic slot keeps its punctuation role")
+            else
+                AssertEqual("", Match, "a renamed Unicode slot retains completion-only semantics")
+        }
+    } finally {
+        HSE_Terminators := SavedCatalogue
+        HSE_WORD_TERMINATORS := SavedWords
+        HSE_CONSUMED_DELIMITERS := SavedConsumed
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_TestReset()
+    }
+}
+Test("HSE magic-completion-word-boundary: completion and word opening have separate roles",
+    TestHSE_MagicCompletionDoesNotOpenWord)

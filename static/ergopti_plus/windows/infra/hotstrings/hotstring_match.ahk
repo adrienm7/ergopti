@@ -534,8 +534,21 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 ; the matcher reject every word boundary. Deriving costs one short concatenation
 ; and makes divergence structurally impossible.
 _HSE_WordBoundarySet() {
-		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES
-		return HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES, HSE_Terminators
+		Boundaries := HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+		; Before catalogue initialization the bare engine has only its own parser
+		; delimiters. Once owned, derive from the live slot rather than copying ★.
+		if IsSet(HSE_Terminators) {
+				for Entry in HSE_Terminators.all() {
+						if Entry["key"] != "star"
+								continue
+						for Char in Entry["chars"]
+								if Ord(Char) > 127
+										Boundaries := StrReplace(Boundaries, Char)
+						break
+				}
+		}
+		return Boundaries
 }
 
 
