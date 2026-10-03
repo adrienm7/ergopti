@@ -72,6 +72,133 @@ NATIVE_FAILURE_ERROR_LIMIT = 4
 NATIVE_FAILURE_INPUT_LIMIT = 2048
 
 
+def native_merge_refusal_code(detail):
+    """Project exact generator refusal boundaries into closed public diagnostic codes.
+
+    These are observations, never admission or recovery authority. No arbitrary
+    source/provider text, profile label, description, path or rule payload escapes.
+    """
+    constants = {
+        "karabiner output path must be a non-empty string": "destination_invalid",
+        "generated config must be a table": "generated_profile_shape",
+        "generated config must contain profiles": "generated_profile_shape",
+        "generated selected profile must contain complex_modifications.rules": "generated_complex_rules",
+        "generated managed rules must be a dense array": "generated_rules_array",
+        "generated managed rules must use one generation token": "generated_token_cohort",
+        "legacy rule fingerprints must be a dense array": "legacy_fingerprint_array",
+        "existing karabiner.json is not valid JSON": "source_json_invalid",
+        "existing config must be a table": "existing_profile_shape",
+        "existing config must contain profiles": "existing_profile_shape",
+        "legacy migration context must be a table": "legacy_context_type",
+        "legacy migration context requires a shared data directory": "legacy_context_data",
+        "legacy migration context requires a non-canonical combo set": "legacy_context_combos",
+        "legacy migration context requires three script-control slots": "legacy_context_slots",
+        "legacy migration context requires the historical physical-key log path": "legacy_context_log",
+        "legacy migration context requires static rule anchors": "legacy_context_anchors",
+        "legacy migration context has incomplete static rule anchors": "legacy_context_anchors",
+        "legacy action catalogue has a missing or duplicate id": "legacy_action_identity",
+        "legacy combo catalogue has a missing or duplicate id": "legacy_combo_identity",
+        "multiple historical ErgoptiPlus blocks match": "legacy_graph_ambiguous",
+    }
+    if detail in constants:
+        return constants[detail]
+    # Only these exact producer prefixes have an opaque native/provider suffix.
+    # Retain the boundary, not any byte of that suffix.
+    for prefix, code in (
+        ("existing karabiner.json read raised: ", "source_read_raised"),
+        ("existing karabiner.json could not be read: ", "source_read_refused"),
+    ):
+        if detail.startswith(prefix):
+            return code
+    number = r"[1-9][0-9]{0,5}"
+    count = r"(?:0|[1-9][0-9]{0,5})"
+    patterns = (
+        (rf"generated profile {number} must be a table", "generated_profile_shape"),
+        (
+            rf"generated config must contain exactly one selected profile, found {count}",
+            "generated_profile_selection",
+        ),
+        (rf"existing profile {number} must be a table", "existing_profile_shape"),
+        (
+            rf"existing config must contain exactly one selected profile, found {count}",
+            "existing_profile_selection",
+        ),
+        (rf"generated rule {number} must be a table", "generated_rule_type"),
+        (rf"generated rule {number} lacks an exact managed tag", "generated_rule_tag"),
+        (rf"generated rule {number} must contain manipulators", "generated_rule_manipulators"),
+        (
+            rf"generated rule {number} manipulator {number} lacks managed conditions",
+            "generated_conditions_missing",
+        ),
+        (
+            rf"generated rule {number} manipulator {number} contains an invalid condition",
+            "generated_condition_type",
+        ),
+        (
+            rf"generated rule {number} manipulator {number} contains a foreign runtime condition",
+            "generated_condition_cohort",
+        ),
+        (
+            rf"generated rule {number} manipulator {number} contains a foreign managed condition",
+            "generated_condition_namespace",
+        ),
+        (
+            rf"existing profile {number} complex_modifications must be a table",
+            "existing_complex_type",
+        ),
+        (
+            rf"existing profile {number} complex_modifications.rules must be a table",
+            "existing_rules_array",
+        ),
+        (
+            rf"legacy rule fingerprint {number} must have a non-empty description",
+            "legacy_fingerprint_description",
+        ),
+        (rf"legacy rule fingerprint {number} must be untagged", "legacy_fingerprint_tag"),
+        (
+            rf"legacy rule fingerprint {number} must contain manipulators",
+            "legacy_fingerprint_manipulators",
+        ),
+        (
+            rf"legacy rule fingerprint {number} manipulator {number} is malformed",
+            "legacy_fingerprint_graph",
+        ),
+        (
+            rf"legacy rule fingerprint {number} manipulator {number} contains a managed condition",
+            "legacy_fingerprint_condition",
+        ),
+        (
+            r"legacy (?:action|tap/hold|combo) catalogue must be a dense array",
+            "legacy_catalogue_array",
+        ),
+        (
+            rf"legacy (?:action|tap/hold|combo) catalogue item {number} lacks a non-empty label",
+            "legacy_catalogue_label",
+        ),
+    )
+    for pattern, code in patterns:
+        if re.fullmatch(pattern, detail):
+            return code
+    # These producer envelopes wrap private runtime references and variables.
+    # Report the public refusal boundary without projecting any wrapped bytes.
+    if re.match(rf"generated rule {number} manipulator {number}: ", detail):
+        return "generated_runtime_references"
+    if re.fullmatch(
+        rf"legacy rule fingerprint {number} contains managed variable '[^\r\n]+' at [^\r\n]+",
+        detail,
+    ):
+        return "legacy_fingerprint_variable"
+    # A description/key is intentionally opaque, including quotes and colons.
+    # Its producer envelope is all the diagnostic is allowed to acknowledge.
+    if re.match(rf"{number} ambiguous legacy ErgoptiPlus rules?: ", detail):
+        return "legacy_signature_conflict"
+    if re.fullmatch(
+        r"legacy (?:action|tap/hold|combo) catalogue has duplicate label '[^\r\n]*'", detail
+    ):
+        return "legacy_catalogue_duplicate"
+    return None
+
+
 def native_failure_error(value):
     """Expose only public probe stages or fixed messages, never arbitrary Lua text."""
     if type(value) is not str:
@@ -102,6 +229,10 @@ def native_failure_error(value):
                 detail,
             ):
                 return prefix + detail
+            if stage == "Native merge refused":
+                code = native_merge_refusal_code(detail)
+                if code is not None:
+                    return stage + " [" + code + "]"
             return stage + " (detail omitted)"
     return "unclassified native error omitted"
 

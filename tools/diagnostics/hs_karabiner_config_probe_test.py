@@ -179,6 +179,116 @@ class NativeReceiptTests(unittest.TestCase):
         ):
             self.assertNotIn(private, detail)
 
+    def test_actual_merge_refusal_boundaries_expose_only_closed_public_codes(self):
+        cases = (
+            (
+                "generated config must contain exactly one selected profile, found 0",
+                "generated_profile_selection",
+            ),
+            (
+                "generated selected profile must contain complex_modifications.rules",
+                "generated_complex_rules",
+            ),
+            ("generated managed rules must be a dense array", "generated_rules_array"),
+            ("generated rule 3 lacks an exact managed tag", "generated_rule_tag"),
+            ("legacy rule fingerprints must be a dense array", "legacy_fingerprint_array"),
+            (
+                "generated rule 3 manipulator 12 contains a foreign managed condition",
+                "generated_condition_namespace",
+            ),
+            (
+                "generated rule 3 manipulator 12: private-runtime-reference-error",
+                "generated_runtime_references",
+            ),
+            (
+                "legacy rule fingerprint 2 manipulator 3 contains a managed condition",
+                "legacy_fingerprint_condition",
+            ),
+            (
+                "legacy rule fingerprint 2 contains managed variable 'private-var' at private-path",
+                "legacy_fingerprint_variable",
+            ),
+            ("legacy action catalogue item 2 lacks a non-empty label", "legacy_catalogue_label"),
+            ("existing karabiner.json read raised: private-provider-error", "source_read_raised"),
+            (
+                "existing karabiner.json could not be read: private-provider-error",
+                "source_read_refused",
+            ),
+            ("existing karabiner.json is not valid JSON", "source_json_invalid"),
+            (
+                "existing config must contain exactly one selected profile, found 2",
+                "existing_profile_selection",
+            ),
+            ("existing profile 2 complex_modifications must be a table", "existing_complex_type"),
+            (
+                "legacy migration context has incomplete static rule anchors",
+                "legacy_context_anchors",
+            ),
+            ("legacy action catalogue has a missing or duplicate id", "legacy_action_identity"),
+            ("multiple historical ErgoptiPlus blocks match", "legacy_graph_ambiguous"),
+            (
+                "1 ambiguous legacy ErgoptiPlus rule: private-user-description",
+                "legacy_signature_conflict",
+            ),
+            (
+                "legacy combo catalogue has duplicate label 'private-user-label'",
+                "legacy_catalogue_duplicate",
+            ),
+        )
+        for actual_reason, expected_code in cases:
+            with self.subTest(actual_reason=actual_reason):
+                value = receipt()
+                value.update(
+                    complete=False,
+                    variants=[],
+                    errors=[
+                        "/private/native-probe.lua:68: Native merge refused: "
+                        + actual_reason
+                        + "\nstack traceback: private-child-argv https://host/private?signature=secret"
+                    ],
+                )
+                failure, detail = self.observe_refusal(value)
+                self.assertTrue(
+                    str(failure).startswith(
+                        "Native Karabiner identity or observation differs: complete"
+                    )
+                )
+                summary = json.loads(detail.split("native_failure=", 1)[1])
+                self.assertEqual(summary["errors"], [f"Native merge refused [{expected_code}]"])
+                self.assertEqual(summary["variant_count"], 0)
+                self.assertEqual(summary["variant_expected"], 8)
+                self.assertEqual(summary["flags"]["complete"], False)
+                self.assertEqual(summary["flags"]["lease_initialized"], False)
+                self.assertEqual(summary["flags"]["private_source_restored"], True)
+                self.assertLessEqual(len(detail), 2048)
+                for private in (
+                    "/private/",
+                    "private-provider",
+                    "private-user",
+                    "private-child",
+                    "https://",
+                    "signature=secret",
+                ):
+                    self.assertNotIn(private, detail)
+
+    def test_merge_reason_codes_require_exact_producer_boundaries(self):
+        for text in (
+            "private-user sentence generated managed rules must be a dense array",
+            "existing karabiner.json is not valid JSON private-user-suffix",
+            "generated rule 9999999 lacks an exact managed tag",
+            "existing profile secret complex_modifications must be a table",
+            "legacy migration context has incomplete static rule anchors private-suffix",
+            "legacy combo catalogue has duplicate private-user-suffix",
+        ):
+            with self.subTest(text=text):
+                value = receipt()
+                value.update(complete=False, errors=["Native merge refused: " + text])
+                _, detail = self.observe_refusal(value)
+                summary = json.loads(detail.split("native_failure=", 1)[1])
+                self.assertEqual(summary["errors"], ["Native merge refused (detail omitted)"])
+                self.assertNotIn("private-user", detail)
+                self.assertNotIn("secret", detail)
+
     def test_foreign_or_malformed_identity_never_exposes_receipt_failure_details(self):
         for field, replacement in {
             "schema_version": 2,
