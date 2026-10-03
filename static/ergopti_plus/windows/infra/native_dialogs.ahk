@@ -46,3 +46,18 @@ Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {
 Ui_FileSelect(Options := "", RootDir := "", Title := "", Filter := "") {
 	return FileSelect(Options, RootDir, WindowTitle(Title), Filter)
 }
+
+#Include %A_LineFile%\..\native_folder_picker.ahk
+
+/**
+ * Opens the native folder modal with separate caption and explanatory prompt.
+ * @param {string} RootDir - Native root and initial-folder notation.
+ * @param {integer} Options - Native creation, edit-box and old-dialog flags.
+ * @param {string} Prompt - Original explanatory body text, preserved exactly.
+ * @param {string} Title - Already-translated, brandless native caption.
+ * @param {integer} OwnerHwnd - Explicit parent HWND, or zero for current callers.
+ * @returns {string} Native filesystem path, or empty on cancellation.
+ */
+Ui_DirSelect(RootDir, Options, Prompt, Title, OwnerHwnd) {
+	return _Ui_FolderSelect(RootDir, Options, Prompt, WindowTitle(Title), OwnerHwnd)
+}

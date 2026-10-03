@@ -1226,8 +1226,14 @@ Native Windows file-picker captions now pass through the same shared title
 composer; option flags, root/default paths, filters and native return shapes
 are preserved. Independent audit mutations and actual five-policy dialog
 probes retain strict result and exact process-retirement assertions. Native
-FileSelect qualification remains pending Windows CI; folder-picker captions
-remain a separate unfinished slice.
+FileSelect and folder-picker qualification remain pending Windows CI.
+Folder chrome now uses one scoped SHBrowseForFolderW caption owner; the
+native explanatory prompt, option flags, initial/root selection and empty
+String cancellation remain independent of the shared title policy. Exact
+callback cookies, HWND leases and PIDL/COM retirement receipts preserve
+partial-acquisition and refusal ownership. Five actual generated-policy
+folder probes and independent native-port refusal cases retain their strict
+assertions; portable checks do not qualify this new native ABI at runtime.
 
 ## Time estimate
 

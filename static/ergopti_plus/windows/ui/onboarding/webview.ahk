@@ -455,7 +455,11 @@ _OnbWeb_PreviewLocale(Code) {
 ; A cancelled dialog leaves the input untouched.
 _OnbWeb_PickConfigDir(Current) {
 	chosen := ""
-	try chosen := DirSelect("*" . Current, 3, t("dialog.config_folder.title"))
+	try chosen := Ui_DirSelect("*" . Current, 3, t("dialog.config_folder.title"), t("dialog.config_folder.window_title"), 0)
+	catch as PickerError {
+		LoggerError("Onboarding", "Native configuration-folder selection failed: {1}", PickerError.Message)
+		return
+	}
 	if (chosen != "")
 		_OnbWeb_Eval("window.setConfigDir(" . _OnbWeb_JsStr(chosen) . ")")
 }
