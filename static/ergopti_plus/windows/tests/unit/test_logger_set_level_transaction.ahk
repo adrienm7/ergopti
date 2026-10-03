@@ -20,6 +20,7 @@ global _LSLT_ObservedSeverity := -1
 global _LSLT_WriterCritical := []
 global _LSLT_NotifyCritical := []
 global _LSLT_RebuildCritical := []
+global _LSLT_UnrelatedDebugCalls := 0
 
 _LSLT_Reset() {
 	global _LSLT_WriterCalls, _LSLT_NotifyCalls, _LSLT_RebuildCalls
@@ -187,6 +188,31 @@ Test("logger level: action defuses inherited Critical through post-commit menu "
 	. "rebuild (logger-level-postcommit-inherited-critical)",
 	_LSLT_InheritedCriticalStopsAtLoggerAction)
 
+; The runner excludes the lifecycle owner because it also owns suspension and
+; timers. The severity tests need its four callback identities, not those effects.
+; An unrelated command must remain observable even if a dispatcher catches it.
+_LSLT_UnrelatedDebugCommand(*) {
+	global _LSLT_UnrelatedDebugCalls
+	_LSLT_UnrelatedDebugCalls += 1
+	throw Error("Log-level tests must not execute unrelated lifecycle commands")
+}
+
+WindowSpy(*) {
+	return _LSLT_UnrelatedDebugCommand()
+}
+
+ActivateListVars(*) {
+	return _LSLT_UnrelatedDebugCommand()
+}
+
+ActivateKeyHistory(*) {
+	return _LSLT_UnrelatedDebugCommand()
+}
+
+ShowHealthCheck(*) {
+	return _LSLT_UnrelatedDebugCommand()
+}
+
 ; Reads expectations independent of the generated severity menu.
 _LSLT_MenuCorpus() {
 	global _SharedDir
@@ -195,8 +221,11 @@ _LSLT_MenuCorpus() {
 
 ; Returns the real Win32 choice and dispatcher callbacks, preserving its owner.
 _LSLT_NativeRow(Owned, Command := 0) {
-	global _MenuDispatchCallbacks
+	global _MenuDispatchCallbacks, _LSLT_UnrelatedDebugCalls
+	PreviousUnrelatedCalls := _LSLT_UnrelatedDebugCalls
 	Built := _MI_BuildDebuggingMenu(Command)
+	AssertEqual(PreviousUnrelatedCalls, _LSLT_UnrelatedDebugCalls,
+		"constructing severity choices must not execute unrelated lifecycle commands")
 	Owned.Push(Built)
 	loop TrayMenuItemCount(Built) {
 		Position := A_Index - 1
