@@ -47,8 +47,10 @@ local transport_get = Updater._http_client.get
 local ci = os.getenv("GITHUB_ACTIONS") == "true"
 local ci_token = ci and os.getenv("GITHUB_TOKEN") or nil
 if ci then
-	assert(type(ci_token) == "string" and #ci_token >= 20 and #ci_token <= 255
-		and ci_token:match("^[A-Za-z0-9_]+$"), "CI updater authentication is unavailable or invalid")
+	-- RFC 6750 b64token is opaque: transport safety does not imply a GitHub
+	-- prefix or length. This excludes control/header injection before curl stdin.
+	assert(type(ci_token) == "string" and ci_token:match("^[A-Za-z0-9._~+/%-]+=*$"),
+		"CI updater authentication is unavailable or invalid")
 end
 
 --- Reads an exact GitHub release-list path without URL alias normalization.
@@ -78,7 +80,13 @@ end
 --- Bounds independently redacted response text without cutting a UTF-8 character.
 --- Request headers and URLs are never collected by this observational probe.
 local function safe_detail(value)
-	local text = Redact.apply(tostring(value or ""), rules, { home = HOME })
+	local raw = tostring(value or "")
+	-- A server may echo even a short opaque credential below the generic
+	-- redactor's threshold. Match the known value literally before truncation.
+	if ci_token then
+		raw = raw:gsub(ci_token:gsub("(%W)", "%%%1"), function() return rules.secret_placeholder end)
+	end
+	local text = Redact.apply(raw, rules, { home = HOME })
 	text = text:gsub("https?://[^%s\"'<>]+", "<url>")
 	local limit = 2048
 	if #text <= limit then return text end

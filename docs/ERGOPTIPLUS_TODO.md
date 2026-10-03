@@ -348,6 +348,18 @@ and the original macOS clean/Karabiner readiness controls remain pending a
 complete native CI run. Neither missing server witnesses nor SIGSEGV
 establish a permission verdict.
 
+CI updater authentication accepts opaque RFC 6750 bearer credentials rather
+than imposing a GitHub prefix or arbitrary length. The original validator
+refused a masked nonempty CI credential before HTTP. Controlled short, long
+and punctuation-bearing credentials reach the actual adapter; malformed
+padding, controls, whitespace and injection still refuse. Diagnostic
+response text removes the exact owned credential before generic redaction
+and clipping, preserving actual HTTP status and bounded response context.
+Trusted release authority, authenticated redirect refusal, caller ownership
+and private-stdin header transport are preserved. TODO 16 remains partial:
+release download, verification, installation and restart still require
+hosted validation.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
