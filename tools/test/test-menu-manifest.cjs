@@ -564,6 +564,63 @@ function checkWordExpanderControls() {
 	);
 }
 
+function checkInfoBarControl() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/info_bar_control.json'), 'utf8')
+	);
+	const definition = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
+	assert.deepEqual(corpus.states, [false, true], 'both independently captured states execute');
+	assert.equal(definition.length, 3);
+	assert.deepEqual(definition[0], { type: 'list', id: 'llm_display_leading' });
+	assert.equal(definition[1].type, 'check');
+	assert.equal(definition[1].id, corpus.row.id);
+	assert.equal(definition[1].i18n, corpus.row.i18n);
+	assert.deepEqual(definition[1].checked_when, ['llm_info_bar_enabled']);
+	assert.deepEqual(definition[1].disabled_when, ['llm_info_bar_ready']);
+	assert.deepEqual(definition[2], { type: 'list', id: 'llm_display_remaining' });
+	for (const [file, first, last] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildDisplayMenu(',
+			'LLM_Menu_BuildNavMenu('
+		],
+		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_display"] = function',
+			'dynamic_handlers["llm_navigation"] = function'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first);
+		const end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: actual display consumer bounds must exist`);
+		const body = source.slice(start, end);
+		for (const owner of [
+			'llm_display_menu',
+			'llm_info_bar',
+			'llm_info_bar_enabled',
+			'llm_info_bar_ready',
+			'llm_display_leading',
+			'llm_display_remaining'
+		]) {
+			assert(
+				body.includes(`"${owner}"`),
+				`${file}: shared Info Bar owner ${owner} must be consumed`
+			);
+		}
+		assert(
+			!body.includes(corpus.row.i18n),
+			`${file}: the fixed Info Bar label belongs to the shared declaration`
+		);
+	}
+	console.log(
+		'Info Bar control: both independent states, shared label and all three actual native owners qualified.'
+	);
+}
+
 main();
 checkChoiceProjection();
 checkWordExpanderControls();
+checkInfoBarControl();

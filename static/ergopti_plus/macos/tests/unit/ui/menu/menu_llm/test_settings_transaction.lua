@@ -126,6 +126,7 @@ local function with_fixture(options, callback)
 		llm_secure_field_filter_enabled = false,
 		llm_disabled_apps = {{name = "Old", appPath = "/Old.app"}},
 	}
+	if options.info_bar_state ~= nil then state.llm_show_info_bar = options.info_bar_state end
 	local runtime = clone_value(state)
 	local persisted = clone_value(state)
 	local rendered = clone_value(state)
@@ -259,6 +260,20 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
+	local display_renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		json_decode = function(raw)
+			local root = assert(require("json").decode(raw))
+			if options.info_label then root.llm_display_menu[2].i18n = options.info_label end
+			if options.info_first then
+				root.llm_display_menu[1], root.llm_display_menu[2] = root.llm_display_menu[2], root.llm_display_menu[1]
+			end
+			return root
+		end,
+		i18n = { get = function(key) return key end, section = function(key) return key end },
+		logger = Logger,
+	}))
 	package.loaded["infra.manifest_menu"] = {
 		render_rows = function(rows)
 			local items = {}
@@ -273,7 +288,10 @@ local function with_fixture(options, callback)
 			end
 			return items
 		end,
-		build = function(_, _, handlers)
+		build = function(key, category, handlers, groups, ctx, providers)
+			if key == "llm_display_menu" then
+				return display_renderer.build(key, category, handlers, groups, ctx, providers)
+			end
 			local items = {}
 			for _, id in ipairs({
 				"llm_generation_settings",
@@ -1046,6 +1064,72 @@ helpers.describe("HS-026 missed LLM setting callbacks share the owner", function
 				"a render-only rebuild must not invoke either runtime setter")
 			helpers.assert_eq(fixture.runtime.llm_nav_modifiers, {"cmd"})
 			helpers.assert_eq(fixture.runtime.llm_val_modifiers, {"alt"})
+		end)
+	end)
+end)
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 8/ Shared Info Bar Control =======
+-- ==========================================
+-- ==========================================
+
+--- Reads the independently captured toggle states and shared label identity.
+--- @return table corpus
+local function info_bar_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/info_bar_control.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared Info Bar control", function()
+	helpers.it("replays both checked states through the actual acknowledged setting owner", function()
+		local corpus = info_bar_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, selected in ipairs(corpus.states) do
+			with_fixture({info_bar_state = selected}, function(fixture)
+				local menu = fixture.streaming_menu()
+				local row = assert(find_item(menu, corpus.row.i18n))
+				helpers.assert_eq(menu[1].title, "menu.llm.indent_label", "the existing leading provider stays first")
+				helpers.assert_eq(menu[2], row, "the shared check stays between its native providers")
+				helpers.assert_eq(row.checked or false, selected)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(fixture.state.llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.persisted().llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.runtime.llm_show_info_bar, not selected)
+				helpers.assert_eq(fixture.calls.save, 1)
+				helpers.assert_eq(fixture.calls.menu, 1)
+			end)
+		end
+	end)
+
+	helpers.it("moves the real check when its shared declaration precedes the leading provider", function()
+		with_fixture({info_first = true}, function(fixture)
+			local menu = fixture.streaming_menu()
+			helpers.assert_eq(menu[1].title, info_bar_corpus().row.i18n)
+			helpers.assert_eq(menu[2].title, "menu.llm.indent_label")
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("uses the shared label while a refused writer preserves every publication", function()
+		local corpus = info_bar_corpus()
+		with_fixture({info_label = corpus.alternate_i18n, failures = {{name = "save", mode = "false"}}}, function(fixture)
+			local menu = fixture.streaming_menu()
+			local row = assert(find_item(menu, corpus.alternate_i18n), "the real native check must read the changed declaration")
+			helpers.assert_eq(find_item(menu, corpus.row.i18n), nil, "no stale native label remains")
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.state.llm_show_info_bar, true)
+			helpers.assert_eq(fixture.runtime.llm_show_info_bar, true)
+			helpers.assert_eq(fixture.persisted().llm_show_info_bar, true)
+			helpers.assert_eq(fixture.rendered().llm_show_info_bar, true)
+			helpers.assert_eq(fixture.calls.menu, 0)
 		end)
 	end)
 end)

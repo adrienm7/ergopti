@@ -417,6 +417,27 @@
 			"disabled_reason_key": "menu.about.source_run_reason"
 		}
 	],
+	"llm_display_menu": [
+		{
+			"type": "list",
+			"id": "llm_display_leading"
+		},
+		{
+			"type": "check",
+			"id": "llm_info_bar",
+			"i18n": "menu.llm.show_info_bar",
+			"checked_when": [
+				"llm_info_bar_enabled"
+			],
+			"disabled_when": [
+				"llm_info_bar_ready"
+			]
+		},
+		{
+			"type": "list",
+			"id": "llm_display_remaining"
+		}
+	],
 	"agent_menu": [
 		{
 			"type": "choice",

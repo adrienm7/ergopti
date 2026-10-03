@@ -701,7 +701,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (current baseline: Windows 105, macOS 189, Linux 116, each
+      drivers still build (current baseline: Windows 105, macOS 188, Linux 116, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -785,6 +785,18 @@ qualification remain pending the next non-release CI. The native-row census is u
 pickers already returned provider data. Items 54 and 81 remain open for the other
 native and fixed provider policies.
 
+The common AI Display Info Bar check now has one shared declaration for its
+label, checked state and native readiness getter. Existing leading and remaining
+providers preserve each driver's surrounding display controls, and the Windows
+and macOS native setting transactions are unchanged. Linux refreshes its menu
+only after the existing strict display-setting writer acknowledges the change;
+refusal preserves runtime and durable preferences. Independent two-state
+expectations and shared-label mutations exercise the actual three-driver menu
+consumers. Qualified component suites and the current JavaScript composition
+pass; native Windows and complete three-OS packaging and installation still
+require CI. The native-row census is Windows 105, macOS 188 and Linux 116.
+Items 54 and 81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -831,7 +843,7 @@ is committed; one request is one commit with its regression test.
       `category_enabled.french_magickey` was false.
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 105, macOS 189 and Linux 116 rows are still built by the
+      Windows 105, macOS 188 and Linux 116 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:

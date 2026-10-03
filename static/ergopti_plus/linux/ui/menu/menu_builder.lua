@@ -2101,7 +2101,6 @@ local function _build_llm(ctx)
 		if not ok_display then return end
 		local rows = {}
 		for _, setting in ipairs({
-			{ name = "show_info_bar", key = "menu.llm.show_info_bar" },
 			{ name = "streaming", key = "menu.llm.show_streaming" },
 			{ name = "streaming_multi", key = "menu.llm.show_all_at_once" },
 		}) do
@@ -2134,9 +2133,27 @@ local function _build_llm(ctx)
 			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
 			items = indent_rows,
 		}
+		local info_bar = DisplaySettings.get("show_info_bar")
+		local display_ctx = {
+			commands = {
+				["llm_info_bar"] = function()
+					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_info_bar_enabled"] = function() return info_bar end,
+				["llm_info_bar_ready"] = function() return true end,
+			},
+		}
+		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
+			["llm_display_leading"] = function() return {} end,
+			["llm_display_remaining"] = function() return rows end,
+		})
 		append_rendered_row(target, {
 			label = i18n_safe("menu.llm.display_menu_title"),
-			items = rows,
+			submenu = display_rows,
 			disabled = not enabled or nil,
 		}, "llm_display")
 	end

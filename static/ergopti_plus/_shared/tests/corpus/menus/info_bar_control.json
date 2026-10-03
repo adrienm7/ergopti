@@ -1,0 +1,9 @@
+{
+	"schema": 1,
+	"row": {
+		"id": "llm_info_bar",
+		"i18n": "menu.llm.show_info_bar"
+	},
+	"alternate_i18n": "menu.llm.display_menu_title",
+	"states": [false, true]
+}
