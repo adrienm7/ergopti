@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Kliknij tutaj, aby wybrać jeden z udostępnianych modeli.",
 	"llm.local_servers.found_body": "Odpowiada z {1} model(ami): wybierz jeden w AI ▸ Silnik AI.",
 	"llm.unreachable.title": "{1} nie odpowiada",
+	"llm.unreachable.body_unconfirmed": "AI pozostaje wyłączona: {1} nie odpowiada pod adresem {2}. Uruchom serwer i ponownie spróbuj włączyć AI.",
 	"llm.unreachable.body_missing": "AI pozostaje wyłączona: nic nie odpowiada pod adresem {2}, adresem {1}, ponieważ na tym komputerze nie zainstalowano {1}.",
 	"llm.unreachable.body_stopped": "AI pozostaje wyłączona: program {1} jest zainstalowany, ale nic nie odpowiada pod adresem {2}. Nie udało się go uruchomić.",
 	"llm.unreachable.servers_found": "Te lokalne serwery odpowiadają i mogą go zastąpić: {1}.",

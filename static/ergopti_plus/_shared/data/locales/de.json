@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Klicke hier, um eines der bereitgestellten Modelle zu wählen.",
 	"llm.local_servers.found_body": "Antwortet mit {1} Modell(en): Wähle eines unter KI ▸ KI-Engine.",
 	"llm.unreachable.title": "{1} antwortet nicht",
+	"llm.unreachable.body_unconfirmed": "Die KI bleibt ausgeschaltet: {1} antwortet nicht unter {2}. Starten Sie den Server und versuchen Sie dann erneut, die KI zu aktivieren.",
 	"llm.unreachable.body_missing": "Die KI bleibt aus: Unter {2}, der Adresse von {1}, antwortet nichts, denn {1} ist auf diesem Computer nicht installiert.",
 	"llm.unreachable.body_stopped": "Die KI bleibt aus: {1} ist installiert, aber unter {2}, seiner Adresse, antwortet nichts. Der Start ist fehlgeschlagen.",
 	"llm.unreachable.servers_found": "Diese lokalen Server antworten und können es ersetzen: {1}.",

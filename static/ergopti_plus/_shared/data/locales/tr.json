@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Sunduğu modellerden birini seçmek için buraya tıklayın.",
 	"llm.local_servers.found_body": "{1} modelle yanıt veriyor: YZ ▸ YZ motoru içinden birini seçin.",
 	"llm.unreachable.title": "{1} yanıt vermiyor",
+	"llm.unreachable.body_unconfirmed": "Yapay zekâ kapalı kalır: {1}, {2} adresinde yanıt vermiyor. Sunucuyu başlatıp yapay zekâyı etkinleştirmeyi yeniden deneyin.",
 	"llm.unreachable.body_missing": "YZ kapalı kalıyor: {1} adresi olan {2} üzerinde hiçbir şey yanıt vermiyor, çünkü {1} bu bilgisayarda kurulu değil.",
 	"llm.unreachable.body_stopped": "YZ kapalı kalıyor: {1} kurulu, ancak adresi olan {2} üzerinde hiçbir şey yanıt vermiyor. Başlatılamadı.",
 	"llm.unreachable.servers_found": "Şu yerel sunucular yanıt veriyor ve onun yerine kullanılabilir: {1}.",

@@ -72,6 +72,8 @@ local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
 local _max_tokens = nil
 local _scope_owner = nil
+local _enable_admission = nil
+local _enable_generation = 0
 local _request_epoch = 0
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
@@ -449,6 +451,8 @@ end
 --- @param opts table|nil
 function M.init(opts)
 	if _scope_owner then return false end
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
+	_enable_generation = _enable_generation + 1
 	local options = type(opts) == "table" and opts or {}
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
@@ -1007,6 +1011,8 @@ end
 --- Told by the daemon after every pause transition: a pause turns live mode off.
 --- @param paused boolean
 function M.on_pause_change(paused)
+	_enable_generation = _enable_generation + 1
+	if _enable_admission then _enable_admission.cancel() end
 	if paused then M.stop_live("Ergopti+ paused", false) end
 end
 
@@ -2421,6 +2427,8 @@ end
 --- Cancels pending/in-flight work and discards the current engine buffer.
 function M.cancel()
 	if _scope_owner then return false end
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.withdraw(_modal_resync_owner)
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 end
@@ -2610,20 +2618,51 @@ end
 
 function M.is_enabled() return _enabled end
 
-function M.enable()
+--- Requests a fresh local receipt before the existing consent owner publishes.
+--- API activation does not depend on a local Ollama installation or server.
+--- @param on_changed function|nil Menu refresh after acknowledged publication.
+--- @return boolean dispatched
+function M.enable(on_changed)
 	if _scope_owner then return false end
-	local profiles = get_profiles()
-	if not profiles or type(profiles.enable) ~= "function" or profiles.enable() ~= true then
-		Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
-		return false
+	if _enabled then return true end
+	if _enable_admission and _enable_admission.pending() then return false end
+	local Preferences = require("infra.llm_preferences")
+	local function snapshot()
+		local values, source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+		local backend = M.get_backend()
+		return {
+			backend = backend, model = values["llm.models.ollama"], origin = M.get_base_url(),
+			generation = Preferences.generation() + _enable_generation, source = source,
+			enabled = values["llm.enabled"], paused = _is_paused(),
+			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values["llm.enabled"]
+				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"]),
+		}
 	end
-	_enabled = true
-	Logger.info(LOG, "Prediction engine enabled.")
-	return true
+	_enable_admission = require("modules.llm.enable_admission").new({
+		snapshot = snapshot,
+		commit = function(source)
+			local profiles = get_profiles()
+			if not profiles or type(profiles.enable) ~= "function" or profiles.enable(source) ~= true then
+				Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
+				return false
+			end
+			_enabled = true
+			Logger.info(LOG, "Prediction engine enabled after current admission.")
+			return true
+		end,
+		reject = function(origin)
+			local _, retry = require("ui.llm_enable_refusal").show(origin)
+			return retry == true and "retry" or nil
+		end,
+		changed = on_changed,
+	})
+	return _enable_admission.enable()
 end
 
 function M.disable()
 	if _scope_owner then return false end
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local profiles = get_profiles()
 	if not profiles or type(profiles.disable) ~= "function" or profiles.disable() ~= true then
 		Logger.error(LOG, "Prediction engine disable was not persisted - keeping the current state.")
@@ -2636,9 +2675,9 @@ function M.disable()
 	return true
 end
 
-function M.toggle()
-	if _enabled then return M.disable() end
-	return M.enable()
+function M.toggle(on_changed)
+	if _enabled or (_enable_admission and _enable_admission.pending()) then return M.disable() end
+	return M.enable(on_changed)
 end
 
 function M.is_predicting() return _predicting or _pending_trigger ~= nil end
@@ -2688,6 +2727,8 @@ end
 function M.set_backend(kind)
 	if _scope_owner then return false end
 	if not BACKENDS[kind] then return false end
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.dismiss()
 	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
@@ -2750,6 +2791,8 @@ function M.get_current_model()
 end
 
 function M.set_model(model_name)
+	_enable_generation = _enable_generation + 1
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local profiles = get_profiles()
 	return profiles and type(profiles.set_model) == "function" and profiles.set_model(model_name) == true or false
 end
@@ -2821,6 +2864,7 @@ function M.is_auto_inject() return false end
 function M.acquire_configuration(owner)
 	if _scope_owner or type(owner) ~= "table" then return false end
 	_scope_owner = owner
+	_enable_generation = _enable_generation + 1
 	return true
 end
 
@@ -2840,6 +2884,7 @@ end
 --- @return boolean quiescent
 function M.quiesce_configuration(owner)
 	if _scope_owner ~= owner then return false end
+	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then
 		if _scheduler.cancel(_pending_trigger) ~= true then return false end
 		_pending_trigger = nil
@@ -2873,7 +2918,8 @@ end
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
 	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
-		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage then return nil end
+		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
+		or (_enable_admission and _enable_admission.pending()) then return nil end
 	return { enabled = _enabled }
 end
 

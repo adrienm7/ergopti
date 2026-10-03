@@ -669,6 +669,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
+#Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
 #Include ../ui/menu/menu_gestures.ahk
 #Include ../infra/menu_dispatcher.ahk
@@ -681,6 +682,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk
 #Include unit/test_app_picker_generation.ahk

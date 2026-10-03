@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Fai clic qui per scegliere uno dei modelli che serve.",
 	"llm.local_servers.found_body": "Risponde con {1} modello/i: scegline uno in IA ▸ Motore IA.",
 	"llm.unreachable.title": "{1} non risponde",
+	"llm.unreachable.body_unconfirmed": "L’IA resta disattivata: {1} non risponde all’indirizzo {2}. Avvia il server, poi prova di nuovo ad attivare l’IA.",
 	"llm.unreachable.body_missing": "L’IA resta disattivata: nulla risponde a {2}, l’indirizzo di {1}, perché {1} non è installato su questo computer.",
 	"llm.unreachable.body_stopped": "L’IA resta disattivata: {1} è installato, ma nulla risponde a {2}, il suo indirizzo. Non si è avviato.",
 	"llm.unreachable.servers_found": "Questi server locali rispondono e possono sostituirlo: {1}.",

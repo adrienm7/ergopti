@@ -209,3 +209,104 @@ _OHTC_StrictPresenceReceipts() {
 }
 Test("Ollama local presence: native tags terminal distinguishes empty, HTTP refusal and malformed (todo-46-local-model)",
 	_OHTC_StrictPresenceReceipts)
+
+
+; A terminal sidecar can precede the shell's physical exit; strict enable must
+; retain the exact native HANDLE until wait and close both acknowledge it.
+_OHTC_EnableReceiptObserve(State, Owner, Value) {
+	State["aux_current_at_callback"] := LLM_AuxIsCurrent(Owner)
+	_OHTC_PidReceipt_RecordResult(State, Value)
+}
+
+_OHTC_EnableReceiptWaitsForPhysicalSettlement() {
+	State := _OHTC_PidReceipt_State(Map("complete", true, "exit", 0, "status", 200,
+		"body_read", true, "body", '{"version":"0.12.3"}'), 9481)
+	State["wait"] := 258
+	Port := _OHTC_PidReceipt_Port(State)
+	Port["wait_process"] := (*) => State["wait"]
+	Process := _LLM_CurlAdoptProcess(48481, Port)
+	Owner := _OHTC_PidReceipt_Owner("enable_version_settlement")
+	Callback := _OHTC_EnableReceiptObserve.Bind(State, Owner)
+	try {
+		_LLM_Ollama_PingPoll(Process, "body", "status", "exit", Callback, A_TickCount, Owner, Port, true)
+		AssertEqual(0, State["callback_calls"], "a valid HTTP sidecar alone cannot confirm enable")
+		AssertEqual(0, State["close_calls"], "the exact running process cannot be abandoned")
+		AssertTrue(LLM_AuxIsCurrent(Owner), "the existing auxiliary owner retains the pending native wait")
+		State["wait"] := 0
+		_LLM_Ollama_PingPoll(Process, "body", "status", "exit", Callback, A_TickCount, Owner, Port, true)
+		AssertEqual(1, State["callback_calls"])
+		AssertTrue(State["value"] is Map, "opt-in mode publishes the actual terminal receipt")
+		AssertEqual(200, State["value"]["status"])
+		AssertTrue(LLM_EnableReceipt(State["value"])["admitted"])
+		AssertFalse(State["aux_current_at_callback"], "auxiliary settlement precedes the enable callback")
+		AssertEqual(1, State["close_calls"])
+		AssertEqual(State["handle"], State["closed_handle"])
+		AssertEqual(0, State["terminate_calls"], "normal readiness does not terminate a child")
+	} finally {
+		State["wait"] := 0
+		LLM_AuxFinish(Owner)
+		_LLM_CurlReleaseProcess(Process, true, _LLM_OllamaPingAcknowledgedPort(Process, Port))
+	}
+}
+Test("Ollama enable receipt: native wait and auxiliary settlement precede confirmed version delivery",
+	_OHTC_EnableReceiptWaitsForPhysicalSettlement)
+
+_OHTC_EnableCancellationRequiresExitAcknowledgement() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	Saved := Map("debt", _LLM_CurlCleanupDebt, "timer", _LLM_CurlCleanupRetryTimer)
+	State := _OHTC_PidReceipt_State(Map("complete", false), 9482)
+	State["wait"] := 258
+	Port := _OHTC_PidReceipt_Port(State)
+	Port["wait_process"] := (*) => State["wait"]
+	Process := _LLM_CurlAdoptProcess(48482, Port)
+	AcknowledgedPort := _LLM_OllamaPingAcknowledgedPort(Process, Port)
+	try {
+		_LLM_CurlCleanupDebt := Map()
+		_LLM_CurlCleanupRetryTimer := 0
+		AssertFalse(_LLM_CurlReleaseProcess(Process, true, AcknowledgedPort),
+			"accepted TerminateProcess is not physical exit acknowledgement")
+		AssertEqual(1, State["terminate_calls"])
+		AssertEqual(0, State["close_calls"])
+		AssertFalse(Process["released"], "native debt retains the exact HANDLE")
+		AssertEqual(1, _LLM_CurlCleanupDebt.Count)
+		AssertFalse(LLM_CurlRetryCleanupDebt(), "a pending wait cannot drain native cleanup debt")
+		AssertEqual(1, State["terminate_calls"], "accepted termination is not resent on every retry")
+		State["wait"] := 0
+		AssertTrue(LLM_CurlRetryCleanupDebt(), "the actual retained process exit settles ownership")
+		AssertEqual(1, State["close_calls"])
+		AssertEqual(State["handle"], State["closed_handle"])
+		AssertTrue(Process["released"])
+		AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	} finally {
+		State["wait"] := 0
+		_LLM_CurlReleaseProcess(Process, true, AcknowledgedPort)
+		LLM_CurlRetryCleanupDebt()
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := Saved["debt"]
+		_LLM_CurlCleanupRetryTimer := Saved["timer"]
+	}
+}
+Test("Ollama enable receipt: accepted native termination retains cleanup debt until exact process exit",
+	_OHTC_EnableCancellationRequiresExitAcknowledgement)
+
+
+_OHTC_EnableSelectedOriginRefusal() {
+	global LLM_OLLAMA_BASE_URL
+	State := Map("callbacks", 0, "result", 0)
+	Owner := LLM_AuxBegin("enable_foreign_version", Map("backend", "ollama",
+		"endpoint", LLM_OLLAMA_BASE_URL . "/foreign"))
+	OnResult(Value) {
+		State["callbacks"] += 1
+		State["result"] := Value
+	}
+	try {
+		LLM_OllamaIsRunning_Async(OnResult, Owner, true)
+		AssertEqual(1, State["callbacks"], "a foreign origin is refused by the actual native dispatch entry")
+		AssertFalse(State["result"]["ok"])
+		AssertEqual(0, Owner["process_pid"], "origin mismatch cannot launch curl")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "ordinary origin refusal settles auxiliary ownership")
+	} finally LLM_AuxFinish(Owner)
+}
+Test("Ollama enable receipt: actual native entry refuses an owner from another selected origin before dispatch",
+	_OHTC_EnableSelectedOriginRefusal)

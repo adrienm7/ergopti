@@ -56,20 +56,58 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_true(type(pe.is_enabled()) == "boolean")
     end)
 
+    local function with_enable_receipt(body)
+      local names = { "adapters.http_client", "modules.llm.enable_admission",
+        "modules.llm.profiles", "modules.llm.prediction_engine" }
+      local previous, pending = {}, nil
+      for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+      package.loaded["adapters.http_client"] = {
+        get = function(_, _, _, callback) pending = callback; return true end,
+        cancel = function() pending = nil; return true end,
+      }
+      package.loaded["modules.llm.enable_admission"] = nil
+      package.loaded["modules.llm.profiles"] = nil
+      package.loaded["modules.llm.prediction_engine"] = nil
+      local ok, err = pcall(function()
+        local preferences = require("infra.llm_preferences")
+        helpers.assert_true(preferences.set("llm.enabled", false))
+        local engine = require("modules.llm.prediction_engine")
+        engine.init({ engine = {}, keyboard_hook = {} })
+        body(engine, function()
+          helpers.assert_true(type(pending) == "function", "a real version request must precede enable")
+          local callback = pending
+          pending = nil
+          callback({ ok = true, status = 200, body = '{"version":"0.12.3"}' })
+        end)
+      end)
+      for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+      if not ok then error(err, 0) end
+    end
+
     PreferencesFixture.it("enable/disable round-trip", function()
-      pe.enable()
-      helpers.assert_true(pe.is_enabled(), "should be enabled after enable()")
-      pe.disable()
-      helpers.assert_eq(pe.is_enabled(), false, "should be disabled after disable()")
-      pe.enable()
+      with_enable_receipt(function(engine, answer)
+        helpers.assert_true(engine.enable())
+        helpers.assert_eq(engine.is_enabled(), false, "a dispatched request is not enable acknowledgement")
+        answer()
+        helpers.assert_true(engine.is_enabled(), "should be enabled after acknowledged version and write")
+        helpers.assert_true(engine.disable())
+        helpers.assert_eq(engine.is_enabled(), false, "should be disabled after disable()")
+      end)
     end)
 
     PreferencesFixture.it("toggle flips state", function()
-      pe.enable()
-      pe.toggle()
-      helpers.assert_eq(pe.is_enabled(), false)
-      pe.toggle()
-      helpers.assert_true(pe.is_enabled())
+      with_enable_receipt(function(engine, answer)
+        helpers.assert_true(engine.toggle())
+        helpers.assert_eq(engine.is_enabled(), false)
+        answer()
+        helpers.assert_true(engine.is_enabled())
+        helpers.assert_true(engine.toggle())
+        helpers.assert_eq(engine.is_enabled(), false)
+        helpers.assert_true(engine.toggle())
+        helpers.assert_eq(engine.is_enabled(), false)
+        answer()
+        helpers.assert_true(engine.is_enabled())
+      end)
     end)
 
     PreferencesFixture.it("get_models delegates to profiles", function()

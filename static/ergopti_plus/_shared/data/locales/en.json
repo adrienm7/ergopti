@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Click here to choose one of the models it serves.",
 	"llm.local_servers.found_body": "Answers with {1} model(s): choose one in AI ▸ AI engine.",
 	"llm.unreachable.title": "{1} is not answering",
+	"llm.unreachable.body_unconfirmed": "The AI stays off: {1} is not answering at {2}. Start the server, then try enabling the AI again.",
 	"llm.unreachable.body_missing": "The AI stays off: nothing answers at {2}, the address of {1}, because {1} is not installed on this computer.",
 	"llm.unreachable.body_stopped": "The AI stays off: {1} is installed, but nothing answers at {2}, its address. It did not start.",
 	"llm.unreachable.servers_found": "These local servers answer and can replace it: {1}.",

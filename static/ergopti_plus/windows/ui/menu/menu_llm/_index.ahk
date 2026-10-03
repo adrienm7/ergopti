@@ -301,5 +301,6 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include hotkey_identity.ahk
 #Include menu_settings.ahk
 #Include menu_agent.ahk
+#Include enable_admission.ahk
 #Include actions.ahk
 #Include tab_accept.ahk

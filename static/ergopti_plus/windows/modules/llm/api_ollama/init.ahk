@@ -531,6 +531,7 @@ LLM_Ollama_SetPort(port) {
 
 
 #Include ../../../../_shared/modules/llm/local_model_policy.ahk
+#Include ../../../../_shared/modules/llm/enable_admission.ahk
 #Include ollama_payload.ahk
 #Include curl_environment.ahk
 #Include ollama_http.ahk

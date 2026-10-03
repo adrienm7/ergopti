@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "ここをクリックして、提供中のモデルから選んでください。",
 	"llm.local_servers.found_body": "{1} 個のモデルで応答中：AI ▸ AI エンジンから選んでください。",
 	"llm.unreachable.title": "{1} が応答しません",
+	"llm.unreachable.body_unconfirmed": "AI は無効のままです。{1} が {2} で応答していません。サーバーを起動してから、AI の有効化をもう一度お試しください。",
 	"llm.unreachable.body_missing": "AI はオフのままです：{1} のアドレス {2} で何も応答しません。このコンピューターに {1} がインストールされていないためです。",
 	"llm.unreachable.body_stopped": "AI はオフのままです：{1} はインストールされていますが、そのアドレス {2} で何も応答しません。起動しませんでした。",
 	"llm.unreachable.servers_found": "次のローカルサーバーが応答しており、代わりに使えます：{1}。",

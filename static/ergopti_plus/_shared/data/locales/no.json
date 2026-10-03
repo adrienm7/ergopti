@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Klikk her for å velge en av modellene den tilbyr.",
 	"llm.local_servers.found_body": "Svarer med {1} modell(er): velg en under KI ▸ KI-motor.",
 	"llm.unreachable.title": "{1} svarer ikke",
+	"llm.unreachable.body_unconfirmed": "KI forblir avslått: {1} svarer ikke på {2}. Start serveren, og prøv deretter å aktivere KI igjen.",
 	"llm.unreachable.body_missing": "KI forblir av: ingenting svarer på {2}, adressen til {1}, fordi {1} ikke er installert på denne datamaskinen.",
 	"llm.unreachable.body_stopped": "KI forblir av: {1} er installert, men ingenting svarer på {2}, adressen dens. Den startet ikke.",
 	"llm.unreachable.servers_found": "Disse lokale serverne svarer og kan erstatte den: {1}.",

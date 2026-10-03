@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "여기를 클릭해 제공되는 모델 중 하나를 선택하세요.",
 	"llm.local_servers.found_body": "모델 {1}개로 응답 중: AI ▸ AI 엔진에서 하나를 선택하세요.",
 	"llm.unreachable.title": "{1}이(가) 응답하지 않습니다",
+	"llm.unreachable.body_unconfirmed": "AI는 꺼진 상태로 유지됩니다. {1}이(가) {2}에서 응답하지 않습니다. 서버를 시작한 다음 AI 활성화를 다시 시도하세요.",
 	"llm.unreachable.body_missing": "AI가 꺼진 상태로 유지됩니다: {1}의 주소인 {2}에서 아무것도 응답하지 않습니다. 이 컴퓨터에 {1}이(가) 설치되어 있지 않기 때문입니다.",
 	"llm.unreachable.body_stopped": "AI가 꺼진 상태로 유지됩니다: {1}이(가) 설치되어 있지만 주소 {2}에서 아무것도 응답하지 않습니다. 시작되지 않았습니다.",
 	"llm.unreachable.servers_found": "다음 로컬 서버가 응답하며 대신 사용할 수 있습니다: {1}.",

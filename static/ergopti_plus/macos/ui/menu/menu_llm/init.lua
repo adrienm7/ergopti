@@ -37,6 +37,8 @@ local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local ActivationPauseOwner = require("ui.menu.menu_llm.activation_pause_owner")
+local EnableAdmission = require("llm.enable_admission")
+local OllamaEnableProbe = require("ui.menu.menu_llm.ollama_enable_probe")
 -- Single source of truth for the MLX server address — the health probe reads the
 -- configured port from here rather than hardcoding it.
 local ApiMlx           = require("modules.llm.api_mlx")
@@ -848,6 +850,8 @@ local function create_menu(deps)
 
 		local check_startup, startup_scope_idle
 		local activation_generation = 0
+		local enable_probe = OllamaEnableProbe.new()
+		local repair_pending = false
 		local activation_requirement_owner = nil
 		if deps.script_control
 				and type(models_mgr.create_requirement_owner) == "function" then
@@ -862,10 +866,17 @@ local function create_menu(deps)
 							"LLM activation requirement-owner creation was refused.")
 				end
 		end
+		local function ollama_owners_idle()
+			local daemon_ok, daemon_idle = xpcall(require("modules.llm.api_ollama").startup_idle, debug.traceback)
+			local install_ok, install_idle = xpcall(require("modules.llm.ollama_deps_checker").provisioning_idle, debug.traceback)
+			return daemon_ok == true and daemon_idle == true and install_ok == true and install_idle == true
+		end
 		local activation_controller = ActivationPauseOwner.new({
 			script_control = deps.script_control,
 			pause_join = function()
-				if activation_requirement_owner == nil then return true, false end
+				local probe_pending = enable_probe.is_pending()
+				local probe_settled = enable_probe.cancel() == true
+				if activation_requirement_owner == nil then return probe_settled, probe_pending end
 				if type(models_mgr.pause_requirements) ~= "function" then
 					return false, false
 				end
@@ -878,8 +889,8 @@ local function create_menu(deps)
 						"LLM activation requirement-task join raised: %s.",
 						tostring(results[2]))
 				end
-				return results[1] == true and results[2] == true,
-					results[3] == true
+				return probe_settled and results[1] == true and results[2] == true,
+					probe_pending or results[3] == true
 			end,
 		})
 
@@ -888,7 +899,7 @@ local function create_menu(deps)
 		local enable_from_offer = nil
 
 		--- Turns the AI on through the switch, for a fix the user pressed.
-		--- @param opts table|nil { install_ollama = true } when the install button was pressed.
+		--- @param opts table|nil Explicit install_ollama/start_ollama service repair intent.
 		--- @return boolean accepted
 		local function enable_ai(opts)
 				if type(enable_from_offer) ~= "function" then
@@ -903,10 +914,11 @@ local function create_menu(deps)
 		--- @param automatic boolean True for a failure found in the background:
 		---   a notification whose click opens the dialog.
 		--- @return boolean offered
-		local function offer_unreachable_ollama(automatic)
+		local function offer_unreachable_ollama(automatic, unconfirmed)
 				return UnreachableOffer.offer({
 						backend = "ollama",
 						automatic = automatic == true,
+						unconfirmed = unconfirmed == true,
 						actions = {
 								-- Switching to a server that answers is the user's confirmed choice
 								use_server = function(id, model)
@@ -914,14 +926,14 @@ local function create_menu(deps)
 												if selected then enable_ai(nil) end
 										end)
 								end,
-								-- Enabling the AI starts Ollama through its usual owner
+								-- Explicit repair starts the service while AI remains off, then proves readiness
 								start = function()
 										if state.llm_backend ~= "ollama" then
 												Logger.warn(LOG, "Ollama start refused: the backend is now '%s'.",
 													tostring(state.llm_backend))
 												return false
 										end
-										return enable_ai(nil)
+										return enable_ai({ start_ollama = true })
 								end,
 								install = function()
 										if state.llm_backend ~= "ollama" then
@@ -1339,9 +1351,9 @@ local function create_menu(deps)
 						return false
 				end
 				--- Runs one switch transaction.
-				--- @param opts table|nil { install_ollama = true } when the user pressed
-				---   the install button of the unreachable-backend error.
+				--- @param opts table|nil Explicit service repair intent from the error's buttons.
 				local function run_toggle(opts)
+						if repair_pending then return false end
 						local install_consented = type(opts) == "table" and opts.install_ollama == true
 						activation_generation = activation_generation + 1
 						local my_generation = activation_generation
@@ -1350,6 +1362,11 @@ local function create_menu(deps)
 						local activation_terminal = false
 						local activation_published = false
 						local attempt = { phase = nil, bootstrap_result = nil }
+						local captured_source = { backend = activation_backend, model = state.llm_model,
+							origin = OllamaEndpoint.get_base_url(), generation = my_generation }
+						local source_backend_ok, source_backend = xpcall(llm_mod.get_backend, debug.traceback)
+						local source_model_ok, source_model = xpcall(llm_mod.get_current_model, debug.traceback)
+						local start_durable, request_admission
 						local token
 
 						local function commit_enabled(enabled)
@@ -1442,6 +1459,75 @@ local function create_menu(deps)
 									and state.llm_backend == activation_backend
 									and state.llm_enabled == true
 									and activation_controller.is_current(token, authorization)
+						end
+
+						local function preflight_is_current(authorization, repair_authority)
+							if repair_authority == true and attempt.phase ~= "repair" then return false end
+							local pause_ok, live_paused = xpcall(deps.script_control.is_paused, debug.traceback)
+							local backend_ok, runtime_backend = xpcall(llm_mod.get_backend, debug.traceback)
+							local model_ok, runtime_model = xpcall(llm_mod.get_current_model, debug.traceback)
+							local blocked = source_backend_ok ~= true or source_model_ok ~= true
+								or backend_ok ~= true or model_ok ~= true
+								or type(source_model) ~= "string" or source_backend ~= captured_source.backend
+								or runtime_backend ~= source_backend or runtime_model ~= source_model
+							for _, owner in ipairs({ prediction_locks, switcher, BackendPanel, settings_mgr, profiles_mgr }) do
+								local ok, idle = xpcall(owner.scope_idle, debug.traceback)
+								if ok ~= true or idle ~= true then blocked = true end
+							end
+							local startup_ok, startup_idle = xpcall(startup_scope_idle, debug.traceback)
+							local core_ok, core_idle = xpcall(llm_mod.configuration_idle, debug.traceback)
+							if repair_authority ~= true then blocked = blocked or ollama_owners_idle() ~= true end
+							blocked = blocked or startup_ok ~= true or startup_idle ~= true
+								or core_ok ~= true or core_idle ~= true
+							return pause_ok == true and type(live_paused) == "boolean"
+								and activation_terminal ~= true
+								and activation_controller.is_current(token, authorization)
+								and EnableAdmission.current(captured_source, {
+									backend = state.llm_backend, model = state.llm_model,
+									origin = OllamaEndpoint.get_base_url(), generation = activation_generation,
+									enabled = state.llm_enabled, paused = pause_ok == true and live_paused,
+									blocked = blocked,
+								})
+						end
+
+						local function retire_stale_admission()
+							local authorization = activation_controller.capture(token)
+							if authorization ~= nil and activation_controller.is_current(token, authorization) then
+								activation_terminal = true
+								activation_controller.complete(token)
+							end
+						end
+
+						local function refuse_admission(reason)
+							activation_terminal = true
+							if activation_controller.complete(token) ~= true then return false end
+							Logger.warn(LOG, "AI remains disabled: %s.", tostring(reason))
+							return offer_unreachable_ollama(false, true)
+						end
+
+						request_admission = function()
+							local authorization = activation_controller.capture(token)
+							if authorization == nil then return false end
+							if not preflight_is_current(authorization) then
+								retire_stale_admission()
+								return false
+							end
+							attempt.phase = "preflight"
+							local completed, completion_result = false, nil
+							local accepted = enable_probe.request(captured_source.origin, function(result)
+								if not preflight_is_current(authorization) then
+									-- Pause retains the logical intent for a fresh post-resume request.
+									retire_stale_admission()
+									return
+								end
+								local admitted, reason = EnableAdmission.receipt(result)
+								completed = true
+								if admitted ~= true then completion_result = refuse_admission(reason) return end
+								completion_result = start_durable()
+							end)
+							if accepted ~= true then return refuse_admission("version request refused") end
+							if completed then return completion_result == true end
+							return true
 						end
 
 						local function publish_activation_once()
@@ -1579,13 +1665,24 @@ local function create_menu(deps)
 								if activation_terminal then return true end
 								if my_generation ~= activation_generation
 									or state.llm_backend ~= activation_backend
-									or state.llm_enabled ~= true then
+									or (attempt.phase ~= "preflight" and attempt.phase ~= "repair"
+										and state.llm_enabled ~= true) then
 										-- A shared preference action (notably Disable All) may
 										-- supersede this activation without going through this
 										-- menu closure.  Settle the stale token so it cannot block
 										-- a later explicit enable or a pause rollback.
 										activation_terminal = true
 										return activation_controller.complete(token) == true
+								end
+								if attempt.phase == "preflight" then return request_admission() end
+								if attempt.phase == "repair" then
+									if attempt.install_result == false then return refuse_admission("installation refused") end
+									if attempt.install_result == true and attempt.repair_result == nil and not repair_pending then
+										return attempt.start_service()
+									end
+									if attempt.repair_result == nil then return true end
+									if attempt.repair_result == true then return request_admission() end
+									return refuse_admission("service repair refused")
 								end
 								if attempt.phase == "bootstrap" then
 										if attempt.bootstrap_result == nil then return true end
@@ -1621,44 +1718,21 @@ local function create_menu(deps)
 								return true
 						end
 
-						if target_enabled then
-								-- Without Ollama nothing can answer at its endpoint: the AI stays
-								-- off, nothing is committed, and the error names the fixes, a
-								-- local server that answers first. Its install button comes back
-								-- here with the consent the download needs.
-								if state.llm_backend == "ollama" and not install_consented
-									and not runtime_install_offer.is_installed("ollama") then
-										Logger.warn(LOG, "AI not enabled: Ollama is not installed; offering the fixes.")
-										return offer_unreachable_ollama(false)
-								end
-								-- Global Disable All mutates the shared preference outside
-								-- this closure.  Its old token is already fenced by state,
-								-- but must settle exactly before a new enable can own work.
-								if activation_controller.cancel() ~= true then return false end
-								token = activation_controller.begin(resume_attempt)
-								if token == nil then return false end
+						start_durable = function()
 								-- No backend process starts until the candidate is durable.
 								if commit_enabled(true) ~= true then
 										activation_controller.cancel()
 										return false
 								end
 
-								-- Enabling the AI selects its backend: MLX always settles its
-								-- runtime first, and a missing Ollama is installed, with the
-								-- consent of the error's install button, before anything else runs.
+								-- MLX retains its explicit runtime selection after durable enable.
+								-- Ollama already proved readiness and never dispatches an installer here.
 								local runtime_backend = state.llm_backend
-								if runtime_backend == "mlx" or (runtime_backend == "ollama"
-									and not runtime_install_offer.is_installed("ollama")) then
+								if runtime_backend == "mlx" then
 										attempt.phase = "bootstrap"
 										Logger.info(LOG, "Activating LLM — settling the %s runtime first.",
 											tostring(runtime_backend))
 										local select_runtime = runtime_install_offer.select
-										if runtime_backend == "ollama" then
-												-- The install button was the question: never ask it twice
-												select_runtime = function(_, on_complete)
-														return runtime_install_offer.install_ollama(on_complete)
-												end
-										end
 										local bootstrap_dispatching = true
 										local bootstrap_terminal = false
 										local bootstrap_ok, bootstrap_accepted = pcall_log(
@@ -1683,11 +1757,83 @@ local function create_menu(deps)
 										end
 										return true
 								else
-										return finish_activation(false)
+										return finish_activation(runtime_backend == "ollama")
 								end
 						end
 
-						if activation_controller.cancel() ~= true then return false end
+						if target_enabled then
+							-- Admission work owns only a read-only request while the preference is off.
+							if enable_probe.cancel() ~= true or activation_controller.cancel() ~= true then return false end
+							token = activation_controller.begin(resume_attempt)
+							if token == nil then return false end
+							if EnableAdmission.requires_probe(activation_backend) then
+								if install_consented or (type(opts) == "table" and opts.start_ollama == true) then
+									attempt.phase = "repair"
+									local function start_service()
+										local authorization = activation_controller.capture(token)
+										if authorization == nil or not preflight_is_current(authorization, true) then
+											retire_stale_admission()
+											return false
+										end
+										repair_pending = true
+										local dispatching, terminal, committed = true, false, false
+										local ok, accepted = pcall_log("explicit Ollama service repair", function()
+											return require("modules.llm.api_ollama").ensure_running({
+												is_authorized = function() return preflight_is_current(authorization, true) end,
+												on_settled = function(value)
+													if terminal then return end
+													terminal, committed = true, value == true
+													repair_pending = false
+													attempt.repair_result = committed
+													if dispatching then return end
+													if not preflight_is_current(authorization, true) then retire_stale_admission() return end
+													if committed then request_admission() else refuse_admission("service repair refused") end
+												end,
+											})
+										end)
+										dispatching = false
+										if ok ~= true or accepted ~= true then
+											repair_pending = false
+											return refuse_admission("service repair dispatch refused")
+										end
+										if terminal then
+											if committed then return request_admission() end
+											return refuse_admission("service repair refused")
+										end
+										return true
+									end
+									attempt.start_service = start_service
+									if not install_consented then return start_service() end
+									repair_pending = true
+									local acquiring, completed, installed = true, false, false
+									local ok, accepted = pcall_log("explicit Ollama installation", runtime_install_offer.install_ollama,
+										function(value)
+											if completed then return end
+											completed, installed = true, value == true
+											repair_pending = false
+											attempt.install_result = installed
+											if acquiring then return end
+											local authorization = activation_controller.capture(token)
+											if authorization == nil or not preflight_is_current(authorization, true) then retire_stale_admission() return end
+											if installed then start_service() else refuse_admission("installation refused") end
+										end)
+									acquiring = false
+									if ok ~= true or accepted ~= true then
+										repair_pending = false
+										return refuse_admission("installation dispatch refused")
+									end
+									if completed then
+										if installed then return start_service() end
+										return refuse_admission("installation refused")
+									end
+									return true
+								end
+								return request_admission()
+							end
+							return start_durable()
+						end
+
+						if enable_probe.cancel() ~= true or activation_controller.cancel() ~= true then return false end
 						if commit_enabled(false) ~= true then return false end
 						publish_toggle()
 						return true
@@ -1794,7 +1940,9 @@ local function create_menu(deps)
 		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({
 			state = state, core = llm_mod, keymap = keymap, shortcuts = trigger_orch,
 			idle = function()
-				for _, owner in ipairs({ prediction_locks, activation_controller, switcher, BackendPanel, settings_mgr, profiles_mgr }) do
+				if repair_pending then return false end
+				if state.llm_backend == "ollama" and ollama_owners_idle() ~= true then return false end
+				for _, owner in ipairs({ prediction_locks, activation_controller, enable_probe, switcher, BackendPanel, settings_mgr, profiles_mgr }) do
 					if type(owner.scope_idle) ~= "function" or owner.scope_idle() ~= true then return false end
 				end
 				return type(startup_scope_idle) == "function" and startup_scope_idle() == true

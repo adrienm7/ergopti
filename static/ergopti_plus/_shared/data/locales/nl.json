@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Klik hier om een van de aangeboden modellen te kiezen.",
 	"llm.local_servers.found_body": "Antwoordt met {1} model(len): kies er een in AI ▸ AI-engine.",
 	"llm.unreachable.title": "{1} antwoordt niet",
+	"llm.unreachable.body_unconfirmed": "De AI blijft uitgeschakeld: {1} antwoordt niet op {2}. Start de server en probeer de AI opnieuw in te schakelen.",
 	"llm.unreachable.body_missing": "De AI blijft uit: niets antwoordt op {2}, het adres van {1}, omdat {1} niet op deze computer is geïnstalleerd.",
 	"llm.unreachable.body_stopped": "De AI blijft uit: {1} is geïnstalleerd, maar niets antwoordt op {2}, het adres ervan. Het is niet gestart.",
 	"llm.unreachable.servers_found": "Deze lokale servers antwoorden en kunnen het vervangen: {1}.",

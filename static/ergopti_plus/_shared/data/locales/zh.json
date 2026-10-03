@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "点击此处从其提供的模型中选择一个。",
 	"llm.local_servers.found_body": "正在以 {1} 个模型响应：请在 AI ▸ AI 引擎中选择一个。",
 	"llm.unreachable.title": "{1} 没有响应",
+	"llm.unreachable.body_unconfirmed": "AI 保持关闭：{1} 在 {2} 未响应。启动服务器后，请再次尝试启用 AI。",
 	"llm.unreachable.body_missing": "AI 保持关闭：{1} 的地址 {2} 没有任何响应，因为此电脑上未安装 {1}。",
 	"llm.unreachable.body_stopped": "AI 保持关闭：{1} 已安装，但其地址 {2} 没有任何响应。它未能启动。",
 	"llm.unreachable.servers_found": "以下本地服务器有响应，可以代替它：{1}。",

@@ -137,7 +137,8 @@ local function ask(request)
 	end
 
 	local lines = {
-		i18n.format(installed and "llm.unreachable.body_stopped" or "llm.unreachable.body_missing",
+		i18n.format(request.unconfirmed == true and "llm.unreachable.body_unconfirmed"
+			or (installed and "llm.unreachable.body_stopped" or "llm.unreachable.body_missing"),
 			BACKEND_LABEL, url),
 	}
 	local names = {}
@@ -189,6 +190,7 @@ end
 ---   backend = "ollama",
 ---   automatic = boolean|nil  -- true for a failure found in the background:
 ---                            -- a notification whose click opens the dialog,
+---   unconfirmed = boolean|nil, -- use receipt-neutral wording before enable admission,
 ---   actions = {
 ---     use_server = function(id, model) -> boolean,  -- switch to a local server
 ---     start = function() -> boolean,                -- enable the AI, which starts Ollama
@@ -206,7 +208,7 @@ function M.offer(request)
 		_notified = true
 		local url = endpoint().get_base_url()
 		Logger.warn(LOG, "%s does not answer at %s; notifying the user.", BACKEND_LABEL, url)
-		local interactive = { backend = request.backend, actions = request.actions }
+		local interactive = { backend = request.backend, actions = request.actions, unconfirmed = request.unconfirmed }
 		local ok, sent = pcall(notifications().notify, i18n.format("llm.unreachable.title", BACKEND_LABEL),
 			i18n.format("llm.unreachable.click", BACKEND_LABEL, url), "warning", function()
 				_notified = false

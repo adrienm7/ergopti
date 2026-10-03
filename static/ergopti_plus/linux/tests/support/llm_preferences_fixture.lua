@@ -13,6 +13,8 @@ function M.new(options)
 	local port = Fakes.storage(options)
 	local write, remove = port.set, port.delete
 	local revision = 0
+	function port.generation() return revision end
+	function port.admit() return true end
 	function port.get_many(paths)
 		local values = {}
 		for _, path in ipairs(paths) do
@@ -58,14 +60,17 @@ function M.with(body, options)
 	local old_get, old_set, old_delete = preferences.get, preferences.set, preferences.delete
 	local old_many = preferences.set_many
 	local old_get_many = preferences.get_many
+	local old_generation, old_admit = preferences.generation, preferences.admit
 	local fake = M.new(options)
 	preferences.get, preferences.set, preferences.delete = fake.get, fake.set, fake.delete
 	preferences.set_many = fake.set_many
 	preferences.get_many = fake.get_many
+	preferences.generation, preferences.admit = fake.generation, fake.admit
 	local ok, err = pcall(body, fake)
 	preferences.get, preferences.set, preferences.delete = old_get, old_set, old_delete
 	preferences.set_many = old_many
 	preferences.get_many = old_get_many
+	preferences.generation, preferences.admit = old_generation, old_admit
 	if not ok then error(err, 0) end
 end
 
