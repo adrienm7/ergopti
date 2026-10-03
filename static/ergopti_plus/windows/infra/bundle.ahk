@@ -81,6 +81,12 @@ global BUNDLE_CHANNEL := "__BUNDLE_CHANNEL__"
 ; in compiled mode. Exposed as a global so every module can read it.
 global _BundleDir := ""
 
+; CNG constants must be initialized before the first compiled asset check.
+; Bootstrap errors use OutputDebug because the central logger is not ready yet.
+#Include ../adapters/crypto.ahk
+#Include ../adapters/file_system.ahk
+#Include *i ../build/bundle_inventory.ahk
+
 
 
 ; ==========================================
@@ -154,18 +160,51 @@ _Bundle_WriteMarker(BundleDir) {
 	return FileExist(MarkerPath)
 }
 
-_Bundle_VerifyStaging(StagingDir) {
-	return DirExist(StagingDir) and DirExist(StagingDir . "\static")
+; The compiled inventory comes from the same selected bytes as the embedded ZIP.
+; Additional runtime caches are allowed; every shipped asset remains immutable.
+_Bundle_VerifyStaging(StagingDir, Inventory := unset) {
+	if !DirExist(StagingDir)
+		return false
+	try {
+		if !IsSet(Inventory) {
+			if !IsSet(_Bundle_CompiledAssetInventory)
+				return false
+			Inventory := _Bundle_CompiledAssetInventory()
+		}
+		if !(Inventory is Array) or Inventory.Length == 0
+			return false
+		Seen := Map()
+		for Row in Inventory {
+			if !(Row is Array) or Row.Length != 3
+				return false
+			if !(Row[1] is String) or Row[1] == ""
+					or RegExMatch(Row[1], "[\\:`r`n]|^/|(^|/)\.{1,2}(/|$)|//")
+					or !(Row[2] is Integer) or Row[2] < 0
+					or !(Row[3] is String) or !RegExMatch(Row[3], "^[0-9a-f]{64}$")
+				return false
+			Key := StrLower(Row[1])
+			if Seen.Has(Key)
+				return false
+			Seen[Key] := true
+			Bytes := FSReadBytesStrict(StagingDir . "\" . StrReplace(Row[1], "/", "\"))
+			if Bytes.Size != Row[2] or _CryptoSha256Cng(Bytes) != Row[3]
+				return false
+		}
+		return true
+	} catch as Err {
+		OutputDebug("[bundle] Asset verification failed: " . Err.Message)
+		return false
+	}
 }
 
-_Bundle_LiveTreeCanSkip(BundleDir, ExistingMarker) {
+_Bundle_LiveTreeCanSkip(BundleDir, ExistingMarker, Inventory := unset) {
 	; A placeholder cannot distinguish two local compiles. Extraction still
 	; works, but only a stamped identity can justify reusing existing assets.
 	if (BUNDLE_VERSION == "__BUNDLE_VERSION__" or BUNDLE_COMMIT == "__BUNDLE_COMMIT__"
 		or BUNDLE_VERSION == "" or BUNDLE_COMMIT == ""
 		or ExistingMarker != _Bundle_BuildMarker())
 		return false
-	return _Bundle_VerifyStaging(BundleDir)
+	return _Bundle_VerifyStaging(BundleDir, Inventory?)
 }
 
 ; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
