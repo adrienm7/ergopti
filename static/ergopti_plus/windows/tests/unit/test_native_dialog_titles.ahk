@@ -337,25 +337,31 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'ExitApp(0)' . "`n"
 		. '_NFO_Main(ObserverArgs) {' . "`n"
 		. 'ObserverReceipt := ObserverArgs[1]' . "`n"
+		. 'ObserverPhaseStarted := A_TickCount' . "`n"
+		. '_NFO_Phase("entry", ObserverPhaseStarted)' . "`n"
 		. 'ObserverWindow := Integer(ObserverArgs[2])' . "`n"
 		. 'ObserverProcess := Integer(ObserverArgs[3])' . "`n"
 		. 'ObserverView := Integer(ObserverArgs[4])' . "`n"
 		. 'ObserverType := Integer(ObserverArgs[5])' . "`n"
 		. 'if ObserverProcess == DllCall("GetCurrentProcessId", "UInt")' . "`n"
 		. 'throw Error("The owned UIA observer must be a separate client process")' . "`n"
+		. '_NFO_Phase("com", ObserverPhaseStarted)' . "`n"
 		. 'ObserverCom := DllCall("ole32\CoInitializeEx", "Ptr", 0, "UInt", 2, "Int")' . "`n"
 		. 'if ObserverCom != 0 && ObserverCom != 1' . "`n"
 		. 'throw Error("The owned observer cannot acquire its COM apartment")' . "`n"
 		. 'try {' . "`n"
+		. '_NFO_Phase("shell-items", ObserverPhaseStarted)' . "`n"
 		. 'ObserverTxtNames := _NFO_ShellNames(ObserverArgs[6])' . "`n"
 		. 'ObserverBinNames := _NFO_ShellNames(ObserverArgs[7])' . "`n"
 		. 'UIA.ConnectionTimeout := 500' . "`n"
 		. 'UIA.TransactionTimeout := 500' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
+		. '_NFO_Phase("uia-provider", ObserverPhaseStarted)' . "`n"
 		. 'ObserverElement := UIA.ElementFromHandle(ObserverView, , false)' . "`n"
 		. 'if ObserverElement.ProcessId != ObserverProcess' . "`n"
 		. 'throw Error("The owned shell-view UIA element must match its native process")' . "`n"
 		. 'ObserverStarted := A_TickCount' . "`n"
+		. '_NFO_Phase("restricted-txt", ObserverPhaseStarted)' . "`n"
 		. '_NFO_WaitVisible(ObserverElement, ObserverTxtNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
 		. 'ObserverItems := ControlGetItems(ObserverType)' . "`n"
 		. 'if ControlGetIndex(ObserverType) != 1' . "`n"
@@ -364,14 +370,17 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
 		. '}' . "`n"
+		. '_NFO_Phase("restricted-bin", ObserverPhaseStarted)' . "`n"
 		. 'if _NFO_Visible(ObserverElement, ObserverBinNames, ObserverProcess)' . "`n"
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
 		. 'if ObserverItems.Length != 2 || ObserverItems[1] != "Owned files" || ObserverItems[2] != "All Files (*.*)"' . "`n"
 		. 'throw Error("The native friendly names must match independently observed SetFileTypes labels")' . "`n"
+		. '_NFO_Phase("all-files", ObserverPhaseStarted)' . "`n"
 		. 'ControlChooseIndex(2, ObserverType)' . "`n"
 		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
 		. 'if ControlGetIndex(ObserverType) != 2' . "`n"
 		. 'throw Error("The owned native All Files selection must be acknowledged")' . "`n"
+		. '_NFO_Phase("restored", ObserverPhaseStarted)' . "`n"
 		. 'ControlChooseIndex(1, ObserverType)' . "`n"
 		. 'loop {' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
@@ -382,11 +391,22 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'Sleep(10)' . "`n"
 		. '}' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
+		. '_NFO_Phase("complete", ObserverPhaseStarted)' . "`n"
 		. 'FileAppend("txt-visible|bin-hidden|all-files-bin-visible|restored-txt-visible|restored-bin-hidden|separate-client|owner-fenced", ObserverReceipt . ".behavior", "UTF-8-RAW")' . "`n"
 		. 'FileAppend("owned-filter-observed", ObserverReceipt . ".ack", "UTF-8-RAW")' . "`n"
 		. 'FileAppend("owned-filter-observed", "*", "UTF-8-RAW")' . "`n"
 		. '} finally {' . "`n"
 		. 'DllCall("ole32\CoUninitialize")' . "`n"
+		. '}' . "`n"
+		. '}' . "`n"
+		. '_NFO_Phase(ObserverPhaseToken, ObserverPhaseStarted) {' . "`n"
+		. 'ObserverPhaseFile := FileOpen(A_Args[1] . ".phase", "w", "UTF-8-RAW")' . "`n"
+		. 'if !IsObject(ObserverPhaseFile)' . "`n"
+		. 'throw Error("The owned observer phase receipt must open")' . "`n"
+		. 'try {' . "`n"
+		. 'ObserverPhaseFile.Write(ObserverPhaseToken . "|elapsed_ms=" . ((A_TickCount - ObserverPhaseStarted) & 0xFFFFFFFF))' . "`n"
+		. '} finally {' . "`n"
+		. 'ObserverPhaseFile.Close()' . "`n"
 		. '}' . "`n"
 		. '}' . "`n"
 		. '_NFO_ShellNames(OwnedPath) {' . "`n"
@@ -488,8 +508,10 @@ _NDT_FileFilterCaptureSource() {
 		. 'PickerObserverStarted := A_TickCount' . "`n"
 		. 'while PickerObserverHandle.Status == 0 && ((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000' . "`n"
 		. 'Sleep(10)' . "`n"
-		. 'if PickerObserverHandle.Status == 0' . "`n"
-		. 'throw Error("The exact owned UIA client did not finish within its bounded observation window")' . "`n"
+		. 'if PickerObserverHandle.Status == 0 {' . "`n"
+		. 'PickerObserverPhase := FileExist(PickerObserverReceipt . ".phase") ? SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128) : "not-started"' . "`n"
+		. 'throw Error("The exact owned UIA client did not finish within its bounded observation window (" . _NFPMode . ", " . PickerObserverPhase . ")")' . "`n"
+		. '}' . "`n"
 		. 'PickerObserverExit := PickerObserverHandle.ExitCode' . "`n"
 		. 'PickerObserverOutput := PickerObserverHandle.StdOut.ReadAll()' . "`n"
 		. 'PickerObserverErrors := PickerObserverHandle.StdErr.ReadAll()' . "`n"
@@ -803,12 +825,18 @@ _NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
 	for Kind in ["selected", "cancelled"] {
 		AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
 			"the real file picker caption follows independent policy " . Index)
-		Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
-			"the actual native picker retains the display label and filter pattern (" . Kind
+		; IFileDialog shows pszName separately from the pszSpec filter.
+		; The independent shell-view family proves the actual *.txt behavior.
+		AssertEqual("Owned files|All Files (*.*)|",
+			FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"),
+			"the actual native picker retains the exact friendly labels (" . Kind
 				. ", policy " . Index . ", owned HWND control classes/IDs: "
 				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8")
 				. "; owned file-type ComboBox items/selection: "
 				. FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8") . ")")
+		AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",
+			FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8"),
+			"the owned native file-type control selects the supplied friendly name")
 	}
 	AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
 		FileRead(PickerRoot . "\selected.result", "UTF-8"),
