@@ -524,10 +524,8 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
 								Options["Category"] := CategoryLabel
 								Options["Section"] := CurrentSection
-				if IsSet(PersonalSource)
-						Options["PersonalSource"] := PersonalSource
 								if IsSet(PersonalSource)
-										Options["PersonalSource"] := PersonalSource
+									Options["PersonalSource"] := PersonalSource
 								; Provenance must not adopt a new activation owner for whole-file packs.
 								if SelectedSection == ""
 										Options["Group"] := "default"
@@ -565,6 +563,8 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 				Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
 				Options["Category"] := CategoryLabel
 				Options["Section"] := CurrentSection
+				if IsSet(PersonalSource)
+					Options["PersonalSource"] := PersonalSource
 				; Provenance must not adopt a new activation owner for whole-file packs.
 				if SelectedSection == ""
 						Options["Group"] := "default"
