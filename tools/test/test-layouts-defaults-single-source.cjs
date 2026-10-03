@@ -49,7 +49,7 @@ function check(name, fn) {
 /** Lists driver sources, skipping tests, vendored code and generated output. */
 function driverSources(dir, extensions, out = []) {
 	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		if (['tests', 'vendor', 'node_modules', '_generated'].includes(entry.name)) continue;
+		if (['tests', 'vendor', 'node_modules', '_generated', 'build'].includes(entry.name)) continue;
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) driverSources(full, extensions, out);
 		else if (extensions.includes(path.extname(entry.name))) out.push(full);
@@ -74,6 +74,31 @@ const registry = defaults.registry;
 const updater = JSON.parse(fs.readFileSync(UPDATER_DEFAULTS_PATH, 'utf8'));
 
 console.log('Layout registry location single source');
+
+check(
+	'the source census retains authored clients and excludes generated bundle inventories',
+	() => {
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-layout-source-census-'));
+		assert.ok(path.resolve(fixture).startsWith(path.resolve(os.tmpdir()) + path.sep));
+		try {
+			const authored = path.join(fixture, 'infra', 'registry_client.ahk');
+			const inventory = path.join(fixture, 'build', 'bundle_inventory.ahk');
+			fs.mkdirSync(path.dirname(authored), { recursive: true });
+			fs.mkdirSync(path.dirname(inventory), { recursive: true });
+			fs.writeFileSync(
+				authored,
+				'\uFEFF; infra/registry_client.ahk\nRegistryClient() => "authored"\n'
+			);
+			fs.writeFileSync(
+				inventory,
+				'\uFEFF; Generated asset path data.\nInventory() => ["' + registry.folder + '"]\n'
+			);
+			assert.deepStrictEqual(driverSources(fixture, ['.ahk']), [authored]);
+		} finally {
+			fs.rmSync(fixture, { recursive: true, force: true });
+		}
+	}
+);
 
 check('the declared folder exists and holds the declared index', () => {
 	const folder = path.join(ROOT, ...registry.folder.split('/'));

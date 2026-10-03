@@ -204,7 +204,7 @@ _Enumerate(arr, n) {
 }
 
 ; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
-; tests/, vendor/ and _generated/ trees — concatenated into one string, so
+; tests/, vendor/, build/ and _generated/ trees — concatenated into one string, so
 ; source-introspection tests find a function regardless of which infra/ or ui/ file
 ; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
@@ -213,7 +213,7 @@ _Enumerate(arr, n) {
 ; One ownership rule for source censuses and include-graph audits. Both path
 ; separators are accepted so generated user code never changes their scope.
 _DriverIsProductionSource(Path) {
-	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|_generated)/")
+	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
 }
 
 _DriverSourceConcat() {

@@ -24,6 +24,8 @@ _DSPR_Child(Mode, Receipt) {
 		Complete := ReadSource.Call()
 		AssertContains(Complete, "ReadableSourceMarker", "the control source must be present")
 		AssertContains(Complete, "LockedSourceMarker", "retry must not reuse a partially populated source cache")
+		AssertFalse(InStr(Complete, "GeneratedBuildMarker"),
+			"generated bundle inventories must remain outside the authored source census")
 		AssertTrue(Failure is OSError, "a locked source must fail the initial scan even when siblings are readable")
 		FileAppend("complete", Receipt, "UTF-8-RAW")
 	} catch Error as Err {
@@ -43,6 +45,8 @@ _DSPR_IsolatedRead(Mode) {
 	try {
 		DirCreate(Root . "\sample")
 		DirCreate(Root . "\tests")
+		DirCreate(Root . "\build")
+		FileAppend("GeneratedBuildMarker() {`nreturn 3`n}`n", Root . "\build\bundle_inventory.ahk", "UTF-8")
 		FileAppend("ReadableSourceMarker() {`nreturn 1`n}`n", Root . "\sample\readable.ahk", "UTF-8")
 		FileAppend("LockedSourceMarker() {`nreturn 2`n}`n", Root . "\sample\locked.ahk", "UTF-8")
 		Launcher := Root . "\tests\probe.ahk"
