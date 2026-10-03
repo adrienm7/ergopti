@@ -157,7 +157,10 @@ Test("toml candidate: invalid renderer result returns a typed failure "
 
 _TBUI_UnchangedBooleanLiterals() {
 	Path := _TBUI_NewPath()
-	Seed := '[existing]`non = true # enabled`noff = false`nzero = 0`none = 1`n'
+	Seed := '[existing]`non = true # enabled`nyes = true # affirmative`noff = false`nzero = 0`none = 1`n'
+	; This handwritten complete image pins source order/comments and the new
+	; section's canonical separation, independently of the production renderer.
+	Expected := Chr(0xFEFF) . '[existing]`non = true # enabled`nyes = true # affirmative`noff = false`nzero = 0`none = 1`n`n`n`n`n`n[script]`nlocale = "fr"`n'
 	Updates := [{ Section: "script", Key: "locale", Value: "fr" }]
 	try {
 		AssertTrue(FSWrite(Path, Seed))
@@ -172,10 +175,21 @@ _TBUI_UnchangedBooleanLiterals() {
 		AssertEqual("ok", Candidate["status"])
 		AssertEqual(Seed, FSRead(Path), "building must not publish")
 		AssertTrue(TOML_BatchWrite(Path, Updates))
-		for Content in [Candidate["content"], FSRead(Path)] {
-			for Key, Literal in Map("on", "true", "off", "false", "zero", "0", "one", "1")
+		for Content in [Candidate["content"], FSReadUtf8Exact(Path)] {
+			AssertEqual(Expected, Content, "both candidate and publication preserve the complete unowned source image")
+			for Key, Literal in Map("on", "true # enabled", "yes", "true # affirmative", "off", "false", "zero", "0", "one", "1")
 				AssertTrue(RegExMatch(Content, "m)^" . Key . " = " . Literal . "$"),
-					"unrelated updates must retain the literal type of " . Key)
+					"unrelated updates must retain the literal type and original comment of " . Key)
+			Typed := TOML_ParseDocument(Content)
+			for Key, Value in Map("on", 1, "yes", 1, "off", 0) {
+				AssertTrue(Typed["existing"][Key] is TOML_Bool, "the real document reader distinguishes Boolean " . Key . " from numbers")
+				AssertEqual(Value, Typed["existing"][Key].Value)
+			}
+			for Key, Value in Map("zero", 0, "one", 1) {
+				AssertTrue(Typed["existing"][Key] is Integer, "numeric " . Key . " must not acquire Boolean intent")
+				AssertEqual(Value, Typed["existing"][Key])
+			}
+			AssertEqual("fr", Typed["script"]["locale"], "the actual requested update is present beside the retained source")
 		}
 		AssertTrue(Cached["existing"]["on"] is Integer,
 			"writer-only Boolean intent must never leak into the reader cache")
