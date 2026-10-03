@@ -1309,6 +1309,8 @@ Windows native registration now retains an explicitly supplied default group whe
 
 Windows ordinary personal packs now retain the authoritative recursive source label and parsed section in live metadata, matching their preview rows without changing the historical default activation owner. Selected official sections keep their existing derived group, resolved delay and priority. Registered native regressions and portable 353-check/encoding gates cover this prerequisite; actual Windows qualification remains pending CI. The shared personal-file identity, live/preview gate owner and menu commands remain incomplete, so item 102 stays partial.
 
+The native Windows checkpoint 37118530448 passes the two source-retaining TOML contracts and reaches 7,988 successful tests. Its two remaining personal-provenance failures compare the short A_Temp spelling with the existing native enumerator's canonical long path before reaching the metadata assertions. The fixture now obtains its expected path independently through Win32 GetLongPathNameW and checks both actual root spellings, preserving the Unicode labels, exact live specifications, insertion order, activation owner and preview assertions. Portable source and encoding gates pass; execution of these corrected native cases and complete three-OS packaging/installation remain pending CI. Item 102 stays partial.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
