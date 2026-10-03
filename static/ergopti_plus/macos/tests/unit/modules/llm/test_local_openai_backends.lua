@@ -679,3 +679,158 @@ helpers.describe("Actual local API models receipt contract", function()
 		end
 	end)
 end)
+
+helpers.describe("Local discovery captured identities (local-discovery-controller)", function()
+	helpers.it("captures each probe identity before the producer can mutate its input", function()
+		local observed = {}
+		with_backend(function(_, servers)
+			local target = { id = "omlx", base_url = "http://127.0.0.1:17341/v1", token = "" }
+			local complete
+			servers.sweep({ target }, function(_, settle) complete = settle; return true end)
+			target.id, target.base_url = "jan", "http://127.0.0.1:17342/v1"
+			complete(models_answer({ "captured-model" }))
+			observed.result = servers.result("omlx")
+			observed.foreign = servers.result("jan")
+		end)
+		helpers.assert_true(observed.result ~= nil, "native delivery belongs to the captured provider")
+		helpers.assert_eq(observed.result.base_url, "http://127.0.0.1:17341/v1")
+		helpers.assert_eq(observed.result.models[1], "captured-model")
+		helpers.assert_eq(observed.foreign, nil)
+	end)
+
+	helpers.it("stops dispatching an older sweep after a native producer reenters a newer sweep", function()
+		local observed = { starts = {}, dones = {} }
+		with_backend(function(_, servers)
+			local old = {
+				{ id = "omlx", base_url = "http://127.0.0.1:17341/v1" },
+				{ id = "lmstudio", base_url = "http://127.0.0.1:17342/v1" },
+			}
+			local newest = { { id = "omlx", base_url = "http://127.0.0.1:17343/v1" } }
+			local old_answer, new_answer
+			servers.sweep(old, function(target, settle)
+				observed.starts[#observed.starts + 1] = "old:" .. target.id
+				if target.id == "omlx" then
+					old_answer = settle
+					servers.sweep(newest, function(current, answer)
+						observed.starts[#observed.starts + 1] = "new:" .. current.id
+						new_answer = answer
+						return true
+					end, function(changed) observed.dones[#observed.dones + 1] = changed end)
+				end
+				return true
+			end, function(changed) observed.dones[#observed.dones + 1] = changed end)
+			new_answer(models_answer({ "new-model" }))
+			old_answer(models_answer({ "old-model" }))
+			observed.result = servers.result("omlx")
+		end)
+		helpers.assert_eq(table.concat(observed.starts, ","), "old:omlx,new:omlx",
+			"a superseded producer cannot cancel newer native requests by continuing its dispatch loop")
+		helpers.assert_eq(#observed.dones, 2, "both waiting callers receive the newest joint publication")
+		helpers.assert_eq(observed.result.models[1], "new-model")
+		helpers.assert_eq(observed.result.base_url, "http://127.0.0.1:17343/v1")
+	end)
+end)
+
+
+--- Holds the real native owner's asynchronous credential boundary, then restores
+--- its exact function even when the test scenario raises. Observations are
+--- asserted after cleanup, outside production's protected callbacks.
+local function with_held_probe_credentials(scenario)
+	with_backend(function(api, LocalServers, world)
+		local crypto = require("modules.llm.api_token_crypto")
+		local original = crypto.decrypt_async
+		local callbacks = {}
+		crypto.decrypt_async = function(stored, callback)
+			callbacks[#callbacks + 1] = { stored = stored, callback = callback }
+			return true
+		end
+		local ok, result = xpcall(function()
+			return scenario(api, LocalServers, world, callbacks)
+		end, debug.traceback)
+		crypto.decrypt_async = original
+		helpers.assert_eq(crypto.decrypt_async, original, "the exact credential callback owner is restored")
+		if not ok then error(result) end
+		for key, observation in pairs(result) do
+			helpers.assert_eq(observation.actual, observation.expected, key)
+		end
+	end)
+end
+
+helpers.describe("Local discovery: native credential admission (local-openai-backends)", function()
+	helpers.it("a superseded held credential cannot acquire an HTTP probe (local-openai-backends)", function()
+		with_held_probe_credentials(function(api, LocalServers, world, credentials)
+			LocalServers.set_pending("omlx", { base_url = "http://localhost:9801/v1", token = "owned-reference" })
+			local done = {}
+			api.detect_local_servers(function() done[#done + 1] = "old" end)
+			api.detect_local_servers(function() done[#done + 1] = "new" end)
+			local before_old = #world.probes
+			credentials[1].callback(true, "old-cleartext")
+			local after_old = #world.probes
+			credentials[2].callback(true, "new-cleartext")
+			local fresh = world.probe("omlx")
+			answer_sweep(world, { omlx = models_answer({ "new-model" }) })
+			return {
+				held = { actual = #credentials, expected = 2 },
+				old_native_acquisitions = { actual = after_old - before_old, expected = 0 },
+				fresh_native_acquisitions = { actual = #world.probes - after_old, expected = 1 },
+				fresh_url = { actual = fresh.url, expected = "http://localhost:9801/v1/models" },
+				fresh_key = { actual = fresh.headers.Authorization, expected = "Bearer new-cleartext" },
+				waiters = { actual = done, expected = { "old", "new" } },
+				fresh_models = { actual = LocalServers.result("omlx").models, expected = { "new-model" } },
+			}
+		end)
+	end)
+
+	helpers.it("a changed current target refuses held credentials and unchanged retry still acquires (local-openai-backends)", function()
+		with_held_probe_credentials(function(api, LocalServers, world, credentials)
+			LocalServers.set_pending("omlx", { base_url = "http://localhost:9801/v1", token = "first-reference" })
+			api.detect_local_servers()
+			LocalServers.set_pending("omlx", { base_url = "http://localhost:9802/v1", token = "second-reference" })
+			local before_stale = #world.probes
+			credentials[1].callback(true, "stale-cleartext")
+			local after_stale = #world.probes
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do
+				world.probe(id).callback({ ok = false, status = 0, error = "connection refused" })
+			end
+			local stale = LocalServers.result("omlx")
+			api.detect_local_servers()
+			credentials[2].callback(true, "unchanged-cleartext")
+			local fresh = world.probe("omlx")
+			answer_sweep(world, { omlx = models_answer({ "current-model" }) })
+			return {
+				stale_native_acquisitions = { actual = after_stale - before_stale, expected = 0 },
+				stale_status = { actual = stale and stale.status or "not-published", expected = LocalServers.STATUS_DOWN },
+				current_url = { actual = fresh.url, expected = "http://localhost:9802/v1/models" },
+				current_key = { actual = fresh.headers.Authorization, expected = "Bearer unchanged-cleartext" },
+				current_models = { actual = LocalServers.result("omlx").models, expected = { "current-model" } },
+			}
+		end)
+	end)
+end)
+
+
+helpers.describe("Local discovery: live response identity (local-openai-backends)", function()
+	helpers.it("an address or stored key change independently refuses an already acquired answer (local-openai-backends)", function()
+		for _, field in ipairs({ "base_url", "token" }) do
+			with_backend(function(api, LocalServers, world)
+				LocalServers.set_pending("omlx", { base_url = "http://localhost:9801/v1", token = "" })
+				local completions = 0
+				api.detect_local_servers(function() completions = completions + 1 end)
+				local captured = world.probe("omlx")
+				local changes = {}
+				changes[field] = field == "token" and "new-owned-reference" or "http://localhost:9802/v1"
+				LocalServers.set_pending("omlx", changes)
+				captured.callback(models_answer({ "foreign-source-model" }))
+				for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do
+					world.probe(id).callback({ ok = false, status = 0, error = "connection refused" })
+				end
+				-- Observe after the protected native response callbacks have returned.
+				helpers.assert_eq(completions, 1, field .. " settles the joint current search")
+				helpers.assert_eq(#world.probes, 4, field .. " never acquires an implicit retry")
+				helpers.assert_eq(LocalServers.result("omlx").status, LocalServers.STATUS_DOWN,
+					field .. " prevents stale source publication")
+				helpers.assert_eq(LocalServers.result("omlx").models, {}, field .. " admits no old models")
+			end)
+		end
+	end)
+end)

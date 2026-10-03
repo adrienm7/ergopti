@@ -877,6 +877,19 @@ and premature-settlement regressions, 70 actual curl streaming/owned-GET
 checks and the unchanged 28 local-API checks qualify this prerequisite
 locally. Automatic discovery and model/menu rows remain unfinished.
 
+The macOS local-server owner now consumes a shared logical discovery controller
+for ordered joint publication, cache age and superseding search generations.
+Captured provider/address snapshots and a dispatch fence prevent a changed
+target or a synchronously reentrant newer search from dispatching the old loop.
+The existing credential, HTTP and persistence owners remain authoritative.
+Independent traces run through both Lua drivers; native task retirement and
+Windows/Linux discovery/menu integration remain separate requirements. The
+macOS probe also checks a shared generation ticket and its live in-memory
+provider/address/stored-key identity before credential callbacks acquire HTTP
+and before responses publish. Held old credentials and independent address/key
+changes are refused; this does not assert fresh private-file reads or physical
+HTTP retirement.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
