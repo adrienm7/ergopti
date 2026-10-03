@@ -93,13 +93,13 @@ func directKeyboardLevel(
 	modifiers: UInt32 = 0
 ) throws -> KeyboardSourceProbeLevel {
 	var deadState: UInt32 = 0
-	var length: UniCharCount = 0
+	var length: Int = 0
 	var output = [UniChar](repeating: 0, count: kMaximumKeyboardTranslationUnits)
 	let status = UCKeyTranslate(
 		layout, code, UInt16(kUCKeyActionDown), modifiers, keyboardType,
-		0, &deadState, UniCharCount(output.count), &length, &output
+		0, &deadState, output.count, &length, &output
 	)
-	guard status == noErr, length <= UniCharCount(output.count) else {
+	guard status == noErr, length <= output.count else {
 		throw KeyboardSourceProbeError.translationFailed
 	}
 	let units = output.prefix(Int(length))

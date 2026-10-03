@@ -1034,6 +1034,12 @@ exact-boolean regressions also pass the focused runner.
 
 The Windows physical catalogue now uses the existing entry-point \_SharedDir owner when called without an injected root. The previous undefined SharedDir stopped legacy Win shortcut registration before the suite or application could start. A direct zero-argument catalogue and actual legacy-registration regression checks independent physical identities and exact callback/root preservation; existing native lifecycle assertions and warning policy stay intact. Encoding and strict conventions pass locally, while native Windows unit, compile and E2E qualification remain pending.
 
+Native CI run 37085780111 exposed a macOS launcher compile failure before
+source-probe tests could run: Swift imports Carbon's UniCharCount as Int.
+The translator now uses that imported type; its exact selected-source,
+direct-output and dead-key contracts are unchanged. Native rebuild and the
+existing real US/French Carbon tests remain pending.
+
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
   `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty
