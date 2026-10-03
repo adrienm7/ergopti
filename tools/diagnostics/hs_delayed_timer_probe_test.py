@@ -604,6 +604,430 @@ def no_prompt_receipt(status=0, result=NONCE, error_origin="none"):
     }
 
 
+SENDER_PID = 31415
+SENDER_STAGES = [
+    "constructed",
+    "send_entered",
+    "send_returned",
+    "error_decode_entered",
+    "error_decode_complete",
+    "reply_decode_complete",
+]
+
+
+def publish_supplemental_fixture(
+    owner, sender_pid, status, server="completed", stages=None, mutation=None
+):
+    """Model actual native file writes with independent closed protocol expectations."""
+    scope = getattr(owner, "no_prompt_scope", None)
+    if scope is None:
+        return
+    stages = stages if stages is not None else SENDER_STAGES if status == 0 else SENDER_STAGES[:-1]
+    sender = {
+        "schema_version": 1,
+        "contract": "hs.applescript.sender-stages",
+        "nonce": NONCE,
+        "target_pid": 42,
+        "sender_pid": sender_pid,
+        "stages": stages,
+    }
+    (scope.path / "sender.json").write_text(json.dumps(sender) + "\n")
+    phases = (
+        ["entry", "completion"]
+        if server == "completed"
+        else ["entry"]
+        if server == "entered"
+        else []
+    )
+    for phase in phases:
+        witness = {
+            "schema_version": 1,
+            "contract": "hs.applescript.server-witness",
+            "nonce": NONCE,
+            "pid": 42,
+            "executable": str(EXECUTABLE),
+            "bundle_id": DOMAIN,
+            "phase": phase,
+        }
+        (scope.path / (phase + ".json")).write_text(json.dumps(witness) + "\n")
+    if mutation:
+        mutation(scope.path)
+
+
+def supplemental_mock_child(owner, native, server=None, stages=None, mutation=None, code=0):
+    """Return a terminal fake sender whose files are not inferred from production policy."""
+    child = mock.Mock(returncode=code, pid=SENDER_PID)
+
+    def communicate(**options):
+        publish_supplemental_fixture(
+            owner,
+            child.pid,
+            native["status"],
+            server if server is not None else "completed" if native["status"] == 0 else "none",
+            stages,
+            mutation,
+        )
+        return json.dumps(native) + "\n", ""
+
+    child.communicate.side_effect = communicate
+    return child
+
+
+class SupplementalReadinessTests(unittest.TestCase):
+    """Execution witnesses never substitute for the unchanged mandatory controls."""
+
+    def owner(self, folder):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+        )
+        owner.nonce = NONCE
+        return owner
+
+    def invoke(self, owner, status=0, server="completed", stages=None, mutation=None, code=0):
+        native = no_prompt_receipt(
+            status, NONCE if status == 0 else None, "none" if status == 0 else "send"
+        )
+        child = supplemental_mock_child(owner, native, server, stages, mutation, code)
+        with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+            return owner.control_pid_no_prompt(42, lambda _: [42])
+
+    def test_acknowledged_reply_requires_both_owned_server_witnesses(self):
+        for server in ("none", "entered"):
+            with self.subTest(server=server), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                with self.assertRaises(ValueError):
+                    self.invoke(owner, server=server)
+                self.assertEqual(list(Path(folder).iterdir()), [])
+                self.assertEqual(owner.scripting_commands, [])
+
+    def test_completion_without_reply_is_execution_not_transport_admission(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            result = self.invoke(owner, status=-1712)
+            self.assertEqual(result["outcome"], "refused")
+            self.assertEqual(result["status"], -1712)
+            self.assertIn("server witness: completed", str(owner.diagnostic_receipts))
+            self.assertIn("sender stage: error_decode_complete", str(owner.diagnostic_receipts))
+            self.assertNotIn(folder, str(owner.diagnostic_receipts))
+            with self.assertRaises(ValueError):
+                probe.validate_control_summary(result)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_sigsegv_retains_last_sender_stage_without_inventing_admission(self):
+        for index in range(1, len(SENDER_STAGES) + 1):
+            with self.subTest(index=index), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                with self.assertRaises(RuntimeError) as error:
+                    self.invoke(
+                        owner, status=-1712, server="none", stages=SENDER_STAGES[:index], code=-11
+                    )
+                self.assertIn("exit -11", str(error.exception))
+                self.assertIn(
+                    "sender stage: " + SENDER_STAGES[index - 1], str(owner.diagnostic_receipts)
+                )
+                self.assertNotIn("denied", str(owner.diagnostic_receipts))
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_stale_malformed_and_foreign_server_receipts_refuse_reply(self):
+        def edit(field, value):
+            def mutation(path):
+                file = path / "entry.json"
+                data = json.loads(file.read_text())
+                data[field] = value
+                file.write_text(json.dumps(data) + "\n")
+
+            return mutation
+
+        mutations = [
+            edit("nonce", "b" * 32),
+            edit("pid", 43),
+            edit("pid", True),
+            edit("executable", "/foreign"),
+            edit("bundle_id", "foreign"),
+            edit("phase", "completion"),
+            edit("unknown", True),
+            lambda path: (path / "entry.json").write_text(
+                '{"schema_version":1,"schema_version":1}\n'
+            ),
+            lambda path: (path / "entry.json").write_text("x" * 2049),
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as folder:
+                with self.assertRaises(ValueError):
+                    self.invoke(self.owner(folder), mutation=mutation)
+                self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_sender_identity_and_nonmonotonic_stage_prefix_are_rejected(self):
+        def mutate(field, value):
+            def mutation(path):
+                file = path / "sender.json"
+                data = json.loads(file.read_text())
+                data[field] = value
+                file.write_text(json.dumps(data) + "\n")
+
+            return mutation
+
+        mutations = [
+            mutate("sender_pid", SENDER_PID + 1),
+            mutate("sender_pid", True),
+            mutate("target_pid", 43),
+            mutate("nonce", "b" * 32),
+            mutate("stages", ["send_entered"]),
+            mutate("stages", SENDER_STAGES + ["foreign"]),
+            mutate("stages", ["constructed", "constructed"]),
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as folder:
+                with self.assertRaises(ValueError):
+                    self.invoke(self.owner(folder), mutation=mutation)
+
+    def test_symlink_receipt_is_refused_without_touching_its_target(self):
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as outside:
+            foreign = Path(outside) / "untouched.json"
+            foreign.write_text("private-neighbour")
+
+            def mutation(path):
+                (path / "entry.json").unlink()
+                (path / "entry.json").symlink_to(foreign)
+
+            with self.assertRaises(ValueError):
+                self.invoke(self.owner(folder), mutation=mutation)
+            self.assertEqual(foreign.read_text(), "private-neighbour")
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_cleanup_refusal_retains_debt_and_does_not_skip_preference_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            with mock.patch.object(Path, "rmdir", side_effect=OSError("owned removal refused")):
+                with self.assertRaises(OSError):
+                    self.invoke(owner)
+            self.assertIsNotNone(owner.no_prompt_scope)
+            with (
+                mock.patch.object(probe.subprocess, "Popen") as spawn,
+                self.assertRaises(RuntimeError),
+            ):
+                owner.control_pid_no_prompt(42, lambda _: [42])
+            spawn.assert_not_called()
+            with mock.patch.object(owner.preference, "restore") as restore:
+                owner.restore()
+            restore.assert_called_once_with()
+            self.assertIsNone(owner.no_prompt_scope)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_refused_send_distinguishes_no_entry_and_entered_only_without_acknowledgement(self):
+        for server, expected in (("none", "not_observed"), ("entered", "entered")):
+            with self.subTest(server=server), tempfile.TemporaryDirectory() as folder:
+                owner = self.owner(folder)
+                result = self.invoke(owner, status=-1712, server=server)
+                self.assertEqual(result["outcome"], "refused")
+                self.assertIn("server witness: " + expected, str(owner.diagnostic_receipts))
+                with self.assertRaises(ValueError):
+                    probe.validate_pid_control_summary(result)
+
+    def test_inode_replacement_during_read_cannot_admit_stale_witness(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            original_fdopen = os.fdopen
+
+            class ReplacingReader:
+                def __init__(self, descriptor, mode):
+                    self.handle = original_fdopen(descriptor, mode)
+
+                def __enter__(self):
+                    self.handle.__enter__()
+                    return self
+
+                def __exit__(self, *args):
+                    return self.handle.__exit__(*args)
+
+                def fileno(self):
+                    return self.handle.fileno()
+
+                def read(self, size):
+                    raw = self.handle.read(size)
+                    path = owner.no_prompt_scope.path / "entry.json"
+                    temporary = path.with_name("entry.json.pending")
+                    temporary.write_bytes(raw)
+                    os.replace(temporary, path)
+                    return raw
+
+            with mock.patch.object(os, "fdopen", side_effect=ReplacingReader):
+                with self.assertRaises(ValueError):
+                    self.invoke(owner)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_nonregular_receipt_is_refused_and_foreign_directory_is_never_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+
+            def mutation(path):
+                file = path / "entry.json"
+                file.unlink()
+                file.mkdir()
+
+            with self.assertRaises(RuntimeError):
+                self.invoke(owner, mutation=mutation)
+            self.assertIsNotNone(owner.no_prompt_scope)
+            directory = owner.no_prompt_scope.path / "entry.json"
+            self.assertTrue(directory.is_dir())
+            directory.rmdir()
+            with mock.patch.object(owner.preference, "restore"):
+                owner.restore()
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_crashed_sender_cannot_qualify_witnesses_after_live_owner_changes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            native = no_prompt_receipt()
+            child = supplemental_mock_child(owner, native, code=-11)
+            live = mock.Mock(side_effect=[[42], [42], [43]])
+            with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+                with self.assertRaisesRegex(RuntimeError, "owner changed") as failure:
+                    owner.control_pid_no_prompt(42, live)
+            self.assertIn("exit -11", str(failure.exception.__cause__))
+            self.assertNotIn("server witness: completed", str(owner.diagnostic_receipts))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+            self.assertEqual(owner.scripting_commands, [])
+
+    def test_timeout_retains_scope_until_actual_child_retirement_and_cleanup_acknowledge(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            native = no_prompt_receipt()
+            child = mock.Mock(returncode=None, pid=SENDER_PID)
+            child.poll.return_value = None
+            captured = []
+
+            def timed_out(**options):
+                if options["timeout"] == 10:
+                    captured.append(owner.no_prompt_scope)
+                    publish_supplemental_fixture(owner, child.pid, 0, "entered", SENDER_STAGES[:2])
+                raise subprocess.TimeoutExpired(["osascript"], options["timeout"])
+
+            child.communicate.side_effect = timed_out
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child) as spawn,
+                mock.patch.object(owner, "sample_scripting_command", return_value=[]),
+                mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "TimeoutExpired"):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            self.assertIsNotNone(owner.no_prompt_scope)
+            scope = captured[0]
+            self.assertIs(owner.no_prompt_scope, scope)
+            self.assertEqual(owner.nonce, NONCE)
+            self.assertEqual(scope.identity["nonce"], NONCE)
+            self.assertTrue(scope.path.is_dir())
+            retained = (scope.path / "entry.json").read_bytes()
+            self.assertEqual(owner.scripting_commands, [child])
+            self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(
+                child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
+            )
+            child.kill.assert_called_once_with()
+            with mock.patch.object(probe.subprocess, "Popen") as replacement:
+                with self.assertRaisesRegex(RuntimeError, "cleanup has not settled"):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            replacement.assert_not_called()
+            with self.assertRaises(subprocess.TimeoutExpired):
+                owner.restore()
+            self.assertIs(owner.no_prompt_scope, scope)
+            self.assertEqual(owner.scripting_commands, [child])
+            self.assertEqual((scope.path / "entry.json").read_bytes(), retained)
+
+            def retired(**options):
+                child.returncode = -9
+                return "", ""
+
+            child.communicate.side_effect = retired
+            with mock.patch.object(Path, "rmdir", side_effect=OSError("owned removal refused")):
+                with self.assertRaisesRegex(OSError, "removal refused"):
+                    owner.restore()
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertEqual(child.returncode, -9)
+            self.assertIs(owner.no_prompt_scope, scope)
+            self.assertTrue(scope.path.is_dir())
+            with mock.patch.object(probe.subprocess, "Popen") as replacement:
+                with self.assertRaisesRegex(RuntimeError, "cleanup has not settled"):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            replacement.assert_not_called()
+            owner.restore()
+            self.assertIsNone(owner.no_prompt_scope)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+            next_scopes = []
+            next_child = supplemental_mock_child(owner, native)
+            next_communicate = next_child.communicate.side_effect
+
+            def next_receipt(**options):
+                next_scopes.append(owner.no_prompt_scope)
+                return next_communicate(**options)
+
+            next_child.communicate.side_effect = next_receipt
+            with mock.patch.object(probe.subprocess, "Popen", return_value=next_child):
+                result = owner.control_pid_no_prompt(42, lambda _: [42])
+            self.assertEqual(result["outcome"], "acknowledged")
+            self.assertNotEqual(next_scopes[0].path, scope.path)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+            self.assertEqual(owner.scripting_commands, [])
+
+    def test_unacknowledged_process_exit_retains_exact_scope_and_child(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            child = supplemental_mock_child(owner, no_prompt_receipt(), code=None)
+            child.poll.return_value = None
+            with mock.patch.object(probe.subprocess, "Popen", return_value=child):
+                with self.assertRaisesRegex(RuntimeError, "actual process exit"):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            self.assertIsNotNone(owner.no_prompt_scope)
+            self.assertEqual(owner.scripting_commands, [child])
+            scope = owner.no_prompt_scope
+            self.assertTrue((scope.path / "completion.json").is_file())
+            with mock.patch.object(probe.subprocess, "Popen") as replacement:
+                with self.assertRaisesRegex(RuntimeError, "cleanup has not settled"):
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            replacement.assert_not_called()
+            child.returncode = -9
+            child.communicate.side_effect = None
+            child.communicate.return_value = ("", "")
+            owner.restore()
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertIsNone(owner.no_prompt_scope)
+            self.assertFalse(scope.path.exists())
+
+    def test_duplicate_unknown_receipt_key_never_enters_public_primary_error(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            marker = "PRIVATE_RECEIPT_KEY_MUST_NOT_LEAK"
+
+            def corrupt(path):
+                (path / "entry.json").write_text('{"' + marker + '":1,"' + marker + '":2}\n')
+
+            with self.assertRaises(ValueError) as failure:
+                self.invoke(owner, mutation=corrupt)
+            owner.retain_primary_error(failure.exception, "pid_no_prompt")
+            self.assertNotIn(marker, str(failure.exception))
+            self.assertNotIn(marker, str(owner.diagnostic_receipts))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_native_body_and_stages_use_actual_identity_and_checked_bounded_writes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            native = no_prompt_receipt()
+            child = supplemental_mock_child(owner, native)
+            with mock.patch.object(probe.subprocess, "Popen", return_value=child) as spawn:
+                result = owner.control_pid_no_prompt(42, lambda _: [42])
+            script = spawn.call_args.args[0][4]
+            self.assertIn("i.processID", script)
+            self.assertIn("i.executablePath", script)
+            self.assertIn("i.bundleID", script)
+            self.assertIn("writeToFileAtomically", script)
+            self.assertIn("size > 2048", script)
+            self.assertIn("Supplemental stage write refused", script)
+            self.assertIn("ownedWitnessSource(argv[1], pid, argv[2])", script)
+            self.assertEqual(result["status"], 0)
+            self.assertIn("server witness: completed", str(owner.diagnostic_receipts))
+            self.assertEqual(child.communicate.call_args, mock.call(timeout=10))
+
+
 class NoPromptControlTests(unittest.TestCase):
     def owner(self, folder):
         owner = probe.NativeDelayedTimerProbe(
@@ -624,8 +1048,7 @@ class NoPromptControlTests(unittest.TestCase):
                 native = no_prompt_receipt(
                     status, NONCE if status == 0 else None, "none" if status == 0 else "send"
                 )
-                child = mock.Mock(returncode=0)
-                child.communicate.return_value = (json.dumps(native) + "\n", "")
+                child = supplemental_mock_child(owner, native)
                 with mock.patch.object(probe.subprocess, "Popen", return_value=child) as spawn:
                     receipt = owner.control_pid_no_prompt(42, lambda _: [42])
                 self.assertEqual(receipt["outcome"], outcome)
@@ -693,7 +1116,7 @@ class NoPromptControlTests(unittest.TestCase):
         for observations in (([43],), ([42], [43]), ([42], [42], [43])):
             with self.subTest(observations=observations), tempfile.TemporaryDirectory() as folder:
                 owner = self.owner(folder)
-                child = mock.Mock(returncode=0)
+                child = mock.Mock(returncode=0, pid=SENDER_PID)
                 child.communicate.return_value = (json.dumps(no_prompt_receipt()) + "\n", "")
                 with (
                     mock.patch.object(probe.subprocess, "Popen", return_value=child),
@@ -714,7 +1137,7 @@ class NoPromptControlTests(unittest.TestCase):
         for code in (None, 1):
             with self.subTest(code=code), tempfile.TemporaryDirectory() as folder:
                 owner = self.owner(folder)
-                child = mock.Mock(returncode=code)
+                child = mock.Mock(returncode=code, pid=SENDER_PID)
                 child.communicate.return_value = (
                     json.dumps(no_prompt_receipt(-1744, None, "send")) + "\n",
                     "refused",
@@ -727,7 +1150,7 @@ class NoPromptControlTests(unittest.TestCase):
                 self.assertEqual(owner.scripting_commands, [child] if code is None else [])
         with tempfile.TemporaryDirectory() as folder:
             owner = self.owner(folder)
-            child = mock.Mock(returncode=None)
+            child = mock.Mock(returncode=None, pid=SENDER_PID)
             primary = subprocess.TimeoutExpired(["osascript", "PRIVATE_SOURCE"], 10)
             child.communicate.side_effect = [primary, subprocess.TimeoutExpired(["osascript"], 2)]
             with (
@@ -806,6 +1229,7 @@ class NoPromptControlTests(unittest.TestCase):
                 child = native_popen([sys.executable, "-c", source], **options)
                 communicate_budgets.append(observe_child_budgets(child))
                 children.append(child)
+                publish_supplemental_fixture(owner, child.pid, -1712, "none")
                 return child
 
             try:
@@ -851,6 +1275,7 @@ class NoPromptControlTests(unittest.TestCase):
                 child = native_popen([sys.executable, "-c", source], **options)
                 communicate_budgets.append(observe_child_budgets(child))
                 children.append(child)
+                publish_supplemental_fixture(owner, child.pid, -1744, "none")
                 return child
 
             try:

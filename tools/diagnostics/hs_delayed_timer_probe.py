@@ -4,12 +4,15 @@
 import base64
 import json
 import math
+import os
 from pathlib import Path
 import plistlib
 import re
 import secrets
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
@@ -371,6 +374,225 @@ class AppleScriptPreference:
             raise RuntimeError("The native scripting preference did not acknowledge restoration")
 
 
+SUPPLEMENTAL_RECEIPT_LIMIT = 2048
+SUPPLEMENTAL_SENDER_STAGES = (
+    "constructed",
+    "send_entered",
+    "send_returned",
+    "error_decode_entered",
+    "error_decode_complete",
+    "reply_decode_complete",
+)
+
+
+class NoPromptDiagnosticScope:
+    """Own fresh server witnesses and sender stages without admitting a control."""
+
+    def __init__(self, output, nonce, pid, executable, bundle_id):
+        self.path = Path(tempfile.mkdtemp(prefix="no-prompt-", dir=output))
+        self.identity = {
+            "nonce": nonce,
+            "pid": pid,
+            "executable": str(executable),
+            "bundle_id": bundle_id,
+        }
+        self.sender_pid = None
+        self.allowed_names = {"entry.json", "completion.json", "sender.json"}
+        self.allowed_names |= {name + ".pending" for name in self.allowed_names}
+        self.directory_identity = (self.path.stat().st_dev, self.path.stat().st_ino)
+
+    def bind_sender(self, pid):
+        """Bind the stage writer to the actual owned Popen child, not its target."""
+        if type(pid) is not int or pid <= 0 or self.sender_pid is not None:
+            raise RuntimeError("Supplemental sender identity is invalid or already bound")
+        self.sender_pid = pid
+
+    def _check_directory(self):
+        """Refuse a replaced scope before reading or removing any named receipt."""
+        info = self.path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != self.directory_identity:
+            raise RuntimeError("The supplemental receipt scope changed identity")
+
+    def read(self, name):
+        """Read one bounded regular owned inode; an absent witness is an observation."""
+        self._check_directory()
+        path = self.path / name
+        try:
+            named = path.lstat()
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISREG(named.st_mode) or named.st_size > SUPPLEMENTAL_RECEIPT_LIMIT:
+            raise ValueError("A supplemental receipt is nonregular or exceeds its bound")
+        descriptor = os.open(
+            path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        )
+        with os.fdopen(descriptor, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (
+                named.st_dev,
+                named.st_ino,
+            ):
+                raise ValueError("A supplemental receipt changed inode")
+            raw = handle.read(SUPPLEMENTAL_RECEIPT_LIMIT + 1)
+            current = path.lstat()
+            if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (
+                opened.st_dev,
+                opened.st_ino,
+            ):
+                raise ValueError("A supplemental receipt changed before admission")
+        if len(raw) > SUPPLEMENTAL_RECEIPT_LIMIT or not raw.endswith(b"\n") or b"\n" in raw[:-1]:
+            raise ValueError("A supplemental receipt is not one bounded JSON line")
+        try:
+            result = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
+        except (UnicodeError, ValueError):
+            # Supplemental receipts are private files, including malformed key text.
+            raise ValueError("A supplemental receipt failed closed JSON decoding") from None
+        if not isinstance(result, dict):
+            raise ValueError("A supplemental receipt is not an object")
+        return result
+
+    def observe(self, require_completion=False, terminal=False):
+        """Keep execution and sender evidence separate from the native send status."""
+        present = []
+        for name, phase in (("entry.json", "entry"), ("completion.json", "completion")):
+            receipt = self.read(name)
+            if receipt is None:
+                continue
+            expected = dict(
+                self.identity,
+                schema_version=1,
+                contract="hs.applescript.server-witness",
+                phase=phase,
+            )
+            if set(receipt) != set(expected) or any(
+                type(receipt[key]) is not type(value) or receipt[key] != value
+                for key, value in expected.items()
+            ):
+                raise ValueError("A supplemental server witness differs from its exact owner")
+            present.append(phase)
+        if present == ["completion"]:
+            raise ValueError("A completion witness has no preceding owned entry")
+        if require_completion and present != ["entry", "completion"]:
+            raise ValueError("The no-prompt nonce reply has incomplete server witnesses")
+        sender = self.read("sender.json")
+        stages = []
+        if sender is not None:
+            expected = {
+                "schema_version": 1,
+                "contract": "hs.applescript.sender-stages",
+                "nonce": self.identity["nonce"],
+                "target_pid": self.identity["pid"],
+                "sender_pid": self.sender_pid,
+            }
+            if set(sender) != set(expected) | {"stages"} or any(
+                type(sender[key]) is not type(value) or sender[key] != value
+                for key, value in expected.items()
+            ):
+                raise ValueError("Supplemental sender stages differ from the actual owned child")
+            stages = sender["stages"]
+            if (
+                not isinstance(stages, list)
+                or not stages
+                or stages != list(SUPPLEMENTAL_SENDER_STAGES[: len(stages)])
+            ):
+                raise ValueError("Supplemental sender stages are not a monotonic closed prefix")
+        required_stages = list(
+            SUPPLEMENTAL_SENDER_STAGES if require_completion else SUPPLEMENTAL_SENDER_STAGES[:-1]
+        )
+        if (terminal or require_completion) and stages != required_stages:
+            raise ValueError("The no-prompt native receipt lacks terminal sender stages")
+        return {
+            "server": "completed"
+            if len(present) == 2
+            else "entered"
+            if present
+            else "not_observed",
+            "sender_stage": stages[-1] if stages else "not_observed",
+        }
+
+    def lua_parts(self):
+        """Use only actual processInfo fields already qualified by the native timer."""
+        identity = self.identity
+        entry = json.dumps(str(self.path / "entry.json"))
+        completion = json.dumps(str(self.path / "completion.json"))
+        prefix = "return (function() local i=hs.processInfo; " + (
+            "assert(i.processID=={pid} and i.executablePath=={exe} and i.bundleID=={bundle}, "
+            "'Supplemental native owner differs'); local function publish(path,phase) "
+            "local text=hs.json.encode({{schema_version=1,contract='hs.applescript.server-witness',"
+            "nonce={nonce},pid=i.processID,executable=i.executablePath,bundle_id=i.bundleID,phase=phase}}); "
+            "assert(type(text)=='string' and #text<2048,'Supplemental witness encoding refused'); "
+            "local f=io.open(path..'.pending','wb'); assert(f,'Supplemental witness open refused'); "
+            "local wrote=f:write(text..'\\n'); local closed=f:close(); "
+            "assert(wrote and closed,'Supplemental witness write refused'); "
+            "assert(os.rename(path..'.pending',path),'Supplemental witness commit refused'); end; "
+            "publish({entry},'entry'); local function body() "
+        ).format(
+            pid=identity["pid"],
+            exe=json.dumps(identity["executable"]),
+            bundle=json.dumps(identity["bundle_id"]),
+            nonce=json.dumps(identity["nonce"]),
+            entry=entry,
+        )
+        suffix = (
+            "\nend; local result=body(); assert(result=="
+            + json.dumps(identity["nonce"])
+            + (
+                ",'Supplemental body nonce differs'); publish("
+                + completion
+                + ",'completion'); return result end)()"
+            )
+        )
+        return prefix, suffix
+
+    def javascript_prelude(self):
+        """Check each atomic stage write before any subsequent native bridge call."""
+        prefix, suffix = self.lua_parts()
+        return (
+            """
+var ownedStages = [];
+function recordOwnedStage(stage) {
+    var expected = __STAGES__;
+    if (stage !== expected[ownedStages.length]) throw new Error('Supplemental stage order refused');
+    ownedStages.push(stage);
+    var data = {schema_version:1,contract:'hs.applescript.sender-stages',nonce:__NONCE__,
+        target_pid:__PID__,sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),stages:ownedStages};
+    var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+    if (!encoded || encoded.isNil()) throw new Error('Supplemental stage encoding refused');
+    var size = Number(encoded.length);
+    if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__PATH__, true))
+        throw new Error('Supplemental stage write refused');
+}
+function ownedWitnessSource(source, pid, nonce) {
+    if (pid !== __PID__ || nonce !== __NONCE__) throw new Error('Supplemental source owner refused');
+    return __PREFIX__ + source + __SUFFIX__;
+}
+""".replace("__STAGES__", json.dumps(list(SUPPLEMENTAL_SENDER_STAGES)))
+            .replace("__NONCE__", json.dumps(self.identity["nonce"]))
+            .replace("__PID__", str(self.identity["pid"]))
+            .replace("__PATH__", json.dumps(str(self.path / "sender.json")))
+            .replace("__PREFIX__", json.dumps(prefix))
+            .replace("__SUFFIX__", json.dumps(suffix))
+        )
+
+    def cleanup(self):
+        """Acknowledge removal only inside the still-owned fresh receipt directory."""
+        self._check_directory()
+        names = {entry.name for entry in self.path.iterdir()}
+        if not names <= self.allowed_names:
+            raise RuntimeError("Supplemental scope cleanup has an unknown neighbour")
+        for name in names:
+            path = self.path / name
+            info = path.lstat()
+            if stat.S_ISDIR(info.st_mode):
+                raise RuntimeError("Supplemental scope cleanup has a foreign directory")
+            path.unlink()
+            if path.exists() or path.is_symlink():
+                raise RuntimeError("Supplemental receipt removal was not acknowledged")
+        self.path.rmdir()
+        if self.path.exists() or self.path.is_symlink():
+            raise RuntimeError("Supplemental scope removal was not acknowledged")
+
+
 class NativeDelayedTimerProbe:
     """Use the launch gate's signed embedded runtime without starting another process."""
 
@@ -386,6 +608,7 @@ class NativeDelayedTimerProbe:
         self.scripting_command_number = 0
         self.diagnostic_receipts = []
         self.runtime_owner = None
+        self.no_prompt_scope = None
 
     @staticmethod
     def executable_path(app):
@@ -441,6 +664,8 @@ class NativeDelayedTimerProbe:
                 "pid_control": self.pid_control_script,
                 "pid_no_prompt": self.no_prompt_script,
             }[phase]()
+            if phase == "pid_no_prompt" and self.no_prompt_scope is not None:
+                script = self.no_prompt_script(self.no_prompt_scope)
             arguments = ["/usr/bin/osascript", "-l", "JavaScript", "-e", script, str(pid), source]
             if phase in ("constructor", "pid_no_prompt"):
                 arguments.append(self.nonce)
@@ -455,6 +680,8 @@ class NativeDelayedTimerProbe:
         self.scripting_commands.append(command)
         self.scripting_command_number += 1
         try:
+            if phase == "pid_no_prompt" and self.no_prompt_scope is not None:
+                self.no_prompt_scope.bind_sender(command.pid)
             stdout, stderr = command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
         except Exception as primary:
             diagnostics = []
@@ -575,9 +802,9 @@ function run(argv) {
         )
 
     @staticmethod
-    def no_prompt_script():
+    def no_prompt_script(scope=None):
         """Discriminate native admission without prompting or changing permission."""
-        return (
+        script = (
             NativeDelayedTimerProbe.pid_event_constructor()
             + """
 function run(argv) {
@@ -613,23 +840,92 @@ function run(argv) {
             )
         )
 
+        if scope is None:
+            return script
+        script = script.replace(
+            "function run(argv) {", scope.javascript_prelude() + "\nfunction run(argv) {", 1
+        )
+        script = script.replace(
+            "constructOwnedEvent(pid, argv[1])",
+            "constructOwnedEvent(pid, ownedWitnessSource(argv[1], pid, argv[2]))",
+            1,
+        )
+        script = script.replace(
+            "    var error = Ref();",
+            "    recordOwnedStage('constructed');\n    var error = Ref();\n    recordOwnedStage('send_entered');",
+            1,
+        )
+        script = script.replace(
+            "    var status = 0,",
+            "    recordOwnedStage('send_returned');\n    recordOwnedStage('error_decode_entered');\n    var status = 0,",
+            1,
+        )
+        script = script.replace(
+            "        origin = 'send';",
+            "        origin = 'send';\n        recordOwnedStage('error_decode_complete');",
+            1,
+        )
+        script = script.replace(
+            "        if (status !== 0) origin = 'handler';",
+            "        recordOwnedStage('error_decode_complete');\n        if (status !== 0) origin = 'handler';",
+            1,
+        )
+        script = script.replace(
+            "            result = ObjC.unwrap(direct.stringValue);",
+            "            result = ObjC.unwrap(direct.stringValue);\n            recordOwnedStage('reply_decode_complete');",
+            1,
+        )
+        return script
+
     def control_pid_no_prompt(self, pid, processes):
-        """Retain one supplemental native admission result after exact settlement."""
+        """Retain execution witnesses separately from actual native admission status."""
         self.bind_runtime(pid, processes)
-        result = self.execute(
-            "return " + json.dumps(self.nonce), phase="pid_no_prompt", _target_pid=pid
-        )
-        if processes(self.executable) != [pid]:
-            raise RuntimeError("The no-prompt native process changed before receipt admission")
-        result["executable"] = str(self.executable)
-        self.retain_diagnostics(
-            [
-                f"Exact owned no-prompt AppleEvent {result['outcome']}: "
-                f"status {result['status']}, origin {result['error_origin']}"
-            ],
-            "pid_no_prompt",
-        )
-        return result
+        if self.no_prompt_scope is not None:
+            raise RuntimeError("Prior supplemental receipt cleanup has not settled")
+        scope = NoPromptDiagnosticScope(self.output, self.nonce, pid, self.executable, self.domain)
+        self.no_prompt_scope = scope
+        receipt_owner = None
+        try:
+            try:
+                result = self.execute(
+                    "return " + json.dumps(self.nonce), phase="pid_no_prompt", _target_pid=pid
+                )
+                receipt_owner = processes(self.executable)
+                if receipt_owner != [pid]:
+                    raise RuntimeError(
+                        "The no-prompt native process changed before receipt admission"
+                    )
+                evidence = scope.observe(require_completion=result["status"] == 0, terminal=True)
+            except Exception as primary:
+                if scope.sender_pid is not None:
+                    if receipt_owner is None:
+                        receipt_owner = processes(self.executable)
+                    if receipt_owner != [pid]:
+                        raise RuntimeError(
+                            "The supplemental server owner changed before witness observation"
+                        ) from primary
+                evidence = scope.observe()
+                self.retain_diagnostics(
+                    [
+                        f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}"
+                    ],
+                    "pid_no_prompt",
+                )
+                raise
+            result["executable"] = str(self.executable)
+            self.retain_diagnostics(
+                [
+                    f"Exact owned no-prompt AppleEvent {result['outcome']}: "
+                    f"status {result['status']}, origin {result['error_origin']}",
+                    f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
+                ],
+                "pid_no_prompt",
+            )
+            return result
+        finally:
+            if not self.scripting_commands:
+                scope.cleanup()
+                self.no_prompt_scope = None
 
     @staticmethod
     def constructor_script():
@@ -1061,3 +1357,6 @@ function run(argv) {
         for command in list(self.scripting_commands):
             self.retire_scripting_command(command)
         self.preference.restore()
+        if self.no_prompt_scope is not None:
+            self.no_prompt_scope.cleanup()
+            self.no_prompt_scope = None
