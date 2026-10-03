@@ -14,6 +14,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
+local ProcessGroup = require("infra.libuv_process_group")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -113,24 +114,11 @@ local function finish(request, result, suppress_callback)
 	end
 end
 
---- Sends a signal to the detached curl process group.
---- @param request table
---- @param signal string
---- @return boolean
-local function signal_group(request, signal)
-	if not luv or not request.pid or type(luv.kill) ~= "function" then return false end
-	local ok, accepted = pcall(luv.kill, -request.pid, signal)
-	return ok and accepted ~= nil and accepted ~= false
-end
-
 --- Terminates the entire owned curl process group.
 --- @param request table
 --- @return boolean
 local function terminate_group(request)
-	if request.exited then return true end
-	local terminated = signal_group(request, "sigterm")
-	if terminated then signal_group(request, "sigkill") end
-	return terminated
+	return ProcessGroup.terminate(luv, request.pid)
 end
 
 

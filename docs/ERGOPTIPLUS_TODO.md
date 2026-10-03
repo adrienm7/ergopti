@@ -242,6 +242,18 @@ These are software implementations; final hardware verification remains below.
   Windows curl process status and CNG, and macOS native HTTP/task status, do not
   expose this libuv split receipt. Native cross-OS validation and manual CI remain
   deferred.
+- [~] **L18.** Linux HTTP/digest descendant retirement: keep process-group
+  ownership after the leader exits and classify native ESRCH as already absent.
+  A common Linux libuv helper now submits graceful and forceful group retirement
+  from both adapters, retaining cancellation ownership on signal refusal. Twenty
+  actual descendant cases and twenty portable cases failed before the fix. The
+  fifty-case native CLI matrix uses real GNU tools and controlled descendants,
+  including SIGTERM resistance, and its own Linux subreaper reclaims every child.
+  Windows HTTP already launches through a tree-owned job. macOS retains hs.task
+  until its exact completion callback and sends only SIGTERM; descendant or
+  resistant-child retirement needs a separate native reproduction before
+  proposing explicit group ownership and forceful retirement. No macOS native
+  owner or gate was modified; native cross-OS suites and manual CI remain deferred.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

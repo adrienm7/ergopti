@@ -4,12 +4,21 @@
 --- All output comes from the GNU tools; no CLI output or libuv API is mocked.
 --- The wrapper is a controlled subprocess fixture, not a physical input test.
 local uv = require("luv")
+local ffi = require("ffi")
+ffi.cdef[[
+	int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
+	int waitpid(int pid, int *status, int options);
+]]
+-- Own and reap fixture descendants after their wrapper exits, rather than
+-- leaving zombies to the container's init. This changes only this process.
+assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "native fixture requires Linux child-subreaper support")
 local Shell = require("adapters.shell_runner")
 local Http = require("adapters.http_client")
 local Digest = require("adapters.file_digest")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-cli-exits-XXXXXX"))
 local previous_path = assert(uv.os_getenv("PATH"))
 local previous_mode = uv.os_getenv("ERGOPTI_NATIVE_EXIT_RECEIPT")
+local previous_receipt = uv.os_getenv("ERGOPTI_NATIVE_DESCENDANT_RECEIPT")
 local files, sockets = {}, {}
 local checks, failures = 0, 0
 local BODY = '{"native":true}\n'
@@ -39,6 +48,11 @@ for _, program in ipairs({ "curl", "sha256sum" }) do
 	write(path, "#!/bin/sh\n" .. Shell.quote(native) .. ' "$@"\n'
 		.. 'result=$?\n[ "$result" -eq 0 ] || exit "$result"\n'
 		.. 'case "$ERGOPTI_NATIVE_EXIT_RECEIPT" in\nsuccess) exit 0;;\nexit7) exit 7;;\n'
+		.. 'orphan*)\ncase "$ERGOPTI_NATIVE_EXIT_RECEIPT" in\n'
+		.. 'orphan-stubborn-*) /bin/sh -c \'trap "" TERM; printf ready > "$ERGOPTI_NATIVE_DESCENDANT_RECEIPT.ready"; exec sleep 30\' &\n'
+		.. 'child=$!; while [ ! -f "$ERGOPTI_NATIVE_DESCENDANT_RECEIPT.ready" ]; do sleep 0.001; done;;\n'
+		.. '*) sleep 30 & child=$!;;\nesac\n'
+		.. 'printf "%s %s\\n" "$$" "$child" > "$ERGOPTI_NATIVE_DESCENDANT_RECEIPT"; exit 0;;\n'
 		.. '*) kill -"$ERGOPTI_NATIVE_EXIT_RECEIPT" "$$"; exit 99;;\nesac\n')
 	assert(uv.fs_chmod(path, 448))
 end
@@ -75,6 +89,42 @@ assert(server:listen(16, function(err)
 end))
 
 --- Settles all request handles while retaining only the owned HTTP listener.
+local function await(done)
+	local deadline = uv.hrtime() + 5000000000
+	repeat
+		uv.run("nowait")
+		if done() then return true end
+		uv.sleep(1)
+	until uv.hrtime() >= deadline
+	return false
+end
+
+local function running(pid)
+	local file = io.open("/proc/" .. pid .. "/stat", "rb")
+	if not file then return false end
+	local stat = assert(file:read("*a"))
+	assert(file:close())
+	local state = assert(stat:match("^%d+ %(.+%) (%a) "))
+	return state ~= "Z" and state ~= "X"
+end
+
+local function identities(path)
+	local file = io.open(path, "rb")
+	if not file then return end
+	local bytes = assert(file:read("*a"))
+	assert(file:close())
+	local leader, child = bytes:match("^(%d+) (%d+)\n$")
+	return tonumber(leader), tonumber(child)
+end
+
+local function reap(child)
+	local status = ffi.new("int[1]")
+	assert(await(function()
+		local pid = ffi.C.waitpid(child, status, 1) -- WNOHANG; only this owned PID.
+		return pid == child or (pid == -1 and ffi.errno() == 10) -- ECHILD: libuv already reaped it.
+	end), "owned native descendant did not reap")
+end
+
 local function settle(done)
 	local deadline = uv.hrtime() + 5000000000
 	repeat
@@ -93,36 +143,67 @@ local function settle(done)
 end
 
 for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
-	for _, mode in ipairs({ "success", "exit7", "15", "9", "10", "12" }) do
+	for _, mode in ipairs({ "success", "exit7", "15", "9", "10", "12",
+		"orphan-deadline", "orphan-cancel", "orphan-stubborn-deadline", "orphan-stubborn-cancel" }) do
 		checks = checks + 1
+		local receipt = root .. "/child-" .. method .. "-" .. mode
+		local orphan = mode:sub(1, 7) == "orphan-"
+		local cancelled = mode:find("cancel", 1, true) ~= nil
+		local leader, child
+		if orphan then
+			files[#files + 1] = receipt
+			if mode:find("stubborn", 1, true) then files[#files + 1] = receipt .. ".ready" end
+		end
 		local ok, err = xpcall(function()
 			assert(uv.os_setenv("ERGOPTI_NATIVE_EXIT_RECEIPT", mode))
+			assert(uv.os_setenv("ERGOPTI_NATIVE_DESCENDANT_RECEIPT", receipt))
 			local result, callbacks, chunks = nil, 0, ""
 			local destination = root .. "/download-" .. mode
 			local before_requests = received
 			local function done(value) result, callbacks = value, callbacks + 1 end
+			local options = { timeout_ms = 500 }
 			local accepted
-			if method == "get" then accepted = Http.get(url, {}, {}, done)
-			elseif method == "post" then accepted = Http.post(url, {}, "{}", done)
+			if method == "get" then accepted = Http.get(url, {}, options, done)
+			elseif method == "post" then accepted = Http.post(url, {}, "{}", done, options)
 			elseif method == "download" then
 				files[#files + 1] = destination
-				accepted = Http.download(url, {}, destination, {}, done)
+				accepted = Http.download(url, {}, destination, options, done)
 			elseif method == "stream" then
-				accepted = Http.postStream(url, {}, "{}", {}, function(chunk) chunks = chunks .. chunk end, done)
+				accepted = Http.postStream(url, {}, "{}", options, function(chunk) chunks = chunks .. chunk end, done)
 			else
-				accepted = Digest.sha256(digest_path, {}, function(value, failure)
+				accepted = Digest.sha256(digest_path, options, function(value, failure)
 					done({ ok = value ~= nil, digest = value, error = failure })
 				end)
 			end
 			assert(accepted, "production dispatch refused the actual tool wrapper")
-			settle(function() return callbacks > 0 end)
-			assert(callbacks == 1 and not Http.isActive() and not Digest.isActive())
+			if orphan then
+				assert(await(function()
+					leader, child = identities(receipt)
+					return leader and not running(leader)
+				end), "native wrapper did not exit before its deadline")
+				assert(running(child), "positive native descendant control is absent")
+				if cancelled then
+					local cancel = method == "sha256" and Digest.cancel or Http.cancel
+					assert(cancel() == true)
+				end
+			end
+			settle(function()
+				if cancelled then return not Http.isActive() and not Digest.isActive() end
+				return callbacks > 0
+			end)
+			assert(callbacks == (cancelled and 0 or 1) and not Http.isActive() and not Digest.isActive())
+			if orphan then
+				assert(await(function() return not running(child) end), "native descendant survived leader retirement")
+			end
 			if method ~= "sha256" then
-				assert(received == before_requests + 1 and result.status == 200, "actual curl did not finish its loopback request")
+				assert(received == before_requests + 1, "actual curl did not finish its loopback request")
+				if not orphan then assert(result.status == 200, "real HTTP receipt lost its status") end
 				if method == "download" then assert(read(destination) == BODY) end
 				if method == "stream" then assert(chunks == BODY) end
 			end
-			if mode == "success" then
+			if cancelled then assert(result == nil, "cancellation published a stale completion")
+			elseif orphan then assert(result.ok == false and result.error == "timeout")
+			elseif mode == "success" then
 				assert(result.ok == true and result.error == nil)
 				if method == "sha256" then assert(result.digest == ABC_SHA256)
 				elseif method == "get" or method == "post" then assert(result.body == BODY) end
@@ -134,6 +215,14 @@ for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 				else assert(result.body == "", "failed process exposed a successful buffered body") end
 			end
 		end, debug.traceback)
+		if orphan then
+			leader, child = identities(receipt)
+			if leader then uv.kill(-leader, "sigkill") end
+			if child then
+				if running(child) then uv.kill(child, "sigkill") end
+				reap(child)
+			end
+		end
 		if ok then print("PASS " .. method .. " native exit " .. mode) else
 			failures = failures + 1
 			io.stderr:write("FAIL " .. method .. " native exit " .. mode .. ": " .. tostring(err) .. "\n")
@@ -149,6 +238,8 @@ assert(not uv.loop_alive(), "native fixture leaked handles")
 assert(uv.os_setenv("PATH", previous_path))
 if previous_mode then assert(uv.os_setenv("ERGOPTI_NATIVE_EXIT_RECEIPT", previous_mode))
 else assert(uv.os_unsetenv("ERGOPTI_NATIVE_EXIT_RECEIPT")) end
+if previous_receipt then assert(uv.os_setenv("ERGOPTI_NATIVE_DESCENDANT_RECEIPT", previous_receipt))
+else assert(uv.os_unsetenv("ERGOPTI_NATIVE_DESCENDANT_RECEIPT")) end
 for _, path in ipairs(files) do assert(uv.fs_unlink(path)) end
 assert(uv.fs_rmdir(root))
 print(string.format("Native CLI exit receipts: %d checks, %d failures", checks, failures))
