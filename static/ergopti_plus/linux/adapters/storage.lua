@@ -30,6 +30,7 @@ local Shell  = require("adapters.shell_runner")
 local json = require("json")
 
 local LOG = "adapters.storage"
+local ENOENT = 2 -- Native Linux errno: only a proven missing store may start empty.
 
 
 -- ========================================
@@ -108,14 +109,15 @@ end
 
 --- Loads the store from disk into _cache.
 local function _load()
-	local ok_open, fh = pcall(io.open, _STORE_PATH, "r")
-	if not ok_open then
+	local ok_open, fh, _, open_errno = pcall(io.open, _STORE_PATH, "r")
+	if not ok_open or not fh then
 		_cache = {}
+		if ok_open and open_errno == ENOENT then return end
 		_load_blocked = true
-		Logger.error(LOG, "Storage read could not start; mutations are blocked.")
+		_recovery = { reason = "read_failed", path = _STORE_PATH, preserved = true }
+		Logger.error(LOG, "Storage read could not start; original path retained and mutations blocked.")
 		return
 	end
-	if not fh then _cache = {} ; return end
 	local read_ok, content = pcall(fh.read, fh, "*a")
 	local close_ok = _close(fh)
 	if not read_ok or type(content) ~= "string" or not close_ok then

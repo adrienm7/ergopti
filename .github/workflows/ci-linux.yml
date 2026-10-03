@@ -182,6 +182,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_crypto_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve JSON stores after native read refusals
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_storage_read_receipts.lua
+        timeout-minutes: 1
+
       # The only step in this workflow that touches a real kernel input path.
       # Every other test of the two FFI adapters runs against a recorded syscall
       # backend, which is the right shape for asserting order and sequence and

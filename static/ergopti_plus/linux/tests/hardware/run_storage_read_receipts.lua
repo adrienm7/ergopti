@@ -1,0 +1,139 @@
+--- tests/hardware/run_storage_read_receipts.lua
+--- Exercises the production JSON Storage adapter with actual Linux permission
+--- failures and native environment changes. An unreadable existing store must
+--- never become an empty store that a subsequent mutation overwrites.
+--- No filesystem API is mocked; TOML persistence is outside this fixture.
+local uv = require("luv")
+local root = assert(uv.fs_mkdtemp("/tmp/ergopti-storage-XXXXXX"))
+local previous_xdg = uv.os_getenv("XDG_CONFIG_HOME")
+local directories, files = { root }, {}
+local checks, failures = 0, 0
+local ORIGINAL = '{"preserve":"original","nested":{"value":"é"}}'
+local operations = {
+	{ name = "set", apply = function(s) return s.set("replacement", true) end },
+	{ name = "set_many", apply = function(s) return s.set_many({ replacement = true }) end },
+	{ name = "delete", apply = function(s) return s.delete("preserve") end },
+	{ name = "clear", apply = function(s) return s.clear() end },
+}
+
+local function mkdir(path)
+	assert(uv.fs_mkdir(path, 448))
+	directories[#directories + 1] = path
+	return path
+end
+
+local function write(path, bytes)
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(bytes) and file:close())
+	files[#files + 1] = path
+end
+
+local function read(path)
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a"))
+	assert(file:close())
+	return bytes
+end
+
+local function fresh(path)
+	assert(uv.os_setenv("XDG_CONFIG_HOME", path))
+	package.loaded["adapters.storage"] = nil
+	return require("adapters.storage")
+end
+
+--- Restores only this fixture's private paths, even after a regression fails.
+local function restore_permissions()
+	for _, path in ipairs(directories) do assert(uv.fs_chmod(path, 448)) end
+	for _, path in ipairs(files) do
+		local ok, _, code = uv.fs_chmod(path, 384)
+		assert(ok or code == "ENOENT", "owned file permission restoration failed")
+	end
+end
+
+local function check(name, test)
+	checks = checks + 1
+	local ok, err = xpcall(test, debug.traceback)
+	restore_permissions()
+	if ok then print("PASS " .. name) else
+		failures = failures + 1
+		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
+	end
+end
+
+assert(uv.getuid() ~= 0, "permission regressions require an unprivileged user")
+for _, operation in ipairs(operations) do
+	for _, refusal in ipairs({ "unreadable-file", "unsearchable-parent", "non-directory" }) do
+		check(operation.name .. " rejects " .. refusal, function()
+			local config = mkdir(root .. "/" .. operation.name .. "-" .. refusal)
+			local parent = config .. "/ergopti_plus"
+			local store = parent .. "/storage.json"
+			if refusal == "non-directory" then
+				write(parent, ORIGINAL)
+			else
+				mkdir(parent)
+				write(store, ORIGINAL)
+				if refusal == "unreadable-file" then assert(uv.fs_chmod(store, 0))
+				else assert(uv.fs_chmod(parent, 0)) end
+			end
+			local storage = fresh(config)
+			local accepted = operation.apply(storage)
+			local recovery = storage.recovery_status()
+			restore_permissions()
+			assert(read(refusal == "non-directory" and parent or store) == ORIGINAL,
+				"native read refusal was followed by data loss")
+			assert(accepted == false, "mutation accepted an unclassified store")
+			assert(recovery and recovery.reason == "read_failed" and recovery.preserved == true)
+			assert(uv.fs_lstat(store .. ".tmp") == nil, "refused mutation wrote a temporary store")
+		end)
+	end
+	check(operation.name .. " accepts a genuinely missing store", function()
+		local config = mkdir(root .. "/" .. operation.name .. "-missing")
+		local parent = mkdir(config .. "/ergopti_plus")
+		local store = parent .. "/storage.json"
+		files[#files + 1] = store
+		local storage = fresh(config)
+		assert(operation.apply(storage) == true)
+		assert(storage.recovery_status() == nil)
+		if operation.name == "set" or operation.name == "set_many" then
+			assert(fresh(config).get("replacement") == true, "new store did not survive reload")
+		else assert(uv.fs_lstat(store) == nil, "empty-store no-op unexpectedly created data") end
+	end)
+end
+
+check("readable native store preserves unrelated nested values", function()
+	local config = mkdir(root .. "/readable")
+	local parent = mkdir(config .. "/ergopti_plus")
+	write(parent .. "/storage.json", ORIGINAL)
+	local storage = fresh(config)
+	assert(storage.get("preserve") == "original")
+	assert(storage.set_many({ replacement = true }))
+	storage = fresh(config)
+	assert(storage.get("preserve") == "original" and storage.get("nested").value == "é")
+	assert(storage.get("replacement") == true)
+end)
+
+check("fresh owner recovers after native permissions are repaired", function()
+	local config = mkdir(root .. "/repaired")
+	local parent = mkdir(config .. "/ergopti_plus")
+	local store = parent .. "/storage.json"
+	write(store, ORIGINAL)
+	assert(uv.fs_chmod(store, 0))
+	local blocked = fresh(config)
+	local accepted = blocked.set("replacement", true)
+	restore_permissions()
+	assert(accepted == false and read(store) == ORIGINAL)
+	local recovered = fresh(config)
+	assert(recovered.get("preserve") == "original")
+	assert(recovered.set("replacement", true))
+	assert(fresh(config).get("preserve") == "original")
+end)
+
+if previous_xdg then assert(uv.os_setenv("XDG_CONFIG_HOME", previous_xdg))
+else assert(uv.os_unsetenv("XDG_CONFIG_HOME")) end
+for index = #files, 1, -1 do
+	local ok, _, code = uv.fs_unlink(files[index])
+	assert(ok or code == "ENOENT", "owned fixture file cleanup failed")
+end
+for index = #directories, 1, -1 do assert(uv.fs_rmdir(directories[index])) end
+print(string.format("Native JSON storage read receipts: %d checks, %d failures", checks, failures))
+os.exit(failures == 0 and 0 or 1)
