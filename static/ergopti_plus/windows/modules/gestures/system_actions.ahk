@@ -107,6 +107,10 @@ _GestureMakeSystemRunner(ActionId, ActionFn, Sys := 0) {
 ; containment has returned, so a failure is contained and logged here rather
 ; than escaping the timer thread into the global error handler.
 _GestureRunSystemAction(ActionId, ActionFn) {
+	if A_IsSuspended {
+		LoggerInfo("gestures", "System action '{1}' was cancelled before its deferred execution: the script is suspended.", ActionId)
+		return false
+	}
 	try {
 		ActionFn.Call()
 	} catch as Err {
@@ -156,6 +160,10 @@ GestureSysSleepDisplays(Sys := 0) {
 }
 
 _GestureSysPowerOffDisplays(Sys) {
+	if A_IsSuspended {
+		LoggerInfo("gestures", "Display sleep was cancelled before its delayed execution: the script is suspended.")
+		return false
+	}
 	global GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF
 	if Sys.PostBroadcast(GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF)
 		LoggerInfo("gestures", "Displays put to sleep.")
