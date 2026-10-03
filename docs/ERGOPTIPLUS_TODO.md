@@ -1109,6 +1109,8 @@ Existing assertions and strict false, nil and throwing refusal contracts remain
 intact. Other native/provider rows keep items 54 and 81 partial; native Windows
 unit/E2E and complete three-OS packaging/install qualification still require CI.
 
+Windows token-streaming admission now refuses unset, non-map and incomplete native engine owners before reading their fields. The actual shared Display projection remains visible and grey without modifying stored streaming intent, future neighbours or acknowledged setting owners. A registered native regression covers six missing/retired owner shapes, and the source audit follows the authoritative shared declaration, capability/readiness bindings and retained-command admission instead of the superseded native row provider. All previous native assertions remain intact. Items 54 and 81 remain partial; the four observed Windows menu failures and obsolete source audit were reproduced by hosted CI, while execution of this correction still requires Windows CI. Portable source-contract checks pass with the original source red and six independent negative mutations refused.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
