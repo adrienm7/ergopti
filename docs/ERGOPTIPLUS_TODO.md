@@ -303,6 +303,15 @@ remains pending; this wiring change does not alter release gates.
 
 TODO 16 remains partial. The supplementary exact-PID no-prompt native send now spends eight seconds inside the unchanged ten-second subprocess deadline, retaining the existing two-second native deadline margin for JXA construction and numeric status delivery. A real-process regression reproduces the former receipt loss; original PATH, PID, feature, cleanup, admission and timer assertions remain mandatory. Actual macOS no-prompt status and the cause of the original PATH failure remain pending native CI.
 
+Compiled Windows first-use bootstrap now derives its reload capability
+from the actual A_IsCompiled state and the existing startup-smoke owner.
+The same acknowledged atomic source/stub publications continue in the
+resident compiled process; source-mode changes keep their terminal
+Reload/Exit handoff. Native child regressions exercise the real generator,
+filesystem and leases for missing, changed, matching and refused stages.
+The actual compiled startup smoke and native AHK regressions still require
+the next Windows CI checkpoint; lineage or exit zero is not readiness.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
