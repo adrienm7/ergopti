@@ -266,11 +266,28 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label) {
 			. '"plx" = { output = "Literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, is_case_sensitive_strict = true, priority = 81 }`n'
 			. '[[Other]]`n"pcx★" = { output = "Owned conform", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
 			. '"pex" = { output = "Explicit", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n', Path, "UTF-8")
+		; Native enumeration expands short directory aliases. Obtain the expected
+		; identity independently from Win32 before observing the catalogue owner.
+		CanonicalPaths := []
+		for SourcePath in [Root, Path] {
+			CanonicalBuffer := Buffer(32768 * 2, 0)
+			CanonicalLength := DllCall("GetLongPathNameW", "Str", SourcePath,
+				"Ptr", CanonicalBuffer, "UInt", 32768, "UInt")
+			AssertTrue(CanonicalLength > 0 && CanonicalLength < 32768,
+				"Win32 must resolve the existing fixture without truncation")
+			CanonicalPaths.Push(StrGet(CanonicalBuffer, CanonicalLength, "UTF-16"))
+		}
 		ScriptInformation["PersonalHotstringsDir"] := Root
 		Packs := HS_EnumeratePersonalExtFiles()
 		AssertEqual(1, Packs.Length, "the actual recursive owner enumerates exactly this personal source")
-		AssertEqual(Path, Packs[1]["Path"])
+		AssertEqual(CanonicalPaths[2], Packs[1]["Path"])
 		AssertEqual(Label, Packs[1]["Label"], "the source label comes from the authoritative enumerator")
+		ScriptInformation["PersonalHotstringsDir"] := CanonicalPaths[1]
+		CanonicalPacks := HS_EnumeratePersonalExtFiles()
+		AssertEqual(1, CanonicalPacks.Length, "both native root spellings identify exactly one source")
+		AssertEqual(CanonicalPaths[2], CanonicalPacks[1]["Path"])
+		AssertEqual(Label, CanonicalPacks[1]["Label"], "root aliases preserve the hierarchical Unicode label")
+		ScriptInformation["PersonalHotstringsDir"] := Root
 		CategoryEnabled["Hotstrings"] := true
 		_HotstringRegistrar := 0
 		HSE_RegistryClear()
