@@ -46,8 +46,9 @@ local EXISTING_WITH_TWIN_PROFILES = [[{
 --- Loads the generator and the shipped catalogues with an existing file.
 --- @param existing string|nil Content of karabiner.json; nil when absent.
 --- @param json_codec table|nil Replacement adapters.json_codec.
---- @param run function Receives { Generator, Config, actions, keys, combos, non_canonical }.
-local function with_generator(existing, json_codec, run)
+--- @param run function Receives the actual generator, catalogues and owned private source.
+--- @param locale_code string|nil Use the actual locale owner instead of unresolved test labels.
+local function with_generator(existing, json_codec, run, locale_code)
 	helpers.with_fresh_modules({
 		"adapters.file_system",
 		"adapters.json_codec",
@@ -57,6 +58,9 @@ local function with_generator(existing, json_codec, run)
 		"infra.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
+		"infra.i18n",
+		"infra.locale",
+		"locale.core",
 		"toml_codec",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -74,25 +78,47 @@ local function with_generator(existing, json_codec, run)
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 		package.loaded["toml_codec"] = toml_stub
 		package.loaded["infra.toml.codec"] = toml_stub
+		local file_state = { content = existing, writes = 0 }
 		package.loaded["adapters.file_system"] = {
 			read = SourceFile.read,
 			read_with_status = function(path)
 				if path == KARABINER_OUT then
-					if existing == nil then return nil, "absent" end
-					return existing, "ok"
+					if file_state.content == nil then return nil, "absent" end
+					return file_state.content, "ok"
 				end
 				return SourceFile.read(path), "ok"
+			end,
+			prepare_parent_for_create = function() return true end,
+			write_if_unchanged = function(path, content, expected)
+				assert(path == KARABINER_OUT, "only the owned private output is writable")
+				if expected.status ~= "ok" or expected.content ~= file_state.content then
+					return false, "source changed before publication"
+				end
+				file_state.content = content
+				file_state.writes = file_state.writes + 1
+				return true
 			end,
 		}
 		if json_codec then package.loaded["adapters.json_codec"] = json_codec end
 
 		local Config    = helpers.load_with_stubs("platform.remap.config")
+		local config_i18n = require("infra.i18n")
 		local Generator = helpers.load_with_stubs("platform.remap.generator")
+		if locale_code then
+			-- Exercise the same lazy locale owner as the standalone native probe,
+			-- rather than the baseline helper's unresolved-key i18n double.
+			package.loaded["infra.i18n"] = nil
+			package.loaded["infra.locale"] = nil
+			local actual_i18n = require("infra.i18n")
+			require("infra.locale").set_locale(locale_code)
+			config_i18n.get = actual_i18n.get
+		end
 		local keys      = assert(Config.load_tap_hold_keys(DATA_DIR .. "tap_hold_keys.json"))
 		local combos    = assert(Config.load_mod_combos(DATA_DIR .. "mod_combos.json"))
 		run({
 			Generator     = Generator,
 			Config        = Config,
+			file_state    = file_state,
 			actions       = assert(Config.load_available_actions(DATA_DIR .. "actions.json")),
 			keys          = keys,
 			combos        = combos,
@@ -118,6 +144,49 @@ local function build(env, preset, tap_holds, combinations)
 end
 
 helpers.describe("the shipped rule graph deploys (json-shared-tables)", function()
+	for _, preset in ipairs({ "default", "recommended" }) do
+		for _, tap_holds in ipairs({ false, true }) do
+			for _, combinations in ipairs({ false, true }) do
+				local name = string.format(
+					"localized canonical %s graph keeps personal profiles with unused action ambiguity (%s/%s)",
+					preset, tostring(tap_holds), tostring(combinations))
+				helpers.it(name, function()
+					with_generator(EXISTING_WITH_TWIN_PROFILES, nil, function(env)
+						local by_id = {}
+						for _, action in ipairs(env.actions) do by_id[action.id] = action end
+						helpers.assert_eq(by_id.cmd_tab.label, by_id.alt_tab_apps.label,
+							"the actual French registry aliases reproduce the native label collision")
+						helpers.assert_eq(by_id.cmd_tab.karabiner_to[1].key_code, "tab")
+						helpers.assert_eq(by_id.alt_tab_apps.karabiner_to[1].key_code, "f17")
+						local generated, detail, legacy, context = build(env, preset, tap_holds, combinations)
+						helpers.assert_not_nil(generated, detail)
+						local source = require("adapters.json_codec").decode(EXISTING_WITH_TWIN_PROFILES)
+						local merged, merge_error, snapshot = env.Generator.merge_into_existing_config(
+							generated, KARABINER_OUT, legacy, context)
+						helpers.assert_not_nil(merged, merge_error)
+						helpers.assert_eq(snapshot.content, EXISTING_WITH_TWIN_PROFILES)
+						helpers.assert_true(helpers.deep_equal(merged.profiles[1], source.profiles[1]),
+							"the inactive personal profile must remain structurally exact")
+						helpers.assert_true(helpers.deep_equal(
+							merged.profiles[2].complex_modifications.rules[1],
+							source.profiles[2].complex_modifications.rules[1]),
+							"the selected personal rule must remain structurally exact")
+						local deployed, deploy_error = env.Generator.merge_and_deploy_config(
+							generated, KARABINER_OUT, legacy, context)
+						helpers.assert_true(deployed, deploy_error)
+						helpers.assert_eq(env.file_state.writes, 1, "the exact source receipt owns one publication")
+						local repeated, repeat_detail, attempts = env.Generator.merge_and_deploy_config(
+							generated, KARABINER_OUT, legacy, context)
+						helpers.assert_true(repeated, repeat_detail)
+						helpers.assert_eq(repeat_detail, "unchanged")
+						helpers.assert_eq(attempts, 0)
+						helpers.assert_eq(env.file_state.writes, 1, "confirmation cannot rewrite the source")
+					end, "fr")
+				end)
+			end
+		end
+	end
+
 	for _, preset in ipairs({ "default", "recommended" }) do
 		for _, tap_holds in ipairs({ true, false }) do
 			for _, combinations in ipairs({ true, false }) do

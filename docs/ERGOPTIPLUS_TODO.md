@@ -629,16 +629,18 @@ use that CI ref with distinct run groups, so advancing it cannot cancel an
 older validation. No registered worktree or uncommitted source was removed;
 worktree hygiene remains unfinished.
 
-- [ ] **40.** The packaged-launch gate never builds a Karabiner configuration:
-      the CI runners have no Karabiner-Elements, so dev.148 passed every launch
-      scenario while every real Mac refused the deploy (« generated rule 1
-      manipulator 3 has inconsistent managed conditions », fixed with
-      `json-shared-tables`). Add a launch scenario that makes the app build and
-      merge its Karabiner configuration in the real Hammerspoon runtime (into the
-      runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
-      without needing the Karabiner driver.
+- [~] **40.** The packaged-launch gate never builds a Karabiner configuration:
+  the CI runners have no Karabiner-Elements, so dev.148 passed every launch
+  scenario while every real Mac refused the deploy (« generated rule 1
+  manipulator 3 has inconsistent managed conditions », fixed with
+  `json-shared-tables`). Add a launch scenario that makes the app build and
+  merge its Karabiner configuration in the real Hammerspoon runtime (into the
+  runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
+  without needing the Karabiner driver.
 
 The packaged macOS launch matrix now contains a Karabiner configuration scenario. It uses the real Hammerspoon JSON runtime and production build, merge and conditional atomic-file owners for eight default/recommended and switch vectors in a runner-owned private destination, preserves foreign profiles and personal rules, proves independent codec trees, and restores exact original bytes. It acquires no remap lease and installs no driver. The selected local gates pass 353 JS checks and 13,074 portable macOS cases, including five registered publication/restoration lifecycle regressions; 65 Python judges pass. Actual signed native execution remains pending and the existing scripting transport deadline is blocking, so TODO40 stays partial until that proof is green.
+
+The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
@@ -706,6 +708,9 @@ Native Windows checkpoint 37116696443 passed 7,978 unit cases; two historical te
   from a Tap-Hold menu row while the rules are pending
   (`karabiner-legacy-cleanup`); untested on a real Mac. Still to do: find why
   the proof fails from the backed-up file.
+
+Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and chord reconstruction accepts only one equivalent class; ambiguous references in selected or inactive historical blocks preserve every source byte and perform no publication. Dense catalogue, unique IDs, key/combo labels, immutable release graph proof, private signatures, managed tags and conditional publication retain their assertions. A descriptive marker-free personal chord remains personal. This fixes the independently reproduced canonical-catalogue obstruction; it does not diagnose an unavailable user's backed-up historical configuration or qualify real Karabiner input.
+
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
   `karabiner_cli --get-variable`, an option karabiner_cli has never had (exit
