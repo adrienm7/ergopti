@@ -7,7 +7,13 @@ param(
     [Parameter(Mandatory)][string] $Root
 )
 $ErrorActionPreference = 'Stop'
-. $Observer -Entry 'unused' -Ahk 'unused' -Root 'unused' -Nonce 'unused' -LibraryOnly
+# Dot-source parameter binding shares this scope; keep the actual native inputs.
+$fixtureAhk = $Ahk
+$fixtureRoot = $Root
+. $Observer -Entry 'unused' -Ahk $fixtureAhk -Root $fixtureRoot -Nonce 'unused' -LibraryOnly
+if ($Ahk -cne $fixtureAhk -or $Root -cne $fixtureRoot) {
+    throw 'The library import changed the native Reload fixture inputs.'
+}
 $entry = 'C:\private clone\ErgoptiPlus.ahk'
 foreach ($command in @(
     ('"C:\AutoHotkey64.exe" /ErrorStdOut "' + $entry + '"'),
