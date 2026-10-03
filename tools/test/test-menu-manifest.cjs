@@ -80,12 +80,13 @@ function loadResolvablePaths() {
 	return paths;
 }
 
-// Reference locale key sets. Full cross-locale parity is enforced by
-// test_locale_json_valid / audit-translations; here we only need a key to
-// exist, so fr (source) + en (fallback) are a sufficient reference.
+// Choice leaf and current-caption keys must exist in all published locales.
+// The broader locale shape remains owned by the existing parity audits.
 function loadLocaleKeys() {
 	const keysByLocale = {};
-	for (const name of ['fr', 'en']) {
+	for (const name of readdirSync(LOCALES_DIR)
+		.filter((file) => file.endsWith('.json'))
+		.map((file) => file.slice(0, -5))) {
 		const file = resolve(LOCALES_DIR, `${name}.json`);
 		// Locale JSON files are UTF-8-with-BOM by convention (matches the AHK
 		// driver) — strip the leading BOM code point before parsing, the same
@@ -107,6 +108,14 @@ function main() {
 	const violations = [];
 
 	const i18nFields = ['i18n', 'i18n_dynamic'];
+	const channelCorpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/update_channel_rows.json'), 'utf8')
+	);
+	const channelDeclaration = menu.about_update_channel_menu?.find(
+		(row) => row.id === 'update_channel'
+	);
+	require('node:assert/strict').deepEqual(channelDeclaration?.choices, channelCorpus.choices);
+	require('node:assert/strict').equal(channelDeclaration?.current_choice_placeholder, '{channel}');
 
 	// Walk every array at the top level of the manifest and validate each
 	// object element. Maps (gesture_slots, hotstring_groups, …) and string
@@ -141,7 +150,15 @@ function main() {
 			}
 
 			if (item.type === 'choice') {
-				if (typeof item.path !== 'string' || !featurePaths.has(item.path)) {
+				if (
+					typeof item.path !== 'string' ||
+					(!featurePaths.has(item.path) &&
+						!(
+							listName === 'about_update_channel_menu' &&
+							item.id === 'update_channel' &&
+							item.path === 'updater.channel'
+						))
+				) {
 					violations.push(`${where}: choice path "${item.path}" not found in manifest.toml`);
 				}
 				if (!Array.isArray(item.choices) || item.choices.length < 2) {
@@ -161,7 +178,9 @@ function main() {
 								violations.push(`${where}: literal choice labels are reserved for log tokens`);
 							continue;
 						}
-						for (const loc of ['fr', 'en']) {
+						for (const loc of Object.keys(localeKeys)) {
+							if (choice.current_i18n !== undefined && !localeKeys[loc].has(choice.current_i18n))
+								violations.push(`${where}: current choice label missing from ${loc}.json`);
 							if (!localeKeys[loc].has(choice.i18n)) {
 								violations.push(`${where}: choice label "${choice.i18n}" missing from ${loc}.json`);
 							}
@@ -221,7 +240,12 @@ function checkChoiceProjection() {
 	const { spawnSync } = require('node:child_process');
 	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-menu-choice-'));
 	try {
-		for (const relativePath of ['tools/build/build-menu-manifest.js', 'tools/lib/paths.cjs']) {
+		for (const relativePath of [
+			'tools/build/build-menu-manifest.js',
+			'tools/lib/paths.cjs',
+			'static/ergopti_plus/_shared/modules/updater/channels.json',
+			'static/ergopti_plus/_shared/ui/update_channels.js'
+		]) {
 			const target = path.join(fixture, relativePath);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.copyFileSync(path.join(REPO_ROOT, relativePath), target);
@@ -266,6 +290,104 @@ function checkChoiceProjection() {
 			{ value: 'action', i18n: 'menu.agent.mode_action' },
 			{ value: 'auto', i18n: 'menu.agent.mode_auto' }
 		]);
+		const channelCorpus = JSON.parse(
+			readFileSync(path.join(SHARED, 'tests/corpus/menus/update_channel_rows.json'), 'utf8')
+		);
+		assert.deepEqual(menu.about_update_channel_menu[0].choices, channelCorpus.choices);
+		assert.equal(menu.about_update_channel_menu[0].current_choice_placeholder, '{channel}');
+		assert.equal(Object.hasOwn(menu.about_update_channel_menu[0], 'choice_registry'), false);
+		const registryPath = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/updater/channels.json'
+		);
+		const registryBytes = fs.readFileSync(registryPath);
+		const reorderedRegistry = JSON.parse(registryBytes);
+		reorderedRegistry.channels.reverse();
+		fs.writeFileSync(registryPath, JSON.stringify(reorderedRegistry));
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(output)).about_update_channel_menu[0].choices.map(
+				(choice) => choice.value
+			),
+			channelCorpus.reordered_values
+		);
+		fs.writeFileSync(registryPath, registryBytes);
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		const acknowledgedChannels = fs.readFileSync(output);
+		for (const [before, after, reason] of [
+			[
+				'choice_registry = "updater.channels"',
+				'choice_registry = "unknown.registry"',
+				'choice_registry'
+			],
+			['path = "updater.channel"', 'path = "updater.future"', 'registry-owned path'],
+			[
+				'choice_registry = "updater.channels"',
+				'choice_registry = "updater.channels"\nchoice_values = ["main", "dev"]',
+				'registry choices'
+			],
+			[
+				'current_choice_placeholder = "{channel}"',
+				'current_choice_placeholder = false',
+				'current_choice_placeholder'
+			],
+			[
+				'current_choice_placeholder = "{channel}"',
+				'current_choice_placeholder = "channel"',
+				'current_choice_placeholder'
+			],
+			[
+				'current_choice_placeholder = "{channel}"',
+				'current_choice_placeholder = "{channel}{1}"',
+				'current_choice_placeholder'
+			]
+		]) {
+			const invalid = original.replace(before, after);
+			assert.notEqual(invalid, original);
+			result = execute(invalid);
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, new RegExp(reason));
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedChannels,
+				'invalid registry presentation preserves published bytes'
+			);
+		}
+		for (const corrupt of [
+			(registry) => {
+				registry.channels[1].id = registry.channels[0].id;
+			},
+			(registry) => {
+				registry.channels[0].menu_label_key = false;
+			}
+		]) {
+			const invalidRegistry = JSON.parse(registryBytes);
+			corrupt(invalidRegistry);
+			fs.writeFileSync(registryPath, JSON.stringify(invalidRegistry));
+			result = execute(original);
+			assert.notEqual(
+				result.status,
+				0,
+				'the actual canonical registry validator refuses malformed data'
+			);
+			assert.deepEqual(fs.readFileSync(output), acknowledgedChannels);
+		}
+		fs.writeFileSync(registryPath, registryBytes);
+		for (const [locale, expected] of Object.entries(channelCorpus.locales)) {
+			const labels = JSON.parse(
+				readFileSync(path.join(LOCALES_DIR, `${locale}.json`), 'utf8').replace(/^\uFEFF+/, '')
+			);
+			assert.equal(labels['menu.about.channel_menu'], expected.parent_template);
+			for (const [index, choice] of channelCorpus.choices.entries()) {
+				assert.equal(labels[choice.i18n], expected.leaf_labels[index]);
+				assert.equal(
+					labels['menu.about.channel_menu'].replace('{channel}', labels[choice.current_i18n]),
+					expected.captions[index]
+				);
+			}
+		}
 		const reordered = original.replace(
 			'enum_values = ["off", "action", "auto"]',
 			'enum_values = ["auto", "off", "action"]'

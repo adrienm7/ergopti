@@ -109,23 +109,12 @@ end
 --- @param subscribed string Registry id of the subscribed channel.
 --- @return table row A provider row with its items.
 local function channel_picker(owner, subscribed)
-	local registry = Updater.channels()
-	local rows = {}
-	for _, id in ipairs(registry.ids()) do
-		rows[#rows + 1] = {
-			label = i18n.get(registry.channel(id).menu_label_key),
-			checked = id == subscribed,
-			action = function()
-				Logger.info(LOG, "User chose the update channel '%s'.", id)
-				owner.set(id)
-			end,
-		}
-	end
-	return {
-		label = fill(i18n.get("menu.about.channel_menu"), "{channel}",
-			i18n.get(registry.channel(subscribed).label_key)),
-		items = rows,
-	}
+	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+		update_channel = function(id)
+			Logger.info(LOG, "User chose the update channel '%s'.", id)
+			owner.set(id)
+		end,
+	}, { ["updater.channel"] = function() return subscribed end })
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
