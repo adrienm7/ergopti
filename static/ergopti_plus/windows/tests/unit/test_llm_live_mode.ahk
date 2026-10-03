@@ -790,3 +790,44 @@ _LLV_MenuNoticeRetiresBeforeYield() {
 }
 Test("LLM live mode: menu fixture retires due rendering before yielding (live-menu-fixture)",
 	_LLV_MenuNoticeRetiresBeforeYield)
+
+
+/** A failed action must retire its queued renderer before scheduler release. */
+_LLV_FailedMenuNoticeRetiresBeforeYield() {
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _TooltipPendingRequest
+		State := { Rendered: false }
+		Renderer := (*) => State.Rendered := true
+		Rows := _LLM_Menu_LiveModeRows()
+		AssertTrue(Rows.Length > 1, "the real menu must provide an action")
+		Failure := Error("expected live menu action failure")
+		Action() {
+			Rows[2]["action"].Call()
+			Request := _TooltipPendingRequest
+			AssertTrue(IsObject(Request), "the failing action first publishes its actual notice")
+			SetTimer(Request.TimerFn, 0)
+			Request.TimerFn := Renderer
+			SetTimer(Renderer, -1)
+			throw Failure
+		}
+		PreviousCritical := A_IsCritical
+		Caught := 0
+		try {
+			try _LLV_InvokeAndRetireNotice(Action)
+			catch as Err
+				Caught := Err
+			AssertTrue(IsObject(Caught), "the action failure must propagate")
+			AssertEqual(ObjPtr(Failure), ObjPtr(Caught), "cleanup must retain the original error")
+			AssertEqual(PreviousCritical, A_IsCritical, "failure restores the caller's scheduler")
+			Sleep(30)
+			AssertFalse(State.Rendered, "the failing action must cancel its due renderer")
+			AssertFalse(IsObject(_TooltipPendingRequest), "failure retires the native notice owner")
+		} finally {
+			SetTimer(Renderer, 0)
+			TooltipHide("LiveModeTest", true)
+		}
+	}
+}
+Test("LLM live mode: failed menu fixture retires due rendering (live-menu-failure-fixture)",
+	_LLV_FailedMenuNoticeRetiresBeforeYield)
