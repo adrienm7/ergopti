@@ -295,6 +295,17 @@ These are software implementations; final hardware verification remains below.
   Linux owns this luv.run adapter; Windows and macOS use their host event loops.
   Shutdown owners still need their normal resource cleanup. No physical keyboard,
   native cross-OS gate or manual CI was exercised.
+- [~] **L23.** Linux logger file receipts: retire a channel when native write
+  or flush refuses, including buffered ENOSPC. Durability and idempotent install
+  now report the surviving main handle accurately; same-directory repoint can
+  reopen a repaired owner. One failed channel cannot disable stdout or the other
+  file, and its diagnostic cannot recurse into the logger. Five of six native
+  cases failed before the fix; fourteen portable cases fail against the prior
+  production module. All six actual /dev/full, descriptor, repair and normal-file
+  cases pass on the host and nonroot Debian. Windows already checks append/fence
+  receipts; macOS file fan-out ignores write/flush returns and needs native
+  diagnosis of this same failure class. No shared logger policy, macOS logger,
+  native cross-OS gate or manual CI changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

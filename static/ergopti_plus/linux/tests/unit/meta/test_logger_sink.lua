@@ -85,6 +85,118 @@ end
 -- ===========================================================
 -- ===========================================================
 
+--- Uses the real sink's write/flush interface; file and console receipts are simulated.
+local function with_write_receipts(channel, refusal, body)
+	local Sink = helpers.load_module("infra.logger_sink")
+	local dir = "/owned-logger-receipts"
+	local state = { files = {}, diagnostics = {}, console = {}, failing = true }
+	local logger = {}
+	function logger.set_sink(callback) state.emit = callback end
+	function logger.enable_repeat_collapsing() end
+	function logger.disable_repeat_collapsing() end
+	local original_open, original_execute = io.open, os.execute
+	local original_stdout, original_stderr = io.stdout, io.stderr
+	local previous_paths = package.loaded["infra.config_paths"]
+	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end }
+	os.execute = function() return 0 end
+	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
+		flush = function() return true end }
+	io.stderr = { write = function(_, line)
+		if state.diagnostics_unavailable then error("diagnostic output is closed") end
+		state.diagnostics[#state.diagnostics + 1] = line
+		return true
+	end }
+	io.open = function(path, mode)
+		if path == dir .. "/.write_probe" then return { close = function() return true end } end
+		if path:sub(1, #dir + 1) ~= dir .. "/" then return original_open(path, mode) end
+		local kind = path:find("_errors_", 1, true) and "errors" or "main"
+		local file = { writes = 0, flushes = 0, closes = 0 }
+		local function receipt(stage)
+			if kind == channel and state.failing and stage == refusal.stage then
+				if refusal.throws then error("native " .. stage .. " threw") end
+				return refusal.value, "native " .. stage .. " refused"
+			end
+			return true
+		end
+		function file.write()
+			file.writes = file.writes + 1
+			return receipt("write")
+		end
+		function file.flush()
+			file.flushes = file.flushes + 1
+			return receipt("flush")
+		end
+		function file.close() file.closes = file.closes + 1; return true end
+		state.files[kind] = file
+		return file
+	end
+	local ok, err = xpcall(function()
+		helpers.assert_true(Sink.install(logger, { log_dir = dir }))
+		body(Sink, state, logger)
+	end, debug.traceback)
+	Sink.uninstall(logger)
+	io.open, os.execute = original_open, original_execute
+	io.stdout, io.stderr = original_stdout, original_stderr
+	package.loaded["infra.config_paths"] = previous_paths
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-logger-write-receipts", function()
+	for _, channel in ipairs({ "main", "errors" }) do
+		for _, refusal in ipairs({
+			{ name = "nil write", stage = "write" }, { name = "nil flush", stage = "flush" },
+			{ name = "false write", stage = "write", value = false },
+			{ name = "false flush", stage = "flush", value = false },
+			{ name = "thrown write", stage = "write", throws = true },
+			{ name = "thrown flush", stage = "flush", throws = true },
+		}) do
+			helpers.it("linux-logger-write-receipts: retires " .. channel .. " after " .. refusal.name, function()
+				with_write_receipts(channel, refusal, function(Sink, state, logger)
+					local failed = state.files[channel]
+					state.emit("first native receipt", "warn")
+					helpers.assert_eq(failed.closes, 1, "refusal must immediately release its exact handle")
+					helpers.assert_eq(Sink.is_file_sink_active(), channel ~= "main")
+					helpers.assert_eq(Sink.install(logger), channel ~= "main", "idempotent install must report current durability")
+					helpers.assert_eq(#state.diagnostics, 1)
+					helpers.assert_contains(state.diagnostics[1], refusal.stage)
+					local attempts = failed.writes
+					state.emit("second native receipt", "warn")
+					helpers.assert_eq(failed.writes, attempts, "retired channel cannot be retried on every line")
+					helpers.assert_eq(#state.diagnostics, 1, "the same retired channel cannot flood diagnostics")
+					helpers.assert_eq(#state.console, 2)
+					local healthy = state.files[channel == "main" and "errors" or "main"]
+					helpers.assert_eq(healthy.writes, 2, "one refused channel must not starve the other")
+					helpers.assert_eq(healthy.flushes, 2)
+				end)
+			end)
+		end
+	end
+	helpers.it("linux-logger-write-receipts: closed diagnostic output cannot retain a failed owner", function()
+		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
+			state.diagnostics_unavailable = true
+			state.emit("native refusal without stderr", "warn")
+			helpers.assert_true(not Sink.is_file_sink_active())
+			helpers.assert_eq(state.files.main.closes, 1)
+			helpers.assert_eq(state.files.errors.writes, 1)
+			helpers.assert_eq(state.files.errors.flushes, 1)
+		end)
+	end)
+	helpers.it("linux-logger-write-receipts: same-directory repoint acquires a fresh repaired owner", function()
+		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
+			local failed = state.files.main
+			state.emit("initial refusal", "info")
+			state.failing = false
+			helpers.assert_true(Sink.repoint())
+			helpers.assert_true(state.files.main ~= failed, "repair must reopen, not retain the refused descriptor")
+			helpers.assert_eq(failed.closes, 1)
+			state.emit("repaired durability", "info")
+			helpers.assert_true(Sink.is_file_sink_active())
+			helpers.assert_eq(state.files.main.writes, 1)
+			helpers.assert_eq(state.files.main.flushes, 1)
+		end)
+	end)
+end)
+
 helpers.describe("logger sink — production wiring", function()
 	local raw   = read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua")
 	local entry = raw and strip_comment_lines(raw) or nil

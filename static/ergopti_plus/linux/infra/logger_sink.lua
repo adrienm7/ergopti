@@ -263,6 +263,28 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Appends one complete line and retires a failed native channel immediately.
+--- @param handle userdata Owned append handle.
+--- @param line string
+--- @param channel string Technical diagnostic label.
+--- @return userdata|nil The retained handle, only after write and flush succeed.
+local function append_line(handle, line, channel)
+	local protected, accepted, failure = pcall(function()
+		local written, write_error = handle:write(line, "\n")
+		if not written then return nil, write_error end
+		return handle:flush()
+	end)
+	if protected and accepted ~= nil and accepted ~= false then return handle end
+	pcall(function() handle:close() end)
+	local reason = protected and failure or accepted
+	-- Calling Logger here would recursively invoke this same failed sink.
+	pcall(function()
+		io.stderr:write("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
+			.. " — channel retired; logging continues through other outputs.\n")
+	end)
+	return nil
+end
+
 --- Writes one formatted line to every configured output.
 --- Signature is the shared core's sink contract: (line, variant).
 --- @param line string Already-formatted log line.
@@ -278,13 +300,11 @@ local function sink(line, variant)
 	rollover_if_needed()
 
 	if _main_handle then
-		_main_handle:write(line, "\n")
-		_main_handle:flush()
+		_main_handle = append_line(_main_handle, line, "main")
 	end
 
 	if _errors_handle and ERROR_VARIANTS[variant] then
-		_errors_handle:write(line, "\n")
-		_errors_handle:flush()
+		_errors_handle = append_line(_errors_handle, line, "errors")
 	end
 end
 
@@ -309,7 +329,7 @@ function M.install(logger, opts)
 		io.stderr:write("[logger_sink] install(): logger is not the shared core — no output installed.\n")
 		return false
 	end
-	if _installed then return not _stdout_only end
+	if _installed then return M.is_file_sink_active() end
 
 	opts = opts or {}
 	_dir = opts.log_dir or M.log_dir()
@@ -382,7 +402,7 @@ end
 function M.repoint()
 	if not _installed then return true end
 	local target = require("infra.config_paths").get_logs_dir()
-	if target == _dir and not _stdout_only then return true end
+	if target == _dir and not _stdout_only and _main_handle ~= nil then return true end
 	if not ensure_dir(target) then
 		return false, "the logs folder '" .. target .. "' could not be created"
 	end
