@@ -1882,9 +1882,9 @@ local function _build_llm(ctx)
 			items = delay_choices,
 		}
 		rows[#rows + 1] = { separator = true }
+		local leading_rows = rows
+		rows = {}
 		for _, setting in ipairs({
-			{ name = "instant_on_word_end", key = "menu.llm.instant_on_word_end" },
-			{ name = "after_hotstring", key = "menu.llm.after_hotstring" },
 			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
 			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
 		}) do
@@ -1898,9 +1898,34 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		local function ready()
+			return llm.is_enabled() == true and ctx.paused ~= true
+				and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+		end
+		local function toggle(name)
+			if not ready() then return false end
+			if TriggerSettings.toggle(name) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local trigger_ctx = {
+			commands = {
+				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
+				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
+			},
+			state_getters = {
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
+				["llm_trigger_ready"] = ready,
+			},
+		}
+		rows = ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, trigger_ctx, {
+			["llm_trigger_leading"] = function() return leading_rows end,
+			["llm_trigger_remaining"] = function() return rows end,
+		})
 		append_rendered_row(target, {
 			label = i18n_safe("menu.llm.trigger_menu_title"),
-			items = rows,
+			submenu = rows,
 			disabled = not enabled or nil,
 		}, "llm_trigger")
 	end

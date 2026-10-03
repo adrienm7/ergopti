@@ -417,6 +417,38 @@
 			"disabled_reason_key": "menu.about.source_run_reason"
 		}
 	],
+	"llm_trigger_menu": [
+		{
+			"type": "list",
+			"id": "llm_trigger_leading"
+		},
+		{
+			"type": "check",
+			"id": "llm_instant_on_word_end",
+			"i18n": "menu.llm.instant_on_word_end",
+			"checked_when": [
+				"llm_instant_on_word_end_enabled"
+			],
+			"disabled_when": [
+				"llm_trigger_ready"
+			]
+		},
+		{
+			"type": "check",
+			"id": "llm_after_hotstring",
+			"i18n": "menu.llm.after_hotstring",
+			"checked_when": [
+				"llm_after_hotstring_enabled"
+			],
+			"disabled_when": [
+				"llm_trigger_ready"
+			]
+		},
+		{
+			"type": "list",
+			"id": "llm_trigger_remaining"
+		}
+	],
 	"llm_display_menu": [
 		{
 			"type": "list",

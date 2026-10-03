@@ -78,15 +78,36 @@ _LLM_Menu_NRows() {
  * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
-LLM_Menu_BuildTriggerMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_trigger", (*) => _LLM_Menu_TriggerRows())
+LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
+	global _LLM_Menu
+	if !IsSet(InstantCommand)
+		InstantCommand := LLM_Menu_OnInstantToggle
+	if !IsSet(AfterCommand)
+		AfterCommand := (*) => LLM_Menu_ToggleBool("after_hotstring")
+	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
+		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
+			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
+		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
+			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call()),
+		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu["instant_on_word_end"],
+			"llm_after_hotstring_enabled", (*) => _LLM_Menu["after_hotstring"],
+			"llm_trigger_ready", _LLM_Menu_TriggerReady))
+}
+
+/**
+ * Reads the live trigger menu admission without coupling it to variant count.
+ * @returns {Boolean} Whether a native setting command may be delivered.
+ */
+_LLM_Menu_TriggerReady(*) {
+	global _LLM_Menu
+	return _LLM_Menu["enabled"] && !A_IsSuspended
 }
 
 /**
  * Row data for the trigger submenu.
- * @returns {Array} Debounce, the four toggles, the app picker.
+ * @returns {Array} Native debounce, privacy filters and the app picker.
  */
-_LLM_Menu_TriggerRows() {
+_LLM_Menu_TriggerRows(Position := "all") {
 	global _LLM_Menu
 	Rows := []
 
@@ -102,17 +123,8 @@ _LLM_Menu_TriggerRows() {
 
 	Rows.Push(Map("separator", true))
 
-	; Instant on word end
-	Rows.Push(Map(
-		"label",   t("menu.llm.instant_on_word_end"),
-		"checked", _LLM_Menu["instant_on_word_end"],
-		"action",  LLM_Menu_OnInstantToggle))
-
-	; After hotstring (suggest after a hotstring expansion finishes)
-	Rows.Push(Map(
-		"label",   t("menu.llm.after_hotstring"),
-		"checked", _LLM_Menu["after_hotstring"],
-		"action",  (*) => LLM_Menu_ToggleBool("after_hotstring")))
+	LeadingRows := Rows
+	Rows := []
 
 	Rows.Push(Map("separator", true))
 
@@ -136,7 +148,13 @@ _LLM_Menu_TriggerRows() {
 			: t("menu.llm.exclude_from_ai"),
 		"action", (*) => LLM_Menu_OpenAppPicker()))
 
-	return Rows
+	if Position == "leading"
+		return LeadingRows
+	if Position == "remaining"
+		return Rows
+	for Row in Rows
+		LeadingRows.Push(Row)
+	return LeadingRows
 }
 
 /**

@@ -102,6 +102,7 @@ const OPENS_SUBMENU = {
 	hotstrings_params: 'hotstrings_params_group',
 	word_expanders: 'word_expanders_menu',
 	llm_display: 'llm_display_menu',
+	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',
 	// Linux uses the same generation child inline, through its dynamic handler.
 	llm_generation: 'llm_generation_menu',
@@ -559,7 +560,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Explicit hotstring category commands and section lists now have one shared head.
 // The three Word Expander controls now share one declared child menu.
 // The common AI Info Bar check delegates to a shared display child menu.
-const RENDERED_THROUGH_SHARED = { hs: 21, linux: 18 };
+const RENDERED_THROUGH_SHARED = { hs: 22, linux: 19 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

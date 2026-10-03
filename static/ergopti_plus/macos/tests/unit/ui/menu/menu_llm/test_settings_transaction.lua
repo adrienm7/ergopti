@@ -130,6 +130,9 @@ local function with_fixture(options, callback)
 	if options.info_bar_state ~= nil then state.llm_show_info_bar = options.info_bar_state end
 	if options.auto_raise_state ~= nil then state.llm_auto_raise_temp = options.auto_raise_state end
 	if options.prediction_count ~= nil then state.llm_num_predictions = options.prediction_count end
+	if options.trigger_states then
+		state.llm_instant_on_word_end, state.llm_after_hotstring = table.unpack(options.trigger_states)
+	end
 	local runtime = clone_value(state)
 	local persisted = clone_value(state)
 	local rendered = clone_value(state)
@@ -282,6 +285,11 @@ local function with_fixture(options, callback)
 					root.llm_generation_menu[1], root.llm_generation_menu[2] = root.llm_generation_menu[2], root.llm_generation_menu[1]
 				end
 			end
+			if options.trigger_label then root.llm_trigger_menu[2].i18n = options.trigger_label end
+			if options.trigger_first then
+				local row = table.remove(root.llm_trigger_menu, 2)
+				table.insert(root.llm_trigger_menu, 1, row)
+			end
 			if options.info_first then
 				root.llm_display_menu[1], root.llm_display_menu[2] = root.llm_display_menu[2], root.llm_display_menu[1]
 			end
@@ -305,7 +313,7 @@ local function with_fixture(options, callback)
 			return items
 		end,
 		build = function(key, category, handlers, groups, ctx, providers)
-			if key == "llm_display_menu" or key == "llm_generation_menu" then
+			if key == "llm_display_menu" or key == "llm_generation_menu" or key == "llm_trigger_menu" then
 				return display_renderer.build(key, category, handlers, groups, ctx, providers)
 			end
 			local items = {}
@@ -532,6 +540,7 @@ local function with_fixture(options, callback)
 				state = state,
 				keymap = keymap,
 				is_disabled = false,
+				is_paused = function() return options.paused == true end,
 				save_prefs = save_prefs,
 				update_menu = update_menu,
 				settings_mgr = manager,
@@ -1318,6 +1327,102 @@ helpers.describe("LLM shared Show-all check", function()
 				helpers.assert_eq(fixture.rendered().llm_streaming_multi, true)
 				helpers.assert_eq(fixture.calls.menu, 0)
 			end)
+		end
+	end)
+end)
+
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 11/ Shared Automatic Triggers =======
+-- =============================================
+-- =============================================
+
+--- Reads independent automatic-trigger states and declaration identity.
+--- @return table corpus
+local function trigger_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/automatic_trigger_controls.json", "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared automatic trigger controls", function()
+	helpers.it("replays every bool pair through actual durable setters independently of count (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		helpers.assert_eq(#corpus.states, 4)
+		for _, states in ipairs(corpus.states) do
+			for _, count in ipairs(corpus.prediction_counts) do
+				for index, expected in ipairs(corpus.rows) do
+					with_fixture({trigger_states = states, prediction_count = count}, function(fixture)
+						local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+						helpers.assert_eq(row.checked or false, states[index])
+						helpers.assert_eq(row.disabled or false, false)
+						helpers.assert_eq(row.fn(), true)
+						helpers.assert_eq(fixture.state[expected.state], not states[index])
+						helpers.assert_eq(fixture.runtime[expected.state], not states[index])
+						helpers.assert_eq(fixture.persisted()[expected.state], not states[index])
+						local neighbor = corpus.rows[index == 1 and 2 or 1]
+						helpers.assert_eq(fixture.persisted()[neighbor.state], states[index == 1 and 2 or 1])
+						helpers.assert_eq(fixture.calls.save, 1)
+						helpers.assert_eq(fixture.calls.menu, 1)
+					end)
+				end
+			end
+		end
+	end)
+
+	helpers.it("honors declaration label and order without publishing sibling settings (shared-automatic-triggers)", function()
+		local corpus = trigger_corpus()
+		with_fixture({trigger_label = corpus.alternate_i18n, trigger_first = true}, function(fixture)
+			local rows = fixture.trigger_menu()
+			helpers.assert_eq(rows[1].title, corpus.alternate_i18n)
+			helpers.assert_true(rows[2].title:find("menu.llm.debounce_label", 1, true) ~= nil)
+			helpers.assert_eq(find_item(rows, corpus.rows[1].i18n), nil)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+		end)
+	end)
+
+	helpers.it("rereads current values and refuses old callbacks after pause or master withdrawal (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			local options = {trigger_states = {false, false}, prediction_count = 2}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+				helpers.assert_eq(row.fn(), true)
+				fixture.state.llm_num_predictions = 1
+				helpers.assert_eq(row.fn(), true, "changing variant count does not revoke a trigger setting")
+				helpers.assert_eq(fixture.state[expected.state], false)
+				local saves, runtime_calls = fixture.calls.save, fixture.calls.runtime
+				options.paused = true
+				helpers.assert_eq(row.fn(), false)
+				options.paused = false
+				fixture.state.llm_enabled = false
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.calls.save, saves)
+				helpers.assert_eq(fixture.calls.runtime, runtime_calls)
+				helpers.assert_eq(fixture.persisted()[expected.state], false)
+			end)
+		end
+	end)
+
+	helpers.it("preserves all publication boundaries on false nil and throwing writers (shared-automatic-triggers)", function()
+		for _, expected in ipairs(trigger_corpus().rows) do
+			for _, mode in ipairs({"false", "nil", "throw"}) do
+				with_fixture({failures = {{name = "save", mode = mode}}}, function(fixture)
+					local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+					helpers.assert_eq(row.fn(), false)
+					helpers.assert_eq(fixture.state[expected.state], false)
+					helpers.assert_eq(fixture.runtime[expected.state], false)
+					helpers.assert_eq(fixture.persisted()[expected.state], false)
+					helpers.assert_eq(fixture.rendered()[expected.state], false)
+					helpers.assert_eq(fixture.calls.menu, 0)
+				end)
+			end
 		end
 	end)
 end)
