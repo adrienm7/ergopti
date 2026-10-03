@@ -360,6 +360,15 @@ and private-stdin header transport are preserved. TODO 16 remains partial:
 release download, verification, installation and restart still require
 hosted validation.
 
+The first openSUSE install in manual run 37117084223 stopped in test
+tooling before the product installer (environment exit 2); the same image
+and unchanged harness had passed in run 37116696443. The native zypper
+exit and bounded solver/download/TLS/unknown token flags now survive the
+tooling boundary without raw output, retries or package-policy changes.
+Controlled package-manager regressions retain the exact native return,
+original outer refusal and unchanged install arguments; a fresh hosted
+failure is still needed to identify the original cause.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
