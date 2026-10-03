@@ -300,6 +300,8 @@ InstallHotstringHooks()
 #Include ../adapters/graphics_renderer.ahk
 #Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
+#Include ../../_shared/modules/actions/brightness.ahk
+#Include ../adapters/screen_brightness.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
@@ -730,6 +732,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
 #Include unit/test_system_actions.ahk
+#Include unit/test_screen_brightness.ahk
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk

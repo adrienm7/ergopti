@@ -220,6 +220,9 @@ REQUIRED_FILES=(
 	# Where a previous/next desktop step lands; the gesture manager loads it.
 	"_shared/lua/desktop_navigation/init.lua"
 	"_shared/lua/send_input/init.lua"
+	"_shared/lua/brightness_actions.lua"
+	"_shared/lua/brightness_actions_data.lua"
+	"_shared/modules/actions/brightness.json"
 	"_shared/modules/actions/send_keys.json"
 	"_shared/modules/actions/tap_keys.json"
 	"_shared/data/keycodes/evdev.json"

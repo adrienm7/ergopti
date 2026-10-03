@@ -17,6 +17,8 @@ local OWNERS = {
 	"infra.script_chord_catalogue",
 	"script_chords",
 	"app_parameter",
+	"brightness_actions",
+	"brightness_actions_data",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.hotkey_registrar",
