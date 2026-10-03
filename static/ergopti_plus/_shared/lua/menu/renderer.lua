@@ -742,7 +742,7 @@ function M.new(deps)
 				-- the values, the current one ticked. The values and their labels are
 				-- the enum feature's (`path`), projected into the row by
 				-- build-menu-manifest.js, so a value added to the feature appears here
-				-- without a driver change. The driver supplies the current value
+				-- unless its menu declares a validated subset. The driver supplies the current value
 				-- (state_getters[path]) and what choosing a value does
 				-- (commands[id](value)).
 				--
@@ -780,14 +780,15 @@ function M.new(deps)
 				local current_label = nil
 				for _, choice in ipairs(choices) do
 					local value = choice.value
-					if current == value then current_label = i18n.get(choice.i18n) end
+					local label = choice.label or i18n.get(choice.i18n)
+					if current == value then current_label = label end
 					sub[#sub + 1] = {
-						title   = i18n.get(choice.i18n),
+						title   = label,
 						checked = current == value,
 						fn      = function() return fn(value) end,
 					}
 				end
-				local title = i18n.get(i18n_key)
+				local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
 				-- Caption interpolation is declared alongside the shared choice, so
 				-- native consumers provide no competing mode-label policy.
 				if item.show_current_choice == true then

@@ -592,14 +592,17 @@ _MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	CurrentLabel := ""
 	for Choice in Choices {
 		Value := _MR_Get(Choice, "value")
+		ChoiceLabel := _MR_Get(Choice, "label")
+		if ChoiceLabel == ""
+			ChoiceLabel := t(_MR_Get(Choice, "i18n"))
 		if HasCurrent and Current == Value
-			CurrentLabel := t(_MR_Get(Choice, "i18n"))
+			CurrentLabel := ChoiceLabel
 		Rows.Push(Map(
-			"label",   t(_MR_Get(Choice, "i18n")),
+			"label",   ChoiceLabel,
 			"checked", HasCurrent and Current == Value,
 			"action",  ((V) => (*) => Command(V))(Value)))
 	}
-	Label := t(I18nKey)
+	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
 	if _MR_Get(Item, "show_current_choice", false) {
 		if CurrentLabel == ""
 			CurrentLabel := String(Current)

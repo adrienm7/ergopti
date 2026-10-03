@@ -318,6 +318,7 @@ return {
 	"tests.unit.modules.test_mt_decoder",
 	"tests.unit.modules.test_touchpad_finder",
 	"tests.unit.platform.remap.test_typing_rollover_catalog",
+	"tests.unit.ui.test_log_level_choices",
 	"tests.unit.ui.test_about_menu_channel_rows",
 	"tests.unit.ui.test_about_menu_uninstall",
 	"tests.unit.ui.test_about_menu_version_row",

@@ -318,6 +318,7 @@ input_altering = false
 type = "enum"
 enum_values = ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
 description_key = "menu.script.log_level"
+platforms = ["ahk", "hs", "linux"]
 
 # Whether a logged ERROR may open the error window (_shared/ui/error_dialog/),
 # ticked from the Debug menu. On by default: an error nobody sees is an error
@@ -4175,8 +4176,17 @@ type = "---"
 id = "---"
 
 [[menu.debug_menu]]
-type = "list"
+type = "choice"
 id = "log_level"
+i18n = "menu.debug.log_level"
+path = "script.log_level"
+choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]
+# These are the logger's technical tokens, identical in every locale. Their
+# presentation is shared; the durable API still accepts all eight severities.
+choice_label_kind = "log_level_token"
+choice_icons = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
+show_current_choice = true
+current_choice_suffix = " : {1}"
 
 [[menu.debug_menu]]
 type = "command"

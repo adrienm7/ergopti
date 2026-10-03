@@ -563,10 +563,12 @@ _MI_ChannelSetter(Id, SetChannelFn) {
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
-; Same shape as the Configuration submenu above: every row is a
-; `command` except the log-level picker, whose label carries the CURRENT level
-; and is therefore a `list` — exactly the shape Linux declared for it.
-_MI_BuildDebuggingMenu() {
+; Shared commands and one enum choice: native code supplies only the actual
+; setter and current runtime value, while the manifest owns the row policy.
+_MI_BuildDebuggingMenu(LogLevelCommand := 0) {
+	global LOGGER_MIN_LEVEL
+	if !HasMethod(LogLevelCommand, "Call")
+		LogLevelCommand := LoggerSetLevel
 	Commands := Map(
 		"window_spy",     WindowSpy,
 		"list_vars",      ActivateListVars,
@@ -577,18 +579,12 @@ _MI_BuildDebuggingMenu() {
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
-		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled())
+		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
+		"log_level", LogLevelCommand
 	)
-	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
-	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled)
-	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands, StateGetters)
-}
-
-; List provider: the log-level picker, whose parent row reads the current level.
-_MI_LogLevelRows() {
-	return [Map(
-		"label", _LogLevelMenuLabel(),
-		"items", _MI_LogLevelChoiceRows())]
+	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
+		"script.log_level", (*) => LOGGER_MIN_LEVEL)
+	return MenuRenderer_Build("debug_menu", "Debug", "", "", Map(), Commands, StateGetters)
 }
 
 ; Keep command registration shared by the real menu and its persistence tests.

@@ -101,6 +101,9 @@ function main() {
 	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
 	const featurePaths = loadResolvablePaths();
 	const localeKeys = loadLocaleKeys();
+	const logTokens = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/log_level_rows.json'), 'utf8')
+	).levels;
 	const violations = [];
 
 	const i18nFields = ['i18n', 'i18n_dynamic'];
@@ -145,6 +148,19 @@ function main() {
 					violations.push(`${where}: choice carries no projected values — run npm run build:menu`);
 				} else {
 					for (const choice of item.choices) {
+						if (choice.label !== undefined) {
+							// Literal labels are admitted only for the existing logger's
+							// technical enum tokens, checked independently below.
+							if (
+								item.path !== 'script.log_level' ||
+								choice.i18n !== undefined ||
+								!logTokens.some(
+									(entry) => entry.value === choice.value && entry.label === choice.label
+								)
+							)
+								violations.push(`${where}: literal choice labels are reserved for log tokens`);
+							continue;
+						}
 						for (const loc of ['fr', 'en']) {
 							if (!localeKeys[loc].has(choice.i18n)) {
 								violations.push(`${where}: choice label "${choice.i18n}" missing from ${loc}.json`);
@@ -262,7 +278,83 @@ function checkChoiceProjection() {
 			menu.agent_menu[0].choices.map((choice) => choice.value),
 			['auto', 'off', 'action']
 		);
+		const logCorpus = JSON.parse(
+			readFileSync(path.join(SHARED, 'tests/corpus/menus/log_level_rows.json'), 'utf8')
+		);
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		menu = JSON.parse(fs.readFileSync(output, 'utf8'));
+		const logRow = menu.debug_menu.find((row) => row.id === 'log_level');
+		assert.equal(logRow.type, 'choice');
+		assert.equal(logRow.path, 'script.log_level');
+		assert.deepEqual(logRow.choices, logCorpus.levels);
+		assert.equal(logRow.current_choice_suffix, ' : {1}');
+		for (const key of ['choice_values', 'choice_label_kind', 'choice_icons'])
+			assert.equal(Object.hasOwn(logRow, key), false, 'source metadata is consumed');
+		const logOrder = original.replace(
+			'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
+			'choice_values = ["ERROR", "DEBUG", "WARNING", "INFO"]'
+		);
+		assert.notEqual(logOrder, original);
+		result = execute(logOrder);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(output, 'utf8'))
+				.debug_menu.find((row) => row.id === 'log_level')
+				.choices.map((choice) => choice.value),
+			logCorpus.reordered_values
+		);
 		const acknowledged = fs.readFileSync(output);
+		for (const [oldValue, invalidValue, reason] of [
+			[
+				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
+				'choice_values = ["DEBUG", "DEBUG"]',
+				'choice_values'
+			],
+			[
+				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
+				'choice_values = ["DEBUG", "UNKNOWN"]',
+				'choice_values'
+			],
+			[
+				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
+				'choice_values = []',
+				'choice_values'
+			],
+			[
+				'choice_label_kind = "log_level_token"',
+				'choice_label_kind = "literal"',
+				'choice_label_kind'
+			],
+			[
+				'path = "script.log_level"\nchoice_values',
+				'path = "llm.agent_mode"\nchoice_values',
+				'choice_values'
+			],
+			['ERROR = "❌"', 'ERROR = "untranslated caption"', 'choice_icons'],
+			[
+				'current_choice_suffix = " : {1}"',
+				'current_choice_suffix = " level: {1}"',
+				'current_choice_suffix'
+			],
+			['ERROR = "❌"', 'OTHER = "❌"', 'choice_icons'],
+			[
+				'current_choice_suffix = " : {1}"',
+				'current_choice_suffix = " : {2}"',
+				'current_choice_suffix'
+			]
+		]) {
+			const invalid = original.replace(oldValue, invalidValue);
+			assert.notEqual(invalid, original);
+			result = execute(invalid);
+			assert.notEqual(result.status, 0, 'invalid log choice projection must refuse publication');
+			assert.match(result.stderr, new RegExp(reason));
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledged,
+				'refusal preserves acknowledged bytes'
+			);
+		}
 		for (const [oldValue, invalidValue, reason] of [
 			[
 				'choice_label_prefix = "menu.agent.mode_"',
@@ -291,7 +383,7 @@ function checkChoiceProjection() {
 		fs.rmSync(fixture, { recursive: true, force: true });
 	}
 	console.log(
-		'menu choice projection: actual enum order, legacy label keys and 3 malformed receipts qualified.'
+		'menu choice projection: actual enum order, legacy label keys, four log states and 12 malformed receipts qualified.'
 	);
 }
 

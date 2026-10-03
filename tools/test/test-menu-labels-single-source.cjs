@@ -5,7 +5,8 @@
  * MODULE: Menu Labels Single-Source Guard
  * DESCRIPTION:
  * Verifies that menu label formatters are single-sourced in
- * _shared/lua/menu/labels.lua: log_level_emoji, fmt_count, decorate_section.
+ * _shared/lua/menu/labels.lua: fmt_count, decorate_section. Log-token presentation now belongs
+ * to the validated shared menu choice, so the retired emoji helper cannot return.
  *
  * ROOT CAUSE ENCODED:
  * The log-level emoji map, count formatter, and section header decoration were
@@ -21,7 +22,7 @@
  * only confirm the compliance it already knew about.
  *
  * It is now an EXCLUSION ratchet over all three drivers: no file outside
- * _shared/lua/menu/labels.lua may define any of the three formatters, unless it
+ * _shared/lua/menu/labels.lua may define any remaining formatter, unless it
  * is named in DUPLICATES with a reason. Two things are asserted about that list —
  * a duplicate not on it fails, and an entry whose duplicate is gone fails too, so
  * the list shrinks as the migration proceeds and can never rot.
@@ -37,7 +38,8 @@ const ROOT = p.resolve(__dirname, '..', '..');
 const SP = p.join(ROOT, 'static/ergopti_plus');
 const CANONICAL = 'static/ergopti_plus/_shared/lua/menu/labels.lua';
 
-const FORMATTERS = ['log_level_emoji', 'fmt_count', 'decorate_section'];
+const FORMATTERS = ['fmt_count', 'decorate_section'];
+const RETIRED = ['log_level_emoji'];
 
 // A definition of one of the formatters, in either language. Lua:
 // `function M.fmt_count(` / `local function fmt_count(`. AHK: `FmtCount(N) {`.
@@ -58,8 +60,7 @@ const AHK_DEF = (name) => {
 // parity gate and the AHK suite instead. They go away when the menu renderer is
 // shared.
 const DUPLICATES = {
-	'static/ergopti_plus/windows/infra/menu_helpers.ahk': ['fmt_count'],
-	'static/ergopti_plus/windows/ui/menu/menu_rebuild.ahk': ['log_level_emoji']
+	'static/ergopti_plus/windows/infra/menu_helpers.ahk': ['fmt_count']
 };
 
 const errors = [];
@@ -88,7 +89,7 @@ function walk(dir, acc = []) {
 	return acc;
 }
 
-// ── 1. The canonical module must exist and export all three ─────────────────
+// ── 1. The canonical module must exist and export the remaining formatters ─────────────────
 if (!fs.existsSync(p.join(ROOT, CANONICAL))) {
 	errors.push(`${CANONICAL}: missing — menu label formatters must be single-sourced`);
 } else {
@@ -111,9 +112,13 @@ if (files.length < 500) {
 const found = {}; // rel → [formatter, …]
 for (const abs of files) {
 	const rel = p.relative(ROOT, abs).replace(/\\/g, '/');
-	if (rel === CANONICAL) continue;
 	const src = fs.readFileSync(abs, 'utf8');
 	const isAhk = rel.endsWith('.ahk');
+	for (const fn of RETIRED) {
+		if ((isAhk ? AHK_DEF(fn) : LUA_DEF(fn)).test(src))
+			errors.push(`${rel}: retired "${fn}" duplicates the shared enum choice presentation`);
+	}
+	if (rel === CANONICAL) continue;
 	for (const fn of FORMATTERS) {
 		const re = isAhk ? AHK_DEF(fn) : LUA_DEF(fn);
 		if (!re.test(src)) continue;

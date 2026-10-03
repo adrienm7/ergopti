@@ -1781,9 +1781,10 @@ local function main()
 				end
 			end,
 			on_set_log_level = function(lvl)
-				if not ScriptSettings.set(lvl) then return end
+				if not ScriptSettings.set(lvl) then return false end
 				Logger.info(LOG, "Log level set to %s.", lvl)
 				if rebuild_tray_menu then rebuild_tray_menu() end
+				return true
 			end,
 			on_toggle_error_dialog = function()
 				if not ErrorDialog then

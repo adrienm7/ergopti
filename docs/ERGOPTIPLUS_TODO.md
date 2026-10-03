@@ -633,6 +633,16 @@ failed both native Mode cases before they could replay their corpus because
 expectations, native flags, shared-order mutations and refusal assertions remain
 unchanged. Native Windows replay still requires the next non-release checkpoint.
 
+The four Debug log-level choices now share a validated enum subset, order,
+technical labels, icons and current caption across Windows, macOS and Linux.
+The existing eight-value severity API is preserved. macOS publishes the new
+threshold and invalidates its cached menu only after exact persistence
+acknowledgement; refusal, nil and throws preserve both. Independent choice and
+owner-refusal regressions pass locally; the current Linux suite and real X11
+checks pass, with unchanged macOS sources covered by the prior full suite.
+Native Windows, packaging and installation validation remain pending CI.
+Items 54 and 81 remain partial for the other native menu groups.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

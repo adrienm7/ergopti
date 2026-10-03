@@ -123,10 +123,13 @@ function validateGreyedRows(menu) {
  *
  * A choice row is one setting with a fixed set of values, drawn as one row with
  * the values beneath it. The values belong to the feature (its `enum_values`),
- * so the row never lists them itself: each becomes `{ value, i18n }`, labelled
+ * so a declared ordered subset must be validated against that enum. Each
+ * translated leaf becomes `{ value, i18n }`, labelled
  * by the key `<row i18n>.<value>`, or by an explicit `choice_label_prefix` for
- * established label keys. `show_current_choice` lets the shared renderer fill
- * {1} in the parent caption from the selected leaf's translated label.
+ * established label keys. The logger alone may expose its existing technical
+ * tokens with source-owned emoji; these are not untranslated natural language.
+ * `show_current_choice` lets the shared renderer fill
+ * {1} in the parent caption from the selected leaf's label.
  * A row whose path is not an enum feature, that lists its choices by hand, or
  * that is shown on a platform the feature does not
  * declare fails the build instead of drawing a row no driver can store.
@@ -168,10 +171,56 @@ function projectChoices(menu, raw) {
 				throw new Error(`${where}: choice_label_prefix must be a non-empty locale-key prefix`);
 			if (row.show_current_choice !== undefined && typeof row.show_current_choice !== 'boolean')
 				throw new Error(`${where}: show_current_choice must be a boolean`);
-			row.choices = feature.enum_values.map((value) => ({
-				value,
-				i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}`
-			}));
+			const values = row.choice_values === undefined ? feature.enum_values : row.choice_values;
+			if (
+				!Array.isArray(values) ||
+				values.length < 2 ||
+				new Set(values).size !== values.length ||
+				values.some((value) => !feature.enum_values.includes(value))
+			)
+				throw new Error(
+					`${where}: choice_values must be a unique enum subset with at least two values`
+				);
+			const technical = row.choice_label_kind === 'log_level_token';
+			if (row.choice_label_kind !== undefined && (!technical || row.path !== 'script.log_level'))
+				throw new Error(`${where}: choice_label_kind is reserved for the logger's enum tokens`);
+			const icons = row.choice_icons;
+			if (technical) {
+				if (
+					prefix !== undefined ||
+					!icons ||
+					typeof icons !== 'object' ||
+					Array.isArray(icons) ||
+					Object.keys(icons).length !== values.length ||
+					values.some(
+						(value) =>
+							!Object.hasOwn(icons, value) ||
+							typeof icons[value] !== 'string' ||
+							!/^\p{Extended_Pictographic}\uFE0F?$/u.test(icons[value])
+					)
+				)
+					throw new Error(`${where}: choice_icons must name every selected log token exactly once`);
+			} else if (icons !== undefined) {
+				throw new Error(`${where}: choice_icons belongs to log_level_token only`);
+			}
+			if (
+				row.current_choice_suffix !== undefined &&
+				(typeof row.current_choice_suffix !== 'string' ||
+					row.show_current_choice !== true ||
+					(row.current_choice_suffix.match(/\{1\}/g) || []).length !== 1 ||
+					/[\p{L}\p{N}\r\n\t]/u.test(row.current_choice_suffix.replace('{1}', '')))
+			)
+				throw new Error(
+					`${where}: current_choice_suffix needs punctuation, one {1} and show_current_choice`
+				);
+			row.choices = values.map((value) =>
+				technical
+					? { value, label: `${icons[value]} ${value}` }
+					: { value, i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}` }
+			);
+			delete row.choice_values;
+			delete row.choice_label_kind;
+			delete row.choice_icons;
 			// The compiler consumes this source metadata; native readers use only
 			// the projected labels and must not carry a competing prefix policy.
 			delete row.choice_label_prefix;
