@@ -267,3 +267,59 @@ _MKS_EditorCase() {
 			Owner[Key] := Value
 	}
 }
+
+Test("magic key source: configured tap claims refuse choices across the shared corpus (magic-key-source)",
+	_MKS_TapClaimCorpusCase)
+
+_MKS_TapClaimCorpusCase() {
+	global _SharedDir, TapKeyAssignments, CategoryEnabled, ScriptInformation
+	SavedAssignments := TapKeyAssignments
+	SavedCategories := CategoryEnabled
+	SavedSource := ScriptInformation["MagicKeySource"]
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\keymap\magic_source_tap_claims.json", "UTF-8"))
+	try {
+		CategoryEnabled := Map("Shortcuts", false)
+		for Vector in Corpus["cases"] {
+			TapKeyAssignments := Vector["assignments"]
+			Source := Vector["source"]
+			Expected := Vector["expected"]["ahk"]
+			Scan := Source == "auto" ? 0 : Integer("0x" . SubStr(LayoutRegistry_KeyScan(Source, LayoutRegistry_Keycodes()), 3))
+			AssertEqual(Expected, TapKeyAssignedToScan(Scan), Vector["name"])
+			AssertEqual(Expected == "" ? "" : Corpus["reason_key"], MagicKeySourceChoiceReason(Source), Vector["name"])
+			if Expected == ""
+				continue
+			ScriptInformation["MagicKeySource"] := "KeyJ"
+			Calls := { writes: 0, notices: [], reloads: 0 }
+			InheritedCritical := A_IsCritical
+			try {
+				Critical("On")
+				AssertFalse(ModifyMagicKeySource(Source, (*) => (Calls.writes += 1),
+					(Reason) => Calls.notices.Push(Map("reason", Reason, "critical", A_IsCritical)),
+					(*) => (Calls.reloads += 1)))
+				Assert(A_IsCritical > 0, "the caller's Critical state is restored after refusal")
+			} finally {
+				Critical(InheritedCritical)
+			}
+			AssertEqual(0, Calls.writes, "refusal precedes persistence")
+			AssertEqual(0, Calls.reloads, "refusal does not reacquire native input")
+			AssertEqual(Corpus["reason_key"], Calls.notices[1]["reason"])
+			AssertEqual(0, Calls.notices[1]["critical"], "notification runs outside the native input Critical span")
+			AssertEqual("KeyJ", ScriptInformation["MagicKeySource"])
+			AssertEqual("send_text", TapKeyAssignments[Expected], "the stored tap action is retained")
+			Rows := MagicKeySourceMenuRows()
+			Seen := 0
+			for Row in Rows[1]["items"] {
+				if Row.Has("label") && (InStr(Row["label"], "(" . Source . ")") || InStr(Row["label"], Source . " — ") == 1) {
+					Seen += 1
+					AssertTrue(Row["disabled"])
+					Assert(InStr(Row["label"], t(Corpus["reason_key"])) > 0, "the row explains its refusal")
+				}
+			}
+			AssertEqual(1, Seen, "the refused candidate is still visible exactly once")
+		}
+	} finally {
+		TapKeyAssignments := SavedAssignments
+		CategoryEnabled := SavedCategories
+		ScriptInformation["MagicKeySource"] := SavedSource
+	}
+}

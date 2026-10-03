@@ -458,6 +458,18 @@ local TAP_WRAP_SCENARIOS = {
 -- remain valid. A refused repeat stays swallowed until release, even if the
 -- pause, group or inhibition is restored before the next repeat.
 local MAGIC_REPEAT_SCENARIOS = {
+	{ name = "a captured assigned source refuses without changing configuration", magic_repeat = "tap-choice", keys = "",
+		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=KeyJ tap=send_text queued=0 executed=0 bytes=true captured=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment" },
+	{ name = "old conflicting magic intent preserves acknowledged tap priority", magic_repeat = "tap-legacy", keys = "",
+		screen = "replacement", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=1 executed=1 bytes=false captured=nil" },
+	{ name = "disabled shortcut delivery releases old conflicting native source", magic_repeat = "tap-off", keys = "",
+		screen = "★★★", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
+	{ name = "paused conflicting sources produce no automated output", magic_repeat = "tap-paused", keys = "",
+		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
+	{ name = "none releases configured source ownership", magic_repeat = "tap-none", keys = "",
+		screen = "★★★", tap_collision_receipt = "choice=true reason=nil source=Backquote tap=none queued=0 executed=0 bytes=false captured=nil" },
+	{ name = "modified old conflicting sources preserve the physical chord", magic_repeat = "tap-modified", keys = "",
+		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
 	{ name = "a held physical magic key emits every acknowledged repeat", magic_repeat = "accepted", keys = "",
 		screen = "★★★", magic_receipt = "decisions=1 dispatched=3 attempts=3 origins=1 raw=0 chosen=0" },
 	{ name = "a refused magic injection retires the held press", magic_repeat = "injection", keys = "",
@@ -574,6 +586,14 @@ do
 			local pipe = io.popen(command, "r")
 			local output = pipe and pipe:read("*a") or ""
 			if pipe then pipe:close() end
+			if scenario.tap_collision_receipt then
+				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
+				if receipt == scenario.tap_collision_receipt then
+					pass(prefix .. scenario.name .. " (exact admission receipt)")
+				else
+					fail(prefix .. scenario.name .. " (exact admission receipt)", scenario.tap_collision_receipt, receipt or "absent")
+				end
+			end
 			if scenario.receipt then
 				local receipt = output:match("TAP_WRAP ([^\r\n]+)")
 				if receipt == scenario.receipt then

@@ -88,3 +88,56 @@ helpers.describe("shortcuts.actions.system: the tap-key tap (tap-keys)", functio
 		end)
 	end)
 end)
+
+helpers.describe("tap-key physical source claims", function()
+	helpers.it("(tap-keys) publishes only acknowledged plain delivery and respects live admission", function()
+		with_fixture(function()
+			local sys, spy = make_sys_screenshot_spies()
+			local admitted, ran = true, 0
+			local owner = sys.bind_tap_keys(function() return admitted end, function(code)
+				if code == 50 then return function() ran = ran + 1 return true end end
+			end)
+			helpers.assert_not_nil(owner)
+			helpers.assert_true(sys.has_tap_key_claim(50, {}))
+			helpers.assert_eq(sys.has_tap_key_claim(27, {}), false)
+			for _, name in ipairs({ "shift", "ctrl", "alt", "cmd", "fn" }) do
+				helpers.assert_eq(sys.has_tap_key_claim(50, { [name] = true }), false)
+			end
+			admitted = false
+			helpers.assert_eq(sys.has_tap_key_claim(50, {}), false)
+			helpers.assert_eq(spy.captured_cb(key_down(50, {}, false, spy.hs.eventtap.event.properties)), false)
+			admitted = true
+			helpers.assert_true(spy.captured_cb(key_down(50, {}, false, spy.hs.eventtap.event.properties)))
+			run_screenshot_deferred(spy)
+			helpers.assert_eq(ran, 1)
+			-- A failed native stop retires logical delivery immediately; the exact
+			-- owner remains available only for cleanup, never for input callbacks.
+			helpers.assert_eq(owner:delete(), false)
+			helpers.assert_eq(sys.has_tap_key_claim(50, {}), false)
+			helpers.assert_eq(spy.captured_cb(key_down(50, {}, false, spy.hs.eventtap.event.properties)), false)
+			helpers.assert_eq(ran, 1)
+			owner.tap.isEnabled = function() return false end
+			helpers.assert_true(owner:delete())
+			helpers.assert_eq(sys.has_tap_key_claim(50, {}), false)
+		end)
+	end)
+
+	helpers.it("(tap-keys) refused native acquisition never publishes a source claim or delivers", function()
+		with_fixture(function()
+			local sys, spy = make_sys_screenshot_spies()
+			local callback
+			spy.hs.eventtap.new = function(_, captured)
+				callback = captured
+				return { start = function() return false end, stop = function() return true end,
+					isEnabled = function() return false end }
+			end
+			local ran = 0
+			local owner = sys.bind_tap_keys(nil, function() return function() ran = ran + 1 return true end end)
+			helpers.assert_nil(owner)
+			helpers.assert_eq(sys.has_tap_key_claim(50, {}), false)
+			helpers.assert_type(callback, "function")
+			helpers.assert_eq(callback(key_down(50, {}, false, spy.hs.eventtap.event.properties)), false)
+			helpers.assert_eq(ran, 0)
+		end)
+	end)
+end)

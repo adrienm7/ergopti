@@ -556,6 +556,7 @@ local function _build_layouts(ctx)
 			t = i18n_safe,
 			current = Source.get(),
 			key_text = Source.key_text,
+			reason = Source.choice_reason,
 			choose = function(value)
 				local ok, reason = Source.set(value)
 				if not ok then

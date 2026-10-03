@@ -1395,7 +1395,6 @@ local function main()
 					if native[id] == code and key.enabled ~= false then return false end
 				end
 			end
-			if magic_remapped then return true end
 			if shortcuts and shortcuts.is_enabled() and not script_actions.is_paused() then
 				for _, key in ipairs(tap_keys.keys()) do
 					if key.linux == code and tap_keys.get_action(key.id) ~= "none" then return false end

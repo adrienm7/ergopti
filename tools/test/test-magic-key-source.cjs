@@ -150,3 +150,71 @@ console.log(
 	`PASS: ${expected.length} physical magic-key candidates pinned to the key tables, ` +
 		`${mapped.size} migrated scan-code spellings and the shipped Ergopti declaration (${declared}).`
 );
+
+// Configured tap ownership is independent of temporary feature gates. The
+// golden corpus is hand-captured; native suites replay their real readers.
+const claims = JSON.parse(
+	fs.readFileSync(shared('tests/corpus/keymap/magic_source_tap_claims.json'), 'utf8')
+);
+const taps = JSON.parse(fs.readFileSync(shared('modules/actions/tap_keys.json'), 'utf8')).keys;
+assert.strictEqual(claims.cases.length, 9, 'the independent admission cases remain complete');
+for (const test of claims.cases) {
+	assert.ok(entry.enum_values.includes(test.source), test.name);
+	for (const platform of ['ahk', 'hs', 'evdev']) {
+		const record = physical[test.source];
+		const ids = record ? [record[platform]] : [];
+		if (platform === 'hs' && record?.macos_iso) ids.push(record.macos_iso.hs);
+		const key = taps.find((tap) => {
+			const native = tap[platform === 'evdev' ? 'linux' : platform];
+			return (
+				(Array.isArray(native) ? native : [native]).some((id) => ids.includes(id)) &&
+				(test.assignments[tap.id] || 'none') !== 'none'
+			);
+		});
+		assert.strictEqual(key?.id || '', test.expected[platform], `${test.name}: ${platform}`);
+	}
+}
+const luaPolicy = fs.readFileSync(shared('lua/keymap/magic_key_source.lua'), 'utf8');
+const windowsChoice = fs.readFileSync(
+	path.join(REPO_ROOT, 'static/ergopti_plus/windows/ui/editors.ahk'),
+	'utf8'
+);
+assert.ok(luaPolicy.includes(claims.reason_key), 'shared source policy owns the translated reason');
+assert.ok(
+	windowsChoice.includes(claims.reason_key),
+	'Windows uses the same existing translated reason'
+);
+for (const platform of ['linux', 'macos']) {
+	const source = fs.readFileSync(
+		path.join(
+			REPO_ROOT,
+			`static/ergopti_plus/${platform}/modules/${platform === 'linux' ? 'hotstrings' : 'keymap'}/magic_key_source.lua`
+		),
+		'utf8'
+	);
+	assert.ok(
+		source.includes('Shared.tap_conflict('),
+		`${platform} consumes the shared configured ownership policy`
+	);
+}
+
+const windowsCorpusReader = fs.readFileSync(
+	path.join(REPO_ROOT, 'static/ergopti_plus/windows/tests/unit/test_magic_key_source_menu.ahk'),
+	'utf8'
+);
+assert.ok(
+	windowsCorpusReader.includes(
+		'JsonParse(FileRead(_SharedDir . "\\tests\\corpus\\keymap\\magic_source_tap_claims.json"'
+	),
+	'the native Windows corpus runs through its actual JSON owner'
+);
+
+const windowsHarness = fs.readFileSync(
+	path.join(REPO_ROOT, 'static/ergopti_plus/windows/tests/test_stubs.ahk'),
+	'utf8'
+);
+assert.match(
+	windowsHarness,
+	/global _SharedDir\s*:=/,
+	'the corpus reader uses the actual native harness shared-root owner'
+);
