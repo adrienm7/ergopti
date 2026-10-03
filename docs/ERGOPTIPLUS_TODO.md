@@ -347,6 +347,17 @@ These are software implementations; final hardware verification remains below.
   eight portable receipt cases cover every probe failure and successful cleanup.
   Windows/macOS logger owners do not use the fixed Linux probe. Shared logging
   policy, native cross-OS gates and manual CI remain unchanged or unexecuted.
+- [~] **L28.** Linux SQLite write receipts: the audited stdin command now
+  optionally appends the real CLI exit status; the writer requires that receipt
+  as well as empty diagnostics. Five genuine silent nonzero exits were falsely
+  accepted before the fix, and nineteen new portable regressions failed against
+  the prior owners. Twelve native cases pass on host and nonroot Debian with
+  actual schema/write/retry checks, TERM/KILL refusal, 105032-byte quote-heavy SQL
+  and an unavailable TMPDIR. Reusing the generic checked runner was independently
+  rejected by ARG_MAX with zero durable rows. No SQL or receipt file is staged.
+  Windows/macOS writers use native SQLite result codes on their corresponding
+  write paths; native cross-OS gates and manual CI remain unexecuted. Reader
+  query receipts are a separate remaining diagnostic, not claimed complete here.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

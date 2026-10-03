@@ -108,7 +108,8 @@ local function _exec(sql)
 	-- Results are discarded so that only errors reach the pipe: the schema's
 	-- "PRAGMA journal_mode = DELETE" prints "delete", which read as a failure
 	-- and put every first start on the JSON fallback.
-	local cmd, reason = SqliteCommand.build(_db_path, ".output /dev/null\n" .. sql, { capture_stderr = true })
+	local cmd, reason = SqliteCommand.build(_db_path, ".output /dev/null\n" .. sql,
+		{ capture_stderr = true, capture_exit = true })
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the sqlite3 command: %s.", reason)
 		return false
@@ -119,13 +120,18 @@ local function _exec(sql)
 		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
 		return false
 	end
-	local err_out = pipe:read("*a") or ""
+	local output = pipe:read("*a")
 	pipe:close()
+	local accepted, err_out, receipt_error = SqliteCommand.read_exit_receipt(output)
 
 	if err_out ~= "" then
 		-- These statements select nothing, and stderr is merged into stdout, so
 		-- any output at all means the script failed.
 		Logger.error(LOG, "SQLite error: %s", SqliteCommand.sanitise_error(err_out))
+		return false
+	end
+	if not accepted then
+		Logger.error(LOG, "SQLite write refused: %s.", receipt_error)
 		return false
 	end
 	return true

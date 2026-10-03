@@ -72,6 +72,10 @@ local REDACTED_SQL_TOKEN = '"[redacted]"'
 -- short enough that a runaway message cannot flood the log.
 local ERROR_LOG_MAX_CHARS = 200
 
+-- stdout is otherwise empty on the write path. The shell emits this terminal
+-- receipt after sqlite3; LuaJIT's pclose result can conceal a nonzero exit.
+local EXIT_STATUS_PREFIX = "ERGOPTI_SQL_EXIT_STATUS="
+
 
 
 
@@ -105,7 +109,7 @@ end
 --- Composes the `sqlite3` invocation that reads `sql` from standard input.
 --- @param db_path string Absolute path to the database file.
 --- @param sql     string Complete SQL script; may contain arbitrary user text.
---- @param opts    table|nil { flags = string[]?, capture_stderr = boolean? }.
+--- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit? }.
 --- @return string|nil The command, or nil when the arguments are unusable.
 --- @return string|nil The reason, when the command could not be composed.
 function M.build(db_path, sql, opts)
@@ -126,7 +130,28 @@ function M.build(db_path, sql, opts)
 	words[#words + 1] = Shell.quote(db_path)
 	words[#words + 1] = opts.capture_stderr and STDERR_TO_STDOUT or STDERR_DISCARDED
 
-	return Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
+	local command = Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
+	if opts.capture_exit then
+		-- Append to the existing command, without quoting the SQL a second time.
+		-- Reusing exec_checked here amplified quote-heavy SQL beyond ARG_MAX and
+		-- required a temporary output file on a path that stages no typed text.
+		command = command .. "printf '\\n" .. EXIT_STATUS_PREFIX .. "%s\\n' \"$?\"\n"
+	end
+	return command
+end
+
+--- Decodes the terminal receipt of a capture_exit invocation.
+--- @param output string|nil Complete captured stdout.
+--- @return boolean accepted Whether sqlite3 exited successfully.
+--- @return string diagnostics Output preceding the shell's terminal receipt.
+--- @return string|nil error_message Missing or refused terminal status.
+function M.read_exit_receipt(output)
+	if type(output) ~= "string" then return false, "", "missing SQLite exit receipt" end
+	local diagnostics, status = output:match("^(.*)\n" .. EXIT_STATUS_PREFIX .. "(%d+)\n$")
+	status = tonumber(status)
+	if not status or status > 255 then return false, "", "invalid SQLite exit receipt" end
+	if status ~= 0 then return false, diagnostics, "SQLite CLI exited with status " .. status end
+	return true, diagnostics, nil
 end
 
 
