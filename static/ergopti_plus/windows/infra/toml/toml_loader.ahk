@@ -520,9 +520,12 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 								; user's key, not the corpus placeholder.
 								Output  := StrReplace(Output, "★", ScriptInformation["MagicKey"])
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
+								Options["Category"] := CategoryLabel
+								Options["Section"] := CurrentSection
+								; Provenance must not adopt a new activation owner for whole-file packs.
+								if SelectedSection == ""
+										Options["Group"] := "default"
 								if SelectedSection != "" {
-										Options["Category"] := CategoryLabel
-										Options["Section"] := CurrentSection
 										Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 										Options["Priority"] := Resolved.Priority
 										Options["TimeActivationSeconds"] := Resolved.Delay
@@ -554,9 +557,12 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 						and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
 				EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
 				Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
+				Options["Category"] := CategoryLabel
+				Options["Section"] := CurrentSection
+				; Provenance must not adopt a new activation owner for whole-file packs.
+				if SelectedSection == ""
+						Options["Group"] := "default"
 				if SelectedSection != "" {
-						Options["Category"] := CategoryLabel
-						Options["Section"] := CurrentSection
 						Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 						Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
 						Options["TimeActivationSeconds"] := Resolved.Delay

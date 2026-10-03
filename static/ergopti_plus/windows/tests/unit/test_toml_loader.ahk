@@ -776,3 +776,130 @@ TestTL_MetadataHeadersAcceptInlineComments() {
 }
 Test("toml metadata: inline-commented headers parse in both readers",
 	TestTL_MetadataHeadersAcceptInlineComments)
+
+
+; Explicit factory ownership must remain distinct from source provenance.
+_TestTL_FactoryGroupOption(Factory) {
+	global _HotstringRegistrar, HSE_RegistryByGroup, HSE_SeqCounter
+	SavedRegistrar := _HotstringRegistrar
+	_HotstringRegistrar := 0
+	try {
+		for AuthorityRecord in [
+			{ Supplied: true, Value: "default", Expected: "default" },
+			{ Supplied: true, Value: "future: Équipe / source", Expected: "future: Équipe / source" },
+			{ Supplied: true, Value: "", Expected: "" },
+			{ Supplied: false, Value: "", Expected: "provenance.owned" }
+		] {
+			HSE_RegistryClear()
+			Options := Map("Category", "provenance", "Section", "owned", "Priority", 77)
+			if AuthorityRecord.Supplied
+				Options["Group"] := AuthorityRecord.Value
+			switch Factory {
+				case "literal": CreateHotstring("*?", "pvx", "owned", Options)
+				case "conform": CreateCaseSensitiveHotstrings("*?", "pvx", "owned", Options)
+				case "variants": CreateCaseSensitiveHotstrings("?", "pvx", "owned", Options)
+				case "raw": CreateRawCallbackHotstring("*?", "pvx", () => 0, Options)
+				default: throw Error("Unknown factory fixture")
+			}
+			AssertTrue(HSE_RegistryByGroup.Has(AuthorityRecord.Expected), "the factory must transport the explicit owner")
+			AssertEqual(1, HSE_RegistryByGroup.Count, "provenance must not add a second activation group")
+			Specs := HSE_RegistryByGroup[AuthorityRecord.Expected]
+			ExpectedCount := Factory == "variants" ? 3 : 1
+			AssertEqual(ExpectedCount, Specs.Length, "factory case families retain their original size")
+			for Position, OwnedSpec in Specs {
+				AssertEqual("provenance", OwnedSpec.Category)
+				AssertEqual("owned", OwnedSpec.Section)
+				AssertEqual(AuthorityRecord.Expected, OwnedSpec.Group)
+				AssertEqual(77, OwnedSpec.Priority)
+				AssertEqual(Position, OwnedSpec.Seq)
+				if Factory == "conform"
+					AssertTrue(OwnedSpec.CaseConform)
+				if Factory == "raw"
+					AssertTrue(OwnedSpec.RawCallback)
+			}
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertTrue(Match == Specs[1], "the original lower-case spec remains active")
+			HSE_DisableGroup(AuthorityRecord.Expected)
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertEqual("", Match, "only the transported native owner disables the family")
+			AssertEqual(0, HSE_MappingsForTail("X").Length, "the real live index is empty while the owner is disabled")
+			HSE_EnableGroup(AuthorityRecord.Expected)
+			HSE_EnableGroup(AuthorityRecord.Expected)
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertTrue(Match == Specs[1], "enable restores the same native spec")
+			AssertEqual(ExpectedCount, Specs.Length)
+			AssertEqual(ExpectedCount, HSE_MappingsForTail("X").Length, "repeated enable cannot duplicate live specs")
+			AssertEqual(ExpectedCount, HSE_SeqCounter, "toggling never allocates replacement registrations")
+		}
+	} finally {
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		_HotstringRegistrar := SavedRegistrar
+	}
+}
+Test("hotstring factories: literal group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("literal"))
+Test("hotstring factories: conform group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("conform"))
+Test("hotstring factories: variant group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("variants"))
+Test("hotstring factories: raw callback group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("raw"))
+
+TestTL_SelectedExtensionKeepsResolvedOwner() {
+	global _HotstringRegistrar, _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup
+	Root := A_Temp . "\ergopti_selected_provenance_" . A_TickCount
+	DirCreate(Root)
+	SavedRegistrar := _HotstringRegistrar
+	SavedOverrides := _HotstringsOverrides
+	SavedGroupConfig := HotstringGroupConfig
+	try {
+		FileAppend('[rolls.ct]`ndelay = 0.25`npriority = 67`n', Root . "\overrides.toml", "UTF-8")
+		FileAppend('[[ct]]`n"slx" = { output = "literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, priority = 81 }`n'
+			. 'simple = "value"`n[[foreign]]`nforeign = "untouched"`n', Root . "\source.toml", "UTF-8")
+		_HotstringsOverrides := _ParseOverrides(Root . "\overrides.toml")
+		HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(2, LoadExtTomlFile(Root . "\source.toml", "rolls", "ct"))
+		AssertEqual(1, HSE_RegistryByGroup.Count)
+		AssertTrue(HSE_RegistryByGroup.Has("rolls.ct"), "selected official sections retain their derived owner")
+		Specs := HSE_RegistryByGroup["rolls.ct"]
+		AssertEqual(4, Specs.Length, "the literal plus three simple variants remain registered")
+		for Position, OwnedSpec in Specs {
+			AssertEqual("rolls", OwnedSpec.Category)
+			AssertEqual("ct", OwnedSpec.Section)
+			AssertEqual("rolls.ct", OwnedSpec.Group)
+			AssertEqual(0.25, OwnedSpec.TimeActivationSeconds)
+			AssertEqual(Position == 1 ? 81 : 67, OwnedSpec.Priority)
+			AssertEqual(Position, OwnedSpec.Seq)
+		}
+		HSE_DisableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[1], "the whole-file owner cannot silence an official selected section")
+		HSE_DisableGroup("rolls.ct")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertEqual("", Match)
+		HSE_EnableGroup("rolls.ct")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[1], "the original selected spec returns without registration drift")
+	} finally {
+		_HotstringRegistrar := SavedRegistrar
+		_HotstringsOverrides := SavedOverrides
+		HotstringGroupConfig := SavedGroupConfig
+		HotstringsResolveBumpGen()
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		DirDelete(Root, true)
+	}
+}
+Test("LoadExtTomlFile: selected official sections keep delay priority and derived activation ownership", TestTL_SelectedExtensionKeepsResolvedOwner)

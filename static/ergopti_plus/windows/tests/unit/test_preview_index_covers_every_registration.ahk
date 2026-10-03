@@ -245,3 +245,108 @@ Test("preview index: pack indexing is not gated on a per-section Features node (
 	_PICR_PackIndexingIsNotGatedOnPerSectionFeatures)
 Test("preview index: the engine and the index share one pack enumeration (preview-index-covers-every-registration)",
 	_PICR_BothSidesShareOneEnumeration)
+
+
+; The live pack and its preview must identify the same parsed source without
+; accidentally adopting bundled-category activation gates from that label.
+_PICR_LivePersonalProvenanceMatchesPreview(Label) {
+	global ScriptInformation, _HotstringRegistrar, HSE_RegistryByGroup, HSE_SeqCounter, CategoryEnabled
+	Root := A_Temp . "\ergopti_picr_provenance_" . A_TickCount
+	DirCreate(Root)
+	DirCreate(Root . "\Équipe")
+	Path := Label == "rolls" ? Root . "\rolls.toml" : Root . "\Équipe\mémoire.toml"
+	SavedRegistrar := _HotstringRegistrar
+	HadDirectory := ScriptInformation.Has("PersonalHotstringsDir")
+	SavedDirectory := ScriptInformation.Get("PersonalHotstringsDir", "")
+	HadMaster := CategoryEnabled.Has("Hotstrings")
+	SavedMaster := CategoryEnabled.Get("Hotstrings", false)
+	try {
+		FileAppend('[_meta]`ndescription = "not a trigger"`n'
+			. '[Fallback]`npsx = "simple"`n'
+			. '"plx" = { output = "Literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, is_case_sensitive_strict = true, priority = 81 }`n'
+			. '[[Other]]`n"pcx★" = { output = "Owned conform", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
+			. '"pex" = { output = "Explicit", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n', Path, "UTF-8")
+		ScriptInformation["PersonalHotstringsDir"] := Root
+		Packs := HS_EnumeratePersonalExtFiles()
+		AssertEqual(1, Packs.Length, "the actual recursive owner enumerates exactly this personal source")
+		AssertEqual(Path, Packs[1]["Path"])
+		AssertEqual(Label, Packs[1]["Label"], "the source label comes from the authoritative enumerator")
+		CategoryEnabled["Hotstrings"] := true
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(4, LoadExtTomlFile(Packs[1]["Path"], Packs[1]["Label"]), "metadata is excluded from both entry shapes")
+		AssertEqual(1, HSE_RegistryByGroup.Count, "source metadata must preserve whole-file activation ownership")
+		AssertTrue(HSE_RegistryByGroup.Has("default"))
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(8, Specs.Length, "simple and inline case families retain their original registration counts")
+		ExpectedTriggers := ["psx", "PSX", "Psx", "plx", "pcx" . ScriptInformation["MagicKey"], "pex", "PEX", "Pex"]
+		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "owned conform", "explicit", "EXPLICIT", "Explicit"]
+		Index := Map()
+		Set := Map()
+		AssertEqual(4, _RegisterExtPackTriggers(Path, Label, Index, Set))
+		PreviewRows := Map()
+		PreviewRows.CaseSense := "On"
+		for _, Bucket in Index {
+			for Row in Bucket {
+				AssertFalse(PreviewRows.Has(Row.Trigger), "the preview never duplicates a case variant")
+				PreviewRows[Row.Trigger] := Row
+			}
+		}
+		AssertEqual(10, PreviewRows.Count, "the conform family previews each of its three accepted cases")
+		for Position, OwnedSpec in Specs {
+			AssertEqual(ExpectedTriggers[Position], OwnedSpec.Trigger, "historical factory registration order is unchanged")
+			AssertEqual(ExpectedOutputs[Position], OwnedSpec.Replacement)
+			AssertEqual(Label, OwnedSpec.Category, "live metadata retains the actual hierarchical personal-file label")
+			AssertEqual(Position <= 4 ? "fallback" : "other", OwnedSpec.Section, "the parser's section supplies provenance even without a declaration")
+			AssertEqual("default", OwnedSpec.Group)
+			AssertEqual(Position, OwnedSpec.Seq)
+			AssertEqual(0, OwnedSpec.TimeActivationSeconds)
+			AssertEqual(Position == 4 ? 81 : 30, OwnedSpec.Priority)
+			AssertTrue(PreviewRows.Has(OwnedSpec.Trigger), "every actual live spec has an exact preview row")
+			Preview := PreviewRows[OwnedSpec.Trigger]
+			AssertEqual(OwnedSpec.Category, Preview.Category)
+			AssertEqual(OwnedSpec.Section, Preview.Section)
+			AssertEqual(OwnedSpec.Priority, Preview.Priority)
+			AssertEqual(OwnedSpec.Replacement, Preview.Output)
+		}
+		AssertTrue(Specs[4].Star && Specs[4].CaseSensitive && Specs[4].FinalResult)
+		AssertFalse(Specs[4].InWord)
+		AssertTrue(Specs[5].Star && Specs[5].InWord && Specs[5].CaseConform)
+		AssertFalse(Specs[5].FinalResult)
+		HSE_DisableGroup(Label . ".fallback")
+		HSE_DisableGroup(Label . ".other")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[4], "unrelated derived-section gates cannot silence a whole-file pack")
+		HSE_DisableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertEqual("", Match, "the retained default owner still disables the native mapping")
+		HSE_EnableGroup("default")
+		HSE_EnableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[4], "reactivation restores the exact original native spec")
+		AssertEqual(7, HSE_MappingsForTail("X").Length, "restoring the default group never duplicates end-character or literal specs")
+		AssertEqual(1, HSE_MappingsForTail(ScriptInformation["MagicKey"]).Length, "the conform spec retains its exact live identity")
+		AssertEqual(8, HSE_SeqCounter, "toggle operations neither duplicate nor re-register personal entries")
+	} finally {
+		_HotstringRegistrar := SavedRegistrar
+		if HadDirectory
+			ScriptInformation["PersonalHotstringsDir"] := SavedDirectory
+		else
+			ScriptInformation.Delete("PersonalHotstringsDir")
+		if HadMaster
+			CategoryEnabled["Hotstrings"] := SavedMaster
+		else
+			CategoryEnabled.Delete("Hotstrings")
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		DirDelete(Root, true)
+	}
+}
+Test("personal pack provenance: nested Unicode labels and parsed sections match real preview rows", (*) => _PICR_LivePersonalProvenanceMatchesPreview("Équipe / mémoire"))
+Test("personal pack provenance: bundled-label collisions preserve whole-file activation ownership", (*) => _PICR_LivePersonalProvenanceMatchesPreview("rolls"))
