@@ -134,6 +134,7 @@ global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
+#Include ../infra/startup_smoke.ahk
 #Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/issue_link.ahk
 #Include ../infra/redact.ahk
@@ -1918,6 +1919,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
 #Include unit/test_bundle_skip_validation.ahk
+#Include unit/test_startup_smoke_receipt.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_changelog_network_resilience.ahk

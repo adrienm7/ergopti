@@ -12,10 +12,11 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { verify, recordMac } = require('./desktop-ci-evidence.cjs');
+const { verify, recordMac, recordWindows } = require('./desktop-ci-evidence.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-pipeline.cjs');
@@ -55,6 +56,34 @@ function karabinerSummary() {
 	};
 }
 
+/** Returns the parent observation and the receipt from the exact compiled child. */
+function windowsStartup() {
+	const nonce = 'c'.repeat(32);
+	const executable = 'C:\\private\\ErgoptiPlus.exe';
+	return {
+		nonce,
+		pid: 42,
+		executable,
+		launched_sha256: 'b'.repeat(64),
+		exit_code: 0,
+		log_files: 1,
+		logged_errors: [],
+		receipt: {
+			schema_version: 1,
+			nonce,
+			pid: 42,
+			executable,
+			compiled: true,
+			build_commit: 'a'.repeat(40),
+			bundle_identity: '0.0.0-dev\n' + 'a'.repeat(40),
+			phase: 'ready',
+			driver_ready: true,
+			menu_ready: true,
+			logs_flushed: true
+		}
+	};
+}
+
 for (const platform of ['windows', 'macos']) {
 	for (const release of [false, true]) {
 		const jobs =
@@ -86,6 +115,7 @@ for (const platform of ['windows', 'macos']) {
 					failures: [],
 					marker_seen: true,
 					crashed_early: false,
+					...(platform === 'windows' ? { native_startup: windowsStartup() } : {}),
 					...(platform === 'macos' && scenario === 'clean'
 						? { native_delayed_timer: timerSummary() }
 						: {}),
@@ -126,6 +156,41 @@ for (const platform of ['windows', 'macos']) {
 			value.evidence[0].package_sha256 = '';
 		});
 		if (platform === 'windows') {
+			rejects((value) => {
+				delete value.evidence[0].native_startup;
+			});
+			for (const [field, replacement] of [
+				['exit_code', 1],
+				['exit_code', null],
+				['log_files', 0],
+				['logged_errors', ['ERROR during boot']],
+				['nonce', 'd'.repeat(32)],
+				['pid', 43],
+				['executable', 'C:\\foreign\\ErgoptiPlus.exe'],
+				['launched_sha256', 'd'.repeat(64)]
+			])
+				rejects((value) => {
+					value.evidence[0].native_startup[field] = replacement;
+				});
+			for (const [field, replacement] of [
+				['compiled', false],
+				['build_commit', 'd'.repeat(40)],
+				['bundle_identity', 'old\n' + 'd'.repeat(40)],
+				['phase', 'input-init'],
+				['driver_ready', false],
+				['menu_ready', false],
+				['logs_flushed', false],
+				['nonce', 'd'.repeat(32)],
+				['pid', 43],
+				['executable', 'C:\\foreign\\ErgoptiPlus.exe']
+			])
+				rejects((value) => {
+					value.evidence[0].native_startup.receipt[field] = replacement;
+				});
+			for (const field of Object.keys(windowsStartup().receipt))
+				rejects((value) => {
+					delete value.evidence[0].native_startup.receipt[field];
+				});
 			rejects((value) => {
 				value.evidence[0].marker_seen = false;
 			});
@@ -264,6 +329,54 @@ try {
 	fs.rmSync(karabinerEvidenceRoot, { recursive: true, force: true });
 }
 
+const startupEvidenceRoot = fs.mkdtempSync(
+	path.join(os.tmpdir(), 'ergopti-native-startup-evidence-')
+);
+const savedGithubSha = process.env.GITHUB_SHA;
+try {
+	process.env.GITHUB_SHA = 'a'.repeat(40);
+	const executable = path.join(startupEvidenceRoot, 'ErgoptiPlus.exe');
+	const bytes = 'owned packaged byte fixture';
+	fs.writeFileSync(executable, bytes);
+	const native = windowsStartup();
+	native.executable = executable;
+	native.receipt.executable = executable;
+	native.launched_sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+	const resultFile = path.join(startupEvidenceRoot, 'observation.json');
+	const output = path.join(startupEvidenceRoot, 'evidence.json');
+	const publishObservation = (observation) =>
+		fs.writeFileSync(
+			resultFile,
+			JSON.stringify({
+				marker_seen: true,
+				crashed_early: false,
+				marker_seconds: 1,
+				native_startup: observation
+			})
+		);
+	const foreignPath = structuredClone(native);
+	foreignPath.executable = path.join(startupEvidenceRoot, 'another', 'ErgoptiPlus.exe');
+	foreignPath.receipt.executable = foreignPath.executable;
+	publishObservation(foreignPath);
+	assert.throws(() => recordWindows(resultFile, executable, output), /not the launched executable/);
+	assert.equal(fs.existsSync(output), false, 'a path substitution must publish no evidence');
+	publishObservation(native);
+	fs.writeFileSync(executable, bytes + ' changed after launch');
+	assert.throws(() => recordWindows(resultFile, executable, output), /Package bytes differ/);
+	assert.equal(fs.existsSync(output), false, 'changed package bytes must publish no evidence');
+	fs.writeFileSync(executable, bytes);
+	recordWindows(resultFile, executable, output);
+	assert.equal(
+		JSON.parse(fs.readFileSync(output, 'utf8')).package_sha256,
+		native.launched_sha256,
+		'the successful record carries the exact launched bytes'
+	);
+} finally {
+	if (savedGithubSha === undefined) delete process.env.GITHUB_SHA;
+	else process.env.GITHUB_SHA = savedGithubSha;
+	fs.rmSync(startupEvidenceRoot, { recursive: true, force: true });
+}
+
 /** Pins a fresh shallow checkout and the exact independently gated core suites. */
 function checkCore(body) {
 	assert.deepEqual(pipeline.needsOf(body), ['validate']);
@@ -334,6 +447,29 @@ for (const [job, name] of [
 	assert.doesNotMatch(upload, /github\.run_attempt/);
 }
 const launch = pipeline.job('launch-windows');
+/** Requires native refusal probes to run on Windows before package admission. */
+function checkWindowsAdmission(body) {
+	const admission = pipeline.step(body, 'Test native compiled startup admission');
+	assert.equal(
+		pipeline.stepField(admission, 'run'),
+		'node tools/test/test-desktop-ci-evidence.cjs'
+	);
+	assert.equal(pipeline.stepField(admission, 'shell'), 'pwsh');
+	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
+	assert.ok(body.indexOf(admission) < body.indexOf('name: Smoke test compiled ErgoptiPlus.exe'));
+}
+checkWindowsAdmission(launch);
+for (const replacement of [
+	'run: echo skipped native probes',
+	'if: false\n        run: node tools/test/test-desktop-ci-evidence.cjs',
+	'continue-on-error: true\n        run: node tools/test/test-desktop-ci-evidence.cjs'
+])
+	assert.throws(() =>
+		checkWindowsAdmission(
+			launch.replace('run: node tools/test/test-desktop-ci-evidence.cjs', replacement)
+		)
+	);
 assert.match(launch, /name: assets-windows/);
 assert.match(launch, /\$env:RUNNER_TEMP\\package\\ergopti_plus\\windows\\ErgoptiPlus\.exe/);
 assert.doesNotMatch(launch, /build_static_bundle|Ahk2Exe/);
@@ -347,3 +483,4 @@ assert.ok(pipeline.job('macos-ok').includes(`pattern: launch-gate-${profile}-*`)
 console.log(
 	'[OK] Desktop verdicts reject incomplete launches; shared core gates run independently.'
 );
+require('./support/windows-launch-runtime.cjs')();

@@ -100,6 +100,8 @@ const WINDOWS_MECHANICS = {
 	'infra/lifecycle.ahk': 'which executable a reload relaunches',
 	'infra/toml/toml_helpers.ahk': "the compiled exe's former paths.toml location",
 	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',
+	'infra/startup_smoke.ahk':
+		'the native readiness receipt identifies its executable and reports the compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keylogger/keylogger_prefetch.ahk': 'how a worker process is spawned',
 	'modules/updater/core.ahk': 'the owner, Updater_IsLocalSource'
@@ -114,6 +116,13 @@ for (const file of sources('windows', '.ahk')) {
 			'decision, or list the file here with the launch mechanics it chooses.'
 	);
 }
+const readinessPublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishReady');
+expect(readinessPublisher !== '', 'the native readiness publisher must exist');
+expect(
+	readinessPublisher.split('A_IsCompiled').length === 3 &&
+		code('windows', 'infra/startup_smoke.ahk', ahkComment).split('A_IsCompiled').length === 3,
+	'the readiness owner reports runtime identity only; product decisions still ask Updater_IsLocalSource'
+);
 const owner = ahkBody('modules/updater/core.ahk', 'Updater_IsLocalSource');
 expect(/return !A_IsCompiled/.test(owner), 'Updater_IsLocalSource must stay the Windows owner');
 expect(

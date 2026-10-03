@@ -340,6 +340,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
+#Include infra/startup_smoke.ahk
 #Include infra/diagnostic_snapshot.ahk
 #Include infra/issue_link.ahk
 #Include infra/redact.ahk
@@ -1444,7 +1445,11 @@ if (_DriverStartupSmokeDir != "") {
 		; deliberately bypasses production teardown and OnExit callbacks.
 		if IsSet(_DriverStartupSmokeInspect)
 				_DriverStartupSmokeInspect.Call()
-		try _LoggerFlush(true)
+		if !LoggerPrepareShutdown()
+				throw Error("The startup smoke could not make its diagnostic logs durable.")
+		_StartupSmokeNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")
+		if _StartupSmokeNonce != ""
+				StartupSmokePublishReady(_DriverStartupSmokeDir, _StartupSmokeNonce, true)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's
 		; immediate destruction of that fresh tree can itself raise STATUS_HEAP_CORRUPTION
