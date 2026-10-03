@@ -20,6 +20,9 @@ SCRIPT_SAMPLE_FRAME_LIMIT = 6
 SCRIPT_SAMPLE_CONTEXT_THREAD_LIMIT = 3
 SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
 SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
+SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT = 8192
+SCRIPT_DIAGNOSTIC_LINE_LIMIT = 128
+SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = 2
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -224,6 +227,7 @@ class NativeDelayedTimerProbe:
         self.started = False
         self.scripting_commands = []
         self.scripting_command_number = 0
+        self.diagnostic_receipts = []
         self.runtime_owner = None
 
     @staticmethod
@@ -284,6 +288,7 @@ class NativeDelayedTimerProbe:
                     diagnostics.append(
                         f"native Hammerspoon server sample failed: {type(sampling).__name__}: {sampling}"
                     )
+            self.retain_diagnostics(diagnostics)
             try:
                 self.retire_scripting_command(command)
             except Exception as cleanup:
@@ -305,6 +310,32 @@ class NativeDelayedTimerProbe:
                 "The packaged native timer scripting command did not acknowledge its nonce "
                 f"(exit {command.returncode}): {stderr.strip()[:1000]}"
             )
+
+    def retain_diagnostics(self, diagnostics):
+        """Retain bounded native observations independently of error annotations."""
+        if not diagnostics:
+            return
+        if len(self.diagnostic_receipts) >= SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT:
+            self.diagnostic_receipts[-1]["additional_commands_omitted"] = True
+            return
+        # The two native fixture calls (observation and cleanup) each own their
+        # sampling replies. Do not include the Lua source or the primary error;
+        # either could contain unrelated user data. Redact native source paths.
+        observations = self.sample_frame_text("\n".join(diagnostics))
+        lines = observations.splitlines()
+        if (
+            len(observations) > SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT
+            or len(lines) > SCRIPT_DIAGNOSTIC_LINE_LIMIT
+        ):
+            marker = "\n[native diagnostic truncated]"
+            observations = "\n".join(lines[: SCRIPT_DIAGNOSTIC_LINE_LIMIT - 1])
+            observations = observations[: SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT - len(marker)] + marker
+        self.diagnostic_receipts.append(
+            {
+                "command": self.scripting_command_number,
+                "observations": observations,
+            }
+        )
 
     def sample_scripting_command(self, command):
         """Sample only an unreaped own child before any timeout retirement signal."""
