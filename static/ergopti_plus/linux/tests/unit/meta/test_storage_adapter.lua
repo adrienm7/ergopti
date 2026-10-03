@@ -86,6 +86,50 @@ helpers.describe("storage native open receipts", function()
 	end
 end)
 
+helpers.describe("storage durable snapshot ownership", function()
+	for _, method in ipairs({ "set", "set_many" }) do
+		for _, source in ipairs({ "input", "returned", "refused" }) do
+			helpers.it("linux-storage-snapshot-receipts: " .. method .. " detaches " .. source, function()
+				local root = make_temp_config_root()
+				local path = root .. "/ergopti_plus/storage.json"
+				local real_getenv, real_rename = os.getenv, os.rename
+				os.getenv = function(name)
+					if name == "XDG_CONFIG_HOME" then return root end
+					return real_getenv(name)
+				end
+				local ok, err = xpcall(function()
+					local storage = helpers.load_module("adapters.storage")
+					local profile = { title = "original", nested = { values = { "é", "original" } } }
+					local function persist(value)
+						if method == "set" then return storage.set("profile", value) end
+						return storage.set_many({ profile = value, peer = { enabled = true } })
+					end
+					helpers.assert_true(persist(profile))
+					local changed = source == "input" and profile or storage.get("profile")
+					changed.title, changed.nested.values[2] = "changed", "changed"
+					if source == "refused" then
+						os.rename = function() return nil, "publication refused", 13 end
+						helpers.assert_eq(persist(changed), false)
+						os.rename = real_rename
+					end
+					local retained = storage.get("profile")
+					helpers.assert_eq(retained.title, "original")
+					helpers.assert_eq(retained.nested.values[2], "original")
+					local reloaded = helpers.load_module("adapters.storage").get("profile")
+					helpers.assert_eq(retained, reloaded, "live cache must equal its durable snapshot")
+				end, debug.traceback)
+				os.getenv, os.rename = real_getenv, real_rename
+				package.loaded["adapters.storage"] = nil
+				os.remove(path)
+				os.remove(path .. ".tmp")
+				os.remove(root .. "/ergopti_plus")
+				os.remove(root)
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+end)
+
 helpers.describe("storage backup open receipts", function()
 	for _, receipt in ipairs({ 13, 5, "unknown", "throw" }) do
 		helpers.it("linux-storage-backup-receipts: preserves prior backup after " .. receipt, function()

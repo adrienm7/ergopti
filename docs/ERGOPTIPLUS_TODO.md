@@ -222,6 +222,15 @@ These are software implementations; final hardware verification remains below.
   Windows built-ins and macOS native paths have no explicit matching NUL guard
   at their public boundary; native reproductions and fixes are deferred to their
   owners. No native cross-OS suite or manual CI was launched.
+- [~] **L16.** Linux JSON storage snapshot ownership: publish an owned snapshot
+  decoded by the shared JSON codec and detach structured getter results. Caller
+  mutations no longer bypass durable writes or contaminate a refused mutation's
+  rollback. Six native and six portable cases failed before the fix, covering
+  single/bulk sets, input/getter references and refused publication. The native
+  store matrix passes 31 cases, including scalar and independent reload controls.
+  Windows decodes registry values per get; macOS hs.settings serializes values
+  across its native settings boundary. No new serialization policy, TOML owner,
+  personal menu, native cross-OS suite or manual CI was introduced or changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -141,11 +141,19 @@ end
 --- Persists a staged cache to disk atomically.
 --- @param staged table Candidate store that is not yet published in memory.
 --- @return boolean
+--- @return table|nil snapshot Owned representation of the persisted JSON.
 local function _flush(staged)
 	if type(staged) ~= "table" or _load_blocked then return false end
 	local encode_ok, payload = pcall(json.encode, staged)
 	if not encode_ok or type(payload) ~= "string" then
 		Logger.error(LOG, "_flush(): store could not be encoded.")
+		return false
+	end
+	-- Own the same representation a subsequent process will read, rather than
+	-- publishing caller tables whose later mutations bypass durable writes.
+	local decode_ok, snapshot = pcall(json.decode, payload)
+	if not decode_ok or type(snapshot) ~= "table" then
+		Logger.error(LOG, "_flush(): store could not round-trip through JSON.")
 		return false
 	end
 	local open_ok, fh = pcall(io.open, _TMP_PATH, "w")
@@ -182,7 +190,7 @@ local function _flush(staged)
 		Logger.error(LOG, "_flush(): atomic rename failed.")
 		return false
 	end
-	return true
+	return true, snapshot
 end
 
 --- Ensures the in-memory cache is populated.
@@ -210,8 +218,9 @@ local function _commit(mutate)
 		Logger.error(LOG, "Storage mutation staging failed — %s", tostring(err))
 		return false
 	end
-	if not _flush(staged) then return false end
-	_cache = staged
+	local flushed, snapshot = _flush(staged)
+	if not flushed then return false end
+	_cache = snapshot
 	return true
 end
 
@@ -249,7 +258,10 @@ end
 function M.get(key, default_value)
 	_ensure_loaded()
 	local ok, result = pcall(function()
-		return _cache[tostring(key)]
+		local value = _cache[tostring(key)]
+		-- Native settings backends return values, not mutable cache ownership.
+		if type(value) == "table" then return json.decode(json.encode(value)) end
+		return value
 	end)
 	if not ok then
 		Logger.error(LOG, "get(): failed to read key '%s' — %s", tostring(key), tostring(result))
