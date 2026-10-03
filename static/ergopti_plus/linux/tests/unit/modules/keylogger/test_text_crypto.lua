@@ -416,7 +416,7 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 
 		local framed = false
 		for _, cmd in ipairs(seen) do
-			local head = cmd:match("^([^\n]*)") or ""
+			local head = helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
 			if head:match("^head %-c 6 ") and head:find("openssl enc", 1, true) then framed = true end
 		end
 		helpers.assert_true(framed,
@@ -431,7 +431,7 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 
 		local framed = false
 		for _, cmd in ipairs(seen) do
-			local head = cmd:match("^([^\n]*)") or ""
+			local head = helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
 			if head:match("^head %-c 4 ") and head:find("openssl enc -d", 1, true) then framed = true end
 		end
 		helpers.assert_true(framed,
@@ -441,6 +441,48 @@ end)
 
 
 helpers.describe("text_cipher — failure never falls back to plaintext", function()
+	helpers.it("requires supervision for the native exact-stdin producer (openssl-stdin-producer)", function()
+		local shell, calls = Shell(), 0
+		local previous = shell.has_command
+		shell.has_command = function() return false end
+		shell._set_runner(function(command)
+			calls = calls + 1
+			return native_receipt(command, "Synthetic output", 0)
+		end)
+		local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", "text")
+		shell.has_command = previous
+		shell._reset_runner()
+		helpers.assert_true(ok)
+		helpers.assert_nil(result, "an unsupported producer pipeline must not be trusted")
+		helpers.assert_eq(calls, 0)
+	end)
+	for index, input in ipairs({ "", "a\n\n", "ERGOPTI_STDIN\nERGOPTI_STDIN_X\n$(false)\n", string.rep("'a", 22000) }) do
+		helpers.it("supervises the entire exact-stdin pipeline without interpreting its bytes " .. index .. " (openssl-stdin-producer)", function()
+			local shell, captured = Shell(), nil
+			shell._set_runner(function(command)
+				if command:find("command -v", 1, true) then return true end
+				captured = command
+				return native_receipt(command, "Synthetic output", 0)
+			end)
+			local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", input)
+			shell._reset_runner()
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, "Synthetic output")
+			local outer = captured and captured:match("^bash %-o pipefail /dev/fd/3 <<'([%w_]+)'")
+			helpers.assert_not_nil(outer, "the supervisor must own the producer as well as its consumer")
+			local script, data_body = captured:match("\n(.-)\n" .. outer .. "\n(.*)$")
+			helpers.assert_not_nil(script)
+			local count = script:match("^head %-c (%d+) | openssl fixture\n")
+			helpers.assert_eq(tonumber(count), #input)
+			local header = captured:match("^([^\n]*)")
+			local token = header:match(" 3<&0 4<<'([%w_]+)' 0<&4 4<&%-$")
+			helpers.assert_not_nil(token, "data must reach stdin independently of the program descriptor")
+			local delivered = data_body:match("^(.-)\n" .. token .. "\n$")
+			helpers.assert_eq(delivered, input, "supervision must not quote or normalize the payload again")
+			helpers.assert_not_nil(script:find("\nprintf", 1, true), "the receipt must follow the full native pipeline")
+
+		end)
+	end
 	for _, checked in ipairs({ true, false }) do
 		helpers.it("requires a pipeline supervisor only for checked pipelines " .. tostring(checked) .. " (openssl-pipeline-receipts)", function()
 			local shell, calls = Shell(), 0
@@ -451,7 +493,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 				return native_receipt(command, "Synthetic output", 0)
 			end)
 			local options = checked and { pipefail = true } or nil
-			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture", "text", options)
+			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture", nil, options)
 			shell.has_command = previous
 			shell._reset_runner()
 			helpers.assert_true(ok)

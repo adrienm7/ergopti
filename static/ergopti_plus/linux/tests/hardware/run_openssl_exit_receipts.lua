@@ -17,6 +17,7 @@ local Codec = require("keylogger.text_crypto")
 assert(uv.getuid() ~= 0, "native at-rest tests require an ordinary user")
 local real = assert(Shell.exec_line("command -v openssl"), "the actual OpenSSL CLI must be installed")
 local real_head = assert(Shell.exec_line("command -v head"))
+local real_cat = assert(Shell.exec_line("command -v cat"))
 local previous_path = assert(os.getenv("PATH"))
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-openssl-exit-XXXXXX"))
 local checks, failures = 0, 0
@@ -53,6 +54,24 @@ write(root .. "/openssl", table.concat({
 	"",
 }, "\n"))
 assert(uv.fs_chmod(root .. "/openssl", 448))
+
+write(root .. "/head", table.concat({
+	"#!/bin/sh",
+	"read target fault < " .. Shell.quote(root .. "/mode"),
+	'if [ "$target" != input ]; then exec ' .. Shell.quote(real_head) .. ' "$@"; fi',
+	Shell.quote(real_head) .. ' "$@" > ' .. Shell.quote(root .. "/input-output"),
+	"native_status=$?",
+	"printf 'input %s\\n' \"$native_status\" >> " .. Shell.quote(root .. "/calls"),
+	'if [ "${fault#PARTIAL}" != "$fault" ]; then',
+	Shell.quote(real_head) .. " -c 1 " .. Shell.quote(root .. "/input-output"),
+	'fault=${fault#PARTIAL}',
+	"else",
+	Shell.quote(real_cat) .. " " .. Shell.quote(root .. "/input-output"),
+	"fi",
+	'case "$fault" in TERM) kill -TERM $$;; KILL) kill -KILL $$;; *) exit "$fault";; esac',
+	"",
+}, "\n"))
+assert(uv.fs_chmod(root .. "/head", 448))
 assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 
 local function mode(operation, fault)
@@ -64,7 +83,7 @@ local function observed(operation)
 	local file = assert(io.open(root .. "/calls", "r"))
 	local calls = assert(file:read("*a"))
 	assert(file:close())
-	assert(calls:find(operation .. " 0\n", 1, true), "fault wrapper did not delegate a successful actual OpenSSL operation")
+	assert(calls:find(operation .. " 0\n", 1, true), "fault wrapper did not delegate a successful actual native operation")
 end
 
 local function fresh()
@@ -117,7 +136,6 @@ check("checked native pipeline retains the existing large binary argv budget", f
 		"pipeline supervision amplified or changed the existing native input")
 end)
 
-assert(uv.fs_symlink(real_head, root .. "/head"))
 check("missing native pipeline supervisor refuses binary input before cryptography", function()
 	mode("success")
 	assert(uv.os_setenv("PATH", root)) -- Actual tool search excludes Bash, not a simulated capability.
@@ -131,16 +149,45 @@ check("missing native pipeline supervisor refuses binary input before cryptograp
 	assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 	assert(ok, err)
 end)
-check("ordinary native encryption remains available without a pipeline supervisor", function()
+check("missing exact-stdin supervisor refuses ordinary input before cryptography", function()
 	mode("success")
 	assert(uv.os_setenv("PATH", root))
 	local ok, err = pcall(function()
-		local protected = cipher.encrypt("native-receipt", 9, plaintext)
-		assert(Codec.is_encrypted(protected) and cipher.decrypt(protected) == plaintext)
+		assert(cipher.encrypt("native-receipt", 9, plaintext) == nil)
+		local file = assert(io.open(root .. "/calls", "r"))
+		assert(file:read("*a") == "", "unsupported input pipeline started cryptography")
+		assert(file:close())
 	end)
 	assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 	assert(ok, err)
 end)
+
+
+for _, operation in ipairs({ "text", "binary", "decrypt" }) do
+	for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL", "PARTIAL7", "PARTIALTERM" }) do
+		check("failed actual stdin producer invalidates " .. operation .. " consumer " .. fault, function()
+			mode("input", fault)
+			local result
+			if operation == "decrypt" then result = cipher.decrypt(envelope)
+			else result = cipher.encrypt("native-receipt", 10, operation == "binary" and "a\0retained bytes" or plaintext) end
+			observed("input")
+			if operation == "decrypt" then assert(result == "", "failed stdin producer admitted plaintext")
+			else assert(result == nil, "failed stdin producer admitted an envelope for untrusted or shortened input") end
+		end)
+	end
+end
+for index, value in ipairs({
+	"Caller\nERGOPTI_STDIN\nERGOPTI_STDIN_X\nERGOPTI_STDIN_X_X\nend\n\n",
+	"Literal $(touch " .. Shell.quote(root .. "/caller-executed") .. ") `false` 'quotes' é漢\n",
+}) do
+	check("nested native script transport retains literal caller bytes " .. index, function()
+		mode("success")
+		local protected = assert(cipher.encrypt("native-receipt", 11 + index, value))
+		assert(cipher.decrypt(protected) == value)
+		local exists, _, code = uv.fs_stat(root .. "/caller-executed")
+		assert(exists == nil and code == "ENOENT", "caller data was interpreted as a command")
+	end)
+end
 
 for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL" }) do
 	check("failed native encryption refuses useful ciphertext stdout " .. fault, function()
@@ -207,6 +254,23 @@ check("actual typing persistence rejects partial decoder output and retains its 
 	assert(writer.insert_typing_events("native-receipt-device", { { text = value } }))
 	rows = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
 	assert(#rows == 2 and cipher.decrypt(rows[2]) == value, "the healthy decoder retry lost or duplicated binary typing data")
+end)
+
+check("actual typing persistence rejects a partial stdin producer and admits its healthy retry", function()
+	local value = "Persisted native stdin bytes"
+	local before = assert(writer.query_rows("SELECT count(*) FROM events_typing;"))
+	assert(#before == 1 and tonumber(before[1]))
+	mode("input", "PARTIAL7")
+	assert(writer.insert_typing_events("native-receipt-device", { { text = value } }) == false)
+	observed("input")
+	local rows = assert(writer.query_rows("SELECT count(*) FROM events_typing;"))
+	assert(#rows == 1 and rows[1] == before[1], "a refused stdin producer changed durable typing data")
+	mode("success")
+	assert(writer.insert_typing_events("native-receipt-device", { { text = value } }))
+	rows = assert(writer.query_rows("SELECT count(*) FROM events_typing;"))
+	assert(#rows == 1 and tonumber(rows[1]) == tonumber(before[1]) + 1)
+	rows = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id DESC LIMIT 1;"))
+	assert(#rows == 1 and cipher.decrypt(rows[1]) == value)
 end)
 
 if writer then writer.close_db() end

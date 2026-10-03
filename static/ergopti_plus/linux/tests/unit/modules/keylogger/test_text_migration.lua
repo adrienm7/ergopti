@@ -69,7 +69,7 @@ end
 --- Every decision below is taken on this and never on the whole string: the
 --- heredoc body is the user's own text and could contain any flag we look for.
 local function command_line(cmd)
-	return cmd:match("^([^\n]*)") or ""
+	return helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
 end
 
 --- Reproduces the bytes the SHELL would hand the command's standard input.
@@ -80,6 +80,16 @@ end
 --- @param cmd string The fully composed command.
 --- @return string|nil The delivered bytes, or nil when there is no heredoc.
 local function delivered_stdin(cmd)
+	local header = cmd:match("^([^\n]*)") or ""
+	local data_token = header:match(" 4<<'([%w_]+)' 0<&4 4<&%-$")
+	if data_token then
+		local program_token = header:match("<<'([%w_]+)'")
+		local data_document = cmd:match("\n.-\n" .. program_token .. "\n(.*)$")
+		local body = data_document and data_document:match("^(.-)\n" .. data_token .. "\n$")
+		local limit = tonumber(command_line(cmd):match("^head %-c (%d+) "))
+		if body == nil or not limit then return nil end
+		return (body .. "\n"):sub(1, limit)
+	end
 	local token = command_line(cmd):match("<<'([%w_]+)'")
 	if not token then return nil end
 	local body = cmd:match("\n(.-)\n" .. token .. "\n$")

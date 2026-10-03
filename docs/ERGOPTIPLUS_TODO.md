@@ -466,8 +466,9 @@ These are software implementations; final hardware verification remains below.
   fail before the fix; all thirty native cases pass with real OpenSSL and an
   explicit failed/partial-output wrapper, ordinary users, and actual SQLite
   rejection/retry. Healthy controls retain a 90,001-byte binary plaintext and
-  permit ordinary encryption without Bash; checked pipelines fail closed when
-  their installed Bash supervisor is absent. Six portable checks fail before
+  permit commands without external stdin to run without Bash; checked pipelines
+  fail closed when their installed Bash supervisor is absent. L39 extends this
+  protection to the exact-stdin producer itself. Six portable checks fail before
   the fix, then pass with the unchanged codec/ordering assertions and explicit
   checked-pipeline policy. Only the native command is quoted, preserving the
   original stdin argument budget. macOS' separate OpenSSL shell path remains an
@@ -488,6 +489,23 @@ These are software implementations; final hardware verification remains below.
   text hashing similarly ignores its native command success flag (unvalidated,
   deferred to the native owner); Windows checks BCrypt return codes. Native
   cross-OS gates, manual CI and physical input tests remain unexecuted.
+- [~] **L39.** Linux OpenSSL exact-stdin producer receipts: supervise head
+  together with every crypto consumer, refusing useful output when input delivery
+  fails. A real partial producer previously acknowledged one of twenty-seven
+  original bytes. Twenty native failure guards plus the missing input-supervisor
+  guard and five portable controls fail before the fix. All fifty-four native
+  cases pass with actual head/OpenSSL and SQLite rejection/retry, including
+  partial output, exit/signal faults, literal script delimiters and shell syntax.
+  Program fd 3 and data stdin remain separate, reusing shared collision/exact-body
+  policy without quoting data again. A real child syscall trace confirms 42-byte
+  and 90,001-byte roundtrips with no created temporary file; observed O_CREAT
+  operations target only /dev/null. Default external-stdin commands now require
+  the installed Bash supervisor; commands without external stdin keep their
+  existing capability contract. Portable native-wire producers understand the
+  separate program/data descriptors; migration and framing assertions remain
+  intact. macOS' separate exact-input pipeline is an unvalidated source concern
+  deferred to its native owner; Windows uses checked native crypto APIs. Native
+  cross-OS gates, manual CI and physical typing tests remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
