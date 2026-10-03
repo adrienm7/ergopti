@@ -327,6 +327,14 @@ pending native qualification.
 
 Windows qualification now reads actual menu item types independently of packed submenu counts and retains native ten/eleven-child probes with real leading, trailing and doubled separator controls. The build-identity fixture accepts only the two known provider signatures and checks the actual default version row. Bootstrap fixtures resolve their already-owned temporary directory through native GetLongPathNameW before deriving expected forwarding bytes, matching the independently observed child identity. All existing byte, durability, terminal handoff and refusal assertions remain intact; production code is unchanged. Corrected native execution and complete packaging/install qualification remain pending the next non-release Windows checkpoint.
 
+CI updater qualification remains partial: the Linux installed-old-build live
+updater authenticates only the trusted shared-catalogue release endpoint
+through its fixture HTTP wrapper and existing contents:read workflow token.
+Authenticated requests forbid redirects, preserve native
+ownership/cache/limits, and keep real403/3xx refusals red. Controlled
+actual-adapter origin/privacy/getter/redirect regressions pass; full
+selected and hosted real download/SHA/install/restart remain required.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
