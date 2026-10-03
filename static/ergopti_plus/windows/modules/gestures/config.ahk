@@ -414,6 +414,10 @@ GestureActionNeedsConfirm(ActionName) {
 ; force_quit_frontmost would kill. Any other action (empty_trash) still runs.
 _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
 		global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
+		if A_IsSuspended {
+				LoggerInfo("gestures", "'{1}' was cancelled before its confirmation: the script is suspended.", ActionName)
+				return false
+		}
 		Label := _GestureActionLabel(ActionName)
 		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
 		if (Answer != "OK") {
@@ -431,6 +435,10 @@ _GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
 						return
 				}
 				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
+		}
+		if A_IsSuspended {
+				LoggerInfo("gestures", "'{1}' was cancelled after focus restoration: the script is suspended.", ActionName)
+				return false
 		}
 		_GestureRunAction(ActionName, BindingId)
 }

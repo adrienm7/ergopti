@@ -688,3 +688,91 @@ _SysActions_ControlProbes() {
 	AssertEqual(Expected, Adapter.SessionId(), "the script's own session")
 }
 Test("system actions: SystemControl probes a registry key and names the session", _SysActions_ControlProbes)
+
+
+_SysActions_PauseReceipt(Replay, Fragment) {
+	global _LOGGER_INFO_ENABLED
+	PriorPause := A_IsSuspended
+	PriorInfo := _LOGGER_INFO_ENABLED
+	Entries := []
+	_LOGGER_INFO_ENABLED := true
+	LoggerSetTestSink((Entry) => Entries.Push(Entry))
+	try {
+		Suspend(true)
+		Replay.Call()
+	} finally {
+		Suspend(PriorPause)
+		LoggerClearTestSink()
+		_LOGGER_INFO_ENABLED := PriorInfo
+	}
+	Found := 0
+	for Entry in Entries {
+		if InStr(Entry, Fragment)
+			Found += 1
+	}
+	return Found
+}
+
+_SysActions_PausedDeferredDispatch() {
+	Fake := _SysActionsFake()
+	Runner := _GestureMakeSystemRunner("clear_clipboard", GestureSysClearClipboard.Bind(Fake), Fake)
+	Runner.Call()
+	Receipts := _SysActions_PauseReceipt(Fake.Deferred[1], "cancelled before its deferred execution")
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "ClearClipboard").Length,
+		"a callback admitted before pause cannot clear the clipboard while paused")
+	AssertEqual(1, Receipts, "the deferred action cancellation is logged once")
+}
+Test("system actions: deferred clipboard action cancels during pause (system-action-pause-boundaries)",
+	_SysActions_PausedDeferredDispatch)
+
+_SysActions_PausedDelayedSleep() {
+	Fake := _SysActionsFake()
+	GestureSysSleepDisplays(Fake)
+	Receipts := _SysActions_PauseReceipt(Fake.Deferred[1], "Display sleep was cancelled")
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "PostBroadcast").Length,
+		"the second display timer must not power monitors off after pause")
+	AssertEqual(1, Receipts, "the delayed display cancellation is logged once")
+}
+Test("system actions: delayed display sleep cancels during pause (system-action-pause-boundaries)",
+	_SysActions_PausedDelayedSleep)
+
+_SysActions_PausedConfirmationAdmission() {
+	Fake := _SysActionsFake()
+	Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
+	GestureInvokeAction("force_quit_frontmost", "keyboard__pause_probe", Fake)
+	Receipts := _SysActions_PauseReceipt(Fake.Deferred[1], "cancelled before its confirmation")
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "Ask").Length,
+		"a queued confirmation must not open a dialog after pause")
+	AssertEqual(1, Receipts, "the confirmation cancellation is logged once")
+}
+Test("system actions: deferred confirmation cancels before Ask during pause (system-action-pause-boundaries)",
+	_SysActions_PausedConfirmationAdmission)
+
+class _SysActions_PausingFocus extends _SysActionsFake {
+	Activate(Hwnd) {
+		this._Log("Activate", Hwnd)
+		Suspend(true)
+		return true
+	}
+}
+
+_SysActions_PausedDuringFocusRestore() {
+	global GESTURE_ACTIONS
+	Saved := GESTURE_ACTIONS["force_quit_frontmost"]
+	Ran := []
+	Fake := _SysActions_PausingFocus()
+	Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
+	Fake.Answer := "OK"
+	GESTURE_ACTIONS["force_quit_frontmost"] := { Fn: () => Ran.Push("ran") }
+	PriorPause := A_IsSuspended
+	try {
+		GestureInvokeAction("force_quit_frontmost", "keyboard__pause_probe", Fake)
+		Fake.Deferred[1].Call()
+		AssertEqual(0, Ran.Length, "a pause during activation cannot dispatch a confirmed extension")
+	} finally {
+		Suspend(PriorPause)
+		GESTURE_ACTIONS["force_quit_frontmost"] := Saved
+	}
+}
+Test("system actions: confirmation rechecks pause after focus restoration (system-action-pause-boundaries)",
+	_SysActions_PausedDuringFocusRestore)
