@@ -335,6 +335,19 @@ ownership/cache/limits, and keep real403/3xx refusals red. Controlled
 actual-adapter origin/privacy/getter/redirect regressions pass; full
 selected and hosted real download/SHA/install/restart remain required.
 
+TODO 16 remains partial: supplemental native readiness diagnostics now test
+the exact NSError code/domain and AppleEvent int32 getters using
+independently constructed -1712/-50 controls, a fresh nil reference and an
+absent error descriptor. Fresh nonce/PID-owned receipts retain strict scalar
+and send/handler read boundaries separately from native admission. Original
+AppleEvent controls, verdicts, deadlines, preferences, restoration and the
+default JXA script remain unchanged. The eight new portable cases fail
+against the original source and pass with the candidate; all 70 original
+probe tests remain byte-identical. Actual Cocoa scalar/branch qualification
+and the original macOS clean/Karabiner readiness controls remain pending a
+complete native CI run. Neither missing server witnesses nor SIGSEGV
+establish a permission verdict.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

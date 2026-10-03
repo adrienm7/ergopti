@@ -385,6 +385,45 @@ SUPPLEMENTAL_SENDER_STAGES = (
 )
 
 
+SUPPLEMENTAL_SCALAR_STAGES = (
+    "nserror_construct_entered",
+    "nserror_construct_returned",
+    "nserror_code_entered",
+    "nserror_code_returned",
+    "nserror_domain_entered",
+    "nserror_domain_returned",
+    "descriptor_construct_entered",
+    "descriptor_construct_returned",
+    "descriptor_int32_entered",
+    "descriptor_int32_returned",
+    "nil_ref_entered",
+    "nil_ref_returned",
+    "absent_errn_entered",
+    "absent_errn_returned",
+)
+SUPPLEMENTAL_DECODER_STAGES = {
+    "send": (
+        "reference_entered",
+        "reference_returned",
+        "code_entered",
+        "code_returned",
+        "domain_entered",
+        "domain_returned",
+    ),
+    "handler": ("errn_entered", "errn_returned", "int32_entered", "int32_returned"),
+}
+SUPPLEMENTAL_PRIMITIVE_TYPES = {
+    "undefined",
+    "object",
+    "boolean",
+    "number",
+    "string",
+    "function",
+    "symbol",
+    "bigint",
+}
+
+
 class NoPromptDiagnosticScope:
     """Own fresh server witnesses and sender stages without admitting a control."""
 
@@ -397,7 +436,13 @@ class NoPromptDiagnosticScope:
             "bundle_id": bundle_id,
         }
         self.sender_pid = None
-        self.allowed_names = {"entry.json", "completion.json", "sender.json"}
+        self.allowed_names = {
+            "entry.json",
+            "completion.json",
+            "sender.json",
+            "scalar.json",
+            "decoder.json",
+        }
         self.allowed_names |= {name + ".pending" for name in self.allowed_names}
         self.directory_identity = (self.path.stat().st_dev, self.path.stat().st_ino)
 
@@ -451,7 +496,152 @@ class NoPromptDiagnosticScope:
             raise ValueError("A supplemental receipt is not an object")
         return result
 
-    def observe(self, require_completion=False, terminal=False):
+    def _owned_packet(self, name, contract, extra):
+        packet = self.read(name)
+        if packet is None:
+            return None
+        if type(self.sender_pid) is not int or self.sender_pid <= 0:
+            raise ValueError("A present supplemental packet has no actual bound sender")
+        expected = {
+            "schema_version": 1,
+            "contract": contract,
+            "nonce": self.identity["nonce"],
+            "target_pid": self.identity["pid"],
+            "sender_pid": self.sender_pid,
+        }
+        if set(packet) != set(expected) | set(extra) or any(
+            type(packet[key]) is not type(value) or packet[key] != value
+            for key, value in expected.items()
+        ):
+            raise ValueError("A supplemental scalar packet differs from its actual owner")
+        return packet
+
+    @staticmethod
+    def _fact(fact, field):
+        if (
+            not isinstance(fact, dict)
+            or set(fact) != {"type", field}
+            or not isinstance(fact["type"], str)
+            or fact["type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+        ):
+            raise ValueError("A supplemental scalar fact is not a closed primitive")
+        value = fact[field]
+        if field == "integer":
+            if fact["type"] != "number" or (value is not None and type(value) is not int):
+                raise ValueError("A supplemental scalar integer has the wrong type")
+        elif type(value) is not bool:
+            raise ValueError("A supplemental scalar flag has the wrong type")
+
+    def scalar_evidence(self, terminal=False, native=None):
+        """Retain decoder boundaries independently of the original native status verdict."""
+        scalar = self._owned_packet(
+            "scalar.json", "hs.applescript.scalar-controls", {"stages", "facts"}
+        )
+        scalar_stage = "not_observed"
+        scalar_qualified = False
+        if scalar is not None:
+            stages, facts = scalar["stages"], scalar["facts"]
+            if (
+                not isinstance(stages, list)
+                or not stages
+                or stages != list(SUPPLEMENTAL_SCALAR_STAGES[: len(stages)])
+                or not isinstance(facts, dict)
+            ):
+                raise ValueError("Supplemental scalar stages are not a closed prefix")
+            specifications = {
+                "code": ("nserror_code_returned", "integer", -1712),
+                "domain": ("nserror_domain_returned", "matches", True),
+                "int32": ("descriptor_int32_returned", "integer", -50),
+                "nil_ref": ("nil_ref_returned", "absent", True),
+                "absent_errn": ("absent_errn_returned", "absent", True),
+            }
+            keys = {key for key, (stage, _, _) in specifications.items() if stage in stages}
+            if set(facts) != keys:
+                raise ValueError("Supplemental scalar facts differ from completed reads")
+            for key in keys:
+                self._fact(facts[key], specifications[key][1])
+            scalar_stage = stages[-1]
+            scalar_qualified = (
+                len(stages) == len(SUPPLEMENTAL_SCALAR_STAGES)
+                and all(
+                    type(facts[key][field]) is type(value) and facts[key][field] == value
+                    for key, (_, field, value) in specifications.items()
+                )
+                and facts["domain"]["type"] == "string"
+                and all(
+                    facts[key]["type"] in {"object", "undefined"}
+                    for key in ("nil_ref", "absent_errn")
+                )
+            )
+        decoder = self._owned_packet(
+            "decoder.json", "hs.applescript.decoder-boundaries", {"branch", "stages", "facts"}
+        )
+        branch, boundary = "not_observed", "not_observed"
+        if decoder is not None:
+            branch, stages, facts = decoder["branch"], decoder["stages"], decoder["facts"]
+            if (
+                not isinstance(branch, str)
+                or branch not in SUPPLEMENTAL_DECODER_STAGES
+                or not isinstance(stages, list)
+                or not stages
+                or not isinstance(facts, dict)
+            ):
+                raise ValueError("A supplemental decoder branch is outside its closed protocol")
+            absent_route = ["errn_entered", "errn_returned", "absent_errn"]
+            route = SUPPLEMENTAL_DECODER_STAGES[branch]
+            if stages != list(route[: len(stages)]) and not (
+                branch == "handler" and stages == absent_route
+            ):
+                raise ValueError("Supplemental decoder boundaries are not a closed prefix")
+            specifications = (
+                {"code": ("code_returned", "integer"), "domain": ("domain_returned", "recognized")}
+                if branch == "send"
+                else {"errn": ("errn_returned", "absent"), "int32": ("int32_returned", "integer")}
+            )
+            keys = {key for key, (stage, _) in specifications.items() if stage in stages}
+            if set(facts) != keys:
+                raise ValueError("Supplemental decoder facts differ from completed reads")
+            for key in keys:
+                self._fact(facts[key], specifications[key][1])
+            boundary = stages[-1]
+            if terminal:
+                expected_branch = "send" if native["error_origin"] == "send" else "handler"
+                if (
+                    branch != expected_branch
+                    or (branch == "send" and stages != list(route))
+                    or (branch == "handler" and stages not in (list(route), absent_route))
+                ):
+                    raise ValueError("The terminal native decoder branch did not complete")
+                key = "code" if branch == "send" else "int32"
+                if key in facts:
+                    if (
+                        type(facts[key]["integer"]) is not int
+                        or facts[key]["integer"] != native["status"]
+                    ):
+                        raise ValueError(
+                            "Supplemental scalar status differs from the native receipt"
+                        )
+                elif native["status"] != 0 or not facts["errn"]["absent"]:
+                    raise ValueError("An absent handler status differs from the native receipt")
+                if branch == "send" and (
+                    facts["domain"]["type"]
+                    != ("string" if isinstance(native["error_domain"], str) else "object")
+                    or facts["domain"]["recognized"]
+                    != (native["error_domain"] == "NSOSStatusErrorDomain")
+                ):
+                    raise ValueError("The supplemental native domain differs from its receipt")
+                if branch == "handler" and facts["errn"]["absent"] != (stages == absent_route):
+                    raise ValueError("The handler descriptor presence differs from its read route")
+        if terminal and (not scalar_qualified or decoder is None):
+            raise ValueError("The supplemental native scalar controls did not qualify")
+        return {
+            "scalar_stage": scalar_stage,
+            "scalar_qualified": scalar_qualified,
+            "decoder_branch": branch,
+            "decoder_boundary": boundary,
+        }
+
+    def observe(self, require_completion=False, terminal=False, native=None):
         """Keep execution and sender evidence separate from the native send status."""
         present = []
         for name, phase in (("entry.json", "entry"), ("completion.json", "completion")):
@@ -502,6 +692,7 @@ class NoPromptDiagnosticScope:
         if (terminal or require_completion) and stages != required_stages:
             raise ValueError("The no-prompt native receipt lacks terminal sender stages")
         return {
+            **self.scalar_evidence(terminal=terminal, native=native),
             "server": "completed"
             if len(present) == 2
             else "entered"
@@ -562,11 +753,68 @@ function recordOwnedStage(stage) {
     if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__PATH__, true))
         throw new Error('Supplemental stage write refused');
 }
+
+var scalarStages = [], scalarFacts = {}, decoderStages = [], decoderFacts = {}, decoderBranch = null;
+function publishOwnedPacket(name, contract, stages, facts, branch) {
+    var data = {schema_version:1,contract:contract,nonce:__NONCE__,target_pid:__PID__,
+        sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),stages:stages,facts:facts};
+    if (branch !== undefined) data.branch = branch;
+    var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+    if (!encoded || encoded.isNil()) throw new Error('Supplemental packet encoding refused');
+    var size = Number(encoded.length);
+    if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__ROOT__ + '/' + name, true))
+        throw new Error('Supplemental packet write refused');
+}
+function integerFact(value) { return {type:typeof value,integer:Number.isInteger(value) ? value : null}; }
+function recordScalar(stage, key, fact) {
+    var expected = __SCALAR_STAGES__;
+    if (stage !== expected[scalarStages.length]) throw new Error('Supplemental scalar order refused');
+    scalarStages.push(stage);
+    if (key !== undefined) scalarFacts[key] = fact;
+    publishOwnedPacket('scalar.json','hs.applescript.scalar-controls',scalarStages,scalarFacts);
+}
+function qualifyOwnedScalars(reply) {
+    recordScalar('nserror_construct_entered');
+    var nativeError = $.NSError.errorWithDomainCodeUserInfo('NSOSStatusErrorDomain', -1712, $());
+    recordScalar('nserror_construct_returned');
+    recordScalar('nserror_code_entered');
+    var code = Number(nativeError.code);
+    recordScalar('nserror_code_returned','code',integerFact(code));
+    recordScalar('nserror_domain_entered');
+    var domain = ObjC.unwrap(nativeError.domain);
+    recordScalar('nserror_domain_returned','domain',{type:typeof domain,matches:domain === 'NSOSStatusErrorDomain'});
+    recordScalar('descriptor_construct_entered');
+    var errorNumber = $.NSAppleEventDescriptor.descriptorWithInt32(-50);
+    recordScalar('descriptor_construct_returned');
+    recordScalar('descriptor_int32_entered');
+    var number = Number(errorNumber.int32Value);
+    recordScalar('descriptor_int32_returned','int32',integerFact(number));
+    recordScalar('nil_ref_entered');
+    var reference = Ref(), missing = reference[0];
+    recordScalar('nil_ref_returned','nil_ref',{type:typeof missing,absent:!missing || missing.isNil()});
+    recordScalar('absent_errn_entered');
+    var absent = reply.paramDescriptorForKeyword(0x6572726e);
+    recordScalar('absent_errn_returned','absent_errn',{type:typeof absent,absent:absent.isNil()});
+}
+function recordDecoderBoundary(branch, stage, key, fact) {
+    var routes = __DECODER_STAGES__;
+    if (decoderBranch !== null && decoderBranch !== branch) throw new Error('Supplemental decoder branch changed');
+    decoderBranch = branch;
+    var expected = routes[branch];
+    if (!expected || (stage !== expected[decoderStages.length] && !(branch === 'handler' && stage === 'absent_errn' && decoderStages.length === 2 && decoderFacts.errn.absent)))
+        throw new Error('Supplemental decoder order refused');
+    decoderStages.push(stage);
+    if (key !== undefined) decoderFacts[key] = fact;
+    publishOwnedPacket('decoder.json','hs.applescript.decoder-boundaries',decoderStages,decoderFacts,branch);
+}
 function ownedWitnessSource(source, pid, nonce) {
     if (pid !== __PID__ || nonce !== __NONCE__) throw new Error('Supplemental source owner refused');
     return __PREFIX__ + source + __SUFFIX__;
 }
 """.replace("__STAGES__", json.dumps(list(SUPPLEMENTAL_SENDER_STAGES)))
+            .replace("__SCALAR_STAGES__", json.dumps(list(SUPPLEMENTAL_SCALAR_STAGES)))
+            .replace("__DECODER_STAGES__", json.dumps(SUPPLEMENTAL_DECODER_STAGES))
+            .replace("__ROOT__", json.dumps(str(self.path)))
             .replace("__NONCE__", json.dumps(self.identity["nonce"]))
             .replace("__PID__", str(self.identity["pid"]))
             .replace("__PATH__", json.dumps(str(self.path / "sender.json")))
@@ -852,7 +1100,7 @@ function run(argv) {
         )
         script = script.replace(
             "    var error = Ref();",
-            "    recordOwnedStage('constructed');\n    var error = Ref();\n    recordOwnedStage('send_entered');",
+            "    recordOwnedStage('constructed');\n    qualifyOwnedScalars(event);\n    var error = Ref();\n    recordOwnedStage('send_entered');",
             1,
         )
         script = script.replace(
@@ -875,6 +1123,32 @@ function run(argv) {
             "            result = ObjC.unwrap(direct.stringValue);\n            recordOwnedStage('reply_decode_complete');",
             1,
         )
+
+        script = script.replace(
+            "        var nativeError = error[0];",
+            "        recordDecoderBoundary('send', 'reference_entered');\n        var nativeError = error[0];\n        recordDecoderBoundary('send', 'reference_returned');",
+            1,
+        )
+        script = script.replace(
+            "        status = Number(nativeError.code);",
+            "        recordDecoderBoundary('send', 'code_entered');\n        status = Number(nativeError.code);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));",
+            1,
+        )
+        script = script.replace(
+            "        domain = ObjC.unwrap(nativeError.domain);",
+            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});",
+            1,
+        )
+        script = script.replace(
+            "        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);",
+            "        recordDecoderBoundary('handler', 'errn_entered');\n        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);\n        recordDecoderBoundary('handler', 'errn_returned', 'errn', {type:typeof errorNumber,absent:errorNumber.isNil()});",
+            1,
+        )
+        script = script.replace(
+            "        if (!errorNumber.isNil()) status = Number(errorNumber.int32Value);",
+            "        if (!errorNumber.isNil()) {\n            recordDecoderBoundary('handler', 'int32_entered');\n            status = Number(errorNumber.int32Value);\n            recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status));\n        } else recordDecoderBoundary('handler', 'absent_errn');",
+            1,
+        )
         return script
 
     def control_pid_no_prompt(self, pid, processes):
@@ -895,7 +1169,9 @@ function run(argv) {
                     raise RuntimeError(
                         "The no-prompt native process changed before receipt admission"
                     )
-                evidence = scope.observe(require_completion=result["status"] == 0, terminal=True)
+                evidence = scope.observe(
+                    require_completion=result["status"] == 0, terminal=True, native=result
+                )
             except Exception as primary:
                 if scope.sender_pid is not None:
                     if receipt_owner is None:
@@ -907,7 +1183,8 @@ function run(argv) {
                 evidence = scope.observe()
                 self.retain_diagnostics(
                     [
-                        f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}"
+                        f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
+                        f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
                     ],
                     "pid_no_prompt",
                 )
@@ -918,6 +1195,7 @@ function run(argv) {
                     f"Exact owned no-prompt AppleEvent {result['outcome']}: "
                     f"status {result['status']}, origin {result['error_origin']}",
                     f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
+                    f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
                 ],
                 "pid_no_prompt",
             )
