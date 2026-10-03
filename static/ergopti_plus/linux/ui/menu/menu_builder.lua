@@ -2153,28 +2153,34 @@ local function _build_llm(ctx)
 		end
 		local streaming_source = streaming_snapshot()
 		local rows = {}
-		local indent = DisplaySettings.get("pred_indent") or 0
-		local indent_rows = {}
-		for _, value in ipairs(DisplaySettings.indent_values()) do
-			local label = value == 0 and i18n_safe("menu.llm.indent_none")
-				or string.format("%+d", value)
-			indent_rows[#indent_rows + 1] = {
-				label = label,
-				checked = indent == value,
-				action = function()
-					DisplaySettings.set("pred_indent", value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
+		local function indentation_snapshot()
+			local snapshot = streaming_snapshot()
+			local values, source = Preferences.get_many({ "llm.profiles.num_predictions", "llm.display.pred_indent" })
+			snapshot.count = ProfileSettings.get("num_predictions")
+			snapshot.indentation = DisplaySettings.get("pred_indent")
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values["llm.profiles.num_predictions"]
+				or snapshot.indentation ~= values["llm.display.pred_indent"]
+			-- Re-reading the canonical owner advances its revision for every source
+			-- change, including unrelated fields and away/back transitions.
+			snapshot.source = source
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local generation = type(revision) == "number" and Preferences.generation() + revision or nil
+			snapshot.blocked = snapshot.blocked or snapshot.generation ~= generation
+			snapshot.generation = generation
+			return snapshot
 		end
-		rows[#rows + 1] = { separator = true }
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
-			items = indent_rows,
-		}
+		local indentation_source = indentation_snapshot()
 		local info_bar = DisplaySettings.get("show_info_bar")
 		local display_ctx = {
 			commands = {
+				["llm_indentation"] = function(value)
+					local current = indentation_snapshot()
+					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("pred_indent", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 				["llm_show_all"] = function()
 					if not show_all_ready() then return false end
 					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
@@ -2196,6 +2202,8 @@ local function _build_llm(ctx)
 				end,
 			},
 			state_getters = {
+				["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
 				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
 				["llm_show_all_ready"] = show_all_ready,
 				["llm_token_streaming_enabled"] = function()

@@ -6,11 +6,16 @@
 	"type": "object",
 	"additionalProperties": false,
 	"required": ["manifest", "sections", "features", "scopes"],
-
 	"properties": {
-		"manifest": { "$ref": "#/$defs/manifest_meta" },
-		"sections": { "$ref": "#/$defs/sections_root" },
-		"features": { "$ref": "#/$defs/features_root" },
+		"manifest": {
+			"$ref": "#/$defs/manifest_meta"
+		},
+		"sections": {
+			"$ref": "#/$defs/sections_root"
+		},
+		"features": {
+			"$ref": "#/$defs/features_root"
+		},
 		"scopes": {
 			"type": "object",
 			"required": [
@@ -23,25 +28,45 @@
 				"metrics",
 				"global"
 			],
-			"additionalProperties": { "$ref": "#/$defs/configuration_scope" }
+			"additionalProperties": {
+				"$ref": "#/$defs/configuration_scope"
+			}
 		}
 	},
-
 	"$defs": {
 		"configuration_scope": {
 			"type": "object",
 			"additionalProperties": false,
 			"required": ["prefixes", "restore_exclude"],
 			"properties": {
-				"prefixes": { "type": "array", "items": { "type": "string" } },
-				"restore_exclude": { "type": "array", "items": { "type": "string" } },
+				"prefixes": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"restore_exclude": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
 				"clear_exclude": {
 					"type": "array",
-					"items": { "type": "string" },
+					"items": {
+						"type": "string"
+					},
 					"description": "Paths a clear leaves as they are, in this scope and in every scope that includes it."
 				},
-				"includes": { "type": "array", "items": { "type": "string" } },
-				"preset": { "type": "string" },
+				"includes": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"preset": {
+					"type": "string"
+				},
 				"action_parameters": {
 					"type": "object",
 					"additionalProperties": false,
@@ -55,7 +80,9 @@
 								"enum": ["combination", "gesture", "keyboard", "script", "tap_key", "tap_hold"]
 							}
 						},
-						"restore": { "const": "remove" }
+						"restore": {
+							"const": "remove"
+						}
 					}
 				},
 				"dynamic_defaults": {
@@ -65,20 +92,31 @@
 						"additionalProperties": false,
 						"required": ["prefix", "depth", "default", "recommended"],
 						"properties": {
-							"prefix": { "type": "string" },
-							"depth": { "type": "integer", "minimum": 1 },
-							"suffix": { "type": "string" },
+							"prefix": {
+								"type": "string"
+							},
+							"depth": {
+								"type": "integer",
+								"minimum": 1
+							},
+							"suffix": {
+								"type": "string"
+							},
 							"type": {
 								"enum": ["boolean", "integer", "number", "string", "array"],
 								"description": "Derived from neutral and recommended source values by the generator."
 							},
 							"default": {
 								"type": ["boolean", "number", "string", "array"],
-								"items": { "type": ["boolean", "number", "string"] }
+								"items": {
+									"type": ["boolean", "number", "string"]
+								}
 							},
 							"recommended": {
 								"type": ["boolean", "number", "string", "array"],
-								"items": { "type": ["boolean", "number", "string"] }
+								"items": {
+									"type": ["boolean", "number", "string"]
+								}
 							}
 						}
 					}
@@ -90,62 +128,86 @@
 			"additionalProperties": false,
 			"required": ["version"],
 			"properties": {
-				"version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-				"config_schema": { "type": "string", "format": "uri" }
+				"version": {
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+\\.\\d+$"
+				},
+				"config_schema": {
+					"type": "string",
+					"format": "uri"
+				}
 			}
 		},
-
 		"sections_root": {
 			"description": "Top-level sections registry. Keys are section names; nested tables follow the same shape recursively.",
 			"type": "object",
 			"properties": {
 				"order": {
 					"type": "array",
-					"items": { "type": "string" },
+					"items": {
+						"type": "string"
+					},
 					"description": "Ordered list of top-level section names; drives both menu order and config.toml emission order."
 				}
 			},
-			"additionalProperties": { "$ref": "#/$defs/section_node" }
+			"additionalProperties": {
+				"$ref": "#/$defs/section_node"
+			}
 		},
-
 		"section_node": {
 			"description": "Metadata for a single section path. Nested sub-section tables appear as further keys on this same table.",
 			"type": "object",
 			"properties": {
-				"description_key": { "type": "string" },
+				"description_key": {
+					"type": "string"
+				},
 				"platforms": {
 					"type": "array",
-					"items": { "enum": ["ahk", "hs", "linux"] },
+					"items": {
+						"enum": ["ahk", "hs", "linux"]
+					},
 					"minItems": 1,
 					"uniqueItems": true
 				},
 				"subsections": {
 					"type": "array",
-					"items": { "type": "string" },
+					"items": {
+						"type": "string"
+					},
 					"description": "Ordered list of child section names for menu/render ordering."
 				}
 			},
 			"required": ["description_key"],
-			"additionalProperties": { "$ref": "#/$defs/section_node" }
+			"additionalProperties": {
+				"$ref": "#/$defs/section_node"
+			}
 		},
-
 		"features_root": {
 			"description": "Top-level features registry. Keys are section paths (dot-separated mirrored as nested tables); values are arrays-of-tables of feature entries.",
 			"type": "object",
 			"additionalProperties": {
 				"oneOf": [
-					{ "type": "array", "items": { "$ref": "#/$defs/feature_entry" } },
-					{ "$ref": "#/$defs/features_root" }
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/$defs/feature_entry"
+						}
+					},
+					{
+						"$ref": "#/$defs/features_root"
+					}
 				]
 			}
 		},
-
 		"feature_entry": {
 			"type": "object",
 			"additionalProperties": false,
 			"required": ["id", "description_key", "input_altering"],
 			"properties": {
-				"id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+				"id": {
+					"type": "string",
+					"pattern": "^[a-z][a-z0-9_]*$"
+				},
 				"default": {
 					"description": "Primitive (bool/number/string/array) OR table. Mutually optional with default_per_platform — exactly one of them must be set."
 				},
@@ -165,9 +227,15 @@
 				"recommended_per_platform": {
 					"type": "object",
 					"additionalProperties": false,
-					"properties": { "ahk": {}, "hs": {}, "linux": {} }
+					"properties": {
+						"ahk": {},
+						"hs": {},
+						"linux": {}
+					}
 				},
-				"input_altering": { "type": "boolean" },
+				"input_altering": {
+					"type": "boolean"
+				},
 				"active_by_default": {
 					"const": true,
 					"description": "Only on an input_altering entry the maintainer decided to switch on in an empty configuration (the script-management chords, 2026-09-30). Its default must equal its recommended value on every platform; every other input-altering entry defaults to off."
@@ -183,7 +251,9 @@
 					"minItems": 1,
 					"description": "Required when type = \"enum\"."
 				},
-				"description_key": { "type": "string" },
+				"description_key": {
+					"type": "string"
+				},
 				"reason_key": {
 					"type": "string",
 					"description": "Locale key explaining WHY this feature is unavailable on the platforms its \"platforms\" list excludes. Read by the platform-coverage report (Menu → Debug → Healthcheck), which is the only place a user can ask why a row is missing. Meaningless without a platforms restriction, and the generator refuses one that has none."
@@ -195,21 +265,68 @@
 				},
 				"platforms": {
 					"type": "array",
-					"items": { "enum": ["ahk", "hs", "linux"] },
+					"items": {
+						"enum": ["ahk", "hs", "linux"]
+					},
 					"minItems": 1,
 					"uniqueItems": true
+				},
+				"choice_values": {
+					"type": "array",
+					"items": {
+						"type": "integer",
+						"minimum": -9007199254740991,
+						"maximum": 9007199254740991
+					},
+					"minItems": 2,
+					"uniqueItems": true,
+					"description": "Optional ordered integer presentation choices on a numeric feature. The generator validates contiguity and default/recommended membership; numeric configuration storage is unchanged."
 				}
 			},
-
-			"oneOf": [{ "required": ["default"] }, { "required": ["default_per_platform"] }],
-
-			"allOf": [
+			"oneOf": [
 				{
-					"oneOf": [{ "required": ["recommended"] }, { "required": ["recommended_per_platform"] }]
+					"required": ["default"]
 				},
 				{
-					"if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
-					"then": { "required": ["enum_values"] }
+					"required": ["default_per_platform"]
+				}
+			],
+			"allOf": [
+				{
+					"oneOf": [
+						{
+							"required": ["recommended"]
+						},
+						{
+							"required": ["recommended_per_platform"]
+						}
+					]
+				},
+				{
+					"if": {
+						"properties": {
+							"type": {
+								"const": "enum"
+							}
+						},
+						"required": ["type"]
+					},
+					"then": {
+						"required": ["enum_values"]
+					}
+				},
+				{
+					"if": {
+						"required": ["choice_values"]
+					},
+					"then": {
+						"required": ["type"],
+						"properties": {
+							"type": {
+								"const": "number"
+							}
+						}
+					}
 				}
 			]
 		}

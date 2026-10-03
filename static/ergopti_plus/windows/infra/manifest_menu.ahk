@@ -595,6 +595,7 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 		ChoiceLabel := _MR_Get(Choice, "label")
 		if ChoiceLabel == ""
 			ChoiceLabel := t(_MR_Get(Choice, "i18n"))
+		ChoiceLabel := _MR_Get(Choice, "label_prefix") . ChoiceLabel
 		if HasCurrent and Current == Value {
 			CurrentI18n := _MR_Get(Choice, "current_i18n")
 			CurrentLabel := CurrentI18n == "" ? ChoiceLabel : t(CurrentI18n)

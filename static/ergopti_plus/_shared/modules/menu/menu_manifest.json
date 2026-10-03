@@ -550,6 +550,97 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
+			"type": "choice",
+			"id": "llm_indentation",
+			"path": "llm.display.pred_indent",
+			"i18n": "menu.llm.indent_label",
+			"show_current_choice": true,
+			"current_choice_suffix": ": {1}",
+			"disabled_when": [
+				"llm_indentation_ready"
+			],
+			"choices": [
+				{
+					"value": -7,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-7 "
+				},
+				{
+					"value": -6,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-6 "
+				},
+				{
+					"value": -5,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-5 "
+				},
+				{
+					"value": -4,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-4 "
+				},
+				{
+					"value": -3,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-3 "
+				},
+				{
+					"value": -2,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-2 "
+				},
+				{
+					"value": -1,
+					"i18n": "menu.llm.indent_space",
+					"label_prefix": "-1 "
+				},
+				{
+					"value": 0,
+					"i18n": "menu.llm.indent_none",
+					"label_prefix": ""
+				},
+				{
+					"value": 1,
+					"i18n": "menu.llm.indent_space",
+					"label_prefix": "+1 "
+				},
+				{
+					"value": 2,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+2 "
+				},
+				{
+					"value": 3,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+3 "
+				},
+				{
+					"value": 4,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+4 "
+				},
+				{
+					"value": 5,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+5 "
+				},
+				{
+					"value": 6,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+6 "
+				},
+				{
+					"value": 7,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+7 "
+				}
+			]
+		},
+		{
 			"type": "list",
 			"id": "llm_display_trailing"
 		}

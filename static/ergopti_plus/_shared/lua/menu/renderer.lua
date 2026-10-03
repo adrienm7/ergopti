@@ -480,7 +480,7 @@ function M.new(deps)
 		local current_label = nil
 		for _, choice in ipairs(choices) do
 			local value = choice.value
-			local label = choice.label or i18n.get(choice.i18n)
+			local label = (choice.label_prefix or "") .. (choice.label or i18n.get(choice.i18n))
 			if current == value then
 				current_label = choice.current_i18n and i18n.get(choice.current_i18n) or label
 			end

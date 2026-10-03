@@ -940,7 +940,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 105, macOS 182, Linux 114, each
+  drivers still build (current baseline: Windows 104, macOS 181, Linux 112, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -1128,6 +1128,24 @@ unit/E2E and complete three-OS packaging/install qualification still require CI.
 
 Windows token-streaming admission now refuses unset, non-map and incomplete native engine owners before reading their fields. The actual shared Display projection remains visible and grey without modifying stored streaming intent, future neighbours or acknowledged setting owners. A registered native regression covers six missing/retired owner shapes, and the source audit follows the authoritative shared declaration, capability/readiness bindings and retained-command admission instead of the superseded native row provider. All previous native assertions remain intact. Items 54 and 81 remain partial; the four observed Windows menu failures and obsolete source audit were reproduced by hosted CI, while execution of this correction still requires Windows CI. Portable source-contract checks pass with the original source red and six independent negative mutations refused.
 
+The AI display indentation menu now has one shared numeric choice declaration
+on Windows, macOS and Linux, with the same trailing position, fifteen signed
+visual prefixes from -7 through +7, existing translated units and current-value
+caption. Numeric configuration storage is unchanged; negative offsets control
+the display prefix and never delete application text. Native ports collect
+fresh master, pause, count, runtime and exact source evidence before invoking
+their existing acknowledged setting owners. macOS reuses one canonical source
+publication guard for streaming and indentation, retaining the actual pre-owned
+source and advancing compensation authority only through its own save receipts.
+Linux retains its sparse exact-source CAS writer; Windows writes only the typed
+indentation leaf under its configuration lease, preserving unrelated values.
+All 128 existing macOS setting transactions plus 12 new indentation cases pass,
+as do ten Linux indentation cases and the independent shared admission corpus.
+Focused current-root compiler, convention, formatting, encoding and native-row
+checks pass; complete current-root portable verification and native Windows,
+packaging and installation validation remain required. Items 54 and 81 remain
+partial for the other native/provider rows.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -1215,7 +1233,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 105, macOS 182 and Linux 114 rows are still built by the
+  Windows 104, macOS 181 and Linux 112 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

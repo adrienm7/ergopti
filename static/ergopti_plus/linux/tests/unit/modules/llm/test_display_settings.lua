@@ -143,6 +143,7 @@ local function with_info_menu(options, callback)
 		["llm.display.streaming_multi"] = options.progressive,
 		["llm.display.streaming"] = options.streaming,
 		["llm.profiles.num_predictions"] = options.count,
+		["llm.display.pred_indent"] = options.indent or 0,
 		["llm.future_field"] = 42,
 	}, options.refused)
 	package.loaded["modules.llm.profile_settings"] = nil
@@ -499,6 +500,128 @@ helpers.describe("Linux acknowledged token streaming checkbox", function()
 				helpers.assert_eq(observed.writes, 1)
 				helpers.assert_eq(observed.redraws, 0)
 			end)
+		end
+	end)
+end)
+
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 6/ Shared Indentation Choice =======
+-- ============================================
+-- ============================================
+
+--- Reads independent signed values and retained-command expectations.
+--- @return table corpus
+local function indentation_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("json").decode(text))
+end
+
+--- Finds the actual declared numeric submenu, including its selected caption.
+--- @param parent table Native AI display submenu.
+--- @return table row
+local function indentation_row(parent)
+	local label = require("infra.i18n").get("menu.llm.indent_label")
+	for _, row in ipairs(parent.menu) do
+		if type(row.title) == "string" and row.title:sub(1, #label) == label and row.menu then return row end
+	end
+	error("the actual indentation choice is absent")
+end
+
+helpers.describe("shared indentation choice", function()
+	helpers.it("renders fifteen distinct translated offsets from the canonical numeric declaration (shared-indentation)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings)
+			local row, corpus = indentation_row(parent), indentation_corpus()
+			helpers.assert_eq(#row.menu, 15)
+			for index, choice in ipairs(corpus.choices) do
+				helpers.assert_eq(row.menu[index].title, choice.prefix .. require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].checked or false, choice.value == settings.get("pred_indent"))
+			end
+			helpers.assert_eq(row.disabled == true, false)
+		end)
+	end)
+
+	for _, condition in ipairs({"paused", "off", "single", "retired source", "restored owner"}) do
+		helpers.it("refuses a retained indentation choice after " .. condition .. " (shared-indentation)", function()
+			with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed, profiles)
+				local command = assert(indentation_row(parent).menu[1].fn)
+				if condition == "paused" then observed.paused = true end
+				if condition == "off" then observed.active = false end
+				if condition == "single" then helpers.assert_true(profiles.set("num_predictions", 1)) end
+				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
+				if condition == "restored owner" then observed.revision = observed.revision + 2 end
+				local writes = observed.writes
+				helpers.assert_eq(command(), false)
+				helpers.assert_eq(observed.writes, writes)
+				helpers.assert_eq(settings.get("pred_indent"), 0)
+				helpers.assert_eq(observed.redraws, 0)
+			end)
+		end)
+	end
+
+	helpers.it("requires a strict writer ACK and preserves unrelated settings on refusal (shared-indentation)", function()
+		for _, mode in ipairs({"false", "nil", "throw"}) do
+			with_info_menu({selected = true, progressive = true, streaming = false, count = 3, refused = mode == "false", refusal_mode = mode}, function(parent, settings, storage, observed)
+				local command = assert(indentation_row(parent).menu[1].fn)
+				local ok, result = pcall(command)
+				helpers.assert_true(not ok or result == false)
+				helpers.assert_eq(settings.get("pred_indent"), 0)
+				helpers.assert_eq(storage.get("llm.display.pred_indent", 0), 0)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				helpers.assert_eq(observed.redraws, 0)
+			end)
+		end
+	end)
+
+	helpers.it("persists each numeric boundary and zero across restart without reviving its held callback (shared-indentation)", function()
+		for _, index in ipairs({1, 8, 15}) do
+			with_info_menu({selected = true, progressive = true, streaming = false, count = 3, indent = 1}, function(parent, settings, storage, observed)
+				local command = assert(indentation_row(parent).menu[index].fn)
+				local value = indentation_corpus().choices[index].value
+				helpers.assert_eq(command(), true)
+				helpers.assert_eq(settings.get("pred_indent"), value)
+				helpers.assert_eq(storage.get("llm.display.pred_indent", 0), value)
+				settings._reset()
+				helpers.assert_eq(settings.get("pred_indent"), value)
+				helpers.assert_eq(observed.redraws, 1)
+				helpers.assert_eq(command(), false)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+			end)
+		end
+	end)
+
+	helpers.it("keeps an external master withdrawal intact under the actual sparse CAS writer (shared-indentation)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed)
+			local command = assert(indentation_row(parent).menu[1].fn)
+			observed.source_race = true
+			helpers.assert_eq(command(), false)
+			helpers.assert_eq(settings.get("pred_indent"), 0)
+			helpers.assert_eq(storage.get_many({"llm.enabled"})["llm.enabled"], false)
+			helpers.assert_eq(storage.get("llm.future_field"), 42)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+
+	helpers.it("replays independent shared multi-prediction admission and value vectors (shared-indentation)", function()
+		local corpus, policy = indentation_corpus(), require("llm.display_policy")
+		local owner, other = {}, {}
+		for _, vector in ipairs(corpus.cases) do
+			local expected, current = {}, {}
+			for key, value in pairs(corpus.base) do expected[key], current[key] = value, value end
+			for key, value in pairs(vector.expected or {}) do expected[key] = value end
+			for key, value in pairs(vector.current) do current[key] = value end
+			expected.owner = expected.owner == "owned" and owner or other
+			current.owner = current.owner == "owned" and owner or other
+			local decision = policy.indentation_intent(expected, current, vector.value, {-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7})
+			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
+			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
 		end
 	end)
 end)

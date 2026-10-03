@@ -1173,6 +1173,7 @@ default = 0
 recommended = 0
 input_altering = false
 type = "number"
+choice_values = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
 description_key = "menu.llm.display.pred_indent"
 
 [[features.llm.display]]
@@ -4068,6 +4069,19 @@ id = "llm_show_all"
 i18n = "menu.llm.show_all_at_once"
 checked_when = ["llm_show_all_enabled"]
 disabled_when = ["llm_show_all_ready"]
+
+[[menu.llm_display_menu]]
+type = "---"
+
+[[menu.llm_display_menu]]
+type = "choice"
+id = "llm_indentation"
+path = "llm.display.pred_indent"
+i18n = "menu.llm.indent_label"
+choice_registry = "llm.indentation"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+disabled_when = ["llm_indentation_ready"]
 
 [[menu.llm_display_menu]]
 type = "list"

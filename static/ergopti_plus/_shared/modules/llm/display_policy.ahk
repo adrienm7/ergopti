@@ -101,3 +101,67 @@ LLM_DisplayStreamingIntent(Expected, Current) {
 	}
 	return Map("admitted", true, "value", !Current["streaming"])
 }
+
+/**
+ * Copies the ordered offsets owned by the generated numeric feature.
+ * @param {Map} Feature Canonical number feature.
+ * @returns {Array} Accepted integer choices.
+ */
+LLM_DisplayIndentValues(Feature) {
+	if !(Feature is Map) || Feature.Get("type", "") != "number"
+			|| !(Feature.Get("choice_values", 0) is Array)
+			|| Feature["choice_values"].Length < 2
+		throw TypeError("Indentation requires its canonical numeric choice catalogue.")
+	Values := []
+	for Index, Value in Feature["choice_values"] {
+		if !(Value is Integer) || (Index > 1 && Value != Values[Index - 1] + 1)
+			throw TypeError("Indentation choices must be ordered contiguous integers.")
+		Values.Push(Value)
+	}
+	return Values
+}
+
+/**
+ * Admits an indentation choice from a live multi-prediction owner.
+ * @param {Map} Snapshot Current native owner and exact revision.
+ * @returns {Integer} Boolean admission.
+ */
+LLM_DisplayIndentReady(Snapshot) {
+	if !(Snapshot is Map)
+		return false
+	for Field in ["owner", "generation", "indentation", "progressive", "count", "enabled", "paused", "blocked"] {
+		if !Snapshot.Has(Field)
+			return false
+	}
+	for Field in ["progressive", "enabled", "paused", "blocked"] {
+		Value := Snapshot[Field]
+		if !(Value is Integer) || (Value != true && Value != false)
+			return false
+	}
+	return Snapshot["owner"] is Object && Snapshot["generation"] is Integer
+		&& Snapshot["generation"] >= 0 && Snapshot["indentation"] is Integer
+		&& Snapshot["enabled"] && !Snapshot["paused"]
+		&& LLM_DisplayShowAllReady(Snapshot["count"], Snapshot["blocked"])
+}
+
+/**
+ * Resolves one retained offset against the same current native source.
+ * @param {Map} Expected Captured rendering snapshot.
+ * @param {Map} Current Fresh snapshot before the native setting owner.
+ * @param {Integer} Value Requested offset.
+ * @param {Array} Values Canonical integer choices.
+ * @returns {Map} Decision with admitted and optional value fields.
+ */
+LLM_DisplayIndentIntent(Expected, Current, Value, Values) {
+	if !LLM_DisplayIndentReady(Expected) || !LLM_DisplayIndentReady(Current)
+		return Map("admitted", false)
+	for Field in ["owner", "generation", "backend", "indentation", "progressive", "count"] {
+		if !Expected.Has(Field) || !Current.Has(Field) || !(Expected[Field] == Current[Field])
+			return Map("admitted", false)
+	}
+	for Accepted in Values {
+		if Value is Integer && Value == Accepted
+			return Map("admitted", true, "value", Value)
+	}
+	return Map("admitted", false)
+}

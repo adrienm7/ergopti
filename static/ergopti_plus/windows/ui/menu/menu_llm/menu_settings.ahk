@@ -332,19 +332,12 @@ _LLM_Menu_GenerationRows() {
 
 ; This initializer belongs beside the display rows so both the resident entry
 ; and the definitions-only native harness initialize the same catalogue.
-; Indent level options for multi-prediction display. Range mirrors the HS
-; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
-; build_indent_menu): negative values produce a leading deletion of N chars so
-; the prediction lines up at column-N relative to the original cursor, while
-; positive values insert N spaces before each line. Built lazily at startup
-; so the integer array stays a single source of truth.
+; These are visual prefixes of the selected and alternative prediction rows;
+; negative offsets never delete application text. The generated number feature
+; owns the accepted range used by menu selection and runtime normalization.
 global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
 _LLMMenuBuildIndentRange() {
-    out := []
-    Loop 15 {
-        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
-    }
-    return out
+	return LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent"))
 }
 
 /**
@@ -353,7 +346,7 @@ _LLMMenuBuildIndentRange() {
  * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, StreamingCommand := unset) {
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, StreamingCommand := unset, IndentCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InfoCommand)
 		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
@@ -361,20 +354,78 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
 	if !IsSet(StreamingCommand)
 		StreamingCommand := (*) => LLM_Menu_ToggleBool("streaming")
+	if !IsSet(IndentCommand)
+		IndentCommand := LLM_Menu_SetIndent
+	IndentSource := _LLM_Menu_IndentSnapshot()
 	StreamingSource := _LLM_Menu_StreamingSnapshot()
 	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
-		Map("llm_info_bar", InfoCommand,
+		Map("llm_indentation", (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
+			"llm_info_bar", InfoCommand,
 			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
 			"llm_show_all", (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
-		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
+		Map("llm.display.pred_indent", (*) => IndentSource["indentation"],
+			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
+			"llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
 			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
 			"llm_show_all_ready", _LLM_Menu_ShowAllReady,
 			"llm_token_streaming_enabled", (*) => LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
 			"llm_token_streaming_ready", (*) => LLM_DisplayStreamingReady(StreamingSource)))
+}
+
+/** Captures the current menu identity, native agreement and exact file source. */
+_LLM_Menu_IndentSnapshot() {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "indentation", _LLM_Menu["pred_indent"],
+		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
+		"count", _LLM_Menu["n_predictions"], "enabled", _LLM_Menu["enabled"],
+		"paused", A_IsSuspended ? true : false, "source", 0,
+		"blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map) || !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend")
+			|| !_LLM_Engine.Has("pred_indent") || !_LLM_Engine.Has("n_predictions")
+			|| !_LLM_Engine.Has("show_all_at_once")
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["pred_indent"] != _LLM_Menu["pred_indent"]
+			|| _LLM_Engine["n_predictions"] != _LLM_Menu["n_predictions"]
+			|| _LLM_Engine["show_all_at_once"] != _LLM_Menu["show_all_at_once"])
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		for Field, Path in Map("enabled", "llm.enabled", "count", "llm.profiles.num_predictions",
+				"indentation", "llm.display.pred_indent", "progressive", "llm.display.streaming_multi",
+				"backend", "llm.models.selected") {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Read["found"] && (Field == "enabled" || Field == "progressive") && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			else if (Field == "count" || Field == "indentation") && Value is Float && Value == Integer(Value)
+				Value := Integer(Value)
+			if Read["blocked"] || !ManifestValuesEqual(Value, Snapshot[Field])
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch {
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses held commands before their existing acknowledged native setter. */
+_LLM_Menu_IndentCommand(Expected, Value, Command) {
+	Current := _LLM_Menu_IndentSnapshot()
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_DisplayIndentIntent(Expected, Current, Value, LLM_MENU_INDENT_OPTIONS)
+	if !Decision["admitted"]
+		return false
+	return Command.Call(Decision["value"], Expected) == true
 }
 
 /**
@@ -436,34 +487,6 @@ _LLM_Menu_DisplayRows(Position := "all") {
 	LeadingRows := Rows
 	Rows := []
 
-	Rows.Push(Map("separator", true))
-
-	; Indent level submenu — mirrors HS settings_manager.build_indent_menu():
-	;   0           → "Aucun" (special-cased so 0 reads naturally).
-	;   -1 or +1    → singular "espace" (with sign preserved so the user can
-	;                 tell -1 from +1 — HS has a quirk that hides the number
-	;                 for these values; AHK fixes the readability here).
-	;   anything else → "N espaces" (plural, sign preserved for negatives).
-	; Negative values yield a leading deletion of N chars so the predicted
-	; continuation lines up at column-N relative to the original cursor.
-	IndentRows := []
-	for lvl in LLM_MENU_INDENT_OPTIONS {
-		if (lvl == 0) {
-			indent_label := t("menu.llm.indent_none")
-		} else if (lvl == 1 or lvl == -1) {
-			indent_label := lvl . " " . t("menu.llm.indent_space")
-		} else {
-			indent_label := lvl . " " . t("menu.llm.indent_spaces")
-		}
-		IndentRows.Push(Map(
-			"label",   indent_label,
-			"checked", (lvl == _LLM_Menu["pred_indent"]),
-			"action",  _LLM_Menu_MakeSetIndentHandler(lvl)))
-	}
-	Rows.Push(Map(
-		"label",    t("menu.llm.indent_label"),
-		"disabled", (n < 2),
-		"items",    IndentRows))
 	_LLM_MaybeResetRow(Rows,
 		_LLM_Menu["pred_indent"],
 		_LLM_DefaultFor("llm_pred_indent", 0),

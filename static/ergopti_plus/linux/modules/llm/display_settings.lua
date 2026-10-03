@@ -13,6 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local DisplayPolicy = require("llm.display_policy")
 
 local LOG = "modules.llm.display_settings"
 local PREF_PREFIX = "llm.display."
@@ -21,8 +22,6 @@ local DEFINITIONS = {
 	pred_indent = {
 		path = "llm.display.pred_indent",
 		type = "number",
-		min = -7,
-		max = 7,
 	},
 	show_info_bar = { path = "llm.display.show_info_bar", type = "boolean" },
 	streaming = { path = "llm.display.streaming", type = "boolean" },
@@ -55,7 +54,8 @@ local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
 	if def.type == "number" then
-		return value == math.floor(value) and value >= def.min and value <= def.max
+		for _, accepted in ipairs(M.indent_values()) do if value == accepted then return true end end
+		return false
 	end
 	return true
 end
@@ -125,11 +125,7 @@ end
 --- Returns the accepted indentation range.
 --- @return table
 function M.indent_values()
-	local values = {}
-	for value = DEFINITIONS.pred_indent.min, DEFINITIONS.pred_indent.max do
-		values[#values + 1] = value
-	end
-	return values
+	return DisplayPolicy.indentation_values(Manifest.find_entry_by_path(DEFINITIONS.pred_indent.path))
 end
 
 --- Test seam: forgets cached reads.
