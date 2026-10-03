@@ -1145,6 +1145,15 @@ Native CI run 37087943283 exposed six Windows contextual fixture failures. The r
   on Cancel and exactly one 0.3-second write on confirmation. This prerequisite
   preserves modal keyboard ownership and leaves native caption integration
   pending.
+  Linux entry prompts, application/config-folder pickers, gesture-conflict and
+  action-confirmation dialogs, error prompts and detached uninstall captions
+  now consume that same shared composer. Eleven registered public regressions
+  preserve arguments, modal keyboard delegation, cancellation/results and the
+  distinction between an omitted error caption and an explicitly empty one.
+  Thirty real Zenity cases across five privately generated title policies
+  qualify exact mapped PID/X11-window/session captions, results, retirement,
+  zero child exit and empty stderr. Native Qt/KDE captions and the complete
+  three-OS CI checkpoint remain pending.
   Remaining native caption paths include file pickers, notifications and
   genuine Linux dialog title APIs.
   Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete

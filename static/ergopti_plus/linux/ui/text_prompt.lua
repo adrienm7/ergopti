@@ -21,6 +21,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Modal = require("ui.modal")
 local Shell = require("adapters.shell_runner")
+local WindowTitles = require("window_titles")
 
 local LOG = "ui.text_prompt"
 
@@ -39,7 +40,7 @@ end
 --- @param choices table|nil Values offered in the entry's drop-down list.
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
 function M.ask(title, prompt, initial, hidden, choices)
-	local command = "zenity --entry --title=" .. shell_quote(title)
+	local command = "zenity --entry --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(prompt)
 		.. " --entry-text=" .. shell_quote(initial or "")
 		.. (hidden and " --hide-text" or "")

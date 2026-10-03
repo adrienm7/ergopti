@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 local ParameterLabel = require("action_parameter_label")
 
 local Logger = require("logger.shim")
@@ -138,7 +139,7 @@ end
 --- @param title string|nil Already-localised window title.
 local function show_error(message, title)
 	local command = "zenity --error"
-		.. (title and (" --title=" .. shell_quote(title)) or "")
+		.. " --title=" .. shell_quote(WindowTitles.compose(title == nil and i18n_safe("common.error_title") or title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
@@ -151,7 +152,7 @@ end
 --- @param title string Already-localised window title.
 --- @param message string Already-localised text.
 local function show_info(title, message)
-	local command = "zenity --info --title=" .. shell_quote(title)
+	local command = "zenity --info --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the outcome is still recorded where a user can find it.
@@ -294,7 +295,7 @@ end
 local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
 	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
 	-- module-level succeeded() above normalises both spellings.
-	local command = "zenity --question --title=" .. shell_quote(title)
+	local command = "zenity --question --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(text)
 		.. " --ok-label=" .. shell_quote(ok_label)
 		.. " --cancel-label=" .. shell_quote(cancel_label)

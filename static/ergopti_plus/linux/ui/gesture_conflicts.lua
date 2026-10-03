@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 local I18n = require("infra.i18n")
 local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
@@ -76,7 +77,7 @@ function M.show(group)
 	if Storage.get(key, false) == true then return true end
 	return require("adapters.event_loop").defer(function()
 		if Storage.get(key, false) == true then return end
-		local title = I18n.get("menu.gestures.conflict_title")
+		local title = WindowTitles.compose(I18n.get("menu.gestures.conflict_title"))
 		local message = I18n.get("gesture.slots." .. group.slot) .. "\n" .. I18n.get("gestures.system.warning")
 		local settings = I18n.get("menu.gestures.open_settings")
 		local dismiss = I18n.get("gestures.system.dismiss")
