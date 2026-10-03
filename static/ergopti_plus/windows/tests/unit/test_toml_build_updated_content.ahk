@@ -225,3 +225,157 @@ _TBUI_RawHex(Path) {
 
 if A_LineFile = A_ScriptFullPath
 	RunTests()
+
+
+; Handwritten physical sources prove that a flat writer cannot own every valid
+; document. Their expected no-op images are the sources, not generated models.
+_TBUI_NamespaceLossVectors() {
+	return [
+		{ Id: "dotted", Source: '# retain exact spelling`n[settings]`nnested.value = 1 # owned identity`n',
+			Key: "nested.value", Value: 1 },
+		{ Id: "root", Source: 'future.version = "001" # unknown root`n[settings]`nowned = 1`n',
+			Key: "owned", Value: 1 },
+		{ Id: "table-arrays", Source: '[[future]]`nname="first"`n[[future]]`nname="second"`n[settings]`nowned=1`n',
+			Key: "owned", Value: 1 }
+	]
+}
+
+_TBUI_LossSensitiveBuildPreservesSource() {
+	for Vector in _TBUI_NamespaceLossVectors() {
+		Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			Cached := ParseTomlFile(Path)
+			Candidate := TOML_BuildUpdatedContent(Path,
+				[{ Section: "settings", Key: Vector.Key, Value: Vector.Value }])
+			AssertEqual("ok", Candidate["status"], Vector.Id)
+			Assert(StrCompare(Source, Candidate["content"], true) == 0,
+				"a real no-op retains the complete loss-sensitive byte image: " . Vector.Id)
+			AssertEqual(Source, Candidate["source_content"])
+			AssertTrue(Cached == ParseTomlFile(Path), "detached admission never replaces the live cache")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+		} finally FSDelete(Path)
+	}
+}
+Test("toml writer admission: loss-sensitive detached no-ops retain original identities and bytes (toml-writer-document)",
+	_TBUI_LossSensitiveBuildPreservesSource)
+
+_TBUI_ChangedLossSensitiveBuildRefuses() {
+	for Vector in _TBUI_NamespaceLossVectors() {
+		Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			Cached := ParseTomlFile(Path)
+			for Update in [{ Section: "settings", Key: Vector.Key, Value: 2 },
+				{ Section: "settings", Key: Vector.Key, Delete: 1 },
+				{ Section: "settings", Key: "unrelated", Value: TOML_Bool(false) }] {
+				Candidate := TOML_BuildUpdatedContent(Path, [Update])
+				AssertEqual("error", Candidate["status"], "no unowned namespace may disappear: " . Vector.Id)
+				AssertFalse(Candidate.Has("source_content"), "no refused candidate gains publication authority")
+				AssertTrue(FSUtf8ExactMatches(Path, Source))
+				AssertTrue(Cached == ParseTomlFile(Path), "refusal leaves the live cache object intact")
+			}
+		} finally FSDelete(Path)
+	}
+}
+Test("toml writer admission: changed dotted leaves and unowned root/table-array loss refuse before candidate authority (toml-writer-document)",
+	_TBUI_ChangedLossSensitiveBuildRefuses)
+
+_TBUI_QuotedDotRemainsRepresentable() {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . '[settings]`n"nested.value" = 1 # canonical writer owns this leaf`n'
+	Expected := Chr(0xFEFF) . '[settings]`n"nested.value" = 2`n'
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		Candidate := TOML_BuildUpdatedContent(Path,
+			[{ Section: "settings", Key: "nested.value", Value: 2 }])
+		AssertEqual("ok", Candidate["status"])
+		Assert(StrCompare(Expected, Candidate["content"], true) == 0,
+			"an independently quoted literal dot keeps the existing canonical contract")
+		AssertTrue(TOML_BatchWrite(Path, [{ Section: "settings", Key: "nested.value", Value: 2 }]))
+		AssertTrue(FSUtf8ExactMatches(Path, Expected))
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(2, Document["settings"]["nested.value"])
+		AssertFalse(Document["settings"].Has("nested"))
+	} finally FSDelete(Path)
+}
+Test("toml writer admission: literal quoted dots remain writable and canonical (toml-writer-document)",
+	_TBUI_QuotedDotRemainsRepresentable)
+
+; The actual value getter is a native controlled concurrent writer. Assertions
+; stay outside rendering/catching callbacks; its observations cannot be swallowed.
+class _TBUI_SourceMutatingBoolean extends TOML_Bool {
+	__New(Path, Content) {
+		this.Path := Path
+		this.Content := Content
+		this.Calls := 0
+		this.WriteAccepted := false
+	}
+	__Get(Name, Parameters) {
+		if Name != "Value"
+			throw PropertyError("Unexpected controlled value property")
+		this.Calls += 1
+		if this.Calls == 1
+			this.WriteAccepted := FSWriteDurable(this.Path, this.Content) == 1
+		return true
+	}
+}
+
+_TBUI_ConcurrentSourceRefusesCandidate() {
+	for BuildOnly in [true, false] {
+		Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . '[settings]`nowned = false`n'
+		Concurrent := Chr(0xFEFF) . '[settings]`nowned = false`nforeign = "concurrent authority"`n'
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			Cached := ParseTomlFile(Path)
+			Value := _TBUI_SourceMutatingBoolean(Path, Concurrent)
+			Update := { Section: "settings", Key: "owned", Value: Value }
+			if BuildOnly {
+				Result := TOML_BuildUpdatedContent(Path, [Update])
+				AssertEqual("error", Result["status"])
+			} else
+				AssertFalse(TOML_BatchWrite(Path, [Update]))
+			AssertTrue(Value.Calls > 0, "the real renderer must observe the controlled native value")
+			AssertTrue(Value.WriteAccepted, "the concurrent source mutation must actually reach disk")
+			AssertTrue(FSUtf8ExactMatches(Path, Concurrent), "fresh source authority cannot be overwritten or called a no-op")
+			Current := ParseTomlFile(Path)
+			if BuildOnly {
+				AssertTrue(Cached == Current, "a refused detached build does not replace the live reader cache")
+				AssertFalse(Current["settings"].Has("foreign"))
+			} else {
+				AssertFalse(Cached == Current, "an ordinary writer retires its actually stale reader snapshot")
+				AssertEqual("concurrent authority", Current["settings"]["foreign"])
+			}
+			AssertFalse(Cached["settings"].Has("foreign"), "retirement never mutates the prior reader object")
+		} finally FSDelete(Path)
+	}
+}
+Test("toml writer admission: actual concurrent mutation cannot gain detached or ordinary publication (toml-writer-document)",
+	_TBUI_ConcurrentSourceRefusesCandidate)
+
+
+_TBUI_SemanticDestinationsCannotHideEffects() {
+	Path := _TBUI_NewPath()
+	Source := Chr(0xFEFF) . 'future.root = 1 # old reader ignores this`n[settings]`npersonal.future.enabled = false`nowned=1`n'
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		Unchanged := { Section: "settings.personal.future", Key: "enabled", Value: TOML_Bool(false) }
+		Candidate := TOML_BuildUpdatedContent(Path, [Unchanged])
+		AssertEqual("ok", Candidate["status"], "a strict semantic destination already carries the desired value")
+		Assert(StrCompare(Source, Candidate["content"], true) == 0)
+		AssertTrue(TOML_BatchWrite(Path, [Unchanged]))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		for Update in [{ Section: "future", Key: "root", Delete: 1 },
+			{ Section: "settings.personal.future", Key: "enabled", Delete: 1 },
+			{ Section: "settings.personal.future", Key: "enabled", Value: TOML_Bool(true) }] {
+			AssertEqual("error", TOML_BuildUpdatedContent(Path, [Update])["status"])
+			AssertFalse(TOML_BatchWrite(Path, [Update]), "an unaddressable semantic change cannot be called a flat no-op")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+		}
+		AssertEqual("error", TOML_BuildUpdatedContent(Path, [], ["future"])["status"],
+			"replacing an ignored root namespace is a real semantic deletion")
+		AssertFalse(TOML_BatchWrite(Path, [], ["future"]))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally FSDelete(Path)
+}
+Test("toml writer admission: semantic no-ops do not hide ignored-root deletes or exact-subtree loss (toml-writer-document)",
+	_TBUI_SemanticDestinationsCannotHideEffects)
