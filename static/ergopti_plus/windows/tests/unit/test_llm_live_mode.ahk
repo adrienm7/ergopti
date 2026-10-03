@@ -39,12 +39,13 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 	_LPP_Run(IsSet(Menu) ? Menu : _LPP_Menu(), Buffer, _Inner, true)
 	_Inner(Calls, Lines) {
 		global _LLM_Live, _LLM_Bridge_Active, _LLM_MenuBuildCoordinator, _LLM_Engine
+		global _LLM_Bridge_ReadLiveFocus
 		global _TooltipActiveSurface, _LLM_AcceptInProgress
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
 		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 		global _SR_ActiveTasks
 		Saved := {
-			Live: _LLM_Live, Active: _LLM_Bridge_Active,
+			Live: _LLM_Live, Active: _LLM_Bridge_Active, Focus: _LLM_Bridge_ReadLiveFocus,
 			Coordinator: _LLM_MenuBuildCoordinator, Surface: _TooltipActiveSurface,
 			Accepting: _LLM_AcceptInProgress,
 			Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
@@ -56,6 +57,8 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			LLM_Engine_CancelTimer()
 			_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
 			_LLM_Bridge_Active := true
+			; This scenario owns its typing target; the hosted desktop need not have focus.
+			_LLM_Bridge_ReadLiveFocus := () => Map("hwnd", 101, "control", 102)
 			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
 				(*) => (Builds.Push(1), 1), (*) => false)
 			_TooltipActiveSurface := 0
@@ -79,9 +82,12 @@ _LLV_Run(Buffer, Body, Menu := unset) {
 			_LLM_AcceptInProgress := Saved.Accepting
 			_TooltipActiveSurface := Saved.Surface
 			_LLM_MenuBuildCoordinator := Saved.Coordinator
+			_LLM_Bridge_ReadLiveFocus := Saved.Focus
 			_LLM_Bridge_Active := Saved.Active
 			_LLM_Live := Saved.Live
 		}
+		AssertEqual(ObjPtr(Saved.Focus), ObjPtr(_LLM_Bridge_ReadLiveFocus),
+			"the live-mode fixture restores the exact foreground probe identity")
 		AssertEqual(Saved.Tasks, _SR_ActiveTasks.Count,
 			"the live-mode fixture must not launch a native positioning worker")
 	}
@@ -507,7 +513,18 @@ Test("LLM live mode: the live translations take no profile hotkey", _LLV_Transla
 ; An expansion fires first: the live tooltip is dismissed and the request is
 ; re-issued on the text after the expansion.
 _LLV_ExpansionReissuesTheLiveRequest() {
-	_LLV_Run("on se voit dm", _Body)
+	global _LLM_Bridge_ReadLiveFocus
+	SavedFocus := _LLM_Bridge_ReadLiveFocus
+	Unfocused := () => Map("hwnd", 101, "control", 0)
+	Restored := false
+	try {
+		_LLM_Bridge_ReadLiveFocus := Unfocused
+		_LLV_Run("on se voit dm", _Body)
+		Restored := ObjPtr(_LLM_Bridge_ReadLiveFocus) == ObjPtr(Unfocused)
+	} finally {
+		_LLM_Bridge_ReadLiveFocus := SavedFocus
+	}
+	AssertTrue(Restored, "the scenario restores its caller's unknown focused-control probe")
 	_Body(Calls, Lines, Builds) {
 		global _LLM_Bridge_Buffer, _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 		; Outside live mode an expansion arms nothing: next-word prediction is unchanged
@@ -531,6 +548,40 @@ _LLV_ExpansionReissuesTheLiveRequest() {
 }
 Test("LLM live mode: a hotstring expansion wins and the live request follows it",
 	_LLV_ExpansionReissuesTheLiveRequest)
+
+; A deferred expansion still refuses an unknown or changed typing target.
+; These observations run after the actual observer's guarded callback returns.
+_LLV_ExpansionObserverRequiresCurrentFocus() {
+	_LLV_Run("on se voit dm", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_Buffer
+		Focus := Map("hwnd", 101, "control", 0)
+		_LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
+		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
+		Missing := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+		AssertEqual("on se voit demain", _LLM_Bridge_Buffer,
+			"an unknown focus does not discard the committed canonical expansion")
+		AssertFalse(Missing.Active, "an unknown focused control refuses the deferred re-arm")
+		AssertEqual(0, Calls.Length, "an unverified typing target starts no transport")
+		Focus["control"] := 102
+		ChangeTarget() {
+			_HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 0, InsertedText: "" })
+			Focus["control"] := 103
+		}
+		Changed := _LLV_CaptureRealTimer(ChangeTarget)
+		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
+		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
+		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ DeleteFromEnd: 0, InsertedText: "" }))
+		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")
+		_LLV_Fire(Map("fn", Stable.Fn))
+		AssertEqual(1, Calls.Length, "the verified deferred re-arm starts exactly one transport")
+		AssertEqual("on se voit demain", Calls[1]["tail"], "the request uses the canonical expanded text")
+	}
+}
+Test("LLM live mode: expansion observers require an unchanged verified typing target",
+	_LLV_ExpansionObserverRequiresCurrentFocus)
 
 ; While a hotstring tooltip is shown the live tooltip waits, then comes back.
 _LLV_HotstringTooltipIsNotCovered() {
