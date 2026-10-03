@@ -196,16 +196,36 @@ _LLM_Menu_MakeLiveModeHandler(ProfileId) {
 /**
  * Builds the generation settings submenu.
  * All numeric values use InputBox dialogs (same UX as HS settings_manager).
+ * @param {Func} AutoCommand Optional acknowledged command owner for native tests.
+ * @param {Func} ValuesProvider Optional unrelated numeric provider for native tests.
  * @returns {Menu} Populated generation submenu.
  */
-LLM_Menu_BuildGenerationMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_generation_settings", (*) => _LLM_Menu_GenerationRows())
+LLM_Menu_BuildGenerationMenu(AutoCommand := unset, ValuesProvider := unset) {
+	global _LLM_Menu
+	if !IsSet(AutoCommand)
+		AutoCommand := (*) => LLM_Menu_ToggleBool("auto_raise_temp")
+	if !IsSet(ValuesProvider)
+		ValuesProvider := (*) => _LLM_Menu_GenerationRows()
+	return MenuRenderer_Build("llm_generation_menu", "LLM", Map(), Map(),
+		Map("llm_generation_values", ValuesProvider),
+		Map("llm_auto_raise_temperature", (*) => _LLM_Menu_AutoRaiseReady() ? AutoCommand.Call() : false),
+		Map("llm_auto_raise_enabled", (*) => _LLM_Menu["auto_raise_temp"],
+			"llm_auto_raise_ready", (*) => _LLM_Menu_AutoRaiseReady()))
+}
+
+/**
+ * Reads the current prediction count before showing or delivering the check.
+ * @returns {Boolean} Whether several predictions are currently requested.
+ */
+_LLM_Menu_AutoRaiseReady() {
+	global _LLM_Menu
+	return _LLM_Menu["n_predictions"] >= 2
 }
 
 /**
  * Row data for the generation submenu.
  * @returns {Array} The suggestion count, the four numeric prompts with their
- *     reset rows, plus the two toggles.
+ *     reset rows, plus the existing navigation reset toggle.
  */
 _LLM_Menu_GenerationRows() {
 	global _LLM_Menu
@@ -278,13 +298,6 @@ _LLM_Menu_GenerationRows() {
 		_LLM_Menu["temperature"],
 		_temp_default,
 		(*) => _LLM_AssignAndRebuild("temperature", _temp_default))
-
-	; Auto-raise temperature — only meaningful when several predictions are drawn
-	Rows.Push(Map(
-		"label",    t("menu.llm.auto_raise_temp"),
-		"checked",  _LLM_Menu["auto_raise_temp"],
-		"disabled", (_LLM_Menu["n_predictions"] <= 1),
-		"action",   (*) => LLM_Menu_ToggleBool("auto_raise_temp")))
 
 	return Rows
 }

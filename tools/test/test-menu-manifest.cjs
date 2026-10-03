@@ -620,7 +620,78 @@ function checkInfoBarControl() {
 	);
 }
 
+function checkAutoTemperatureControl() {
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/auto_raise_temperature.json'), 'utf8')
+	);
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const definition = root.llm_generation_menu;
+	assert.deepEqual(corpus.states, [false, true]);
+	assert.deepEqual(corpus.prediction_counts, [1, 2]);
+	assert.equal(definition.length, 2);
+	assert.deepEqual(definition[0], { type: 'list', id: 'llm_generation_values' });
+	assert.equal(definition[1].type, 'check');
+	assert.equal(definition[1].id, corpus.row.id);
+	assert.equal(definition[1].i18n, corpus.row.i18n);
+	assert.deepEqual(definition[1].checked_when, ['llm_auto_raise_enabled']);
+	assert.deepEqual(definition[1].disabled_when, ['llm_auto_raise_ready']);
+	assert.equal(
+		root.llm_menu.find((row) => row.id === 'llm_generation').type,
+		'dynamic',
+		'the Linux inline caller delivers the shared child without a private list policy'
+	);
+	for (const [file, first, last] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_Menu_BuildGenerationMenu(',
+			'LLM_Menu_BuildDisplayMenu('
+		],
+		['macos/ui/menu/menu_llm/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'dynamic_handlers["llm_generation"] = function',
+			"-- The category switch, the submenu's first row"
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf(first);
+		const end = source.indexOf(last, start);
+		assert(start >= 0 && end > start, `${file}: the actual generation consumer bounds must exist`);
+		const body = source.slice(start, end);
+		for (const owner of [
+			'llm_auto_raise_temperature',
+			'llm_auto_raise_enabled',
+			'llm_auto_raise_ready'
+		]) {
+			assert(
+				body.includes(`"${owner}"`),
+				`${file}: shared auto-raise owner ${owner} must be consumed`
+			);
+		}
+		assert(
+			!body.includes(corpus.row.i18n),
+			`${file}: the fixed label belongs to the shared declaration`
+		);
+		if (!file.startsWith('macos/')) {
+			for (const owner of ['llm_generation_menu', 'llm_generation_values'])
+				assert(body.includes(`"${owner}"`), `${file}: numeric providers must use the shared child`);
+		}
+	}
+	const mac = readFileSync(resolve(SHARED, '../macos/ui/menu/menu_llm/init.lua'), 'utf8');
+	const first = mac.indexOf('local generation_ctx = TempPanel.build(');
+	const last = mac.indexOf('-- ===== Display submenu =====', first);
+	assert(first >= 0 && last > first, 'the actual Mac generation caller bounds must exist');
+	const body = mac.slice(first, last);
+	for (const owner of ['llm_generation_menu', 'llm_generation_values'])
+		assert(body.includes(`"${owner}"`), `the Mac numeric provider consumes ${owner}`);
+	console.log(
+		'Automatic temperature diversity: independent states/counts and all three shared generation callers qualified.'
+	);
+}
+
 main();
 checkChoiceProjection();
 checkWordExpanderControls();
 checkInfoBarControl();
+checkAutoTemperatureControl();
