@@ -329,6 +329,14 @@ These are software implementations; final hardware verification remains below.
   native application-watcher events. Windows currently accepts these callbacks
   without emitting launch/quit events, an existing capability gap deferred to
   its owner. Focus/title logic, native cross-OS gates and manual CI are untouched.
+- [~] **L26.** Linux process header collision: request GNU ps comm output
+  without a header instead of discarding every row named COMMAND. One actual
+  named-process case and two portable cases failed before the fix. The fifteen
+  native snapshot cases pass on host and nonroot Debian, including real COMMAND
+  launch/quit, refusal recovery and ordinary events. Existing empty-snapshot
+  and partial-failure assertions remain intact. macOS native app events have no
+  textual ps header; Windows's existing launch/quit capability gap remains
+  deferred. Focus/title logic and native cross-OS/manual CI are untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

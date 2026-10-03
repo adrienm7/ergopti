@@ -53,7 +53,7 @@ write(root .. "/ps", table.concat({
 	"#!/bin/sh",
 	"mode=$(cat " .. Shell.quote(root .. "/mode") .. ")",
 	'if [ "$mode" = success ]; then exec ' .. Shell.quote(real_ps) .. ' "$@"; fi',
-	'if [ "$mode" = header ]; then ' .. Shell.quote(real_ps) .. ' "$@" | head -n 1; exit 0; fi',
+	'if [ "$mode" = header ]; then ' .. Shell.quote(real_ps) .. ' "$@" | head -n 0; exit 0; fi',
 	Shell.quote(real_ps) .. ' "$@" | sed ' .. Shell.quote("/^" .. marker_a .. "$/d"),
 	'case "$mode" in term) kill -TERM $$;; kill) kill -KILL $$;; *) exit "$mode";; esac',
 	"",
@@ -62,8 +62,8 @@ assert(uv.fs_chmod(root .. "/ps", 448))
 assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
 local child_a = spawn(marker_a)
 local launched, quit = {}, {}
-Life.onAppLaunch(function(name) if name == marker_a or name == marker_b then launched[#launched + 1] = name end end)
-Life.onAppQuit(function(name) if name == marker_a or name == marker_b then quit[#quit + 1] = name end end)
+Life.onAppLaunch(function(name) if name == marker_a or name == marker_b or name == "COMMAND" then launched[#launched + 1] = name end end)
+Life.onAppQuit(function(name) if name == marker_a or name == marker_b or name == "COMMAND" then quit[#quit + 1] = name end end)
 
 local function mode(value) write(root .. "/mode", value) end
 
@@ -101,7 +101,7 @@ for _, failure in ipairs({ "1", "7", "127", "255", "term", "kill" }) do
 	end)
 end
 
-check("header-only native ps cannot erase the successful baseline", function()
+check("empty native ps cannot erase the successful baseline", function()
 	mode("success")
 	Life.start()
 	mode("header")
@@ -122,6 +122,19 @@ check("actual process launch and exit still deliver exactly one event", function
 	assert(#quit == 1 and quit[1] == marker_b, "real process exit was not observed")
 	Life.tick(24)
 	assert(#quit == 1 and #launched == 1, "stable native snapshot repeated settled events")
+end)
+
+check("actual process named COMMAND is data, never a header", function()
+	local accepted, current = Shell.exec_checked(Shell.quote(real_ps) .. " -eo comm=")
+	assert(accepted and not ("\n" .. current):find("\nCOMMAND\n", 1, true), "fixture requires no pre-existing COMMAND process")
+	mode("success")
+	Life.start()
+	local command = spawn("COMMAND")
+	Life.tick(8)
+	assert(#launched == 1 and launched[1] == "COMMAND", "legitimate native process name was discarded as a header")
+	retire(command)
+	Life.tick(16)
+	assert(#quit == 1 and quit[1] == "COMMAND", "header-like process retirement was never observed")
 end)
 
 Life.stop()

@@ -114,12 +114,13 @@ end
 local function _snapshot_processes()
 	-- LuaJIT's pclose can report true for a child that exited nonzero.
 	-- The checked runner retains native status independently of partial stdout.
-	local accepted, output = Shell.exec_checked("ps -eo comm 2>/dev/null")
+	-- Request no header: COMMAND is also a legal native process name.
+	local accepted, output = Shell.exec_checked("ps -eo comm= 2>/dev/null")
 	if not accepted then return nil end
 	local snapshot = {}
 	for line in (output .. "\n"):gmatch("([^\n]*)\n") do
 		local name = line:match("^%s*(.-)%s*$")
-		if name and name ~= "" and name ~= "COMMAND" then
+		if name and name ~= "" then
 			snapshot[name] = true
 		end
 	end

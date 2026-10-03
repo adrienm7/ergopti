@@ -31,6 +31,9 @@ local function with_ps(outputs, body)
 		if out == false then return nil end
 		local receipt = type(out) == "table" and out or { output = tostring(out), status = 0 }
 		local content = receipt.output
+		-- Fixture strings include the conventional header. A headerless request
+		-- removes only that first protocol row; subsequent COMMAND rows are data.
+		if cmd:find("ps -eo comm=", 1, true) then content = content:gsub("^COMMAND\n", "", 1) end
 		local lines = {}
 		for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 			lines[#lines + 1] = line
@@ -95,6 +98,30 @@ helpers.describe("linux-process-snapshot-receipts", function()
 			end)
 		end)
 	end
+end)
+
+helpers.describe("linux-process-header-receipts", function()
+	helpers.it("linux-process-header-receipts: COMMAND launches and quits as an ordinary process", function()
+		with_ps({ PS_AB }, function()
+			local M, launched, quit = fresh_lifecycle()
+			M.start()
+			with_ps({ PS_AB .. "COMMAND\n" }, function() M.tick(PROCESS_TICK) end)
+			helpers.assert_eq(launched, { "COMMAND" }, "protocol headers cannot reserve a legitimate application name")
+			with_ps({ PS_AB }, function() M.tick(PROCESS_TICK * 2) end)
+			M.stop()
+			helpers.assert_eq(quit, { "COMMAND" })
+		end)
+	end)
+	helpers.it("linux-process-header-receipts: COMMAND present at startup remains in the baseline", function()
+		with_ps({ PS_AB .. "COMMAND\n" }, function()
+			local M, launched, quit = fresh_lifecycle()
+			M.start()
+			with_ps({ PS_AB }, function() M.tick(PROCESS_TICK) end)
+			M.stop()
+			helpers.assert_eq(launched, {})
+			helpers.assert_eq(quit, { "COMMAND" }, "startup must retain every real row")
+		end)
+	end)
 end)
 
 helpers.describe("process_lifecycle: a failed snapshot fires nothing (ps-storm)", function()
