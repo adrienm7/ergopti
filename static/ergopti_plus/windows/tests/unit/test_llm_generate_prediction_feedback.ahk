@@ -60,6 +60,8 @@ _LMPF_Run(Menu, Buffer, Body) {
 	SavedSink := _LOGGER_TEST_SINK
 	SavedInfo := _LOGGER_INFO_ENABLED
 	Captured := []
+	; Observe the published notice and retire it before its next-turn renderer.
+	PreviousCritical := Critical("On")
 	try {
 		_LLM_Menu := Menu
 		_LLM_Bridge_Buffer := Buffer
@@ -72,6 +74,7 @@ _LMPF_Run(Menu, Buffer, Body) {
 		_LOGGER_INFO_ENABLED := SavedInfo
 		_LLM_Menu := SavedMenu
 		_LLM_Bridge_Buffer := SavedBuffer
+		Critical(PreviousCritical)
 	}
 }
 
