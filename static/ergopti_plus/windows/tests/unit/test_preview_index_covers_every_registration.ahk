@@ -431,7 +431,7 @@ _PICR_DescriptorCorpus() {
 Test("personal-file descriptors: independent exact UTF-8 identity corpus", _PICR_DescriptorCorpus)
 
 
-_PICR_DistinctDiscoveredSources() {
+_PICR_DistinctDiscoveredSources(RootSpelling := "temp") {
 	global ScriptInformation
 	OwnedRoot := A_Temp . "\ergopti_picr_sources_" . A_TickCount
 	SourceFiles := Map("a__b.toml", "personal-file:615f5f622e746f6d6c",
@@ -449,39 +449,35 @@ _PICR_DistinctDiscoveredSources() {
 		for RelativeFile in SourceFiles
 			FileAppend('[probe]`n"pqx" = "Owned"`n', OwnedRoot . "\" . RelativeFile, "UTF-8")
 		FileAppend('[probe]`n"pqx" = "Canonical"`n', OwnedRoot . "\personal_hotstrings.toml", "UTF-8")
-		; The OS expands short A_Temp aliases during Loop Files. Resolve the
-		; expected fixture boundary independently, before reading native discovery.
-		SourceRootBuffer := Buffer(32768 * 2, 0)
-		SourceRootLength := DllCall("GetLongPathNameW", "Str", OwnedRoot,
-			"Ptr", SourceRootBuffer, "UInt", 32768, "UInt")
-		AssertTrue(SourceRootLength > 0 && SourceRootLength < 32768,
-			"Win32 must resolve the owned source root without truncation")
-		CanonicalSourceRoot := StrGet(SourceRootBuffer, SourceRootLength, "UTF-16")
-		for RootSpelling in [OwnedRoot, CanonicalSourceRoot] {
-			ScriptInformation["PersonalHotstringsDir"] := RootSpelling
-			Packs := HS_EnumeratePersonalExtFiles()
-			AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
-			SeenSources := Map()
-			for Pack in Packs {
-				Assert(SubStr(Pack["Path"], 1, StrLen(CanonicalSourceRoot) + 1) == CanonicalSourceRoot . "\",
-					"native enumeration remains inside the independently resolved fixture boundary")
-				RelativeFile := SubStr(Pack["Path"], StrLen(CanonicalSourceRoot) + 2)
-				AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
-				AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
-				AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
-				AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
-				SeenSources[Pack["PersonalSource"]["id"]] := true
-			}
-			AssertEqual(8, SeenSources.Count)
+		; Resolve the oracle through Win32, independently of the catalogue owner.
+		NativeBuffer := Buffer(32768 * 2, 0)
+		NativeLength := DllCall("GetLongPathNameW", "Str", OwnedRoot, "Ptr", NativeBuffer, "UInt", 32768, "UInt")
+		AssertTrue(NativeLength > 0 && NativeLength < 32768, "Win32 resolves the owned existing root without truncation")
+		LongRoot := StrGet(NativeBuffer, NativeLength, "UTF-16")
+		InputRoot := RootSpelling == "long" ? LongRoot : OwnedRoot
+		ScriptInformation["PersonalHotstringsDir"] := InputRoot
+		Packs := HS_EnumeratePersonalExtFiles()
+		AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
+		SeenSources := Map()
+		for Pack in Packs {
+			Assert(SubStr(Pack["Path"], 1, StrLen(LongRoot) + 1) == LongRoot . "\", "the canonical discovered file must remain inside the exact owned native root")
+			RelativeFile := SubStr(Pack["Path"], StrLen(LongRoot) + 2)
+			AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
+			AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
+			AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
+			AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
+			SeenSources[Pack["PersonalSource"]["id"]] := true
 		}
+		AssertEqual(8, SeenSources.Count)
 	} finally {
 		if HadRoot
 			ScriptInformation["PersonalHotstringsDir"] := PriorRoot
-		else
+		else if ScriptInformation.Has("PersonalHotstringsDir")
 			ScriptInformation.Delete("PersonalHotstringsDir")
 		try DirDelete(OwnedRoot, true)
 	}
 }
 Test("personal-file descriptors: recursive native discovery retains distinct exact paths", _PICR_DistinctDiscoveredSources)
+Test("personal-file descriptors: recursive native discovery admits the exact long root", (*) => _PICR_DistinctDiscoveredSources("long"))
 
 #Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
