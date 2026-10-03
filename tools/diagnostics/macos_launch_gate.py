@@ -412,7 +412,92 @@ def quit_application(bundle_id, executables):
     return None
 
 
-def collect(output, state, home):
+def collect_owned_windows(output, executables):
+    """Inspect owned live application PIDs; unavailable UI is diagnostic evidence.
+
+    Window inspection needs Accessibility, which hosted runners cannot grant.
+    It is independent of the five required application launch criteria. A
+    refused query cannot prove that the application's windows are absent.
+    """
+    if not executables:
+        raise ValueError("Owned window collection requires exact executable identities")
+    deadline = time.monotonic() + 30
+    owners = [{"executable": str(path), "pids": processes(path)} for path in executables]
+    observations = []
+    for owner in owners:
+        for pid in owner["pids"]:
+            row = {"pid": pid, "executable": owner["executable"], "status": "unavailable"}
+            observations.append(row)
+            try:
+                if pid not in processes(Path(owner["executable"])):
+                    row["cause"] = "Owned process exited before its window query"
+                    continue
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Owned window collection exhausted its 30 s budget")
+                # Bind the process before extracting properties: `whose` on
+                # {name, window names} instead filters the materialized lists.
+                script = (
+                    'tell application "System Events"\n'
+                    f"set ownedProcess to first process whose unix id is {pid}\n"
+                    "tell ownedProcess\n"
+                    "set ownedName to name\n"
+                    "set ownedWindowTitles to name of every window\n"
+                    "end tell\n"
+                    "return {ownedName, ownedWindowTitles}\n"
+                    "end tell"
+                )
+                result = subprocess.run(
+                    ["osascript", "-e", script],
+                    capture_output=True,
+                    text=True,
+                    timeout=remaining,
+                )
+                row.update(
+                    exit_status=result.returncode, stdout=result.stdout, stderr=result.stderr
+                )
+                if result.returncode:
+                    row["cause"] = f"Owned window query refused (exit {result.returncode})"
+                elif pid not in processes(Path(owner["executable"])):
+                    row["cause"] = "Owned process changed before window evidence admission"
+                else:
+                    row["status"] = "observed"
+            except (OSError, subprocess.TimeoutExpired, TimeoutError) as error:
+                row["cause"] = f"{type(error).__name__}: {error}"
+                if isinstance(error, subprocess.TimeoutExpired):
+                    row["stdout"] = (
+                        (error.stdout or b"").decode(errors="replace")
+                        if isinstance(error.stdout, bytes)
+                        else error.stdout or ""
+                    )
+                    row["stderr"] = (
+                        (error.stderr or b"").decode(errors="replace")
+                        if isinstance(error.stderr, bytes)
+                        else error.stderr or ""
+                    )
+    status = (
+        "not_running"
+        if not observations
+        else (
+            "observed"
+            if all(row["status"] == "observed" for row in observations)
+            else "unavailable"
+        )
+    )
+    receipt = {
+        "status": status,
+        "ui_qualified": status == "observed",
+        "owners": owners,
+        "observations": observations,
+        "timeout_seconds": 30,
+    }
+    text = json.dumps(receipt, indent=2) + "\n"
+    (output / "windows.json").write_text(text, encoding="utf-8")
+    (output / "windows.txt").write_text(text, encoding="utf-8")
+    return receipt
+
+
+def collect(output, state, home, executables):
     """Retain every early log location and the state tree for the artifact."""
     errors = []
     for path in (
@@ -434,32 +519,11 @@ def collect(output, state, home):
         text=True,
     )
     (output / "state-tree.txt").write_text(tree.stdout + tree.stderr, encoding="utf-8")
-    # A modal window (a launcher alert, an updater prompt) changes what the
-    # launcher can observe, so keep what was on screen and every window title.
+    # A screenshot remains useful even when Accessibility cannot qualify UI.
     subprocess.run(
         ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
     )
-    try:
-        windows = subprocess.run(
-            [
-                "osascript",
-                "-e",
-                'tell application "System Events" to get '
-                "{name, name of every window} of every process whose background only is false",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        window_text = windows.stdout + windows.stderr
-        if windows.returncode:
-            raise RuntimeError(
-                f"Window collection refused (exit {windows.returncode}): {window_text}"
-            )
-    except (OSError, subprocess.TimeoutExpired, RuntimeError) as error:
-        window_text = f"{type(error).__name__}: {error}\n"
-        errors.append(f"Window collection failed: {type(error).__name__}: {error}")
-    (output / "windows.txt").write_text(window_text, encoding="utf-8")
+    windows = collect_owned_windows(output, executables)
     # Unified log and crash reports explain a child that dies or a launcher that
     # stops logging, which the file logs alone cannot distinguish.
     try:
@@ -492,7 +556,7 @@ def collect(output, state, home):
                 ):
                     (output / "crash-reports").mkdir(exist_ok=True)
                     shutil.copyfile(report, output / "crash-reports" / report.name)
-    return errors
+    return {"errors": errors, "windows": windows}
 
 
 def print_tails(output):
@@ -590,7 +654,9 @@ def run(app, output, scenario, seed_tag):
             observation["driver_log"] = driver_logs(state)
             observation["state_problems"] = check_state(scenario, state, home)
             try:
-                diagnostic_errors.extend(collect(output, state, home))
+                collected = collect(output, state, home, (launcher, child))
+                diagnostic_errors.extend(collected["errors"])
+                report["owned_windows"] = collected["windows"]
             except Exception as error:
                 diagnostic_errors.append(
                     f"Evidence collection failed: {type(error).__name__}: {error}"

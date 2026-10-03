@@ -119,15 +119,155 @@ class VerdictTests(unittest.TestCase):
                     raise subprocess.TimeoutExpired(arguments, options["timeout"])
                 return subprocess.CompletedProcess(arguments, 0, "retained native evidence", "")
 
-            with mock.patch.object(gate.subprocess, "run", side_effect=native_run):
-                errors = gate.collect(output, {"logs_dir": home / "missing-logs"}, home)
-            self.assertEqual(len(errors), 1)
-            self.assertIn("TimeoutExpired", errors[0])
+            with (
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                mock.patch.object(gate, "processes", return_value=[42]),
+            ):
+                collected = gate.collect(
+                    output,
+                    {"logs_dir": home / "missing-logs"},
+                    home,
+                    (Path("/private/owned/Hammerspoon"),),
+                )
+            self.assertEqual(collected["errors"], [])
+            self.assertEqual(collected["windows"]["status"], "unavailable")
+            self.assertFalse(collected["windows"]["ui_qualified"])
+            self.assertIn("TimeoutExpired", collected["windows"]["observations"][0]["cause"])
             self.assertIn("TimeoutExpired", (output / "windows.txt").read_text())
             self.assertIn(
                 "log", calls, "the window timeout must not prevent unified-log collection"
             )
             self.assertEqual((output / "unified.log").read_text(), "retained native evidence")
+
+    def test_successful_quit_attests_exact_owned_process_absence_without_global_ax_query(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            owners = (
+                Path("/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"),
+                timer_probe.NativeDelayedTimerProbe.executable_path(
+                    Path("/Applications/ErgoptiPlus.app")
+                ),
+            )
+            with (
+                mock.patch.object(gate, "processes", return_value=[]) as resolve,
+                mock.patch.object(gate.subprocess, "run") as native,
+            ):
+                receipt = gate.collect_owned_windows(output, owners)
+            self.assertEqual(resolve.call_args_list, [mock.call(path) for path in owners])
+            native.assert_not_called()
+            self.assertEqual(receipt["status"], "not_running")
+            self.assertFalse(
+                receipt["ui_qualified"], "process absence is not qualified window inspection"
+            )
+            self.assertEqual(
+                receipt["owners"], [{"executable": str(path), "pids": []} for path in owners]
+            )
+            self.assertEqual(receipt["observations"], [])
+            self.assertEqual(json.loads((output / "windows.json").read_text()), receipt)
+            self.assertEqual(gate.evaluate("symlink_logs", observe()), [])
+
+    def test_window_properties_are_extracted_after_binding_exact_live_pid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            scripts = []
+
+            def native_run(arguments, **options):
+                script = arguments[2]
+                scripts.append((script, options["timeout"]))
+                if "whose background only" in script:
+                    return subprocess.CompletedProcess(
+                        arguments,
+                        1,
+                        "",
+                        "Can't get materialized lists whose background only=false. (-1728)",
+                    )
+                return subprocess.CompletedProcess(arguments, 0, "Hammerspoon, Owned window", "")
+
+            with (
+                mock.patch.object(gate, "processes", return_value=[42]),
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+            ):
+                receipt = gate.collect_owned_windows(output, (Path("/private/owned/Hammerspoon"),))
+            self.assertEqual(receipt["status"], "observed")
+            self.assertTrue(receipt["ui_qualified"])
+            self.assertEqual(len(scripts), 1)
+            self.assertIn(
+                "set ownedProcess to first process whose unix id is 42\ntell ownedProcess",
+                scripts[0][0],
+            )
+            self.assertNotIn("every process", scripts[0][0])
+            self.assertNotIn("background only", scripts[0][0])
+            self.assertGreater(scripts[0][1], 0)
+            self.assertLessEqual(scripts[0][1], 30)
+            self.assertEqual(receipt["observations"][0]["stdout"], "Hammerspoon, Owned window")
+
+    def test_accessibility_refusal_retains_cause_without_fabricating_missing_app_windows(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            refusal = "System Events: osascript is not allowed assistive access. (-25211)"
+            with (
+                mock.patch.object(gate, "processes", return_value=[42]),
+                mock.patch.object(
+                    gate.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 1, "", refusal),
+                ),
+            ):
+                receipt = gate.collect_owned_windows(output, (Path("/private/owned/Hammerspoon"),))
+            self.assertEqual(receipt["status"], "unavailable")
+            self.assertFalse(receipt["ui_qualified"])
+            self.assertEqual(receipt["observations"][0]["stderr"], refusal)
+            self.assertEqual(receipt["observations"][0]["exit_status"], 1)
+            self.assertEqual(gate.evaluate("symlink_logs", observe(owned_windows=receipt)), [])
+            self.assertTrue(
+                gate.evaluate("symlink_logs", observe(owned_windows=receipt, quit_seconds=None))
+            )
+            self.assertTrue(
+                gate.evaluate(
+                    "symlink_logs",
+                    observe(owned_windows=receipt, driver_log="[ERROR] actual application failure"),
+                )
+            )
+            self.assertTrue(
+                gate.evaluate("clean", observe(owned_windows=receipt, native_delayed_timer=None))
+            )
+
+    def test_owned_pid_exit_during_query_never_qualifies_stale_window_evidence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with (
+                mock.patch.object(gate, "processes", side_effect=[[42], [42], []]),
+                mock.patch.object(
+                    gate.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, "stale window", ""),
+                ),
+            ):
+                receipt = gate.collect_owned_windows(
+                    Path(folder), (Path("/private/owned/Hammerspoon"),)
+                )
+            self.assertEqual(receipt["status"], "unavailable")
+            self.assertFalse(receipt["ui_qualified"])
+            self.assertIn("changed", receipt["observations"][0]["cause"])
+
+    def test_two_owned_window_queries_share_the_original_total_deadline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with (
+                mock.patch.object(gate.time, "monotonic", side_effect=[0, 1, 31]),
+                mock.patch.object(gate, "processes", return_value=[42]),
+                mock.patch.object(
+                    gate.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, "owned window", ""),
+                ) as native,
+            ):
+                receipt = gate.collect_owned_windows(
+                    Path(folder),
+                    (Path("/private/owned/Launcher"), Path("/private/owned/Hammerspoon")),
+                )
+            self.assertEqual(native.call_count, 1)
+            self.assertEqual(native.call_args.kwargs["timeout"], 29)
+            self.assertEqual(receipt["status"], "unavailable")
+            self.assertIn("30 s budget", receipt["observations"][1]["cause"])
 
     def test_quit_and_collection_failures_still_write_primary_report(self):
         with tempfile.TemporaryDirectory() as folder:
