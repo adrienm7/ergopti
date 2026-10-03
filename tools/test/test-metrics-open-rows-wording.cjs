@@ -104,3 +104,45 @@ assert.equal(french[KEYS[1]], 'Tableau de bord du temps sur les applications');
 console.log(
 	'[OK] metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales.'
 );
+
+// A retired feature must not return through a generated default or a scope.
+const TOML = require('smol-toml');
+const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
+const manifest = TOML.parse(
+	fs.readFileSync(path.join(shared, 'modules/features/manifest.toml'), 'utf8')
+);
+const retiredMetrics = [
+	'metrics_shortcut_typing',
+	'metrics_shortcut_apps',
+	'shortcut',
+	'apps_shortcut'
+];
+assert.ok(manifest.features.metrics.length > 10, 'the actual Metrics catalogue stays populated');
+for (const id of retiredMetrics) {
+	assert.ok(
+		!manifest.features.metrics.some((feature) => feature.id === id),
+		`${id}: retired binding is unowned`
+	);
+}
+const actions = TOML.parse(
+	fs.readFileSync(path.join(shared, 'modules/actions/actions.toml'), 'utf8')
+);
+for (const id of ['open_metrics_typing', 'open_metrics_apps']) {
+	assert.equal(
+		actions.sg_actions[id].platform,
+		'all',
+		`${id}: the ordinary action remains on every driver`
+	);
+}
+for (const file of files) {
+	const strings = JSON.parse(fs.readFileSync(path.join(locales, file), 'utf8'));
+	const key = 'platform_reason.metrics_extras_are_not_on_linux';
+	assert.equal(typeof strings[key], 'string');
+	assert.ok(strings[key].length > 10, `${file}: the exclusion-list refusal is explained`);
+	assert.ok(
+		!Object.keys(strings).some(
+			(id) => id.startsWith('menu.metrics.shortcut_') || id.startsWith('metrics.shortcut_')
+		),
+		`${file}: the removed dedicated shortcut UI has no orphan labels`
+	);
+}

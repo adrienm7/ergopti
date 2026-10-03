@@ -15,7 +15,7 @@
  *   * `i18n_dynamic`, on the two metrics rows whose label is computed at
  *     runtime, named the locale key for the prefix. It had **zero** readers
  *     anywhere in the repo; both handlers carried their own literal
- *     `t("menu.metrics.shortcut_prefix")`.
+ *     `t("menu.metrics.show_typing")`.
  *   * `accented_letters_group` listed four letter_picker ids while the builder
  *     looped over a hardcoded array of the same four paths.
  *   * `modifier_combos_group` listed three feature-section paths while the same

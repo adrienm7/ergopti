@@ -321,8 +321,6 @@ menubar_colors = true
 float_wpm = true
 float_graph = true
 float_colors = true
-shortcut = false
-apps_shortcut = false
 
 [shortcuts]
 enabled = false

@@ -1261,10 +1261,6 @@ if MetricsShortcuts.enabled {
 				"Startup aborted because keylogger persistence is unavailable.")
 			ExitApp(1)
 		}
-		MetricsBindingsReady := MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-		if !((MetricsBindingsReady is Integer) && MetricsBindingsReady == 1)
-			try LoggerError("MetricsShortcuts",
-				"One or more metrics shortcuts could not be activated during boot; continuing with explicit recovery state.")
 		; HookDispatcher is already started unconditionally above.
 		KL_Hook_Start()
 		KL_Watchers_Start()

@@ -12,8 +12,6 @@
 ;
 ;   [metrics]
 ;   metrics_enabled            = true
-;   metrics_shortcut_typing    = "ctrl+alt+m"
-;   metrics_shortcut_apps      = "ctrl+alt+t"
 ;   private_filter_enabled     = true
 ;   system_auth_filter_enabled = true
 ;   metrics_disabled_apps      = ["chrome.exe", "firefox.exe"]
@@ -248,10 +246,6 @@ _CS_ValidateMetricsSection(Section) {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
-		for Key in ["metrics_shortcut_typing", "metrics_shortcut_apps"] {
-				if Section.Has(Key)
-						Validated[Key] := _CS_RequireString(Section[Key], Key)
-		}
 		if Section.Has("metrics_disabled_apps")
 				Validated["metrics_disabled_apps"] :=
 						_CS_RequireDisabledApps(Section["metrics_disabled_apps"])
@@ -279,10 +273,6 @@ CS_Load() {
 
 		if Validated.Has("metrics_enabled")
 				MetricsShortcuts.enabled := Validated["metrics_enabled"]
-		if Validated.Has("metrics_shortcut_typing")
-				MetricsShortcuts.typing_str := Validated["metrics_shortcut_typing"]
-		if Validated.Has("metrics_shortcut_apps")
-				MetricsShortcuts.apps_str := Validated["metrics_shortcut_apps"]
 
 		if Validated.Has("metrics_wpm_menubar_colors")
 				MetricsShortcuts.wpm_menubar_colors := Validated["metrics_wpm_menubar_colors"]

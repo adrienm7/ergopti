@@ -30,8 +30,8 @@ helpers.describe("empty configuration boot projection", function()
 			"system_auth_filter_enabled" }) do
 			helpers.assert_eq(metrics["keylogger_" .. field], manifest.default_for("metrics." .. field))
 		end
-		helpers.assert_eq(metrics.metrics_shortcut, manifest.default_for("metrics.shortcut"))
-		helpers.assert_eq(metrics.apps_time_shortcut, manifest.default_for("metrics.apps_shortcut"))
+		helpers.assert_nil(metrics.metrics_shortcut)
+		helpers.assert_nil(metrics.apps_time_shortcut)
 		for _, field in ipairs({ "pause_switch_enabled", "on_pause", "on_resume" }) do
 			helpers.assert_eq(layout["layout_" .. field], manifest.default_for("layout." .. field))
 		end

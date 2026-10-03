@@ -13,7 +13,7 @@ local function clone(value)
 end
 
 local function fixture(demoted)
-	local original = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nencrypt = true\nfloat_colors = false\nfuture = { keep = 9 }\n[llm]\nenabled = true\napi_key = "untouched"\n'
+	local original = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nencrypt = true\nfloat_colors = false\nfuture = { keep = 9 }\nshortcut = { mods = ["cmd"], key = "m", future = 7 } # legacy typing\napps_shortcut = "unsupported" # legacy apps\n[llm]\nenabled = true\napi_key = "untouched"\n'
 	local files, control, writes = { config = original, history = "private historical bytes" }, {}, 0
 	local adapter = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
@@ -65,7 +65,6 @@ local function fixture(demoted)
 			end,
 		}
 	end
-	local shortcuts = { metrics_shortcut = false, apps_time_shortcut = false }
 	local save, checkpoint = require("ui.menu.preferences_transaction").bind(Preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = {}, initial_state = state,
 		initial_preferences = Preferences.snapshot(state, {}, {}), restore_runtime = function() return true end,
@@ -78,8 +77,8 @@ local function fixture(demoted)
 		admission = function(_, callback) return callback() end, paused = function() return false end,
 		backup_path = function() return "backup" end,
 		activation_pending = function() return control.pending == true end,
-		capture_shortcuts = function() return clone(shortcuts) end,
-		apply_shortcut = function(name, mods, key) shortcuts[name] = key and { mods = mods, key = key } or false; return true end,
+		capture_shortcuts = function() error("retired shortcut snapshot must not be used") end,
+		apply_shortcut = function() error("retired shortcut owner must not be called") end,
 	})
 	return owner, state, files, control, function() return native, starts end, save, demotions,
 		function() return writes end, original, bar, widget
@@ -99,6 +98,10 @@ helpers.describe("macOS complete Metrics scope", function()
 		local decoded = Codec.decode(files.config)
 		helpers.assert_eq(decoded.metrics.enabled, nil)
 		helpers.assert_eq(decoded.metrics.future.keep, 9)
+		helpers.assert_eq(decoded.metrics.shortcut.future, 7)
+		helpers.assert_eq(decoded.metrics.apps_shortcut, "unsupported")
+		helpers.assert_true(files.config:find('shortcut = { mods = ["cmd"], key = "m", future = 7 } # legacy typing\n', 1, true) ~= nil)
+		helpers.assert_true(files.config:find('apps_shortcut = "unsupported" # legacy apps\n', 1, true) ~= nil)
 		helpers.assert_eq(decoded.llm.enabled, true)
 		helpers.assert_eq(decoded.llm.api_key, "untouched")
 		helpers.assert_eq(files.history, "private historical bytes")

@@ -24,11 +24,6 @@ function M.new(options)
 		fields[path] = assert(Preferences.flat_key_for(path), "metrics preference owner missing: " .. path)
 	end
 	local active
-	local function apply_shortcut(name, value)
-		assert(value == false or type(value) == "table", "invalid metrics shortcut")
-		return options.apply_shortcut(name, type(value) == "table" and value.mods or nil,
-			type(value) == "table" and value.key or nil, type(value) == "table" and value.enabled) == true
-	end
 	local function restore(snapshot)
 		if options.activation_pending() ~= false then return false end
 		if core.apply_configuration(snapshot.core) ~= true then return false end
@@ -36,9 +31,6 @@ function M.new(options)
 		if lifecycle(options.script_control) ~= true then return false end
 		if menubar.apply_configuration(snapshot.menubar) ~= true then return false end
 		if widget.apply_configuration(snapshot.widget) ~= true then return false end
-		for _, name in ipairs({ "metrics_shortcut", "apps_time_shortcut" }) do
-			if not apply_shortcut(name, snapshot.shortcuts[name]) then return false end
-		end
 		for _, key in pairs(fields) do state[key] = clone(snapshot.state[key]) end
 		return true
 	end
@@ -53,9 +45,9 @@ function M.new(options)
 	ports.runtime = {
 		capture = function()
 			if options.activation_pending() ~= false then return nil end
-			local native, shortcuts = core.configuration_snapshot(), options.capture_shortcuts()
-			if type(native) ~= "table" or type(shortcuts) ~= "table" then return nil end
-			active = { core = native, shortcuts = shortcuts, menubar = menubar.configuration_snapshot(),
+			local native = core.configuration_snapshot()
+			if type(native) ~= "table" then return nil end
+			active = { core = native, menubar = menubar.configuration_snapshot(),
 				widget = widget.configuration_snapshot(), state = {} }
 			for _, key in pairs(fields) do active.state[key] = clone(state[key]) end
 			return active
@@ -89,9 +81,6 @@ function M.new(options)
 				colors = state.keylogger_menubar_colors }) ~= true then return false end
 			if widget.apply_configuration({ running = enabled and state.keylogger_float_wpm,
 				colors = state.keylogger_float_colors, graph = state.keylogger_float_graph }) ~= true then return false end
-			for _, name in ipairs({ "metrics_shortcut", "apps_time_shortcut" }) do
-				if not apply_shortcut(name, state[name]) then return false end
-			end
 			return true
 		end,
 		restore = restore,

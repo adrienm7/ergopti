@@ -57,24 +57,10 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 		)
 	end)
 
-	helpers.it("metrics_shortcut and apps_time_shortcut are in KEY_MAP as scalars", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/infra/preferences.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open infra/preferences.lua")
-		local src = fh:read("*a")
-		fh:close()
-
-		-- Both entries must be present in KEY_MAP
-		helpers.assert_true(
-			src:find("metrics_shortcut", 1, true) ~= nil,
-			"metrics_shortcut must be defined in KEY_MAP"
-		)
-		helpers.assert_true(
-			src:find("apps_time_shortcut", 1, true) ~= nil,
-			"apps_time_shortcut must be defined in KEY_MAP"
-		)
+	helpers.it("keeps retired dashboard paths out of the preference owner", function()
+		local prefs = helpers.load_with_stubs("infra.preferences")
+		helpers.assert_nil(prefs.flat_key_for("metrics.shortcut"))
+		helpers.assert_nil(prefs.flat_key_for("metrics.apps_shortcut"))
+		helpers.assert_eq(prefs.flat_key_for("metrics.enabled"), "keylogger_enabled")
 	end)
 end)

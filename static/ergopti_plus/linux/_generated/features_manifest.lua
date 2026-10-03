@@ -615,12 +615,6 @@ M.unavailable = {
 		path = "metrics.metrics_enabled", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.metrics_shortcut_typing", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_shortcut_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
@@ -1132,12 +1126,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.float_colors", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.shortcut", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.apps_shortcut", section = "metrics", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "layout.pause_switch_enabled", section = "layout", reason_key = "", platforms = { "hs" },

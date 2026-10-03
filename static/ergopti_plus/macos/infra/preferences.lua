@@ -91,8 +91,6 @@ local KEY_MAP = {
 	keylogger_private_filter_enabled     = { sec = "metrics", key = "private_filter_enabled"        },
 	keylogger_secure_filter_enabled      = { sec = "metrics", key = "secure_filter_enabled"         },
 	keylogger_system_auth_filter_enabled = { sec = "metrics", key = "system_auth_filter_enabled"   },
-	metrics_shortcut                     = { sec = "metrics", key = "shortcut"                      },
-	apps_time_shortcut                   = { sec = "metrics", key = "apps_shortcut"                 },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -644,8 +642,8 @@ local function flatten_from_disk(grouped, mark)
 				if type(disk_val) == "table" then
 					-- Could be: a known nested table, a sub-path table, or (rarely)
 					-- a nested table inside [gestures] — treat those as action slots.
-					-- First try the scalar reverse map: some flat keys (e.g. metrics_shortcut,
-					-- apps_time_shortcut) map to a top-level section:key but their on-disk value
+					-- First try the scalar reverse map: an owned scalar may map to a
+					-- top-level section:key while its on-disk value
 					-- is a structured table {mods, key}. Without this early check they fall into
 					-- the sub-path branch which iterates inner keys and finds nothing.
 					local top_scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key]
