@@ -2362,7 +2362,7 @@ local function _build_llm(ctx)
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 			end,
-		}, ctx.on_menu_changed, ollama_model_rows)
+		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every

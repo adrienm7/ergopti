@@ -232,3 +232,31 @@ helpers.describe("prediction backend: the raise-temperature switch", function()
 	end)
 
 end)
+
+
+helpers.describe("local API configuration uses the ordinary prediction admission owner", function()
+	helpers.it("master OFF permits configuration but pause and retained scope debt refuse it", function()
+		local engine, _, scheduler, restore = load("ollama", nil, { ["llm.enabled"] = false })
+		-- The engine reads the profiles owner, not the storage fixture directly.
+		package.loaded["modules.llm.profiles"].is_enabled = function() return false end
+		local paused, debt = false, true
+		local owner = { pending = function() return debt end }
+		local ok, err = pcall(function()
+			engine.init({ scheduler = scheduler, is_paused = function() return paused end })
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(engine.can_configure_local_servers(), true)
+			paused = true
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			paused = false
+			helpers.assert_eq(engine.acquire_configuration(owner), true)
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			helpers.assert_eq(engine.release_configuration(owner), false)
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			debt = false
+			helpers.assert_eq(engine.release_configuration(owner), true)
+			helpers.assert_eq(engine.can_configure_local_servers(), true)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)
