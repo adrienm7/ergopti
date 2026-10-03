@@ -405,6 +405,13 @@ remain pending in the next macOS install/launch run.
   actual SyntheticInput consumer first exposed missing payload publication;
   they now pass, including exact text at Cmd+V and later text/RTF/PNG recovery.
   The complete pipeline remains pending for this stub slice.
+  The shared Hammerspoon canvas stub now copies frame values at construction,
+  assignment and reading, matching the pinned native 1.1.1 NSRect API. Actual
+  GraphicsRenderer callback observations are asserted outside its production
+  pcall; four original alias failures precede five focused passing cases.
+  The complete macOS unit gate passes 12903 cases on the isolated candidate;
+  native three-OS qualification remains pending.
+
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «

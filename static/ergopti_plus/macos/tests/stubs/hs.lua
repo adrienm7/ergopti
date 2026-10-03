@@ -930,6 +930,15 @@ M.drawing = {
 
 local CANVASES = {}
 
+--- Snapshots native rect values at the constructor, setter and getter boundaries.
+--- Hammerspoon 1.1.1's extensions/canvas/canvas.lua frame wrapper builds a fresh
+--- NSRect table from the native topLeft/size values on every read.
+--- @param frame table Valid canvas rect.
+--- @return table rect Independently owned native-style rect value.
+local function canvas_frame_snapshot(frame)
+	return { __luaSkinType = "NSRect", x = frame.x, y = frame.y, w = frame.w, h = frame.h }
+end
+
 --- Builds a stateful canvas double that preserves the native commit surface.
 --- Returning one generic function for every lookup made numeric element reads
 --- such as `canvas[7]` callable instead of mutable, while `isShowing()` returned
@@ -939,7 +948,7 @@ local CANVASES = {}
 --- @return table canvas Stateful canvas double.
 local function make_canvas(initial_frame)
 	local canvas = {
-		_frame = initial_frame or { x = 0, y = 0, w = 0, h = 0 },
+		_frame = canvas_frame_snapshot(initial_frame or { x = 0, y = 0, w = 0, h = 0 }),
 		_showing = false,
 		_deleted = false,
 	}
@@ -963,8 +972,8 @@ local function make_canvas(initial_frame)
 	end
 
 	function canvas:frame(value)
-		if value == nil then return self._frame end
-		self._frame = value
+		if value == nil then return canvas_frame_snapshot(self._frame) end
+		self._frame = canvas_frame_snapshot(value)
 		return self
 	end
 
