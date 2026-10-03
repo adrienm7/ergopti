@@ -21,6 +21,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local LibuvExit = require("infra.libuv_exit")
 local LOG = "adapters.process_runner"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -165,9 +166,9 @@ function M.run(program, args, options, callback)
 		args = args,
 		stdio = { nil, run.stdout, run.stderr },
 		detached = true,
-	}, function(code)
+	}, function(code, signal)
 		run.exited = true
-		run.exit_code = tonumber(code) or -1
+		run.exit_code = LibuvExit.status(code, signal)
 		maybe_complete(run)
 		-- A run already finished by its deadline still owns this handle.
 		if run.terminal and run.process then

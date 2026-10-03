@@ -55,10 +55,10 @@ local function fake_luv(config)
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
 	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
-	function state.finish(code)
+	function state.finish(code, signal)
 		state.stdout(nil)
 		state.stderr(nil)
-		state.exit_callback(code, 0)
+		state.exit_callback(code, signal or 0)
 	end
 	return fake, state
 end
@@ -118,6 +118,15 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		helpers.assert_contains(results[1].error, "exited with code 3")
 		helpers.assert_eq(results[1].stderr, "Traceback\n")
 		helpers.assert_true(results[1].not_found ~= true)
+	end)
+
+	helpers.it("reports a signalled child as failed (linux-signalled-child-exit)", function()
+		local runner, state = fresh_runner()
+		local _, results = start(runner, "python3", {}, {})
+		state.finish(0, 15)
+		helpers.assert_eq(#results, 1)
+		helpers.assert_eq(results[1].exit_code, 143, "libuv's zero exit code cannot hide SIGTERM")
+		helpers.assert_contains(results[1].error, "143")
 	end)
 
 	helpers.it("tells a program that cannot start from one that fails (layout-registry-convert)", function()
