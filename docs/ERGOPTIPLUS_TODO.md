@@ -322,13 +322,17 @@ native three-OS qualification remains pending.
       `wip/delta-updates` (mirrored as `backup/wip/delta-updates`, not integrated:
       its CI step only runs on real releases, so it needs a dry-run CI mode first),
       then Windows and Linux per ADR 010 with an automatic full-download fallback.
-- [~] **23.** Ergopti-only hotstring groups (SFB reduction, rolls, repeat
-  corrections) moved into the Ergopti extension, shown under « Hotstrings
-  Ergopti ». Integrated. Open maintainer decisions: "installed" currently means
-  "shipped with the app" (the submenu shows for every user); other
-  Ergopti-looking groups (distancesreduction `qu`, `comma_j`,
-  `comma_far_letters`, `ê` sections, French `suffixes_a`, magickey `replace`)
-  were not moved.
+
+Ergopti-only distance and SFB reduction, rolls and repeat corrections now
+come from the Ergopti extension. Their declared bindings preserve the historical
+categories, preference sections and `common` priority. These source files are
+unchanged since non-release checkpoint
+[37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
+at `b92d9dec8`, which passed the complete three-OS unit, E2E, packaging and
+installation pipeline with release publication skipped. Item 37 retains the
+installed-layout visibility and French suffix/magic-key placement decisions;
+item 104 separately tracks the common-autocorrection section split.
+
 - [~] **24.** macOS tap-hold outage: a not-ready remap guardian held every
   Karabiner regeneration forever and pinned the first bulk edit (Restore
   defaults), refusing later edits and Reload. Fixed, with a Tap-Hold menu row
@@ -437,11 +441,12 @@ the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
-- [ ] **37.** Item 23 decisions: whether « Hotstrings Ergopti » should appear
-      only when the layout is really installed (today: always, shipped copy), and
-      whether to move French `suffixes_a` and the magickey `replace` section into
-      the Ergopti extension. The common distance rules are handled by item 103;
-      the French distance category remains independent.
+- [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
+      should appear only when the layout is really installed (today: always,
+      shipped copy), and whether to move French `suffixes_a` and the magickey
+      `replace` section into the Ergopti extension. Common distance reduction
+      already belongs to the extension; the French distance category remains
+      independent.
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
