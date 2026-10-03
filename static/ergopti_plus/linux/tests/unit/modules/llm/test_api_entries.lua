@@ -175,6 +175,8 @@ helpers.describe("api_entries: a private, durable store", function()
 	for label, document in pairs({
 		["entries keyed by id"] = { version = 1, active_id = "a",
 			entries = { a = { id = "a", provider = "cerebras", label = "A", token = "csk-keyed" } } },
+		["typed future selection"] = { version = 1, active_id = { future = true },
+			entries = { { id = "a", provider = "cerebras", label = "A", token = "csk-selection" } } },
 		["another version"] = { version = 2, active_id = "a",
 			entries = { { id = "a", provider = "cerebras", label = "A", token = "csk-v2", scopes = { "chat" } } } },
 	}) do
@@ -236,11 +238,83 @@ helpers.describe("api_entries: a private, durable store", function()
 			helpers.assert_true(entries.set_active("new-1"))
 			local stored = Json.decode(assert(io.open(PATH, "r")):read("*a"))
 			helpers.assert_eq(#stored.entries, 2, "a save keeps the outdated entry")
-			helpers.assert_eq(stored.entries[2].key, "sk-legacy-secret", "its key is never deleted")
+			helpers.assert_eq(stored.entries[1].id, "old-1", "the foreign row retains its original position")
+			helpers.assert_eq(stored.entries[2].id, "new-1", "the owned row retains its original position")
+			helpers.assert_eq(stored.entries[1].key, "sk-legacy-secret", "its key is never deleted")
 		end)
 		Logger.warn, Logger.error = real_warn, real_error
 		os.execute("rm -rf '" .. DIR .. "'")
 		if not ok then error(err, 0) end
 	end)
 
+end)
+
+
+helpers.describe("Local API optional authentication: durable identity (local-api-optional-auth) (local-api-optional-auth)", function()
+	helpers.it("saves and reloads a keyless known local provider with its custom address (local-api-optional-auth)", function()
+		local entries = fresh()
+		local added = entries.add({ provider = "lmstudio", token = "", label = "lmstudio/fixture-model",
+			model = "fixture-model", base_url = "http://127.0.0.1:19273/v1" })
+		helpers.assert_true(added ~= nil, "known local provider accepts an explicitly empty key")
+		local restarted = fresh(true)
+		helpers.assert_eq(restarted.active().provider, "lmstudio")
+		helpers.assert_eq(restarted.active().token, "")
+		helpers.assert_eq(restarted.active().base_url, "http://127.0.0.1:19273/v1")
+	end)
+
+	helpers.it("keeps foreign rows and nested fields at their original positions during selection (local-api-optional-auth)", function()
+		local entries = fresh()
+		local first = assert(entries.add({ provider = "cerebras", token = "private-a", label = "first" }))
+		local fh = assert(io.open(PATH, "wb"))
+		fh:write(require("json").encode({ version = 1, active_id = first.id, entries = {
+			{ id = first.id, provider = "cerebras", token = "private-a", label = "first", future = { flag = true } },
+			{ id = "future-row", provider = "future-provider", token = { future = true }, label = "foreign", nested = { 7, 9 } },
+			{ id = "local-row", provider = "lmstudio", token = "", label = "local", model = "fixture-model" },
+			{ id = "last-row", provider = "mistral", token = "private-d", label = "last", future = { 2, 3 } },
+		} }))
+		fh:close()
+		entries = fresh(true)
+		helpers.assert_true(entries.set_active(first.id))
+		fh = assert(io.open(PATH, "rb")); local saved = require("json").decode(fh:read("*a")); fh:close()
+		helpers.assert_eq(saved.entries[1].id, first.id)
+		helpers.assert_eq(saved.entries[2].id, "future-row")
+		helpers.assert_eq(saved.entries[3].id, "local-row")
+		helpers.assert_eq(saved.entries[4].id, "last-row")
+		helpers.assert_eq(saved.entries[4].future[2], 3)
+		helpers.assert_eq(saved.entries[1].future.flag, true)
+		helpers.assert_eq(saved.entries[2].nested[2], 9)
+	end)
+end)
+
+
+helpers.describe("Local API foreign JSON identities", function()
+	helpers.it("keeps independent null, empty-array and empty-object fields (local-api-optional-auth)", function()
+		fresh(); os.execute("mkdir -p '" .. DIR .. "'")
+		local raw = '{"version":1,"active_id":"known","future":null,"empty_list":[],"empty_object":{},"entries":[{"id":"known","provider":"lmstudio","token":"","label":"Local","model":"m","future":null,"list":[],"object":{}}]}'
+		local file = assert(io.open(PATH, "wb")); file:write(raw); file:close()
+		local entries = fresh(true)
+		local saved = entries.set_active("known")
+		file = assert(io.open(PATH, "rb")); local json = require("json"); local decoded = json.decode_lossless(file:read("*a")); file:close()
+		helpers.assert_eq(saved, true)
+		helpers.assert_true(json.is_null(decoded.future), "unknown root null must remain explicit")
+		helpers.assert_true(json.is_array(decoded.empty_list), "unknown root empty-array identity is retained")
+		helpers.assert_eq(json.is_array(decoded.empty_object), false)
+		helpers.assert_true(json.is_null(decoded.entries[1].future), "unknown row null must remain explicit")
+		helpers.assert_true(json.is_array(decoded.entries[1].list))
+		helpers.assert_eq(json.is_array(decoded.entries[1].object), false)
+	end)
+
+	helpers.it("keeps a future typed model row unowned and unchanged (local-api-optional-auth)", function()
+		fresh(); os.execute("mkdir -p '" .. DIR .. "'")
+		local raw = '{"version":1,"entries":[{"id":"known","provider":"lmstudio","token":"","label":"Local","model":"m"},{"id":"future","provider":"lmstudio","token":"","label":"Future","model":{"next":true},"base_url":[]}],"active_id":"known"}'
+		local file = assert(io.open(PATH, "wb")); file:write(raw); file:close()
+		local entries = fresh(true)
+		local unowned = entries.get("future") == nil
+		local saved = entries.set_active("known")
+		file = assert(io.open(PATH, "rb")); local json = require("json"); local decoded = json.decode_lossless(file:read("*a")); file:close()
+		helpers.assert_eq(unowned, true, "unsupported field types must not acquire a normalized ordinary owner")
+		helpers.assert_eq(saved, true)
+		helpers.assert_eq(decoded.entries[2].model.next, true)
+		helpers.assert_true(json.is_array(decoded.entries[2].base_url))
+	end)
 end)

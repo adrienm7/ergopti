@@ -121,10 +121,13 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 			return
 		end
 	end
-	local token = dialogs.prompt(heading, tr("menu.llm.api_prompt_token"), "", true)
+	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "") == true
+		and fill(tr("dialog.local_servers.key_prompt"), { provider.label }) or tr("menu.llm.api_prompt_token")
+	local token = dialogs.prompt(heading, prompt, "", true)
 	if not token then return end
-	token = token:match("^%s*(.-)%s*$")
-	if token == "" then return end
+	-- The actual provider owns optional authentication; never trim secret bytes.
+	if token == "" and (type(remote.token_allowed) ~= "function"
+		or remote.token_allowed(provider.id, token) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
 	if not model then return end
 	model = model:match("^%s*(.-)%s*$")

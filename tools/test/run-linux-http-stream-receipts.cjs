@@ -36,17 +36,22 @@ function run({
 	// Cloud unit suites may use Lua 5.4 modules. The native gate uses the
 	// explicitly provisioned LuaJIT ABI rather than loading those into Lua 5.1.
 	if (env.ERGOPTI_NATIVE_LUA_CPATH) env.LUA_CPATH = env.ERGOPTI_NATIVE_LUA_CPATH;
-	const result = spawn('luajit', ['tests/hardware/run_http_stream_receipts.lua'], {
-		cwd: DRIVER,
-		stdio: 'inherit',
-		env,
-		timeout: 180000
-	});
-	if (result.error) {
-		error(`[FAIL] Native Linux HTTP streaming receipts could not run: ${result.error.message}`);
-		return 1;
+	let failed = 0;
+	// Separate native processes retain independent cleanup owners. Both mandatory
+	// proofs run even when one refuses; a failed child never becomes success.
+	for (const fixture of ['run_http_stream_receipts.lua', 'run_local_api_auth.lua']) {
+		const result = spawn('luajit', [`tests/hardware/${fixture}`], {
+			cwd: DRIVER,
+			stdio: 'inherit',
+			env,
+			timeout: 180000
+		});
+		if (result.error) {
+			error(`[FAIL] Native Linux HTTP receipts could not run: ${result.error.message}`);
+			failed ||= 1;
+		} else if (result.status !== 0) failed ||= result.status ?? 1;
 	}
-	if (result.status !== 0) return result.status ?? 1;
+	if (failed) return failed;
 	log('[OK] Actual libuv/curl HTTP receipts and native owner settlement passed.');
 	return 0;
 }

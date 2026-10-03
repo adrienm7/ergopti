@@ -459,6 +459,10 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 				"the exact pre-transition file images could not be verified")
 		}
 		ApiSnapshot := ApiSnapshotResult["snapshot"]
+		if ApiSnapshot["present"] && !_LLM_Menu_ApiSourceOwned(ApiSnapshot["content"]) {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the API-entry source contains unsupported records; its exact bytes were retained")
+		}
 		ApiExpected := Map("present", ApiSnapshot["present"],
 			"hash", ApiSnapshot["hash"])
 		TargetSpecs := [

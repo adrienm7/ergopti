@@ -427,6 +427,12 @@ _LMT_ApiSerialize(CandidateMenu) {
 		? '[{"Id":"api_new"}]' : "[]"
 }
 
+; The source authority is a complete canonical API entry, so new source admission
+; still tests actual second-target refusal and compensation rather than malformed input.
+_LMT_ApiOldImage() {
+	return '[{"Id":"api_old","Name":"Old","Provider":"openai","BaseUrl":"https://old.invalid","Token":"old","Model":"old-model"}]'
+}
+
 _LMT_ApiMutate(Candidate) {
 	Candidate["enabled"] := true
 	return _LLM_Menu_UpsertApiEntryCandidate(Candidate,
@@ -475,7 +481,7 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 		if WriteFn.Call(ConfigPath,
 				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
 			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
-		if WriteFn.Call(ApiPath, '[{"Id":"api_old"}]') != 1
+		if WriteFn.Call(ApiPath, _LMT_ApiOldImage()) != 1
 			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
 		CandidateFeatures := _LMT_Features()
 		CandidateMenu := _LMT_Menu()
@@ -558,7 +564,7 @@ _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 		AssertContains(FSReadUtf8Exact(ConfigurationFile),
 			'api_entry_id = "api_old"',
 			"the first target must roll back when the second target fails")
-		AssertEqual('[{"Id":"api_old"}]', FSReadUtf8Exact(_LMT_ApiPath))
+		AssertEqual(_LMT_ApiOldImage(), FSReadUtf8Exact(_LMT_ApiPath))
 		AssertEqual("api_old", _LLM_Menu["api_entry_id"],
 			"failed multi-target durability must leave live authority old")
 		AssertFalse(_LLM_Menu["enabled"])

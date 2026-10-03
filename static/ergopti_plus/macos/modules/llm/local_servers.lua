@@ -32,6 +32,7 @@ local Logger         = require("infra.logger")
 local Paths          = require("infra.paths")
 local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
+local AuthPolicy     = require("llm.local_server_auth")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -85,18 +86,9 @@ local function load_catalogue()
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
 		return {}, {}
 	end
-	local order, servers = {}, {}
-	for _, id in ipairs(root.server_order) do
-		local desc = type(id) == "string" and root.servers[id] or nil
-		local valid = type(desc) == "table" and id:match("^[a-z][a-z0-9_]*$") ~= nil and servers[id] == nil
-			and type(desc.label) == "string" and desc.label ~= ""
-			and type(desc.base_url) == "string" and desc.base_url:match("^https?://%S+$") ~= nil
-		if valid then
-			servers[id] = { id = id, label = desc.label, base_url = desc.base_url }
-			order[#order + 1] = id
-		else
-			Logger.error(LOG, "local_servers.json: server '%s' has an invalid descriptor and is skipped.", tostring(id))
-		end
+	local order, servers = AuthPolicy.catalogue(root, {})
+	if #order ~= #root.server_order then
+		Logger.error(LOG, "local_servers.json contains unsupported or duplicate optional-auth descriptors.")
 	end
 	return order, servers
 end
@@ -125,13 +117,7 @@ end
 --- @param body any The answer body.
 --- @return table|nil ids Nil when the body is not a models list.
 function M.models_from_body(body)
-	if type(body) ~= "string" or body == "" then return nil end
-	local ok, decoded = pcall(JsonCodec.decode, body)
-	if not ok or type(decoded) ~= "table" or type(decoded.data) ~= "table" then return nil end
-	local ids = {}
-	for _, model in ipairs(decoded.data) do
-		if type(model) == "table" and type(model.id) == "string" and model.id ~= "" then ids[#ids + 1] = model.id end
-	end
+	local ids = AuthPolicy.models_receipt({ ok = true, status = 200, body = body })
 	return ids
 end
 
@@ -144,7 +130,7 @@ function M.classify(response)
 	local status = tonumber(response.status) or 0
 	if status == 401 or status == 403 then return M.STATUS_NEEDS_KEY, nil end
 	if response.ok ~= true then return M.STATUS_DOWN, nil end
-	local models = M.models_from_body(response.body)
+	local models = AuthPolicy.models_receipt(response)
 	-- A 200 that is not a models list is another service on that port
 	if not models then return M.STATUS_DOWN, nil end
 	return M.STATUS_UP, models

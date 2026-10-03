@@ -627,3 +627,55 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 		end)
 	end)
 end)
+
+
+helpers.describe("Local API typed optional authentication (local-api-optional-auth)", function()
+	helpers.it("refuses a non-string local token before the actual request", function()
+		local observed = {}
+		with_backend(function(api, _, world)
+			api.set_entries({ { id = "typed-local", provider = "lmstudio", token = {},
+				model = "fixture-model", base_url = "http://127.0.0.1:19273/v1" } })
+			api.set_active_entry_id("typed-local")
+			api.resolve_active_entry(function(ok, entry, reason)
+				observed.ok, observed.entry, observed.reason = ok, entry, reason
+			end)
+			observed.posts = #world.posts
+		end)
+		helpers.assert_eq(observed.ok, false)
+		helpers.assert_eq(observed.entry, nil)
+		helpers.assert_eq(observed.posts, 0)
+	end)
+
+	helpers.it("keeps a configured keyless local address as a supported request", function()
+		local observed = {}
+		with_backend(function(api, _, world)
+			api.set_entries({ { id = "custom-local", provider = "lmstudio", token = "",
+				model = "fixture-model", base_url = "http://127.0.0.1:19273/v1" } })
+			api.set_active_entry_id("custom-local")
+			api.request_raw(nil, "Continue.", "hello", "", 0.2, 16,
+				function(text) observed.text = text end, function(reason) observed.reason = reason end)
+			observed.posts, observed.post = #world.posts, world.posts[1]
+		end)
+		helpers.assert_eq(observed.posts, 1)
+		helpers.assert_eq(observed.post.url, "http://127.0.0.1:19273/v1/chat/completions")
+		helpers.assert_eq(observed.post.headers.Authorization, nil)
+	end)
+end)
+
+
+helpers.describe("Actual local API models receipt contract", function()
+	helpers.it("replays strict typed/status receipts through the native catalogue consumer", function()
+		local vectors = read_json("tests/corpus/llm/local_server_auth.json").models_cases
+		local observed = {}
+		with_backend(function(_, servers)
+			for index, vector in ipairs(vectors) do
+				local status, ids = servers.classify(vector.response)
+				observed[index] = { status = status, ids = ids }
+			end
+		end)
+		for index, vector in ipairs(vectors) do
+			helpers.assert_eq(observed[index].status == "up", vector.admitted, vector.name)
+			if vector.admitted then helpers.assert_eq(observed[index].ids, vector.models, vector.name) end
+		end
+	end)
+end)
