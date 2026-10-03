@@ -348,6 +348,36 @@ end)
 
 
 helpers.describe("text_cipher — the payload reaches openssl unchanged", function()
+	local binary_inputs = { "a\0b", "\0", "\0\0a\n\n", "a\0é漢\0\n" }
+	local bytes = {}
+	for value = 0, 255 do bytes[#bytes + 1] = string.char(value) end
+	binary_inputs[#binary_inputs + 1] = table.concat(bytes)
+	for index, plaintext in ipairs(binary_inputs) do
+		helpers.it("keeps binary plaintext off the native C-string boundary " .. index .. " (cipher-binary-receipts)", function()
+			local cipher = fresh_cipher()
+			capture_shell()
+			cipher.set_enabled(true)
+			local shell = Shell()
+			local previous = shell.exec_exact_stdin
+			local transport
+			shell.exec_exact_stdin = function(command, input)
+				transport = { command = command, input = input }
+				return "Y2lwaGVydGV4dA=="
+			end
+			local ok, result = pcall(cipher.encrypt, "binary-device", index, plaintext)
+			shell.exec_exact_stdin = previous
+			shell._reset_runner()
+			helpers.assert_true(ok and TextCrypto.is_encrypted(result), "binary encryption must still return the canonical envelope")
+			helpers.assert_true(transport ~= nil, "the cipher must reach the native stdin transport")
+			helpers.assert_true(transport.input:find("\0", 1, true) == nil,
+				"embedding a NUL in the shell command silently truncates plaintext")
+			helpers.assert_eq(require("compat.base64").decode(transport.input), plaintext,
+				"the shared binary codec must retain every original byte")
+			helpers.assert_true(transport.command:find("openssl base64 -d -A | ", 1, true) == 1,
+				"native decoding must happen before the encryption primitive")
+		end)
+	end
+
 	helpers.it("truncates the newline a heredoc is forced to append", function()
 		-- A heredoc cannot express "a body with no final newline", so the plain
 		-- framing normalises the payload's own trailing newlines away and openssl

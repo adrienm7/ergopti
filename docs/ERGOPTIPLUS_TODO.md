@@ -429,6 +429,20 @@ These are software implementations; final hardware verification remains below.
   and ran no assertions; the owned container setup supplies those targets, and
   the subsequent complete before/after matrices pass. Native cross-OS gates
   and manual CI remain unexecuted.
+- [~] **L35.** Linux binary at-rest plaintext: encode NUL-containing input
+  with the existing shared Base64 codec and restore its bytes before native
+  OpenSSL encryption. Raw heredoc NUL previously truncated the C-string command,
+  while a valid envelope acknowledged permanently shortened text. Six native
+  and five portable cases failed before the fix. Fourteen native cases pass
+  with real OpenSSL, every byte from 0 to 255, repeated NULs, Unicode/newlines
+  and a real encrypted typing batch read after SQLite close/reopen; these run
+  as an ordinary user with owned synthetic identity mounts. Portable transport
+  cases verify exact shared-codec roundtrip and NUL-free command input.
+  macOS uses the same raw-heredoc shape, an unvalidated C-boundary concern
+  deferred to its native owner; Windows' AHK StrPut boundary cannot be equated
+  with a Lua binary string. No cross-OS binary hardware claim is made. Shared
+  key/IV/envelope policy, native cross-OS gates and manual CI remain unchanged
+  or unexecuted; no physical typing device was used.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
