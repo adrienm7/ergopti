@@ -19,7 +19,7 @@ HotstringsScopeApply(Mode, Options := unset) {
 	ManifestScopePlan("hotstrings", Mode)
 	if !_HCW_FlushNumericWrite(false)
 		return Map("status", "refused", "scope", "hotstrings", "mode", Mode, "detail", "pending_numeric_write")
-	Owner := HotstringsScopeFiles(Options)
+	Owner := HotstringsScopeFiles(Options, Mode)
 	Operations() {
 		Inventory := ManifestScopeInventory("hotstrings", Map("catalogue", Owner.Inventory.Bind(Owner)))
 		return ManifestScopePlan("hotstrings", Mode, Inventory).operations
@@ -185,11 +185,23 @@ _HotstringsScopeSourceKey(Path) {
 	return _ConfigWriteLeaseKey(Path)
 }
 
+
+/** Resolves only source metadata and the shared fallback, excluding user overrides. */
+_HotstringsScopeInheritedDelay(Category, Section) {
+	global GLOBAL_DEFAULT_DELAY
+	Config := ParseTomlGroupConfig(Category)
+	if Config.Sections.Has(Section) && Config.Sections[Section].Delay != ""
+		return Config.Sections[Section].Delay
+	return Config.Delay != "" ? Config.Delay : GLOBAL_DEFAULT_DELAY
+}
+
 /**
  * Owns additional files without introducing a second transaction coordinator.
  */
 class HotstringsScopeFiles {
-	__New(Options) {
+	__New(Options, Mode := "clear") {
+		this.mode := Mode
+		this.inherited := Options.Get("inherited_delay", _HotstringsScopeInheritedDelay)
 		this.catalogue := Options.Get("catalogue", _HotstringsScopeCatalogue)
 		this.sections := Options.Get("sections", _HotstringsScopeSections)
 		this.languages := Options.Get("language_paths", _HotstringsScopeLanguagePaths)
@@ -244,6 +256,32 @@ class HotstringsScopeFiles {
 				for Field in _PersonalTomlOverrideFields()
 					RowsByPath[this.overrides].Push({ Section: Section, Key: Field, Delete: 1 })
 			}
+		}
+		Groups := []
+		for Entry in this.entries {
+			if Entry.IsPersonal || Entry.IsExtension
+				continue
+			Sections := []
+			for Section in this.sections.Call(Entry)
+				Sections.Push(Section.Name)
+			Groups.Push(Map("id", Entry.Key, "sections", Sections, "bundled", true))
+		}
+		for Recommendation in HotstringsScopeDelayRecommendations(this.mode,
+				ManifestFeatures(), Groups, this.inherited) {
+			Section := Recommendation["group"] . "." . Recommendation["section"]
+			; Replace the existing deletion in place, so no duplicate writer row can
+			; discard the measured recommendation during transaction preparation.
+			Found := false
+			for Index, Row in RowsByPath[this.overrides] {
+				if Row.Section == Section && Row.Key == "delay" {
+					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay",
+						Value: Recommendation["seconds"] }
+					Found := true
+					break
+				}
+			}
+			if !Found
+				throw Error("A recommended hotstring delay has no owned reset row.")
 		}
 		for Category in ["_global", "dynamichotstrings"] {
 			for Field in _PersonalTomlOverrideFields()
