@@ -121,3 +121,42 @@ for (const mode of [
 	}
 	console.log(`[OK] drift restoration: ${mode}`);
 }
+
+const { runIsolatedCoverage } = require('./test-drift-guard-covers-every-output.cjs');
+const selected = outputs.slice(0, 2);
+const untouched = selected.map((relative) => fs.readFileSync(path.join(root, relative)));
+const fixtureFailure = new Error('isolated perturbation failure');
+let observed;
+assert.throws(
+	() =>
+		runIsolatedCoverage({
+			files: selected,
+			probe({ root: privateRoot }) {
+				observed = privateRoot;
+				assert.notEqual(privateRoot, root, 'the probe must never receive the working checkout');
+				for (const [index, relative] of selected.entries()) {
+					const destination = path.join(privateRoot, relative);
+					assert.deepEqual(
+						fs.readFileSync(destination),
+						untouched[index],
+						'copy exact current bytes'
+					);
+					fs.writeFileSync(destination, 'fixture-owned perturbation');
+				}
+				throw fixtureFailure;
+			}
+		}),
+	(error) => error === fixtureFailure,
+	'preserve the original probe failure'
+);
+assert.ok(observed, 'the real isolation helper must invoke the probe');
+assert.equal(fs.existsSync(observed), false, 'remove the owned fixture after failure');
+for (const [index, relative] of selected.entries())
+	assert.deepEqual(
+		fs.readFileSync(path.join(root, relative)),
+		untouched[index],
+		'never overwrite the source bytes'
+	);
+console.log(
+	'[OK] drift coverage: isolated real perturbations preserve the working checkout after failure'
+);
