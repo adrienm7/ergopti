@@ -280,9 +280,82 @@ for (const reader of READERS) {
 	}
 }
 
+// ================================================
+// ================================================
+// ======= 4/ Physical combination labels =========
+// ================================================
+// ================================================
+
+const macMenu = stripLineComments(read(path.join(SP, 'macos/ui/menu/menu_tap_holds.lua')), '.lua');
+if (
+	!/require\("tap_hold\.combination_labels"\)/.test(macMenu) ||
+	!macMenu.includes(
+		'CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)'
+	)
+) {
+	errors.push(
+		'the macOS combination provider must resolve both physical keys through the shared label policy'
+	);
+}
+if (/combo_def\.(?:label|group)\b/.test(macMenu)) {
+	errors.push('the macOS combination provider still displays raw native matrix names');
+}
+if (!/local parts = \{ enabled and "1" or "0", i18n\.get_locale\(\) \}/.test(macMenu)) {
+	errors.push('the combination picker cache must include the active locale');
+}
+
+const nativeMatrix = JSON.parse(read(path.join(SP, 'macos/platform/remap/data/mod_combos.json')));
+if (nativeMatrix.length !== 182)
+	errors.push('the full ordered macOS physical pair matrix must retain 182 entries');
+const macIds = new Set(columns.hs);
+for (const pair of nativeMatrix) {
+	const physical = pair.from?.simultaneous;
+	if (
+		!Array.isArray(physical) ||
+		physical.length !== 2 ||
+		physical.some((key) => !macIds.has(key.key_code))
+	) {
+		errors.push(`native combination ${pair.id} lacks two canonical physical key labels`);
+	}
+}
+
+// Windows already translates both the family and the pair from this catalogue.
+const windowsCombos = stripLineComments(
+	read(path.join(SP, 'windows/infra/key_combinations.ahk')),
+	'.ahk'
+);
+if (
+	!windowsCombos.includes('t(First["i18n"]) . " + " . t(Second["i18n"])') ||
+	!windowsCombos.includes('Rows.Push(Map("label", t(First["i18n"])')
+) {
+	errors.push(
+		'Windows combination families and pairs must keep the canonical translated key names'
+	);
+}
+
+// Linux has no combination engine; preserve the declared reason instead of
+// inventing a provider that implies these physical bindings can be acquired.
+const manifest = TOML.parse(read(path.join(SP, '_shared/modules/features/manifest.toml')));
+const combinations = manifest.menu.shortcuts_menu.find((row) => row.id === 'key_combinations');
+if (
+	!combinations ||
+	combinations.platforms?.join(',') !== 'ahk,hs' ||
+	combinations.reason_key !== 'platform_reason.remap_engine_is_per_driver'
+) {
+	errors.push('Linux combination availability must remain truthful to its native engine');
+}
+for (const locale of locales) {
+	if (
+		typeof locale.data[combinations?.reason_key] !== 'string' ||
+		locale.data[combinations?.reason_key] === ''
+	) {
+		errors.push(`${locale.name} lacks the Linux combination availability reason`);
+	}
+}
+
 // ==========================
 // ==========================
-// ======= 4/ Verdict =======
+// ======= 5/ Verdict =======
 // ==========================
 // ==========================
 
