@@ -90,6 +90,14 @@ These are software implementations; final hardware verification remains below.
   consoles, diagnostics/error interfaces and issue-reporting improvements.
 - Shared updater channels, release notes and automatic-check scheduling.
   The common update-result interface remains C4.
+- Every macOS production JSON reader now uses the shared codec, preserving
+  independent mutable trees and each caller's decode-error behavior. The
+  direct-call ratchet retains only the adapter's implementation. Non-release
+  checkpoint [37033032620](https://github.com/adrienm7/ergopti/actions/runs/37033032620)
+  at `6275cac35` passed all three OS unit, E2E, packaging, installation and
+  launch lanes, with Release / Publish skipped. The JSON-reader requirement
+  of item 41 is complete; remaining Hammerspoon stub audits and native contract
+  acceptance stay under item 16, with Karabiner publication under item 40.
 
 ## Ordered TODO
 
@@ -261,6 +269,52 @@ Forty-five diagnostic regressions pass, including a real blocked child that
 is sampled before termination and reaped. Native cause and qualification
 remain pending in the next macOS install/launch run.
 
+Remaining Hammerspoon runtime acceptance, separated from the completed
+JSON-reader migration: audit other stubs and qualify their actual native
+contracts. The real Karabiner publication vectors remain item 40.
+
+The settings stub now snapshots valid acyclic values on write and returns
+independent graphs per read, retaining native equal-child aliasing within a
+read. Its clear receipt matches native true/false; set remains void. Direct
+snapshot regressions failed before the fix, and a real learning/debounce
+regression prevents unflushed updates from appearing persisted. Focused
+cases passed, and the settings slice passed the complete three-OS pipeline
+in non-release run 37039329959 at `ea5d64ef6`. The delayed timer now keeps a configured default separately from
+one-start overrides, provides native running/nextTrigger and chainable
+setDelay receipts, and retains callback rearming. Five direct contract cases
+failed before the fix and now pass; a real SyntheticInput listener retry
+regression failed with one delivery before passing with two. Generic doAfter
+semantics stay separate. The stub slice passed complete three-OS
+checkpoint 37046598989 at `051504e0a`, including packages and installation,
+with release skipped.
+The packaged clean macOS launch requires these contracts to be qualified in
+its real signed Hammerspoon process through a temporarily owned scripting
+preference.
+Strict receipts require 18 measured observations, runtime identity, nonce,
+self-rearm deliveries and acknowledged preference restoration; aggregate
+evidence refuses missing or partial proofs. Local probe judges passed their
+red/green regressions; actual native execution is not yet qualified. Run 37046757566 exposed
+a clean-launch scripting timeout and a refused physical preference restore;
+no incomplete proof is accepted.
+Audit other hs stubs for remaining divergences from native behaviour.
+The probe now restores an initially absent scripting preference with an
+acknowledged targeted deletion and exact physical readback, preserving
+unrelated runtime changes. Observation and cleanup refusals retain both
+causes; 14 focused and 40 aggregate Python cases passed after the new cases
+first reproduced merged-import and masked-error failures. The 18 native
+measurements remain mandatory; the real control channel still needs CI.
+The pasteboard stub now retains isolated UTI-to-bytes snapshots, returns
+nil for absent text and keeps clearContents void. Four direct cases and the
+actual SyntheticInput consumer first exposed missing payload publication;
+they now pass, including exact text at Cmd+V and later text/RTF/PNG recovery.
+The complete pipeline remains pending for this stub slice.
+The shared Hammerspoon canvas stub now copies frame values at construction,
+assignment and reading, matching the pinned native 1.1.1 NSRect API. Actual
+GraphicsRenderer callback observations are asserted outside its production
+pcall; four original alias failures precede five focused passing cases.
+The complete macOS unit gate passes 12903 cases on the isolated candidate;
+native three-OS qualification remains pending.
+
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
@@ -426,64 +480,6 @@ the complete three-OS checkpoint remain pending.
       without needing the Karabiner driver.
 
 The packaged macOS launch matrix now contains a Karabiner configuration scenario. It uses the real Hammerspoon JSON runtime and production build, merge and conditional atomic-file owners for eight default/recommended and switch vectors in a runner-owned private destination, preserves foreign profiles and personal rules, proves independent codec trees, and restores exact original bytes. It acquires no remap lease and installs no driver. The selected local gates pass 353 JS checks and 13,074 portable macOS cases, including five registered publication/restoration lifecycle regressions; 65 Python judges pass. Actual signed native execution remains pending and the existing scripting transport deadline is blocking, so TODO40 stays partial until that proof is green.
-
-- [~] **41.** Remaining direct `hs.json.decode` calls (ratchet
-  `tests/meta/test_json_decode_through_codec.lua`, no calls outside the adapter).
-  Locale, manifest menus, personal hotstrings, keylogger
-  aggregation, keymap priority and both shortcut readers now decode through
-  `adapters/json_codec.lua`, which returns a tree. A menu regression preserves
-  independent equal arrays, rows and nested options after mutation; it failed
-  before the migration. The single-reader guard recognizes codec bindings
-  and detects competing readers in one directory without lowering its limits.
-  The remaining 14 calls in 12 files now use the codec as well: caret ingest,
-  gesture catalogues, AI defaults/catalogues, MLX configuration/readiness/session
-  handoffs, changelog responses and UI geometry. Callers check the decode error
-  tuple and preserve their previous refusal or required-file failure behaviour.
-  Caret and model-catalogue regressions preserve independent equal objects and
-  nested arrays after mutation, including the native decoder's original graph.
-  The direct-call baseline now contains only the adapter's own implementation.
-  The complete three-OS pipeline, including packaging and installation,
-  passed checkpoint 37033032620 at `6275cac35` with release skipped.
-  The settings stub now snapshots valid acyclic values on write and returns
-  independent graphs per read, retaining native equal-child aliasing within a
-  read. Its clear receipt matches native true/false; set remains void. Direct
-  snapshot regressions failed before the fix, and a real learning/debounce
-  regression prevents unflushed updates from appearing persisted. Focused
-  cases passed, and the settings slice passed the complete three-OS pipeline
-  in non-release run 37039329959 at `ea5d64ef6`. The delayed timer now keeps a configured default separately from
-  one-start overrides, provides native running/nextTrigger and chainable
-  setDelay receipts, and retains callback rearming. Five direct contract cases
-  failed before the fix and now pass; a real SyntheticInput listener retry
-  regression failed with one delivery before passing with two. Generic doAfter
-  semantics stay separate. The stub slice passed complete three-OS
-  checkpoint 37046598989 at `051504e0a`, including packages and installation,
-  with release skipped.
-  The packaged clean macOS launch now qualifies these contracts in its real
-  signed Hammerspoon process through a temporarily owned scripting preference.
-  Strict receipts require 18 measured observations, runtime identity, nonce,
-  self-rearm deliveries and acknowledged preference restoration; aggregate
-  evidence refuses missing or partial proofs. Local probe judges passed their
-  red/green regressions; actual native execution is not yet qualified. Run 37046757566 exposed
-  a clean-launch scripting timeout and a refused physical preference restore;
-  no incomplete proof is accepted.
-  Audit other hs stubs for remaining divergences from native behaviour.
-  The probe now restores an initially absent scripting preference with an
-  acknowledged targeted deletion and exact physical readback, preserving
-  unrelated runtime changes. Observation and cleanup refusals retain both
-  causes; 14 focused and 40 aggregate Python cases passed after the new cases
-  first reproduced merged-import and masked-error failures. The 18 native
-  measurements remain mandatory; the real control channel still needs CI.
-  The pasteboard stub now retains isolated UTI-to-bytes snapshots, returns
-  nil for absent text and keeps clearContents void. Four direct cases and the
-  actual SyntheticInput consumer first exposed missing payload publication;
-  they now pass, including exact text at Cmd+V and later text/RTF/PNG recovery.
-  The complete pipeline remains pending for this stub slice.
-  The shared Hammerspoon canvas stub now copies frame values at construction,
-  assignment and reading, matching the pinned native 1.1.1 NSRect API. Actual
-  GraphicsRenderer callback observations are asserted outside its production
-  pcall; four original alias failures precede five focused passing cases.
-  The complete macOS unit gate passes 12903 cases on the isolated candidate;
-  native three-OS qualification remains pending.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
