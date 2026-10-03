@@ -290,6 +290,8 @@ Manual CI validations now use an independent concurrency group per run, so advan
 
 TODO 16 / 40 remains partial. The native Karabiner probe now projects exact generator merge refusal boundaries into bounded public codes after strict receipt identity/schema admission; arbitrary paths, configuration, provider errors and descriptions remain omitted. Independent tests keep unknown producer messages omitted and preserve the original complete/publication/cleanup verdict. Checkpoint 37112320507 proves the first generated batch reaches a refused merge with zero variants, private source restored and independent codec trees; the exact native refusal code still requires the next macOS CI checkpoint. Original AppleEvent transport failures remain mandatory, and no Karabiner driver or runtime lease is enabled by this diagnostic.
 
+TODO 16 remains partial. The shared Node test reporter now lets forwarded stdout/stderr and final failure annotations drain before natural shutdown, preserving wrapped process statuses and the existing fitting-detail assertions. Actual slow-reader CLI regressions cover native child and PARSE_FILE failure, complete bounded notices and all full error annotations, exact JSON counts, large stderr, success, spawn refusal and usage refusal. This fixes diagnostic transport truncation only; application/native failures retain their original mandatory verdicts. Windows/macOS execution of the portable Node lifecycle tests remains pending CI.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
