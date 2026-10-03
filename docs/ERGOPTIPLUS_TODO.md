@@ -182,6 +182,16 @@ These are software implementations; final hardware verification remains below.
   chunk accumulation, bounded stderr/excess stdout and terminal cleanup. Windows
   Get-FileHash returns the hash separately, and macOS shasum has no matching fixed
   output cap. Native cross-OS validation and manual CI remain deferred by request.
+- [~] **L12.** Linux Crypto byte receipts: embedded NUL is encoded with the
+  shared Base64 codec and decoded into OpenSSL stdin before hashing. Shell
+  quoting alone cannot carry NUL in a C command string. Five real OpenSSL and
+  five portable regressions failed before the fix; eleven shared independent
+  vectors now cover NUL position, every byte, UTF-8, literal shell characters,
+  trailing newlines and long input. Ordinary text retains its existing path.
+  Windows CNG and macOS `sha256_bytes` already carry explicit byte lengths; the
+  macOS text `sha256` shell path still has the analogous NUL boundary and needs
+  a separate native reproduction. Native cross-OS suites and manual CI remain
+  deferred by request; no macOS crypto owner or native gate was modified.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
