@@ -174,8 +174,9 @@ _PSAB_BootReloadCapabilityIsExplicit() {
 	Assert(Policy != "", "the actual bootstrap policy must be source-visible")
 	Assert(RegExMatch(Source,
 		'if !EnsurePersonalShortcutsFile\(ScriptInformation\["PersonalAhkPath"\],\s*'
-			. '_PersonalShortcutsBootAllowsReload\(A_IsCompiled, _DriverStartupSmokeDir != ""\)\)'),
-		"boot must use the real compiled capability and the actual startup-smoke owner")
+			. '_PersonalShortcutsBootAllowsReload\(A_IsCompiled,\s*'
+			. '_DriverStartupSmokeDir != "" and EnvGet\("ERGOPTI_STARTUP_SMOKE_BOOTSTRAP"\) != "1"\)\)'),
+		"boot keeps compiled ownership while the explicit cold-source observer may follow Reload")
 	Assert(InStr(Policy, "return !IsCompiled && !IsStartupSmoke") > 0,
 		"only an ordinary source-mode boot can reload a newly generated include")
 }

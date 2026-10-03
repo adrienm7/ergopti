@@ -460,6 +460,33 @@ function checkWindowsAdmission(body) {
 	assert.ok(body.indexOf(admission) < body.indexOf('name: Smoke test compiled ErgoptiPlus.exe'));
 }
 checkWindowsAdmission(launch);
+
+/** A fresh-clone boot must be an unconditional native Windows gate. */
+function checkFreshSourceBoot(body) {
+	const step = pipeline.step(body, 'Test fresh Git clone bootstrap and warm startup');
+	assert.equal(pipeline.stepField(step, 'shell'), 'pwsh');
+	assert.equal(pipeline.stepField(step, 'if'), null);
+	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	const run = pipeline.runOf(step).join('\n');
+	assert.match(run, /\$env:ERGOPTI_AHK_EXE = \$ahk/);
+	assert.match(run, /node tools\/test\/test-ahk-fresh-clone-startup\.cjs/);
+	assert.match(run, /if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}/);
+}
+const sourceBoot = pipeline.job('test-ahk');
+checkFreshSourceBoot(sourceBoot);
+for (const [from, to] of [
+	['node tools/test/test-ahk-fresh-clone-startup.cjs', 'echo skipped source boot'],
+	['$env:ERGOPTI_AHK_EXE = $ahk', '$env:UNUSED_AHK_EXE = $ahk'],
+	[
+		'- name: Test fresh Git clone bootstrap and warm startup',
+		'- name: Test fresh Git clone bootstrap and warm startup\n        if: false'
+	],
+	[
+		'- name: Test fresh Git clone bootstrap and warm startup',
+		'- name: Test fresh Git clone bootstrap and warm startup\n        continue-on-error: true'
+	]
+])
+	assert.throws(() => checkFreshSourceBoot(sourceBoot.replaceAll(from, to)), from);
 for (const replacement of [
 	'run: echo skipped native probes',
 	'if: false\n        run: node tools/test/test-desktop-ci-evidence.cjs',

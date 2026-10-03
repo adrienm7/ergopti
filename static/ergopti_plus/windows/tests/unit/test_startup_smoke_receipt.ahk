@@ -71,3 +71,32 @@ _SSRT_ExpectRefusal(Directory, Nonce, LogsFlushed, ExpectedMessage) {
 	AssertTrue(InStr(Caught.Message, ExpectedMessage), "refusal must be for the intended contract: " . Caught.Message)
 }
 Test("startup readiness requires a fresh native process receipt (compiled-ready-receipt)", _SSRT_ReceiptGuards)
+
+_SSRT_ObserverAcknowledgment() {
+	Root := A_Temp . "\ergopti_observer_ack_" . DllCall("GetCurrentProcessId") . "_" . Random(100000, 999999)
+	DirCreate(Root)
+	Nonce := "abcdef0123456789abcdef0123456789"
+	AckPath := Root . "\ack.txt"
+	try {
+		for Scenario in ["missing", "foreign", "invalid"] {
+			if Scenario == "foreign"
+				FileAppend("0123456789abcdef0123456789abcdef", AckPath, "UTF-8-RAW")
+			Caught := 0
+			StartedAt := A_TickCount
+			try StartupSmokeAwaitObserver(Root, Scenario == "invalid" ? "bad" : Nonce, 30, 1)
+			catch as Err
+				Caught := Err
+			AssertTrue(IsObject(Caught), Scenario . " must refuse readiness acknowledgment")
+			Expected := Scenario == "missing" ? "before the timeout" : Scenario == "foreign" ? "another run" : "Invalid startup smoke nonce"
+			AssertTrue(InStr(Caught.Message, Expected), "the intended acknowledgment guard must reject " . Scenario)
+			AssertTrue(TickElapsed(StartedAt) < 2000, "a missing or foreign observer must remain bounded")
+			if FileExist(AckPath)
+				FileDelete(AckPath)
+		}
+		FileAppend(Nonce, AckPath, "UTF-8-RAW")
+		AssertTrue(StartupSmokeAwaitObserver(Root, Nonce, 500, 1), "the exact nonce admits the parent observer")
+	} finally {
+		DirDelete(Root, true)
+	}
+}
+Test("source readiness requires its own bounded observer acknowledgment (startup-observer-ack)", _SSRT_ObserverAcknowledgment)
