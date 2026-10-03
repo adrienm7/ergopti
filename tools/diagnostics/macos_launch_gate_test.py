@@ -15,6 +15,7 @@ import unittest
 from unittest import mock
 
 import hs_delayed_timer_probe as timer_probe
+import hs_delayed_timer_probe_test as timer_probe_test
 import hs_karabiner_config_probe as karabiner_probe
 
 spec = importlib.util.spec_from_file_location(
@@ -253,6 +254,9 @@ class VerdictTests(unittest.TestCase):
                         owner, "control", side_effect=RuntimeError("control refused")
                     ) as control,
                     mock.patch.object(
+                        owner, "constructor_control", return_value={"constructed": "only"}
+                    ) as constructor,
+                    mock.patch.object(
                         owner, "control_pid", return_value={"diagnostic": "only"}
                     ) as pid_control,
                     mock.patch.object(owner, "observe", side_effect=observe_native),
@@ -269,6 +273,8 @@ class VerdictTests(unittest.TestCase):
                     report = gate.run(app, output, scenario, "")
                 self.assertEqual(report["native_probe_diagnostics"], owner.diagnostic_receipts)
                 control.assert_called_once_with(42, resolver)
+                constructor.assert_called_once_with(42, resolver)
+                self.assertEqual(report["native_descriptor_constructor"], {"constructed": "only"})
                 pid_control.assert_called_once_with(42, resolver)
                 self.assertEqual(report["native_pid_transport_control"], {"diagnostic": "only"})
                 self.assertEqual(len(report["failures"]), 2)
@@ -300,6 +306,41 @@ class VerdictTests(unittest.TestCase):
                     ),
                 )
                 self.assertTrue(any("control" in value for value in failures))
+
+    def test_constructor_cannot_replace_original_path_pid_or_feature_proofs(self):
+        constructed = timer_probe.validate_constructor_receipt(
+            json.dumps(timer_probe_test.constructor_receipt()) + "\n",
+            timer_probe_test.NONCE,
+            42,
+            timer_probe_test.constructor_receipt()["direct_text"],
+        )
+        for scenario, feature in (
+            ("clean", "native_delayed_timer"),
+            ("karabiner_config", "native_karabiner_config"),
+        ):
+            with self.subTest(scenario=scenario):
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_descriptor_constructor=constructed,
+                        native_transport_control_error="original control refusal",
+                        **{feature + "_error": "original feature refusal"},
+                    ),
+                )
+                self.assertTrue(any("original control refusal" in value for value in failures))
+                self.assertTrue(any("original feature refusal" in value for value in failures))
+                failures = gate.evaluate(
+                    scenario,
+                    observe(
+                        native_descriptor_constructor=constructed,
+                        native_transport_control=constructed,
+                        **{feature: None},
+                    ),
+                )
+                self.assertTrue(any("control" in value for value in failures))
+                self.assertTrue(any("proof is incomplete" in value for value in failures))
+        with self.assertRaises(ValueError):
+            timer_probe.validate_pid_control_summary(constructed)
 
     def test_pid_diagnostic_cannot_replace_path_control_or_original_feature(self):
         alternative = dict(

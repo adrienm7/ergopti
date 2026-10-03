@@ -1,6 +1,7 @@
 # tools/diagnostics/hs_delayed_timer_probe.py
 """Observe real packaged timers through the launch gate's existing native process."""
 
+import base64
 import json
 import math
 from pathlib import Path
@@ -8,6 +9,7 @@ import plistlib
 import re
 import secrets
 import subprocess
+import sys
 import time
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
@@ -22,10 +24,11 @@ SCRIPT_SAMPLE_CONTEXT_FRAME_LIMIT = 24
 SCRIPT_SAMPLE_CONTEXT_CHARACTER_LIMIT = 4096
 SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT = 8192
 SCRIPT_DIAGNOSTIC_LINE_LIMIT = 128
-SCRIPTING_PHASES = ("control", "pid_control", "observation", "cleanup")
+SCRIPTING_PHASES = ("control", "constructor", "pid_control", "observation", "cleanup")
 SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT = len(SCRIPTING_PHASES)
 CONTROL_CONTRACT = "hs.applescript.control"
 PID_CONTROL_CONTRACT = "hs.applescript.pid-control"
+CONSTRUCTOR_CONTRACT = "hs.applescript.constructor"
 CHECK_COUNT = (
     len(CONTRACT["boolean_observations"])
     + len(CONTRACT["remaining_limits"])
@@ -79,6 +82,51 @@ def _validate_owned_control(summary, contract, phase, feature):
         for key in ("nonce", "pid", "executable"):
             if type(feature.get(key)) is not type(summary[key]) or feature.get(key) != summary[key]:
                 raise ValueError(f"Native AppleEvent control and feature owners differ: {key}")
+
+
+def validate_constructor_receipt(raw, nonce, pid, direct_text):
+    """Require measured descriptor bytes and Unicode without admitting delivery."""
+    if (
+        not isinstance(raw, str)
+        or len(raw) > SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT
+        or not raw.startswith("{")
+        or not raw.endswith("}\n")
+        or "\n" in raw[:-1]
+    ):
+        raise ValueError("The native constructor receipt is not one bounded JSON line")
+    result = json.loads(raw, object_pairs_hook=unique_object)
+    expected = {
+        "schema_version": 1,
+        "contract": CONSTRUCTOR_CONTRACT,
+        "phase": "constructor",
+        "constructed": True,
+        "nonce": nonce,
+        "pid": pid,
+        "address_type": 0x6B706964,
+        "event_class": 0x486D5370,
+        "event_id": 0x45584543,
+        "direct_type": 0x75747874,
+        "direct_text": direct_text,
+    }
+    if not isinstance(result, dict) or set(result) != set(expected) | {"address_bytes_base64"}:
+        raise ValueError("The native constructor receipt has incomplete descriptor fields")
+    for key, value in expected.items():
+        if type(result[key]) is not type(value) or result[key] != value:
+            raise ValueError(f"The native constructor descriptor differs: {key}")
+    encoded = result["address_bytes_base64"]
+    if not isinstance(encoded, str) or len(encoded) != 8:
+        raise ValueError("The native constructor address bytes are not a pid_t")
+    try:
+        address = base64.b64decode(encoded, validate=True)
+    except ValueError as error:
+        raise ValueError("The native constructor address bytes are invalid") from error
+    if (
+        len(address) != 4
+        or base64.b64encode(address).decode("ascii") != encoded
+        or int.from_bytes(address, sys.byteorder, signed=True) != pid
+    ):
+        raise ValueError("The native constructor address bytes differ from the exact owned PID")
+    return result
 
 
 def validate_receipt(result, nonce, pid, executable, bundle_id):
@@ -307,7 +355,7 @@ class NativeDelayedTimerProbe:
             "return execute lua code (item 1 of argv)\nend tell\nend run"
         )
         arguments = ["/usr/bin/osascript", "-e", script, source]
-        if phase == "pid_control":
+        if phase in ("pid_control", "constructor"):
             if self.runtime_owner is None:
                 raise RuntimeError("The PID control has no bound native runtime")
             pid, processes = self.runtime_owner
@@ -320,8 +368,12 @@ class NativeDelayedTimerProbe:
             # The sender remains osascript. Only the address changes: a raw kernel
             # PID bypasses application-path resolution while HmSp/EXEC still
             # reaches the pinned NSScriptCommand and its enabled preference.
-            script = self.pid_control_script()
+            script = (
+                self.constructor_script() if phase == "constructor" else self.pid_control_script()
+            )
             arguments = ["/usr/bin/osascript", "-l", "JavaScript", "-e", script, str(pid), source]
+            if phase == "constructor":
+                arguments.append(self.nonce)
         elif _target_pid is not None:
             raise ValueError("A PID address is reserved for its distinct diagnostic")
         command = subprocess.Popen(
@@ -366,6 +418,13 @@ class NativeDelayedTimerProbe:
                 "The native scripting command did not acknowledge actual process exit"
             )
         self.scripting_commands.remove(command)
+        if phase == "constructor":
+            if command.returncode != 0:
+                raise RuntimeError(
+                    "The native descriptor constructor refused its bounded receipt "
+                    f"(exit {command.returncode}): {stderr.strip()[:1000]}"
+                )
+            return validate_constructor_receipt(stdout, self.nonce, pid, source)
         acknowledged = (
             stdout == self.nonce + "\n"
             if phase in ("control", "pid_control")
@@ -400,19 +459,30 @@ class NativeDelayedTimerProbe:
         }
 
     @staticmethod
-    def pid_control_script():
-        """Send the pinned direct-text command to a kernel PID from osascript."""
+    def pid_event_constructor():
+        """Construct the one native command shared by smoke and actual sending."""
         return """ObjC.import('Foundation');
-function run(argv) {
-    if (argv.length !== 2) throw new Error('PID control arguments refused');
-    var pid = Number(argv[0]);
+function constructOwnedEvent(pid, source) {
     if (!Number.isInteger(pid) || pid <= 0) throw new Error('PID control target refused');
     var target = $.NSAppleEventDescriptor.descriptorWithProcessIdentifier(pid);
     if (target.isNil() || Number(target.descriptorType) !== 0x6b706964)
         throw new Error('Native kernel-PID address refused');
     var event = $.NSAppleEventDescriptor.appleEventWithEventClassEventIDTargetDescriptorReturnIDTransactionID(
         0x486d5370, 0x45584543, target, -1, 0);
-    event.setParamDescriptorForKeyword($.NSAppleEventDescriptor.descriptorWithString(argv[1]), 0x2d2d2d2d);
+    event.setParamDescriptorForKeyword($.NSAppleEventDescriptor.descriptorWithString(source), 0x2d2d2d2d);
+    return event;
+}
+"""
+
+    @staticmethod
+    def pid_control_script():
+        """Send the pinned direct-text command to a kernel PID from osascript."""
+        return (
+            NativeDelayedTimerProbe.pid_event_constructor()
+            + """
+function run(argv) {
+    if (argv.length !== 2) throw new Error('PID control arguments refused');
+    var event = constructOwnedEvent(Number(argv[0]), argv[1]);
     var error = Ref();
     var reply = event.sendEventWithOptionsTimeoutError(3, __SCRIPTING_TIMEOUT_SECONDS__, error);
     if (!reply || reply.isNil()) {
@@ -428,6 +498,47 @@ function run(argv) {
     return ObjC.unwrap(result.stringValue);
 }
 """.replace("__SCRIPTING_TIMEOUT_SECONDS__", json.dumps(SCRIPTING_TIMEOUT_SECONDS))
+        )
+
+    @staticmethod
+    def constructor_script():
+        """Inspect native construction only; this script never sends or launches."""
+        return (
+            NativeDelayedTimerProbe.pid_event_constructor()
+            + """
+function run(argv) {
+    if (argv.length !== 3) throw new Error('Constructor arguments refused');
+    var pid = Number(argv[0]);
+    var event = constructOwnedEvent(pid, argv[1]);
+    var address = event.attributeDescriptorForKeyword(0x61646472);
+    var direct = event.paramDescriptorForKeyword(0x2d2d2d2d);
+    if (address.isNil() || direct.isNil()) throw new Error('Native descriptor inspection refused');
+    return JSON.stringify({schema_version: 1, contract: 'hs.applescript.constructor',
+        phase: 'constructor', constructed: true, nonce: argv[2], pid: pid,
+        address_type: Number(address.descriptorType),
+        address_bytes_base64: ObjC.unwrap(address.data.base64EncodedStringWithOptions(0)),
+        event_class: Number(event.eventClass), event_id: Number(event.eventID),
+        direct_type: Number(direct.descriptorType), direct_text: ObjC.unwrap(direct.stringValue)});
+}
+"""
+        )
+
+    def constructor_control(self, pid, processes):
+        """Measure the actual bridge in native scenarios without sending an event."""
+        self.bind_runtime(pid, processes)
+        direct_text = "return " + json.dumps(self.nonce + " — ù ★", ensure_ascii=False)
+        receipt = self.execute(direct_text, phase="constructor", _target_pid=pid)
+        if processes(self.executable) != [pid]:
+            raise RuntimeError("The native constructor process changed before receipt admission")
+        receipt = validate_constructor_receipt(
+            json.dumps(receipt, ensure_ascii=False) + "\n", self.nonce, pid, direct_text
+        )
+        receipt["executable"] = str(self.executable)
+        self.retain_diagnostics(
+            ["Actual native kernel-PID, event and Unicode descriptor construction qualified"],
+            phase="constructor",
+        )
+        return receipt
 
     def control_pid(self, pid, processes):
         """Compare exact-PID delivery without admitting the original feature gate."""
@@ -487,7 +598,7 @@ function run(argv) {
         if len(self.diagnostic_receipts) >= SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT:
             self.diagnostic_receipts[-1]["additional_commands_omitted"] = True
             return
-        # Path control, PID control, observation and cleanup own independent native
+        # Path control, construction, PID control and feature lifecycle own native
         # sampling replies. Do not include the Lua source or the primary error;
         # either could contain unrelated user data. Redact native source paths.
         observations = self.bounded_diagnostic_text("\n".join(diagnostics))
