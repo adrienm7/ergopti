@@ -294,6 +294,13 @@ TODO 16 remains partial. The shared Node test reporter now lets forwarded stdout
 
 The CI pipeline keeps one approved concurrency owner in ci.yml: workflow_dispatch uses its own run ID, while automatic runs supersede the previous automatic run on the same ref. The wiring guard now refuses extra groups in reusable-workflow callers and every called OS workflow/job, including quoted YAML keys, so one native lane cannot silently cancel a different manual validation. Real Windows-caller, macOS-workflow and Linux-verdict mutations demonstrate the prior hole; missing and duplicate root groups are refused, while embedded run-block text is not interpreted as a YAML key. Release conditions, permissions and secret gating remain unchanged. This follow-up is qualified by local proportional format and JavaScript gates; complete three-OS validation remains under the existing native checkpoint requirements.
 
+Native reporter lifecycle self-tests are now mandatory on the Windows
+unit host and the macOS Swift-unit host, after the repository Node runtime
+and before product units. Linux keeps the registered Core JS execution.
+Real workflow mutation guards reject missing, conditional, forgiven,
+duplicated or reordered native self-tests. Hosted Windows/macOS execution
+remains pending; this wiring change does not alter release gates.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

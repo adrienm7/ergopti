@@ -88,6 +88,10 @@ jobs:
           node-version-file: '.node-version'
           cache: 'npm'
 
+      - name: Run reporter lifecycle self-tests
+        shell: pwsh
+        run: node tools/test/test-report.cjs
+
       - run: npm ci
         shell: pwsh
 
