@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 
 local ShellRunner = require("adapters.shell_runner")
 local Paths = require("infra.paths")
@@ -68,7 +69,7 @@ function M.run(opts)
 		return false
 	end
 	command = command .. " --yes --wait-owner " .. quote(pid .. ":" .. started)
-		.. " --gui " .. quote(opts.title) .. " " .. quote(opts.failure)
+		.. " --gui " .. quote(WindowTitles.compose(opts.title)) .. " " .. quote(opts.failure)
 	if run("systemctl --user show-environment >/dev/null 2>&1") then
 		local launcher = "systemd-run --user --collect --quiet --service-type=exec --unit="
 			.. quote("ergopti-uninstall-" .. pid .. "-" .. started)

@@ -320,6 +320,7 @@ return {
 	"tests.unit.ui.test_about_menu_uninstall",
 	"tests.unit.ui.test_about_menu_version_row",
 	"tests.unit.ui.test_app_chooser",
+	"tests.unit.ui.test_native_dialog_titles",
 	"tests.unit.ui.test_text_prompt_exit_status",
 	"tests.unit.ui.test_asset_inlining_is_loud",
 	"tests.unit.ui.test_error_dialog_bridge",

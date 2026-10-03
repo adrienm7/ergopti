@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local WindowTitles = require("window_titles")
 
 local Logger = require("logger.shim")
 local i18n = require("infra.i18n")
@@ -105,7 +106,7 @@ M.CLEAR_NOTIFICATIONS = "dunstctl close-all 2>/dev/null || makoctl dismiss --all
 --- @return string|nil confirmed The chained command, nil when no dialog tool exists.
 function M.confirmed_command(action_label, command, has_command)
 	has_command = has_command or ShellRunner.has_command
-	local title = i18n.get("dialog.confirm_action.title")
+	local title = WindowTitles.compose(i18n.get("dialog.confirm_action.title"))
 	local message = i18n.get("dialog.confirm_action.message"):gsub("{1}", function() return action_label end)
 	local continue = i18n.get("dialog.confirm_action.confirm")
 	local cancel = i18n.get("button.cancel")
