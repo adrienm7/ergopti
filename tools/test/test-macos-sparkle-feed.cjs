@@ -43,6 +43,15 @@ const aboutSource = fs.readFileSync(
 	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'menu_about.lua'),
 	'utf8'
 );
+const menuManifest = JSON.parse(
+	fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		'utf8'
+	)
+);
+const frequencyDeclaration = menuManifest.about_update_frequency_menu?.find(
+	(row) => row.id === 'update_check_interval'
+);
 const autoCheckSource = fs.readFileSync(
 	path.join(root, 'static', 'ergopti_plus', 'macos', 'modules', 'updater', 'auto_check.lua'),
 	'utf8'
@@ -213,7 +222,14 @@ if (
 if (
 	!menuSource.includes('require("modules.updater.auto_check")') ||
 	!menuSource.includes('AutoCheck.start_session') ||
-	!aboutSource.includes('menu.about.frequency_menu') ||
+	!aboutSource.includes(
+		'ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval"'
+	) ||
+	frequencyDeclaration?.type !== 'choice' ||
+	frequencyDeclaration?.path !== 'updater.check_interval_seconds' ||
+	frequencyDeclaration?.i18n !== 'menu.about.frequency_menu' ||
+	!aboutSource.includes('checks.set_interval(seconds) == true') ||
+	!aboutSource.includes('return checks.interval()') ||
 	!autoCheckSource.includes('Schedule.next_due') ||
 	!autoCheckSource.includes('If-None-Match')
 ) {

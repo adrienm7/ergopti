@@ -378,6 +378,58 @@
 			]
 		}
 	],
+	"about_update_frequency_menu": [
+		{
+			"type": "choice",
+			"id": "update_check_interval",
+			"path": "updater.check_interval_seconds",
+			"i18n": "menu.about.frequency_menu",
+			"show_current_choice": true,
+			"current_choice_suffix": ": {1}",
+			"choices": [
+				{
+					"value": 300,
+					"i18n": "menu.about.frequency.5m"
+				},
+				{
+					"value": 1800,
+					"i18n": "menu.about.frequency.30m"
+				},
+				{
+					"value": 3600,
+					"i18n": "menu.about.frequency.1h"
+				},
+				{
+					"value": 21600,
+					"i18n": "menu.about.frequency.6h"
+				},
+				{
+					"value": 43200,
+					"i18n": "menu.about.frequency.12h"
+				},
+				{
+					"value": 86400,
+					"i18n": "menu.about.frequency.1d"
+				},
+				{
+					"value": 259200,
+					"i18n": "menu.about.frequency.3d"
+				},
+				{
+					"value": 604800,
+					"i18n": "menu.about.frequency.1w"
+				},
+				{
+					"value": 2592000,
+					"i18n": "menu.about.frequency.1mo"
+				},
+				{
+					"value": 0,
+					"i18n": "menu.about.frequency.never"
+				}
+			]
+		}
+	],
 	"about_menu": [
 		{
 			"type": "list",

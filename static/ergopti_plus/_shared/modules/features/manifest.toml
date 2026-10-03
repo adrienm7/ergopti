@@ -3936,8 +3936,8 @@ platforms = ["ahk", "hs", "linux"]
 #
 # All three drivers show the same block: the version, one channel submenu titled
 # with the subscribed channel and listing every channel of the shared
-# update-channel registry, right before the check row, the check frequency (a
-# `list`, because its rows come from the registry and the updater state), then
+# update-channel registry, right before the check row, the check frequency (another
+# registered choice, using the cadence owner and its snapped state), then
 # Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
 # The updater registry owns the channel ids, stability order and both label forms.
@@ -3949,6 +3949,17 @@ i18n = "menu.about.channel_menu"
 choice_registry = "updater.channels"
 show_current_choice = true
 current_choice_placeholder = "{channel}"
+
+# The cadence registry owns numeric values and duration labels; the shared
+# renderer owns order, ticks and the translated current-choice caption.
+[[menu.about_update_frequency_menu]]
+type = "choice"
+id = "update_check_interval"
+path = "updater.check_interval_seconds"
+i18n = "menu.about.frequency_menu"
+choice_registry = "updater.check_intervals"
+show_current_choice = true
+current_choice_suffix = ": {1}"
 
 [[menu.about_menu]]
 type = "list"

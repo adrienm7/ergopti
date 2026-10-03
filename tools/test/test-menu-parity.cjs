@@ -118,7 +118,7 @@ const OPENS_SUBMENU = {
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
 	// The About updater provider renders the registry-backed channel choice.
-	about_updates: 'about_update_channel_menu',
+	about_updates: ['about_update_channel_menu', 'about_update_frequency_menu'],
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
@@ -241,21 +241,23 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
-			const opened = OPENS_SUBMENU[row.id];
-			if (!opened) continue;
-			// A string names the menu the row opens wherever it is visible; an object
-			// also names the platforms where it opens that menu.
-			const target = typeof opened === 'string' ? opened : opened.menu;
-			const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
-			const effective = PLATFORMS.filter(
-				(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
-			);
-			const before = (reachableOn[target] || []).join(',');
-			if (before !== effective.join(',')) {
-				reachableOn[target] = effective;
-				changed = true;
+			const published = OPENS_SUBMENU[row.id];
+			if (!published) continue;
+			// One provider can publish multiple independently declared children.
+			// Every existing platform restriction still applies to its own edge.
+			for (const opened of Array.isArray(published) ? published : [published]) {
+				const target = typeof opened === 'string' ? opened : opened.menu;
+				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
+				const effective = PLATFORMS.filter(
+					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
+				);
+				const before = (reachableOn[target] || []).join(',');
+				if (before !== effective.join(',')) {
+					reachableOn[target] = effective;
+					changed = true;
+				}
+				openedBy[target] = `${menuKey}/${row.id}`;
 			}
-			openedBy[target] = `${menuKey}/${row.id}`;
 		}
 	}
 	if (!changed) break;
