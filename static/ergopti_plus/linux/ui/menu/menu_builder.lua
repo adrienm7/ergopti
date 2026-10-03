@@ -3794,6 +3794,26 @@ local function _channel_picker(ctx, up)
 	}, { ["updater.channel"] = function() return up.get_channel() end })
 end
 
+--- Supplies the registered cadence choice to the existing updater owner.
+--- @param ctx table Menu context.
+--- @param up table Native updater owner.
+--- @return table row Shared choice provider data.
+local function _frequency_picker(ctx, up)
+	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+		update_check_interval = function(seconds)
+			if up.set_check_interval(seconds) ~= true then return false end
+			up.stop_background_checks()
+			up.start_background_checks()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["updater.check_interval_seconds"] = function()
+			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
+		end,
+	})
+end
+
 --- The updater block of the About submenu, as provider DATA: the version, the
 --- channel picker right before the check row, then the check-frequency picker.
 --- It used to be a Linux-only top-level "Updates" submenu with its own
@@ -3826,9 +3846,7 @@ local function _about_update_rows(ctx)
 	-- frequency row are still drawn, greyed with the reason: left out, nobody
 	-- could tell whether the automatic update exists.
 	local source_run = Installation.is_source_run()
-	local _, current_code = Schedule.snap_interval(up.get_check_interval(), up.TIMING)
-	local frequency_label = i18n_safe("menu.about.frequency_menu") .. ": "
-		.. i18n_safe("menu.about.frequency." .. current_code)
+	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
 	out[#out + 1] = source_run and {
@@ -3905,33 +3923,14 @@ local function _about_update_rows(ctx)
 
 
 	if source_run then
-		out[#out + 1] = {
-			label = frequency_label,
-			disabled = true,
-			disabled_reason_key = "menu.about.source_run_reason",
-		}
+		frequency_row.items = nil
+		frequency_row.disabled = true
+		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		out[#out + 1] = frequency_row
 		return out
 	end
 
-	-- The tick and the parent label name the preset in force; a live value
-	-- outside the presets reads as its nearest preset, the one a restart loads.
-	local frequency_rows = {}
-	for _, preset in ipairs(up.INTERVAL_PRESETS) do
-		frequency_rows[#frequency_rows + 1] = {
-			label   = i18n_safe("menu.about.frequency." .. preset.code),
-			checked = preset.code == current_code,
-			action  = function()
-				up.set_check_interval(preset.seconds)
-				up.stop_background_checks()
-				up.start_background_checks()
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		}
-	end
-	out[#out + 1] = {
-		label = frequency_label,
-		items = frequency_rows,
-	}
+	out[#out + 1] = frequency_row
 	return out
 end
 

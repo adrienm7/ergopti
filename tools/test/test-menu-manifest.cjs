@@ -116,6 +116,17 @@ function main() {
 	);
 	require('node:assert/strict').deepEqual(channelDeclaration?.choices, channelCorpus.choices);
 	require('node:assert/strict').equal(channelDeclaration?.current_choice_placeholder, '{channel}');
+	const frequencyCorpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/update_check_frequency.json'), 'utf8')
+	);
+	const frequencyDeclaration = menu.about_update_frequency_menu?.find(
+		(row) => row.id === frequencyCorpus.id
+	);
+	require('node:assert/strict').deepEqual(frequencyDeclaration?.choices, frequencyCorpus.choices);
+	require('node:assert/strict').equal(
+		frequencyDeclaration?.current_choice_suffix,
+		frequencyCorpus.suffix
+	);
 
 	// Walk every array at the top level of the manifest and validate each
 	// object element. Maps (gesture_slots, hotstring_groups, …) and string
@@ -157,6 +168,11 @@ function main() {
 							listName === 'about_update_channel_menu' &&
 							item.id === 'update_channel' &&
 							item.path === 'updater.channel'
+						) &&
+						!(
+							listName === 'about_update_frequency_menu' &&
+							item.id === 'update_check_interval' &&
+							item.path === 'updater.check_interval_seconds'
 						))
 				) {
 					violations.push(`${where}: choice path "${item.path}" not found in manifest.toml`);
@@ -244,7 +260,9 @@ function checkChoiceProjection() {
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/paths.cjs',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
-			'static/ergopti_plus/_shared/ui/update_channels.js'
+			'static/ergopti_plus/_shared/ui/update_channels.js',
+			'static/ergopti_plus/_shared/modules/updater/defaults.json',
+			'static/ergopti_plus/_shared/modules/updater/schedule.js'
 		]) {
 			const target = path.join(fixture, relativePath);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -296,6 +314,73 @@ function checkChoiceProjection() {
 		assert.deepEqual(menu.about_update_channel_menu[0].choices, channelCorpus.choices);
 		assert.equal(menu.about_update_channel_menu[0].current_choice_placeholder, '{channel}');
 		assert.equal(Object.hasOwn(menu.about_update_channel_menu[0], 'choice_registry'), false);
+		const frequencyCorpus = JSON.parse(
+			readFileSync(path.join(SHARED, 'tests/corpus/menus/update_check_frequency.json'), 'utf8')
+		);
+		const frequencyRow = menu.about_update_frequency_menu[0];
+		assert.deepEqual(frequencyRow.choices, frequencyCorpus.choices);
+		assert.equal(frequencyRow.path, frequencyCorpus.path);
+		assert.equal(frequencyRow.current_choice_suffix, frequencyCorpus.suffix);
+		assert.equal(Object.hasOwn(frequencyRow, 'choice_registry'), false);
+		const timingPath = path.join(
+			fixture,
+			'static/ergopti_plus/_shared/modules/updater/defaults.json'
+		);
+		const timingBytes = fs.readFileSync(timingPath);
+		const ownerTiming = JSON.parse(timingBytes);
+		[
+			ownerTiming.timing.check_interval_presets[0].code,
+			ownerTiming.timing.check_interval_presets[1].code
+		] = [
+			ownerTiming.timing.check_interval_presets[1].code,
+			ownerTiming.timing.check_interval_presets[0].code
+		];
+		fs.writeFileSync(timingPath, JSON.stringify(ownerTiming));
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		const changedChoices = JSON.parse(fs.readFileSync(output)).about_update_frequency_menu[0]
+			.choices;
+		assert.equal(changedChoices[0].value, 300);
+		assert.equal(changedChoices[0].i18n, 'menu.about.frequency.30m');
+		assert.equal(changedChoices[1].value, 1800);
+		assert.equal(changedChoices[1].i18n, 'menu.about.frequency.5m');
+		fs.writeFileSync(timingPath, timingBytes);
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		const acknowledgedCadence = fs.readFileSync(output);
+		for (const mutation of ['duplicate_code', 'unordered_seconds', 'misplaced_never']) {
+			const invalid = JSON.parse(timingBytes);
+			if (mutation === 'duplicate_code') invalid.timing.check_interval_presets[1].code = '5m';
+			if (mutation === 'unordered_seconds') invalid.timing.check_interval_presets[1].seconds = 1;
+			if (mutation === 'misplaced_never') invalid.timing.check_interval_presets[0].code = 'never';
+			fs.writeFileSync(timingPath, JSON.stringify(invalid));
+			result = execute(original);
+			assert.notEqual(result.status, 0, mutation);
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedCadence,
+				'an invalid canonical cadence registry must not replace acknowledged menu bytes'
+			);
+		}
+		fs.writeFileSync(timingPath, timingBytes);
+		for (const replacement of [
+			'choice_registry = "unregistered.intervals"',
+			'choice_registry = "updater.channels"',
+			'choice_registry = "updater.check_intervals"\nchoice_values = [300, 1800]'
+		]) {
+			const changed = original.replace('choice_registry = "updater.check_intervals"', replacement);
+			assert.notEqual(
+				changed,
+				original,
+				'cadence registry metadata mutation must change the source'
+			);
+			result = execute(changed);
+			assert.notEqual(result.status, 0, result.stdout + result.stderr);
+			assert.deepEqual(fs.readFileSync(output), acknowledgedCadence);
+		}
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+
 		const registryPath = path.join(
 			fixture,
 			'static/ergopti_plus/_shared/modules/updater/channels.json'
@@ -870,3 +955,42 @@ checkInfoBarControl();
 checkAutoTemperatureControl();
 checkShowAllControl();
 checkAutomaticTriggerControls();
+
+/** Guards the actual native read sites in addition to the shared registry data. */
+function checkUpdateFrequencyControl() {
+	const assert = require('node:assert/strict');
+	for (const [file, declaration, endMarker, renderer] of [
+		['windows/ui/menu/menu_init.ahk', '_MI_FrequencyPickerRow(', '\n}', 'MenuRenderer_ChoiceRow'],
+		[
+			'macos/ui/menu/menu_about.lua',
+			'local function frequency_picker(',
+			'\nend',
+			'ManifestMenu.choice_row'
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'local function _frequency_picker(',
+			'\nend',
+			'ManifestMenu.choice_row'
+		]
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const start = source.indexOf('\n' + declaration);
+		assert(start >= 0, `${file}: the registered cadence binding must exist`);
+		const end = source.indexOf(endMarker, start + 1);
+		assert(end > start, `${file}: cadence read-site body must be nonempty`);
+		const body = source.slice(start, end);
+		assert(body.includes(renderer), `${file}: cadence choices must use the actual shared renderer`);
+		assert(body.includes('"about_update_frequency_menu"'));
+		assert(body.includes('"updater.check_interval_seconds"'));
+		assert(
+			!source.includes('"menu.about.frequency."'),
+			`${file}: native presets and caption labels are declared centrally`
+		);
+	}
+	console.log(
+		'Update frequency: canonical numeric registry, 21 translated labels and three actual native receipt owners.'
+	);
+}
+
+checkUpdateFrequencyControl();

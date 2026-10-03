@@ -817,7 +817,7 @@ integrated, then publish one grouped release.
 
 - [ ] **54.** Every menu is declared in the shared menu manifest, never in
       driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (current baseline: Windows 105, macOS 184, Linux 115, each
+      drivers still build (current baseline: Windows 105, macOS 183, Linux 114, each
       site listed in tools/test/native-menu-rows-baseline.json); migrate them to
       zero. Each OS-limited row declares `unavailable = "hide"` (not
       applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -972,6 +972,20 @@ native callers. The current census is Windows 105, macOS 184 and Linux 115;
 the Show All census above is a historical checkpoint. Items 54 and 81 remain
 partial, and actual native Windows, packaging and installation require CI.
 
+The update-check frequency picker now consumes the existing shared updater
+registry on all three drivers. Its ten numeric intervals, order, translated
+labels and selected-value caption are declared once; native getters retain the
+existing nearest-preset snap without rewriting stored values. Source-run rows
+remain grey with their translated reason and no callable submenu. The existing
+Windows lease/schedule owner and macOS save/rollback owner remain unchanged.
+Linux now requires an exact durable acknowledgement before retiring or restarting
+its timer or redrawing the menu. Independent preset/snap cases, refused writers,
+unknown-neighbour preservation, held callbacks and shared order/label mutations
+exercise the actual menu providers. The current census is Windows 105, macOS
+183 and Linux 114; the earlier trigger census is a historical checkpoint. Items
+54 and 81 remain partial; native Windows, packaging and installation confirmation
+requires CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -1032,7 +1046,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
       declared in the shared manifest, none built in a driver's folder):
-      Windows 105, macOS 184 and Linux 115 rows are still built by the
+      Windows 105, macOS 183 and Linux 114 rows are still built by the
       drivers (`tools/test/native-menu-rows-baseline.json`). Read on
       2026-10-01, the sites are of four kinds, and three of them need the
       manifest to say more than it can today:

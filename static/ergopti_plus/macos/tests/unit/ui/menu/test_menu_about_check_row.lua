@@ -35,6 +35,7 @@ local function build(latest)
 	local checks = {
 		presets = function() return {} end,
 		interval_code = function() return "1d" end,
+		interval = function() return 86400 end,
 		set_interval = function() return true end,
 		latest = function() return latest end,
 	}
