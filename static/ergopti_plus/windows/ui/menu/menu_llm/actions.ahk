@@ -417,6 +417,36 @@ LLM_Menu_SetN(n) {
 			"n_predictions", n), _LLM_Menu_ApplyStandardCommitted)
 }
 
+/** Publishes one Info Bar value through the existing leased transaction. */
+LLM_Menu_SetInfoBar(Value, Expected) {
+	return LLM_Menu_CommitMutation("the LLM Info Bar setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		_LLM_Menu_ApplyStandardCommitted, _LLM_Menu_InfoBarWrite.Bind(Expected))
+}
+
+/** Revalidates the held source inside the actual borrowed configuration lease. */
+_LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
+	Current := _LLM_Menu_InfoBarSnapshot()
+	if !LLM_DisplayInfoBarIntent(Expected, Current)["admitted"]
+			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Owned := []
+	for Update in Updates {
+		if Update.Section == "llm.display" && Update.Key == "show_info_bar"
+			Owned.Push(Update)
+	}
+	if Owned.Length != 1
+		return false
+	; Bind the canonical renderer to the same admitted image. A later read must
+	; not silently promote a foreign document to this held command's authority.
+	Content := FSReadUtf8Exact(Path)
+	if !(Content is String) || !_LLM_Menu_EnableSourceMatches(Expected["source"], _LLM_Menu_EnableReadSource())
+		return false
+	if HasMethod(WriterFn, "Call")
+		return WriterFn.Call(Path, Owned, Content, 1)
+	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+}
+
 LLM_Menu_SetIndent(lvl, Expected := 0) {
 	Writer := Expected is Map ? _LLM_Menu_IndentWrite.Bind(Expected) : 0
 	return LLM_Menu_CommitMutation("the LLM indentation setting",

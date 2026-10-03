@@ -165,3 +165,42 @@ LLM_DisplayIndentIntent(Expected, Current, Value, Values) {
 	}
 	return Map("admitted", false)
 }
+
+/**
+ * Admits Info Bar independently of prediction count and streaming capability.
+ * @param {Map} Snapshot Current native owner, gates and exact revision.
+ * @returns {Integer} Boolean admission.
+ */
+LLM_DisplayInfoBarReady(Snapshot) {
+	if !(Snapshot is Map)
+		return false
+	for Field in ["owner", "generation", "backend", "info_bar", "enabled", "paused", "blocked"] {
+		if !Snapshot.Has(Field)
+			return false
+	}
+	for Field in ["info_bar", "enabled", "paused", "blocked"] {
+		Value := Snapshot[Field]
+		if !(Value is Integer) || (Value != true && Value != false)
+			return false
+	}
+	return Snapshot["owner"] is Object && Snapshot["generation"] is Integer
+		&& Snapshot["generation"] >= 0 && Snapshot["backend"] is String
+		&& Snapshot["backend"] != "" && Snapshot["enabled"]
+		&& !Snapshot["paused"] && !Snapshot["blocked"]
+}
+
+/**
+ * Resolves a held checkbox against the same acknowledged native source.
+ * @param {Map} Expected Rendering snapshot.
+ * @param {Map} Current Fresh snapshot before the canonical setting owner.
+ * @returns {Map} Decision with admitted and optional value fields.
+ */
+LLM_DisplayInfoBarIntent(Expected, Current) {
+	if !LLM_DisplayInfoBarReady(Expected) || !LLM_DisplayInfoBarReady(Current)
+		return Map("admitted", false)
+	for Field in ["owner", "generation", "backend", "info_bar"] {
+		if !(Expected[Field] == Current[Field])
+			return Map("admitted", false)
+	}
+	return Map("admitted", true, "value", !Current["info_bar"])
+}

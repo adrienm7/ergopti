@@ -1181,6 +1181,8 @@ TODO54 remains integrated pending full native qualification. Repair the Windows 
 
 Partial: the personal hotstring editor command now shares its declaration, translated label and readiness key across Windows, macOS and Linux. Native providers preserve the personal settings, default sections, extension tree and existing file/scope mutation owners. Held callbacks recheck the live pause owner; macOS also rechecks after acknowledged deferred scheduling. The canonical native-row inventory decreases from 104/181/112 to 103/180/111 on the authored baseline. Focused owner and regression gates passed; composed verify-change and actual three-OS CI remain required before completion. TODO 54/81 remain partial.
 
+TODO 54/81: The already shared Info Bar row now resolves retained clicks through one shared live-owner policy on all three drivers. Single predictions and every backend remain supported. macOS retains its pre-owned complete source and own-ACK compensation receipt; Linux uses its existing sparse source CAS; Windows publishes one typed leaf under the existing configuration lease and binds the canonical publisher to the admitted source. Paused, disabled, replaced, stale and sparse runtime owners refuse publication. Actual native AHK menu/publisher qualification remains pending the hosted Windows run; no additional native row was introduced or retired.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

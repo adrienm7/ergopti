@@ -171,7 +171,7 @@ local function with_info_menu(options, callback)
 		i18n = require("infra.i18n"), logger = require("logger.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
-	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = "ollama", revision = 0 }
+	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = options.backend or "ollama", revision = 0 }
 	local native_set, native_many = storage.set, storage.set_many
 	local function admission_boundary()
 		observed.writes = observed.writes + 1
@@ -624,4 +624,83 @@ helpers.describe("shared indentation choice", function()
 			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
 		end
 	end)
+end)
+
+helpers.describe("LLM retained Info Bar admission", function()
+	helpers.it("replays independent live-owner decisions without count or transport restrictions (shared-info-bar)", function()
+		local corpus = info_bar_corpus()
+		local owner, other = {}, {}
+		for _, vector in ipairs(corpus.cases) do
+			local expected, current = {}, {}
+			for key, value in pairs(corpus.base) do expected[key], current[key] = value, value end
+			for key, value in pairs(vector.expected or {}) do expected[key] = value end
+			for key, value in pairs(vector.current) do current[key] = value end
+			expected.owner = expected.owner == "owned" and owner or other
+			current.owner = current.owner == "owned" and owner or other
+			local decision = require("llm.display_policy").info_bar_intent(expected, current)
+			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
+			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
+		end
+	end)
+
+	for _, condition in ipairs({"paused", "master", "canonical master", "source", "runtime value", "generation", "backend"}) do
+		helpers.it("refuses a retained actual native checkbox after " .. condition .. " (shared-info-bar)", function()
+			with_info_menu({selected = true, count = 1, progressive = false}, function(parent, settings, storage, observed)
+				local row = show_all_row(parent, info_bar_corpus().row.i18n)
+				helpers.assert_eq(row.disabled == true, false)
+				if condition == "paused" then observed.paused = true end
+				if condition == "master" then observed.active = false end
+				if condition == "canonical master" then assert(storage.set("llm.enabled", false)) end
+				if condition == "source" then assert(storage.set("llm.generation.temperature", 0.9)) end
+				if condition == "runtime value" then assert(settings.set("show_info_bar", false)) end
+				if condition == "generation" then observed.revision = observed.revision + 1 end
+				if condition == "backend" then observed.backend = "api" end
+				local before = observed.writes
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(observed.writes, before)
+				helpers.assert_eq(observed.redraws, 0)
+				helpers.assert_eq(settings.get("show_info_bar"), condition ~= "runtime value")
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+			end)
+		end)
+	end
+
+	helpers.it("uses actual sparse CAS when the source changes inside the writer (shared-info-bar)", function()
+		with_info_menu({selected = true, count = 1}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, info_bar_corpus().row.i18n)
+			observed.source_race = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, 0)
+			helpers.assert_eq(storage.get("llm.enabled", false), false)
+			helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
+			helpers.assert_eq(settings.get("show_info_bar"), true)
+		end)
+	end)
+
+	helpers.it("admits one API prediction and retires the acknowledged callback (shared-info-bar)", function()
+		with_info_menu({selected = true, count = 1, progressive = false, streaming = false, backend = "api"}, function(parent, settings, storage, observed)
+			-- The source is the same owner; the backend is captured when built.
+			local row = show_all_row(parent, info_bar_corpus().row.i18n)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, 1)
+			helpers.assert_eq(settings.get("show_info_bar"), false)
+			helpers.assert_eq(storage.get("llm.future_field"), 42)
+		end)
+	end)
+
+	for _, mode in ipairs({"nil", "throw"}) do
+		helpers.it("preserves exact native publication after " .. mode .. " writer refusal (shared-info-bar)", function()
+			with_info_menu({selected = true, refusal_mode = mode}, function(parent, settings, storage, observed)
+				local ok, result = pcall(show_all_row(parent, info_bar_corpus().row.i18n).fn)
+				helpers.assert_true(not ok or result ~= true)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 0)
+				helpers.assert_eq(settings.get("show_info_bar"), true)
+				helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
+			end)
+		end)
+	end
 end)

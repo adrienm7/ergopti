@@ -349,7 +349,7 @@ _LLMMenuBuildIndentRange() {
 LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, StreamingCommand := unset, IndentCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InfoCommand)
-		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
+		InfoCommand := LLM_Menu_SetInfoBar
 	if !IsSet(ShowAllCommand)
 		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
 	if !IsSet(StreamingCommand)
@@ -358,22 +358,68 @@ LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, Streami
 		IndentCommand := LLM_Menu_SetIndent
 	IndentSource := _LLM_Menu_IndentSnapshot()
 	StreamingSource := _LLM_Menu_StreamingSnapshot()
+	InfoSource := _LLM_Menu_InfoBarSnapshot()
 	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
 		Map("llm_indentation", (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
-			"llm_info_bar", InfoCommand,
+			"llm_info_bar", (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
 			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
 			"llm_show_all", (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
 		Map("llm.display.pred_indent", (*) => IndentSource["indentation"],
 			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
-			"llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
+			"llm_info_bar_enabled", (*) => InfoSource["info_bar"],
+			"llm_info_bar_ready", (*) => LLM_DisplayInfoBarReady(InfoSource),
 			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
 			"llm_show_all_ready", _LLM_Menu_ShowAllReady,
 			"llm_token_streaming_enabled", (*) => LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
 			"llm_token_streaming_ready", (*) => LLM_DisplayStreamingReady(StreamingSource)))
+}
+
+/** Captures the live presentation owner and its exact canonical source. */
+_LLM_Menu_InfoBarSnapshot() {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "info_bar", _LLM_Menu["show_info_bar"],
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"source", 0, "blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has("show_info_bar")
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["show_info_bar"] != _LLM_Menu["show_info_bar"])
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		for Field, Path in Map("enabled", "llm.enabled", "info_bar", "llm.display.show_info_bar",
+				"backend", "llm.models.selected") {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Read["found"] && (Field == "enabled" || Field == "info_bar") && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			if Read["blocked"] || !ManifestValuesEqual(Value, Snapshot[Field])
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch {
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses stale native commands before their acknowledged setting owner. */
+_LLM_Menu_InfoBarCommand(Expected, Command) {
+	Current := _LLM_Menu_InfoBarSnapshot()
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_DisplayInfoBarIntent(Expected, Current)
+	if !Decision["admitted"]
+		return false
+	return Command.Call(Decision["value"], Expected) == true
 }
 
 /** Captures the current menu identity, native agreement and exact file source. */

@@ -1877,3 +1877,136 @@ helpers.describe("macOS real-source indentation compensation", function()
 
 	end
 end)
+
+helpers.describe("macOS retained Info Bar source admission", function()
+	for _, condition in ipairs({"paused", "master", "runtime value", "retired owner"}) do
+		helpers.it("refuses a retained actual checkbox after " .. condition .. " (shared-info-bar)", function()
+			local options = {prediction_count = 1, progressive_state = false}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+				helpers.assert_eq(row.disabled == true, false)
+				if condition == "paused" then options.paused = true end
+				if condition == "master" then fixture.state.llm_enabled, fixture.runtime.llm_enabled = false, false end
+				if condition == "runtime value" then fixture.runtime.llm_show_info_bar = false end
+				if condition == "retired owner" then fixture.retire_display() end
+				local before = fixture.calls.save
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(fixture.calls.save, before)
+				helpers.assert_eq(fixture.state.llm_show_info_bar, true)
+				helpers.assert_eq(fixture.persisted().llm_show_info_bar, true)
+				helpers.assert_eq(fixture.calls.menu, 0)
+			end)
+		end)
+	end
+
+	helpers.it("retires an acknowledged checkbox without restricting single predictions (shared-info-bar)", function()
+		with_fixture({prediction_count = 1, progressive_state = false}, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(fixture.calls.save, 1)
+			helpers.assert_eq(fixture.state.llm_show_info_bar, false)
+			helpers.assert_eq(fixture.runtime.llm_show_info_bar, false)
+			helpers.assert_eq(fixture.persisted().llm_show_info_bar, false)
+		end)
+	end)
+end)
+
+helpers.describe("macOS real-source Info Bar compensation", function()
+	for _, race in ipairs({"before menu construction", "before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
+	helpers.it("preserves a real foreign master winner " .. race .. " through compensation and a fresh second click for Info Bar (shared-info-bar)", function()
+		local path = require("infra.config_paths").get("ConfigTomlPath")
+		local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.display]\npred_indent = 1\nshow_info_bar = true\nstreaming = false\nstreaming_multi = true\n[llm.profiles]\nnum_predictions = 3\n[private]\nfuture = 42\n'
+		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
+			or initial:gsub('enabled = true', 'enabled = false')
+		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
+		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(read_path)
+				if read_path ~= path then wrong_path = true end
+				return disk, "ok"
+			end,
+			write = function() unconditional = unconditional + 1; return false end,
+			write_if_unchanged = function(write_path, content, source)
+				if write_path ~= path then wrong_path = true end
+				attempts = attempts + 1
+				if attempts == 1 and race == "before forward acknowledgement" then disk = external end
+				if source.status ~= "ok" or source.content ~= disk then return false, "source changed" end
+				disk = content
+				return true
+			end,
+		}
+		package.loaded["infra.preferences"] = nil
+		local preferences = require("infra.preferences")
+		local ok, err = xpcall(function()
+			local _, status = preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			with_fixture({preferences = preferences, preference_source = path,
+				failures = race ~= "before forward acknowledgement" and {{name = "menu", mode = "false"}} or {},
+				after_save = function()
+					if race == "between own acknowledgement and receipt admission" then disk = external end
+				end,
+				before_menu = function(occurrence)
+					if occurrence == 1 and race == "after forward acknowledgement" then disk = external end
+				end,
+			}, function(fixture)
+				local previous_temperature = fixture.state.llm_temperature
+				if race == "before menu construction" then disk = external end
+				local parent = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+				local row = parent
+				if race == "before menu construction" then
+					if row.fn then helpers.assert_eq(row.fn(), false) end
+					helpers.assert_eq(disk, external, "stale compensation cannot overwrite the foreign temperature")
+					helpers.assert_eq(parent.disabled, true, "an already foreign full-document image is not action authority")
+					helpers.assert_eq(attempts, 0)
+					helpers.assert_eq(fixture.calls.save, 0)
+					helpers.assert_eq(fixture.manager.scope_idle(), true)
+					helpers.assert_eq(preferences.publication_receipt(path), {id = 0})
+					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = initial})
+					helpers.assert_eq(fixture.state.llm_temperature, previous_temperature)
+					helpers.assert_eq(fixture.runtime.llm_temperature, previous_temperature)
+					helpers.assert_eq(require("infra.toml.codec").decode(disk).llm.generation.temperature, 0.9)
+					helpers.assert_eq(unconditional, 0)
+					helpers.assert_eq(wrong_path, false)
+					return
+				end
+				helpers.assert_eq(parent.disabled == true, false)
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(disk, external, "compensation cannot turn the external master on")
+				local receipt = preferences.publication_receipt(path)
+				if race == "before forward acknowledgement" then
+					helpers.assert_eq(receipt.id, 0)
+					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = external})
+				else
+					helpers.assert_eq(receipt.id, 1, "only the true owned forward save issues authority")
+					helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
+					local acknowledged = require("infra.toml.codec").decode(receipt.source.content)
+					helpers.assert_eq(acknowledged.llm.enabled, true)
+					helpers.assert_eq((acknowledged.llm.display or {}).show_info_bar, false, "only the requested checkbox value belongs to the acknowledged source")
+					helpers.assert_eq(preferences.source_snapshot(path), receipt.source)
+				end
+				helpers.assert_eq(attempts, 1, "compensation cannot borrow a foreign source")
+				helpers.assert_eq(fixture.manager.scope_idle(), false, "refused compensation remains owned debt")
+				helpers.assert_eq(fixture.state.llm_enabled, true)
+				helpers.assert_eq(fixture.runtime.llm_enabled, true)
+				local before = attempts
+				local fresh = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+				helpers.assert_eq(fresh.disabled, true)
+				if fresh.fn then helpers.assert_eq(fresh.fn(), false) end
+				helpers.assert_eq(attempts, before)
+				helpers.assert_eq(fixture.manager.apply_setting_transaction({
+					key = "llm_show_info_bar", value = true, runtime_fn = "set_llm_show_info_bar", publish_setting = false,
+				}), false, "a later action cannot borrow the foreign image to settle retained debt")
+				helpers.assert_eq(attempts, before)
+				helpers.assert_eq(fixture.manager.scope_idle(), false)
+				helpers.assert_eq(disk, external)
+				helpers.assert_eq(unconditional, 0)
+				helpers.assert_eq(wrong_path, false)
+			end)
+		end, debug.traceback)
+		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		if not ok then error(err, 0) end
+	end)
+
+	end
+end)

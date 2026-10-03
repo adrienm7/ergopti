@@ -5,5 +5,133 @@
 		"i18n": "menu.llm.show_info_bar"
 	},
 	"alternate_i18n": "menu.llm.display_menu_title",
-	"states": [false, true]
+	"states": [false, true],
+	"base": {
+		"owner": "owned",
+		"generation": 4,
+		"backend": "ollama",
+		"info_bar": true,
+		"enabled": true,
+		"paused": false,
+		"blocked": false
+	},
+	"cases": [
+		{
+			"id": "current true",
+			"current": {},
+			"admitted": true,
+			"value": false
+		},
+		{
+			"id": "current false",
+			"expected": {
+				"info_bar": false
+			},
+			"current": {
+				"info_bar": false
+			},
+			"admitted": true,
+			"value": true
+		},
+		{
+			"id": "single API prediction",
+			"expected": {
+				"backend": "api",
+				"count": 1,
+				"progressive": false
+			},
+			"current": {
+				"backend": "api",
+				"count": 1,
+				"progressive": false
+			},
+			"admitted": true,
+			"value": false
+		},
+		{
+			"id": "master withdrawn",
+			"current": {
+				"enabled": false
+			},
+			"admitted": false
+		},
+		{
+			"id": "paused",
+			"current": {
+				"paused": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "refused owner",
+			"current": {
+				"blocked": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "retired generation",
+			"current": {
+				"generation": 5
+			},
+			"admitted": false
+		},
+		{
+			"id": "retired identity",
+			"current": {
+				"owner": "other"
+			},
+			"admitted": false
+		},
+		{
+			"id": "backend changed",
+			"current": {
+				"backend": "mlx"
+			},
+			"admitted": false
+		},
+		{
+			"id": "unknown backend",
+			"current": {
+				"backend": ""
+			},
+			"admitted": false
+		},
+		{
+			"id": "value changed",
+			"current": {
+				"info_bar": false
+			},
+			"admitted": false
+		},
+		{
+			"id": "invalid selected",
+			"current": {
+				"info_bar": "true"
+			},
+			"admitted": false
+		},
+		{
+			"id": "unknown pause",
+			"current": {
+				"paused": null
+			},
+			"admitted": false
+		},
+		{
+			"id": "invalid generation",
+			"current": {
+				"generation": 0.5
+			},
+			"admitted": false
+		},
+		{
+			"id": "master restoration cannot revive",
+			"expected": {
+				"enabled": false
+			},
+			"current": {},
+			"admitted": false
+		}
+	]
 }
