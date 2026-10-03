@@ -324,3 +324,5 @@ local noop_vectors_file = assert(io.open(helpers.driver_root() .. "/../_shared/t
 local noop_vectors = assert(require("json").decode(noop_vectors_file:read("*a")))
 noop_vectors_file:close()
 require("test.toml_noop_contract")(helpers, noop_vectors)
+
+require("test.toml_dotted_keys_contract")(helpers)
