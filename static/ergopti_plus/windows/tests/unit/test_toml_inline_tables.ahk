@@ -230,3 +230,53 @@ _TIT_DottedCorpus() {
 	}
 }
 Test("TOML: native inline reader replays independent dotted identities (toml-dotted-keys)", _TIT_DottedCorpus)
+
+
+_TIT_DocumentCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\toml\dotted_keys.json", "UTF-8"))
+	AssertEqual(23, Corpus["documents"].Length, "every independent semantic document vector runs")
+	for Row in Corpus["documents"] {
+		if !Row["valid"] {
+			AssertThrows(TOML_ParseDocument.Bind(Row["source"]), Row["name"])
+			continue
+		}
+		_TIT_DottedAssert(Row["expected"], TOML_ParseDocument(Row["source"]))
+	}
+}
+Test("TOML: native document reader replays independent dotted identities (toml-dotted-document)", _TIT_DocumentCorpus)
+
+_TIT_DocumentTypedRecords() {
+	Source := '[settings]`n"a.b".flag = false`n"a.b".count = 0`n"a.b".text = "001"`n'
+		. '"a.b".empty_map = {}`n"a.b".empty_array = []`n'
+		. '[[profiles]]`nshortcut.key = "x"`n[[profiles]]`nshortcut.key = "y"`n'
+	Document := TOML_ParseDocument(Source, &Records)
+	Settings := Document["settings"]["a.b"]
+	AssertTrue(Settings["flag"] is TOML_Bool, "source false retains Boolean intent")
+	AssertFalse(Settings["flag"].Value)
+	AssertTrue(Settings["count"] is Integer, "source zero is independent of Boolean false")
+	AssertTrue(Settings["text"] is String)
+	AssertEqual("001", Settings["text"])
+	AssertTrue(Settings["empty_map"] is Map)
+	AssertTrue(Settings["empty_array"] is Array)
+	AssertEqual(7, Records.Length)
+	AssertEqual(3, Records[1].Path.Length)
+	AssertEqual("settings", Records[1].Path[1])
+	AssertEqual("a.b", Records[1].Path[2], "quoted dots remain one source segment")
+	AssertEqual("flag", Records[1].Path[3])
+	AssertEqual("false", Records[1].Raw)
+	AssertTrue(Records[1].Value is TOML_Bool)
+	Assert(ObjPtr(Records[6].Owner) != ObjPtr(Records[7].Owner), "table-array generations never share their actual assignment owner")
+	AssertEqual("x", Document["profiles"][1]["shortcut"]["key"])
+	AssertEqual("y", Document["profiles"][2]["shortcut"]["key"])
+	AssertTrue(ObjPtr(Records[6].Owner) == ObjPtr(Document["profiles"][1]["shortcut"]))
+	AssertTrue(ObjPtr(Records[7].Owner) == ObjPtr(Document["profiles"][2]["shortcut"]))
+	Document := TOML_ParseDocument('A.flag=true`na.flag=false`n')
+	AssertEqual(2, Document.Count, "native documents retain case-sensitive TOML identities")
+	AssertTrue(Document["A"]["flag"].Value)
+	AssertFalse(Document["a"]["flag"].Value)
+	for Source in ['a."x"tail=1', 'a..b=1', 'a."bad\q"=1', 'a."bad\u12"=1', 'values=[1,,]']
+		AssertThrows(TOML_ParseDocument.Bind(Source), "invalid native source identity: " . Source)
+}
+Test("TOML: document records retain exact typed identities and owner generations (toml-dotted-document-records)",
+	_TIT_DocumentTypedRecords)

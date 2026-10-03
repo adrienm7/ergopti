@@ -723,6 +723,9 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 	try {
 		Scan := _ConfigMigrateRecordScan(Source)
 		_ConfigMigrateRecordValidateModel(Scan, Before)
+		; Raw native cells cannot distinguish dotted and quoted semantic aliases.
+		; This read-only proof leaves that model and every source byte intact.
+		TOML_ParseDocument(Source)
 	} catch as Err {
 		Plan["detail"] := "the migration record owner refused: " . Err.Message
 		return Plan
@@ -755,8 +758,12 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		Plan["detail"] := "the record renderer refused the migrated configuration"
 		return Plan
 	}
-	try Reread := _ConfigMigrateParse(Built["content"], "the migrated candidate")
-	catch as Err {
+	try {
+		; A new header can redeclare an existing dotted parent even when the
+		; old flat model reads back exactly. Prove its semantic namespace too.
+		TOML_ParseDocument(Built["content"])
+		Reread := _ConfigMigrateParse(Built["content"], "the migrated candidate")
+	} catch as Err {
 		Plan["detail"] := "the migrated candidate does not parse: " . Err.Message
 		return Plan
 	}
@@ -862,6 +869,7 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			VersionSource := FSReadStrict(FilePath)
 			VersionScan := _ConfigMigrateRecordScan(VersionSource)
 			_ConfigMigrateRecordValidateModel(VersionScan, Before)
+			TOML_ParseDocument(VersionSource)
 			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
 				return Refuse("failed", "the file changed while its physical version ownership was checked")
 		} catch as Err
