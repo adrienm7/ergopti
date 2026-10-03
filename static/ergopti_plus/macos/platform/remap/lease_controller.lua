@@ -66,6 +66,7 @@ local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
 -- The launcher never registers the guardian itself: the driver does, only
 -- after reading « Ergopti uses Karabiner », through this headless role.
 local GUARDIAN_REGISTER_FLAG = "--register-remap-guardian"
+local GUARDIAN_UNREGISTER_FLAG = "--unregister-remap-guardian"
 local GUARDIAN_SETTINGS_FLAG = "--open-remap-guardian-settings"
 local GUARDIAN_STATUS_OUTPUT_MAX_BYTES = 32
 local GUARDIAN_SETTINGS_OUTPUT_MAX_BYTES = 32
@@ -522,6 +523,7 @@ end
 --- Returns the current generation, allocating an inert one when needed.
 --- @return table|nil generation Prepared or live generation.
 local function current_or_prepare()
+	if _state.guardian_unregistration_request then return nil end
 	if not _state.token_ledger_ready then
 		Logger.error(LOG, "Cannot allocate a Karabiner lease while token history is unavailable: %s",
 			tostring(_state.token_ledger_error))
@@ -1376,6 +1378,7 @@ end
 --- @return table|nil handle Started cancellation wrapper, or nil on rejection.
 --- @return string|nil error_message Stable launch failure detail.
 local function start_guardian_observation(flag, label, on_done, on_canonical)
+	if _state.guardian_unregistration_request then return nil, "guardian-unregistration-in-progress" end
 	if type(on_done) ~= "function" then
 		Logger.error(LOG, "%s requires a completion callback.", label)
 		return nil, "invalid-callback"
@@ -1386,9 +1389,12 @@ local function start_guardian_observation(flag, label, on_done, on_canonical)
 		settled = false,
 		termination_complete = false,
 	}
+	local registration = flag == GUARDIAN_REGISTER_FLAG
+	if registration then _state.guardian_registration_requests[request] = true end
 	local raw_handle, helper_error = spawn_current_helper(
 		{ flag },
 		function(exit_code, stdout, stderr)
+			if registration then _state.guardian_registration_requests[request] = nil end
 			if request.cancelled or request.settled then return end
 			request.settled = true
 			-- A settings recheck or newer status probe supersedes both the cache
@@ -1414,9 +1420,16 @@ local function start_guardian_observation(flag, label, on_done, on_canonical)
 		end
 	)
 	if not raw_handle then
+		if registration then _state.guardian_registration_requests[request] = nil end
 		request.cancelled = true
 		invalidate_guardian_observation(observation_serial)
 		return nil, helper_error or "helper-unavailable"
+	end
+	if registration then
+		request.handle = raw_handle
+		if type(raw_handle.onSettled) == "function" then
+			raw_handle.onSettled(function() _state.guardian_registration_requests[request] = nil end)
+		end
 	end
 
 	-- Logical invalidation precedes native termination. Retain the same opaque
@@ -1440,6 +1453,9 @@ local function start_guardian_observation(flag, label, on_done, on_canonical)
 	if not start_ok or started ~= true then
 		request.cancelled = true
 		invalidate_guardian_observation(observation_serial)
+		if registration and type(raw_handle.isSettled) == "function" and raw_handle.isSettled() == true then
+			_state.guardian_registration_requests[request] = nil
+		end
 		return nil, start_ok and "helper-start-failed"
 			or "helper-start-raised: " .. tostring(started)
 	end
@@ -1478,6 +1494,78 @@ end
 --- @return boolean required True until one registration of this lifecycle answered.
 function M.guardian_registration_required()
 	return _state ~= nil and _state.guardian_registration_settled ~= true
+end
+
+--- Removes the own guardian only after aggregate exact lease fencing.
+--- The retained operation fences activation until actual native settlement;
+--- accepted termination or a failed start never masquerades as a clean exit.
+--- @param on_done function|nil Callback fn(ok, reason) after native settlement.
+--- @return boolean accepted True when joined or the operation was accepted.
+function M.unregister_guardian(on_done)
+	if not require_state("unregister_guardian") then return false end
+	local existing = _state.guardian_unregistration_request
+	if existing then
+		if type(on_done) == "function" then existing.callbacks[#existing.callbacks + 1] = on_done end
+		return true
+	end
+	if _state.current or any_retiring() or next(_state.guardian_registration_requests) then
+		invoke_callback("lease.unregister_guardian", on_done, false, "guardian-owner-busy")
+		return false
+	end
+	local request = { callbacks = type(on_done) == "function" and { on_done } or {} }
+	_state.guardian_unregistration_request = request
+	_state.guardian_registration_settled = false
+	_state.guardian_status = nil
+	next_guardian_observation()
+	local function finish_if_settled()
+		if request.finished or request.native_settled ~= true or request.completed ~= true then return end
+		request.finished = true
+		if _state.guardian_unregistration_request == request then
+			_state.guardian_unregistration_request = nil
+		end
+		settle_callbacks("lease.unregister_guardian", request.callbacks, request.ok == true, request.reason)
+	end
+	local handle, helper_error = spawn_current_helper({ GUARDIAN_UNREGISTER_FLAG }, function(code, stdout, stderr)
+		request.completed = true
+		request.ok = code == 0 and stdout == "unregistered\n"
+		request.reason = request.ok and "unregistered"
+			or string.format("guardian unregistration refused (exit %s): %s", tostring(code), tostring(stderr))
+		if request.handle and request.handle.isSettled() == true then request.native_settled = true end
+		finish_if_settled()
+	end)
+	if not handle then
+		request.completed, request.native_settled = true, true
+		request.reason = helper_error or "helper-unavailable"
+		finish_if_settled()
+		return false
+	end
+	request.handle = handle
+	if type(handle.isSettled) ~= "function" or type(handle.onSettled) ~= "function" then
+		request.completed = true
+		request.reason = "helper-settlement-contract-missing"
+		-- An unstarted handle still owns its acquisition: retain it fail-closed.
+		return true
+	end
+	local observed, registered = pcall(handle.onSettled, function()
+		request.native_settled = true
+		finish_if_settled()
+	end)
+	if not observed or registered ~= true then
+		request.completed = true
+		request.reason = "helper-settlement-observer-refused"
+		if handle.isSettled() == true then request.native_settled = true end
+		finish_if_settled()
+		return _state.guardian_unregistration_request == request
+	end
+	local started_ok, started = pcall(handle.start)
+	if request.finished then return true end
+	if not started_ok or started ~= true then
+		request.completed = true
+		request.reason = started_ok and "helper-start-failed" or "helper-start-raised"
+		if handle.isSettled() == true then request.native_settled = true end
+		finish_if_settled()
+	end
+	return _state.guardian_unregistration_request == request
 end
 
 --- Opens the exact Login Items settings pane after a native current-status
@@ -1581,6 +1669,8 @@ function M.init(phase_listener)
 		guardian_registration_settled = false,
 		guardian_observation_serial = 0,
 		guardian_settings_request = nil,
+		guardian_unregistration_request = nil,
+		guardian_registration_requests = {},
 		helper_path = helper_path,
 		helper_error = helper_err,
 		last_phase = token_ledger_ready and "idle" or "failed",
@@ -1911,7 +2001,9 @@ function M.status()
 	retry_timer_cleanup()
 	local generation = _state.current
 	local phase
-	if generation then
+	if _state.guardian_unregistration_request then
+		phase = "unregistering"
+	elseif generation then
 		phase = generation.phase
 	else
 		generation = any_retiring()

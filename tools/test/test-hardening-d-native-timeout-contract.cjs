@@ -229,7 +229,14 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 {
 	const legacy = swiftFuncBody(guardian, 'ensureLegacyRemapGuardianRegistered');
 	const runnerClass = guardian.indexOf('final class PosixGuardianLaunchctlRunner');
-	const runner = runnerClass < 0 ? null : swiftFuncBody(guardian.slice(runnerClass), 'run');
+	const runnerSource = runnerClass < 0 ? null : guardian.slice(runnerClass);
+	const runBody = runnerSource && swiftFuncBody(runnerSource, 'run');
+	// The Boolean registration port now delegates to the exact exit-status
+	// owner shared with unregistration. Only that complete delegation may
+	// redirect the budget scan; extra work in the wrapper must be accounted for.
+	const delegatesExitStatus =
+		runBody && /^\s*return\s+exitStatus\(arguments:\s*arguments\)\s*==\s*0\s*$/.test(runBody);
+	const runner = delegatesExitStatus ? swiftFuncBody(runnerSource, 'exitStatus') : runBody;
 	const healthWait = swiftFuncBody(guardian, 'waitForLegacyGuardianHealth');
 	const graceMatch = runner && runner.match(/terminationDeadline\s*=[^\n]*\+\s*([\d.]+)/);
 	if (!legacy || !runner || !healthWait || !graceMatch) {

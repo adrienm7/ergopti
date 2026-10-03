@@ -298,9 +298,19 @@ remain pending in the next macOS install/launch run.
       the file, runtime and next-save state, keeping personal delimiters and
       restoring the exact snapshot after publication or runtime refusal. The
       common behavior contract runs in both driver suites.
-- [ ] **35.** Item 13 remainder: unregister the remap guardian LaunchAgent when
-      the Karabiner switch goes off or « Retirer Ergopti de Karabiner » runs
-      (headless unregister role in the launcher, verified on a Mac).
+- [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
+  is turned OFF or its rules are removed. The same owned transaction now joins
+  STOPPED, exact native unregistration and the persisted OFF/rule removal.
+  Refusal retains the prior preference and a fresh READY recovery; unsettled
+  registration tasks block retirement instead of hiding process debt. Native
+  acknowledgement proves the exact launcher identity, empty durable lease,
+  absent legacy job and ServiceManagement registration status. The hosted
+  signed-helper acceptance lane also checks wrong-inode refusal, successful
+  unregistration and idempotence, retaining primary and cleanup errors.
+  Focused registered macOS tests pass 315 cases and the diagnostic judge passes
+  six regressions. Complete native Swift, helper registration and three-OS
+  qualification remain pending.
+
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 - [ ] **37.** Item 23 decisions: whether « Hotstrings Ergopti » should appear

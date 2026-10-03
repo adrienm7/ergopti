@@ -273,11 +273,12 @@ end
 --- @param transaction table Transaction descriptor.
 --- @param ok boolean Operation result.
 --- @param reason string Result detail.
-local function settle_enabled_callbacks(transaction, ok, reason)
+--- @param removed_count integer|nil Number of managed rules removed.
+local function settle_enabled_callbacks(transaction, ok, reason, removed_count)
 	local callbacks = transaction.callbacks or {}
 	transaction.callbacks = {}
 	for _, callback in ipairs(callbacks) do
-		invoke_public_callback("set_enabled", callback, ok, reason)
+		invoke_public_callback("set_enabled", callback, ok, reason, removed_count)
 	end
 end
 
@@ -3606,8 +3607,8 @@ function M.set_enabled(value, on_done, onboarding_gate)
 				end
 				_enabled_preflight = nil
 				if stopped == true then
-					continuation_result = M.set_enabled(value, function(ok, reason)
-						settle_enabled_callbacks(preflight, ok == true, reason)
+					continuation_result = M.set_enabled(value, function(ok, reason, removed_count)
+						settle_enabled_callbacks(preflight, ok == true, reason, removed_count)
 					end, ONBOARDING_STOP_JOINED)
 				else
 					settle_enabled_callbacks(preflight, false, "onboarding-stop-incomplete")
@@ -3622,7 +3623,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 	end
 
 	local was_enabled = _state.enabled == true
-	if target_enabled == was_enabled then
+	if target_enabled and was_enabled then
 		invoke_public_callback("set_enabled", on_done, true,
 			target_enabled and "already-enabled" or "already-disabled")
 		return true
@@ -3760,6 +3761,12 @@ function M.set_enabled(value, on_done, onboarding_gate)
 
 	local function rollback_enabled_state(disable_reason)
 		if _enabled_transition ~= transaction then return end
+		if not was_enabled then
+			_enabled_transition = nil
+			replay_pending_layout_refresh()
+			settle_enabled_callbacks(transaction, false, disable_reason or "disable-failed")
+			return
+		end
 		transaction.kind = "recovering"
 		Logger.error(LOG, "Karabiner disable did not receive STOPPED: %s; restoring a fresh lease.",
 			tostring(disable_reason))
@@ -3783,24 +3790,36 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			return
 		end
 
-		if not persist_enabled_flag(false) then
-			rollback_enabled_state("persistence-failed-after-STOPPED")
-			return
+		local unregister_callback_fired = false
+		local function finish_unregistration(unregistered, unregister_reason)
+			unregister_callback_fired = true
+			if _enabled_transition ~= transaction then return end
+			if unregistered ~= true then
+				rollback_enabled_state(unregister_reason or "guardian-unregistration-failed")
+				return
+			end
+			if was_enabled and not persist_enabled_flag(false) then
+				rollback_enabled_state("persistence-failed-after-STOPPED")
+				return
+			end
+			_state.enabled = false
+			clear_managed_output_set()
+			stop_lease_bound_inputs()
+			_enabled_transition = nil
+			replay_pending_layout_refresh()
+			Logger.info(LOG, "Karabiner integration disabled after exact fencing and guardian removal.")
+			local removed, removal_detail, removed_count = remove_managed_rules("Karabiner integration disable")
+			if not removed then
+				settle_enabled_callbacks(transaction, false, "rules-not-removed: " .. removal_detail)
+				return
+			end
+			settle_enabled_callbacks(transaction, true, was_enabled and (reason or "stopped") or removal_detail, removed_count)
 		end
-		_state.enabled = false
-		clear_managed_output_set()
-		stop_lease_bound_inputs()
-		_enabled_transition = nil
-		replay_pending_layout_refresh()
-		Logger.info(LOG, "Karabiner integration disabled after exact lease fencing.")
-		-- The fenced rules are inert; « off » also means none is left behind.
-		-- A refusal keeps the switch off and names the retained rules.
-		local removed, removal_detail = remove_managed_rules("Karabiner integration disable")
-		if not removed then
-			settle_enabled_callbacks(transaction, false, "rules-not-removed: " .. removal_detail)
-			return
+		local unregister_ok, unregister_requested = pcall(LeaseController.unregister_guardian, finish_unregistration)
+		if not unregister_ok or (unregister_requested ~= true and not unregister_callback_fired) then
+			rollback_enabled_state(unregister_ok and "guardian-unregistration-rejected"
+				or "guardian-unregistration-raised")
 		end
-		settle_enabled_callbacks(transaction, true, reason or "stopped")
 	end)
 	if not ok_stop then
 		rollback_enabled_state(stop_requested)
@@ -3828,9 +3847,7 @@ function M.remove_from_karabiner(on_done)
 	if _state.enabled == true or _enabled_transition ~= nil or _enabled_preflight ~= nil then
 		return M.set_enabled(false, on_done)
 	end
-	local removed, detail, removed_count = remove_managed_rules("Remove Ergopti from Karabiner")
-	invoke_public_callback("remove from Karabiner", on_done, removed, detail, removed_count)
-	return removed
+	return M.set_enabled(false, on_done)
 end
 
 --- Clones the persisted settings without sharing either nested binding table.

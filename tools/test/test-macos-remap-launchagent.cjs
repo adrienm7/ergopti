@@ -719,6 +719,16 @@ check(
 	`native helper artifact authentication must reject altered or stale inputs: ${artifactVerification.stderr || artifactVerification.error || ''}`
 );
 
+const registrationJudge = spawnSync(
+	process.platform === 'win32' ? 'python' : 'python3',
+	['tools/diagnostics/macos_helper_registration_test.py'],
+	{ cwd: ROOT, encoding: 'utf8', timeout: 10000 }
+);
+check(
+	!registrationJudge.error && registrationJudge.status === 0,
+	`native guardian acceptance must reject missing receipts and retain primary/cleanup failures: ${registrationJudge.stderr || registrationJudge.error || ''}`
+);
+
 if (failures.length > 0) {
 	console.error('[FAIL] macOS independent remap LaunchAgent:');
 	for (const failure of failures) console.error(`  - ${failure}`);

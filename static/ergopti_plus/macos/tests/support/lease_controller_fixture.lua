@@ -80,12 +80,26 @@ local function load_controller(options)
 				terminated = false,
 				terminate_calls = 0,
 				start_result = start_result,
+				settled = false,
+				settlement_observers = {},
 			}
+			local function settle()
+				if task.settled then return end
+				task.settled = true
+				for _, observer in ipairs(task.settlement_observers) do observer() end
+			end
+			task.settle = settle
+			task.on_done = function(...)
+				task.settled = true
+				on_done(...)
+				for _, observer in ipairs(task.settlement_observers) do observer() end
+			end
 			ctx.next_start_result = nil
 			ctx.spawns[#ctx.spawns + 1] = task
 			return {
 				start = function()
 					if ctx.ready_on_start and task.on_chunk then task.on_chunk(task, "READY\n", "") end
+					if task.start_result ~= true and ctx.start_refusal_debt ~= true then settle() end
 					return task.start_result
 				end,
 				set_input = function(data)
@@ -109,8 +123,14 @@ local function load_controller(options)
 					local result = table.remove(ctx.terminate_results, 1)
 					if result == nil then result = true end
 					if result == "raise" then error("injected terminate failure") end
-					if result == true then task.terminated = true end
+					if result == "pending" then task.terminated = true; return true, "pending" end
+					if result == true then task.terminated = true; settle() end
 					return result
+				end,
+				isSettled = function() return task.settled end,
+				onSettled = function(observer)
+					if task.settled then observer() else task.settlement_observers[#task.settlement_observers + 1] = observer end
+					return true
 				end,
 			}
 		end,
