@@ -263,6 +263,25 @@ The original timeout, reaping and retry assertions remain intact. All 104 unique
 portable tests and selected JavaScript checks pass; native no-prompt outcomes
 and the original timer/Karabiner feature measurements still require CI.
 
+A supplementary diagnostics-only startup owner now invokes
+those same original native timer and Karabiner probes in the unchanged signed
+installed embedded Hammerspoon app, independently of external AppleEvent
+admission. It temporarily owns only MJConfigFile, binds an exact fresh
+nonce/PID/executable/bundle/version ready-to-admit receipt before dispatch,
+requires original measurements and native cleanup acknowledgement, retires the
+actual runtime and restores the exact physical preference while preserving
+unrelated current values. Timers retain their original ten-second watchdog and
+fifteen-second receipt observation; synchronous Karabiner keeps ten seconds;
+late answers and retained ownership debt refuse admission. The result explicitly
+qualifies only installed native feature measurements: full managed boot,
+AppleEvent permission/delivery and physical hardware remain separate. Required
+original controls, scenarios, failed verdicts and deadlines are unchanged and
+cannot be satisfied by the supplementary namespace. The registered portable
+package suite has 121 unique tests; eight executable Lua lifecycle boundary
+replays and three independent rejection mutations qualify the new owner with
+explicit doubles. Actual supplementary Darwin measurements remain pending the
+next non-release checkpoint; keep the original native/physical limitations open.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

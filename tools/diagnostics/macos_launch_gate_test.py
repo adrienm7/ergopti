@@ -940,9 +940,11 @@ def load_tests(loader, tests, pattern):
     """Keep native receipt and preference checks in the existing package self-test."""
     import hs_delayed_timer_probe_test
     import hs_karabiner_config_probe_test
+    import hs_native_bootstrap_probe_test
 
     tests.addTests(loader.loadTestsFromModule(hs_delayed_timer_probe_test))
     tests.addTests(loader.loadTestsFromModule(hs_karabiner_config_probe_test))
+    tests.addTests(loader.loadTestsFromModule(hs_native_bootstrap_probe_test))
     return tests
 
 
