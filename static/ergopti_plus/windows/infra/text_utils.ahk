@@ -140,3 +140,65 @@ SendEscapeLiteral(Text) {
 	Escaped := StrReplace(Escaped, "#", "{#}")
 	return Escaped
 }
+
+
+/** Counts Unicode scalars while retaining UTF-16 units for internal offsets. */
+_TextCodepointLength(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCodepointLength expects a string, got " . Type(Text) . ".")
+	Units := StrLen(Text)
+	Count := 0
+	Position := 1
+	while (Position <= Units) {
+		Count += 1
+		Position += _TextCodepointWidth(Text, Position, Units)
+	}
+	return Count
+}
+
+/** Returns the UTF-16 span erased by up to Count native Backspace events. */
+_TextTailCodeUnits(Text, Count) {
+	if !(Text is String) || !(Count is Integer) || Count < 0
+		throw TypeError("_TextTailCodeUnits expects a string and a nonnegative integer.")
+	Position := StrLen(Text)
+	Start := Position
+	loop Count {
+		if Position == 0
+			break
+		Unit := Ord(SubStr(Text, Position, 1))
+		if Unit >= 0xDC00 && Unit <= 0xDFFF && Position > 1 {
+			Previous := Ord(SubStr(Text, Position - 1, 1))
+			if Previous >= 0xD800 && Previous <= 0xDBFF
+				Position -= 1
+		}
+		Position -= 1
+	}
+	return Start - Position
+}
+
+
+/** Returns whole Unicode characters without splitting surrogate pairs. */
+_TextCodepoints(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCodepoints expects a string, got " . Type(Text) . ".")
+	Characters := []
+	Position := 1
+	Units := StrLen(Text)
+	while Position <= Units {
+		Width := _TextCodepointWidth(Text, Position, Units)
+		Characters.Push(SubStr(Text, Position, Width))
+		Position += Width
+	}
+	return Characters
+}
+
+; Counting and replay share the same surrogate-pair admission rule.
+_TextCodepointWidth(Text, Position, Units) {
+	Unit := Ord(SubStr(Text, Position, 1))
+	if Unit >= 0xD800 && Unit <= 0xDBFF && Position < Units {
+		Next := Ord(SubStr(Text, Position + 1, 1))
+		if Next >= 0xDC00 && Next <= 0xDFFF
+			return 2
+	}
+	return 1
+}

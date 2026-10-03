@@ -1111,10 +1111,11 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
  * @param {boolean} IsPhysicalEvent - True only for the I1-filtered prefix hook.
  */
 LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
+	global _LLM_Bridge_AgentBuffer
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) {
 		; Predictions are off: only the AI agent's typing observer listens
 		if (vk = 0x08)
-			_LLM_Bridge_ObserveAgentTyping(1, "")
+			_LLM_Bridge_ObserveAgentTyping(_TextTailCodeUnits(_LLM_Bridge_AgentBuffer, 1), "")
 		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
 			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
@@ -1332,7 +1333,7 @@ LLM_Bridge_OnBackspace() {
 	if !_LLM_Bridge_Active
 		return
 
-	_LLM_Bridge_ApplyBufferEdit(1, "")
+	_LLM_Bridge_ApplyBufferEdit(_TextTailCodeUnits(_LLM_Bridge_Buffer, 1), "")
 	if IsSet(LLM_Agent_OnTyping)
 		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 

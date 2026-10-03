@@ -131,7 +131,7 @@ E2E_RunScenarioPure(Scenario) {
     Trigger := Scenario["trigger"]
     InputBuffer := Scenario.Get("buffer", "")
     Term := Scenario.Get("terminator", " ")
-    AssertTrue(StrLen(Term) <= 1, "the corpus terminator must describe one physical character")
+    AssertTrue(_TextCodepointLength(Term) <= 1, "the corpus terminator must describe one physical character")
     Flags := Scenario.Get("is_word", false) ? "" : "?"
     ; An explicit consumption policy describes the END path; STAR would fire
     ; before that future character exists. Both Lua E2E consumers do the same.
@@ -151,7 +151,7 @@ E2E_RunScenarioPure(Scenario) {
         HSE_RegisterFromTomlFlags(Scenario.Get("is_case_sensitive", false),
             Flags, Trigger, Scenario["replacement"],
             Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON))
-        for Char in StrSplit(InputBuffer . Term) {
+        for Char in _TextCodepoints(InputBuffer . Term) {
             Document .= Char
             Match := HSE_FeedChar(Char)
             if !IsObject(Match)
@@ -163,7 +163,7 @@ E2E_RunScenarioPure(Scenario) {
             ; Windows deletes an already visible end character and replays it
             ; when retained. The shared count excludes only that physical replay.
             ReplayedEnd := EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)
-            LogicalBackspaces += EmittedBackspaces - (ReplayedEnd ? StrLen(EndChar) : 0)
+            LogicalBackspaces += EmittedBackspaces - (ReplayedEnd ? _TextCodepointLength(EndChar) : 0)
         }
         return Map("matched", DispatchCount > 0, "document", Document,
             "backspace_count", LogicalBackspaces, "dispatch_count", DispatchCount)
@@ -187,8 +187,8 @@ _E2E_ApplyRecordedEdit(&Document, &NextSend) {
         AssertTrue(RegExMatch(Payload, "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
             "the intercepted sender must emit a recognized atomic text edit: " . Payload)
         Count := Integer(Edit[1])
-        AssertTrue(Count <= StrLen(Document), "an expansion must never delete before the virtual document starts")
-        Document := SubStr(Document, 1, StrLen(Document) - Count) . Edit[2]
+        AssertTrue(Count <= _TextCodepointLength(Document), "an expansion must never delete before the virtual document starts")
+        Document := SubStr(Document, 1, StrLen(Document) - _TextTailCodeUnits(Document, Count)) . Edit[2]
         Deleted += Count
         Applied += 1
     }
@@ -279,6 +279,28 @@ for _Sc in E2E_SCENARIOS {
     Test("e2e[pure] " . _Sc["id"], _E2E_RunPureTest.Bind(_Sc))
 }
 
+
+; Supplementary characters must exercise the same actual sender replay.
+_E2E_UnicodeReplay() {
+    global HSE_WORD_TERMINATORS
+    Saved := HSE_WORD_TERMINATORS
+    Emoji := Chr(0x1F600)
+    try {
+        _E2E_RunPureTest(Map("trigger", Emoji . "x", "buffer", "A" . Emoji . "x",
+            "replacement", "R", "terminator", "", "auto_expand", true,
+            "is_case_sensitive", true, "is_case_sensitive_strict", true,
+            "expected", Map("matched", true, "replacement", "R", "backspace_count", 2)))
+        HSE_WORD_TERMINATORS .= Emoji
+        _E2E_RunPureTest(Map("trigger", "xy", "buffer", "Axy", "replacement", "R",
+            "terminator", Emoji, "terminator_consumed", true,
+            "is_case_sensitive", true, "is_case_sensitive_strict", true,
+            "expected", Map("matched", true, "replacement", "R", "backspace_count", 3)))
+    } finally {
+        HSE_WORD_TERMINATORS := Saved
+    }
+}
+Test("e2e[pure] supplementary trigger and completion preserve native edits (unicode-erase)",
+    _E2E_UnicodeReplay)
 
 ; Strategy B — real GUI — registered only when E2E_REAL_GUI is set.
 ; In that mode the test creates a visible Edit control, types the trigger,

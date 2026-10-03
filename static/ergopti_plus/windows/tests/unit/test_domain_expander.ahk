@@ -37,7 +37,7 @@ _DE_Add(Trigger, Repl, Group := "default", IsWord := false) {
 ; Returns a Map with the fields the JS Expander contract defines:
 ;   not_null          — true when a match was found
 ;   replacement       — Spec.Replacement / Spec.Repl (or "" when no match)
-;   backspace_count   — Spec.Length + (EndChar != "" ? 1 : 0)
+;   backspace_count   — _TextCodepointLength(Spec.Trigger . EndChar)
 ;   consume_terminator — true when a star trigger consumed the tailChar
 ;   trigger           — matched trigger string
 ;   is_null           — true when no match was found
@@ -64,7 +64,7 @@ _DE_Decide(Buffer, TailChar, TermConsumed := false) {
 	} else if Spec.HasOwnProp("Repl") {
 		Repl := Spec.Repl
 	}
-	BSCount := Spec.Length + (EndChar != "" ? 1 : 0)
+	BSCount := _TextCodepointLength(Spec.Trigger . EndChar)
 	return Map(
 		"is_null",           false,
 		"not_null",          true,
@@ -283,3 +283,27 @@ _DE_HighVolumeStaysCorrect() {
 }
 Test("Expander: 500 decisions leave the matcher correct (domain-expander-placeholders)",
 	_DE_HighVolumeStaysCorrect)
+
+
+_DE_UnicodeNativeCounts() {
+	global HSE_WORD_TERMINATORS
+	Saved := HSE_WORD_TERMINATORS
+	Emoji := Chr(0x1F600)
+	try {
+		HSE_TestReset()
+		_DE_Add(Emoji . "x", "R")
+		Result := _DE_Decide("A" . Emoji . "x", " ")
+		AssertTrue(Result["not_null"])
+		AssertEqual(3, Result["backspace_count"], "two trigger scalars plus one end character")
+		HSE_TestReset()
+		HSE_WORD_TERMINATORS .= Emoji
+		_DE_Add("xy", "R")
+		Result := _DE_Decide("Axy", Emoji)
+		AssertTrue(Result["not_null"], "a complete supplementary terminator must match")
+		AssertEqual(3, Result["backspace_count"], "a surrogate pair requires one native Backspace")
+	} finally {
+		HSE_WORD_TERMINATORS := Saved
+		HSE_TestReset()
+	}
+}
+Test("Expander: Unicode contract counts native key events (unicode-erase)", _DE_UnicodeNativeCounts)

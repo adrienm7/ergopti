@@ -164,7 +164,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		return Owner["CommitFn"].Call(Owner, TrailingText)
 	if Owner.Has("RawEffect")
 		return _HSE_CommitTerminalRawOwner(Owner, TrailingText)
-	DeleteCount := Owner["Backspaces"] + StrLen(TrailingText)
+	DeleteCount := Owner["EraseUnits"] + StrLen(TrailingText)
 	; TrailingText was already visible before capture admission.  The paced burst
 	; erases and restores it on screen, but the canonical buffers deliberately
 	; stop at the replacement.  After native release, the exact characters are
@@ -240,7 +240,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 		try {
 			BufferLength := StrLen(HSE_Buffer)
 			Backspaces := Max(0, Min(
-				RawEffect.Bs + StrLen(TrailingText), BufferLength))
+				Owner["EraseUnits"] + StrLen(TrailingText), BufferLength))
 			InsertedText := RawEffect.Ins
 			HSE_Buffer := (BufferLength >= Backspaces
 				? SubStr(HSE_Buffer, 1, BufferLength - Backspaces) : "")
@@ -316,6 +316,7 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 		"Id", ++_HSE_TerminalOwnerSerial,
 		"Pending", true,
 		"Backspaces", Prepared.Bs,
+		"EraseUnits", _TextTailCodeUnits(HSE_Buffer, Prepared.Bs),
 		"PlainInsertedText", Prepared.Ins,
 		"SendPayload", "{Text}" . Prepared.Ins,
 		"EndCharPart", "",
@@ -491,7 +492,7 @@ _HSE_RunOwnedTerminalTransaction(Owner) {
 				: Owner["SendPayload"]
 					. (TrailingText != "" ? "{Text}" . TrailingText : "")
 			OutputSucceeded := _HSE_SendTerminalPaced(
-				Owner["Backspaces"] + StrLen(TrailingText),
+				Owner["Backspaces"] + _TextCodepointLength(TrailingText),
 				Tail, Owner["DelayMs"],
 				Owner["EmitFn"], Owner["DelayFn"])
 			if !OutputSucceeded
@@ -662,22 +663,24 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 						if !((EffectOk is Integer) and EffectOk)
 								return false
 						BufLen := StrLen(HSE_Buffer)
-						Bs  := Max(0, Min(Effect.Bs, BufLen))
+						KeyCount := _TextCodepointLength(HSE_Buffer)
+						Bs := Max(0, Min(Effect.Bs, KeyCount))
+						EraseUnits := _TextTailCodeUnits(HSE_Buffer, Bs)
 						if (Bs != Effect.Bs)
-								try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, BufLen)
+								try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, KeyCount)
 						Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
 						; Deleted nothing AND inserted nothing == the callback declined.
 						Fired := (Bs > 0 or Ins != "")
 						if Fired {
 								_BufferCrit := Critical("On")
 								try {
-										HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
+										HSE_Buffer := SubStr(HSE_Buffer, 1, BufLen - EraseUnits) . Ins
 										; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
 										; Ins can never grow the buffer unbounded or drift the boundary flag.
 										_HSE_TrimBufferToCapacity()
 										CanonicalEffect := {
 												ClearAll: false,
-												DeleteFromEnd: Bs,
+												DeleteFromEnd: EraseUnits,
 												InsertedText: Ins,
 												EndCharEmitted: false,
 												KnownBoundaryAfter: HSE_Buffer != ""
@@ -922,7 +925,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
-				BSCount := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
+				EraseUnits := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+				BSCount := _TextCodepointLength(Spec.Trigger . EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
 				; Replacement, casing and OnlyText were frozen by the shared decision
 				; preflight above. Never resolve a callable again here: when the tooltip
@@ -991,6 +995,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"Id", ++_HSE_TerminalOwnerSerial,
 									"Pending", true,
 									"Backspaces", BSCount,
+									"EraseUnits", EraseUnits,
 									"PlainInsertedText", Replacement . EndCharPart,
 									"SendPayload", ReplacementPart . EndCharPart,
 									"EndCharPart", EndCharPart,

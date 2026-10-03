@@ -174,7 +174,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 ; over both plus the positional option booleans. Each call produces a fresh
 ; closure with its own captures — safe to call in a loop over variants.
 _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false) {
-		BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
+		BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
 		AbbreviationLen := StrLen(Abbreviation)
 		PrevCharKey := SubStr(Abbreviation, -2, 1)
 		return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
