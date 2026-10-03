@@ -50,12 +50,17 @@ local function read_rows(sqlite_path, sql)
 	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
 	-- Same rule as the writer: the script goes on stdin, never through a file in
 	-- a world-writable directory.
-	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" } })
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" }, capture_exit = true })
 	if not cmd then return {} end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return {} end
-	local body = pipe:read("*a") or ""
+	local output = pipe:read("*a")
 	pipe:close()
+	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
+	if not accepted then
+		Logger.warn(LOG, "SQLite read refused: %s.", reason)
+		return {}
+	end
 	if body == "" then return {} end
 	local ok, rows = pcall(Json.decode, body)
 	if not ok or type(rows) ~= "table" then

@@ -31,6 +31,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local NativeCommand = require("modules.keylogger.sqlite_command")
 
 -- Every table the schema declares for character sequences, and the code the
 -- dashboard envelope uses for each.
@@ -63,15 +64,20 @@ local function with_stubbed_sqlite(responder, body)
 	local next_body = ""
 
 	package.loaded[command_name] = {
-		build = function(_path, sql)
+		build = function(_path, sql, opts)
 			statements[#statements + 1] = sql
-			next_body = responder(sql) or ""
-			-- The literal never runs: io.popen is stubbed too. It only has to be
-			-- a non-nil string, because returning nil is the reader's own signal
-			-- that the command could not be composed.
-			return "true"
+			local response = responder(sql) or ""
+			local body = type(response) == "table" and response.body or response
+			local status = type(response) == "table" and response.status or 0
+			next_body = body
+			if opts and opts.capture_exit then
+				next_body = body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n"
+			end
+			-- Preserve the real builder/parser ABI; only the CLI response is fake.
+			return NativeCommand.build(_path, sql, opts)
 		end,
-		sanitise_error = function(msg) return msg end,
+		read_exit_receipt = NativeCommand.read_exit_receipt,
+		sanitise_error = NativeCommand.sanitise_error,
 	}
 	io.popen = function()
 		local sent = next_body
@@ -92,6 +98,28 @@ local function with_stubbed_sqlite(responder, body)
 	helpers.assert_true(ok, "the projection must complete: " .. tostring(err))
 	return statements
 end
+
+helpers.describe("linux-sqlite-read-receipts", function()
+	for _, status in ipairs({ 1, 7, 127, 137, 255 }) do
+		helpers.it("linux-sqlite-read-receipts: dashboard rejects valid JSON with status " .. status, function()
+			with_stubbed_sqlite(function()
+				return { body = '[{"date":"2026-10-03","wifi_changes":42}]', status = status }
+			end, function(reader)
+				helpers.assert_nil(next(reader.read_system_days("/db/metrics.sqlite", nil, nil)),
+					"valid rows cannot hide a failed query receipt")
+			end)
+		end)
+	end
+
+	helpers.it("linux-sqlite-read-receipts: successful dashboard JSON retains real values", function()
+		with_stubbed_sqlite(function()
+			return { body = '[{"date":"2026-10-03","wifi_changes":42}]', status = 0 }
+		end, function(reader)
+			local days = reader.read_system_days("/db/metrics.sqlite", nil, nil)
+			helpers.assert_eq(days["2026-10-03"].wifi_changes, 42)
+		end)
+	end)
+end)
 
 --- Whether any statement selects from the given table.
 --- @param statements table

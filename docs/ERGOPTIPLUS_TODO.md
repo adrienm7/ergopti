@@ -358,6 +358,17 @@ These are software implementations; final hardware verification remains below.
   Windows/macOS writers use native SQLite result codes on their corresponding
   write paths; native cross-OS gates and manual CI remain unexecuted. Reader
   query receipts are a separate remaining diagnostic, not claimed complete here.
+- [~] **L29.** Linux SQLite read receipts: migration rows, scalar lookups and
+  JSON dashboard queries now require the same native terminal status as writes.
+  Failed CLI output cannot become a trusted prefix of rows or a migration value.
+  Seventeen native and seventeen portable refusal cases failed before the fix;
+  twenty-two native cases pass on host and nonroot Debian with genuine SQLite
+  data, an explicit faulty CLI wrapper, successful empty/multi-row/scalar/JSON
+  controls, marker-looking user bytes and 150000-byte output. Existing projection
+  assertions remain intact. Windows queries require native SQLITE_DONE; macOS
+  uses native iterators but intentionally retains partial dashboard side effects
+  on an exception, a distinct unvalidated source-level concern for its owner.
+  No common projection policy, native cross-OS gates or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

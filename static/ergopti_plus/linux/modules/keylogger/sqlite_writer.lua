@@ -137,18 +137,32 @@ local function _exec(sql)
 	return true
 end
 
+--- Runs a read query and rejects any rows from a failed native CLI.
+--- @param sql string Complete SELECT statement.
+--- @return string|nil Complete output, or nil when the query fails.
+local function _query_output(sql)
+	if not _db_path or not _available then return nil end
+	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" }, capture_exit = true })
+	if not cmd then return nil end
+	local pipe = io.popen(cmd, "r")
+	if not pipe then return nil end
+	local output = pipe:read("*a")
+	pipe:close()
+	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
+	if not accepted then
+		Logger.warn(LOG, "SQLite read refused: %s.", reason)
+		return nil
+	end
+	return body
+end
+
 --- Runs a scalar SELECT through the sqlite3 CLI.
 --- @param sql string Complete SELECT statement.
 --- @return string|nil First output line, or nil when the query fails.
 local function _query_scalar(sql)
-	if not _db_path or not _available then return nil end
-	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
-	if not cmd then return nil end
-	local pipe = io.popen(cmd, "r")
-	if not pipe then return nil end
-	local value = pipe:read("*l")
-	pipe:close()
-	return value
+	local output = _query_output(sql)
+	if output == nil or output == "" then return nil end
+	return output:match("^([^\n]*)")
 end
 
 --- Reserves consecutive event IDs transactionally within this writer process.
@@ -1046,17 +1060,17 @@ end
 
 --- Runs a SELECT and returns its output lines.
 --- @param sql string Complete SELECT statement.
---- @return table|nil One entry per output line, or nil when no database is open.
+--- @return table|nil One entry per output line, or nil when unavailable/failed.
 function M.query_rows(sql)
 	if not M.is_available() then return nil end
 	if type(sql) ~= "string" or sql == "" then return nil end
-	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
-	if not cmd then return nil end
-	local pipe = io.popen(cmd, "r")
-	if not pipe then return nil end
+	local output = _query_output(sql)
+	if output == nil then return nil end
 	local lines = {}
-	for line in pipe:lines() do lines[#lines + 1] = line end
-	pipe:close()
+	if output ~= "" then
+		local framed = output:sub(-1) == "\n" and output or (output .. "\n")
+		for line in framed:gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
+	end
 	return lines
 end
 

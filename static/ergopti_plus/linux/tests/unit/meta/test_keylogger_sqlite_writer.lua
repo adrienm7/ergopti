@@ -10,6 +10,78 @@ local helpers = require("tests.helpers")
 local it = require("tests.support.metrics_preferences_fixture").it
 local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 
+--- Models native stdout and LuaJIT's ambiguous pclose without replacing the
+--- production builder or query logic. lines()/read() both mirror the real ABI.
+local function with_writer_read_receipts(body, status, test)
+	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+	local previous_execute, previous_popen = os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write("existing native database fixture") and file:close())
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		local content, code = body, status
+		if command:find("SELECT sql FROM sqlite_master", 1, true) then
+			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
+		end
+		return {
+			read = function(_, mode)
+				if mode == "*l" then return content:match("^([^\n]*)") end
+				if command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true) and code ~= "missing" then
+					return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. code .. "\n"
+				end
+				return content
+			end,
+			lines = function()
+				if content == "" then return function() return nil end end
+				local framed = content:sub(-1) == "\n" and content or (content .. "\n")
+				return framed:gmatch("([^\n]*)\n")
+			end,
+			close = function() return true end,
+		}
+	end
+	local ok, err = xpcall(function()
+		helpers.assert_true(writer.open_db(path))
+		test(writer)
+	end, debug.traceback)
+	os.execute, io.popen = previous_execute, previous_popen
+	writer.close_db()
+	os.remove(path)
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-sqlite-read-receipts", function()
+	for _, status in ipairs({ 1, 7, 127, 137, 255, "missing" }) do
+		it("linux-sqlite-read-receipts: migration rows reject receipt " .. status, function()
+			with_writer_read_receipts("one\ntwo\n", status, function(writer)
+				helpers.assert_nil(writer.query_rows("SELECT value FROM receipt;"))
+			end)
+		end)
+		it("linux-sqlite-read-receipts: scalar rejects receipt " .. status, function()
+			with_writer_read_receipts("trusted scalar\n", status, function(writer)
+				helpers.assert_nil(writer.get_meta("receipt"))
+			end)
+		end)
+	end
+
+	for label, body in pairs({ rows = "one\ntwo\n", unterminated = "one\ntwo", empty = "", blank = "\n" }) do
+		it("linux-sqlite-read-receipts: accepted " .. label .. " output preserves its line contract", function()
+			with_writer_read_receipts(body, 0, function(writer)
+				local rows = writer.query_rows("SELECT value FROM receipt;")
+				helpers.assert_eq(type(rows), "table")
+				if label == "empty" then helpers.assert_eq(#rows, 0)
+				elseif label == "blank" then
+					helpers.assert_eq(#rows, 1)
+					helpers.assert_eq(rows[1], "")
+				else
+					helpers.assert_eq(#rows, 2)
+					helpers.assert_eq(table.concat(rows, "|"), "one|two")
+				end
+			end)
+		end)
+	end
+end)
+
 helpers.describe("linux-sqlite-writer-receipts", function()
 	for _, status in ipairs({ 1, 7, 23, 127, 255 }) do
 		it("linux-sqlite-writer-receipts: silent status " .. status .. " cannot acknowledge a write", function()
