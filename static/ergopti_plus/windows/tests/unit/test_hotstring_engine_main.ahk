@@ -1303,6 +1303,70 @@ TestHSE_CrossSensitivityStarArbitration() {
 Test("HSE cross-sensitivity end/star arbitration follows the star candidate",
     TestHSE_CrossSensitivityStarArbitration)
 
+TestHSE_StarPrefixRequiresEligibleContinuation() {
+    Cases := [
+        { Flags: "*", Typed: "xfoo", Boundary: true, Conform: false, Shadow: false },
+        { Flags: "*?", Typed: "xfoo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: false, Conform: false, Shadow: false },
+        { Flags: "*", Typed: "x'foo", Boundary: false, Conform: false, Shadow: true },
+        { Flags: "*?", Typed: "fOo", Boundary: true, Conform: true, Shadow: false },
+        { Flags: "*?", Typed: "Foo", Boundary: true, Conform: true, Shadow: true },
+        { Flags: "*?", Typed: "FOO", Boundary: true, Conform: true, Shadow: true }
+    ]
+    for Index, Vector in Cases {
+        HSE_TestReset()
+        try {
+            HSE_FeedReset(Vector.Boundary)
+            HSE_Register("?", "foo", () => 0)
+            HSE_Register(Vector.Flags, "foo bar", () => 0,
+                Map("CaseConform", Vector.Conform))
+            for Char in StrSplit(Vector.Typed)
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            if Vector.Shadow {
+                AssertEqual("", Match, "case " . Index . ": an eligible longer star still reserves its prefix")
+            } else {
+                AssertTrue(IsObject(Match), "case " . Index . ": an impossible star must not silence the end trigger")
+                AssertEqual("foo", Match.Trigger, "case " . Index . ": the valid end trigger wins")
+            }
+        } finally {
+            HSE_TestReset()
+        }
+    }
+}
+Test("HSE star prefix checks word scope and conform case (star-prefix-eligibility)",
+    TestHSE_StarPrefixRequiresEligibleContinuation)
+
+TestHSE_StarPrefixEligibilitySurvivesGroupToggles() {
+    HSE_TestReset()
+    try {
+        HSE_Register("?", "foo", () => 0)
+        Restricted := HSE_Register("*", "foo bar", () => 0, Map("group", "restricted"))
+        InWord := HSE_Register("*?", "foo baz", () => 0, Map("group", "inword"))
+        AssertEqual("restricted", Restricted.Group, "the restricted candidate is in its own group")
+        AssertEqual("inword", InWord.Group, "the in-word candidate is independently toggleable")
+        for Enabled in [true, false, true] {
+            if Enabled
+                HSE_EnableGroup("inword")
+            else
+                HSE_DisableGroup("inword")
+            HSE_FeedReset(true)
+            for Char in StrSplit("xfoo")
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            AssertEqual(!Enabled, IsObject(Match),
+                "any eligible continuation may suppress; a disabled or word-scoped one cannot")
+            if IsObject(Match)
+                AssertEqual("foo", Match.Trigger, "the end trigger remains live across index rebuilds")
+        }
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE star prefix retains candidate eligibility across group toggles (star-prefix-eligibility)",
+    TestHSE_StarPrefixEligibilitySurvivesGroupToggles)
+
 
 
 
