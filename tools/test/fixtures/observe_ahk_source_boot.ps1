@@ -99,6 +99,23 @@ function Get-AdmittedSourceHandle {
         if ($candidateHandle -ne [IntPtr]::Zero) { & $Close $candidateHandle }
     }
 }
+function Get-SourceOwnerEvidence {
+    param($Native, [string] $Interpreter, [string] $Entry)
+    # These booleans explain refusal; they never grant process cleanup authority.
+    # Keep command lines, source paths and unrelated process metadata private.
+    $nativePresent = $null -ne $Native
+    $imagePresent = $nativePresent -and ![string]::IsNullOrEmpty($Native.ExecutablePath)
+    $commandPresent = $nativePresent -and ![string]::IsNullOrEmpty($Native.CommandLine)
+    return [ordered]@{
+        schema_version = 1
+        native_present = [bool]$nativePresent
+        image_present = [bool]$imagePresent
+        image_exact = [bool]($imagePresent -and $Native.ExecutablePath -ieq $Interpreter)
+        command_present = [bool]$commandPresent
+        script_argument_exact = [bool]($commandPresent -and
+            [SourceBootProcess]::HasExactEntry($Native.CommandLine, $Entry))
+    }
+}
 if ($LibraryOnly) { return }
 
 $env:LOCALAPPDATA = Join-Path $Root 'localappdata'
@@ -147,7 +164,9 @@ try {
     $native = Get-CimInstance Win32_Process -Filter "ProcessId=$($receipt.pid)"
     if ($null -eq $native -or $native.ExecutablePath -ine $Ahk -or
         ![SourceBootProcess]::HasExactEntry($native.CommandLine, $Entry)) {
-        throw 'The readiness owner is not executing the private cloned source.'
+        $ownerEvidence = Get-SourceOwnerEvidence -Native $native -Interpreter $Ahk -Entry $Entry
+        throw ('The readiness owner is not executing the private cloned source. source-owner-evidence=' +
+            ($ownerEvidence | ConvertTo-Json -Compress))
     }
     $successor = Get-AdmittedSourceHandle -ProcessId $receipt.pid `
         -CreationFileTime $native.CreationDate.ToFileTimeUtc() -Interpreter $Ahk

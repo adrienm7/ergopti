@@ -47,4 +47,47 @@ foreach ($mode in @('mismatch', 'query-failure', 'accepted')) {
         throw 'An unproven handle escaped into termination cleanup.'
     }
 }
-Write-Output '[OK] Source observer admits only the exact script and proven process generation.'
+$interpreter = 'C:\private interpreter\AutoHotkey64.exe'
+$privateEntry = 'C:\private source secret\ErgoptiPlus.ahk'
+$exactCommand = '"' + $interpreter + '" /restart /script "' + $privateEntry + '"'
+foreach ($case in @(
+    @{ native = $null; expected = @($false, $false, $false, $false, $false) },
+    @{ native = @{ ExecutablePath = $null; CommandLine = $exactCommand };
+        expected = @($true, $false, $false, $true, $true) },
+    @{ native = @{ ExecutablePath = 'C:\foreign.exe'; CommandLine = $exactCommand };
+        expected = @($true, $true, $false, $true, $true) },
+    @{ native = @{ ExecutablePath = $interpreter; CommandLine = $null };
+        expected = @($true, $true, $true, $false, $false) },
+    @{ native = @{ ExecutablePath = $interpreter; CommandLine = '' };
+        expected = @($true, $true, $true, $false, $false) },
+    @{ native = @{ ExecutablePath = $interpreter;
+        CommandLine = '"' + $interpreter + '" "other.ahk" "' + $privateEntry + '"' };
+        expected = @($true, $true, $true, $true, $false) },
+    @{ native = @{ ExecutablePath = $interpreter;
+        CommandLine = '"' + $interpreter + '" /unknown "' + $privateEntry + '"' };
+        expected = @($true, $true, $true, $true, $false) },
+    @{ native = @{ ExecutablePath = $interpreter;
+        CommandLine = '"' + $interpreter + '" "' + $privateEntry + '.other"' };
+        expected = @($true, $true, $true, $true, $false) },
+    @{ native = @{ ExecutablePath = $interpreter; CommandLine = $exactCommand };
+        expected = @($true, $true, $true, $true, $true) }
+)) {
+    $evidence = Get-SourceOwnerEvidence -Native $case.native -Interpreter $interpreter -Entry $privateEntry
+    $keys = @('schema_version', 'native_present', 'image_present', 'image_exact',
+        'command_present', 'script_argument_exact')
+    if (@($evidence.Keys).Count -ne $keys.Count -or $evidence.schema_version -ne 1) {
+        throw 'Source-owner evidence has an unexpected shape.'
+    }
+    for ($index = 1; $index -lt $keys.Count; $index++) {
+        if ($evidence[$keys[$index]] -isnot [bool] -or
+            $evidence[$keys[$index]] -ne $case.expected[$index - 1]) {
+            throw ('Source-owner evidence disagrees at closed predicate ' + $keys[$index] + '.')
+        }
+    }
+    $serialized = $evidence | ConvertTo-Json -Compress
+    if ($serialized.Length -gt 200 -or $serialized.Contains('private') -or
+        $serialized.Contains('foreign') -or $serialized.Contains('.ahk') -or $serialized.Contains('.exe')) {
+        throw 'Source-owner evidence exposed private process metadata.'
+    }
+}
+Write-Output '[OK] Source observer admits only the exact script and proven process generation; refusal evidence remains closed.'

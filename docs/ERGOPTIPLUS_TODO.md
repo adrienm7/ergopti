@@ -378,6 +378,8 @@ original nonzero verdict. Registered native-adapter regressions reproduce the
 old diagnostic level and retain missing headers and empty-body evidence.
 Complete three-OS qualification remains pending.
 
+TODO 16 remains partial: the native AHK suite passed 8,061 cases and the full-driver startup smoke passed, but the fresh private source clone reached READY and was refused by the observer before warm qualification. Add a closed five-boolean refusal receipt for CIM presence, image presence/equality, command presence and exact first-script-argument identity. Preserve the actual admission, generation, image, handle and cleanup predicates. Native PowerShell regression vectors and actual cold-clone receipt still require Windows CI; no alias cause or identity-admission correction is claimed.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
