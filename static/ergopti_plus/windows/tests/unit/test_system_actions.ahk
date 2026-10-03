@@ -1182,3 +1182,74 @@ for _SysActions_QueryPauseRead in [1, 3, 4]
 	Test("unblock callback pause during ownership/directory read  (confirmed-query-pause)" . _SysActions_QueryPauseRead, _QueryPauseUnblockFactory(_SysActions_QueryPauseRead))
 for _SysActions_QueryPausePositiveAction in ["force_quit_frontmost", "unblock_file_selection"]
 	Test("confirmed callback unchanged  (confirmed-query-pause)" . _SysActions_QueryPausePositiveAction, _QueryPausePositiveFactory(_SysActions_QueryPausePositiveAction))
+
+class _SiblingQueryFake extends _SysActionsFake {
+	__New() {
+		super.__New()
+		this.PauseQuery := true
+	}
+	ActiveWindow() {
+		Current := super.ActiveWindow()
+		if this.PauseQuery
+			Suspend(true)
+		return Current
+	}
+	CaptureMuted() {
+		Current := super.CaptureMuted()
+		if this.PauseQuery
+			Suspend(true)
+		return Current
+	}
+	ReadDword(Key, Name) {
+		Current := super.ReadDword(Key, Name)
+		if this.PauseQuery
+			Suspend(true)
+		return Current
+	}
+}
+_SiblingQueryCase(ActionName, Fn, Effect, PauseQuery := true) {
+	Fake := _SiblingQueryFake()
+	Fake.Active := {Hwnd: 0x100, Pid: 812, Class: "Notepad"}
+	Fake.Windows := [0x100]
+	Fake.PauseQuery := PauseQuery
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureMakeSystemRunner(ActionName, Fn.Bind(Fake), Fake).Call()
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(PauseQuery ? 0 : (Effect == "WriteDword" ? 2 : 1), _SysActions_CallsNamed(Fake, Effect).Length,
+			"deferred sibling emitted effect after query observed pause")
+	} finally Suspend(PriorPause)
+}
+_SiblingQueryFactory(ActionName, Fn, Effect, PauseQuery := true) => () => _SiblingQueryCase(ActionName, Fn, Effect, PauseQuery)
+class _SiblingThemeMidWriteFake extends _SiblingQueryFake {
+	WriteDword(Key, Name, Value) {
+		Written := super.WriteDword(Key, Name, Value)
+		if Name == "AppsUseLightTheme"
+			Suspend(true)
+		return Written
+	}
+}
+_SiblingThemeMidWriteStillSettles() {
+	Fake := _SiblingThemeMidWriteFake()
+	Fake.PauseQuery := false
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureMakeSystemRunner("toggle_dark_mode", GestureSysToggleDarkMode.Bind(Fake), Fake).Call()
+		Fake.Deferred.RemoveAt(1).Call()
+		AssertEqual(2, _SysActions_CallsNamed(Fake, "WriteDword").Length,
+			"an admitted theme transaction must publish both settings")
+		AssertEqual(Fake.Registry["AppsUseLightTheme"], Fake.Registry["SystemUsesLightTheme"],
+			"mid-write pause cannot leave applications and system themes inconsistent")
+		AssertEqual(1, _SysActions_CallsNamed(Fake, "BroadcastSettingChange").Length,
+			"the admitted write phase still tells applications its committed state")
+	} finally Suspend(PriorPause)
+}
+Test("quit runner after active query pause", _SiblingQueryFactory("quit_frontmost_app", GestureSysQuitFrontmostApp, "PostClose"))
+Test("microphone runner after capture query pause", _SiblingQueryFactory("mic_mute_toggle", GestureSysMicMuteToggle, "SetCaptureMuted"))
+Test("theme runner after registry query pause", _SiblingQueryFactory("toggle_dark_mode", GestureSysToggleDarkMode, "WriteDword"))
+Test("quit unchanged recording", _SiblingQueryFactory("quit_frontmost_app", GestureSysQuitFrontmostApp, "PostClose", false))
+Test("microphone unchanged recording", _SiblingQueryFactory("mic_mute_toggle", GestureSysMicMuteToggle, "SetCaptureMuted", false))
+Test("theme unchanged recording", _SiblingQueryFactory("toggle_dark_mode", GestureSysToggleDarkMode, "WriteDword", false))
+Test("theme mid-first-write pause completes transaction", _SiblingThemeMidWriteStillSettles)
