@@ -1645,3 +1645,41 @@ _LAG_AutomaticMissingModelNotifiesWithoutModal() {
 }
 Test("LLM agent: actual automatic local triage missing-model notice has no modal or pull (todo-46-local-model)",
 	_LAG_AutomaticMissingModelNotifiesWithoutModal)
+
+/** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
+_LAG_ToolsCacheLifetime(StartTick) {
+	_LAG_RunConnectors("", _Body)
+	_Body(Fx) {
+		global _LLM_AgentConnector_ListFn, LLM_AGENT_TOOLS_TTL_MS
+		State := { Reads: 0, Files: ["C:\tools\old.ps1"] }
+		List(Dir) {
+			State.Reads += 1
+			return State.Files.Clone()
+		}
+		_LLM_AgentConnector_ListFn := List
+		Config := LLM_Agent_Config()
+		Initial := LLM_AgentConnector_Tools(Config, true, StartTick)
+		AssertEqual(1, State.Reads, "initial force actually enumerates the folder")
+		AssertEqual("old", Initial["names"][1])
+		State.Files := ["C:\tools\new.cmd"]
+		Before := (StartTick + LLM_AGENT_TOOLS_TTL_MS - 1) & 0xFFFFFFFF
+		Cached := LLM_AgentConnector_Tools(Config, false, Before)
+		AssertEqual(1, State.Reads, "strictly before expiry the cache is reused")
+		AssertEqual(ObjPtr(Initial), ObjPtr(Cached), "reuse retains the same cache owner")
+		Now := (StartTick + LLM_AGENT_TOOLS_TTL_MS) & 0xFFFFFFFF
+		Refreshed := LLM_AgentConnector_Tools(Config, false, Now)
+		AssertEqual(2, State.Reads, "at the exact TTL the folder must be enumerated again")
+		AssertEqual("new", Refreshed["names"][1], "removed tools disappear from the prompt list")
+		AssertFalse(Refreshed["paths"].Has("old"), "removed tools cannot remain executable")
+		AssertEqual("C:\tools\new.cmd", Refreshed["paths"]["new"])
+		AssertEqual(Now, Refreshed["tick"], "the admitted snapshot uses the same clock observation")
+		State.Files := ["C:\tools\forced.ahk"]
+		Forced := LLM_AgentConnector_Tools(Config, true, Now)
+		AssertEqual(3, State.Reads, "explicit force still bypasses a fresh cache")
+		AssertEqual("forced", Forced["names"][1])
+	}
+}
+Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)",
+	_LAG_ToolsCacheLifetime.Bind(100))
+Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
+	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
