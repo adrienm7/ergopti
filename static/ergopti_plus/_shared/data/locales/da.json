@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Klik her for at vælge en af de modeller, den tilbyder.",
 	"llm.local_servers.found_body": "Svarer med {1} model(ler): vælg en under AI ▸ AI-motor.",
 	"llm.unreachable.title": "{1} svarer ikke",
+	"llm.unreachable.body_unconfirmed": "AI forbliver slået fra: {1} svarer ikke på {2}. Start serveren, og prøv derefter at aktivere AI igen.",
 	"llm.unreachable.body_missing": "AI forbliver slået fra: intet svarer på {2}, adressen for {1}, fordi {1} ikke er installeret på denne computer.",
 	"llm.unreachable.body_stopped": "AI forbliver slået fra: {1} er installeret, men intet svarer på {2}, dens adresse. Den startede ikke.",
 	"llm.unreachable.servers_found": "Disse lokale servere svarer og kan erstatte den: {1}.",

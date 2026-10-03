@@ -85,12 +85,17 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	try LLM_Menu_BootstrapOllama(true)
 }
 
-LLM_Menu_OnToggle(*) {
+LLM_Menu_OnToggle(EnablePort := 0, *) {
+	global _LLM_Menu
 	static _Toggling := false
 	if _Toggling
 		return false
 	_Toggling := true
 	try {
+		if !_LLM_Menu.Get("enabled", false)
+				&& LLM_EnableRequiresProbe(_LLM_Menu.Get("backend", ""))
+			return LLM_Menu_RequestEnableAdmission(EnablePort)
+		LLM_Menu_CancelEnableAdmission()
 		return LLM_Menu_CommitMutation("the LLM enabled-state change",
 			(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "enabled"),
 			_LLM_Menu_ApplyToggleCommitted)
@@ -99,7 +104,7 @@ LLM_Menu_OnToggle(*) {
 	}
 }
 
-_LLM_Menu_ApplyToggleCommitted(Candidate) {
+_LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 	LoggerInfo("LLM", "Toggle clicked — enabled: "
 		. (Candidate["enabled"] ? "true" : "false") . ".")
@@ -108,7 +113,7 @@ _LLM_Menu_ApplyToggleCommitted(Candidate) {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-		LLM_Menu_ScheduleBackendLifecycle(true)
+		LLM_Menu_ScheduleBackendLifecycle(ShowUi)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)

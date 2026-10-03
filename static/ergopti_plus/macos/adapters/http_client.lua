@@ -54,6 +54,11 @@ local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "adapters.http_client"
+local CACHE_POLICIES = {
+	protocolCachePolicy = true, ignoreLocalCache = true, ignoreLocalAndRemoteCache = true,
+	returnCacheOrLoad = true, returnCacheDontLoad = true, reloadRevalidatingCache = true,
+}
+
 
 --- Invokes a completion callback so a throw inside it cannot vanish.
 ---
@@ -268,13 +273,21 @@ end
 --- Creates and returns a new independent HttpClient instance.
 --- Each instance manages its own in-flight request slot and timeout timer,
 --- so concurrent users (e.g. different LLM backends) do not interfere.
---- @param options table|nil Optional configuration (`timeout_ms` overrides the default).
+--- @param options table|nil Timeout settings, native cache_policy and an opt-in follow_redirects=false origin fence.
 --- @return table A fresh HttpClient instance with post/get/cancel/isActive methods.
 local function new(options)
 	if options ~= nil and type(options) ~= "table" then
 		error("HttpClient.new(): options must be a table", 2)
 	end
 	options = options or {}
+	if options.follow_redirects ~= nil and type(options.follow_redirects) ~= "boolean" then
+		error("HttpClient.new(): follow_redirects must be a boolean", 2)
+	end
+	local follow_redirects = options.follow_redirects ~= false
+	local cache_policy = options.cache_policy
+	if cache_policy ~= nil and (type(cache_policy) ~= "string" or CACHE_POLICIES[cache_policy] ~= true) then
+		error("HttpClient.new(): cache_policy must name a supported native cache policy", 2)
+	end
 	local timeout_ms = options.timeout_ms
 	if timeout_ms == nil then
 		timeout_ms = DEFAULT_TIMEOUT_MS
@@ -583,6 +596,21 @@ local function new(options)
 		return my_generation
 	end
 
+	--- Calls the single configurable native entry for explicit cache and redirect policy.
+	--- @param method string Lowercase HTTP method.
+	--- @param url string Exact request URL.
+	--- @param headers table Request headers.
+	--- @param body string|nil Request body.
+	--- @param callback function Native response callback.
+	--- @param redirects boolean Whether the native request may follow redirects.
+	--- @return any task Optional native cancellation capability.
+	local function _native_request(method, url, headers, body, callback, redirects)
+		-- Hammerspoon accepts cache policy at argument 6 and redirects at argument 7.
+		-- Its legacy boolean argument 6 remains valid when no cache policy was selected.
+		return hs.http.doAsyncRequest(url, method:upper(), body, headers, callback,
+			cache_policy or redirects, redirects)
+	end
+
 	--- Dispatches one HTTP method after the timeout transaction commits.
 	--- @param method string Native method name.
 	--- @param url string Absolute URL.
@@ -594,6 +622,10 @@ local function new(options)
 		if not my_generation then return false end
 
 		local ok, task_or_err = pcall(function()
+			if follow_redirects == false or cache_policy ~= nil then
+				return _native_request(method, url, headers, body,
+					_make_cb(callback, my_generation), follow_redirects)
+			end
 			if method == "post" then
 				return hs.http.asyncPost(url, body, headers, _make_cb(callback, my_generation))
 			end
@@ -653,11 +685,11 @@ local function new(options)
 			current_hop = current_hop + 1
 			local my_hop = current_hop
 			local ok, result_or_err = pcall(function()
-				return hs.http.doAsyncRequest(
+				return _native_request(
+					hop_method,
 					hop_url,
-					hop_method:upper(),
-					hop_body,
 					hop_headers,
+					hop_body,
 					function(status, response_body, response_headers)
 						if _active_task_generation == my_generation
 							and _active_task_hop == my_hop then
@@ -708,8 +740,7 @@ local function new(options)
 						end
 
 						terminal_callback(status, response_body, response_headers)
-					end,
-					false)
+					end, false)
 			end)
 
 			if not ok or result_or_err == false then
@@ -747,7 +778,7 @@ local function new(options)
 	--- @param body     string   JSON-encoded request body.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.post(url, headers, body, callback)
-		if has_sensitive_headers(headers) then
+		if follow_redirects == true and has_sensitive_headers(headers) then
 			return _dispatch_with_redirect_policy("post", url, headers, body, callback)
 		end
 		return _dispatch("post", url, headers, body, callback)
@@ -758,7 +789,7 @@ local function new(options)
 	--- @param headers  table    Key→value header map.
 	--- @param callback function Called with { ok, status, body, headers, error }.
 	function inst.get(url, headers, callback)
-		if has_sensitive_headers(headers) then
+		if follow_redirects == true and has_sensitive_headers(headers) then
 			return _dispatch_with_redirect_policy("get", url, headers, nil, callback)
 		end
 		return _dispatch("get", url, headers, nil, callback)

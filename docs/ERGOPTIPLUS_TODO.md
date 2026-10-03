@@ -550,17 +550,8 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
       asynchronous probe (WinHTTP, curl), keyless API entries (Linux
       `api_remote.lua` refuses an empty key) and menu rows; the Linux tray has no
       text input for an address or a key.
-- [ ] **48.** Enabling the AI when Ollama does not answer is explained on macOS
-      only: the AI stays off and one error names Ollama and its address, with a
-      button per running local server, "Start Ollama" or "Install Ollama and the
-      model" (`llm-enable-unreachable-local`,
-      `ui/menu/menu_llm/unreachable_backend_offer.lua`). Linux `llm_toggle` turns
-      the prediction engine on without any reachability check, and the Windows tray
-      only adds an install row while the Ollama dependencies are missing; neither
-      names the address nor offers a start or a running server. Their neutral
-      backend is Ollama (`llm.models.selected` `default_per_platform`), so once item
-      47 lands a server that answers is the natural first button there; the switch
-      must still be confirmed (W1).
+- [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its

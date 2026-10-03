@@ -1,0 +1,270 @@
+--- tests/unit/modules/llm/test_enable_admission.lua
+
+--- ==============================================================================
+--- MODULE: Linux Owned AI Enable Admission
+--- DESCRIPTION:
+--- Exercises real controller ownership, then the engine and durable preference
+--- seams. Scripted HTTP receipts represent actual terminal adapter fields.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local function test(name, body) helpers.it(name .. " (ai-enable-admission)", body) end
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+
+local function with_owner(body, options)
+	options = options or {}
+	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
+		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
+	world.live = { backend = "ollama", model = "model:2b", origin = "http://127.0.0.1:11434",
+		generation = 1, enabled = false, paused = false, blocked = false, source = { status = "absent" } }
+	local Http = {
+		get = function(url, _, request, callback)
+			world.calls[#world.calls + 1] = { url = url, request = request, callback = callback }
+			if options.synchronous then callback(options.synchronous) end
+			return options.dispatched ~= false
+		end,
+		cancel = function(owner)
+			world.cancels[#world.cancels + 1] = owner
+			return world.cancel_ok
+		end,
+	}
+	package.loaded["adapters.http_client"] = Http
+	package.loaded["modules.llm.enable_admission"] = nil
+	world.owner = require("modules.llm.enable_admission").new({
+		snapshot = function()
+			if world.unreadable then error("unreadable source") end
+			local snapshot = {}
+			for key, value in pairs(world.live) do snapshot[key] = value end
+			return snapshot
+		end,
+		commit = function(source)
+			world.commits[#world.commits + 1] = source
+			return world.write_ok ~= false
+		end,
+		reject = function(origin, reason)
+			world.rejects[#world.rejects + 1] = { origin, reason }
+			if world.on_reject then world.on_reject() end
+			return world.choice
+		end,
+		changed = function() world.changes = world.changes + 1 end,
+	})
+	world.good = { ok = true, status = 200, body = '{"version":"0.12.3"}' }
+	function world.answer(receipt, index) world.calls[index or #world.calls].callback(receipt or world.good) end
+	function world.load_engine(backend)
+		local preferences = PreferencesFixture.new({ initial = {
+			["llm.enabled"] = false, ["llm.models.selected"] = backend or "ollama",
+			["llm.models.ollama"] = "model:2b",
+		} })
+		package.loaded["infra.llm_preferences"] = preferences
+		package.loaded["modules.llm.profiles"] = nil
+		package.loaded["modules.llm.prediction_engine"] = nil
+		package.loaded["ui.llm_enable_refusal"] = { show = function(origin)
+			world.rejects[#world.rejects + 1] = { origin }; return true
+		end }
+		world.engine = require("modules.llm.prediction_engine")
+		world.engine.init({ is_paused = function() return world.live.paused end })
+		return world.engine, preferences
+	end
+	local ok, err = xpcall(function() body(world) end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("owned Linux enable version admission", function()
+	test("does not publish before a complete successful version receipt", function()
+		with_owner(function(world)
+			helpers.assert_true(world.owner.enable())
+			helpers.assert_eq(#world.commits, 0)
+			helpers.assert_eq(world.calls[1].url, "http://127.0.0.1:11434/api/version")
+			helpers.assert_eq(world.calls[1].request.owner, "llm_enable_admission")
+			helpers.assert_eq(world.calls[1].request.follow_redirects, false)
+			world.answer()
+			helpers.assert_eq(world.commits, { world.live.source })
+			helpers.assert_eq(world.changes, 1)
+			helpers.assert_eq(world.owner.pending(), false)
+		end)
+	end)
+
+	for _, receipt in ipairs({
+		{ ok = false, status = 0, body = "" }, { ok = false, status = 401, body = "unauthorized" },
+		{ ok = true, status = 200, body = '{"models":[]}' },
+	}) do
+		test("keeps AI off and names its origin on a refused terminal " .. receipt.status .. ":" .. receipt.body, function()
+			with_owner(function(world)
+				helpers.assert_true(world.owner.enable())
+				world.answer(receipt)
+				helpers.assert_eq(#world.commits, 0)
+				helpers.assert_eq(#world.rejects, 1)
+				helpers.assert_eq(world.rejects[1][1], world.live.origin)
+				helpers.assert_eq(world.changes, 0)
+			end)
+		end)
+	end
+
+
+	test("requests a fresh receipt only after explicit current retry", function()
+		with_owner(function(world)
+			helpers.assert_true(world.owner.enable())
+			world.choice = "retry"
+			world.answer({ ok = false, status = 503, body = "" }, 1)
+			helpers.assert_eq(#world.calls, 2)
+			helpers.assert_eq(#world.commits, 0)
+			helpers.assert_true(world.owner.pending())
+			helpers.assert_eq(world.calls[2].url, world.calls[1].url)
+			world.answer(world.good, 1)
+			helpers.assert_eq(#world.commits, 0, "an old failed request cannot publish the retry")
+			world.answer(world.good, 2)
+			helpers.assert_eq(#world.commits, 1)
+			helpers.assert_eq(world.changes, 1)
+		end)
+	end)
+
+	for _, change in ipairs({ { "origin", "http://127.0.0.1:21434" },
+		{ "generation", 2 }, { "paused", true }, { "blocked", true } }) do
+		test("does not retry after " .. change[1] .. " changes during the offer", function()
+			with_owner(function(world)
+				world.choice = "retry"
+				world.on_reject = function() world.live[change[1]] = change[2] end
+				helpers.assert_true(world.owner.enable())
+				world.answer({ ok = false, status = 503, body = "" })
+				helpers.assert_eq(#world.calls, 1)
+				helpers.assert_eq(#world.commits, 0)
+				helpers.assert_eq(world.owner.pending(), false)
+			end)
+		end)
+	end
+
+	for _, mutation in ipairs({
+		{ "backend", "api" }, { "model", "model:3b" }, { "origin", "http://127.0.0.1:21434" },
+		{ "generation", 3 }, { "paused", true }, { "blocked", true }, { "enabled", true },
+	}) do
+		test("drops a late answer after " .. mutation[1] .. " changes", function()
+			with_owner(function(world)
+				helpers.assert_true(world.owner.enable())
+				world.live[mutation[1]] = mutation[2]
+				world.answer()
+				helpers.assert_eq(#world.commits + #world.rejects, 0)
+				helpers.assert_eq(world.owner.pending(), false)
+			end)
+		end)
+	end
+
+	test("retains cancellation refusal debt and never accepts the old answer", function()
+		with_owner(function(world)
+			helpers.assert_true(world.owner.enable())
+			world.cancel_ok = false
+			helpers.assert_eq(world.owner.cancel(), false)
+			helpers.assert_eq(world.owner.enable(), false)
+			helpers.assert_true(world.owner.pending())
+			world.answer()
+			helpers.assert_eq(#world.commits + #world.rejects, 0)
+			helpers.assert_eq(world.owner.pending(), false)
+			helpers.assert_true(world.owner.enable())
+			world.cancel_ok = true
+			helpers.assert_true(world.owner.cancel())
+			world.answer()
+			helpers.assert_eq(#world.commits, 0)
+		end)
+	end)
+
+	test("does not publish an answer delivered before dispatch refusal", function()
+		with_owner(function(world)
+			helpers.assert_eq(world.owner.enable(), false)
+			helpers.assert_eq(#world.commits, 0)
+			helpers.assert_eq(#world.rejects, 1)
+			helpers.assert_eq(world.owner.pending(), false)
+		end, { dispatched = false, synchronous = { ok = true, status = 200, body = '{"version":"1"}' } })
+	end)
+
+	test("preserves persistence refusal and does not refresh an uncommitted state", function()
+		with_owner(function(world)
+			world.write_ok = false
+			helpers.assert_true(world.owner.enable())
+			world.answer()
+			helpers.assert_eq(#world.commits, 1)
+			helpers.assert_eq(world.changes, 0)
+		end)
+	end)
+
+	test("keeps API enabling independent of an unreachable local server", function()
+		with_owner(function(world)
+			world.live.backend, world.live.origin, world.live.model = "api", nil, nil
+			helpers.assert_true(world.owner.enable())
+			helpers.assert_eq(#world.calls, 0)
+			helpers.assert_eq(#world.commits, 1)
+			helpers.assert_eq(world.changes, 1)
+		end)
+	end)
+end)
+
+helpers.describe("Linux prediction enable publication", function()
+	test("API activation publishes without a local model or version request", function()
+		with_owner(function(world)
+			local engine, preferences = world.load_engine("api")
+			package.loaded["modules.llm.profiles"].get_current_model = function() return nil end
+			helpers.assert_true(engine.enable())
+			helpers.assert_true(engine.is_enabled())
+			helpers.assert_true(preferences.get("llm.enabled"))
+			helpers.assert_eq(#world.calls, 0, "the API owner does not contact a local Ollama server")
+			helpers.assert_eq(#world.rejects, 0)
+		end)
+	end)
+
+	test("persists disabled until the actual controller acknowledges current Ollama", function()
+		with_owner(function(world)
+			local engine, preferences = world.load_engine()
+			helpers.assert_true(engine.enable(function() world.changes = world.changes + 1 end))
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(preferences.get("llm.enabled"), false)
+			world.answer()
+			helpers.assert_true(engine.is_enabled())
+			helpers.assert_true(preferences.get("llm.enabled"))
+			helpers.assert_eq(world.changes, 1)
+		end)
+	end)
+
+	test("a preference A-B-A edit invalidates the pending enable", function()
+		with_owner(function(world)
+			local engine, preferences = world.load_engine()
+			helpers.assert_true(engine.enable())
+			helpers.assert_true(preferences.set("llm.models.ollama", "model:3b"))
+			helpers.assert_true(preferences.set("llm.models.ollama", "model:2b"))
+			world.answer()
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(preferences.get("llm.enabled"), false)
+		end)
+	end)
+
+	test("a pause and resume cannot revive a pre-pause answer", function()
+		with_owner(function(world)
+			local engine, preferences = world.load_engine()
+			helpers.assert_true(engine.enable())
+			world.live.paused = true
+			engine.on_pause_change(true)
+			world.live.paused = false
+			engine.on_pause_change(false)
+			world.answer()
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(preferences.get("llm.enabled"), false)
+		end)
+	end)
+
+	test("a scope owner must settle the probe before taking its reversible snapshot", function()
+		with_owner(function(world)
+			local engine = world.load_engine()
+			helpers.assert_true(engine.enable())
+			local scope = { pending = function() return false end }
+			helpers.assert_true(engine.acquire_configuration(scope))
+			helpers.assert_nil(engine.configuration_snapshot(scope))
+			world.cancel_ok = false
+			helpers.assert_eq(engine.quiesce_configuration(scope), false)
+			world.cancel_ok = true
+			world.answer()
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_true(engine.release_configuration(scope))
+		end)
+	end)
+end)

@@ -960,6 +960,15 @@ local function ensure_ollama_running(options)
 	return true
 end
 
+--- Reports exact startup admission without retrying or starting a service.
+--- An acknowledged published daemon is stable ownership, not cleanup debt.
+--- @return boolean idle
+function M.startup_idle()
+	return _ollama_start_acquisition_depth == 0 and _ollama_starting ~= true
+		and _ollama_start_transaction == nil and _ollama_start_cleanup_pending ~= true
+		and _ollama_start_resume_pending ~= true and not has_pending_ollama_start_owner()
+end
+
 --- Ensures the Ollama daemon is running.
 --- Must be called by the LLM orchestrator only when the effective backend is
 --- Ollama — calling it unconditionally at require-time launches Ollama even for

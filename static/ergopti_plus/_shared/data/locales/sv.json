@@ -3116,6 +3116,7 @@
 	"llm.local_servers.model_missing_body": "Klicka här för att välja en av modellerna den erbjuder.",
 	"llm.local_servers.found_body": "Svarar med {1} modell(er): välj en under AI ▸ AI-motor.",
 	"llm.unreachable.title": "{1} svarar inte",
+	"llm.unreachable.body_unconfirmed": "AI förblir avstängd: {1} svarar inte på {2}. Starta servern och försök sedan aktivera AI igen.",
 	"llm.unreachable.body_missing": "AI förblir avstängd: inget svarar på {2}, adressen till {1}, eftersom {1} inte är installerat på den här datorn.",
 	"llm.unreachable.body_stopped": "AI förblir avstängd: {1} är installerat, men inget svarar på {2}, dess adress. Det startade inte.",
 	"llm.unreachable.servers_found": "Dessa lokala servrar svarar och kan ersätta det: {1}.",

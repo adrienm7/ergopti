@@ -196,6 +196,8 @@ h.describe("native caption consumer inventory", function()
 			["modules/gestures/system_actions.lua"] = 2,
 			["ui/menu/menu_builder.lua"] = 3,
 			["modules/llm/local_model_offer.lua"] = 2,
+			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
+			["ui/llm_enable_refusal.lua"] = 2,
 		}
 		local observed = {}
 		local root = h.driver_root()

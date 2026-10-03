@@ -1,0 +1,452 @@
+{
+	"version": 1,
+	"receipts": [
+		{
+			"name": "actual version",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":\"0.12.3\"}"
+			},
+			"expected": true
+		},
+		{
+			"name": "real empty versions are not readiness",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":\"\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "tags body cannot prove version",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"models\":[]}"
+			},
+			"expected": false
+		},
+		{
+			"name": "array cannot prove version",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "[{\"version\":\"1\"}]"
+			},
+			"expected": false
+		},
+		{
+			"name": "numeric version",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":1}"
+			},
+			"expected": false
+		},
+		{
+			"name": "malformed trailing bytes",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":\"1\"} invalid"
+			},
+			"expected": false
+		},
+		{
+			"name": "partial native transfer",
+			"result": {
+				"ok": false,
+				"status": 200,
+				"body": "{\"version\":\"1\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "auth refusal",
+			"result": {
+				"ok": false,
+				"status": 401,
+				"body": "{\"version\":\"1\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "server refusal",
+			"result": {
+				"ok": false,
+				"status": 503,
+				"body": "{\"version\":\"1\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "no response",
+			"result": {
+				"ok": false,
+				"status": 0,
+				"body": ""
+			},
+			"expected": false
+		},
+		{
+			"name": "unproven truthy native success",
+			"result": {
+				"ok": 2,
+				"status": 200,
+				"body": "{\"version\":\"1\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "redirect not version endpoint success",
+			"result": {
+				"ok": true,
+				"status": 204,
+				"body": "{\"version\":\"1\"}"
+			},
+			"expected": false
+		},
+		{
+			"name": "truncated native body",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "{\"version\":\"1\"}",
+				"body_truncated": true
+			},
+			"expected": false
+		},
+		{
+			"name": "null body",
+			"result": {
+				"ok": true,
+				"status": 200,
+				"body": "null"
+			},
+			"expected": false
+		}
+	],
+	"current": [
+		{
+			"name": "current disabled writer and source",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": true
+		},
+		{
+			"name": "backend changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "api",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "model changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:3b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "origin changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:21434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "acknowledged ABA generation changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 9,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "unknown generation is not proof",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": "7",
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "enabled changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": true,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "paused",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": true,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "configuration scope owns writer",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": true
+			},
+			"expected": false
+		},
+		{
+			"name": "missing enabled receipt",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "missing paused receipt",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "missing blocked receipt",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false
+			},
+			"expected": false
+		},
+		{
+			"name": "missing generation receipt",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "missing origin receipt",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "case-sensitive model changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "MODEL:2b",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "case-sensitive request origin changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://localhost:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "model:2b",
+				"origin": "http://LOCALHOST:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		},
+		{
+			"name": "numeric-looking model identity changed",
+			"captured": {
+				"backend": "ollama",
+				"model": "01",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7
+			},
+			"live": {
+				"backend": "ollama",
+				"model": "1",
+				"origin": "http://127.0.0.1:11434",
+				"generation": 7,
+				"enabled": false,
+				"paused": false,
+				"blocked": false
+			},
+			"expected": false
+		}
+	]
+}

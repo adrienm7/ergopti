@@ -583,7 +583,7 @@ LLM_OllamaAllowInference() {
  *
  * @param {function} on_result - Callback receiving the boolean reachability.
  */
-LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
+LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 	; curl CHILD PROCESS, not WinHTTP. The WinHttpRequest.5.1 COM object's "async"
 	; mode (Open(...,true) + Send()) still performs the TCP connect synchronously on
 	; the CALLING (message-loop) thread: against a cold/busy local daemon that connect
@@ -607,35 +607,76 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
 			return Owner
 		Stage := "command_build"
+		Origin := Structured ? Owner.Get("endpoint", "") : LLM_OLLAMA_BASE_URL
+		if Structured && (!(Origin is String) || Origin == ""
+				|| StrCompare(Origin, LLM_OLLAMA_BASE_URL, true) != 0 || !LLM_AuxIsCurrent(Owner))
+			throw Error("Selected-origin version ownership is no longer current.")
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
 		curlCmd := '"' . curl_exe . '" -s -m 2 '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
-			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+			. _Q(Origin . (Structured ? LLM_EnableVersionPath() : "/api/version"))
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
+			if Structured && (StrCompare(Origin, LLM_OLLAMA_BASE_URL, true) != 0 || !LLM_AuxIsCurrent(Owner))
+				throw Error("Selected-origin version dispatch was superseded.")
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
 				cmd, "", "Hide", &pid)
+			ProcessPort := Structured ? _LLM_OllamaPingAcknowledgedPort(ProcessOwner) : 0
 			if !LLM_AuxBindResources(Owner, Map(
 					"process_pid", pid,
 					"process_owner", ProcessOwner,
-					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, ProcessPort)))
 				return Owner
 		} finally Critical(PreviousCritical)
 		Stage := "poll_handoff"
-		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
+		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner, ProcessPort, Structured)
 	} catch as Err {
 		_LLM_OllamaLogSetupFailure("ping", Stage, Owner, Err)
 		if ProcessOwner is Map
-			_LLM_CurlReleaseProcess(ProcessOwner, true)
-		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
+			_LLM_CurlReleaseProcess(ProcessOwner, true,
+				Structured ? _LLM_OllamaPingAcknowledgedPort(ProcessOwner) : 0)
+		_LLM_OllamaPingDeliver(Owner, on_result,
+			Structured ? Map("ok", false, "status", 0, "body", "") : false, Structured)
 	}
 	return Owner
+}
+
+; These per-owner ports preserve the old boolean ping ABI while strict enable
+; admission retains its exact HANDLE until physical exit is acknowledged.
+_LLM_OllamaPingAcknowledgedPort(ProcessOwner, Port := 0) {
+	Copy := (Port is Map) ? Port.Clone() : Map()
+	Copy["terminate_process"] := _LLM_OllamaPingTerminateAcknowledged.Bind(ProcessOwner, Port)
+	return Copy
+}
+
+_LLM_OllamaPingTerminateAcknowledged(ProcessOwner, Port, Handle) {
+	if !ProcessOwner.Get("termination_requested", false) {
+		TerminateFn := _LLM_CurlArtifactPortFn(Port, "terminate_process", _LLM_CurlTerminateProcessExact)
+		if TerminateFn.Call(Handle) == true
+			ProcessOwner["termination_requested"] := true
+	}
+	WaitFn := _LLM_CurlArtifactPortFn(Port, "wait_process", _LLM_CurlWaitProcessExact)
+	return WaitFn.Call(Handle) == 0
+}
+
+_LLM_OllamaPingDeliver(Owner, Callback, Result, Structured) {
+	if !Structured
+		return _LLM_OllamaInvokeAuxResult(Owner, Callback, Result)
+	if !LLM_AuxIsCurrent(Owner)
+		return false
+	; Structured receipts leave the auxiliary owner before the caller can enter
+	; persistence. Any refused finalization remains in the existing debt owners.
+	LLM_AuxFinish(Owner)
+	if !LLM_AuxRetryCleanupDebt() || !LLM_CurlRetryCleanupDebt()
+		return false
+	_LLM_InvokeCallback(Callback, "on_result", Result)
+	return true
 }
 
 ; Correlate preparation failures without logging a model, request body, command
@@ -656,27 +697,40 @@ _LLM_OllamaLogSetupFailure(Operation, Stage, Owner, Err) {
  * @param {function} on_result  - Callback receiving the boolean reachability.
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0) {
+_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0, Structured := false) {
 	if !LLM_AuxIsCurrent(Owner)
 		return
 	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
 		"read_terminal", _LLM_CurlReadTerminal)
 	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
 	if _LLM_CurlTerminalComplete(Terminal) {
-		_LLM_CurlReleaseProcess(ProcessOwner, false, Port)
-		reachable := _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
-		_LLM_OllamaInvokeAuxResult(Owner, on_result, reachable)
-		return
+		WaitFn := _LLM_CurlArtifactPortFn(Port, "wait_process", _LLM_CurlWaitProcessExact)
+		Stopped := !Structured || ProcessOwner.Get("released", false)
+			|| WaitFn.Call(ProcessOwner.Get("handle", 0)) == 0
+		if Stopped && _LLM_CurlReleaseProcess(ProcessOwner, false, Port) {
+			reachable := Structured ? Map("ok", Terminal["exit"] == 0 && Terminal["body_read"],
+				"status", Terminal["status"], "body", Terminal["body"])
+				: _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+			_LLM_OllamaPingDeliver(Owner, on_result, reachable, Structured)
+			return
+		}
+		if !Structured {
+			; Preserve the historical boolean callback contract on cleanup refusal.
+			reachable := _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+			_LLM_OllamaInvokeAuxResult(Owner, on_result, reachable)
+			return
+		}
 	}
 	; Curl owns a 2 s max-time; this 4 s backstop retires a missing receipt.
 	if _LLM_DeadlineExpired(start_tick, 4000) {
 		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
-		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
+		_LLM_OllamaPingDeliver(Owner, on_result,
+			Structured ? Map("ok", false, "status", 0, "body", "") : false, Structured)
 		return
 	}
 	LLM_AuxSchedule(Owner,
 		() => _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit,
-			on_result, start_tick, Owner, Port), -150)
+			on_result, start_tick, Owner, Port, Structured), -150)
 }
 
 /**

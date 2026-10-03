@@ -18,20 +18,23 @@ local function copy_headers(headers)
 	return copy
 end
 
-local function load_fixture()
+local function load_fixture(options)
 	local state = {
 		requests = {},
 		callbacks = {},
 		unsafe_calls = 0,
 	}
 	local http = {}
-	function http.doAsyncRequest(url, method, body, headers, callback, enable_redirect)
+	function http.doAsyncRequest(url, method, body, headers, callback, cache_or_redirect, explicit_redirect)
+		local enable_redirect = type(cache_or_redirect) == "boolean" and cache_or_redirect or true
+		if type(explicit_redirect) == "boolean" then enable_redirect = explicit_redirect end
 		state.requests[#state.requests + 1] = {
 			url = url,
 			method = method,
 			body = body,
 			headers = copy_headers(headers),
 			enable_redirect = enable_redirect,
+			cache_policy = type(cache_or_redirect) == "string" and cache_or_redirect or nil,
 		}
 		state.callbacks[#state.callbacks + 1] = callback
 		return nil
@@ -79,10 +82,72 @@ local function load_fixture()
 		http = http,
 		timer = timer,
 	})
-	return HttpClient.new(), state
+	return HttpClient.new(options), state
 end
 
 helpers.describe("HttpClient redirect ownership", function()
+	helpers.it("preserves uncredentialed default native redirect behavior", function()
+		local client, state = load_fixture()
+		local result
+		helpers.assert_eq(client.get("http://127.0.0.1:11435/api/version", {}, function(value) result = value end), true)
+		helpers.assert_eq(state.unsafe_calls, 1)
+		helpers.assert_eq(result.status, 200)
+	end)
+
+	for _, headers in ipairs({ {}, { Authorization = "Bearer explicit-test-token" } }) do
+		helpers.it("opt-in selected origin proof does not follow a native redirect with " .. tostring(headers.Authorization ~= nil), function()
+			local client, state = load_fixture({ follow_redirects = false })
+			local result
+			helpers.assert_eq(client.get("http://127.0.0.1:11435/api/version", headers, function(value) result = value end), true)
+			helpers.assert_eq(state.unsafe_calls, 0)
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_eq(state.requests[1].method, "GET")
+			helpers.assert_eq(state.requests[1].enable_redirect, false)
+			helpers.assert_eq(state.requests[1].headers, headers)
+			state.callbacks[1](302, '{"version":"foreign-receipt"}', { Location = "http://foreign.test/api/version" })
+			helpers.assert_eq(result.status, 302)
+			helpers.assert_eq(#state.requests, 1, "selected-origin admission must never acquire a redirect hop")
+			helpers.assert_eq(client.isActive(), false)
+		end)
+	end
+
+	for _, invalid in ipairs({ "false", 0, {} }) do
+		helpers.it("rejects unknown native redirect option " .. type(invalid), function()
+			local ok, reason = pcall(load_fixture, { follow_redirects = invalid })
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(reason, "follow_redirects must be a boolean")
+		end)
+	end
+
+	helpers.it("requests a fresh selected-origin receipt through native cache6 and redirects7", function()
+		local client, state = load_fixture({ follow_redirects = false, cache_policy = "ignoreLocalCache" })
+		local result
+		helpers.assert_eq(client.get("http://127.0.0.1:11435/api/version", {}, function(value) result = value end), true)
+		helpers.assert_eq(state.unsafe_calls, 0)
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(state.requests[1].cache_policy, "ignoreLocalCache")
+		helpers.assert_eq(state.requests[1].enable_redirect, false)
+		state.callbacks[1](0, "", {})
+		helpers.assert_eq(result.ok, false, "a stopped service cannot be replaced by a cached200 proof")
+		helpers.assert_eq(result.status, 0)
+	end)
+
+	helpers.it("retains redirect selection for a cache-only native request", function()
+		local client, state = load_fixture({ cache_policy = "ignoreLocalCache" })
+		helpers.assert_eq(client.get("http://example.test/cache", {}, function() end), true)
+		helpers.assert_eq(state.unsafe_calls, 0)
+		helpers.assert_eq(state.requests[1].cache_policy, "ignoreLocalCache")
+		helpers.assert_eq(state.requests[1].enable_redirect, true)
+	end)
+
+	for _, invalid in ipairs({ false, "ignoredCache", 0, {} }) do
+		helpers.it("refuses unknown native cache policy " .. tostring(invalid), function()
+			local ok, reason = pcall(load_fixture, { cache_policy = invalid })
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(reason, "cache_policy must name a supported native cache policy")
+		end)
+	end
+
 	helpers.it("pins redirect confidentiality in the shared port contract", function()
 		local file = assert(io.open("../_shared/core/ports/HttpClient.spec.js", "rb"))
 		local contract = file:read("*a")

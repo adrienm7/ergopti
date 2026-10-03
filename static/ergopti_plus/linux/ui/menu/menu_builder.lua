@@ -2314,7 +2314,7 @@ local function _build_llm(ctx)
 		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
-		if llm.toggle then llm.toggle() end
+		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	llm_ctx.state_getters = {}
