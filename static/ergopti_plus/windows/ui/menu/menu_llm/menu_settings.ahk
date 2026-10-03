@@ -353,21 +353,56 @@ _LLMMenuBuildIndentRange() {
  * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset) {
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, StreamingCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InfoCommand)
 		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
 	if !IsSet(ShowAllCommand)
 		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
+	if !IsSet(StreamingCommand)
+		StreamingCommand := (*) => LLM_Menu_ToggleBool("streaming")
+	StreamingSource := _LLM_Menu_StreamingSnapshot()
 	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
-		Map("llm_info_bar", InfoCommand, "llm_show_all", (*) =>
+		Map("llm_info_bar", InfoCommand,
+			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
+			"llm_show_all", (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
 		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
 			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
-			"llm_show_all_ready", _LLM_Menu_ShowAllReady))
+			"llm_show_all_ready", _LLM_Menu_ShowAllReady,
+			"llm_token_streaming_enabled", (*) => LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
+			"llm_token_streaming_ready", (*) => LLM_DisplayStreamingReady(StreamingSource)))
+}
+
+/**
+ * Captures the exact current menu/runtime owner without acquiring input.
+ * @returns {Map} Native token-streaming admission snapshot.
+ */
+_LLM_Menu_StreamingSnapshot() {
+	global _LLM_Menu, _LLM_Engine
+	return Map("owner", _LLM_Menu, "generation", 0, "platform", "ahk",
+		"backend", _LLM_Menu["backend"], "streaming", _LLM_Menu["streaming"],
+		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"blocked", !(_LLM_Engine is Map) || _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| !LLM_EffectiveStreaming(_LLM_Menu["backend"], true))
+}
+
+/**
+ * Refuses an obsolete or unsupported checkbox before the canonical transaction.
+ * @param {Map} Expected Exact owner captured during rendering.
+ * @param {Func} Command Existing acknowledged native setting owner.
+ * @returns {Integer} Boolean acknowledgement.
+ */
+_LLM_Menu_StreamingCommand(Expected, Command) {
+	Decision := LLM_DisplayStreamingIntent(Expected, _LLM_Menu_StreamingSnapshot())
+	if !Decision["admitted"]
+		return false
+	return Command.Call() == true
 }
 
 /**
@@ -395,14 +430,6 @@ _LLM_Menu_DisplayRows(Position := "all") {
 		"action",  (*) => LLM_Menu_ToggleBool("inline_autotype")))
 
 	Rows.Push(Map("separator", true))
-
-	; Streaming (token-by-token display) — only meaningful when show-all-at-once
-	; (multi) is enabled
-	Rows.Push(Map(
-"label",    t("menu.llm.show_streaming"),
-"checked",  LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
-"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
-		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
 
 	LeadingRows := Rows
 	Rows := []

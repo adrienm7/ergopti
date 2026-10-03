@@ -135,6 +135,7 @@ M.DEFAULT_STATE = load_shared_defaults()
 -- Single source of truth for the streaming flag; backends receive it as a parameter
 -- on each fetch call so they hold no state of their own for this flag
 local _streaming_enabled = M.DEFAULT_STATE.llm_streaming
+local _display_generation = 0
 
 local CoreState = {
 	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
@@ -1597,6 +1598,7 @@ end
 --- The flag is stored here and passed to backends at dispatch time — no backend state.
 --- @param v boolean True to enable streaming, false to disable.
 function M.set_llm_streaming(v)
+	if _streaming_enabled ~= (v == true) then _display_generation = _display_generation + 1 end
 	_streaming_enabled = (v == true)
 	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
 end
@@ -1775,6 +1777,7 @@ end
 function M.set_runtime_llm_enabled(enabled)
 	local next_enabled = enabled == true
 	local identity_changed = CoreState.runtime_llm_enabled ~= next_enabled
+	if identity_changed then _display_generation = _display_generation + 1 end
 	CoreState.runtime_llm_enabled = next_enabled
 	local settled = true
 	if identity_changed or deferred_profile_warmup_cleanup_pending() then
@@ -1795,6 +1798,16 @@ end
 --- @return boolean
 function M.get_runtime_llm_enabled()
 	return CoreState.runtime_llm_enabled == true
+end
+
+--- Captures the real token-streaming admission owner without starting a backend.
+--- @return table snapshot Current backend, runtime gate, flag and exact revision.
+function M.streaming_snapshot()
+	return {
+		owner = M, generation = CoreState.backend_generation + _display_generation,
+		backend = CoreState.backend, enabled = CoreState.runtime_llm_enabled,
+		streaming = _streaming_enabled, blocked = not M.configuration_idle(),
+	}
 end
 
 --- Schedules the background backend probes explicitly once boot state has

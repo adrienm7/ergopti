@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Karabiner から Ergopti を削除",
 	"menu.global.restore_touchpad_gestures": "Windows のタッチパッド ジェスチャを復元",
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
-	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。"
+	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
+	"platform_reason.token_streaming_transport_missing": "Windows では非対応: Windows ではまだ候補をトークンごとに表示できません。このオプションは無効のままです。"
 }

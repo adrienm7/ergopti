@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Usuń Ergopti z Karabinera",
 	"menu.global.restore_touchpad_gestures": "Przywróć gesty touchpada Windows",
 	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
-	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu."
+	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu.",
+	"platform_reason.token_streaming_transport_missing": "Nie w Windows: Windows nie może jeszcze wyświetlać sugestii token po tokenie. Ta opcja pozostaje nieaktywna."
 }

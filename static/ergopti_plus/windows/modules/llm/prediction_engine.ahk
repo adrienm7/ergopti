@@ -127,7 +127,7 @@ LLM_BackendCapabilities(Backend) {
 	; Windows has no typed/reliable partial-frame transport yet. The same
 	; capability object drives both the menu and dispatch so an unsupported
 	; backend can never persist a checked control that runtime overrides.
-	return Map("streaming", false)
+	return Map("streaming", LLM_DisplayStreamingCapable("ahk", Backend))
 }
 
 LLM_EffectiveStreaming(Backend, Requested) {

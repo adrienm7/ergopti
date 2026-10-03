@@ -898,15 +898,15 @@ checked on a real machine moves to item 51 (Windows) or its macOS twin.
 Releases: push to `dev` without a release until every item below is
 integrated, then publish one grouped release.
 
-- [ ] **54.** Every menu is declared in the shared menu manifest, never in
-      driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-      drivers still build (current baseline: Windows 105, macOS 183, Linux 114, each
-      site listed in tools/test/native-menu-rows-baseline.json); migrate them to
-      zero. Each OS-limited row declares `unavailable = "hide"` (not
-      applicable) or `"grey"` (not yet ported, with its reason); classify the
-      existing rows during the migration (proposal in the menu-first-group
-      report: most hide; greyed: Linux edit_shortcuts, Linux key
-      combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+- [~] **54.** Every menu is declared in the shared menu manifest, never in
+  driver code. The ratchet `npm run test:native-menu-rows` counts the rows
+  drivers still build (current baseline: Windows 105, macOS 182, Linux 114, each
+  site listed in tools/test/native-menu-rows-baseline.json); migrate them to
+  zero. Each OS-limited row declares `unavailable = "hide"` (not
+  applicable) or `"grey"` (not yet ported, with its reason); classify the
+  existing rows during the migration (proposal in the menu-first-group
+  report: most hide; greyed: Linux edit_shortcuts, Linux key
+  combinations, Linux metrics shortcut rows, Windows preview_bubbles).
 
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
@@ -1069,6 +1069,23 @@ exercise the actual menu providers. The current census is Windows 105, macOS
 54 and 81 remain partial; native Windows, packaging and installation confirmation
 requires CI.
 
+The token-streaming option now belongs to one shared Display declaration and
+capability/admission policy. macOS Ollama/MLX and Linux Ollama use their actual
+partial-frame transports. Windows retains a grey row with its reason in all
+21 locales and preserves stored intent until a partial-frame transport exists.
+The menu census is Windows 105, macOS 182 and Linux 114.
+
+Commands collect current master, pause, backend, progressive-mode and setting
+revisions before the existing acknowledged writers. Linux carries the exact
+canonical source into its sparse writer. macOS requires its retained pre-owned
+source to match the current physical view; only an exact owned full-save receipt
+advances forward, compensation or retry authority. Four real preference-owner
+races preserve external master and temperature edits, including an edit after
+true forward acknowledgement. Refused compensation remains recovery debt.
+Existing assertions and strict false, nil and throwing refusal contracts remain
+intact. Other native/provider rows keep items 54 and 81 partial; native Windows
+unit/E2E and complete three-OS packaging/install qualification still require CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -1154,46 +1171,46 @@ The physical-label contract is independent of the native matrix and stored actio
 IDs. Original provider cases fail before the fix; the qualified component suites
 pass with all 21 locale catalogues. Full native CI remains required.
 
-- [ ] **81.** The maintainer asks to treat item 54 now (every menu row is
-      declared in the shared manifest, none built in a driver's folder):
-      Windows 105, macOS 183 and Linux 114 rows are still built by the
-      drivers (`tools/test/native-menu-rows-baseline.json`). Read on
-      2026-10-01, the sites are of four kinds, and three of them need the
-      manifest to say more than it can today:
-      (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
-      `append` and `add`: the WPM widget rows of Metrics, the AI menus):
-      convert each to `check` or `command` with its predicate, as the
-      conversions of 2026-08-07 did; the rows that tick themselves on the
-      live menu need a rebuild after the click instead;
-      (b) fixed-key rows inside the result of a `list` provider (the
-      disable, tap and hold rows under each Tap-Hold key, the rows under a
-      gesture slot, a hotstring file or an AI profile): the manifest needs a
-      declared child template for a list parent, read by the three
-      renderers;
-      (c) separators a provider inserts between its own rows (155 of the 459
-      sites): they follow (b), as part of the template;
-      (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
-      `menu_init.ahk`).
-      Metrics widget rows are now shared `check` declarations on all three
-      drivers. Native getters retain stored colors/graph checks while disabled;
-      Windows commands rebuild through the normal tray owner after durable
-      acknowledgement. One golden fixture covers all 16 state combinations
-      in each native menu suite; command regressions fence refused writes and
-      ensure a refused Linux stop never starts the widget instead. Native CI
-      run 36920222032 passed the new widget behaviors but exposed an API-family
-      census that counted Menu( inside domain-helper names. The counter now
-      recognizes complete native tokens (including whitespace calls); a source
-      fixture covers every family, helper suffixes and comments without raising
-      any baseline. Native run 36922684126 now passes Windows unit, engine E2E,
-      packaging and installation, as well as the macOS and Linux test lanes.
-      Order: finish other computed Metrics rows, then the template of (b)
-      on Tap-Holds (the smallest menu that has one), then Gestures and
-      Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
-      (Windows 41, macOS about 70), and Linux `menu_builder.lua` (123) along
-      each. One commit per menu, the baseline lowered in the same commit.
-      The update rows greyed on a local version (2026-10-01) were added as
-      provider rows and join the About slice.
-      The fixed agent Mode choices now use the shared declaration and renderers; see item 54 for the regression and remaining native-row scope.
+- [~] **81.** The maintainer asks to treat item 54 now (every menu row is
+  declared in the shared manifest, none built in a driver's folder):
+  Windows 105, macOS 182 and Linux 114 rows are still built by the
+  drivers (`tools/test/native-menu-rows-baseline.json`). Read on
+  2026-10-01, the sites are of four kinds, and three of them need the
+  manifest to say more than it can today:
+  (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
+  `append` and `add`: the WPM widget rows of Metrics, the AI menus):
+  convert each to `check` or `command` with its predicate, as the
+  conversions of 2026-08-07 did; the rows that tick themselves on the
+  live menu need a rebuild after the click instead;
+  (b) fixed-key rows inside the result of a `list` provider (the
+  disable, tap and hold rows under each Tap-Hold key, the rows under a
+  gesture slot, a hotstring file or an AI profile): the manifest needs a
+  declared child template for a list parent, read by the three
+  renderers;
+  (c) separators a provider inserts between its own rows (155 of the 459
+  sites): they follow (b), as part of the template;
+  (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
+  `menu_init.ahk`).
+  Metrics widget rows are now shared `check` declarations on all three
+  drivers. Native getters retain stored colors/graph checks while disabled;
+  Windows commands rebuild through the normal tray owner after durable
+  acknowledgement. One golden fixture covers all 16 state combinations
+  in each native menu suite; command regressions fence refused writes and
+  ensure a refused Linux stop never starts the widget instead. Native CI
+  run 36920222032 passed the new widget behaviors but exposed an API-family
+  census that counted Menu( inside domain-helper names. The counter now
+  recognizes complete native tokens (including whitespace calls); a source
+  fixture covers every family, helper suffixes and comments without raising
+  any baseline. Native run 36922684126 now passes Windows unit, engine E2E,
+  packaging and installation, as well as the macOS and Linux test lanes.
+  Order: finish other computed Metrics rows, then the template of (b)
+  on Tap-Holds (the smallest menu that has one), then Gestures and
+  Shortcuts, Hotstrings (Windows 35, macOS 59 sites), the AI menus
+  (Windows 41, macOS about 70), and Linux `menu_builder.lua` (123) along
+  each. One commit per menu, the baseline lowered in the same commit.
+  The update rows greyed on a local version (2026-10-01) were added as
+  provider rows and join the About slice.
+  The fixed agent Mode choices now use the shared declaration and renderers; see item 54 for the regression and remaining native-row scope.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and

@@ -2618,6 +2618,10 @@ end
 
 function M.is_enabled() return _enabled end
 
+--- The real master/backend/scope revision observed by retained display commands.
+--- @return integer revision Monotonic native admission revision.
+function M.streaming_revision() return _enable_generation end
+
 --- Requests a fresh local receipt before the existing consent owner publishes.
 --- API activation does not depend on a local Ollama installation or server.
 --- @param on_changed function|nil Menu refresh after acknowledged publication.

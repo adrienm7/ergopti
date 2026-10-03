@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "הסרת Ergopti מ-Karabiner",
 	"menu.global.restore_touchpad_gestures": "שחזור מחוות משטח המגע של Windows",
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
-	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט."
+	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט.",
+	"platform_reason.token_streaming_transport_missing": "לא ב-Windows: Windows עדיין אינו יכול להציג הצעות טוקן אחר טוקן. אפשרות זו נשארת לא פעילה."
 }

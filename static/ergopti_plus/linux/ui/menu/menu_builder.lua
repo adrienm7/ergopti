@@ -2132,22 +2132,27 @@ local function _build_llm(ctx)
 				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
-		local rows = {}
-		for _, setting in ipairs({
-			{ name = "streaming", key = "menu.llm.show_streaming" },
-		}) do
-			local current = DisplaySettings.get(setting.name)
-			rows[#rows + 1] = {
-				label = i18n_safe(setting.key),
-				checked = current == true,
-				action = function()
-					DisplaySettings.set(setting.name, not current)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
+		local Preferences = require("infra.llm_preferences")
+		local function streaming_snapshot()
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.streaming", "llm.display.streaming_multi" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get("streaming_multi")
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				platform = "linux",
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or streaming ~= values["llm.display.streaming"] or progressive ~= values["llm.display.streaming_multi"],
+				progressive = progressive, streaming = streaming,
 			}
 		end
-		local streaming_rows = rows
-		rows = {}
+		local streaming_source = streaming_snapshot()
+		local rows = {}
 		local indent = DisplaySettings.get("pred_indent") or 0
 		local indent_rows = {}
 		for _, value in ipairs(DisplaySettings.indent_values()) do
@@ -2176,6 +2181,14 @@ local function _build_llm(ctx)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
+				["llm_token_streaming"] = function()
+					local current = streaming_snapshot()
+					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("streaming", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 				["llm_info_bar"] = function()
 					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -2185,13 +2198,18 @@ local function _build_llm(ctx)
 			state_getters = {
 				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
 				["llm_show_all_ready"] = show_all_ready,
+				["llm_token_streaming_enabled"] = function()
+					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
+						and streaming_source.streaming == true
+				end,
+				["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
 				["llm_info_bar_enabled"] = function() return info_bar end,
 				["llm_info_bar_ready"] = function() return true end,
 			},
 		}
 		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
 			["llm_display_leading"] = function() return {} end,
-			["llm_display_remaining"] = function() return streaming_rows end,
+			["llm_display_remaining"] = function() return {} end,
 			["llm_display_trailing"] = function() return rows end,
 		})
 		append_rendered_row(target, {

@@ -43,4 +43,42 @@ function M.ready(count, blocked)
 		and count == math.floor(count) and count >= 2
 end
 
+--- Whether the current driver has an actual token streaming transport.
+--- Buffered API answers do not qualify as native partial frames.
+--- @param platform string Canonical driver id.
+--- @param backend string Current native backend id.
+--- @return boolean
+function M.streaming_capable(platform, backend)
+	return (platform == "hs" and (backend == "ollama" or backend == "mlx"))
+		or (platform == "linux" and backend == "ollama")
+end
+
+--- Whether a fresh native snapshot admits changing token streaming.
+--- @param snapshot table Runtime gates and exact owner revision.
+--- @return boolean
+function M.streaming_ready(snapshot)
+	return type(snapshot) == "table"
+		and (type(snapshot.owner) == "table" or (type(snapshot.owner) == "string" and snapshot.owner ~= ""))
+		and type(snapshot.generation) == "number" and snapshot.generation >= 0
+		and snapshot.generation == math.floor(snapshot.generation)
+		and type(snapshot.streaming) == "boolean"
+		and snapshot.enabled == true and snapshot.paused == false
+		and snapshot.blocked == false and snapshot.progressive == true
+		and M.streaming_capable(snapshot.platform, snapshot.backend)
+end
+
+--- Resolves a retained checkbox only against the same current native source.
+--- @param expected table Snapshot captured when this checkbox was rendered.
+--- @param current table Fresh native snapshot collected before publication.
+--- @return table decision { admitted, value? }.
+function M.streaming_intent(expected, current)
+	if not M.streaming_ready(expected) or not M.streaming_ready(current) then
+		return { admitted = false }
+	end
+	for _, field in ipairs({ "owner", "generation", "platform", "backend", "streaming", "progressive" }) do
+		if expected[field] ~= current[field] then return { admitted = false } end
+	end
+	return { admitted = true, value = not current.streaming }
+end
+
 return M

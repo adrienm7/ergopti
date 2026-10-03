@@ -4054,6 +4054,16 @@ id = "llm_display_remaining"
 
 [[menu.llm_display_menu]]
 type = "check"
+id = "llm_token_streaming"
+i18n = "menu.llm.show_streaming"
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.token_streaming_transport_missing"
+checked_when = ["llm_token_streaming_enabled"]
+disabled_when = ["llm_token_streaming_ready"]
+
+[[menu.llm_display_menu]]
+type = "check"
 id = "llm_show_all"
 i18n = "menu.llm.show_all_at_once"
 checked_when = ["llm_show_all_enabled"]

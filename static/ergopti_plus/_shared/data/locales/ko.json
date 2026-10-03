@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Karabiner에서 Ergopti 제거",
 	"menu.global.restore_touchpad_gestures": "Windows 터치패드 제스처 복원",
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
-	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요."
+	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
+	"platform_reason.token_streaming_transport_missing": "Windows 제외: Windows는 아직 제안을 토큰 단위로 표시할 수 없습니다. 이 옵션은 비활성 상태로 유지됩니다."
 }
