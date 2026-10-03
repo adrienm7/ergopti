@@ -165,6 +165,15 @@ These are software implementations; final hardware verification remains below.
   ambiguous existence guard before its native removal owner; removing that guard
   and reproducing denied-path/broken-link controls is a deferred native diagnosis.
   No macOS files, conditional TOML owner or manual CI were changed or executed.
+- [~] **L10.** Linux timer cancellation ownership: the scheduler now retains
+  every armed token strongly until firing or accepted cancellation. Dropping a
+  repeating token no longer lets GC erase it from diagnostics and `cancelAll`
+  while native callbacks continue running. Five real libuv/GC regressions failed
+  before the fix; all seven native cases now cover cancellation, mixed ownership,
+  one-shot retirement and successor isolation. Six portable cases exercise the
+  same ownership and release rules. macOS already uses a strong registry and
+  Windows retains tokens in its Map. Physical input is unrelated to this proof;
+  native Windows/macOS suites and manual CI remain deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

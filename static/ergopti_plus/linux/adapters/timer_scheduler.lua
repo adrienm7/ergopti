@@ -14,7 +14,7 @@
 ---    the busy-wait overhead of os.clock-based polling. Each handle maps to
 ---    a uv_timer_t under the hood.
 --- 2. Opaque handles: every scheduled action returns a {timer, fired} table.
----    Callers hold the handle; cancelAll() drains a weak registry.
+---    Callers can hold the handle; cancelAll() drains the scheduler's registry.
 --- 3. Exception isolation: the user callback is wrapped in pcall so a crash
 ---    inside fn never propagates to the libuv event loop.
 --- 4. Idempotent cancel: cancel() on a nil, already-fired, or already-cancelled
@@ -34,10 +34,10 @@ local LOG = "adapters.timer_scheduler"
 -- =========================================
 -- =========================================
 
--- Weak-value table of all live timer handles issued by this adapter instance.
--- Using weak references prevents the registry from keeping timers alive after
--- all other references are dropped.
-local _live_timers = setmetatable({}, { __mode = "v" })
+-- The scheduler owns every armed token until firing or accepted cancellation.
+-- Weak values let GC erase a fire-and-forget repeater while its native timer
+-- remained live, making cancelAll() report success without stopping it.
+local _live_timers = {}
 
 -- Monotonically increasing ID used to key entries in _live_timers.
 local _next_id = 0
