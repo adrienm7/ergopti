@@ -274,6 +274,17 @@ These are software implementations; final hardware verification remains below.
   Windows CNG and macOS sha256_bytes already use native byte APIs; macOS's text
   SHA-256 shell path shares the argument-size risk and needs a separate native
   reproduction. No macOS source, native cross-OS suite or manual CI was changed.
+- [~] **L21.** Linux source-watch activation receipts: distinguish protected
+  invocation from successful inotify registration. Native EACCES previously
+  retained an inactive handle as armed; refused candidates now close immediately
+  and remain outside the committed registry. Three real permission cases and
+  four portable refusal cases failed before the fix. Seven native cases cover
+  delivery, filtering, pending-reload cancellation and restart after permission
+  repair; seven portable cases cover refused, thrown and successful receipts.
+  macOS already requires the exact watcher returned by start() before committing
+  activation. Windows does not use libuv fs_event_start. Only generic Linux
+  activation changed; TOML persistence, personal-menu logic, native cross-OS
+  suites and manual CI remain untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
