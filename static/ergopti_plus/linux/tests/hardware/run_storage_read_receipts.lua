@@ -128,6 +128,51 @@ check("fresh owner recovers after native permissions are repaired", function()
 	assert(fresh(config).get("preserve") == "original")
 end)
 
+for _, method in ipairs({ "set", "set_many" }) do
+	for _, source in ipairs({ "input", "returned", "refused" }) do
+		check(method .. " owns its durable snapshot after " .. source .. " mutation", function()
+			local config = mkdir(root .. "/snapshot-" .. method .. "-" .. source)
+			local parent = mkdir(config .. "/ergopti_plus")
+			local store = parent .. "/storage.json"
+			files[#files + 1] = store
+			local storage = fresh(config)
+			local profile = { title = "original", nested = { count = 7, values = { "é", "original" } } }
+			local function persist(value)
+				if method == "set" then return storage.set("profile", value) end
+				return storage.set_many({ profile = value, peer = { enabled = true } })
+			end
+			assert(persist(profile))
+			local bytes = read(store)
+			local changed = source == "input" and profile or storage.get("profile")
+			changed.title, changed.nested.count, changed.nested.values[2] = "changed", 99, "changed"
+			if source == "refused" then
+				assert(uv.fs_chmod(parent, 320)) -- 0500: permit reads, refuse new writes.
+				local accepted = persist(changed)
+				restore_permissions()
+				assert(accepted == false, "real parent permission control did not refuse publication")
+			end
+			assert(read(store) == bytes, "unpublished caller mutation changed native bytes")
+			local retained = storage.get("profile")
+			assert(retained.title == "original" and retained.nested.count == 7
+				and retained.nested.values[2] == "original", "caller reference escaped into durable cache")
+			local reloaded = fresh(config).get("profile")
+			assert(reloaded.title == retained.title and reloaded.nested.count == retained.nested.count)
+		end)
+	end
+end
+
+check("durable native snapshots retain scalar JSON values", function()
+	local config = mkdir(root .. "/snapshot-scalars")
+	local parent = mkdir(config .. "/ergopti_plus")
+	files[#files + 1] = parent .. "/storage.json"
+	local storage = fresh(config)
+	assert(storage.set_many({ flag = false, count = 0, text = "é\0\n" }))
+	for _, owner in ipairs({ storage, fresh(config) }) do
+		assert(owner.get("flag", true) == false and owner.get("count", 10) == 0)
+		assert(owner.get("text") == "é\0\n")
+	end
+end)
+
 for _, suffix in ipairs({ 0, 1, 3 }) do
 	for _, inaccessible in ipairs({ true, false }) do
 		check("corrupt backup suffix " .. suffix .. (inaccessible and " is protected after refusal" or " is preserved before recovery"), function()
