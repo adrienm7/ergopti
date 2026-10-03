@@ -112,6 +112,9 @@ function M.validate_spawn_args(executable, args)
 	if type(executable) ~= "string" or executable == "" then
 		return "executable must be a non-empty string"
 	end
+	-- execve receives C strings: libuv silently truncates embedded NUL rather
+	-- than refusing a different executable or argv value. Reject before spawn.
+	if executable:find("\0", 1, true) then return "executable cannot contain NUL" end
 	if args == nil then return "" end
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
@@ -125,6 +128,9 @@ function M.validate_spawn_args(executable, args)
 		if type(args[index]) ~= "string" then
 			return string.format("argument %d must be a string, got %s",
 				index, type(args[index]))
+		end
+		if args[index]:find("\0", 1, true) then
+			return string.format("argument %d cannot contain NUL", index)
 		end
 	end
 	return ""

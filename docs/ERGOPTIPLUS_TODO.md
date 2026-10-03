@@ -506,6 +506,23 @@ These are software implementations; final hardware verification remains below.
   intact. macOS' separate exact-input pipeline is an unvalidated source concern
   deferred to its native owner; Windows uses checked native crypto APIs. Native
   cross-OS gates, manual CI and physical typing tests remain unexecuted.
+- [~] **L40.** Linux native spawn NUL refusal: the existing common Linux
+  argv validator rejects embedded NUL in executable names and every argument,
+  before libuv supplies a shorter C string to execve. Eight native and eight
+  portable cases fail before the fix. Twelve actual ordinary-user cases pass
+  on host and Debian with both LuaJIT and Lua 5.4, using native subprocesses,
+  GNU sha256sum, loopback curl downloads and ETag files. Invalid requests create
+  no child side effect, network request or shorter-path overwrite; bounded
+  diagnostics identify the argument index without its bytes. Four healthy
+  controls retain empty strings, literal Unicode/newline argv and filenames,
+  an independent file hash and actual download. Nine portable validator cases
+  cover NUL positions and representable words. One native validator serves
+  ShellRunner, ProcessRunner, FileDigest and HttpClient; no domain or encoding
+  policy is duplicated. macOS' source validator also lacks an explicit NUL check
+  (its native task bridge remains unvalidated); Windows constructs a native
+  UTF-16 command line, which cannot be equated with Lua binary strings. Matching
+  bridge regressions are deferred to their native owners. Native cross-OS gates,
+  manual CI and physical input tests remain unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
