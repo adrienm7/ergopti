@@ -519,6 +519,50 @@ const sourceObserver = fs.readFileSync(
 	path.join(__dirname, 'fixtures/observe_ahk_source_boot.ps1'),
 	'utf8'
 );
+/** Requires native path normalization before any source process starts. */
+function checkCanonicalSourceEntry(source) {
+	const canonical = source.match(
+		/public static string CanonicalEntry\(string entry\) \{([\s\S]*?)^    \}/m
+	)?.[1];
+	assert.ok(canonical, 'the existing-file native canonical constructor must exist');
+	for (const required of [
+		'!Path.IsPathFullyQualified(entry) || !File.Exists(entry)',
+		'string full = Path.GetFullPath(entry);',
+		'GetLongPathName(full, canonical, (uint)canonical.Capacity)',
+		'size == 0 || size >= canonical.Capacity || !File.Exists(canonical.ToString())',
+		'return canonical.ToString();'
+	])
+		assert.ok(
+			canonical.includes(required),
+			'native canonical construction must retain ' + required
+		);
+	const normalize = '$Entry = [SourceBootProcess]::CanonicalEntry($Entry)';
+	assert.equal(source.split(normalize).length - 1, 1, 'normalize the selected entry exactly once');
+	assert.ok(source.indexOf('if ($LibraryOnly) { return }') < source.indexOf(normalize));
+	assert.ok(source.indexOf(normalize) < source.indexOf('$initial = Start-Process'));
+	assert.ok(source.includes('entry = $requestedEntry;'), 'observations preserve caller spelling');
+	assert.ok(
+		source.includes('[SourceBootProcess]::HasExactEntry($native.CommandLine, $requestedEntry)')
+	);
+	assert.ok(source.includes('[SourceBootProcess]::HasExactEntry($native.CommandLine, $Entry)'));
+	assert.doesNotMatch(canonical, /GetFileInformationByHandle|Contains|EndsWith|GetFileName/);
+}
+checkCanonicalSourceEntry(sourceObserver);
+for (const [from, to] of [
+	['$Entry = [SourceBootProcess]::CanonicalEntry($Entry)', '$Entry = $Entry'],
+	[
+		'GetLongPathName(full, canonical, (uint)canonical.Capacity)',
+		'GetLongPathName(entry, canonical, (uint)canonical.Capacity)'
+	],
+	['!Path.IsPathFullyQualified(entry) || !File.Exists(entry)', '!Path.IsPathFullyQualified(entry)'],
+	['entry = $requestedEntry;', 'entry = $Entry;']
+]) {
+	assert.ok(
+		sourceObserver.includes(from),
+		'native normalization mutation must modify actual source'
+	);
+	assert.throws(() => checkCanonicalSourceEntry(sourceObserver.replaceAll(from, to)), from);
+}
 checkSourceOwnerEvidence(sourceObserver);
 for (const [from, to] of [
 	['function Get-SourceOwnerEvidence {', 'function MissingEvidenceProducer {'],

@@ -79,7 +79,11 @@ try {
 		'-File',
 		path.join(root, 'tools/test/fixtures/test_source_boot_ownership.ps1'),
 		'-Observer',
-		path.join(root, 'tools/test/fixtures/observe_ahk_source_boot.ps1')
+		path.join(root, 'tools/test/fixtures/observe_ahk_source_boot.ps1'),
+		'-Ahk',
+		interpreter,
+		'-Root',
+		temporary
 	]);
 	run(
 		'git',
@@ -136,6 +140,12 @@ try {
 		run('pwsh.exe', args, root, 270000);
 		const observation = JSON.parse(fs.readFileSync(path.join(probe, 'observation.json'), 'utf8'));
 		assert.equal(observation.receipt.nonce, nonce);
+		assert.equal(
+			observation.entry,
+			entry,
+			'the observation keeps the caller-selected entry spelling'
+		);
+		assert.equal(observation.source_owner.script_argument_canonical_exact, true);
 		assert.equal(observation.reloaded, reloaded);
 		assert.equal(observation.ready_pid !== observation.initial_pid, reloaded);
 		assert.equal(observation.initial_exit_code, 0);
