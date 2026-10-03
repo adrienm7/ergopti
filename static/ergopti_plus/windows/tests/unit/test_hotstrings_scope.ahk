@@ -310,8 +310,9 @@ _HotstringsScopeDelayVectors() {
 Test("hotstrings-scope: independent delay vectors agree with both Lua drivers", _HotstringsScopeDelayVectors)
 
 _HotstringsScopeMeasuredDelayRoundTrip() {
-	global _HotstringsOverrides, _HSResolveCache, _HSResolveGen
-	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen }
+	global _HotstringsOverrides, _HSResolveCache, _HSResolveGen, HotstringGroupConfig
+	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen,
+		groups: HotstringGroupConfig }
 	Fixture := _HotstringsScopeFixture()
 	Fixture.options["sections"] := (Entry) => [{ Name: Entry.IsPersonal ? "words" : "caps" }]
 	Bundle := 0, Refusal := 0
@@ -322,6 +323,9 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 	}
 	Fixture.options["reload"] := Launch
 	try {
+		; Other resolver fixtures deliberately seed empty metadata. This real-corpus
+		; round trip owns a fresh cache so the actual TOML parser supplies inheritance.
+		HotstringGroupConfig := Map()
 		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", "caps"),
 			"the real corpus makes deletion inherit 1.0 seconds")
 		AssertEqual(0.5, ManifestValueFor("hotstrings.autocorrection.caps.time_activation_seconds", "recommended"),
@@ -359,9 +363,11 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 		_HotstringsOverrides := Saved.overrides
 		_HSResolveCache := Saved.cache
 		_HSResolveGen := Saved.generation
+		HotstringGroupConfig := Saved.groups
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_ScopeOwnerCleanup(Fixture)
 	}
+	Assert(HotstringGroupConfig == Saved.groups, "the original metadata cache identity is restored")
 }
 Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal", _HotstringsScopeMeasuredDelayRoundTrip)
