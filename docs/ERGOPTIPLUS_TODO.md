@@ -143,6 +143,18 @@ These are software implementations; final hardware verification remains below.
   Windows already admits curl responses only after exit zero; macOS consumes
   hs.http's native completion status and explicitly clears successful errors.
   Native Windows/macOS suites and manual CI remain deferred by request.
+- [~] **L8.** Linux model-pull retry retirement: successful settlement now
+  clears the retained retry request instead of preserving it through Lua's
+  `and`/`or` fallback. Stale direct/progress callbacks cannot dispatch another
+  pull; the bridge rejects a successful session before resetting its receipt,
+  so WebKit still receives success after a stale message. An HTTP failure
+  remains retryable. Both portable regressions and the
+  native GTK/WebKit/libuv/curl reproduction failed before the fix. The native
+  fixture uses an owned loopback Ollama response, not an installed model or
+  physical keyboard, and is registered for future Linux CI. Windows launches
+  its pull in an independent terminal; macOS uses native task and progress
+  ownership rather than this retained-request expression. Native cross-OS
+  validation and manual CI remain deferred by request.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

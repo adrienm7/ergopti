@@ -1703,6 +1703,29 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("dl_bridge", function()
     local handler = helpers.load_module("ui.download_window.bridge")
+	helpers.it("linux-model-pull-retry-retirement: progress retries preserve successful settlement", function()
+		local previous_manager = package.loaded["ui.webview_manager"]
+		local evaluated, retries = {}, 0
+		package.loaded["ui.webview_manager"] = {
+			show = function() return true end,
+			hide = function() return true end,
+			eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+		}
+		local ok, err = xpcall(function()
+			handler._reset()
+			local session_id = handler.show({ kind = "ollama_model", label = "Successful fixture",
+				on_retry = function() retries = retries + 1; return false end })
+			helpers.assert_true(handler.complete(session_id, true, "Installed"))
+			helpers.assert_eq(handler.on_message("retry").retried, false)
+			helpers.assert_eq(retries, 0, "a successful session never invokes a retry controller")
+			helpers.assert_true(handler.on_message("ready").pushed)
+			helpers.assert_true(evaluated[#evaluated]:find("done(true", 1, true) ~= nil,
+				"stale retry must preserve the successful terminal receipt")
+		end, debug.traceback)
+		handler._reset()
+		package.loaded["ui.webview_manager"] = previous_manager
+		if not ok then error(err) end
+	end)
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "dl_bridge")

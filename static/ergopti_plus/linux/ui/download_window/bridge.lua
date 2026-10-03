@@ -186,6 +186,8 @@ function M.on_message(payload)
 		return { cancelled = true }
 	end
 	if payload == "retry" and session.terminal and type(session.on_retry) == "function" then
+		-- A queued retry cannot reopen a successful operation or erase its receipt.
+		if session.succeeded == true then return { retried = false } end
 		session.terminal = false
 		session.progress = 0
 		session.detail = translated("download_window.starting")

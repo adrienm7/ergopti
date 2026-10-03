@@ -66,6 +66,21 @@ local function load_fixture()
 end
 
 helpers.describe("Ollama model download: streaming transaction", function()
+	helpers.it("linux-model-pull-retry-retirement: successful pulls refuse retained retry callbacks", function()
+		local Download, transport, window, shown = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk('{"status":"success"}\n')
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], true)
+			helpers.assert_eq(shown().on_retry(), false, "success retires retry authorization")
+			helpers.assert_eq(#transport.starts, 1, "a stale callback cannot dispatch another pull")
+			helpers.assert_eq(Download.is_active(), false)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err) end
+	end)
+
 	helpers.it("parses split NDJSON progress and settles only after Ollama success", function()
 		local Download, transport, window = load_fixture()
 		local completed = nil
