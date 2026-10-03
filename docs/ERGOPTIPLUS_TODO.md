@@ -1406,6 +1406,21 @@ TODO 102 remains partial. The shared personal-file policy now supplies reversibl
 
 The descriptors are provenance, not an adopted settings key or a file lease. The next cohort must admit these exact shared identities into the existing acknowledged Dynamic scope/menu/persistence owners, with stale-source and file-alias refusal, before claiming personal-file collisions or per-file gates are fixed. Native Windows execution and full three-OS packaging/install validation remain required.
 
+Personal file commands bind the shared descriptor admission policy before
+the macOS registry transaction. File and section callbacks require a current
+native owner, configured route and exclusive source binding; legacy group
+collisions, physical aliases and stale callbacks refuse before mutation.
+Existing localized failure notices and canonical ACK/rollback owners remain
+in charge. The master switch, pause state, unrelated mappings and unknown
+disk neighbors are preserved. Eleven literal admission decisions are
+replayed through all three test ports, including Linux overlay losers and
+the Windows additional-file default group that has no exclusive file gate.
+
+      TODO 102 remains partial: Windows additional-file persistence ownership and
+      collision-free personal view adoption still need work. Native Windows
+      qualification also awaits the separate inline descriptor transport and
+      canonical-path fixture repairs; their original assertions remain intact.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue

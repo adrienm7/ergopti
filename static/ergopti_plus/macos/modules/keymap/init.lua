@@ -666,6 +666,7 @@ M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, t
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
+M.personal_file_scope_binding = Registry.personal_file_scope_binding
 M.is_section_enabled    = Registry.is_section_enabled
 M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section, true)
 M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section, true)

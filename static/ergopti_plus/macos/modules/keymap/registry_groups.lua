@@ -806,6 +806,17 @@ function M.is_group_enabled(name)
 	return _state and _state.groups[name] ~= nil and _state.groups[name].enabled or false
 end
 
+--- Captures one actual TOML owner without exposing its mutable group record.
+--- @param name string Registered native group identity.
+--- @return table|nil binding Owned provenance and current-owner predicate.
+function M.personal_file_scope_binding(name)
+	if not require_state("personal_file_scope_binding") then return nil end
+	local group = _state.groups[name]
+	if not group or group.kind ~= "toml" or not PersonalFiles.is_descriptor(group.personal_source) then return nil end
+	return { source = PersonalFiles.copy(group.personal_source), path = group.path,
+		current = function() return _state.groups[name] == group end }
+end
+
 --- Returns a flat table of {name → enabled} for all registered groups.
 --- @return table
 function M.list_groups()
