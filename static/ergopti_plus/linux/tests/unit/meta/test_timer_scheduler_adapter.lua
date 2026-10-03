@@ -11,6 +11,93 @@
 local helpers = require("tests.helpers")
 local ts      = helpers.load_module("adapters.timer_scheduler")
 
+-- Native API double: the backend retains callbacks, not returned Lua tokens.
+local function timer_fixture()
+	local state = { timers = {} }
+	local backend = {}
+	function backend.new_timer()
+		local timer = { closed = false, stopped = false }
+		state.timers[#state.timers + 1] = timer
+		return timer
+	end
+	function backend.timer_start(timer, timeout, interval, callback)
+		timer.timeout, timer.interval, timer.callback = timeout, interval, callback
+		return 0
+	end
+	function backend.timer_stop(timer) timer.stopped = true; return 0 end
+	function backend.close(timer) timer.closed = true; timer.callback = nil end
+	function state.fire(index)
+		local timer = state.timers[index]
+		if not timer.closed and not timer.stopped then timer.callback() end
+	end
+	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["adapters.timer_scheduler"]
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = backend, nil
+	local scheduler = require("adapters.timer_scheduler")
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = previous_backend, previous_scheduler
+	return scheduler, state
+end
+
+helpers.describe("linux-timer-gc-ownership", function()
+	for _, count in ipairs({ 1, 3, 12 }) do
+		helpers.it("linux-timer-gc-ownership: cancelAll owns " .. count .. " unretained repeaters", function()
+			local scheduler, state = timer_fixture()
+			local callbacks = 0
+			for _ = 1, count do scheduler.every(1, function() callbacks = callbacks + 1 end) end
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(scheduler.activeCount(), count, "GC cannot erase native timer ownership")
+			helpers.assert_eq(scheduler.cancelAll(), true)
+			for index, timer in ipairs(state.timers) do
+				helpers.assert_true(timer.stopped and timer.closed, "every issued timer must be retired")
+				state.fire(index)
+			end
+			helpers.assert_eq(callbacks, 0, "retired backend timers publish no callbacks")
+			helpers.assert_eq(scheduler.activeCount(), 0)
+			helpers.assert_eq(scheduler.cancelAll(), true, "bulk cancellation remains idempotent")
+		end)
+	end
+
+	helpers.it("linux-timer-gc-ownership: cancellation preserves mixed unretained ownership", function()
+		local scheduler, state = timer_fixture()
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 4)
+		helpers.assert_eq(scheduler.cancelAll(), true)
+		for _, timer in ipairs(state.timers) do helpers.assert_true(timer.closed and timer.stopped) end
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+
+	helpers.it("linux-timer-gc-ownership: one-shot firing releases its token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		local callbacks = 0
+		tokens[1] = scheduler.after(1, function() callbacks = callbacks + 1 end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 1)
+		state.fire(1)
+		state.fire(1)
+		collectgarbage("collect")
+		helpers.assert_eq(callbacks, 1, "one-shot completion occurs once")
+		helpers.assert_eq(scheduler.activeCount(), 0)
+		helpers.assert_eq(tokens[1], nil, "settled one-shots do not accumulate in the registry")
+	end)
+
+	helpers.it("linux-timer-gc-ownership: individual cancellation releases a repeating token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		tokens[1] = scheduler.every(1, function() end)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		collectgarbage("collect")
+		helpers.assert_eq(tokens[1], nil)
+		helpers.assert_true(state.timers[1].closed and state.timers[1].stopped)
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+end)
+
 helpers.describe("timer_scheduler adapter", function()
 
   -- ==========================================================================
