@@ -101,6 +101,54 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	end
 end
 
+--- Captures declared external module owners selected by the actual shared index.
+--- Placeholders without a binding remain outside this scope; an unsupported
+--- declared module refuses before any category, module or file can change.
+--- @param ctx table Native menu context.
+--- @param group_names table Selected registry group identities.
+--- @return table choices Exact runtime and sparse menu-state inverses.
+local function category_module_choices(ctx, group_names)
+	local choices, selected = {}, {}
+	for _, group in ipairs(group_names) do
+		local modules = type(ctx.module_sections) == "table" and ctx.module_sections[group]
+		if type(modules) == "table" then
+			for _, section in ipairs(ctx.keymap.get_sections(group) or {}) do
+				local binding = modules[section.name]
+				local id = type(binding) == "table" and binding.mod_id or binding
+				if section.is_module_placeholder and id ~= nil then
+					assert(id == "personal_info", "selected hotstring module has no scope owner")
+					if not selected[id] then
+						local owner = ctx[id]
+						assert(type(owner) == "table" and type(owner.set_enabled) == "function"
+							and type(owner.is_enabled) == "function", "hotstring module acknowledgement owner is unavailable")
+						local enabled = owner.is_enabled()
+						assert(type(enabled) == "boolean", "hotstring module snapshot must be boolean")
+						selected[id] = true
+						choices[#choices + 1] = { id = id, owner = owner, enabled = enabled, state = ctx.state[id] }
+					end
+				end
+			end
+		end
+	end
+	return choices
+end
+
+--- Applies only explicit external-module choices through their acknowledged owner.
+--- @param choices table Captured native module choices.
+--- @param enabled boolean|nil nil restores each independent runtime snapshot.
+--- @return boolean committed
+local function apply_category_modules(choices, enabled)
+	for _, choice in ipairs(choices) do
+		local value = enabled
+		if value == nil then value = choice.enabled end
+		if (enabled ~= nil or choice.attempted) and choice.owner.is_enabled() ~= value then
+			choice.attempted = true
+			if choice.owner.set_enabled(value) ~= true or choice.owner.is_enabled() ~= value then return false end
+		end
+	end
+	return true
+end
+
 --- Commits a category gate and its section choices in the registry transaction.
 --- The canonical save participates in that transaction; a failed save cannot
 --- leave the live category changed or rebuild the tray as though it succeeded.
@@ -114,11 +162,14 @@ function M.category_scope_fn(ctx, group_names, enabled)
 		for _, name in ipairs(group_names) do
 			prior[#prior + 1] = { name = name, value = ctx.state.hotstrings[name] }
 		end
-		local scope_committed = false
+		local scope_committed, module_choices = false, {}
 		local committed = KeymapLifecycle.commit_mutation(ctx, "set hotstring category scope", function()
 			local km = ctx.keymap
 			if not km or type(km.set_category_scope_enabled) ~= "function" then return false end
+			module_choices = category_module_choices(ctx, group_names)
 			local result = km.set_category_scope_enabled(group_names, enabled, function()
+				if apply_category_modules(module_choices, enabled) ~= true then return false end
+				for _, choice in ipairs(module_choices) do ctx.state[choice.id] = enabled end
 				for _, name in ipairs(group_names) do ctx.state.hotstrings[name] = enabled end
 				if ctx.save_prefs() ~= true then return false end
 				return true
@@ -128,6 +179,12 @@ function M.category_scope_fn(ctx, group_names, enabled)
 		end, function() ctx.updateMenu() end)
 		-- A refresh failure cannot undo an acknowledged file and registry choice.
 		if not scope_committed then
+			if #module_choices > 0 then
+				KeymapLifecycle.commit_mutation(ctx, "restore hotstring module choices", function()
+					return apply_category_modules(module_choices)
+				end)
+				for _, choice in ipairs(module_choices) do ctx.state[choice.id] = choice.state end
+			end
 			for _, choice in ipairs(prior) do ctx.state.hotstrings[choice.name] = choice.value end
 		end
 		return committed
@@ -152,6 +209,9 @@ function M.all_sections_on(ctx, group_names)
 			if not (section_on and section_on(name, section)) then return false end
 		end
 	end
+	local ok, choices = pcall(category_module_choices, ctx, group_names)
+	if not ok then return false end
+	for _, choice in ipairs(choices) do if not choice.enabled then return false end end
 	return true
 end
 
