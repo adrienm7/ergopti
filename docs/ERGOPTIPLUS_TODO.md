@@ -1152,6 +1152,12 @@ actual delegates before their includes and preserve caption/body/options/
 cancellation checks. Actual Windows and AppleScript GUI qualification remains
 pending.
 
+Native dialog tests snapshot caption, body, buttons and password properties
+before file I/O can pump messages and retire a timed dialog. Delayed
+persistence must observe actual retirement while retaining every original
+caption, body and result assertion. The independent expiry mutation must
+fail; native Windows qualification remains pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

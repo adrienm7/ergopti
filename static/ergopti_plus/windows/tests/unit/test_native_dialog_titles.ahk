@@ -7,6 +7,8 @@
 ; AHK children. Visible message/input captions are captured independently of the
 ; shared composer, alongside body, timeout and exact default-text receipts.
 ; Calls precede both owner #Includes, exercising their pre-bootstrap availability.
+; Snapshot every native property before file I/O pumps the timeout dialog away.
+; An expired-window mutation must reproduce the original exact native exception.
 ; ==============================================================================
 
 /**
@@ -14,9 +16,10 @@
  * @param {string} Executable - The native executable.
  * @param {Array} Args - Structured arguments.
  * @param {object} Ownership - Retains the fixture if exact child retirement fails.
+ * @param {integer} ExpectedCode - Zero for real probes, two only for the expiry mutation.
  * @returns {string} Captured ASCII completion acknowledgement.
  */
-_NDT_RunChild(Executable, Args, Ownership) {
+_NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0) {
 	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
 	OnDone(Code, Output, Errors) {
 		Receipt.Calls += 1
@@ -33,7 +36,7 @@ _NDT_RunChild(Executable, Args, Ownership) {
 			Sleep(10)
 		}
 		AssertEqual(1, Receipt.Calls, "the native-dialog child completes exactly once")
-		AssertEqual(0, Receipt.Code, "the actual native caption owner parses and runs: "
+		AssertEqual(ExpectedCode, Receipt.Code, "the actual native caption owner parses and runs: "
 			. Receipt.Output . Receipt.Errors)
 		AssertEqual("", Receipt.Errors, "native dialog receipts contain no hidden errors")
 		return Receipt.Output
@@ -81,19 +84,30 @@ _NDT_ProbeSource(Artifact, Owner) {
 		. 'global _NDTReceipt' . "`n"
 		. 'for Hwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
 		. 'if Hwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", Hwnd)' . "`ncontinue`n"
-		. 'FileAppend(WinGetTitle("ahk_id " . Hwnd), _NDTReceipt . ".title", "UTF-8-RAW")' . "`n"
-		. 'FileAppend(WinGetText("ahk_id " . Hwnd), _NDTReceipt . ".body", "UTF-8-RAW")' . "`n"
+		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
+		. 'Body := WinGetText("ahk_id " . Hwnd)' . "`n"
+		. 'Buttons := ""' . "`n"
+		. 'Password := ""' . "`n"
 		. 'if InStr(_NDTReceipt, "\message") {' . "`n"
 		. 'YesButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 6, "Ptr")' . "`n"
 		. 'NoButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 7, "Ptr")' . "`n"
 		. 'DefaultId := SendMessage(0x400, 0, 0, , "ahk_id " . Hwnd) & 0xFFFF' . "`n"
-		. 'FileAppend((YesButton ? "yes" : "missing") . "|" . (NoButton ? "no" : "missing") . "|" . DefaultId, _NDTReceipt . ".buttons", "UTF-8-RAW")' . "`n}`n"
+		. 'Buttons := (YesButton ? "yes" : "missing") . "|" . (NoButton ? "no" : "missing") . "|" . DefaultId' . "`n}`n"
 		. 'if InStr(_NDTReceipt, "\input") {' . "`n"
 		. 'InputControlHwnd := ControlGetHwnd("Edit1", "ahk_id " . Hwnd)' . "`n"
-		. 'FileAppend((WinGetStyle("ahk_id " . InputControlHwnd) & 0x20) ? "password" : "plain", _NDTReceipt . ".password", "UTF-8-RAW")' . "`n}`n"
+		. 'Password := (WinGetStyle("ahk_id " . InputControlHwnd) & 0x20) ? "password" : "plain"' . "`n}`n"
 		. 'SetTimer(_NDTCapture, 0)' . "`n"
 		. 'if InStr(_NDTReceipt, "\cancelled")' . "`n"
-		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`nreturn`n}`n}`n"
+		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
+		. 'if InStr(_NDTReceipt, "\message") && A_Args[2] == "delay" {' . "`n"
+		. 'Sleep(700)' . "`n"
+		. 'FileAppend(DllCall("IsWindow", "Ptr", Hwnd) ? "live" : "retired", _NDTReceipt . ".retirement", "UTF-8-RAW")' . "`n}`n"
+		. 'FileAppend(Caption, _NDTReceipt . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(Body, _NDTReceipt . ".body", "UTF-8-RAW")' . "`n"
+		. 'if Buttons != ""' . "`n"
+		. 'FileAppend(Buttons, _NDTReceipt . ".buttons", "UTF-8-RAW")' . "`n"
+		. 'if Password != ""' . "`n"
+		. 'FileAppend(Password, _NDTReceipt . ".password", "UTF-8-RAW")' . "`nreturn`n}`n}`n"
 		. '_NDTProbeError(Err, *) {' . "`n"
 		. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n"
 		. '#Include ' . Artifact . "`n"
@@ -146,7 +160,7 @@ _NDT_ActualNativeCaptionsAndResults() {
 			Harness := Fixture . "\native_dialogs.ahk"
 			FileAppend(_NDT_ProbeSource(Artifact, Owner), Harness, "UTF-8")
 			AssertEqual("dialogs-written", _NDT_RunChild(A_AhkPath,
-				["/ErrorStdOut", Harness, Fixture], Ownership), "native dialogs acknowledge private receipts with ASCII stdout")
+				["/ErrorStdOut", Harness, Fixture, Index == 1 ? "delay" : "immediate"], Ownership), "native dialogs acknowledge private receipts with ASCII stdout")
 			for Kind in ["message", "input", "unnamed", "cancelled"] {
 				Caption := Fixture . "\" . Kind . ".title"
 				Body := Fixture . "\" . Kind . ".body"
@@ -159,6 +173,24 @@ _NDT_ActualNativeCaptionsAndResults() {
 			}
 			AssertEqual("Timeout", FileRead(Fixture . "\message.result", "UTF-8"),
 				"message button/options forwarding preserves the native timeout result")
+			if Index == 1 {
+				AssertEqual("retired", FileRead(Fixture . "\message.retirement", "UTF-8"),
+					"native observations survive persistence after the exact dialog has timed out")
+				; Reintroduce an interruption between native reads, independently of
+				; the repaired persistence order. The same T0.5 window must expire
+				; and the original native target exception must reject the mutation.
+				MutantRoot := Fixture . "\expired_read"
+				DirCreate(MutantRoot)
+				Mutant := StrReplace(_NDT_ProbeSource(Artifact, Owner),
+					'Body := WinGetText("ahk_id " . Hwnd)',
+					'Sleep(700)' . "`n" . 'Body := WinGetText("ahk_id " . Hwnd)', , &Mutations)
+				AssertEqual(1, Mutations, "the expiry mutation changes one exact native observation")
+				MutantHarness := MutantRoot . "\expired_read.ahk"
+				FileAppend(Mutant, MutantHarness, "UTF-8")
+				AssertEqual("Target window not found.", _NDT_RunChild(A_AhkPath,
+					["/ErrorStdOut", MutantHarness, MutantRoot, "immediate"], Ownership, 2),
+					"the independent expired-window mutation reproduces the original rejected target query")
+			}
 			AssertEqual("yes|no|7", FileRead(Fixture . "\message.buttons", "UTF-8"),
 				"the native message retains Yes/No buttons and the second default button")
 			AssertEqual("Timeout`n Secret value ", FileRead(Fixture . "\input.result", "UTF-8"),
