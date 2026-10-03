@@ -217,6 +217,89 @@ _TBUI_RawHex(Path) {
 
 
 
+; Ordinary updates own exactly their declared assignment rows. The independent
+; shared corpus retains handwritten foreign bytes instead of serializer output.
+_TBUI_ForeignSourceVector(Vector) {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector["source"]
+	Updates := []
+	for Row in Vector["updates"] {
+		Update := { Section: Row["section"], Key: Row["key"] }
+		if Row["kind"] == "delete" {
+			AssertEqual(true, Row["delete"])
+			Update.Delete := 1
+		} else {
+			AssertTrue(Row["kind"] == "boolean" || Row["kind"] == "integer")
+			Update.Value := Row["kind"] == "boolean" ? TOML_Bool(Row["value"]) : Row["value"]
+		}
+		Updates.Push(Update)
+	}
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		Candidate := TOML_BuildUpdatedContent(Path, Updates)
+		AssertEqual("ok", Candidate["status"], "the source-retaining candidate must be admitted")
+		if Vector.Has("lua_admission") {
+			AssertEqual("refused_unaddressable", Vector["lua_admission"],
+				"the shared corpus declares the distinct existing Lua refusal boundary")
+			AssertTrue(Vector.Has("lua_refusal"))
+		}
+		if Vector.Has("windows_canonical")
+			AssertEqual(Chr(0xFEFF) . Vector["windows_canonical"], Candidate["content"],
+				"a fully owned source without foreign comments keeps the canonical serializer contract")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "detached preparation owns no source writes")
+		AssertTrue(TOML_BatchWrite(Path, Updates), "the real ordinary writer must acknowledge publication")
+		AssertTrue(FSUtf8ExactMatches(Path, Candidate["content"]),
+			"detached and ordinary modes must publish the same qualified bytes")
+		for Raw in Vector["retained"] {
+			AssertContains(Candidate["content"], Raw,
+				"unowned records retain the independent handwritten source bytes")
+			AssertContains(FSReadUtf8Exact(Path), Raw,
+				"publication preserves those same foreign physical records")
+		}
+		Document := TOML_ParseDocument(Candidate["content"])
+		for Expected in Vector["owned"] {
+			AssertTrue(Expected["kind"] == "boolean" || Expected["kind"] == "integer")
+			Value := Expected["kind"] == "boolean" ? TOML_Bool(Expected["value"]) : Expected["value"]
+			AssertTrue(TOML_SameValue(Document[Expected["section"]][Expected["key"]], Value),
+				"the complete candidate must contain the independently requested owned value")
+		}
+	} finally FSDelete(Path)
+}
+
+_TBUI_RegisterForeignSourceVectors() {
+	global _SharedDir
+	Fixture := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_source_preservation\vectors.json", "UTF-8"))
+	for Vector in Fixture["cases"]
+		Test("toml-foreign-source " . Vector["id"], _TBUI_ForeignSourceVector.Bind(Vector))
+}
+_TBUI_RegisterForeignSourceVectors()
+
+_TBUI_OwnedLastWinsRetainsForeignSource() {
+	Source := '# unowned source anchor`n[settings]`nknown = 0`nfuture = "keep" # retained`n'
+	Updates := [
+		{ Section: "settings", Key: "known", Value: 1 },
+		{ Section: "settings", Key: "known", Delete: 1 },
+		{ Section: "settings", Key: "known", Value: 2 },
+		{ Section: "missing", Key: "absent", Delete: 1 }
+	]
+	Path := _TBUI_NewPath()
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Chr(0xFEFF) . Source) == 1)
+		Candidate := TOML_BuildUpdatedContent(Path, Updates)
+		AssertEqual("ok", Candidate["status"])
+		AssertContains(Candidate["content"], "known = 2`n", "the last explicit row keeps its existing ownership")
+		AssertContains(Candidate["content"], '# unowned source anchor`n')
+		AssertContains(Candidate["content"], 'future = "keep" # retained`n')
+		AssertFalse(InStr(Candidate["content"], "[missing]"), "an absent neutral deletion owns no new header")
+		AssertTrue(TOML_BatchWrite(Path, Updates))
+		AssertTrue(FSUtf8ExactMatches(Path, Candidate["content"]))
+	} finally FSDelete(Path)
+}
+Test("toml physical ownership preserves last-wins and absent deletion semantics", _TBUI_OwnedLastWinsRetainsForeignSource)
+
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Direct-run Entry =======
