@@ -16,6 +16,7 @@ local Shell = require("adapters.shell_runner")
 local Codec = require("keylogger.text_crypto")
 assert(uv.getuid() ~= 0, "native at-rest tests require an ordinary user")
 local real = assert(Shell.exec_line("command -v openssl"), "the actual OpenSSL CLI must be installed")
+local real_head = assert(Shell.exec_line("command -v head"))
 local previous_path = assert(os.getenv("PATH"))
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-openssl-exit-XXXXXX"))
 local checks, failures = 0, 0
@@ -29,14 +30,22 @@ end
 write(root .. "/openssl", table.concat({
 	"#!/bin/sh",
 	"operation=other",
+	'if [ "$1" = base64 ]; then operation=decode; fi',
 	'if [ "$1" = enc ]; then',
 	"operation=encrypt",
 	'for arg in "$@"; do case "$arg" in -P) operation=derive; break;; -d) operation=decrypt;; esac; done',
 	"fi",
+	"read target fault < " .. Shell.quote(root .. "/mode"),
+	'if [ "$operation" = decode ] && [ "$target" = decode ] && [ "${fault#PARTIAL}" != "$fault" ]; then',
+	Shell.quote(real) .. ' "$@" > ' .. Shell.quote(root .. "/native-output"),
+	"native_status=$?",
+	Shell.quote(real_head) .. " -c 1 " .. Shell.quote(root .. "/native-output"),
+	'fault=${fault#PARTIAL}',
+	"else",
 	Shell.quote(real) .. ' "$@"',
 	"native_status=$?",
+	"fi",
 	"printf '%s %s\\n' \"$operation\" \"$native_status\" >> " .. Shell.quote(root .. "/calls"),
-	"read target fault < " .. Shell.quote(root .. "/mode"),
 	'if [ "$operation" = "$target" ]; then',
 	'case "$fault" in TERM) kill -TERM $$;; KILL) kill -KILL $$;; *) exit "$fault";; esac',
 	"fi",
@@ -90,6 +99,49 @@ assert(cipher.is_available(), "the ordinary successful native key derivation mus
 assert(cipher.set_enabled(true))
 local plaintext = "Synthetic receipt text"
 local envelope = assert(cipher.encrypt("native-receipt", 1, plaintext))
+for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL", "PARTIAL7", "PARTIALTERM" }) do
+	check("failed native decoder cannot hide behind a successful encryption consumer " .. fault, function()
+		mode("decode", fault)
+		local result = cipher.encrypt("native-receipt", 6, "a\0retained bytes")
+		observed("decode")
+		assert(result == nil, "an unsuccessful native producer admitted a shortened or untrusted envelope")
+	end)
+end
+
+check("checked native pipeline retains the existing large binary argv budget", function()
+	mode("success")
+	local value = string.rep("'a", 45000) .. "\0"
+	assert(#value == 90001)
+	local protected = cipher.encrypt("native-receipt", 7, value)
+	assert(Codec.is_encrypted(protected) and cipher.decrypt(protected) == value,
+		"pipeline supervision amplified or changed the existing native input")
+end)
+
+assert(uv.fs_symlink(real_head, root .. "/head"))
+check("missing native pipeline supervisor refuses binary input before cryptography", function()
+	mode("success")
+	assert(uv.os_setenv("PATH", root)) -- Actual tool search excludes Bash, not a simulated capability.
+	local ok, err = pcall(function()
+		assert(cipher.encrypt("native-receipt", 8, "a\0b") == nil, "missing native pipeline supervision was ignored")
+		local file = assert(io.open(root .. "/calls", "r"))
+		local calls = assert(file:read("*a"))
+		assert(file:close())
+		assert(calls == "", "unsupported binary pipeline started native cryptography")
+	end)
+	assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
+	assert(ok, err)
+end)
+check("ordinary native encryption remains available without a pipeline supervisor", function()
+	mode("success")
+	assert(uv.os_setenv("PATH", root))
+	local ok, err = pcall(function()
+		local protected = cipher.encrypt("native-receipt", 9, plaintext)
+		assert(Codec.is_encrypted(protected) and cipher.decrypt(protected) == plaintext)
+	end)
+	assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
+	assert(ok, err)
+end)
+
 for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL" }) do
 	check("failed native encryption refuses useful ciphertext stdout " .. fault, function()
 		mode("encrypt", fault)
@@ -142,6 +194,19 @@ check("actual typing persistence rejects failed encryption and admits healthy re
 	rows = assert(writer.query_rows("SELECT text FROM events_typing;"))
 	assert(#rows == 1 and Codec.is_encrypted(rows[1]) and cipher.decrypt(rows[1]) == plaintext,
 		"healthy cipher retry duplicated, lost or changed the actual typed row")
+end)
+check("actual typing persistence rejects partial decoder output and retains its healthy retry", function()
+	local value = "Persisted\0native decoder bytes"
+	mode("decode", "PARTIAL7")
+	assert(writer.insert_typing_events("native-receipt-device", { { text = value } }) == false,
+		"a failed native decoder committed shortened typing data")
+	observed("decode")
+	local rows = assert(writer.query_rows("SELECT count(*) FROM events_typing;"))
+	assert(#rows == 1 and rows[1] == "1", "the refused decoder batch changed durable typing data")
+	mode("success")
+	assert(writer.insert_typing_events("native-receipt-device", { { text = value } }))
+	rows = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
+	assert(#rows == 2 and cipher.decrypt(rows[2]) == value, "the healthy decoder retry lost or duplicated binary typing data")
 end)
 
 if writer then writer.close_db() end
