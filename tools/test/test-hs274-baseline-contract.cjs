@@ -45,7 +45,8 @@ const fail = (msg) => errors.push(msg);
 
 /** Runs the contract check against one repository root. */
 function check(root) {
-	return spawnSync('python3', [SCRIPT, '--root', root], { encoding: 'utf8' });
+	const python = process.platform === 'win32' ? 'python' : 'python3';
+	return spawnSync(python, [SCRIPT, '--root', root], { encoding: 'utf8' });
 }
 
 /** Writes a minimal tree declaring the three baseline versions. */
