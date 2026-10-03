@@ -131,6 +131,139 @@ console.log(
 	`Native folder adapter provenance mutations: ${folderMutations.length}/${folderMutations.length} passed.`
 );
 
+/** Rejects UI family coupling which can hide real folder ABI failures. */
+function assertNativePolicyFamilyIsolation(source) {
+	const body = (name) => {
+		const found = source.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n([\\s\\S]*?)^\\}`, 'm'));
+		assert.ok(found && found[1].trim(), `${name} has a nonempty actual native case body`);
+		return found[1];
+	};
+	const families = [
+		[
+			'dialogs',
+			'_NDT_ActualNativeCaptionsAndResults',
+			'_NDT_CheckDialogPolicy',
+			'_NDT_ProbeSource'
+		],
+		[
+			'file_picker',
+			'_NDT_ActualNativeFilePickerCaptionsAndResults',
+			'_NDT_CheckFilePickerPolicy',
+			'_NDT_FilePickerProbeSource'
+		],
+		[
+			'folder_picker',
+			'_NDT_ActualNativeFolderPickerCaptionsAndResults',
+			'_NDT_CheckFolderPickerPolicy',
+			'_NDT_FolderPickerProbeSource'
+		]
+	];
+	for (const [family, wrapper, handler, probe] of families) {
+		assert.match(
+			source,
+			new RegExp(`^Test\\("[^"\\n]+\\(shared-window-titles\\)"[,]\\s*${wrapper}\\)`, 'm'),
+			`${family} registers an independent case with the actual test runner`
+		);
+		assert.equal(
+			body(wrapper).trim(),
+			`_NDT_RunPolicyFamily("${family}", ${handler})`,
+			`${family} cannot depend on another native UI family completing`
+		);
+		const checks = body(handler);
+		assert.ok(
+			checks.includes(`${probe}(Artifact, Owner)`),
+			`${family} invokes its real native child`
+		);
+		assert.ok(
+			checks.includes('_NDT_RunChild(A_AhkPath,'),
+			`${family} checks owned native process completion`
+		);
+		for (const [, otherWrapper, otherHandler, otherProbe] of families) {
+			if (otherHandler === handler) continue;
+			for (const unrelated of [otherWrapper, otherHandler, otherProbe])
+				assert.equal(
+					checks.includes(`${unrelated}(`),
+					false,
+					`${family} cannot invoke ${unrelated}`
+				);
+		}
+	}
+	const ownership = body('_NDT_RunPolicyFamily');
+	for (const invariant of [
+		'"\\ergopti_native_" . Family',
+		'Cases := _NDT_PolicyCases()',
+		'generator.main(target)',
+		'Owner := _NDT_NativeDialogOwner()',
+		'CheckPolicy.Call(Index, Spec, Fixture, Artifact, Owner, Ownership)',
+		'if Ownership.CanRetire',
+		'DirDelete(Root, true)'
+	])
+		assert.ok(ownership.includes(invariant), `each family retains ${invariant}`);
+	assert.match(
+		ownership,
+		/for Index, Spec in Cases \{[\s\S]*CheckPolicy\.Call/,
+		'every family checks all independently generated policy cases'
+	);
+	const policies = body('_NDT_PolicyCases');
+	assert.equal(
+		(policies.match(/Expected:/g) || []).length,
+		5,
+		'each native family retains all five independent policy variants'
+	);
+	assert.ok(
+		body('_NDT_CheckFilePickerPolicy').includes('"Owned files (*.txt)") > 0'),
+		'the independent file case retains the exact native filter predicate'
+	);
+	assert.ok(
+		body('_NDT_CheckFolderPickerPolicy').includes('"retired", FileRead('),
+		'the independent folder case retains actual HWND retirement assertions'
+	);
+}
+const nativePolicySource = fs.readFileSync(
+	path.join(repository, 'static/ergopti_plus/windows/tests/unit/test_native_dialog_titles.ahk'),
+	'utf8'
+);
+assertNativePolicyFamilyIsolation(nativePolicySource);
+const nativePolicyMutations = [
+	nativePolicySource.replace(
+		/Test\("native folder picker:[\s\S]*?_NDT_ActualNativeFolderPickerCaptionsAndResults\)/,
+		''
+	),
+	nativePolicySource.replace(
+		'_NDT_RunPolicyFamily("folder_picker", _NDT_CheckFolderPickerPolicy)',
+		'_NDT_RunPolicyFamily("folder_picker", _NDT_CheckFilePickerPolicy)'
+	),
+	nativePolicySource.replace(
+		'FileAppend(_NDT_FolderPickerProbeSource(Artifact, Owner)',
+		'FileAppend(_NDT_FilePickerProbeSource(Artifact, Owner)'
+	),
+	nativePolicySource.replace(
+		'CheckPolicy.Call(Index, Spec, Fixture, Artifact, Owner, Ownership)',
+		'_NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership)'
+	),
+	nativePolicySource.replace('generator.main(target)', 'generator.skipped(target)'),
+	nativePolicySource.replaceAll(
+		'if Ownership.CanRetire\n\t\t\tDirDelete(Root, true)',
+		'if true\n\t\t\tDirDelete(Root, true)'
+	),
+	nativePolicySource.replace('"Owned files (*.txt)") > 0', '"Owned files (*.txt)") >= 0')
+];
+for (const mutant of nativePolicyMutations) {
+	assert.notEqual(
+		mutant,
+		nativePolicySource,
+		'each independent family mutation changes actual source'
+	);
+	assert.throws(
+		() => assertNativePolicyFamilyIsolation(mutant),
+		assert.AssertionError,
+		'native UI families reject missing registration, coupling and weakened receipts'
+	);
+}
+console.log(
+	`Native UI policy family isolation mutations: ${nativePolicyMutations.length}/${nativePolicyMutations.length} passed.`
+);
+
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-title-audit-'));
 const sourcePath = (platform) =>
 	`static/ergopti_plus/${platform}/ui/error_dialog/init.${platform === 'windows' ? 'ahk' : 'lua'}`;
