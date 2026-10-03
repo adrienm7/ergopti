@@ -1,0 +1,538 @@
+{
+	"version": 1,
+	"order": ["omlx", "lmstudio", "llamacpp", "jan"],
+	"max_age": 30,
+	"cases": [
+		{
+			"name": "ordered joint publication and exact cache-age boundary",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "first",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						},
+						{
+							"id": "lmstudio",
+							"base_url": "http://127.0.0.1:17342/v1"
+						}
+					],
+					"expected": {
+						"active": true,
+						"stale": false,
+						"detected": [],
+						"done": [],
+						"published": 0
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "first",
+					"id": "lmstudio",
+					"response": {
+						"ok": false,
+						"status": 401,
+						"body": "{}"
+					},
+					"expected": {
+						"active": true,
+						"detected": [],
+						"done": [],
+						"published": 0
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "first",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+					},
+					"expected": {
+						"active": false,
+						"stale": false,
+						"detected": ["omlx", "lmstudio"],
+						"done": [
+							{
+								"name": "first",
+								"changed": true
+							}
+						],
+						"published": 1,
+						"results": {
+							"omlx": {
+								"status": "up",
+								"base_url": "http://127.0.0.1:17341/v1",
+								"models": ["model-a", "model-b"]
+							},
+							"lmstudio": {
+								"status": "needs_key",
+								"base_url": "http://127.0.0.1:17342/v1",
+								"models": []
+							}
+						}
+					}
+				},
+				{
+					"kind": "clock",
+					"value": 29,
+					"expected": {
+						"stale": false
+					}
+				},
+				{
+					"kind": "clock",
+					"value": 30,
+					"expected": {
+						"stale": true
+					}
+				}
+			]
+		},
+		{
+			"name": "empty sweep publishes once and zero-model service remains reachable",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "empty",
+					"targets": [],
+					"expected": {
+						"active": false,
+						"stale": false,
+						"published": 1,
+						"done": [
+							{
+								"name": "empty",
+								"changed": false
+							}
+						],
+						"detected": []
+					}
+				},
+				{
+					"kind": "sweep",
+					"name": "models",
+					"targets": [
+						{
+							"id": "jan",
+							"base_url": "http://127.0.0.1:17344/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "models",
+					"id": "jan",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[]}"
+					},
+					"expected": {
+						"published": 2,
+						"detected": ["jan"],
+						"results": {
+							"jan": {
+								"status": "up",
+								"base_url": "http://127.0.0.1:17344/v1",
+								"models": []
+							}
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "superseded responses cannot publish and earlier waiters hear newest verdict",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "old",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						}
+					]
+				},
+				{
+					"kind": "sweep",
+					"name": "new",
+					"targets": [
+						{
+							"id": "lmstudio",
+							"base_url": "http://127.0.0.1:17345/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "old",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+					},
+					"expected": {
+						"active": true,
+						"published": 0,
+						"detected": [],
+						"done": []
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "new",
+					"id": "lmstudio",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[]}"
+					},
+					"expected": {
+						"active": false,
+						"published": 1,
+						"detected": ["lmstudio"],
+						"done": [
+							{
+								"name": "old",
+								"changed": true
+							},
+							{
+								"name": "new",
+								"changed": true
+							}
+						]
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "old",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+					},
+					"expected": {
+						"published": 1,
+						"detected": ["lmstudio"],
+						"done": [
+							{
+								"name": "old",
+								"changed": true
+							},
+							{
+								"name": "new",
+								"changed": true
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "captured provider and address cannot be reassigned by later input mutation",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "captured",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1",
+							"token": "inert-token"
+						}
+					]
+				},
+				{
+					"kind": "mutate",
+					"sweep": "captured",
+					"index": 1,
+					"fields": {
+						"id": "jan",
+						"base_url": "http://127.0.0.1:17399/v1"
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "captured",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+					},
+					"expected": {
+						"detected": ["omlx"],
+						"results": {
+							"omlx": {
+								"status": "up",
+								"base_url": "http://127.0.0.1:17341/v1",
+								"models": ["model-a", "model-b"]
+							}
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "duplicate responses and synchronous settle before refused dispatch are inert",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "sync",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						}
+					],
+					"sync": {
+						"omlx": {
+							"ok": true,
+							"status": 200,
+							"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+						}
+					},
+					"refuse": ["omlx"],
+					"expected": {
+						"active": false,
+						"published": 1,
+						"detected": ["omlx"],
+						"done": [
+							{
+								"name": "sync",
+								"changed": true
+							}
+						]
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "sync",
+					"id": "omlx",
+					"response": {
+						"ok": false,
+						"status": 0,
+						"body": ""
+					},
+					"expected": {
+						"published": 1,
+						"detected": ["omlx"],
+						"done": [
+							{
+								"name": "sync",
+								"changed": true
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "probe refusals and observer errors preserve one joint publication",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "refused",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						},
+						{
+							"id": "jan",
+							"base_url": "http://127.0.0.1:17344/v1"
+						}
+					],
+					"refuse": ["omlx"],
+					"throw": ["jan"],
+					"observer_throws": true,
+					"expected": {
+						"active": false,
+						"published": 1,
+						"detected": [],
+						"done": [
+							{
+								"name": "refused",
+								"changed": true
+							}
+						],
+						"errors": ["probe", "probe", "observer"]
+					}
+				}
+			]
+		},
+		{
+			"name": "an unchanged sweep ignores model metadata but respects model order and address",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "first",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "first",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\"},{\"id\":\"model-b\"}]}"
+					}
+				},
+				{
+					"kind": "sweep",
+					"name": "same",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "same",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-a\",\"object\":\"model\"},{\"id\":\"model-b\",\"future\":42}]}"
+					},
+					"expected": {
+						"done": [
+							{
+								"name": "first",
+								"changed": true
+							},
+							{
+								"name": "same",
+								"changed": false
+							}
+						]
+					}
+				},
+				{
+					"kind": "sweep",
+					"name": "order",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "order",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{\"id\":\"model-b\"},{\"id\":\"model-a\"}]}"
+					},
+					"expected": {
+						"done": [
+							{
+								"name": "first",
+								"changed": true
+							},
+							{
+								"name": "same",
+								"changed": false
+							},
+							{
+								"name": "order",
+								"changed": true
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "malformed models and ordinary HTTP failures never create a server row",
+			"steps": [
+				{
+					"kind": "sweep",
+					"name": "bad",
+					"targets": [
+						{
+							"id": "omlx",
+							"base_url": "http://127.0.0.1:17341/v1"
+						},
+						{
+							"id": "lmstudio",
+							"base_url": "http://127.0.0.1:17342/v1"
+						},
+						{
+							"id": "llamacpp",
+							"base_url": "http://127.0.0.1:17343/v1"
+						},
+						{
+							"id": "jan",
+							"base_url": "http://127.0.0.1:17344/v1"
+						}
+					]
+				},
+				{
+					"kind": "answer",
+					"sweep": "bad",
+					"id": "omlx",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":{}}"
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "bad",
+					"id": "lmstudio",
+					"response": {
+						"ok": true,
+						"status": 200,
+						"body": "{\"data\":[{}]}"
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "bad",
+					"id": "llamacpp",
+					"response": {
+						"ok": false,
+						"status": 404,
+						"body": "{\"error\":\"model missing\"}"
+					}
+				},
+				{
+					"kind": "answer",
+					"sweep": "bad",
+					"id": "jan",
+					"response": {
+						"ok": false,
+						"status": 503,
+						"body": "{}"
+					},
+					"expected": {
+						"active": false,
+						"published": 1,
+						"detected": []
+					}
+				}
+			]
+		}
+	]
+}

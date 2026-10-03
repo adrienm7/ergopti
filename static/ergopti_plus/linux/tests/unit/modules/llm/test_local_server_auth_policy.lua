@@ -50,3 +50,7 @@ helpers.describe("Local API optional authentication policy (local-api-optional-a
 		helpers.assert_eq(Policy.token_allowed("openai", "", accepted), false)
 	end)
 end)
+
+helpers.describe("Shared local discovery controller", function()
+	require("test.local_server_discovery_contract").run(read("tests/corpus/llm/local_server_discovery.json"), helpers)
+end)
