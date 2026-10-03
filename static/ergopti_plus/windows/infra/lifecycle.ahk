@@ -494,7 +494,7 @@ Ergopti_OnSuspendEnter() {
 	; the shared process lifecycle to terminate each tree exactly once.
 	if IsSet(ScreenBrightnessCancel)
 		_LifecycleRunRequiredStep(Transition, "screen-brightness",
-			() => ScreenBrightnessCancel("suspended"))
+			() => ScreenBrightnessCancel("suspended"), true)
 	if IsSet(GestureScreenshotCancelAll)
 		_LifecycleRunRequiredStep(Transition, "gesture-screenshot",
 			() => GestureScreenshotCancelAll("suspended"))

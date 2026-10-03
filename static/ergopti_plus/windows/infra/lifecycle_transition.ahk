@@ -6,7 +6,7 @@
 global LIFECYCLE_REQUIRED_OWNERS := Map(
 	"suspend", [
 		"navigation-event", "llm-aux-context", "keylogger-system-intervals", "tap-hold-synthetic-keys",
-		"tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
+		"screen-brightness", "tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
 		"suppressive-input-hooks", "magic-key-editor-input-hook",
 		"suspend-tooltip", "llm-tooltip", "llm-live-mode", "llm-generation-timer",

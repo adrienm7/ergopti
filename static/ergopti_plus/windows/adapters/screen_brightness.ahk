@@ -76,7 +76,7 @@ ScreenBrightnessRequest(Action, Done := 0) {
 		ScreenBrightnessCancel("start-refused", Id)
 		return false
 	}
-	SetTimer(ScreenBrightnessPoll, Data["worker_poll_ms"])
+	SetTimer(ScreenBrightnessPoll, ScreenBrightnessData()["worker_poll_ms"])
 	LoggerDebug("ScreenBrightness", "Native request acquired ({1}, generation {2}).", Action, Id)
 	return true
 }
@@ -101,7 +101,7 @@ ScreenBrightnessCancel(Reason := "canceled", ExpectedId := 0) {
 	}
 	if !(Retired is Integer) || Retired != true {
 		LoggerError("ScreenBrightness", "Worker retirement refused ({1}); ownership retained.", Reason)
-		SetTimer(ScreenBrightnessPoll, Job["data"]["worker_poll_ms"])
+		SetTimer(ScreenBrightnessPoll, ScreenBrightnessData()["worker_poll_ms"])
 		return false
 	}
 	; requestTerminate may invoke the terminal synchronously. A vanished owner
