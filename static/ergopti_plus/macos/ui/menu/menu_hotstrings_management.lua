@@ -210,9 +210,15 @@ function M.build_management(ctx)
 						i18n.get("button.delete"), i18n.get("button.cancel")
 					)
 					if res ~= i18n.get("button.delete") then return end
-					if ctx.keymap and type(ctx.keymap.remove_custom_terminator) == "function" then
-						pcall(ctx.keymap.remove_custom_terminator, k)
-					end
+					local committed = KeymapLifecycle.commit_mutation(ctx,
+						"remove custom word expander", function()
+							if not ctx.keymap
+								or type(ctx.keymap.remove_custom_terminator) ~= "function" then
+								return false
+							end
+							return ctx.keymap.remove_custom_terminator(k)
+						end)
+					if not committed then return false end
 					if type(state.custom_terminators) == "table" then
 						for i, ct_e in ipairs(state.custom_terminators) do
 							if ct_e.key == k then table.remove(state.custom_terminators, i); break end
@@ -221,6 +227,7 @@ function M.build_management(ctx)
 					if type(state.terminator_states) == "table" then state.terminator_states[k] = nil end
 					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
+					return true
 				end end)(ct.key) or nil,
 			},
 		}
