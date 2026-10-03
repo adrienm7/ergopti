@@ -1493,3 +1493,59 @@ _LAG_PauseStopsTheFeed() {
 	}
 }
 Test("LLM agent: a pause stops the typing feed, the resume lets it start again", _LAG_PauseStopsTheFeed)
+
+
+_LAG_MissingLocalModelOffersOnlyCurrentFlow() {
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL, _LLM_Agent_Generation
+		Saved := _LLM_LocalModelOfferPort
+		Offers := []
+		try {
+			_LLM_LocalModelOfferPort := Map("confirm", (Title, Text) => (Offers.Push(Text), false))
+			AssertTrue(_LAG_Invoke("llm_agent_selection"), "the real action starts a local manual agent flow")
+			AssertEqual(1, Fx.Ollama.Length)
+			Request := Fx.Ollama[1]
+			Model := JsonParse(Request["body"])["model"]
+			Request["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "a current manual failure offers a download rather than a bare 404")
+			AssertContains(Offers[1], Model, "the consent names the exact requested model")
+			_LLM_Agent_Generation += 1
+			Request["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "a superseded flow cannot open another prompt")
+			AssertEqual(0, Sent.Length, "a missing model never injects an action")
+		} finally _LLM_LocalModelOfferPort := Saved
+	}
+}
+Test("LLM agent: missing local model offers explicit manual recovery only for current flow (todo-46-local-model)",
+	_LAG_MissingLocalModelOffersOnlyCurrentFlow)
+
+_LAG_AutomaticMissingModelNotifiesWithoutModal() {
+	_LAG_Run(_LAG_Menu("auto", "local", "local"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, LLM_OLLAMA_BASE_URL
+		Saved := Map("port", _LLM_LocalModelOfferPort, "notified", _LLM_LocalModelNotified)
+		State := Map("notices", 0, "confirms", 0, "downloads", 0)
+		try {
+			_LLM_LocalModelNotified := Map()
+			_LLM_LocalModelOfferPort := Map("notify", (*) => (State["notices"] += 1, true),
+				"confirm", (*) => (State["confirms"] += 1, true), "install", (*) => (State["downloads"] += 1, true))
+			Fx.App := "Slack"
+			TooltipHide("AgentTest", true)
+			Pause := _LAG_Type(Fx, LAG_TYPED)
+			AssertTrue(Pause.Call(), "the actual typing pause starts local System 1")
+			AssertEqual(1, Fx.Ollama.Length)
+			Model := JsonParse(Fx.Ollama[1]["body"])["model"]
+			Fx.Ollama[1]["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, State["notices"], "current automatic triage reports its missing model")
+			AssertEqual(0, State["confirms"], "typing must not open a modal")
+			AssertEqual(0, State["downloads"], "typing cannot download without consent")
+			AssertEqual(1, Fx.Ollama.Length, "a failed triage cannot wake System 2")
+		} finally {
+			_LLM_LocalModelOfferPort := Saved["port"]
+			_LLM_LocalModelNotified := Saved["notified"]
+		}
+	}
+}
+Test("LLM agent: actual automatic local triage missing-model notice has no modal or pull (todo-46-local-model)",
+	_LAG_AutomaticMissingModelNotifiesWithoutModal)

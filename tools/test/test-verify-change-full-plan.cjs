@@ -89,6 +89,18 @@ for (const file of [
 		`${file}: native source proof must be selected`
 	);
 
+assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
+for (const file of [
+	'static/ergopti_plus/linux/adapters/http_client.lua',
+	'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
+	'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua'
+])
+	assert(
+		selectGates([file]).has('linux-http-stream'),
+		`${file}: actual native streaming receipt proof must be selected`
+	);
+
 const failures = [];
 for (const file of [
 	'docs/ERGOPTIPLUS_TODO.md',

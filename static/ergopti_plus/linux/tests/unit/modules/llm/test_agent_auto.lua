@@ -67,6 +67,27 @@ local function type_and_pause(world, app, sentence)
 	world.scheduler.test.advance(1)
 end
 
+helpers.describe("AI agent: automatic missing local model", function()
+	helpers.it("notifies once per model and never interrupts typing with a download dialog", function()
+		Scenario.run({ local_backend = true, stored = auto({ ["llm.agent_system1"] = "local",
+			["llm.agent_system2"] = "local" }), download_choice = true }, function(world)
+			type_and_pause(world)
+			helpers.assert_eq(#world.probes, 1)
+			world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			local notices = #world.notices
+			helpers.assert_true(notices > 0)
+			helpers.assert_true(world.notices[notices]:find("qwen2.5:7b", 1, true) ~= nil)
+			type_and_pause(world, nil, " et budget")
+			helpers.assert_eq(#world.probes, 2)
+			world.probes[2].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(#world.notices, notices)
+			helpers.assert_eq(#world.model_offers, 0)
+			helpers.assert_eq(#world.model_installs, 0)
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+end)
+
 --- The posts that ask System 2 for actions.
 --- @param world table
 --- @return integer

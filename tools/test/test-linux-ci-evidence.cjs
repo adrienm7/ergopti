@@ -741,7 +741,8 @@ for (const [, subject, value] of recorded) {
 		{
 			unit: '$unit_assertions',
 			'hotstring-e2e': '$e2e_assertions',
-			'xkb-source-qualification': '$xkb_source_assertions'
+			'xkb-source-qualification': '$xkb_source_assertions',
+			'http-stream-receipts': '$http_stream_assertions'
 		}[subject] ?? '1';
 	assert.strictEqual(
 		value,

@@ -43,7 +43,7 @@
  *                    registry holds at most one in-flight slot by design.
  */
 LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "") {
-	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
+	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending, LLM_OLLAMA_BASE_URL
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
 	job := Map(
@@ -60,6 +60,10 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"tail_text", tail_text,
 		"payload", payload
 	)
+	if payload != "" {
+		job["presence_generation"] := LLM_AuxGeneration()
+		job["base_url"] := LLM_OLLAMA_BASE_URL
+	}
 	global _LLM_Ollama_Async
 	if (_LLM_Ollama_Async.Count > 0) {
 		; Latest-only coalescing keeps a single pending slot. If a previous job
@@ -102,7 +106,7 @@ LLM_OllamaChat_Async(payload, on_success, on_fail) {
 ; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
 ; returned HTTP 200 with ``content: ""`` on this driver despite valid JSON payloads.
 _LLM_Ollama_DispatchAsync(job) {
-	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT, _LLM_Ollama_PreflightPort
 	req_id := job["req_id"]
 	payload := (job.Get("payload", "") != "") ? job["payload"] : LLM_BuildOllamaPayload(
 		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
@@ -134,8 +138,112 @@ _LLM_Ollama_DispatchAsync(job) {
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
 		"cancelled", false, "start_tick", A_TickCount,
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "",
-		"redact", job.Get("payload", "") != "")
-	SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
+		"redact", job.Get("payload", "") != "",
+		"base_url", job.Get("base_url", LLM_OLLAMA_BASE_URL),
+		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()))
+	if job.Get("payload", "") != "" {
+		Port := _LLM_Ollama_PreflightPort
+		ScheduleFn := _LLM_CurlArtifactPortFn(Port, "schedule", _LLM_Ollama_SchedulePreflight)
+		ScheduleFn.Call(() => _LLM_Ollama_Preflight(req_id, payload, job, Port), -1)
+	}
+	else
+		SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
+}
+
+_LLM_Ollama_SchedulePreflight(Callback, Period) {
+	SetTimer(Callback, Period)
+}
+
+; A chat slot stays reserved while the existing auxiliary curl owner probes tags.
+; No payload bytes are written until a strict receipt admits the selected model.
+_LLM_Ollama_Preflight(req_id, payload, job, Port := 0) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL
+	if !_LLM_Ollama_Async.Has(req_id)
+		return
+	Entry := _LLM_Ollama_Async[req_id]
+	if Entry["cancelled"] || A_IsSuspended {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "request_cancelled")
+		return
+	}
+	try Root := JsonParse(payload)
+	catch {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "invalid_chat_payload")
+		return
+	}
+	Model := (Root is Map) ? Root.Get("model", "") : ""
+	if LLM_LocalModelNormalize(Model) == "" {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "invalid_chat_model")
+		return
+	}
+	if Entry.Get("presence_generation", 0) != LLM_AuxGeneration()
+			|| Entry.Get("base_url", "") != LLM_OLLAMA_BASE_URL {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
+		return
+	}
+	Owner := LLM_AuxBegin("ollama_chat_presence:" . req_id,
+		Map("backend", "ollama", "endpoint", Entry["base_url"], "identity", Model))
+	Entry["presence_owner"] := Owner
+	Entry["presence_pending"] := true
+	Owner["on_retired"] := _LLM_Ollama_PresenceRetired.Bind(req_id, Entry)
+	ListFn := _LLM_CurlArtifactPortFn(Port, "list_models", LLM_OllamaListModels_Async)
+	try ListFn.Call(_LLM_Ollama_OnPresence.Bind(req_id, Entry, payload, job, Model, Owner, Port), Owner, true)
+	catch {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "model_list_unavailable")
+		_LLM_AuxRetireOwner(Owner, true)
+	}
+}
+
+_LLM_Ollama_PresenceFail(req_id, Entry, Failure) {
+	global _LLM_Ollama_Async
+	if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+		return
+	Entry["presence_pending"] := false
+	_LLM_Ollama_Async.Delete(req_id)
+	_LLM_Ollama_CleanupCurlFiles(Entry)
+	if !Entry["cancelled"]
+		_LLM_InvokeCallback(Entry["on_fail"], "on_fail", Failure)
+	_LLM_Ollama_DrainPending()
+}
+
+; Invalidation and acknowledged cancellation retire the exact reserved slot too.
+_LLM_Ollama_PresenceRetired(req_id, Entry) {
+	if Entry.Get("presence_pending", false)
+		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
+}
+
+_LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL
+	if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+		return
+	if !Entry.Get("presence_pending", false)
+		return
+	if Entry["cancelled"] || A_IsSuspended || !LLM_AuxIsCurrent(Owner)
+			|| Entry["presence_generation"] != LLM_AuxGeneration()
+			|| Entry["base_url"] != LLM_OLLAMA_BASE_URL {
+		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
+		return
+	}
+	Entry["presence_pending"] := false
+	if !(Receipt is Map) || Receipt.Get("ok", false) != true {
+		_LLM_Ollama_PresenceFail(req_id, Entry,
+			(Receipt is Map) ? Receipt.Get("reason", "model_list_unavailable") : "model_list_unavailable")
+		return
+	}
+	if !Receipt["names"].Has(LLM_LocalModelNormalize(Model)) {
+		_LLM_Ollama_PresenceFail(req_id, Entry, LLM_LocalModelFailure(Model, Entry["base_url"]))
+		return
+	}
+	Entry["presence_admitted"] := true
+	Entry["presence_model"] := Model
+	SpawnFn := _LLM_CurlArtifactPortFn(Port, "spawn", _LLM_Ollama_DoSpawn)
+	SpawnFn.Call(req_id, payload, Entry["tmp_payload"], Entry["tmp_stdout"], job)
+}
+
+_LLM_Ollama_PresenceStillCurrent(Entry) {
+	global LLM_OLLAMA_BASE_URL
+	return !Entry.Get("presence_admitted", false)
+		|| (Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& Entry.Get("base_url", "") == LLM_OLLAMA_BASE_URL)
 }
 
 ; Deferred spawn: writes the payload file and launches curl outside the
@@ -163,7 +271,8 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 		; double on_fail.
 		return
 	}
-	if (A_IsSuspended or _LLM_Ollama_Async[req_id]["cancelled"]) {
+	if (A_IsSuspended or _LLM_Ollama_Async[req_id]["cancelled"]
+			or !_LLM_Ollama_PresenceStillCurrent(_LLM_Ollama_Async[req_id])) {
 		try LoggerInfo("LLM.ollama", "Deferred spawn for req {1} skipped — {2}.",
 			req_id, A_IsSuspended ? "suspended" : "cancelled before dispatch")
 		_LLM_Ollama_Async.Delete(req_id)
@@ -198,7 +307,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 				launch_blocked := true
 			} else {
 				entry := _LLM_Ollama_Async[req_id]
-				if (A_IsSuspended or entry["cancelled"]) {
+				if (A_IsSuspended or entry["cancelled"] or !_LLM_Ollama_PresenceStillCurrent(entry)) {
 					launch_blocked := true
 				} else {
 					cmdLine := '"' . curl_exe . '" -s -S -m '
@@ -303,6 +412,8 @@ LLM_OllamaCancelAllAsync() {
 	Kills := []
 	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
+		if entry.Get("presence_owner", 0) is Map
+			Kills.Push(Map("cancel", _LLM_AuxRetireOwner.Bind(entry["presence_owner"], true)))
 		if entry.Has("process_owner") and entry["process_owner"] is Map
 			Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
 				entry["process_owner"], true)))
@@ -344,6 +455,8 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
 	entry := _LLM_Ollama_Async[req_id]
+	if !_LLM_Ollama_PresenceStillCurrent(entry)
+		entry["cancelled"] := true
 	Terminal := Map("complete", false, "exit", -1,
 		"status", 0, "body_read", false, "body", "")
 	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
@@ -367,7 +480,12 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 		if !_LLM_CurlTerminalOk(Terminal) or body == "" {
 			try LoggerWarn("LLM.ollama", "curl terminal failure (exit={1}, status={2}, body_chars={3}).",
 				Terminal["exit"], Terminal["status"], StrLen(body))
-			_LLM_InvokeCallback(on_fail, "on_fail")
+			Failure := entry.Get("presence_admitted", false)
+				? LLM_LocalModelResponseFailure(Terminal, entry["base_url"]) : 0
+			if Failure is Map
+				_LLM_InvokeCallback(on_fail, "on_fail", Failure)
+			else
+				_LLM_InvokeCallback(on_fail, "on_fail")
 			_LLM_Ollama_DrainPending()
 			return
 		}

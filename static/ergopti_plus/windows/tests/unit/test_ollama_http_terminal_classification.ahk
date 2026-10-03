@@ -174,3 +174,38 @@ _OHTC_PidReceipt_AllAuxPollersResolveReceiptBeforeDeadline() {
 Test("Ollama curl polls: terminal receipts precede deadline for every auxiliary child "
 	. "(ahk2-04-curl-receipt-first)",
 	_OHTC_PidReceipt_AllAuxPollersResolveReceiptBeforeDeadline)
+
+
+_OHTC_StrictPresenceReceipts() {
+	for Status in [200, 401, 403, 404, 500] {
+		State := _OHTC_PidReceipt_State(Map("complete", true, "exit", 0, "status", Status,
+			"body_read", true, "body", '{"models":[]}'), 9300 + Status)
+		Port := _OHTC_PidReceipt_Port(State)
+		Process := _LLM_CurlAdoptProcess(4700 + Status, Port)
+		Owner := _OHTC_PidReceipt_Owner("todo46_tags_" . Status)
+		_LLM_Ollama_TagsPoll(Process, "body", "status", "exit", _OHTC_PidReceipt_RecordResult.Bind(State),
+			A_TickCount, Owner, Port, true)
+		AssertEqual(1, State["callback_calls"], "strict presence receives one terminal result")
+		AssertTrue(State["value"] is Map, "strict admission keeps receipt shape distinct from the legacy array")
+		if Status == 200 {
+			AssertTrue(State["value"]["ok"], "a canonical empty list is known, not unavailable")
+			AssertEqual(0, State["value"]["names"].Count)
+		} else {
+			AssertFalse(State["value"]["ok"], "HTTP refusal cannot become a missing-model offer")
+			AssertEqual("model_list_unavailable", State["value"]["reason"])
+		}
+		AssertEqual(1, State["close_calls"], "terminal receipt releases the exact native handle")
+		AssertEqual(0, State["terminate_calls"])
+	}
+	for Body in ['{"models":{}}', "not JSON", '{"models":[{}]}'] {
+		State := _OHTC_PidReceipt_State(Map("complete", true, "exit", 0, "status", 200,
+			"body_read", true, "body", Body), 9901)
+		Port := _OHTC_PidReceipt_Port(State)
+		Owner := _OHTC_PidReceipt_Owner("todo46_unreadable_tags")
+		_LLM_Ollama_TagsPoll(_LLM_CurlAdoptProcess(4991, Port), "body", "status", "exit",
+			_OHTC_PidReceipt_RecordResult.Bind(State), A_TickCount, Owner, Port, true)
+		AssertEqual("unreadable_model_list", State["value"]["reason"], "malformed successful body is unknown")
+	}
+}
+Test("Ollama local presence: native tags terminal distinguishes empty, HTTP refusal and malformed (todo-46-local-model)",
+	_OHTC_StrictPresenceReceipts)

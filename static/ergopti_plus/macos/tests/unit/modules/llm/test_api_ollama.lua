@@ -747,3 +747,74 @@ helpers.describe("ApiOllama.get_base_url (configurable port)", function()
 			"base url must be http://127.0.0.1:<port>")
 	end)
 end)
+
+
+helpers.describe("ApiOllama strict local model listing", function()
+	local client = get_upvalue(ApiOllama.request_chat, "_vision_client")
+
+	local function request_with_receipt(receipt)
+		local original_get, original_post = client.get, client.post
+		local gets, posts, failures, successes = {}, {}, {}, {}
+		client.get = function(url, _, callback)
+			gets[#gets + 1] = url
+			callback(receipt)
+		end
+		client.post = function(url, _, _, callback)
+			posts[#posts + 1] = url
+			callback({ status = 200, body = '{"message":{"content":"admitted answer"}}' })
+		end
+		ApiOllama.forget_local_models()
+		local ok, err = xpcall(function()
+			ApiOllama.request_chat({ model = "qwen2.5:7b", messages = {} },
+				function(text) successes[#successes + 1] = text end,
+				function(reason) failures[#failures + 1] = reason end)
+		end, debug.traceback)
+		local installed = ApiOllama.local_model_installed("qwen2.5:7b")
+		client.get, client.post = original_get, original_post
+		ApiOllama.forget_local_models()
+		if not ok then error(err, 0) end
+		return { gets = gets, posts = posts, failures = failures, successes = successes, installed = installed }
+	end
+
+	for _, body in ipairs({ '{"models":{}}', '{"models":[{}]}', '{"models":["qwen2.5:7b"]}', '[]', 'not JSON' }) do
+		helpers.it("refuses unreadable inventory before chat or a missing-model offer: " .. body, function()
+			local seen = request_with_receipt({ status = 200, body = body })
+			helpers.assert_eq(#seen.gets, 1)
+			helpers.assert_true(seen.gets[1]:match("/api/tags$") ~= nil)
+			helpers.assert_eq(#seen.posts, 0, "private chat bytes need a valid inventory receipt")
+			helpers.assert_eq(#seen.successes, 0)
+			helpers.assert_eq(#seen.failures, 1, "a refused inventory settles the actual request once")
+			helpers.assert_eq(seen.failures[1], "unreadable_model_list", "unknown inventory is never a missing model")
+			helpers.assert_eq(seen.installed, nil, "an unreadable receipt cannot publish an empty installation cache")
+		end)
+	end
+
+	helpers.it("keeps a failed tags endpoint distinct from a known empty inventory", function()
+		local failed = request_with_receipt({ status = 404, body = '{"models":[]}' })
+		helpers.assert_eq(#failed.posts, 0)
+		helpers.assert_eq(#failed.failures, 1)
+		helpers.assert_eq(failed.failures[1], "http_404")
+		helpers.assert_eq(failed.installed, nil)
+		local empty = request_with_receipt({ status = 200, body = '{"models":[]}' })
+		helpers.assert_eq(#empty.posts, 0)
+		helpers.assert_eq(#empty.failures, 1)
+		helpers.assert_eq(empty.failures[1], ApiOllama.MODEL_MISSING)
+		helpers.assert_eq(empty.installed, false)
+	end)
+
+	helpers.it("admits the requested model from either authoritative name field", function()
+		for _, body in ipairs({
+			'{"models":[{"name":"QWEN2.5:7B"}]}',
+			'{"models":[{"model":"qwen2.5:7b"}]}',
+		}) do
+			local seen = request_with_receipt({ status = 200, body = body })
+			helpers.assert_eq(#seen.gets, 1)
+			helpers.assert_eq(#seen.posts, 1)
+			helpers.assert_true(seen.posts[1]:match("/api/chat$") ~= nil)
+			helpers.assert_eq(#seen.failures, 0)
+			helpers.assert_eq(#seen.successes, 1)
+			helpers.assert_eq(seen.successes[1], "admitted answer")
+			helpers.assert_eq(seen.installed, true)
+		end
+	end)
+end)

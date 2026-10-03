@@ -25,6 +25,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Json = require("json")
 local Vision = require("llm.vision")
+local LocalModelPolicy = require("llm.local_model_policy")
 
 local LOG = "modules.llm.vision_request"
 
@@ -36,6 +37,8 @@ local LOCAL_FORMAT = "ollama"
 
 -- The decoded vision.json, loaded once
 local _config = nil
+local _active_request = nil
+local _request_epoch = 0
 
 
 
@@ -154,7 +157,7 @@ function M.resolve_target(backend, model)
 		local base_url = profiles.get_base_url() or Bridge.resolve_base_url()
 		local url = Bridge.ollama_endpoint(base_url, "chat")
 		if not url then return nil, "invalid Ollama origin" end
-		return { url = url, headers = { ["Content-Type"] = "application/json" }, format = LOCAL_FORMAT }, nil
+		return { url = url, headers = { ["Content-Type"] = "application/json" }, format = LOCAL_FORMAT, base_url = base_url }, nil
 	end
 	local Remote = require("modules.llm.api_remote")
 	if not Remote.provider(backend) then return nil, "unknown provider " .. backend end
@@ -197,40 +200,69 @@ function M.send(target, body, on_done)
 		on_done(nil, "request could not be encoded")
 		return false
 	end
+	if _active_request and M.cancel() ~= true then return false end
+	_request_epoch = _request_epoch + 1
+	local request = { epoch = _request_epoch, terminal = false }
+	_active_request = request
+	local function current()
+		return _active_request == request and request.epoch == _request_epoch and not request.terminal
+	end
+	local function finish(text, err)
+		if not current() then return end
+		request.terminal = true
+		_active_request = nil
+		on_done(text, err)
+	end
 	local HttpClient = require("adapters.http_client")
 	local Timings = require("infra.timings")
-	-- The body holds the image: only its size is logged, and the URL is
-	-- redacted (a Gemini key travels in it).
+	-- Image and transcription never enter the logs; only the encoded size does.
 	Logger.info(LOG, "Vision request → %s (format=%s, %d byte(s)).",
 		require("modules.llm.api_remote").redact_url(target.url), target.format, #encoded)
-	local dispatched = HttpClient.post(target.url, target.headers, encoded, function(result)
-		if type(result) ~= "table" or result.ok ~= true then
-			local status = type(result) == "table" and result.status or 0
-			local server = type(result) == "table" and require("modules.llm.api_remote").server_message(result.error_body)
-			local detail = status ~= 0 and string.format("HTTP %d%s", status, server and (": " .. server) or "")
-				or tostring(type(result) == "table" and result.error or "transport failed")
-			on_done(nil, detail)
-			return
-		end
-		local text = extract_text(target.format, result.body)
-		if not text or text == "" then
-			on_done(nil, "the response holds no answer text")
-			return
-		end
-		on_done(text, nil)
-	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000 })
-	return dispatched == true
+	local function dispatch()
+		if not current() then return false end
+		return HttpClient.post(target.url, target.headers, encoded, function(result)
+			if not current() then return end
+			if type(result) ~= "table" or result.ok ~= true then
+				local missing = target.format == LOCAL_FORMAT
+					and LocalModelPolicy.response_failure(result, target.base_url) or nil
+				if missing then finish(nil, missing) return end
+				local status = type(result) == "table" and result.status or 0
+				local server = type(result) == "table" and require("modules.llm.api_remote").server_message(result.error_body)
+				local detail = status ~= 0 and string.format("HTTP %d%s", status, server and (": " .. server) or "")
+					or tostring(type(result) == "table" and result.error or "transport failed")
+				finish(nil, detail)
+				return
+			end
+			local text = extract_text(target.format, result.body)
+			if not text or text == "" then finish(nil, "the response holds no answer text") return end
+			finish(text, nil)
+		end, { owner = OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms") }) == true
+	end
+	if target.format == LOCAL_FORMAT then
+		return require("modules.llm.local_model_probe").verify(target.base_url, body.model, OWNER,
+			function(installed, reason)
+				if not current() then return end
+				if installed == nil then finish(nil, reason) return end
+				if installed == false then finish(nil, LocalModelPolicy.failure(body.model, target.base_url)) return end
+				dispatch()
+			end)
+	end
+	return dispatch()
 end
 
 --- Withdraws the vision request in flight; its callback is not called.
 --- @return boolean cancelled
 function M.cancel()
-	return require("adapters.http_client").cancel(OWNER) == true
+	if require("adapters.http_client").cancel(OWNER) ~= true then return false end
+	_request_epoch = _request_epoch + 1
+	if _active_request then _active_request.terminal = true end
+	_active_request = nil
+	return true
 end
 
 --- Forgets the loaded configuration (tests).
 function M._reset_for_test()
-	_config = nil
+	_config, _active_request, _request_epoch = nil, nil, 0
 end
 
 return M

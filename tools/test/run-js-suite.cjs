@@ -1003,6 +1003,12 @@ const CHECKS = [
 		repro: 'npm run test:linux-ci-evidence'
 	},
 	{
+		name: 'Linux native streaming receipts retain mandatory npm, planner and CI owners',
+		cmd: 'node',
+		args: ['tools/test/test-linux-http-stream-registration.cjs'],
+		repro: 'npm run test:linux-http-stream-registration'
+	},
+	{
 		name: 'Desktop verdicts and parallel shared-core gates',
 		cmd: 'node',
 		args: ['tools/test/test-desktop-ci-evidence.cjs'],

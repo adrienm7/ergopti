@@ -78,3 +78,27 @@ helpers.describe("keyboard_hook.while_released: a dialog runs with the keyboard 
 	end)
 
 end)
+
+
+helpers.describe("keyboard_hook.while_released: acknowledged modal observer", function()
+	helpers.it("brackets only the real callback after native restoration and preserves results", function()
+		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local trail, returned, receipt = {}, nil, nil
+		Hook._test_drive({ { type = EV_KEY, code = KEY_A, value = 1 } }, {
+			onChar = function()
+				returned = Hook.while_released(function() return "yes" end, {
+					observer = function(stage, result)
+						trail[#trail + 1] = stage
+						if stage == "after" then receipt = result end
+					end,
+				})
+			end,
+			onDesync = function() trail[#trail + 1] = "daemon reset" end,
+			onEmitRaw = function() return true end,
+		}, true)
+		helpers.assert_eq(returned, "yes")
+		helpers.assert_eq(table.concat(trail, "|"), "before|daemon reset|after",
+			"an observer cannot swallow the existing daemon reset")
+		helpers.assert_true(receipt and receipt.ok == true)
+	end)
+end)

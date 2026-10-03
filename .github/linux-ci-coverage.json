@@ -14,6 +14,7 @@
 				"grab-race": 1,
 				"system-keymaps": 1,
 				"xkb-source-qualification": 17,
+				"http-stream-receipts": 55,
 				"x11-display": 1,
 				"wayland-display": 1,
 				"tray-symbols": 1,

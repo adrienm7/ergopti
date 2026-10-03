@@ -26,6 +26,56 @@ local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"
 	.. '{"type":"mail","to":["paul@example.com"],"subject":"Devis","body":"Bonjour Paul,\\nÀ jeudi."}]'
 local CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
 
+helpers.describe("AI agent: missing local model admission", function()
+	helpers.it("asks tags before local System 2 and offers the exact model without sending selection text", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.scheduler.test.advance(1)
+			helpers.assert_eq(#world.probes, 1)
+			helpers.assert_eq(#world.posts, 0)
+			world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.model_offers, 1)
+			helpers.assert_true(world.model_offers[1].text:find("qwen2.5:7b", 1, true) ~= nil)
+			helpers.assert_eq(#world.model_installs, 1)
+			helpers.assert_eq(world.model_installs[1].model, "qwen2.5:7b")
+			helpers.assert_eq(world.model_installs[1].base_url, "http://127.0.0.1:11434")
+			helpers.assert_eq(#world.typed, 0)
+		end)
+	end)
+
+	helpers.it("runs the actual local agent after the listing acknowledges its model", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" } }, function(world)
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.scheduler.test.advance(1)
+			world.probes[1].callback({ ok = true, status = 200,
+				body = '{"models":[{"name":"qwen2.5:7b"}]}' })
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_eq(world.posts[1].body.model, "qwen2.5:7b")
+			world.respond(1, ANSWER)
+			helpers.assert_eq(#world.offered(), 2)
+			helpers.assert_eq(#world.model_offers, 0)
+			helpers.assert_eq(#world.model_installs, 0)
+		end)
+	end)
+
+	helpers.it("a withdrawn local agent preflight cannot offer or start a download", function()
+		Scenario.run({ local_backend = true, selection = SELECTION,
+			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.scheduler.test.advance(1)
+			local probe = world.probes[1]
+			world.engine.dismiss()
+			probe.callback({ ok = true, status = 200, body = '{"models":[]}' })
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.model_offers, 0)
+			helpers.assert_eq(#world.model_installs, 0)
+		end)
+	end)
+end)
+
 --- The System 2 prompt the scenario's context must produce.
 --- @param world table
 --- @param source string
@@ -289,5 +339,76 @@ helpers.describe("AI agent: a typed command", function()
 			helpers.assert_eq(#world.posts, 0)
 			helpers.assert_eq(#world.notices, 0)
 		end)
+	end)
+end)
+
+
+helpers.describe("AI agent: native missing-model modal ownership", function()
+	local function native_case(effect, refuse_regrab)
+		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local Reader = require("adapters.evdev_reader")
+		local saved_hook, saved_grab = package.loaded["adapters.keyboard_hook"], Reader.grab
+		package.loaded["adapters.keyboard_hook"] = Hook
+		local observed, caught, world_active, desyncs = nil, nil, nil, 0
+		if refuse_regrab then Reader.grab = function() return false end end
+		Hook._test_drive({ { type = 1, code = 30, value = 1 } }, {
+			onChar = function()
+				local ok, err = xpcall(function()
+					Scenario.run({ local_backend = true, selection = SELECTION,
+						stored = { ["llm.agent_system2"] = "local" }, native_model_dialog = true,
+						download_choice = true, on_model_confirm = effect }, function(world)
+						world_active = world
+						assert(world.handlers.llm_agent_selection("tap_3"))
+						world.scheduler.test.advance(1)
+						world.probes[1].callback({ ok = true, status = 200, body = '{"models":[]}' })
+						observed = { offers = #world.model_offers, installs = #world.model_installs,
+							posts = #world.posts, running = Hook.isRunning() }
+					end)
+				end, debug.traceback)
+				if not ok then caught = err end
+			end,
+			onDesync = function()
+				desyncs = desyncs + 1
+				if world_active then world_active.engine.cancel() end
+			end,
+			onEmitRaw = function() return true end,
+		}, true)
+		Reader.grab, package.loaded["adapters.keyboard_hook"] = saved_grab, saved_hook
+		helpers.assert_eq(caught, nil, "assertions inside the real runtime guard must be collected, never swallowed")
+		helpers.assert_true(observed ~= nil, "the actual decoded reader event starts the scenario")
+		observed.desyncs = desyncs
+		return observed
+	end
+
+	helpers.it("real while_released resync cancellation preserves only its acknowledged consent", function()
+		local actual = native_case(nil, false)
+		helpers.assert_eq(actual.offers, 1, "actual confirm reaches the native shell boundary through ui.modal")
+		helpers.assert_eq(actual.desyncs, 1, "the actual hook delivers the daemon cancellation after regrab")
+		helpers.assert_eq(actual.installs, 1, "that bounded resynchronisation does not invalidate valid manual consent")
+		helpers.assert_eq(actual.posts, 0, "missing-model inference still never carries private text")
+		helpers.assert_true(actual.running)
+	end)
+
+	for _, effect in ipairs({ "new_action", "endpoint", "shutdown", "pause", "reinitialise" }) do
+		helpers.it("actual modal affirmative cannot launch after " .. effect, function()
+			local actual = native_case(function(world)
+				if effect == "new_action" then world.engine.dismiss()
+				elseif effect == "endpoint" then world.base_url = "http://127.0.0.1:11435"
+				elseif effect == "shutdown" then world.engine.cancel()
+				elseif effect == "pause" then world.paused = true
+				elseif effect == "reinitialise" then world.engine.init() end
+			end, false)
+			helpers.assert_eq(actual.offers, 1)
+			helpers.assert_eq(actual.installs, 0, "a genuine newer/lifecycle/endpoint state revokes consent before /api/pull")
+			helpers.assert_eq(actual.posts, 0)
+		end)
+	end
+
+	helpers.it("an emergency regrab refusal revokes the affirmative native receipt", function()
+		local actual = native_case(nil, true)
+		helpers.assert_eq(actual.offers, 1)
+		helpers.assert_eq(actual.desyncs, 0, "failed restoration never fabricates acknowledged resync")
+		helpers.assert_eq(actual.installs, 0)
+		helpers.assert_eq(actual.running, false)
 	end)
 end)

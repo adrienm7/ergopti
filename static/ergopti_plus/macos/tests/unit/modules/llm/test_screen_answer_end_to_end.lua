@@ -103,7 +103,7 @@ local function list_local_models(world, names)
 	assert(pending, "a model listing was asked for")
 	local models = {}
 	for index, name in ipairs(names) do models[index] = { name = name, model = name } end
-	pending.callback({ ok = true, status = 200, body = json.encode({ models = models }), headers = {} })
+	pending.callback({ ok = true, status = 200, body = json.encode({ models = json.array(models) }), headers = {} })
 end
 
 --- Builds the real pipeline around the faked boundaries.

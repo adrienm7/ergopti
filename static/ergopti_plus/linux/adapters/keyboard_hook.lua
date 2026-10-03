@@ -1750,8 +1750,14 @@ end
 --- then (the Enter that closed it) are treated as consumed, so neither reaches
 --- the hotstring buffer nor the application a second time.
 --- @param fn function The modal; its results are returned.
+--- @param opts table|nil { observer(stage, receipt) } brackets acknowledged native restoration.
 --- @return any
-function M.while_released(fn)
+function M.while_released(fn, opts)
+	local observer = type(opts) == "table" and opts.observer or nil
+	local function observe(stage, receipt)
+		if type(observer) ~= "function" then return true end
+		return _call_callback("modal restoration observer", observer, stage, receipt)
+	end
 	if not _running or not _intercept then return fn() end
 	local paths = {}
 	for index, path in ipairs(_devices) do paths[index] = path end
@@ -1759,6 +1765,7 @@ function M.while_released(fn)
 	local released, release_err = _release_forwarded_sources(paths)
 	if not released then
 		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
+		observe("refused", { ok = false, reason = "release_failed" })
 		return fn()
 	end
 	for _, path in ipairs(paths) do EvdevReader.ungrab(keyboard_slot(path)) end
@@ -1775,6 +1782,7 @@ function M.while_released(fn)
 		_pending_events[slot] = nil
 		if not EvdevReader.grab(slot) then
 			M.emergency_stop("could not take the keyboard back after a dialog: " .. path)
+			observe("refused", { ok = false, reason = "regrab_failed" })
 			return (table.unpack or unpack)(results, 1, results.n)
 		end
 		local held = EvdevReader.pressed_keys(slot, KEY_MAX)
@@ -1782,10 +1790,16 @@ function M.while_released(fn)
 		local synced, sync_err = _resynchronise(path)
 		if not synced then
 			M.emergency_stop("could not resynchronise after a dialog: " .. tostring(sync_err))
+			observe("refused", { ok = false, reason = "resynchronisation_failed" })
 			return (table.unpack or unpack)(results, 1, results.n)
 		end
 	end
-	if _on_desync then _call_callback("input-desync callback", _on_desync) end
+	if not observe("before", { ok = true }) then
+		observe("refused", { ok = false, reason = "observer_failed" })
+		return (table.unpack or unpack)(results, 1, results.n)
+	end
+	local desynced = not _on_desync or _call_callback("input-desync callback", _on_desync)
+	observe("after", { ok = desynced and _running and err == nil })
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
 	if err then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)

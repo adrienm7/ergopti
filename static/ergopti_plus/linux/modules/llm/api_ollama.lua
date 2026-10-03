@@ -26,6 +26,7 @@ local LOG = "modules.llm.api_ollama"
 -- driver's LLM call times out identically (no magic seconds literal here).
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
+local LocalModelPolicy = require("llm.local_model_policy")
 
 
 -- =========================================
@@ -167,7 +168,7 @@ end
 --- @param base_url string   Ollama base URL (e.g. "http://localhost:11434").
 --- @param model    string   Model name.
 --- @param messages table    Array of { role, content } message objects.
---- @param opts     table|nil  { stream?, temperature?, max_tokens? }
+--- @param opts     table|nil  { stream?, temperature?, max_tokens?, verify_local_model? }
 --- @param on_chunk function  Called with (delta_text) for each streaming chunk.
 --- @param on_done  function  Called with (full_text, error) on completion.
 function M.chat(base_url, model, messages, opts, on_chunk, on_done)
@@ -217,22 +218,35 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	_active_request = request
 
 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
-	HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
-		timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
-	}, function(chunk)
-		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
-		consume_chunk(request, chunk, false)
-	end, function(result)
-		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
-		consume_chunk(request, "", true)
-		if type(result) ~= "table" or result.ok ~= true then
-			finish_request(request, type(result) == "table" and result.error or "HTTP transport failed")
-		elseif request.full_text == "" then
-			finish_request(request, "no response from Ollama")
-		else
-			finish_request(request, nil)
-		end
-	end)
+	local function dispatch()
+		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return false end
+		return HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
+			timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
+		}, function(chunk)
+			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			consume_chunk(request, chunk, false)
+		end, function(result)
+			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			consume_chunk(request, "", true)
+			if type(result) ~= "table" or result.ok ~= true then
+				finish_request(request, LocalModelPolicy.response_failure(result, base_url)
+					or (type(result) == "table" and result.error or "HTTP transport failed"))
+			elseif request.full_text == "" then
+				finish_request(request, "no response from Ollama")
+			else
+				finish_request(request, nil)
+			end
+		end)
+	end
+	if options.verify_local_model == true then
+		return require("modules.llm.local_model_probe").verify(base_url, model, nil, function(installed, reason)
+			if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+			if installed == nil then finish_request(request, reason) return end
+			if installed == false then finish_request(request, LocalModelPolicy.failure(model, base_url)) return end
+			dispatch()
+		end)
+	end
+	return dispatch()
 end
 
 --- Cancels the in-flight request and publishes one terminal cancellation.

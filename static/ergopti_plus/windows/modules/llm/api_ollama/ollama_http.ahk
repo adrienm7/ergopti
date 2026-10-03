@@ -709,9 +709,11 @@ _LLM_Ollama_ParseTagNames(raw) {
  * at every tray rebuild past the installed-cache TTL, stalled the menu (and dropped
  * keystrokes) for up to ~20 s — the UI must read only the in-memory cache and let
  * THIS function refresh it in the background (AUDIT_AHK_2026-06-19 / TODO.md).
- * @param {function} on_result - Callback receiving an Array of tag names ([] on failure).
+ * @param {function} on_result - Legacy Array callback, or a strict presence receipt.
+ * @param {Map|0} Owner - Existing auxiliary lifecycle owner.
+ * @param {Boolean} Strict - Keep HTTP/malformed receipts distinct from a known empty list.
  */
-LLM_OllamaListModels_Async(on_result, Owner := 0) {
+LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 	; curl CHILD PROCESS, not WinHTTP — identical reasoning to LLM_OllamaIsRunning_Async:
 	; WinHttpRequest async mode (Open(...,true) + Send()) still performs the TCP connect
 	; SYNCHRONOUSLY on the calling thread, so against a busy daemon it could block the
@@ -729,7 +731,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 		Paths := [tmp_out, terminal["status"], terminal["exit"]]
 		Stage := "resource_binding"
 		if !LLM_AuxBindResources(Owner, Map(
-				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
+				"finalizer", _LLM_Ollama_TagsFinalize.Bind(Paths, Owner)))
 			return Owner
 		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
@@ -752,14 +754,21 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 				return Owner
 		} finally Critical(PreviousCritical)
 		Stage := "poll_handoff"
-		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
+		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner, 0, Strict)
 	} catch as Err {
 		_LLM_OllamaLogSetupFailure("tags", Stage, Owner, Err)
 		if ProcessOwner is Map
 			_LLM_CurlReleaseProcess(ProcessOwner, true)
-		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, Strict
+			? Map("ok", false, "reason", "model_list_unavailable") : [])
 	}
 	return Owner
+}
+
+_LLM_Ollama_TagsFinalize(Paths, Owner) {
+	_LLM_OllamaAuxDeletePaths(Paths)
+	if HasMethod(Owner.Get("on_retired", 0), "Call")
+		Owner["on_retired"].Call()
 }
 
 /**
@@ -771,7 +780,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
  * @param {function} on_result  - Callback receiving an Array of tag names ([] on failure).
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0) {
+_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0, Strict := false) {
 	if !LLM_AuxIsCurrent(Owner)
 		return
 	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
@@ -779,18 +788,21 @@ _LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
 	if _LLM_CurlTerminalComplete(Terminal) {
 		_LLM_CurlReleaseProcess(ProcessOwner, false, Port)
-		tags := _LLM_CurlTerminalOk(Terminal) ? _LLM_Ollama_ParseTagNames(Terminal["body"]) : []
+		tags := Strict ? LLM_LocalModelListReceipt(Map("ok", _LLM_CurlTerminalOk(Terminal),
+			"status", Terminal.Get("status", 0), "body", Terminal.Get("body", "")))
+			: (_LLM_CurlTerminalOk(Terminal) ? _LLM_Ollama_ParseTagNames(Terminal["body"]) : [])
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, tags)
 		return
 	}
 	if _LLM_DeadlineExpired(start_tick, 4000) {
 		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
-		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, Strict
+			? Map("ok", false, "reason", "model_list_unavailable") : [])
 		return
 	}
 	LLM_AuxSchedule(Owner,
 		() => _LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit,
-			on_result, start_tick, Owner, Port), -150)
+			on_result, start_tick, Owner, Port, Strict), -150)
 }
 
 /**
