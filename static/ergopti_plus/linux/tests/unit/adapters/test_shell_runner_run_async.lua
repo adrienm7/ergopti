@@ -114,7 +114,10 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		local answers = {}
 		runner.run_async("df", { "-Pk", "/tmp" }, { timeout_ms = 10 }, function(result) answers[#answers + 1] = result end)
 		state.timer.callback()
-		helpers.assert_eq(state.kills, { { pid = -4321, signal = "sigterm" } })
+		helpers.assert_eq(state.kills, {
+			{ pid = -4321, signal = "sigterm" },
+			{ pid = -4321, signal = "sigkill" },
+		})
 		helpers.assert_eq(#answers, 1)
 		helpers.assert_eq(answers[1].error, "timeout")
 		state.finish(143)
@@ -127,9 +130,22 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		local answers = 0
 		local handle = runner.run_async("df", { "-Pk", "/tmp" }, { timeout_ms = 1000 }, function() answers = answers + 1 end)
 		handle.cancel()
-		helpers.assert_eq(state.kills, { { pid = -4321, signal = "sigterm" } })
+		helpers.assert_eq(state.kills, {
+			{ pid = -4321, signal = "sigterm" },
+			{ pid = -4321, signal = "sigkill" },
+		})
 		state.finish(143)
 		helpers.assert_eq(answers, 0)
+	end)
+
+	helpers.it("forces group retirement after SIGTERM (linux-sigterm-resistant-child)", function()
+		local luv, state = fake_luv()
+		local runner = fresh_runner(luv)
+		runner.run_async("sh", { "-c", "trap '' TERM; sleep 30" }, { timeout_ms = 10 }, function() end)
+		state.timer.callback()
+		helpers.assert_eq(state.kills[2], { pid = -4321, signal = "sigkill" },
+			"the deadline must also retire a SIGTERM-resistant process")
+		state.finish(0)
 	end)
 
 	helpers.it("stops descendants after their leader exits (linux-orphaned-process-group)", function()

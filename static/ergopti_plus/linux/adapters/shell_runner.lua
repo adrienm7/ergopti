@@ -390,8 +390,14 @@ local function stop_group(request)
 	-- A descendant can retain the pipes after libuv reaps the group leader.
 	-- The deadline and cancellation still own that group until terminal cleanup.
 	if not request.pid then return end
-	local ok = pcall(luv.kill, -request.pid, "sigterm")
-	if not ok then Logger.error(LOG, "run_async(): could not stop pid %s.", tostring(request.pid)) end
+	pcall(luv.kill, -request.pid, "sigterm")
+	-- A deadline must also retire children that ignore SIGTERM, or libuv keeps
+	-- their process handles alive indefinitely. The other argv runner does this too.
+	local ok, status, detail, code = pcall(luv.kill, -request.pid, "sigkill")
+	if not ok or (status == nil and code ~= "ESRCH") then
+		Logger.error(LOG, "run_async(): could not stop pid %s — %s.",
+			tostring(request.pid), tostring(detail or status))
+	end
 end
 
 --- Publishes one terminal result and releases every handle.
