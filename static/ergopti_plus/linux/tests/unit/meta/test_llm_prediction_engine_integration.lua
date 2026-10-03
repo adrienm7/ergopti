@@ -9,6 +9,46 @@
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
+local REFUSED_STORAGE_MODULES = { "adapters.http_client", "modules.llm.enable_admission",
+  "infra.llm_preferences", "modules.llm.profiles", "modules.llm.prediction_engine" }
+
+--- Isolates the actual admission and publication owners, including failed assertions.
+--- @param body function Receives profiles, prediction, storage and a version receipt.
+local function with_refused_storage(body)
+  local previous, pending = {}, nil
+  for _, name in ipairs(REFUSED_STORAGE_MODULES) do previous[name] = package.loaded[name] end
+  local ok, err = pcall(function()
+    local storage = PreferencesFixture.new({
+      initial = { ["llm.models.ollama"] = "codellama", ["llm.enabled"] = false },
+      writes_fail = true,
+    })
+    package.loaded["infra.llm_preferences"] = storage
+    package.loaded["adapters.http_client"] = {
+      get = function(url, _, _, callback)
+        helpers.assert_eq(url, "http://127.0.0.1:11434/api/version")
+        pending = callback
+        return true
+      end,
+      cancel = function() pending = nil; return true end,
+    }
+    package.loaded["modules.llm.enable_admission"] = nil
+    package.loaded["modules.llm.profiles"] = nil
+    package.loaded["modules.llm.prediction_engine"] = nil
+    local profiles = require("modules.llm.profiles")
+    profiles.init({})
+    local prediction = require("modules.llm.prediction_engine")
+    prediction.init({})
+    body(profiles, prediction, storage, function()
+      helpers.assert_type(pending, "function", "the real admission must dispatch a version request")
+      local callback = pending
+      pending = nil
+      callback({ ok = true, status = 200, body = '{"version":"0.12.3"}' })
+    end)
+  end)
+  for _, name in ipairs(REFUSED_STORAGE_MODULES) do package.loaded[name] = previous[name] end
+  if not ok then error(err, 0) end
+end
+
 helpers.describe("prediction_engine integration", function()
 
   -- ==========================================================================
@@ -245,35 +285,49 @@ helpers.describe("prediction_engine integration", function()
     end)
 
     PreferencesFixture.it("profiles and prediction state stay durable when storage fails", function()
-      local previous_storage = package.loaded["infra.llm_preferences"]
-      local previous_profiles = package.loaded["modules.llm.profiles"]
-      local previous_prediction = package.loaded["modules.llm.prediction_engine"]
-      local storage = PreferencesFixture.new({
-        initial = { ["llm.models.ollama"] = "codellama", ["llm.enabled"] = false },
-        writes_fail = true,
-      })
-      package.loaded["infra.llm_preferences"] = storage
-      package.loaded["modules.llm.profiles"] = nil
-      local profiles = require("modules.llm.profiles")
-      profiles.init({})
+      with_refused_storage(function(profiles, prediction, storage, answer)
+        helpers.assert_eq(profiles.set_model("llama3"), false)
+        helpers.assert_eq(profiles.get_current_model(), "codellama",
+          "a failed model write must not publish a session-only selection")
+        helpers.assert_eq(profiles.enable(), false)
+        helpers.assert_eq(profiles.is_enabled(), false,
+          "a failed enable write must not turn only the profile state on")
 
-      helpers.assert_eq(profiles.set_model("llama3"), false)
-      helpers.assert_eq(profiles.get_current_model(), "codellama",
-        "a failed model write must not publish a session-only selection")
-      helpers.assert_eq(profiles.enable(), false)
-      helpers.assert_eq(profiles.is_enabled(), false,
-        "a failed enable write must not turn only the profile state on")
+        local writes, set_many = 0, storage.set_many
+        storage.set_many = function(values, expected_source)
+          writes = writes + 1
+          return set_many(values, expected_source)
+        end
+        helpers.assert_true(prediction.enable(), "true acknowledges version dispatch only")
+        helpers.assert_eq(prediction.is_enabled(), false)
+        helpers.assert_eq(writes, 0, "persistence must wait for a successful version receipt")
+        answer()
+        helpers.assert_eq(writes, 1, "the admitted callback must reach the refusing durable writer")
+        helpers.assert_eq(storage.get("llm.enabled"), false)
+        helpers.assert_eq(profiles.is_enabled(), false)
+        helpers.assert_eq(prediction.is_enabled(), false,
+          "the engine must not diverge from the profile that refused persistence")
+      end)
+    end)
 
-      package.loaded["modules.llm.prediction_engine"] = nil
-      local prediction = require("modules.llm.prediction_engine")
-      prediction.init({})
-      helpers.assert_eq(prediction.enable(), false)
-      helpers.assert_eq(prediction.is_enabled(), false,
-        "the engine must not diverge from the profile that refused persistence")
-
-      package.loaded["infra.llm_preferences"] = previous_storage
-      package.loaded["modules.llm.profiles"] = previous_profiles
-      package.loaded["modules.llm.prediction_engine"] = previous_prediction
+    helpers.it("refused-storage fixture restores all owners after an assertion failure", function()
+      local previous = {}
+      for _, name in ipairs(REFUSED_STORAGE_MODULES) do previous[name] = package.loaded[name] end
+      local ok, err = pcall(function()
+        with_refused_storage(function(_, prediction)
+          helpers.assert_true(prediction.enable())
+          error("refused-storage-cleanup-sentinel", 0)
+        end)
+      end)
+      helpers.assert_eq(ok, false)
+      helpers.assert_true(tostring(err):find("refused-storage-cleanup-sentinel", 1, true) ~= nil)
+      for _, name in ipairs(REFUSED_STORAGE_MODULES) do
+        helpers.assert_true(rawequal(package.loaded[name], previous[name]), "the prior identity must survive: " .. name)
+      end
+      helpers.assert_type(require("infra.llm_preferences").mark_config_read, "function")
+      local settings = require("modules.llm.settings")
+      local read_ok, read_error = pcall(settings.mark_config_reads, {}, function() end)
+      helpers.assert_true(read_ok, "the real configuration reader must remain usable: " .. tostring(read_error))
     end)
   end)
 
