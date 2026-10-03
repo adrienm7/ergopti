@@ -20,9 +20,9 @@
 
 /** Reads the actual physical registry once, including non-typing key positions. */
 MagicEditorPhysicalCatalogue(SharedRoot := unset) {
-	global SharedDir
+	global _SharedDir
 	static Catalogues := Map()
-	Root := IsSet(SharedRoot) ? SharedRoot : SharedDir
+	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
 	if !(Root is String) || Root == ""
 		throw TypeError("The physical registry requires its actual shared source root.")
 	if Catalogues.Has(Root)

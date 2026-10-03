@@ -10,6 +10,34 @@
 
 #Requires AutoHotkey v2.0
 
+_MET_ActualDefaultCatalogue() {
+	global _SharedDir
+	Root := _SharedDir
+	State := MagicEditorState(), Saved := State.Clone()
+	try {
+		Catalogue := MagicEditorPhysicalCatalogue(), Keys := Map()
+		for Key in Catalogue["keys"]
+			Keys[Key["code"]] := Key["ahk"]
+		for Code, Scan in Map("KeyA", "SC01E", "KeyC", "SC02E", "Semicolon", "SC027", "Quote", "SC028")
+			AssertEqual(Scan, Keys[Code], "the zero-argument production reader uses the actual physical registry")
+		AssertTrue(Catalogue == MagicEditorPhysicalCatalogue(Root),
+			"default and explicit production roots share one catalogue owner")
+		State["initialized"] := false, State["legacy"] := Map()
+		Callback := (*) => 0
+		AssertTrue(MagicEditorRecordLegacy("sc1e", Callback),
+			"top-level legacy registration resolves the production root without an injected catalogue")
+		AssertTrue(State["legacy"]["SC01E"] == Callback,
+			"the actual legacy callback retains its canonical physical identity")
+		AssertEqual(Root, _SharedDir, "catalogue registration cannot replace the initialized shared root")
+	} finally {
+		_SharedDir := Root
+		State.Clear()
+		for Key, Value in Saved
+			State[Key] := Value
+	}
+}
+Test("magic editor: zero-argument catalogue and legacy registration use the actual shared root", _MET_ActualDefaultCatalogue)
+
 _MET_Options(Changes := unset) {
 	if !IsSet(Changes)
 		Changes := Map()

@@ -1031,6 +1031,9 @@ exact-boolean regressions also pass the focused runner.
   remain pending. Native macOS/Windows
   layout delivery and genuine Wayland seats are not qualified by Linux-host
   stubs or the Xvfb source probe.
+
+The Windows physical catalogue now uses the existing entry-point \_SharedDir owner when called without an injected root. The previous undefined SharedDir stopped legacy Win shortcut registration before the suite or application could start. A direct zero-argument catalogue and actual legacy-registration regression checks independent physical identities and exact callback/root preservation; existing native lifecycle assertions and warning policy stay intact. Encoding and strict conventions pass locally, while native Windows unit, compile and E2E qualification remain pending.
+
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
   `_shared/ui/apps.manifest.json`, with generated Lua/AHK composers; an empty
