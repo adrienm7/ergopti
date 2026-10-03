@@ -342,8 +342,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		"min_words", [1, 20],
 		"max_words", [0, 10000],
 		"debounce_ms", [50, 10000],
-		"ctx_chars", [50, 10000],
-		"pred_indent", [-7, 7])
+		"ctx_chars", [50, 10000])
 	static BooleanKeys := Map(
 		"enabled", true, "auto_profile_for_model", true,
 		"instant_on_word_end", true, "after_hotstring", true,
@@ -368,6 +367,17 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	}
 	if (Key == "ollama_port")
 		return LLM_Option_TryNormalizeOllamaPort(Value, &Normalized)
+	if (Key == "pred_indent") {
+		if !(Value is Integer) && !(Value is Float)
+			return false
+		for Accepted in LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent")) {
+			if Value == Accepted {
+				Normalized := Accepted
+				return true
+			}
+		}
+		return false
+	}
 	if IntegerRanges.Has(Key) {
 		if !(Value is Integer) && !(Value is Float)
 			return false

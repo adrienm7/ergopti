@@ -22,6 +22,8 @@ local ManifestMenu  = require("infra.manifest_menu")
 local DisplayPolicy = require("llm.display_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
+local Manifest = require("infra.manifest_reader")
+local SettingsManager = require("ui.menu.menu_llm.settings_manager")
 
 
 
@@ -43,14 +45,6 @@ function M.build(ctx)
 
 	local leading_rows = {}
 	local rows = {}
-
-	-- Indentation picker — only meaningful with multiple predictions (num < 2 disables)
-	local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-	table.insert(leading_rows, {
-		label    = i18n.get("menu.llm.indent_label"),
-		disabled = (is_disabled or num_preds_safe < 2) or nil,
-		submenu  = settings_mgr.build_indent_menu(),  -- settings_mgr's tree, handed over whole
-	})
 
 	local function streaming_snapshot()
 		local snapshot = llm_mod.streaming_snapshot()
@@ -81,6 +75,28 @@ function M.build(ctx)
 		return snapshot
 	end
 	local streaming_source = streaming_snapshot()
+	local indent_values = DisplayPolicy.indentation_values(Manifest.find_entry_by_path("llm.display.pred_indent"))
+	local function indentation_snapshot()
+		local snapshot = streaming_snapshot()
+		local indentation = settings_mgr.setting_snapshot("llm_pred_indent")
+		local count = settings_mgr.setting_snapshot("llm_num_predictions")
+		local canonical, source = Preferences.current_view(ConfigPaths.get("ConfigTomlPath"))
+		snapshot.indentation = state.llm_pred_indent
+		snapshot.count = state.llm_num_predictions
+		local function canonical_value(key)
+			if canonical == nil then return nil end
+			if canonical[key] == nil then return llm_mod.DEFAULT_STATE[key] end
+			return canonical[key]
+		end
+		snapshot.blocked = snapshot.blocked or indentation == nil or count == nil
+			or (indentation and indentation.value ~= snapshot.indentation)
+			or (count and count.value ~= snapshot.count)
+			or not Preferences.source_matches(snapshot.source, source)
+			or canonical_value("llm_pred_indent") ~= snapshot.indentation
+			or canonical_value("llm_num_predictions") ~= snapshot.count
+		return snapshot
+	end
+	local indentation_source = indentation_snapshot()
 
 	local function show_all_ready()
 		return DisplayPolicy.ready(state.llm_num_predictions,
@@ -90,6 +106,18 @@ function M.build(ctx)
 
 	local display_ctx = {
 		commands = {
+			["llm_indentation"] = function(value)
+				local current = indentation_snapshot()
+				if not Preferences.source_matches(indentation_source.source, current.source) then return false end
+				local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, indent_values)
+				if decision.admitted ~= true then return false end
+				return settings_mgr.apply_setting_transaction({
+					key = "llm_pred_indent", value = decision.value,
+					runtime_fn = "set_llm_pred_indent", publish_setting = true,
+					publication_guard = SettingsManager.publication_guard(Preferences,
+						ConfigPaths.get("ConfigTomlPath"), current.source),
+				})
+			end,
 			["llm_show_all"] = function()
 				if not show_all_ready() then return false end
 				return settings_mgr.apply_setting_transaction({
@@ -104,25 +132,8 @@ function M.build(ctx)
 				if not Preferences.source_matches(streaming_source.source, current.source) then return false end
 				local decision = DisplayPolicy.streaming_intent(streaming_source, current)
 				if decision.admitted ~= true then return false end
-				local path, expected_source = ConfigPaths.get("ConfigTomlPath"), current.source
-				local before_id
-				local function publication_guard(phase)
-					if phase == "before" then
-						local _, source = Preferences.current_view(path)
-						if not Preferences.source_matches(expected_source, source) then return false end
-						local receipt = Preferences.publication_receipt(path)
-						if type(receipt) ~= "table" or type(receipt.id) ~= "number" or receipt.id < 0
-							or receipt.id ~= math.floor(receipt.id) then return false end
-						before_id = receipt.id
-						return true
-					end
-					if phase ~= "acknowledged" then return false end
-					local receipt = Preferences.publication_receipt(path)
-					if not receipt or receipt.id ~= before_id + 1
-						or not Preferences.source_matches(receipt.source, receipt.source) then return false end
-					expected_source = receipt.source
-					return true
-				end
+				local publication_guard = SettingsManager.publication_guard(Preferences,
+					ConfigPaths.get("ConfigTomlPath"), current.source)
 				return settings_mgr.apply_setting_transaction({
 					key = "llm_streaming", value = decision.value,
 					runtime_fn = "set_llm_streaming", publish_setting = false,
@@ -139,6 +150,8 @@ function M.build(ctx)
 			end,
 		},
 		state_getters = {
+			["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+			["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
 			["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(state.llm_streaming_multi) end,
 			["llm_show_all_ready"] = show_all_ready,
 			["llm_token_streaming_enabled"] = function()

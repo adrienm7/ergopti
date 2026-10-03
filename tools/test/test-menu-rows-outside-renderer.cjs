@@ -28,8 +28,8 @@
  * a first attempt produced numbers that meant nothing — `.Add(` matched every
  * AutoHotkey object, `title =` matched dialog and window titles, and Linux
  * scored 6 because it does not use `label =` at all. The predicates below follow
- * the actual call each driver makes, and are pinned by the floors: a predicate
- * that stops matching reports a suspiciously low count instead of passing.
+ * the actual call each driver makes, and are pinned by independent grammar and real-file discovery probes: broken
+ * matching refuses measurement even after a complete migration reaches zero.
  * ==============================================================================
  */
 
@@ -37,6 +37,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const os = require('node:os');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
@@ -438,93 +440,9 @@ const BASELINE = {
 	linux: 3
 };
 
-// Floors on the TOTAL count. A predicate that silently stops matching would
-// otherwise drive the outside-count to zero and pass while measuring nothing.
-//
-// macos lowered 260 → 220 on 2026-08-06, and the reason matters because it is
-// the second time a guard in this repository has been found measuring the OLD
-// shape of the thing it guards. The Lua predicates key on `title =`, which is
-// the hs.menubar field — and a row that MOVES to the renderer stops using it,
-// because provider data says `label =`. So every successful migration shrinks
-// this total by construction, and the floor eventually fires on progress.
-//
-// It is not raised back and it is not removed: it still catches a predicate that
-// stopped matching. It is set below the count a fully-migrated macOS would show
-// rather than just under today's, so it cannot fire on the next migration
-// either. If it ever fires again, check whether `title =` is still the field
-// this driver's rows use BEFORE assuming the tree shrank.
-const MIN_TOTAL = {
-	// windows lowered 180 → 120 on 2026-08-07, for the reason given for macOS
-	// below: the predicate keys on the driver's own row calls, so every
-	// conversion of a native Menu tree to provider rows shrinks the total by
-	// construction and the floor eventually fires on progress. 120 is below what
-	// a driver with a fully migrated menu would still show, not merely under
-	// today's number.
-	// windows lowered 120 → 80 on 2026-08-07, same reason again: the IA menu was
-	// the driver's biggest reservoir of hand-built rows and converting it took the
-	// total to 115, four under the floor. 80 is under what a Windows driver whose
-	// menu is fully migrated would still show — the renderer's own Add calls, the
-	// tray root, and the handful of rows that mutate a live menu.
-	// windows lowered 80 → 45 on 2026-08-07, same reason a third time for this
-	// driver: the per-category hotstring submenus were the last block assembling a
-	// native Menu one manifest entry at a time, and converting them took the total
-	// to 72, eight under the floor. 45 is under what a Windows driver whose menu is
-	// fully migrated would still show — the renderer's own Add calls, the tray
-	// root, and the rows whose callbacks repaint a menu that is already open.
-	// windows lowered 45 → 25 on 2026-08-07, fourth time for this driver and the
-	// same reason each time: the predicate reads this driver's own row calls, so
-	// every conversion shrinks the total by construction. The personal tree and the
-	// extension folders took it to 47, two above the floor. 25 is under what a
-	// Windows driver whose menu is fully migrated would still show — the renderer's
-	// own Add calls and the tray root.
-	// windows lowered 25 → 15 on 2026-08-08: naming the transport and converting
-	// the last submenus took the total to 33, of which 28 are the renderer's own.
-	// 15 is under what this driver would show with every convertible row moved.
-	windows: 15,
-	// macos lowered 220 → 120 on 2026-08-07, for the reason stated above it: the
-	// predicate keys on `title =`, so every conversion of a builder to provider
-	// data shrinks the total by construction and the floor eventually fires on
-	// progress. 120 is below what a driver with a fully migrated menu would still
-	// show — the submenu wrappers and the rows no declaration can carry — rather
-	// than merely under today's number.
-	// macos lowered 120 → 100 on 2026-08-07, for the reason stated above it: the
-	// predicate keys on `title =`, so every conversion of a builder to provider
-	// data shrinks the total by construction and the floor eventually fires on
-	// progress.
-	// macos lowered 100 → 60 on 2026-08-07, same reason a third time: the IA menu
-	// was this driver's biggest reservoir of hand-built rows and converting it
-	// took the total to 85, fifteen under the floor. 60 is under what a macOS
-	// driver whose menu is fully migrated would still show — the renderer's own
-	// rows, the pickers other subsystems own, and the dialog titles the predicate
-	// counts because it cannot tell them from a row.
-	// macos lowered 60 → 35 on 2026-08-07, fourth time and the same reason: the
-	// predicate keys on `title =`, so every builder that starts emitting provider
-	// data shrinks the total by construction and the floor fires on progress. The
-	// debug submenu and the Karabiner pickers took it to 54, six under the floor.
-	// 35 is under what a macOS driver whose menu is fully migrated would still
-	// show — the submenu wrappers and the dialog titles the predicate counts
-	// because it cannot tell them from a row.
-	// macos lowered 35 → 20 on 2026-08-07, fifth time and the same reason: the
-	// predicate keys on `title =`, so every builder that starts emitting provider
-	// data shrinks the total by construction. The tray-root conversion took it to
-	// 35, level with the floor.
-	macos: 20,
-	// linux lowered 80 → 55 on 2026-08-06 and 55 → 30 on 2026-08-07, both times
-	// for the reason given for macOS above: the predicate keys on `title =`, so
-	// every successful migration shrinks the total by construction and the floor
-	// eventually fires on progress. 30 is below what a driver with a fully
-	// migrated menu would still show, not merely under today's number.
-	// linux lowered 30 → 8 on 2026-08-07, same reason a fourth time: every
-	// top-level builder returns row data now, so the twenty parent rows that
-	// hung each submenu on the tray stopped using `title =` at once and the
-	// total fell to 15. 8 is under what a Linux driver whose menu is fully
-	// migrated would still show — the dialog titles the predicate counts because
-	// it cannot tell them from a row
-	// linux lowered 8 → 2 on 2026-08-08: the four category gates moved onto the
-	// renderer and the total fell to 3. 2 is under what a Linux driver whose menu
-	// is fully migrated would still show — the degraded tray's own two rows.
-	linux: 2
-};
+// Sensitivity belongs to independent literal grammar and actual-file discovery
+// probes below. A lower total is legitimate progress, including zero once the
+// native dialect has moved completely to shared declarations.
 
 const DRIVER_SPEC = {
 	windows: {
@@ -608,66 +526,150 @@ const CONTEXT_LINES = 3;
 const errors = [];
 const summary = [];
 
-/** Counts rows in one driver, split by whether the file is its renderer. */
-function countRows(driver, spec) {
-	const base = path.join(DRIVERS, driver);
+/** Counts the unchanged native dialect in one source text. */
+function rowsInText(text, spec) {
+	const lines = text.split(/\r?\n/);
+	let n = 0;
+	lines.forEach((line, i) => {
+		const t = line.trimStart();
+		if (t.startsWith('--') || t.startsWith(';') || t.startsWith('//')) return;
+		if (!spec.patterns.some((rx) => rx.test(line))) return;
+		if (spec.context) {
+			const window = lines.slice(Math.max(0, i - CONTEXT_LINES), i + CONTEXT_LINES + 1).join('\n');
+			if (!spec.context.test(window)) return;
+		}
+		n++;
+	});
+	return n;
+}
+
+/** Counts rows only after complete production source and renderer discovery. */
+function countRows(driver, spec, base = path.join(DRIVERS, driver), counter = rowsInText) {
+	assert(
+		fs.existsSync(base) && fs.statSync(base).isDirectory(),
+		`${driver}: production directory unavailable`
+	);
+	for (const renderer of spec.renderers) {
+		const file = path.join(base, renderer);
+		assert(
+			fs.existsSync(file) && fs.statSync(file).isFile(),
+			`${driver}: renderer path unavailable`
+		);
+	}
+	if (spec.sharedRenderer) {
+		const sharedRenderer = path.join(DRIVERS, '_shared', 'lua', 'menu', 'renderer.lua');
+		assert(
+			fs.existsSync(sharedRenderer) && fs.statSync(sharedRenderer).isFile(),
+			`${driver}: shared renderer unavailable`
+		);
+	}
 	let total = 0;
 	let inRenderer = 0;
+	let sourceFiles = 0;
 	const offenders = new Map();
-
 	(function walk(dir) {
-		if (!fs.existsSync(dir)) return;
-		for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-			const p = path.join(dir, e.name);
-			if (e.isDirectory()) {
-				if (
-					e.name !== 'tests' &&
-					e.name !== 'vendor' &&
-					e.name !== '_generated' &&
-					e.name !== 'node_modules'
-				) {
-					walk(p);
-				}
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const file = path.join(dir, entry.name);
+			if (entry.isDirectory()) {
+				if (!['tests', 'vendor', '_generated', 'node_modules'].includes(entry.name)) walk(file);
 				continue;
 			}
-			if (!spec.exts.includes(path.extname(e.name))) continue;
-
-			const rel = path.relative(base, p).split(path.sep).join('/');
-			const lines = fs.readFileSync(p, 'utf8').split(/\r?\n/);
-			let n = 0;
-			lines.forEach((line, i) => {
-				const t = line.trimStart();
-				if (t.startsWith('--') || t.startsWith(';') || t.startsWith('//')) return;
-				if (!spec.patterns.some((rx) => rx.test(line))) return;
-				if (spec.context) {
-					const window = lines
-						.slice(Math.max(0, i - CONTEXT_LINES), i + CONTEXT_LINES + 1)
-						.join('\n');
-					if (!spec.context.test(window)) return;
-				}
-				n++;
-			});
-			if (n === 0) continue;
-			total += n;
-			if (spec.renderers.has(rel)) inRenderer += n;
-			else offenders.set(rel, n);
+			if (!entry.isFile() || !spec.exts.includes(path.extname(entry.name))) continue;
+			sourceFiles += 1;
+			const relative = path.relative(base, file).split(path.sep).join('/');
+			const count = counter(fs.readFileSync(file, 'utf8'), spec);
+			total += count;
+			if (spec.renderers.has(relative)) inRenderer += count;
+			else if (count > 0) offenders.set(relative, count);
 		}
 	})(base);
-
+	assert(sourceFiles > 0, `${driver}: no actual production extension sources discovered`);
 	return { total, inRenderer, outside: total - inRenderer, offenders };
 }
 
+const WINDOWS_GRAMMAR = [
+	['registered', 'RegisterMenuItem(M, Label, Fn)', 1],
+	['helper', 'MenuAddCheckbox(M, Label, Fn)', 1],
+	['menu receiver', 'RootMenu.Add(Label, Fn)', 1],
+	['submenu receiver', 'SubTools.Add(Label, Fn)', 1],
+	['short receiver', 'M.Add(Label, Fn)', 1],
+	['comment', '; RegisterMenuItem(M, Label, Fn)', 0],
+	['array', 'Array.Add(Value)', 0],
+	['map', 'Map.Add(Key, Value)', 0],
+	['control', 'Gui.Add("Text", Options, Label)', 0]
+];
+const LUA_GRAMMAR = [
+	['action', '{ title = name, fn = choose }', 1],
+	['check', '{ title = name, checked = value }', 1],
+	['disabled', '{ title = name, disabled = blocked }', 1],
+	['submenu', '{ title = name, menu = children }', 1],
+	['upper boundary', 'fn = choose\n-- a\n-- b\ntitle = name', 1],
+	['lower boundary', 'title = name\n-- a\n-- b\nfn = choose', 1],
+	['far context', 'title = name\n-- a\n-- b\n-- c\nfn = choose', 0],
+	['plain window title', 'title = window_name', 0],
+	['provider', '{ label = name, action = choose }', 0],
+	['comment', '-- { title = name, fn = choose }', 0]
+];
+
+/** Independent grammar fixtures must remain sensitive to missing/overbroad rules. */
+function qualifyPredicate(spec, fixtures) {
+	for (const [name, source, count] of fixtures)
+		assert.equal(rowsInText(source, spec), count, `native row grammar: ${name}`);
+}
+qualifyPredicate(DRIVER_SPEC.windows, WINDOWS_GRAMMAR);
+for (const driver of ['macos', 'linux']) qualifyPredicate(DRIVER_SPEC[driver], LUA_GRAMMAR);
+assert.throws(() => qualifyPredicate({ ...DRIVER_SPEC.windows, patterns: [] }, WINDOWS_GRAMMAR));
+for (let missing = 0; missing < DRIVER_SPEC.windows.patterns.length; missing++)
+	assert.throws(() =>
+		qualifyPredicate(
+			{
+				...DRIVER_SPEC.windows,
+				patterns: DRIVER_SPEC.windows.patterns.filter((_, index) => index !== missing)
+			},
+			WINDOWS_GRAMMAR
+		)
+	);
+for (const driver of ['macos', 'linux']) {
+	assert.throws(() => qualifyPredicate({ ...DRIVER_SPEC[driver], patterns: [] }, LUA_GRAMMAR));
+	assert.throws(() => qualifyPredicate({ ...DRIVER_SPEC[driver], context: /(?!) / }, LUA_GRAMMAR));
+	assert.throws(() => qualifyPredicate({ ...DRIVER_SPEC[driver], context: /./ }, LUA_GRAMMAR));
+}
+
+/** Actual file discovery must admit completed migration but reject an inert walker. */
+function qualifyWalker(counter = rowsInText) {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-menu-row-discovery-'));
+	const spec = { ...DRIVER_SPEC.macos, renderers: new Set(['renderer.lua']) };
+	try {
+		assert.throws(() => countRows('fixture', spec, path.join(directory, 'absent'), counter));
+		const file = path.join(directory, 'native.lua');
+		fs.writeFileSync(file, '{ title = name, fn = choose }');
+		assert.throws(
+			() => countRows('fixture', spec, directory, counter),
+			/renderer path unavailable/
+		);
+		fs.writeFileSync(path.join(directory, 'renderer.lua'), 'return {}');
+		const positive = countRows('fixture', spec, directory, counter);
+		assert.equal(positive.total, 1, 'the real walker must consume the production predicate');
+		assert.equal(positive.outside, 1);
+		fs.writeFileSync(file, '{ label = name, action = choose }');
+		const migrated = countRows('fixture', spec, directory, counter);
+		assert.equal(migrated.total, 0, 'a real provider-only migration may reach zero');
+		assert.equal(migrated.outside, 0);
+		fs.unlinkSync(file);
+		fs.unlinkSync(path.join(directory, 'renderer.lua'));
+		assert.throws(
+			() => countRows('fixture', { ...spec, renderers: new Set() }, directory, counter),
+			/no actual production extension sources/
+		);
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+qualifyWalker();
+assert.throws(() => qualifyWalker(() => 0), /real walker must consume/);
+
 for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 	const { total, inRenderer, outside, offenders } = countRows(driver, spec);
-
-	if (total < MIN_TOTAL[driver]) {
-		errors.push(
-			`${driver}: found only ${total} menu row(s) (floor ${MIN_TOTAL[driver]}). The row predicate has ` +
-				'stopped matching, which would drive the outside-count to zero and pass this ratchet while ' +
-				'measuring nothing.'
-		);
-		continue;
-	}
 
 	// A renderer that draws no rows is not a renderer; the path is probably stale.
 	// Unless the driver has no renderer of its own — Linux renders entirely through
@@ -776,5 +778,7 @@ if (errors.length > 0) {
 	for (const e of errors) console.error('    - ' + e);
 	process.exit(1);
 }
+
+require('./test-native-menu-rows.cjs');
 
 console.log(`\x1b[32m[OK] No new menu rows outside the renderer (${summary.join(', ')}).\x1b[0m`);

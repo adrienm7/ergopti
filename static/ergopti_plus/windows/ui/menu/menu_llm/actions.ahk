@@ -417,10 +417,29 @@ LLM_Menu_SetN(n) {
 			"n_predictions", n), _LLM_Menu_ApplyStandardCommitted)
 }
 
-LLM_Menu_SetIndent(lvl) {
+LLM_Menu_SetIndent(lvl, Expected := 0) {
+	Writer := Expected is Map ? _LLM_Menu_IndentWrite.Bind(Expected) : 0
 	return LLM_Menu_CommitMutation("the LLM indentation setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"pred_indent", lvl), _LLM_Menu_ApplyStandardCommitted)
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", lvl),
+		_LLM_Menu_ApplyStandardCommitted, Writer)
+}
+
+; Rechecks the retained choice inside the actual borrowed configuration lease.
+_LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
+	Current := _LLM_Menu_IndentSnapshot()
+	if !LLM_DisplayIndentIntent(Expected, Current, Expected["indentation"], LLM_MENU_INDENT_OPTIONS)["admitted"]
+			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Owned := []
+	for Update in Updates {
+		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+			Owned.Push(Update)
+	}
+	if Owned.Length != 1
+		return false
+	; This choice owns one presentation leaf, so unrelated external settings
+	; remain byte-owned by their existing source instead of the RAM full collector.
+	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned) : TOML_BatchWrite(Path, Owned)
 }
 
 

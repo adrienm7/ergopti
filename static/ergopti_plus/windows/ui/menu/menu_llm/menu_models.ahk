@@ -538,10 +538,6 @@ _LLM_Menu_MakeSetNHandler(n) {
 	return (name, pos, menu) => LLM_Menu_SetN(n)
 }
 
-_LLM_Menu_MakeSetIndentHandler(lvl) {
-	return (name, pos, menu) => LLM_Menu_SetIndent(lvl)
-}
-
 _LLM_Menu_MakeSetBackendHandler(backend_id) {
 	return (name, pos, menu) => LLM_Menu_SetBackend(backend_id)
 }

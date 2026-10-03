@@ -322,6 +322,75 @@ function checkChoiceProjection() {
 		assert.equal(frequencyRow.path, frequencyCorpus.path);
 		assert.equal(frequencyRow.current_choice_suffix, frequencyCorpus.suffix);
 		assert.equal(Object.hasOwn(frequencyRow, 'choice_registry'), false);
+		const indentationCorpus = JSON.parse(
+			readFileSync(path.join(SHARED, 'tests/corpus/menus/indentation_control.json'), 'utf8')
+		);
+		const indentation = menu.llm_display_menu.filter((row) => row.id === indentationCorpus.row.id);
+		assert.equal(indentation.length, 1, 'one shared declaration owns the numeric submenu');
+		assert.deepEqual(
+			indentation[0].choices,
+			indentationCorpus.choices.map(({ value, prefix, i18n }) => ({
+				value,
+				i18n,
+				label_prefix: prefix
+			}))
+		);
+		assert.equal(indentation[0].path, indentationCorpus.row.path);
+		assert.equal(indentation[0].current_choice_suffix, ': {1}');
+		assert.equal(
+			Object.hasOwn(indentation[0], 'platforms'),
+			false,
+			'all drivers use identical row order'
+		);
+		assert.equal(Object.hasOwn(indentation[0], 'choice_registry'), false);
+		const numericChoices = 'choice_values = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]';
+		assert.equal(
+			original.split(numericChoices).length - 1,
+			1,
+			'the numeric feature owns its values once'
+		);
+		const publishedIndentation = fs.readFileSync(output);
+		for (const replacement of [
+			'choice_values = []',
+			'choice_values = [-1, -1, 0, 1]',
+			'choice_values = [1, 0, -1]',
+			'choice_values = [-1, 0.5, 1]',
+			'choice_values = [-1, "0", 1]',
+			'choice_values = [1, 2]',
+			'choice_values = [-9007199254740992, 0, 1]'
+		]) {
+			result = execute(original.replace(numericChoices, replacement));
+			assert.notEqual(result.status, 0, 'malformed numeric metadata refuses before publication');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				publishedIndentation,
+				'refusal preserves exact acknowledged menu bytes'
+			);
+		}
+		for (const replacement of [
+			'choice_registry = "unknown.indentation"',
+			'choice_registry = "llm.indentation"\nchoice_values = [-1, 0, 1]'
+		]) {
+			result = execute(original.replace('choice_registry = "llm.indentation"', replacement));
+			assert.notEqual(
+				result.status,
+				0,
+				'only the registered numeric feature may own choice values'
+			);
+			assert.deepEqual(fs.readFileSync(output), publishedIndentation);
+		}
+		result = execute(original.replace(numericChoices, 'choice_values = [-1, 0, 1]'));
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(output))
+				.llm_display_menu.find((row) => row.id === 'llm_indentation')
+				.choices.map((row) => row.value),
+			[-1, 0, 1],
+			'the actual feature catalogue, not a native copied range, drives codegen'
+		);
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		menu = JSON.parse(fs.readFileSync(output));
 		const timingPath = path.join(
 			fixture,
 			'static/ergopti_plus/_shared/modules/updater/defaults.json'
@@ -656,7 +725,7 @@ function checkInfoBarControl() {
 	);
 	const definition = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
 	assert.deepEqual(corpus.states, [false, true], 'both independently captured states execute');
-	assert.equal(definition.length, 6);
+	assert.equal(definition.length, 8);
 	assert.deepEqual(definition[0], { type: 'list', id: 'llm_display_leading' });
 	assert.equal(definition[1].type, 'check');
 	assert.equal(definition[1].id, corpus.row.id);
@@ -781,7 +850,7 @@ function checkTokenStreamingControl() {
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/token_streaming_control.json'), 'utf8')
 	);
 	const rows = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
-	assert.equal(rows.length, 6);
+	assert.equal(rows.length, 8);
 	assert.deepEqual(rows[3], {
 		type: 'check',
 		id: corpus.row.id,
@@ -833,7 +902,7 @@ function checkShowAllControl() {
 	]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
 	const rows = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
-	assert.equal(rows.length, 6);
+	assert.equal(rows.length, 8);
 	assert.deepEqual(
 		rows.map((row) => row.id),
 		[
@@ -842,6 +911,8 @@ function checkShowAllControl() {
 			'llm_display_remaining',
 			'llm_token_streaming',
 			corpus.row.id,
+			undefined, // Shared separator before the numeric submenu.
+			'llm_indentation',
 			'llm_display_trailing'
 		]
 	);
@@ -1043,3 +1114,121 @@ function checkUpdateFrequencyControl() {
 }
 
 checkUpdateFrequencyControl();
+
+/** Qualifies the numeric registry and actual native providers without a storage enum. */
+function checkIndentationControl() {
+	const assert = require('node:assert/strict');
+	const raw = readFileSync(MANIFEST_PATH, 'utf8');
+	const parsed = parseToml(
+		raw.replace(
+			/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+			(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
+		)
+	);
+	const feature = parsed.entries.find(
+		(entry) => entry.path_prefix === 'llm.display' && entry.id === 'pred_indent'
+	);
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/indentation_control.json'), 'utf8')
+	);
+	assert.equal(feature.type, 'number', 'existing numeric persistence remains compatible');
+	assert.deepEqual(
+		[...feature.choice_values],
+		corpus.choices.map((choice) => choice.value)
+	);
+	assert.equal(feature.default, 0);
+	assert.equal(feature.recommended, 0);
+	const declaration = JSON.parse(readFileSync(MENU_PATH, 'utf8')).llm_display_menu;
+	const row = declaration.find((entry) => entry.id === corpus.row.id);
+	assert.equal(declaration.filter((entry) => entry.id === corpus.row.id).length, 1);
+	assert.equal(row.path, corpus.row.path);
+	assert.equal(row.i18n, corpus.row.i18n);
+	assert.deepEqual(row.disabled_when, ['llm_indentation_ready']);
+	assert.equal(row.type, 'choice');
+	assert.equal(declaration.at(-2).id, corpus.row.id, 'all drivers share one trailing placement');
+	for (const locale of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const labels = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale), 'utf8'));
+		for (const key of [corpus.row.i18n, ...new Set(corpus.choices.map((choice) => choice.i18n))])
+			assert.equal(typeof labels[key], 'string', `${locale}: numeric units must be translated`);
+	}
+	for (const [file, intent, writer] of [
+		[
+			'windows/ui/menu/menu_llm/menu_settings.ahk',
+			'LLM_DisplayIndentIntent',
+			'_LLM_Menu_EnableSourceMatches'
+		],
+		[
+			'macos/ui/menu/menu_llm/streaming_panel.lua',
+			'DisplayPolicy.indentation_intent',
+			'SettingsManager.publication_guard'
+		],
+		['linux/ui/menu/menu_builder.lua', 'DisplayPolicy.indentation_intent', 'current.source']
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		assert(
+			source.includes('"llm_indentation"'),
+			`${file}: native provider consumes the canonical declaration`
+		);
+		assert(source.includes(intent), `${file}: retained commands consume shared admission`);
+		assert(source.includes(writer), `${file}: publication retains native source ownership`);
+	}
+	console.log(
+		'Indentation: fifteen shared numeric choices, existing translated units, and three acknowledged source owners.'
+	);
+}
+
+checkIndentationControl();
+
+/** Executes the canonical feature-entry schema, including numeric presentation metadata. */
+function checkNumericChoiceSchema() {
+	const assert = require('node:assert/strict');
+	const Ajv = require('ajv/dist/2020'); // Existing pinned package-lock dependency.
+	const schema = JSON.parse(
+		readFileSync(resolve(SHARED, 'modules/features/manifest.schema.json'), 'utf8')
+	);
+	const validate = new Ajv({ strict: false }).compile(schema.$defs.feature_entry);
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/indentation_control.json'), 'utf8')
+	);
+	const feature = {
+		id: 'pred_indent',
+		default: 0,
+		recommended: 0,
+		input_altering: false,
+		description_key: 'menu.llm.indent_label',
+		type: 'number',
+		choice_values: corpus.choices.map((choice) => choice.value)
+	};
+	assert.equal(validate(feature), true, JSON.stringify(validate.errors));
+	const absentChoices = { ...feature };
+	delete absentChoices.choice_values;
+	assert.equal(
+		validate(absentChoices),
+		true,
+		'ordinary numeric features need no presentation metadata'
+	);
+	for (const invalid of [
+		{ ...feature, choice_values: [] },
+		{ ...feature, choice_values: [0] },
+		{ ...feature, choice_values: [0, 0] },
+		{ ...feature, choice_values: [0, 0.5] },
+		{ ...feature, choice_values: [0, '1'] },
+		{ ...feature, choice_values: [0, 9007199254740992] },
+		{ ...feature, choice_values: [0, -9007199254740992] },
+		{ ...feature, choice_values: '0,1' },
+		{ ...feature, type: 'string' },
+		{ ...feature, type: 'enum', enum_values: [0, 1] },
+		{ ...feature, type: undefined },
+		{ ...feature, future_presentation_field: true }
+	])
+		assert.equal(
+			validate(invalid),
+			false,
+			'actual strict schema must reject malformed or misplaced choice metadata'
+		);
+	console.log(
+		'Numeric feature schema: declared fifteen-value catalogue, unchanged plain numbers and twelve strict negative vectors.'
+	);
+}
+
+checkNumericChoiceSchema();

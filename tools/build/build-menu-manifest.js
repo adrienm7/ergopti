@@ -148,7 +148,37 @@ function updaterIntervalChoices() {
 	}));
 }
 
+/** Projects signed display offsets from their numeric feature catalogue. */
+function indentationChoices(feature) {
+	const values = feature?.choice_values;
+	if (
+		feature?.type !== 'number' ||
+		!Array.isArray(values) ||
+		values.length < 2 ||
+		values.some(
+			(value, index) =>
+				!Number.isSafeInteger(value) || (index > 0 && value !== values[index - 1] + 1)
+		) ||
+		!values.includes(feature.default) ||
+		!values.includes(feature.recommended)
+	)
+		throw new Error(
+			'llm.indentation: numeric choices need ordered integral values containing the defaults'
+		);
+	return values.map((value) => ({
+		value,
+		i18n:
+			value === 0
+				? 'menu.llm.indent_none'
+				: Math.abs(value) === 1
+					? 'menu.llm.indent_space'
+					: 'menu.llm.indent_spaces',
+		label_prefix: value === 0 ? '' : `${value > 0 ? '+' : ''}${value} `
+	}));
+}
+
 const CHOICE_REGISTRIES = {
+	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
 	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
 	'updater.check_intervals': {
 		path: 'updater.check_interval_seconds',
@@ -183,8 +213,10 @@ function projectChoices(menu, raw) {
 		)
 	);
 	const enums = new Map();
+	const numeric = new Map();
 	for (const entry of flattened.entries || []) {
 		if (entry.type === 'enum') enums.set(`${entry.path_prefix}.${entry.id}`, entry);
+		if (entry.type === 'number') numeric.set(`${entry.path_prefix}.${entry.id}`, entry);
 	}
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
@@ -199,7 +231,7 @@ function projectChoices(menu, raw) {
 					throw new Error(`${where}: unknown choice_registry or registry-owned path`);
 				if (row.choice_values !== undefined || row.choice_label_prefix !== undefined)
 					throw new Error(`${where}: registry choices own their values, order and label keys`);
-				projectedRegistry = registry.project();
+				projectedRegistry = registry.project(numeric.get(row.path));
 				feature = {
 					enum_values: projectedRegistry.map((entry) => entry.value),
 					platforms: PLATFORMS

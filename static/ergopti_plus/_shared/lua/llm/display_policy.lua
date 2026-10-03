@@ -81,4 +81,54 @@ function M.streaming_intent(expected, current)
 	return { admitted = true, value = not current.streaming }
 end
 
+--- Copies the numeric indentation catalogue without changing stored value types.
+--- @param feature table Canonical generated number feature.
+--- @return table values Ordered integer offsets.
+function M.indentation_values(feature)
+	assert(type(feature) == "table" and feature.type == "number"
+		and type(feature.choice_values) == "table" and #feature.choice_values >= 2,
+		"indentation requires its canonical numeric choice catalogue")
+	local values = {}
+	for index, value in ipairs(feature.choice_values) do
+		assert(type(value) == "number" and value == math.floor(value)
+			and value ~= math.huge and value ~= -math.huge
+			and (index == 1 or value == values[index - 1] + 1),
+			"indentation choices must be ordered contiguous integers")
+		values[index] = value
+	end
+	return values
+end
+
+--- Admits an indentation choice only from a live multi-prediction owner.
+--- @param snapshot table Current native owner and exact revision.
+--- @return boolean
+function M.indentation_ready(snapshot)
+	return type(snapshot) == "table" and type(snapshot.owner) == "table"
+		and type(snapshot.generation) == "number" and snapshot.generation >= 0
+		and snapshot.generation == math.floor(snapshot.generation)
+		and type(snapshot.indentation) == "number" and snapshot.indentation == math.floor(snapshot.indentation)
+		and type(snapshot.progressive) == "boolean"
+		and snapshot.enabled == true and snapshot.paused == false
+		and M.ready(snapshot.count, snapshot.blocked)
+end
+
+--- Resolves a retained numeric choice against the same current native source.
+--- @param expected table Rendering snapshot.
+--- @param current table Fresh snapshot before the acknowledged setting owner.
+--- @param value number Requested offset.
+--- @param values table Canonical ordered integer catalogue.
+--- @return table decision { admitted, value? }.
+function M.indentation_intent(expected, current, value, values)
+	if not M.indentation_ready(expected) or not M.indentation_ready(current) then
+		return { admitted = false }
+	end
+	for _, field in ipairs({ "owner", "generation", "backend", "indentation", "progressive", "count" }) do
+		if expected[field] ~= current[field] then return { admitted = false } end
+	end
+	for _, accepted in ipairs(values) do
+		if type(value) == "number" and value == accepted then return { admitted = true, value = value } end
+	end
+	return { admitted = false }
+end
+
 return M

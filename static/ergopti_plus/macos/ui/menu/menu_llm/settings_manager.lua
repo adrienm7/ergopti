@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Logic for handling numerical configurations via system dialogs.
 --- Manages debounce delays, temperature, token limits, and context length.
---- Includes a dedicated menu builder for indentation preferences.
+--- Retains native setting transactions and their canonical publication guards.
 --- ==============================================================================
 
 local M = {}
@@ -27,6 +27,36 @@ local function clone_value(value)
 	local clone = {}
 	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
 	return clone
+end
+
+--- Retains the exact source authority across forward, inverse and debt retry saves.
+--- Source adoption is never a publication receipt; only one next owned ACK may
+--- advance the checkpoint used by this native setting transaction.
+--- @param preferences table Actual canonical preference owner.
+--- @param path string Canonical configuration path.
+--- @param expected_source table Source captured by the admitted menu row.
+--- @return function guard Strict before/acknowledged publication guard.
+function M.publication_guard(preferences, path, expected_source)
+	local expected = clone_value(expected_source)
+	local before_id
+	return function(phase)
+		if phase == "before" then
+			local _, source = preferences.current_view(path)
+			if not preferences.source_matches(expected, source) then return false end
+			local receipt = preferences.publication_receipt(path)
+			if type(receipt) ~= "table" or type(receipt.id) ~= "number" or receipt.id < 0
+				or receipt.id ~= math.floor(receipt.id) then return false end
+			before_id = receipt.id
+			return true
+		end
+		if phase ~= "acknowledged" or before_id == nil then return false end
+		local receipt = preferences.publication_receipt(path)
+		if not receipt or receipt.id ~= before_id + 1
+			or not preferences.source_matches(receipt.source, receipt.source) then return false end
+		expected = clone_value(receipt.source)
+		before_id = nil
+		return true
+	end
 end
 
 --- Reports whether a numeric candidate can be safely published and persisted.
@@ -668,34 +698,6 @@ function M.new(deps)
 		if not ok_apply or apply_result == false then return false end
 		if apply_result == true then return true end
 		return commit_port()
-	end
-
-	--- Builds the indentation selection submenu.
-	--- @return table The Hammerspoon menu structure.
-	function obj.build_indent_menu()
-		local menu = {}
-		local default_val = llm_mod.DEFAULT_STATE.llm_pred_indent
-		local current = math.floor(tonumber(deps.state.llm_pred_indent) or default_val)
-		local paused = is_paused(deps, "Indentation menu pause-state read")
-
-		for i = -7, 7 do
-			local title_str = ((i == -1 or i == 0 or i == 1) and i18n.get("menu.settings.indent_space")) or (i .. i18n.get("menu.settings.indent_spaces"))
-			if i == default_val then title_str = title_str .. " " .. i18n.get("menu.settings.default_indicator") end
-			
-			table.insert(menu, {
-				title   = title_str,
-				checked = (i == current) or nil,
-				fn      = not paused and function()
-					return obj.apply_setting_transaction({
-						key = "llm_pred_indent",
-						value = i,
-						runtime_fn = "set_llm_pred_indent",
-						publish_setting = true,
-					})
-				end or nil,
-			})
-		end
-		return menu
 	end
 
 	--- Dynamic builder for modifier menus.
