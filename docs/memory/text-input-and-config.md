@@ -123,8 +123,8 @@ save writes only what differs from the catalogue at the last sync, so hand
 edits and outdated entries survive, and the Hotstrings scope resets only the
 shipped delimiters' states, keeping the user's own. Windows keeps its
 delimiter string in the override file. The shared writer cannot address one
-`[[array-of-tables]]` element; it replaces the whole list by an inline one
-(macOS full saves), and Linux still refuses to save over such a list.
+`[[array-of-tables]]` element; both Lua drivers can replace the whole custom
+delimiter list through the shared writer, including quoted table-array headers.
 
 ### project-hotstrings-self-healing-cache
 
@@ -246,8 +246,20 @@ matches quoted keys; only a changed key inside an inline table or a root
 entry is refused, naming its path. Action: a new writer shape must stay
 addressable by the batch, and a whole-table reset in `Preferences.save` must
 keep the load-outdated entries below it (`reset_keeping_outdated`). The Lua
-codec reads a dotted key (`a.b = 1`) as one literal key, so such a hand edit
-is ignored, not refused.
+codec resolves dotted assignment keys with the same strict quoted-segment
+identity as headers. A quoted dot stays literal, while a bare dot defines a
+nested table. Dotted parents can extend implicit header parents, but scalar,
+array, explicit inline and explicitly declared header values stay closed. A
+no-op batch over an unaddressable dotted leaf preserves the exact source; a
+changed leaf stays refused until its physical record has a writing owner.
+Windows document/config readers still use their flat section model; their
+inline-table reader independently supports the common dotted-key contract.
+
+Legacy `[features]` overrides project scalar semantic leaves onto their flat
+settings keys through `config_override_projection`; read marks retain the
+original segment arrays. Literal and nested paths that project onto the same
+setting refuse the entire candidate set before either owned section writes.
+`[script]` stays a flat scalar section, and arrays stay unconsumed.
 
 ### project-configuration-noop-preserves-the-live-inode
 

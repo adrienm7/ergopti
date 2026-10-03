@@ -179,3 +179,54 @@ _TIT_SimpleMemberWhitespace() {
 }
 Test("TOML: simple-member optimization preserves whitespace token boundaries (inline-member-perf-2026-10-02)",
 	_TIT_SimpleMemberWhitespace)
+
+; Shared source expectations are independent of this native inline decoder.
+_TIT_DottedAssert(Expected, Actual) {
+	if Expected is Map {
+		AssertTrue(Actual is Map)
+		AssertEqual(Expected.Count, Actual.Count, "every semantic member is retained")
+		for Key, Child in Expected {
+			AssertTrue(Actual.Has(Key), "the exact quoted identity exists: " . Key)
+			_TIT_DottedAssert(Child, Actual[Key])
+		}
+	} else if Expected is Array {
+		AssertTrue(Actual is Array)
+		AssertEqual(Expected.Length, Actual.Length)
+		for Index, Child in Expected
+			_TIT_DottedAssert(Child, Actual[Index])
+	} else if Expected is String {
+		AssertTrue(Actual is String, "quoted values cannot become numbers")
+		AssertEqual(Expected, Actual)
+	} else {
+		AssertTrue((Actual is Integer) || (Actual is TOML_Bool), "native scalar intent is retained")
+		AssertEqual(Expected, (Actual is TOML_Bool) ? Actual.Value : Actual)
+	}
+}
+
+_TIT_DottedCorpus() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\toml\dotted_keys.json"
+	AssertTrue(FileExist(Path), "the independently written dotted-key corpus exists")
+	Corpus := JsonParse(FileRead(Path, "UTF-8"))
+	AssertEqual(17, Corpus["inline"].Length, "the complete native inline matrix runs")
+	for Row in Corpus["inline"] {
+		if !Row["valid"] {
+			AssertThrows(TOML_CoerceValue.Bind(Row["source"], true), Row["name"])
+			continue
+		}
+		Actual := TOML_CoerceValue(Row["source"], true)
+		_TIT_DottedAssert(Row["expected"], Actual)
+		for Check in Row.Get("types", []) {
+			Value := Actual
+			for Segment in Check["path"]
+				Value := Value[Segment]
+			switch Check["kind"] {
+				case "boolean": AssertTrue(Value is TOML_Bool, "Boolean intent remains distinct from zero")
+				case "integer": AssertTrue(Value is Integer, "integers cannot become Boolean wrappers")
+				case "string": AssertTrue(Value is String, "quoted numeric text remains text")
+				default: throw Error("Unknown independent scalar type")
+			}
+		}
+	}
+}
+Test("TOML: native inline reader replays independent dotted identities (toml-dotted-keys)", _TIT_DottedCorpus)

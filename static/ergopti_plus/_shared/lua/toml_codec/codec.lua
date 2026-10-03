@@ -221,6 +221,34 @@ end
 -- coerce_value calls split_kv and parse_key for inline-table parsing.
 local split_kv, parse_key
 
+--- Resolve a dotted assignment relative to its current table. Values are closed;
+--- only implicit table parents or this assignment owner's dotted parents extend.
+--- @param target table Current semantic table.
+--- @param segments table Decoded assignment identity.
+--- @param dotted table Tables defined by dotted assignment prefixes.
+--- @param sealed table Explicit value tables that cannot be extended.
+--- @param declared table|nil Explicit document table definitions.
+--- @param arrays table|nil Array-of-table containers.
+--- @return table|nil owner, string|nil key Assignment cell, or refusal.
+local function assignment_owner(target, segments, dotted, sealed, declared, arrays)
+	for index = 1, #segments - 1 do
+		local key = segments[index]
+		local child = target[key]
+		if child == nil then
+			child = {}
+			target[key] = child
+		elseif type(child) ~= "table" or sealed[child]
+			or (arrays and arrays[child])
+			or (declared and declared[child] and not dotted[child]) then
+			return nil
+		end
+		dotted[child] = true
+		if declared then declared[child] = true end
+		target = child
+	end
+	return target, segments[#segments]
+end
+
 -- Sentinel returned by coerce_value on parse failure; propagated to M.decode.
 local PARSE_ERROR = {}
 
@@ -543,7 +571,7 @@ local function coerce_value(raw)
 		-- Parse the inline table's key-value pairs
 		local body = trim(raw:sub(2, -2))
 		local tbl = {}
-		local seen = {}
+		local dotted, sealed = {}, {}
 		if body == "" then return tbl end
 		-- `depth` tracks nested [ ] and { } so a comma INSIDE a nested value does
 		-- not split the pair list. Without it, { key = "Left", mods = ["ctrl",
@@ -560,12 +588,14 @@ local function coerce_value(raw)
 		for _, pair in ipairs(pairs_raw) do
 			local k, v_raw = split_kv(trim(pair))
 			if not k or k=="" then return PARSE_ERROR end
-			local parsed_key = parse_key(k)
-			if parsed_key == nil or seen[parsed_key] then return PARSE_ERROR end
+			local segments = parse_key(k)
+			if segments == nil then return PARSE_ERROR end
+			local owner, key = assignment_owner(tbl, segments, dotted, sealed)
+			if not owner or owner[key] ~= nil then return PARSE_ERROR end
 			local v = coerce_value(v_raw or "")
 			if v == PARSE_ERROR then return PARSE_ERROR end
-			seen[parsed_key] = true
-			tbl[parsed_key] = v
+			owner[key] = v
+			if type(v) == "table" then sealed[v] = true end
 		end
 		return tbl
 	end
@@ -617,21 +647,9 @@ split_kv = function(line)
 	return nil, nil
 end
 
---- Parse a key — a bare identifier, a basic string or a literal string.
---- A literal-string key ('KeyL') used to come back with its quotes, so it named
---- a different key from "KeyL" and a layer file written with single quotes
---- bound nothing on macOS and Linux while every other parser read it.
+--- Parse assignment segments with the same quoted identity as table headers.
 parse_key = function(raw)
-	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
-		return BasicString.unescape_body(raw:sub(2, -2))
-	end
-	if #raw >= 2 and raw:sub(1, 1) == "'" and raw:sub(-1) == "'" then
-		local body = raw:sub(2, -2)
-		-- A literal string has no escapes, so a quote inside it ends it early.
-		if body:find("'", 1, true) then return nil end
-		return body
-	end
-	return raw
+	return KeyPath.parse(raw)
 end
 
 --- Advance the array-bracket nesting depth across a line fragment, honouring
@@ -660,6 +678,7 @@ function M.decode(content)
 	-- path. An array-of-tables creates a fresh owner generation on every header,
 	-- so a child path may be declared once in each generation.
 	local declared_tables = {}
+	local dotted_tables = {}
 	local aot_arrays = {}
 	local sealed_values = {}
 
@@ -805,15 +824,18 @@ function M.decode(content)
 			-- Key with no value (raw is nil or empty after trimming)
 			local raw_trimmed = raw and trim(raw) or ""
 			if raw_trimmed == "" then return nil end
-			local parsed_key = parse_key(key)
-			if parsed_key == nil then return nil end
+			local segments = parse_key(key)
+			if segments == nil then return nil end
+			local target, parsed_key = assignment_owner(current, segments, dotted_tables,
+				sealed_values, declared_tables, aot_arrays)
+			if not target then return nil end
 			-- Arrays and multiline strings share one exact record boundary. Defer
 			-- coercion until neither a container nor a triple quote remains open.
 			local depth, multiline_quote = scan_bracket_depth(raw_trimmed, 0, nil)
 			if multiline_quote ~= nil or (raw_trimmed:sub(1, 1) == "[" and depth > 0) then
 				pending = {
 					key = parsed_key,
-					target = current,
+					target = target,
 					parts = { multiline_quote ~= nil and original_rhs or raw_trimmed },
 					depth = depth,
 					multiline_quote = multiline_quote,
@@ -823,7 +845,7 @@ function M.decode(content)
 			local v = coerce_value(raw_trimmed)
 			-- Propagate parse errors from coerce_value
 			if v == PARSE_ERROR then return nil end
-			if not claim_value(current, parsed_key, v) then return nil end
+			if not claim_value(target, parsed_key, v) then return nil end
 		end
 		::continue_decode::
 	end

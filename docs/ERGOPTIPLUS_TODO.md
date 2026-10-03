@@ -514,8 +514,10 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
   the batch cannot address the destination without ambiguous TOML keys » —
   maintainer decision: may an ordinary save overwrite a value flagged outdated?
-  Hand-written dotted keys (`a.b = 1`) are read by the shared decoder as one key
-  named "a.b", so the app ignores them.
+  The shared macOS/Linux decoder now resolves hand-written dotted assignments
+  (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
+  Windows document/config dotted assignments remain unsupported; its existing
+  inline-table reader already resolves them and replays the common corpus.
   Linux now delegates whole custom-delimiter lists to the shared TOML writer,
   including `[[hotstrings.terminators]]` and quoted table-array headers. The
   obsolete local refusal and its unsupported-format warning are removed.
@@ -527,7 +529,32 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
   checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
   E2E, packaging and installation gates with release skipped. The scalar
-  migration decision and dotted-key reader remain open.
+  migration decision and Windows document dotted-key reader remain open.
+
+The shared dotted-key reader now uses the existing strict key-path owner for
+root, section-relative, multiline and inline assignments, including independent
+array-of-table generations. Forty hand-authored vectors checked against Python
+`tomllib` preserve quoted Unicode and literal dots, reject semantic duplicates
+and refuse scalar, array, closed inline or explicit-header namespace conflicts.
+Both registered Lua runners replay the same expectations; Windows replays the
+17 inline vectors through its real typed native decoder. Writer regressions
+retain unknown source bytes, preserve exact no-op images and refuse changed
+unaddressable dotted leaves, duplicate destinations and stale source snapshots
+before publication. The legacy macOS feature override adapter now consumes the
+shared scalar-path projection and marks the original source segments for cleanup.
+A literal and nested path that target the same legacy setting refuse the full
+projection before any setting write, including the preceding script section.
+Its existing dotted-key assertions remain intact; arrays, flat script settings
+and unknown sections retain their separate contracts. Native Windows
+qualification and the complete three-OS
+checkpoint remain pending; no ordinary scalar migration policy changes here.
+
+The full selected local gate passed 353 JS checks, 13,229 macOS unit cases,
+4,931 Linux unit cases and 101/144 macOS/Linux E2E checks. All production,
+test and corpus bytes match that gate; the subsequent memory correction
+passed formatting and strict conventions. Actual Windows replay and native
+three-OS packaging/installation qualification remain pending.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
