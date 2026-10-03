@@ -34,6 +34,8 @@
 #Requires AutoHotkey v2.0
 #Include config_migrate_records.ahk
 
+#Include config_registry_cache.ahk
+
 
 
 
@@ -239,7 +241,8 @@ ConfigMigrateLoadRegistry(Path) {
 ConfigMigrateShippedRegistry() {
 	static Registry := 0
 	if !(Registry is Map)
-		Registry := ConfigMigrateLoadRegistry(ConfigMigrateRegistryPath())
+		Registry := ConfigRegistryCacheLoad(ConfigMigrateRegistryPath(),
+			EnvGet("LOCALAPPDATA") . "\ergopti_plus\cache\migration-registry-v1.cache")
 	return Registry
 }
 
@@ -549,6 +552,51 @@ _ConfigMigrateWriterBatch(Before, After, &DropSections) {
 	return Updates
 }
 
+; A stamp-only migration has no configuration edit to serialize. Preserve the
+; original records and comments, changing only the scalar metadata value.
+_ConfigMigrateStampCandidate(Source, Version, Scan) {
+	Bom := SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : ""
+	Text := Bom != "" ? SubStr(Source, 2) : Source
+	Eol := InStr(Text, "`r`n") ? "`r`n" : "`n"
+	Section := ""
+	MetaInsert := 0
+	Offset := 1
+	Depth := 0
+	Quote := ""
+	Escaped := false
+	loop parse, Text, "`n" {
+		Row := A_LoopField
+		Line := Trim(Row, " `t`r")
+		if Depth > 0 {
+			Depth := _TOML_ArrayScanFragment(TOML_StripInlineComment(Line), Depth, &Quote, &Escaped)
+		} else if SubStr(Line, 1, 1) == "[" {
+			Header := TOML_StripInlineComment(Line)
+			Section := Trim(RegExReplace(Header, "^\[+|\]+$", ""))
+			if Section == "_meta"
+				MetaInsert := Offset + StrLen(Row) + (Offset + StrLen(Row) <= StrLen(Text) ? 1 : 0)
+		} else if RegExMatch(Line, '^(?:"schema_version"|schema_version)\s*=', &KeyMatch) && Section == "_meta" {
+			if !RegExMatch(Row, '^(\s*(?:"schema_version"|schema_version)\s*=\s*)([^\s#]+)', &ValueMatch)
+				throw Error("The migration metadata stamp cannot be located.")
+			Start := Offset + ValueMatch.Pos(2) - 1
+			return Bom . SubStr(Text, 1, Start - 1) . Version . SubStr(Text, Start + ValueMatch.Len(2))
+		} else {
+			Eq := InStr(Line, "=")
+			Value := Eq ? TOML_StripInlineComment(Trim(SubStr(Line, Eq + 1))) : ""
+			if SubStr(Value, 1, 1) == "["
+				Depth := _TOML_ArrayScanFragment(Value, 0, &Quote, &Escaped)
+		}
+		Offset += StrLen(Row) + 1
+	}
+	Stamp := "schema_version = " . Version . Eol
+	if MetaInsert {
+		Separator := MetaInsert > StrLen(Text) && SubStr(Text, -1) != "`n" ? Eol : ""
+		return Bom . SubStr(Text, 1, MetaInsert - 1) . Separator . Stamp . SubStr(Text, MetaInsert)
+	}
+	; The shared record owner inserts new metadata after opaque root records.
+	return _ConfigMigrateRenderRecords(Source,
+		[{ Section: "_meta", Key: "schema_version", Value: Version }], [], Scan)["content"]
+}
+
 ; Plans the migration of Source for Driver without I/O. Returns Map("outcome",
 ; "version", "detail") where outcome is "current", "migrated", "newer",
 ; "invalid", "unsupported" or "failed"; a "migrated" plan also carries the
@@ -580,8 +628,14 @@ ConfigMigratePlan(Source, Registry, Driver) {
 	}
 	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version)
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
-	try Built := _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan)
-	catch as Err {
+	try {
+		if Updates.Length == 1 && DropSections.Length == 0
+				&& Updates[1].Section == "_meta" && Updates[1].Key == "schema_version" {
+			_ConfigMigrateRecordValidateTargets(Scan, Updates, DropSections)
+			Built := Map("status", "ok", "content", _ConfigMigrateStampCandidate(Source, Registry["current"], Scan))
+		} else
+			Built := _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan)
+	} catch as Err {
 		Plan["detail"] := "the migration record renderer refused: " . Err.Message
 		return Plan
 	}

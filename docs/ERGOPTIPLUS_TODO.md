@@ -182,6 +182,11 @@ These are software implementations; final hardware verification remains below.
   icon/title/priority assertion remain blocking. Checkpoint 37061649827 lacked
   the worker parser output; the next native run must qualify its cause.
 
+  Concurrent Windows performance commits are integrated without replacing the
+  pending editor, model or remap slices. The committed delay policy and its
+  independent vectors remain intact. This merge retains the original native
+  failure assertions and requires a new complete non-release checkpoint.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

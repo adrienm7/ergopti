@@ -146,6 +146,7 @@ _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 ; Whether the first activation of the AI hotkeys waits for the resume, and how
 ; many times that resume may try it, how far apart.
 global _LLM_Menu_FirstRestoreHotkeysDeferred := false
+global _LLM_Menu_RuntimeActivated := false
 global LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS := 3
 global LLM_MENU_DEFERRED_HOTKEY_RETRY_MS := 500
 
@@ -246,11 +247,11 @@ _LLM_Menu_ShouldScheduleInitialBackendLifecycle(FirstRestore, MenuState) {
 /**
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
+ * @param {Boolean} ActivateRuntime - False while rendering before input registration.
  */
-LLM_Menu_Init(saved_opts := Map()) {
+LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
 	global _LLM_Menu_Loaded
-	global LLM_HEALTH_PROBE_INTERVAL_MS
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
@@ -293,12 +294,6 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; the main config.toml — kept separate because the array-of-maps shape
 	; would not survive the project's flat-TOML writer).
 	_LLM_Menu_LoadApiEntries()
-
-	; Register Ctrl+1 … Ctrl+9 once. Re-registering on every build_menu pass
-	; would be wasteful and noisy in the AHK Hotkey log; doing it here
-	; covers both fresh boots and post-Reload paths since LLM_Menu_Init is
-	; the only entry into the tray module.
-	_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users
@@ -352,16 +347,45 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; CPU with the input pipeline. The build_warning_row below now surfaces
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
-	if _LLM_Menu_ShouldScheduleInitialBackendLifecycle(FirstRestore, _LLM_Menu)
-		LLM_Menu_ScheduleBackendLifecycle(false)
-
-	; Background health-tick: refreshes the dot on the shared cadence without
-	; waiting for the user to open the menu. The previous "probe on menu open"
-	; model painted a stale dot on the first open after the daemon died
-	; (probe result only landed the second time around). The tick uses
-	; the same flip-guard as the on-open probe, so a stable backend
-	; doesn't trigger spurious rebuilds.
-	SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-
 	_LLM_Menu_Loaded := true
+	if ActivateRuntime
+		LLM_Menu_ActivateRuntime()
+}
+
+/** Activates restored AI state after the input hotkey variants exist. */
+LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthTimerFn := 0,
+		Attempt := 1) {
+	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Menu_RuntimeActivated
+	global LLM_HEALTH_PROBE_INTERVAL_MS
+	global _MenuStartupCommands, _DriverReady
+	if !_LLM_Menu_Loaded
+		throw Error("AI runtime activation requires restored menu state")
+	if _LLM_Menu_RuntimeActivated
+		return false
+	Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
+	try Activate.Call(true)
+	catch TrayRootRetryPendingError as Err {
+		if Attempt >= LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS
+			throw Error("AI runtime activation exhausted its bounded retries: " . Err.Message)
+		SetTimer(LLM_Menu_ActivateRuntime.Bind(ActivateHotkeysFn, ScheduleBackendFn,
+			HealthTimerFn, Attempt + 1), -LLM_MENU_DEFERRED_HOTKEY_RETRY_MS)
+		try LoggerWarn("LLM", "AI runtime activation retained for bounded retry {1}: {2}.",
+			Attempt + 1, Err.Message)
+		return false
+	}
+	ScheduleBackend := HasMethod(ScheduleBackendFn, "Call") ? ScheduleBackendFn : LLM_Menu_ScheduleBackendLifecycle
+	if _LLM_Menu_ShouldScheduleInitialBackendLifecycle(true, _LLM_Menu)
+		ScheduleBackend.Call(false)
+	HealthTimer := HasMethod(HealthTimerFn, "Call") ? HealthTimerFn : SetTimer
+	HealthTimer.Call(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
+	_LLM_Menu_RuntimeActivated := true
+	if Attempt > 1 && IsSet(_DriverReady) && _DriverReady
+			&& IsSet(_MenuStartupCommands) && _MenuStartupCommands is MenuStartupCommands
+		_MenuStartupCommands.NotifyReady()
+	if !HasMethod(HealthTimerFn, "Call") {
+		_LLM_Menu_FireHealthProbe(true)
+		_LLM_Menu_FireInstalledTagsProbe()
+	}
+	try LoggerInfo("LLM", "Restored AI menu state activated after input registration.")
+	return true
 }

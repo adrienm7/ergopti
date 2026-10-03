@@ -39,6 +39,7 @@ global _LayMgrWeb_MsgSub     := unset
 global _LayMgrWeb_NavSub     := unset
 global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
+global _LayMgrWeb_ReadyEpoch := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
 ; A durable catalogue operation still waits for its terminal runtime refresh.
@@ -492,10 +493,23 @@ _LayMgrWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
 }
 
 _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
-	global _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_ReadyEpoch
 	if (SessionEpoch != _LayMgrWeb_SessionEpoch)
 		return false
-	Callback(Params*)
+	IsReady := Callback == LayoutManager_HandleMessage && Params.Length > 0
+		&& Params[1] is Map && Params[1].Get("action", "") == "ready"
+	if IsReady {
+		if _LayMgrWeb_ReadyEpoch == SessionEpoch
+			return false
+		; Claim before dispatch: both native navigation and the page emit ready.
+		_LayMgrWeb_ReadyEpoch := SessionEpoch
+	}
+	try Callback(Params*)
+	catch as Err {
+		if IsReady && _LayMgrWeb_ReadyEpoch == SessionEpoch
+			_LayMgrWeb_ReadyEpoch := 0
+		throw Err
+	}
 	return true
 }
 

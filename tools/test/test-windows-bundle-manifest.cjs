@@ -31,6 +31,9 @@
 
 'use strict';
 
+// The release selection gate also proves every native flag's authoritative pixels.
+require('./test-native-menu-flags.cjs');
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -55,7 +58,7 @@ const PY_CANDIDATES = [
 
 // File types a runtime path can name. A token must end with one to count.
 const PATH_EXTENSIONS =
-	'json|toml|html?|js|css|sql|png|ico|jpe?g|svg|dll|ps1|keylayout|ahk|lua|md|py|sh|txt|tsv|atom';
+	'json|toml|html?|js|css|sql|png|bmp|ico|jpe?g|svg|dll|ps1|keylayout|ahk|lua|md|py|sh|txt|tsv|atom';
 const PATH_TOKEN = new RegExp(
 	`(^|[\\\\/])?((?:[A-Za-z0-9_.-]+[\\\\/])*[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.(?:${PATH_EXTENSIONS}))(?![A-Za-z0-9_])`,
 	'g'
@@ -777,6 +780,7 @@ if (selection && refs) {
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
 		['drop', `${SHARED_REL}/data/locales/fr.json`, 'a dynamic locale path'],
 		['drop', 'static/img/flags/de.png', 'a dynamic flag path'],
+		['drop', 'static/img/flags/de.bmp', 'a native language flag path'],
 		['drop', `${SHARED_REL}/modules/hotstrings/french/magickey.toml`, 'a language-pack TOML'],
 		['drop', `${SHARED_REL}/ui/host_bridge.js`, 'a script a page loads'],
 		[

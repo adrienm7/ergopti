@@ -140,7 +140,8 @@ _TomlWarmFileCounts(FilePath) {
 				; leaving CurrentSec on the PREVIOUS section, so every entry below is
 				; counted against the wrong one. That is why the menu's hotstring count
 				; could disagree with the number of entries actually registered.
-				if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+				if (SubStr(Line, 1, 1) == "["
+				and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
 						CurrentSec := StrLower(Trim(SectionMatch[1]))
 						if !Counts.Has(CurrentSec)
 								Counts[CurrentSec] := 0

@@ -17,6 +17,8 @@ module.exports = function checkPrefetchHistory(html) {
 		const received = [];
 		const errors = [];
 		const context = vm.createContext({
+			location: { search: '' },
+			URLSearchParams,
 			console: {
 				log() {},
 				error(...args) {

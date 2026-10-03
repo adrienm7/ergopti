@@ -1432,11 +1432,12 @@ _LLM_SlotBodyText(slot) {
 ; @param {Array} Segments - _LLM_SlotSegments() result.
 ; @returns {Object} { W, H }
 _LLM_TooltipMeasureSegments(Segments, Measure := _TooltipMeasureText) {
-	Size := { W: 0, H: 0 }
+	Size := { W: 0, H: 0, Pieces: [] }
 	for , Segment in Segments {
 		Piece := Measure.Call(Segment.Text, Segment.Bold)
 		Size.W += Piece.W
 		Size.H := Max(Size.H, Piece.H)
+		Size.Pieces.Push(Piece)
 	}
 	return Size
 }
@@ -1457,16 +1458,22 @@ _LLM_TooltipMeasurePredictionRow(Slot, ActivePrefix, InactivePrefix, SuffixW,
 	Body := _LLM_TooltipMeasureSlotBody(Slot, Measure)
 	return { W: Max(ActivePrefix.W + Body.Selected.W + SuffixW,
 		InactivePrefix.W + Body.Unselected.W) + ShortcutW,
-		H: Max(ActivePrefix.H, InactivePrefix.H, Body.H) }
+		H: Max(ActivePrefix.H, InactivePrefix.H, Body.H),
+		Selected: Body.Selected, Unselected: Body.Unselected }
 }
 
 ; One transparent text span; the Gui background shows through.
-_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm") {
+_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm", Size := 0) {
 	global _TOOLTIP_FONT_NAME
 	if (Text = "")
 		return 0
-	Bold := RegExMatch(Style, "i)(^|\s)bold(\s|$)") != 0
-	Size := _TooltipMeasureTextSize(Text, FontSize, , , Bold)
+	; Sizing and drawing share exact dimensions within this render only. The
+	; measure owner has already released its GDI objects; no native resource leaks
+	; into the next streaming update, font change or DPI context.
+	if !IsObject(Size) {
+		Bold := RegExMatch(Style, "i)(^|\s)bold(\s|$)") != 0
+		Size := _TooltipMeasureTextSize(Text, FontSize, , , Bold)
+	}
 	G.SetFont(Style . " c" . ColorHex . " s" . FontSize, _TOOLTIP_FONT_NAME)
 	; +2: a GDI extent rounded to layout units can clip the last glyph's overhang.
 	G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
@@ -1475,13 +1482,14 @@ _LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm") {
 }
 
 ; Keep the paint owner and its measured advance together for every line piece.
-_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected) {
+_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected, Pieces := 0) {
 	global _TOOLTIP_FONT_SIZE
 	Start := X
-	for Segment in Segments
+	for Index, Segment in Segments
 		X += _LLM_TooltipDrawText(G, X, Y, H,
 			_LLM_SegmentColorHex(Segment.Role, IsSelected), _TOOLTIP_FONT_SIZE,
-			Segment.Text, Segment.Bold ? "bold" : "norm")
+			Segment.Text, Segment.Bold ? "bold" : "norm",
+			Pieces is Array ? Pieces[Index] : 0)
 	return X - Start
 }
 
@@ -1500,20 +1508,20 @@ _LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
 		X := (Layout.W - Footer.Combined.W) // 2
 		H := Footer.Combined.H
 		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_HINT_COLOR_HEX,
-			_TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+			_TOOLTIP_LABEL_FONT_SIZE, Texts.Hint, "norm", Footer.Hint)
 		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_SEP_COLOR_HEX,
 			_TOOLTIP_LABEL_FONT_SIZE, UI_LLM_FOOTER_SPACE_DIV . UI_LLM_FOOTER_COMBINED_SEP
-				. UI_LLM_FOOTER_SPACE_DIV)
+				. UI_LLM_FOOTER_SPACE_DIV, "norm", Footer.Sep)
 		_LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_INFO_COLOR_HEX,
-			_TOOLTIP_INFO_FONT_SIZE, Texts.Info)
+			_TOOLTIP_INFO_FONT_SIZE, Texts.Info, "norm", Footer.Info)
 		return
 	}
 	if IsObject(Footer.Hint)
 		_LLM_TooltipDrawText(G, (Layout.W - Footer.Hint.W) // 2, Layout.HintY,
-			Footer.Hint.H, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+			Footer.Hint.H, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, Texts.Hint, "norm", Footer.Hint)
 	if IsObject(Footer.Info)
 		_LLM_TooltipDrawText(G, (Layout.W - Footer.Info.W) // 2, Layout.InfoY,
-			Footer.Info.H, _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_INFO_FONT_SIZE, Texts.Info)
+			Footer.Info.H, _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_INFO_FONT_SIZE, Texts.Info, "norm", Footer.Info)
 }
 
 
@@ -1539,6 +1547,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 
 	G := 0
 	CandidateHandedOff := false
+	BuildStarted := HotPath_Now()
 	try {
 	slotCount := slots.Length
 	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
@@ -1554,6 +1563,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	Bodies := []
 	Shortcuts := []
 	RowSegments := []
+	RowSpanSizes := []
+	SuffixSize := 0
 	ActivePrefixSize := _TooltipMeasureText(activePrefix)
 	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
 	for i, slot in slots {
@@ -1572,23 +1583,30 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		Bodies.Push(Body)
 		Shortcuts.Push(Shortcut)
 		RowSegments.Push(Segments)
+		SpanSizes := { Shortcut: 0, Body: 0, Pieces: [] }
+		RowSpanSizes.Push(SpanSizes)
 		if (all_placeholder and i > 1) {
 			PredRows.Push({ W: 0, H: 0 })
 			continue
 		}
-		ShortcutW := (Shortcut != "")
-			? _TooltipMeasureTextSize(Shortcut, _TOOLTIP_LABEL_FONT_SIZE).W : 0
+		SpanSizes.Shortcut := _LLM_TooltipMeasureOptional(Shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
 		if (Segments.Length > 0) {
 			; A real line is drawn piece by piece after its prefix, so it is
 			; measured the same way.
-			SuffixW := (LLM_TOOLTIP_TAB_SUFFIX != "")
-				? _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W : 0
-			PredRows.Push(_LLM_TooltipMeasurePredictionRow(slot,
-				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutW))
+			if !IsObject(SuffixSize)
+				SuffixSize := _LLM_TooltipMeasureOptional(LLM_TOOLTIP_TAB_SUFFIX, _TOOLTIP_FONT_SIZE)
+			SuffixW := IsObject(SuffixSize) ? SuffixSize.W : 0
+			MeasuredRow := _LLM_TooltipMeasurePredictionRow(slot,
+				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutW)
+			SpanSizes.Pieces := i == active_idx
+				? MeasuredRow.Selected.Pieces : MeasuredRow.Unselected.Pieces
+			PredRows.Push(MeasuredRow)
 			continue
 		}
 		Active := _TooltipMeasureText(activePrefix . Body)
 		Inactive := _TooltipMeasureText(inactivePrefix . Body)
+		SpanSizes.Body := _LLM_TooltipMeasureOptional(Body, _TOOLTIP_FONT_SIZE)
 		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutW,
 			H: Max(Active.H, Inactive.H) })
 	}
@@ -1611,33 +1629,35 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		RowY := Layout.RowY[Idx]
 		RowH := PredRows[Idx].H
 		X := _TOOLTIP_PADDING_X
+		SpanSizes := RowSpanSizes[Idx]
 		if all_placeholder {
 			if (Idx == 1)
 				_LLM_TooltipDrawText(G, X, RowY, RowH, _TOOLTIP_LOADING_TEXT_HEX,
-					_TOOLTIP_FONT_SIZE, Bodies[1], "norm italic")
+					_TOOLTIP_FONT_SIZE, Bodies[1], "norm italic", SpanSizes.Body)
 			continue
 		}
 		is_active := (Idx == active_idx)
 		if _LLM_SlotIsEmpty(slot) {
 			X += InactivePrefixSize.W
 			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_LOADING_HEX,
-				_TOOLTIP_FONT_SIZE, Bodies[Idx], "norm italic")
+				_TOOLTIP_FONT_SIZE, Bodies[Idx], "norm italic", SpanSizes.Body)
 		} else {
 			; The mark is drawn on the selected line only; on the others the
 			; prefix is spacing, of the width its characters would take.
 			if is_active
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_CURSOR_HEX,
-					_TOOLTIP_FONT_SIZE, activePrefix)
+					_TOOLTIP_FONT_SIZE, activePrefix, "norm", ActivePrefixSize)
 			else
 				X += InactivePrefixSize.W
-			X += _LLM_TooltipDrawSegments(G, X, RowY, RowH, RowSegments[Idx], is_active)
+			X += _LLM_TooltipDrawSegments(G, X, RowY, RowH,
+				RowSegments[Idx], is_active, SpanSizes.Pieces)
 			if is_active
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
-					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX)
+					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX, "norm", SuffixSize)
 		}
 		; Inline after the line, bottom-aligned at the smaller hint size.
 		_LLM_TooltipDrawText(G, X, RowY, RowH, is_active ? UI_LLM_CMD_SEL_HEX : UI_LLM_CMD_DIM_HEX,
-			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx])
+			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx], "norm", SpanSizes.Shortcut)
 	}
 	_LLM_TooltipDrawFooter(G, Layout, Texts, Footer)
 	TotalW := Layout.W
@@ -1647,6 +1667,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	; generation-fenced commit in _TooltipPresentStack.
 	Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
 	_TooltipPrepareContent(Row)
+	HotPath_LogIfSlow("Tooltip.LlmBuild", BuildStarted, "slots=" . slotCount)
 	CandidateSurface := _TooltipCreateDetachedSurface(Row, RenderGeneration)
 	; A newer show/hide can take ownership while this renderer performs GUI
 	; work. Dispose only this detached candidate; never consult active globals.

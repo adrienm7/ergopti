@@ -14,6 +14,50 @@
 
 #Requires AutoHotkey v2.0
 
+_FIL_DesiredRootLookup() {
+	global Features
+	SavedFeatures := Features
+	Owner := MasterGateState()
+	SavedInitialized := Owner["initialized"]
+	SavedDesired := Owner["features"]
+	try {
+		Features := _FIL_Fixture()
+		Desired := _HSDeepCloneMap(Features)
+		Desired["layout"]["ergopti_base"] := true
+		Desired["shortcuts"]["gpt"]["enabled"] := true
+		Owner["initialized"] := true
+		Owner["features"] := Desired
+		for Path in ["layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.link",
+			"gestures", "hotstrings.autocorrection.accents", "unknown", "shortcuts.absent"] {
+			Expected := FeatureLocateV2(MasterGateDesiredFeatures(Features), Path)
+			Actual := FeatureDesiredLocateV2(Features, Path)
+			if Expected is Map {
+				AssertEqual(Expected["section"], Actual["section"])
+				AssertEqual(Expected["key"], Actual["key"])
+				AssertEqual(Expected["is_alpha"], Actual["is_alpha"])
+				AssertTrue(Expected["v2_node"] == Actual["v2_node"], "canonical root identity is preserved")
+			} else
+				AssertFalse(Actual)
+		}
+		State := ReadFeatureStateV2("shortcuts.gpt")
+		AssertTrue(State["enabled"])
+		State["enabled"] := false
+		AssertTrue(Desired["shortcuts"]["gpt"]["enabled"], "returned UI state remains detached")
+		Replacement := _HSDeepCloneMap(Desired)
+		Replacement["layout"]["ergopti_base"] := false
+		Owner["features"] := Replacement
+		AssertFalse(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "committed desired-map replacements invalidate naturally")
+		Owner["features"].Delete("layout")
+		Features["layout"]["ergopti_base"] := true
+		AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "missing retained roots use their ordinary live owner")
+	} finally {
+		Features := SavedFeatures
+		Owner["initialized"] := SavedInitialized
+		Owner["features"] := SavedDesired
+	}
+}
+Test("feature_io: desired reads preserve canonical roots without cloning the view", _FIL_DesiredRootLookup)
+
 
 
 

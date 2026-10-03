@@ -290,6 +290,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; from previous contexts.
 	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 	this_request_id := _LLM_Engine["request_id"]
+	_LLM_Engine["performance_request"] := {
+		Id: this_request_id, Started: A_TickCount, Path: "preparing",
+		FirstVisible: false, FinalLogged: false }
 	RequestAcceptSource := AcceptSource.Clone()
 	RequestAcceptSource["request_id"] := this_request_id
 	RequestAcceptSource["app_name"] :=
@@ -414,7 +417,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; sample of everything the user typed while the LLM was on — a plaintext
 	; keystroke sink outside the keylogger's privacy policy, which governs
 	; today.log and data.sql only. macOS already logs a length here.
-	try LoggerInfo("LLM", "Prediction request queued — {1} chars of context.", StrLen(tail))
+	try LoggerInfo("LLM", Format("Prediction request #{1} prepared — {2} chars of context.",
+		this_request_id, StrLen(tail)))
 
 	; Cache hit (exact match): re-display last result without an API call.
 	; The cache is an array of slot strings so the multi-prediction reveal
@@ -437,6 +441,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		; carrying the typed context survive until the poll tick reaps them.
 		try LLM_OllamaCancelAllAsync()
 		try LLM_RemoteCancelAllAsync()
+		_LLM_Engine_PerformancePath(this_request_id, "exact_cache")
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true,
 			this_request_id, request_semantic_signature)
 		return
@@ -476,6 +481,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			; child keeps a PII temp file alive.
 			try LLM_OllamaCancelAllAsync()
 			try LLM_RemoteCancelAllAsync()
+			_LLM_Engine_PerformancePath(this_request_id, "prefix_cache")
 			LLM_Engine_OnResults(sliced, ctx, 1, true, this_request_id,
 				request_semantic_signature)
 			return
@@ -497,6 +503,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	elapsed_since_last := (now - last + 0x100000000) & 0xFFFFFFFF
 	if (last > 0 and elapsed_since_last < min_interval) {
 		remaining := min_interval - elapsed_since_last
+		try LoggerInfo("LLM", Format("Prediction request #{1} rate-floor deferred: backend={2}, remaining={3} ms.",
+			this_request_id, backend, remaining))
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
@@ -589,6 +597,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	}
 
 	; ── Batch vs sequential dispatch ──
+	_LLM_Engine_PerformancePath(this_request_id,
+		(n_predictions > 1 && is_batch_profile) ? "network_batch" : "network_sequential")
 	; A profile with batch=true asks the model to return all N predictions
 	; in a single response, separated by ===. Mirrors the HS fetch_batch
 	; path. Falls back to sequential when batch is off or n=1.
@@ -1071,7 +1081,10 @@ _LLM_Engine_FinalizeRequest(state) {
 		return
 	}
 	try LLM_ApiCommon_LogSummary((state.Has("is_batch") and state["is_batch"]) ? "batch" : "sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
-	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
+	RequestStarted := state.Get("request_start", 0)
+	try LoggerInfo("LLM", Format("Prediction request #{1} received — {2} suggestion(s), generation_chain={3} ms.",
+		state["request_id"], state["slots"].Length,
+		RequestStarted > 0 ? TickElapsed(RequestStarted) : "unknown"))
 	global _LLM_Ollama_IsReady
 	if state.Get("backend", "") == "ollama"
 		_LLM_Ollama_IsReady := true
@@ -1387,7 +1400,43 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; The common surface transaction publishes pixels, slots, active index,
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.
-	LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
+	RenderStarted := HotPath_Now()
+	RenderReceipt := LLM_Tooltip_Show(display_slots, active, is_final, PresentationMeta)
+	HotPath_LogIfSlow("LLM.Render", RenderStarted, "final=" . (is_final ? "true" : "false"))
+	_LLM_Engine_PerformanceRender(request_id, RenderReceipt, is_final)
+}
+
+; Keep one bounded record: superseded callbacks cannot borrow a newer clock.
+_LLM_Engine_PerformancePath(RequestId, Path) {
+	global _LLM_Engine
+	Perf := _LLM_Engine.Get("performance_request", 0)
+	if !IsObject(Perf) || Perf.Id != RequestId
+		return false
+	Perf.Path := Path
+	try LoggerInfo("LLM", Format("Prediction request #{1} dispatch: path={2}, backend={3}, prepare={4} ms.",
+		RequestId, Path, _LLM_Engine.Get("backend", "unconfigured"), TickElapsed(Perf.Started)))
+	return true
+}
+
+; A positive committed render receipt proves pixels, not merely result arrival.
+_LLM_Engine_PerformanceRender(RequestId, Receipt, IsFinal) {
+	global _LLM_Engine
+	Perf := _LLM_Engine.Get("performance_request", 0)
+	if !IsObject(Perf) || Perf.Id != RequestId
+		return false
+	Visible := (Receipt is Integer) && Receipt > 0
+	if IsFinal && !Perf.FinalLogged {
+		Perf.FinalLogged := true
+		Stage := Visible ? "final_visible" : "final_refused"
+	} else if Visible && !Perf.FirstVisible {
+		Stage := "first_visible"
+	} else
+		return false
+	if Visible
+		Perf.FirstVisible := true
+	try LoggerInfo("LLM", Format("Prediction request #{1} presentation: stage={2}, path={3}, request_to_present={4} ms.",
+		RequestId, Stage, Perf.Path, TickElapsed(Perf.Started)))
+	return true
 }
 
 ; What the lines of the slots parsed for one context read, by slot text. The

@@ -102,7 +102,7 @@ module.exports = async function checkSnapshotReopen(html) {
 					received.push(JSON.parse(JSON.stringify(value)));
 				},
 				URLSearchParams,
-				location: { hash: `#prefetch=${encodeURIComponent(sidecar)}` },
+				location: { search: '', hash: `#prefetch=${encodeURIComponent(sidecar)}` },
 				async fetch(url) {
 					assert.equal(url, sidecar);
 					fetches++;

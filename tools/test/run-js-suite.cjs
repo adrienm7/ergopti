@@ -187,6 +187,18 @@ const CHECKS = [
 		repro: 'npm run test:metrics-apps-publication-order'
 	},
 	{
+		name: 'metrics filter projection caches and native invalidation',
+		cmd: 'node',
+		args: ['tools/test/test-metrics-filter-cache.cjs'],
+		repro: 'npm run test:metrics-filter-cache'
+	},
+	{
+		name: 'native menu flags preserve authoritative PNG pixels',
+		cmd: 'node',
+		args: ['tools/test/test-native-menu-flags.cjs'],
+		repro: 'npm run test:native-menu-flags'
+	},
+	{
 		name: 'typing metrics mailbox ownership',
 		cmd: 'node',
 		args: ['tools/test/test-typing-metrics-mailbox-ownership.cjs'],

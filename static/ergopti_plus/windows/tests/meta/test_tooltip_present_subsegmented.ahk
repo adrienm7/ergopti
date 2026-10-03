@@ -98,6 +98,9 @@ _TPS_EveryStepCarriesItsOwnMark() {
 
 _TPS_BreakdownCapRetainsEveryMark() {
 	Body := _DriverFuncBody("_TooltipPresentStack")
+	Reveal := _DriverFuncBody("_TooltipRevealPreparedSurfaces")
+	Assert(Body != "" and Reveal != "", "present and native reveal owners must exist")
+	Body .= Reveal
 	MarkCount := 0
 	Pos := 1
 	while (Pos := InStr(Body, "HotPath_BreakdownMark(", true, Pos)) {
@@ -199,7 +202,7 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 	Llm := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGuiLlm"))
 	NormalizedShow := RegExReplace(Show, "\s+", " ")
 	Assert(InStr(NormalizedShow,
-		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown)") > 0,
+		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown, PreparedContext)") > 0,
 		"the ordinary/owned presenter must give the common commit the exact rows and semantic tuple it reveals")
 	Assert(RegExMatch(Destack,
 		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan, 0, &PresentBreakdown\)") > 0,

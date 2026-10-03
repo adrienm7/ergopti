@@ -76,13 +76,16 @@ _MetaCheckInputSerialization() {
 	; included sub-module, so fold in the whole infra/hotstrings dir.
 	W := WShim . _DriverDirConcat("infra/hotstrings")
 
-	OnCharPos := InStr(W, "_OnPrefixChar(IH, Char) {")
-	Assert(OnCharPos > 0, "watcher must define _OnPrefixChar(IH, Char)")
-	FeedPos := InStr(W, "HSEMatch := HSE_FeedChar(Char, true)", , OnCharPos)
+	Watcher := _DriverFuncBody("_OnPrefixChar")
+	Assert(Watcher != "", "watcher must define _OnPrefixChar")
+	FeedPos := InStr(Watcher, "HSEMatch := HSE_FeedChar(Char, true)")
 	Assert(FeedPos > 0, "_OnPrefixChar must feed the physical Char through HSE_FeedChar with provenance")
-	OnCharCritPos := InStr(W, 'Critical("On")', , OnCharPos)
+	OnCharCritPos := InStr(Watcher, 'Critical("On")')
 	Assert(OnCharCritPos > 0 and OnCharCritPos < FeedPos,
 		"_OnPrefixChar must enter Critical On before HSE_FeedChar so the fire + expansion burst is uninterruptible")
+	MirrorPos := InStr(Watcher, "LLM_Bridge_FeedCharForPrefix(Char)")
+	Assert(MirrorPos > OnCharCritPos && MirrorPos < FeedPos,
+		"bounded LLM mirroring must share the ordered input transaction before HSE admission")
 
 	; The debounced render must skip while a burst is in flight (TooltipShow pumps
 	; the message loop and could otherwise straddle an expansion).

@@ -397,6 +397,66 @@ assert.strictEqual(
 
 require('./support/typing-prefetch-history-cases.cjs')(html);
 
+// Exercise both real message handlers: native queues can cross a controller's navigation.
+for (const pageName of ['metrics_typing', 'metrics_apps']) {
+	const pageHtml = read(`static/ergopti_plus/_shared/ui/${pageName}/index.html`);
+	const handlers = [
+		...pageHtml.matchAll(
+			/window\.chrome\.webview\.addEventListener\('message', \(e\) => \{([\s\S]*?)\n\t{5}\}\);/g
+		)
+	];
+	assert.strictEqual(handlers.length, 1, `${pageName}: exactly one actual WebView message handler`);
+	for (const search of ['?epoch=73', '']) {
+		const accepted = [];
+		const messageContext = vm.createContext({
+			window: {
+				location: { search },
+				receive_range_data: (value) => accepted.push(value),
+				complete_range_request: (id) => accepted.push(id),
+				metrics_rebuild: { show_progress: (value) => accepted.push(value) }
+			},
+			URLSearchParams,
+			apply_prefetch: (value) => accepted.push(value),
+			push_count: 0,
+			processed_count: 0,
+			console: {
+				log() {},
+				error() {
+					throw new Error('Unexpected message parsing failure');
+				}
+			}
+		});
+		vm.runInContext(`receive = (e) => {${handlers[0][1]}\n};`, messageContext);
+		for (const type of [
+			'prefetch',
+			'rebuild_progress',
+			...(pageName === 'metrics_typing' ? ['range_data', 'range_terminal'] : [])
+		]) {
+			const envelope = {
+				type,
+				blob: 'current',
+				progress: 'current',
+				payload: 'current',
+				request_id: 9
+			};
+			const before = accepted.length;
+			messageContext.receive({ data: JSON.stringify({ ...envelope, host_epoch: 72 }) });
+			messageContext.receive({ data: JSON.stringify(envelope) });
+			assert.strictEqual(
+				accepted.length,
+				before + (search ? 0 : 2),
+				`${pageName}/${type}: obsolete and untagged envelopes cannot enter an owned document`
+			);
+			messageContext.receive({ data: JSON.stringify({ ...envelope, host_epoch: 73 }) });
+			assert.strictEqual(
+				accepted.length,
+				before + (search ? 1 : 3),
+				`${pageName}/${type}: current document and existing hosts retain delivery`
+			);
+		}
+	}
+}
+
 require('./support/typing-snapshot-reopen-runtime.cjs')(html)
 	.then(() => {
 		console.log('Windows metrics selected-range bridge contract: OK');

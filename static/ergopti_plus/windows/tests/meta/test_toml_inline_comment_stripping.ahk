@@ -151,3 +151,38 @@ Test("meta toml: an escaped quote does not end the string", _TIC_EscapedQuoteDoe
 Test("meta toml: a comment after a section header is stripped", _TIC_SectionHeaderDropsItsComment)
 Test("meta toml: every header parser strips comments first", _TIC_AllHeaderParsersStripComments)
 Test("meta toml: an array element comment is not an element", _TIC_ArrayElementCommentIsNotAnElement)
+
+; The migration registry is a large multiline array. Rescanning its complete
+; prefix on every continuation made an unchanged boot spend over one second
+; verifying the schema. Each fragment must be scanned once, preserving quote
+; and escape state at the inserted space between physical lines.
+_TICS_ArrayScanIsIncremental() {
+	Body := _DriverFuncBody("_ParseTomlFileImpl")
+	Assert(Body != "", "the production TOML parser must exist")
+	Assert(InStr(Body, "_TOML_ArrayBracketDepth(PendingVal)") == 0,
+		"continuations must not rescan the accumulated array (tray-array-scan-2026-10-02)")
+	Assert(InStr(Body, "_TOML_ArrayScanFragment(") > 0,
+		"the parser must carry bracket, quote and escape state across fragments")
+}
+Test("meta TOML: multiline arrays scan each fragment once (tray-array-scan-2026-10-02)",
+	_TICS_ArrayScanIsIncremental)
+
+_TICS_ArrayFragmentsKeepStringState() {
+	Quote := ""
+	Escaped := false
+	AssertEqual(_TOML_ArrayScanFragment('["open]', 0, &Quote, &Escaped), 1,
+		"a data bracket cannot terminate the open array")
+	AssertEqual(Quote, Chr(34), "the basic string remains open across the fragment")
+	AssertEqual(_TOML_ArrayScanFragment(' still]", [1, 2]', 1, &Quote, &Escaped), 1,
+		"the next fragment closes the string and retains nested array depth")
+	AssertEqual(Quote, "", "the continuation closes the basic string")
+	AssertEqual(_TOML_ArrayScanFragment(' ]', 1, &Quote, &Escaped), 0,
+		"only the structural closing bracket terminates the array")
+	AssertEqual(_TOML_ArrayScanFragment('["escape' . Chr(92), 0, &Quote, &Escaped), 1,
+		"a trailing basic-string escape remains pending")
+	AssertTrue(Escaped, "the trailing escape is carried to the next fragment")
+	AssertEqual(_TOML_ArrayScanFragment(' "]', 1, &Quote, &Escaped), 0,
+		"the parser's inserted space consumes the escape before the closing quote")
+}
+Test("TOML: array fragments retain quotes and escapes (tray-array-scan-2026-10-02)",
+	_TICS_ArrayFragmentsKeepStringState)

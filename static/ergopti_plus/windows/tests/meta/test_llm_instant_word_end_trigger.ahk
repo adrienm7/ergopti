@@ -31,13 +31,18 @@ _LIWE_AssertWordEndTrigger() {
 	; OnChar must route a word-end trigger to a zero-delay fire, distinct from the debounce.
 	OnChar := _DriverFuncBody("LLM_Bridge_OnChar")
 	Assert(OnChar != "", "LLM_Bridge_OnChar must exist")
-	Assert(InStr(OnChar, "_LLM_Bridge_IsWordEndTrigger") > 0,
-		"LLM_Bridge_OnChar must consult _LLM_Bridge_IsWordEndTrigger to fire instantly on a completed word (llm-instant-word-end-trigger)")
-	Assert(InStr(OnChar, "LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer, 0)") > 0,
-		"LLM_Bridge_OnChar must arm a zero-delay (instant) fire on a word-end trigger, distinct from the debounce path (llm-instant-word-end-trigger)")
+	Notify := _DriverFuncBody("_LLM_Bridge_NotifyChar")
+	Assert(Notify != "", "the shared character observer must exist")
+	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)",
+		"ordinary character admission must reach the shared observer")
+	AssertContains(Notify, "_LLM_Bridge_IsWordEndTrigger(ch)",
+		"the observer must recognize a completed word (llm-instant-word-end-trigger)")
+	AssertContains(Notify, "LLM_Engine_OnKeystroke(Buffer, 0, TimerSetCallback,",
+		"a completed word uses the zero-delay path with its publication guard")
 
 	; OnKeystroke must honour the delay override so the two paths actually differ.
 	OnKey := _DriverFuncBody("LLM_Engine_OnKeystroke")
+	Assert(OnKey != "", "the prediction keystroke owner must exist")
 	Assert(InStr(OnKey, "delay_override_ms") > 0,
 		"LLM_Engine_OnKeystroke must accept a delay override so the word-end path fires sooner than the debounce (llm-instant-word-end-trigger)")
 }

@@ -287,9 +287,13 @@ _KLSql_ShutdownJournalFlush(Stage, Sink) {
 }
 
 _KLSql_ShutdownPreflightProvesDurability() {
+	SavedInitialized := Keylogger.initialized
 	SavedPending := Keylogger._pending_entries
 	SavedFlush := Keylogger._flush_in_progress
 	try {
+		; This fixture owns accepted events and exercises the initialized drain.
+		; Pre-initialization debt is separately refused without opening a journal.
+		Keylogger.initialized := true
 		Keylogger._flush_in_progress := false
 		for _, Stage in ["buffer", "open", "append", "flush"] {
 			Keylogger._pending_entries := [Map("type", "shortcut", "_event_id", 951)]
@@ -315,6 +319,7 @@ _KLSql_ShutdownPreflightProvesDurability() {
 				"each injected failure must reach its advertised boundary")
 		}
 	} finally {
+		Keylogger.initialized := SavedInitialized
 		Keylogger._pending_entries := SavedPending
 		Keylogger._flush_in_progress := SavedFlush
 	}

@@ -82,12 +82,13 @@ Test("title deadline: the resolver degrades instead of rejecting (hotstring-titl
 
 ; The degrade above only reaches the user if the consumers keep gating on
 ; "Valid" alone. A consumer that also refused on TimedOut would reinstate the
-; whole defect one level up, so enumerate every RequireTitle site.
+; whole defect one level up, so enumerate unconditional and conditional title sites.
 _TTE_EveryTitleConsumerGatesOnValidityAlone() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable")
 
 	Sites := _TTE_CountOccurrences(Src, "OutputHostResolve(true)")
+		+ _TTE_CountOccurrences(Src, "OutputHostResolve(_HSE_OutputHostNeedsTitle)")
 	Assert(Sites >= 2,
 		"both RequireTitle consumers in the send path must still exist; found "
 		. Sites . " (hotstring-title-timeout-eats-expansion)")

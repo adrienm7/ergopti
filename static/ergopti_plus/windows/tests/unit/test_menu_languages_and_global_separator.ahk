@@ -38,7 +38,7 @@ Test("menu layout: the hotstring language rows sit under their own header (menu-
 
 _MLG_LanguageRowCarriesItsFlag() {
 	Path := I18nFlagIconPath("fr")
-	AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.png")) == "\img\flags\fr.png",
+	AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.bmp")) == "\img\flags\fr.bmp",
 		"the French flag icon must be the one the language selector draws, got " . Path)
 	AssertTrue(FileExist(Path) != "", "the French flag icon must ship at " . Path)
 	AssertEqual("", I18nFlagIconPath("xx"), "a locale without a flag icon draws none")

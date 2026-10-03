@@ -194,3 +194,48 @@ _PrefixIndexCacheEquiv_PredicateSelectsBundled() {
 }
 Test("prefix watcher: cached-category predicate selects bundled categories (prefix-index-cache-rebuild)",
 	_PrefixIndexCacheEquiv_PredicateSelectsBundled)
+
+; Count actual resolver cache probes instead of asserting a noisy timing limit.
+class _PWCE_CountingResolverCache extends Map {
+	Calls := 0
+	Has(Key) {
+		this.Calls += 1
+		return super.Has(Key)
+	}
+}
+
+_PrefixIndexCacheEquiv_ResolvesOncePerSection() {
+	global Features, _HS_CACHE_ROWS, _HSResolveCache, _HSResolveGen, HSE_PRIORITY_COMMON
+	SavedFeatures := Features
+	SavedRows := _HS_CACHE_ROWS
+	SavedCache := _HSResolveCache
+	SavedGen := _HSResolveGen
+	try {
+		Features := Map("hotstrings", Map("personal", Map("testsec", Map("enabled", true))))
+		_HS_CACHE_ROWS := Map("personal.testsec", [
+			["", "abc", "ABC", true, false, false, ""],
+			["", "def", "DEF", true, false, false, "0"],
+			["C", "ghi", "GHI", true, false, false, "77"]
+		])
+		_HSResolveCache := _PWCE_CountingResolverCache()
+		for Priority in [12, 35, ""] {
+			HotstringsResolveBumpGen()
+			_HSResolveCache["personal|testsec"] := { gen: _HSResolveGen, val: { Priority: Priority } }
+			_HSResolveCache.Calls := 0
+			Index := Map(), Triggers := Map()
+			_RegisterCategoryTriggersFromCache("personal", Index, Triggers)
+			AssertEqual(1, _HSResolveCache.Calls, "one enabled section resolves once regardless of variants")
+			Expected := Priority == "" ? HSE_PRIORITY_COMMON : Priority
+			AssertEqual(Expected, Index["abc"][1].Priority, "the next rebuild observes the current generation")
+			AssertEqual(0, Index["def"][1].Priority, "an explicit zero still overrides the section")
+			AssertEqual(77, Index["ghi"][1].Priority, "individual strict-row priority still wins")
+		}
+	} finally {
+		Features := SavedFeatures
+		_HS_CACHE_ROWS := SavedRows
+		_HSResolveCache := SavedCache
+		_HSResolveGen := SavedGen
+	}
+}
+Test("prefix watcher: resolve priority once per section and refresh each rebuild (prefix-index-cache-rebuild)",
+	_PrefixIndexCacheEquiv_ResolvesOncePerSection)

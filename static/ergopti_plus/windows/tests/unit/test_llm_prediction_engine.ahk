@@ -21,6 +21,33 @@
 ; =========================================
 ; =========================================
 
+_TLPE_PerformanceReceiptOwnsItsRequest() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	try {
+		Perf := { Id: 7, Started: A_TickCount, Path: "exact_cache", FirstVisible: false, FinalLogged: false }
+		_LLM_Engine := Map("performance_request", Perf)
+		AssertFalse(_LLM_Engine_PerformanceRender(6, 1, true),
+			"a superseded response cannot borrow the new request's timer")
+		AssertFalse(_LLM_Engine_PerformanceRender(7, 0, false),
+			"a refused streaming paint is not a first usable prediction")
+		AssertFalse(Perf.FirstVisible)
+		AssertTrue(_LLM_Engine_PerformanceRender(7, 13, false))
+		AssertTrue(Perf.FirstVisible)
+		AssertFalse(_LLM_Engine_PerformanceRender(7, 14, false),
+			"streaming updates must not create per-frame INFO traffic")
+		AssertTrue(_LLM_Engine_PerformanceRender(7, 0, true))
+		AssertTrue(Perf.FinalLogged)
+		AssertFalse(_LLM_Engine_PerformanceRender(7, 15, true),
+			"one request has one final presentation outcome")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+
+Test("LLM engine: performance receipts own the request and visible commit (llm-perf-receipt-2026-10-02)",
+	_TLPE_PerformanceReceiptOwnsItsRequest)
+
 _EngineInit_SetsEnabledTrue() {
 	global _LLM_Engine
 	_LLM_Engine["enabled"] := false

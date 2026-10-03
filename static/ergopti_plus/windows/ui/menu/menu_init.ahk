@@ -76,7 +76,7 @@ BuildLanguageMenuDeferred() {
 }
 
 
-initMenu(PublishAuthorizeFn := 0) {
+initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
 	TrayMenuStage_Begin()
 	try {
@@ -93,7 +93,11 @@ initMenu(PublishAuthorizeFn := 0) {
 	; sequence of calls here, compared with the manifest by a log line only, ahead
 	; of a tail read from the manifest — so the declared order reached half of
 	; the tray, and a reordered top level changed the other two drivers alone.
-	_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
+	if GlobalsOnly {
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders(),
+			(Entry) => !Entry.Get("greyed_when_paused", false))
+	} else
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
 	BootProfile_Mark("MENU/initMenu: top level staged")
 	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
 	return Published
@@ -136,12 +140,21 @@ _MI_TopLevelBuilders() {
 ; will not see: it is reported, and the rest of the root still builds.
 ; @param TopLevel {Array} The manifest's top_level rows.
 ; @param Builders {Map} Id → builder that stages the row.
+; @param IncludeFn {Func} Optional projection filter for manifest rows.
+; @param StatusLabel {String} Optional inert status for a partial boot projection.
 ; @returns {Integer} How many rows were dispatched.
-_MI_StageTopLevel(TopLevel, Builders) {
+_MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
+	if (StatusLabel != "") {
+		TrayMenuStage_Add(StatusLabel, _TrayBootstrapNoOp)
+		TrayMenuStage_Disable(StatusLabel)
+		TrayMenuStage_Add()
+	}
 	Dispatched := 0
 	SeparatorPending := false
 	for _, Entry in TopLevel {
 		if !(Entry is Map) || !Entry.Has("id")
+			continue
+		if HasMethod(IncludeFn, "Call") && !IncludeFn.Call(Entry)
 			continue
 		Id := Entry["id"]
 		if (Id == "---") {
@@ -158,7 +171,14 @@ _MI_StageTopLevel(TopLevel, Builders) {
 			TrayMenuStage_Add()
 			SeparatorPending := false
 		}
-		Builders[Id].Call()
+		BootProfile_StageBegin("menu row " . Id)
+		try {
+			Builders[Id].Call()
+			BootProfile_StageEnd("menu row " . Id)
+		} catch as Err {
+			BootProfile_StageAbort("menu row " . Id, Err.Message)
+			throw Err
+		}
 		Dispatched += 1
 	}
 	return Dispatched
@@ -271,11 +291,11 @@ _MI_StageHotstrings() {
 ; timer can build the IA menu before this root does, and the stale flag would
 ; then skip the row in the root being staged.
 _MI_StageLlm() {
-	global _LLM_Menu_InTray
+	global _LLM_Menu_InTray, _DriverInputInitPending
 	_LLM_Menu_InTray := false
 	_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
 	_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
-	LLM_Menu_Init(_LlmSavedOpts)
+	LLM_Menu_Init(_LlmSavedOpts, !(IsSet(_DriverInputInitPending) && _DriverInputInitPending))
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 }
 
@@ -353,11 +373,11 @@ _MI_StageConfiguration() {
 ; The 21-locale language submenu costs ~156 ms on the first build. On the boot
 ; pass, defer it; on a live rebuild populate synchronously.
 _MI_StageLanguage() {
-	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
+	global _DriverReady, _LangMenuRef, _LangMenuBuildPending, _DriverInputInitPending
 	LangMenu := Menu()
 	TrayMenuStage_Add(t("menu.global.language"), LangMenu)
 	_LangMenuRef := LangMenu
-	if _DriverReady
+	if _DriverReady || (IsSet(_DriverInputInitPending) && _DriverInputInitPending)
 		I18nBuildLanguageMenu(LangMenu)
 	else {
 		; A disabled placeholder makes the deferred population visible as
@@ -377,7 +397,7 @@ _MI_StageAbout() {
 _MI_StageSuspend() {
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
-	TrayMenuStage_AddAction(MenuSuspend, ToggleSuspend)
+	TrayMenuStage_AddAction(MenuSuspend, MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("suspend", ToggleSuspend)))
 	; The row carries its own checked state at its single construction
 	; point, so no rebuild caller can forget it. UpdateTrayIcon owns the
 	; indicator but is wired only to state TRANSITIONS and to the boot
@@ -392,12 +412,12 @@ _MI_StageSuspend() {
 
 
 _MI_StageReload() {
-	TrayMenuStage_AddAction(t("menu.global.reload"), ActivateReload)
+	TrayMenuStage_AddAction(t("menu.global.reload"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
 }
 
 
 _MI_StageQuit() {
-	TrayMenuStage_AddAction(t("menu.global.quit"), ActivateExitApp)
+	TrayMenuStage_AddAction(t("menu.global.quit"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
 }
 
 
@@ -554,7 +574,7 @@ _MI_BuildDebuggingMenu() {
 		"open_logs",      OpenLogsFolder,
 		"open_today_log", OpenTodayLog,
 		"open_error_log", OpenErrorLog,
-		"healthcheck",    ShowHealthCheck,
+		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled())

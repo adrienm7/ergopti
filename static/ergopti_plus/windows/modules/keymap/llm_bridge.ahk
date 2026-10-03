@@ -49,6 +49,7 @@ global LLM_BRIDGE_BUFFER_MAX_CHARS := 10000
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_ContentGeneration := 0
 global _LLM_Bridge_Active := false
+global _LLM_Bridge_PrefixObserver := 0
 ; The AI agent's typing context while the prediction bridge is inactive. The
 ; agent's automatic mode does not depend on the AI menu's switch (macOS feeds
 ; its observer from update_preview, Linux from on_char, whatever the switch
@@ -136,6 +137,7 @@ _LLM_Bridge_ApplyBufferEdit(DeleteFromEnd := unset, InsertedText := "") {
 }
 
 _LLM_Bridge_ClearBuffer() {
+	LLM_Bridge_CancelPrefixObserver()
 	return _LLM_Bridge_ApplyBufferEdit()
 }
 
@@ -944,6 +946,7 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
  */
 LLM_Bridge_Stop() {
 	global _LLM_Bridge_Active
+	LLM_Bridge_CancelPrefixObserver()
 	_LLM_Bridge_UnregisterDispatcherFallback()
 	_LLM_PointerWatch_Stop()
 	if !_LLM_Bridge_Active
@@ -980,6 +983,123 @@ LLM_Bridge_FeedCharIfActive(ch) {
 		LLM_Bridge_OnChar(ch)
 	else
 		_LLM_Bridge_ObserveAgentTyping(0, ch)
+}
+
+/**
+ * Mirrors a prefix-hook character without running file-backed observers.
+ * The caller serializes this RAM edit with HSE admission and native output.
+ * @param {String} ch Character already delivered to the application.
+ * @returns {Boolean} True when an observer owns the deferred notification.
+ */
+LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unset,
+		AgentWantedFn := unset) {
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentBuffer
+	global _LLM_Bridge_PrefixObserver, _LLM_Engine, _LLM_Bridge_ReadLiveFocus
+	global _PrefixDeferredGeneration
+	if !A_IsCritical
+		throw Error("Prefix character mirroring requires a serialized input transaction.")
+	Active := _LLM_Bridge_Active
+	if Active {
+		_LLM_Bridge_ApplyBufferEdit(0, ch)
+		; Invalidate stale responses now; transport release and callbacks are deferred.
+		LLM_Engine_CancelTimer()
+		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
+		_LLM_Engine["active_request_signature"] := ""
+	} else {
+		Wanted := IsSet(AgentWantedFn) ? AgentWantedFn.Call()
+			: (IsSet(LLM_Agent_WatchesTyping) && LLM_Agent_WatchesTyping())
+		_LLM_Bridge_AgentFeeding := Wanted ? true : false
+		if !Wanted {
+			_LLM_Bridge_AgentBuffer := ""
+			LLM_Bridge_CancelPrefixObserver()
+			return false
+		}
+		LLM_Bridge_MirrorAgentEdit(0, ch)
+	}
+	return _LLM_Bridge_SchedulePrefixObserver(ch,
+		ScheduleFn, IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus)
+}
+
+_LLM_Bridge_SchedulePrefixObserver(ch, ScheduleFn, ReadFocus) {
+	global _LLM_Bridge_PrefixObserver, _LLM_Bridge_Active, _PrefixDeferredGeneration
+	LLM_Bridge_CancelPrefixObserver()
+	Source := ReadFocus.Call()
+	Owner := { Active: _LLM_Bridge_Active, Char: ch, Source: Source.Clone(), FocusFn: ReadFocus,
+		PhysicalGeneration: KS_GetPhysicalInputGeneration(),
+		LifecycleGeneration: _PrefixDeferredGeneration, Timer: 0 }
+	Owner.Timer := _LLM_Bridge_RunPrefixObserver.Bind(Owner)
+	_LLM_Bridge_PrefixObserver := Owner
+	ScheduleFn.Call(Owner.Timer, -1)
+	return true
+}
+
+/** Retires the exact pending prefix observer before lifecycle or content resets. */
+LLM_Bridge_CancelPrefixObserver() {
+	global _LLM_Bridge_PrefixObserver
+	PreviousCritical := Critical("On")
+	try {
+		Owner := _LLM_Bridge_PrefixObserver
+		_LLM_Bridge_PrefixObserver := 0
+		if IsObject(Owner) && IsObject(Owner.Timer)
+			TimerSetCallback(Owner.Timer, 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return IsObject(Owner)
+}
+
+_LLM_Bridge_PrefixObserverStillCurrent(Owner, ContentGeneration := unset) {
+	global _LLM_Bridge_PrefixObserver, _LLM_Bridge_Active
+	global _LLM_Bridge_ContentGeneration, _PrefixDeferredGeneration
+	if A_IsSuspended || !IsObject(_LLM_Bridge_PrefixObserver)
+		return false
+	if (ObjPtr(_LLM_Bridge_PrefixObserver) != ObjPtr(Owner)
+		|| Owner.Active != _LLM_Bridge_Active
+		|| Owner.LifecycleGeneration != _PrefixDeferredGeneration
+		|| Owner.PhysicalGeneration != KS_GetPhysicalInputGeneration())
+		return false
+	if (IsSet(ContentGeneration) && Owner.Active
+		&& ContentGeneration != _LLM_Bridge_ContentGeneration)
+		return false
+	Focus := Owner.FocusFn.Call()
+	return Owner.Source.Get("hwnd", 0) > 0 && Owner.Source.Get("control", 0) > 0
+		&& Focus.Get("hwnd", 0) == Owner.Source["hwnd"]
+		&& Focus.Get("control", 0) == Owner.Source["control"]
+}
+
+_LLM_Bridge_RunPrefixObserver(Owner) {
+	global _LLM_Bridge_PrefixObserver, _LLM_Bridge_Buffer
+	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_ContentGeneration
+	Started := HotPath_Now()
+	try {
+		if !_LLM_Bridge_PrefixObserverStillCurrent(Owner)
+			return false
+		; Read the canonical buffer after any expansion, never the original trigger.
+		ContentGeneration := _LLM_Bridge_ContentGeneration
+		CurrentFn := _LLM_Bridge_PrefixObserverStillCurrent.Bind(Owner, ContentGeneration)
+		if Owner.Active {
+			LLM_Engine_CancelInflight(CurrentFn)
+			if !CurrentFn.Call()
+				return false
+			_LLM_Bridge_NotifyChar(Owner.Char, _LLM_Bridge_Buffer, CurrentFn)
+		} else if _LLM_Bridge_AgentFeedIsWanted() {
+			LLM_Agent_OnTyping(_LLM_Bridge_AgentBuffer, CurrentFn)
+		}
+		return true
+	} catch as Err {
+		LoggerError("LLM", "Deferred prefix observer failed: {1}.", Err.Message)
+		return false
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(_LLM_Bridge_PrefixObserver)
+				&& ObjPtr(_LLM_Bridge_PrefixObserver) == ObjPtr(Owner)
+				_LLM_Bridge_PrefixObserver := 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+		HotPath_LogIfSlow("LLM.PrefixObservers", Started)
+	}
 }
 
 /**
@@ -1121,10 +1241,18 @@ LLM_Bridge_OnChar(ch) {
 		return
 
 	_LLM_Bridge_ApplyBufferEdit(0, ch)
+	return _LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)
+}
+
+_LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
 	; The AI agent's automatic mode waits for a pause in the same typing, and
 	; every keystroke retires its flow in flight, hotstring tooltip or not
 	if IsSet(LLM_Agent_OnTyping)
-		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
+		LLM_Agent_OnTyping(Buffer, IsSet(PublishGuard) ? PublishGuard : (*) => true)
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
@@ -1157,16 +1285,18 @@ LLM_Bridge_OnChar(ch) {
 	; Wrap-safe tick delta: A_TickCount overflows at ~49.7 days
 	if (((now - _LLM_Bridge_LastLogTick + 0x100000000) & 0xFFFFFFFF) > 2000) {
 		_LLM_Bridge_LastLogTick := now
-		try LoggerInfo("LLM", "Keystroke buffered ({1} chars) — debounce pending.", StrLen(_LLM_Bridge_Buffer))
+		try LoggerInfo("LLM", "Keystroke buffered ({1} chars) — debounce pending.", StrLen(Buffer))
 	}
 	; instant_on_word_end: when the just-typed char completes a word (a word char
 	; followed by whitespace/punctuation) and the user enabled the option, fire the
 	; prediction immediately instead of waiting the full debounce — macOS parity with
 	; engine.start_timer_word_end (llm-instant-word-end-trigger).
 	if _LLM_Bridge_IsWordEndTrigger(ch)
-		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer, 0)
+		LLM_Engine_OnKeystroke(Buffer, 0, TimerSetCallback,
+			IsSet(PublishGuard) ? PublishGuard : (*) => true)
 	else
-		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+		LLM_Engine_OnKeystroke(Buffer, "", TimerSetCallback,
+			IsSet(PublishGuard) ? PublishGuard : (*) => true)
 }
 
 /**
@@ -1179,7 +1309,7 @@ LLM_Bridge_OnChar(ch) {
  * @returns {Integer} True when a live request was re-armed.
  */
 LLM_Bridge_ReissueLiveAfterExpansion() {
-	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
+	global _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) || !LLM_Engine_LiveIsActive()
 		return false
 	if LLM_Tooltip_IsVisible()
@@ -1187,7 +1317,7 @@ LLM_Bridge_ReissueLiveAfterExpansion() {
 	; Armed even while the consumed preview is still retiring: the live request
 	; waits at fire time for any hotstring tooltip left on screen, whose own
 	; chain (LLM_Bridge_ScheduleAfterHotstring) asks again once it closes.
-	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+	_LLM_Bridge_SchedulePrefixObserver("", TimerSetCallback, _LLM_Bridge_ReadLiveFocus)
 	return true
 }
 
@@ -1316,6 +1446,7 @@ LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText := "", ClearAll := false)
  */
 LLM_Bridge_ResetAgentFeed(Reason) {
 	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+	LLM_Bridge_CancelPrefixObserver()
 	WasFeeding := _LLM_Bridge_AgentFeeding
 	_LLM_Bridge_AgentFeeding := false
 	_LLM_Bridge_AgentBuffer := ""

@@ -806,6 +806,18 @@ serialize bridge payloads with the shared adapter, reject stale generations,
 and release native handlers on teardown. A page loading is not proof that its
 bridge is alive.
 
+### project-webview2-retained-host-document-fence
+
+A retained controller keeps native queues and virtual-host subresource caches
+across navigation. AHK epochs alone cannot fence a message delivered through a
+new subscription on the same controller. Give each document a distinct URL,
+validate message source and script destination, and tag pushed metrics envelopes
+with their document epoch. Fresh navigation alone, and even network-cache
+disablement, served an old same-size JavaScript edit in a native fixture; use
+the checked document-cache invalidation owner before navigation. Hidden HWND
+existence must also bypass thread-dependent window search settings. Retention
+revokes sessions before native teardown and disposes inactive hosts at shutdown.
+
 ### project-typing-latency-tooltip-coldstart
 
 Do not move WebView2 creation or cold native window construction onto the typing
@@ -831,6 +843,28 @@ selects a visible mode (`IsWindowVisible` returns 1). Use `Hide` alone when
 sizing a prepared surface; keep the reveal explicit. A source assertion that
 only finds `Show("Hide` cannot prove invisibility. Check the native window after
 construction and after repositioning, as in the tooltip hidden-surface test.
+
+### project-startup-probe-parse-time-isolation
+
+Personal shortcut forwarders are parsed from both the driver's generated path
+and LOCALAPPDATA before auto-execute can redirect configuration. A wrapper with
+a temporary configuration alone can rewrite the live generated include. Copy
+the driver code and isolate LOCALAPPDATA in the child's environment before
+launch; detach any read-only junctions before removing the private fixture.
+
+### project-native-menu-blocks-startup
+
+An early native tray menu can suspend auto-execute and disables AHK timers until
+navigation ends. Deferred construction cannot make progress behind that menu.
+Retain context requests until the configured root publishes; even the first
+bootstrap popup can add the user's reading interval to startup. A temporary
+loading GUI was rejected by the user. Close construction timing stages before
+releasing retained navigation. Menu publication and input readiness are distinct:
+retain feature selections until their runtime owners exist, while lifecycle
+commands retain their existing startup owner across root replacement. Restored
+pause and pending lifecycle intent must take precedence over releasing feature
+selections. The isolated full-startup smoke exercises both publication order and
+selection admission, including inherited pause.
 
 ### project-tooltip-two-hwnd-zorder
 
