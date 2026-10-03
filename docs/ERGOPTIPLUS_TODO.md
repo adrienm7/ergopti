@@ -369,11 +369,23 @@ item 104 separately tracks the common-autocorrection section split.
   refuses a key it cannot type without the clipboard and cancels a pending
   Compose. Remaining: real-device checks on each OS (Windows capture under the
   emulation, macOS on ISO and ANSI boards where Backquote and IntlBackslash both
-  answer, Linux grab and injection); Linux follow-ups: the Layout menu shows the
-  row without the replace switch it depends on, holding the key types one ★
-  where the others auto-repeat, choosing Backquote, Minus or Equal silently
+  answer, Linux grab and injection). The Linux Layout menu now renders its
+  existing shared replacement switch before the physical-key picker, through
+  the canonical hotstring choice owner: only an acknowledged durable write
+  changes the active catalogue and notifies the tray; refused writes preserve
+  the original bytes and runtime, and paused or closed-group callbacks cannot
+  write. Its focused native Linux regression covers the menu and transaction;
+  full three-OS CI and real-device acceptance remain pending. Linux follow-ups:
+  holding the key types one ★ where the others auto-repeat, choosing Backquote,
+  Minus or Equal silently
   overrides a tap-key action, and tap-key presses leave the wrap-on-type window
   open.
+
+The selected local gate passed 353 JS checks, 4,946 Linux unit cases and
+144 Linux E2E checks. Nine causal menu/transaction regressions and the three
+existing macOS placement cases pass. The Windows renderer and shared menu
+declaration are unchanged; complete native qualification remains pending.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2

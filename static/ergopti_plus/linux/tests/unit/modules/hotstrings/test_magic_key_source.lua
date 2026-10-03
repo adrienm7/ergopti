@@ -465,3 +465,170 @@ helpers.describe("magic key source: physical editor evidence", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("magic replacement: the layout prerequisite", function()
+	local Choices = require("tests.support.hotstring_choices")
+	local SOURCE = '[hotstrings]\ngroups = { magickey = true }\n'
+		.. '[hotstrings.modules.magickey]\nreplace = false\n'
+		.. '[future]\nchoice = "preserve exact bytes" # untouched\n'
+
+	--- Exercises the canonical choice owner and actual rendered layout menu.
+	--- @param source string Initial canonical document.
+	--- @param body function body(Config, path, state, row).
+	local function with_replace(source, body)
+		local names = { "modules.hotstrings.loader", "modules.hotstrings.hotstrings_config", "ui.menu.menu_builder" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local state = { published = {}, notified = 0, redraw = 0, paused = false, reject = false }
+		package.loaded[names[1]] = {
+			read_file = function() return nil end,
+			load_catalogue = function()
+				return { committed = true, errors = 0, categories = {
+					magickey = { id = "magickey", sections_order = { "replace" },
+						sections = { replace = { count = 1 } }, count = 1 },
+				}, mappings = { { trigger = "j", replacement = "★", group = "magickey", section = "replace" } } }
+			end,
+		}
+		local ok, err = pcall(function()
+			local Config = helpers.load_module(names[2])
+			Choices.with_file(Config, source, function(path)
+				Config.init({ load_mappings = function(_, mappings)
+					state.published[#state.published + 1] = mappings
+					return not (state.reject and #state.published == 2)
+				end }, "virtual.toml", function() state.notified = state.notified + 1 end)
+				local _, committed = Config.load_all()
+				helpers.assert_eq(committed, true, "the fixture catalogue must initialize")
+				local Builder = helpers.load_module(names[3])
+				local I18n = require("infra.i18n")
+				local function row()
+					local items = Builder.build({ config = Config, on_quit = function() end,
+						paused = state.paused, is_paused = function() return state.paused end,
+						on_menu_changed = function() state.redraw = state.redraw + 1 end,
+						magic_key_source = state.source })
+					for _, item in ipairs(items) do
+						if item.title == I18n.get("menu.layout.title") then
+							for index, child in ipairs(item.menu or {}) do
+								if child.title == I18n.get("menu.layout.replace") then return child, index, item end
+							end
+							return nil, nil, item
+						end
+					end
+				end
+				body(Config, path, state, row)
+			end)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("(layout-magic-replace) renders the prerequisite and commits the current choice once", function()
+		with_replace(SOURCE, function(Config, path, state, row)
+			local first = row()
+			helpers.assert_type(first, "table", "the shared layout feature must reach the tray")
+			helpers.assert_eq(first.checked, false)
+			helpers.assert_type(first.fn, "function")
+			helpers.assert_eq(first.fn(), true)
+			helpers.assert_eq(Config.is_section_checked("magickey", "replace"), true)
+			helpers.assert_eq(#state.published[#state.published], 1)
+			helpers.assert_eq(state.notified, 1)
+			helpers.assert_eq(state.redraw, 0, "the menu must not duplicate its owner's redraw")
+			helpers.assert_true(Choices.read(path):find('choice = "preserve exact bytes" # untouched', 1, true) ~= nil)
+			helpers.assert_eq(row().checked, true)
+			helpers.assert_eq(first.fn(), true, "a retained callback toggles the current value")
+			helpers.assert_eq(Config.is_section_checked("magickey", "replace"), false)
+			helpers.assert_eq(#state.published[#state.published], 0)
+			helpers.assert_eq(state.notified, 2)
+		end)
+	end)
+
+	for _, refusal in ipairs({ "false", "nil", "throw", "runtime" }) do
+		helpers.it("(layout-magic-replace) preserves source and runtime after " .. refusal, function()
+			with_replace(SOURCE, function(Config, path, state, row)
+				local item = row()
+				helpers.assert_type(item, "table")
+				local Writer, Modal = require("toml_codec.writer"), require("ui.modal")
+				local previous_write, previous_modal = Writer.batch_write, Modal.run
+				local writes, notices = 0, 0
+				Writer.batch_write = function(...)
+					writes = writes + 1
+					if refusal == "throw" then error("injected canonical write refusal") end
+					if refusal == "nil" then return nil end
+					if refusal == "false" then return false end
+					return previous_write(...)
+				end
+				Modal.run = function() notices = notices + 1; return true end
+				state.reject = refusal == "runtime"
+				local called, result = pcall(item.fn)
+				Writer.batch_write, Modal.run = previous_write, previous_modal
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(writes, refusal == "runtime" and 0 or 1)
+				helpers.assert_eq(notices, 1, "a refusal is visible")
+				helpers.assert_eq(Choices.read(path), SOURCE, "every original byte survives")
+				helpers.assert_eq(Config.is_section_checked("magickey", "replace"), false)
+				helpers.assert_eq(#state.published[#state.published], 0, "the old catalogue is republished")
+				helpers.assert_eq(state.notified, 0)
+				helpers.assert_eq(state.redraw, 0)
+				helpers.assert_eq(row().checked, false)
+			end)
+		end)
+	end
+
+	helpers.it("(layout-magic-replace) keeps a checked choice behind a closed group", function()
+		local source = SOURCE:gsub("magickey = true", "magickey = false"):gsub("replace = false", "replace = true")
+		with_replace(source, function(_, path, state, row)
+			local item = row()
+			helpers.assert_type(item, "table")
+			helpers.assert_eq(item.checked, true)
+			helpers.assert_eq(item.disabled, true)
+			helpers.assert_eq(item.fn, nil)
+			helpers.assert_eq(Choices.read(path), source)
+			helpers.assert_eq(#state.published[#state.published], 0)
+		end)
+	end)
+
+	helpers.it("(layout-magic-replace) follows the published order directly before the physical picker", function()
+		with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			with_replace(SOURCE, function(_, _, state, row)
+				state.source = Source
+				local item, index, layout = row()
+				helpers.assert_type(item, "table")
+				local physical = layout.menu[index + 1]
+				local I18n = require("infra.i18n")
+				helpers.assert_eq(physical.title, I18n.get("menu.layout.magic_key_source") .. " : j   (KeyJ)")
+				helpers.assert_type(physical.menu[1].fn, "function", "the capture picker remains available")
+			end)
+			Source._reset_for_test()
+		end)
+	end)
+
+	helpers.it("(layout-magic-replace) refuses an old callback after its group closes", function()
+		with_replace(SOURCE, function(Config, path, state, row)
+			local before = row()
+			helpers.assert_type(before, "table")
+			helpers.assert_eq(Config.toggle_group("magickey"), true)
+			local closed_source, notified = Choices.read(path), state.notified
+			helpers.assert_eq(before.fn(), false)
+			helpers.assert_eq(Choices.read(path), closed_source)
+			helpers.assert_eq(state.notified, notified)
+			helpers.assert_eq(row().disabled, true)
+		end)
+	end)
+
+	helpers.it("(layout-magic-replace) strips paused actions and refuses an old callback", function()
+		with_replace(SOURCE, function(_, path, state, row)
+			local before = row()
+			helpers.assert_type(before, "table")
+			state.paused = true
+			local paused, _, layout = row()
+			helpers.assert_eq(paused, nil, "the paused layout subtree is retired")
+			helpers.assert_eq(layout.disabled, true)
+			helpers.assert_eq(layout.menu, nil)
+			helpers.assert_eq(before.fn(), false)
+			helpers.assert_eq(Choices.read(path), SOURCE)
+			helpers.assert_eq(state.notified, 0)
+		end)
+	end)
+end)
