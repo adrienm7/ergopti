@@ -119,3 +119,132 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		restore()
 	end)
 end)
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 3/ Shared Info Bar Check =======
+-- ========================================
+-- ========================================
+
+--- Builds the real AI display menu over its existing acknowledged settings owner.
+--- @param options table Fixture state, writer refusal and shared label mutation.
+--- @param callback function Observations asserted outside native callbacks.
+local function with_info_menu(options, callback)
+	local names = { "infra.llm_preferences", "modules.llm.display_settings", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local settings, storage = load_settings({
+		["llm.display.show_info_bar"] = options.selected,
+		["llm.future_field"] = 42,
+	}, options.refused)
+	local renderer = assert(require("menu.renderer").new({
+		platform = "linux",
+		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		json_decode = function(raw)
+			local root = assert(require("json").decode(raw))
+			if options.label then root.llm_display_menu[2].i18n = options.label end
+			if options.info_last then
+				root.llm_display_menu[2], root.llm_display_menu[3] = root.llm_display_menu[3], root.llm_display_menu[2]
+			end
+			return root
+		end,
+		i18n = require("infra.i18n"), logger = require("logger.shim"),
+	}))
+	package.loaded["infra.manifest_menu"] = renderer
+	local observed = { writes = 0, redraws = 0 }
+	local native_set = storage.set
+	storage.set = function(...)
+		observed.writes = observed.writes + 1
+		return native_set(...)
+	end
+	local ok, err = xpcall(function()
+		local items = helpers.load_module("ui.menu.menu_builder").build({
+			_version = "0.0.0-dev.12",
+			llm = { is_enabled = function() return true end, toggle = function() return true end },
+			on_quit = function() end,
+			on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
+		})
+		local title = require("infra.i18n").get("menu.llm.display_menu_title")
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if row.title == title and row.menu then return row end
+				local nested = find(row.menu)
+				if nested then return nested end
+			end
+		end
+		callback(assert(find(items), "the actual AI display submenu must be present"), settings, storage, observed)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	restore()
+	if not ok then error(err, 0) end
+end
+
+--- Loads a historical expectation independently of the generated menu declaration.
+--- @return table corpus
+local function info_bar_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("LLM shared Info Bar check", function()
+	helpers.it("replays both states through the actual durable display owner (shared-info-bar)", function()
+		local corpus = info_bar_corpus()
+		helpers.assert_eq(#corpus.states, 2)
+		for _, selected in ipairs(corpus.states) do
+			with_info_menu({selected = selected}, function(parent, settings, storage, observed)
+				local row = parent.menu[1]
+				helpers.assert_eq(row.title, require("infra.i18n").get(corpus.row.i18n))
+				helpers.assert_eq(row.checked or false, selected)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(settings.get("show_info_bar"), not selected)
+				helpers.assert_eq(storage.get("llm.display.show_info_bar", settings.get("show_info_bar")), not selected)
+				helpers.assert_eq(storage.get("llm.future_field"), 42)
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, 1)
+				settings._reset()
+				helpers.assert_eq(settings.get("show_info_bar"), not selected, "restart reads the acknowledged sparse value")
+			end)
+		end
+	end)
+
+	helpers.it("moves the actual check after its shared remaining provider (shared-info-bar)", function()
+		with_info_menu({selected = true, info_last = true}, function(parent, _, _, observed)
+			helpers.assert_eq(parent.menu[#parent.menu].title, require("infra.i18n").get(info_bar_corpus().row.i18n))
+			helpers.assert_true(#parent.menu > 1)
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+
+	helpers.it("refuses an ordinary native click without optimistic redraw (shared-info-bar)", function()
+		with_info_menu({selected = true, refused = true}, function(parent, settings, storage, observed)
+			local receipt = parent.menu[1].fn()
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, 0)
+			helpers.assert_eq(settings.get("show_info_bar"), true)
+			helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
+			helpers.assert_eq(storage.get("llm.future_field"), 42)
+			helpers.assert_eq(receipt, false)
+		end)
+	end)
+
+	helpers.it("reads the shared label and retains exact state on refusal (shared-info-bar)", function()
+		local corpus = info_bar_corpus()
+		with_info_menu({selected = true, refused = true, label = corpus.alternate_i18n}, function(parent, settings, storage, observed)
+			local row = parent.menu[1]
+			helpers.assert_eq(row.title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(settings.get("show_info_bar"), true)
+			helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
+			helpers.assert_eq(storage.get("llm.future_field"), 42)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, 0)
+		end)
+	end)
+end)

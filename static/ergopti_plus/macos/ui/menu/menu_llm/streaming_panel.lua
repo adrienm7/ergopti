@@ -38,29 +38,15 @@ function M.build(ctx)
 	local is_disabled  = ctx.is_disabled
 	local settings_mgr = ctx.settings_mgr
 
+	local leading_rows = {}
 	local rows = {}
 
 	-- Indentation picker — only meaningful with multiple predictions (num < 2 disables)
 	local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-	table.insert(rows, {
+	table.insert(leading_rows, {
 		label    = i18n.get("menu.llm.indent_label"),
 		disabled = (is_disabled or num_preds_safe < 2) or nil,
 		submenu  = settings_mgr.build_indent_menu(),  -- settings_mgr's tree, handed over whole
-	})
-
-	-- Info bar visibility toggle
-	table.insert(rows, {
-		label    = i18n.get("menu.llm.show_info_bar"),
-		checked  = state.llm_show_info_bar,
-		disabled = is_disabled or nil,
-		action   = function()
-			return settings_mgr.apply_setting_transaction({
-				key = "llm_show_info_bar",
-				value = not state.llm_show_info_bar,
-				runtime_fn = "set_llm_show_info_bar",
-				publish_setting = false,
-			})
-		end,
 	})
 
 	-- Streaming flags are nil-safe: old configs without these keys default to false
@@ -101,7 +87,26 @@ function M.build(ctx)
 		end or nil,
 	})
 
-	return ManifestMenu.render_rows(rows, "llm_display")
+	local display_ctx = {
+		commands = {
+			["llm_info_bar"] = function()
+				return settings_mgr.apply_setting_transaction({
+					key = "llm_show_info_bar",
+					value = not state.llm_show_info_bar,
+					runtime_fn = "set_llm_show_info_bar",
+					publish_setting = false,
+				})
+			end,
+		},
+		state_getters = {
+			["llm_info_bar_enabled"] = function() return state.llm_show_info_bar end,
+			["llm_info_bar_ready"] = function() return not is_disabled end,
+		},
+	}
+	return ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
+		["llm_display_leading"] = function() return leading_rows end,
+		["llm_display_remaining"] = function() return rows end,
+	})
 end
 
 return M

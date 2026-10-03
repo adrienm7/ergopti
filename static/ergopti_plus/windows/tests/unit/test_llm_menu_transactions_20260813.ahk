@@ -878,3 +878,100 @@ _LMT_UniqueApiCandidatesMutateExactlyOneRow() {
 Test("LLM API entries: unique candidate ids mutate exactly one row "
 	. "(api-entry-identity-cardinality)",
 	_LMT_UniqueApiCandidatesMutateExactlyOneRow)
+
+
+
+
+
+; ========================================
+; ========================================
+; ======= 2/ Shared Info Bar Check =======
+; ========================================
+; ========================================
+
+_LMT_InfoBarCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\info_bar_control.json"))
+}
+
+_LMT_InfoBarCollect(CandidateFeatures, CandidateMenu) {
+	return [{ Section: "llm.display", Key: "show_info_bar", Value: CandidateMenu["show_info_bar"] }]
+}
+
+_LMT_InfoBarToggle(*) {
+	return LLM_Menu_CommitMutation("the native Info Bar control",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "show_info_bar"),
+		_LMT_Apply, _LMT_Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_InfoBarCollect)
+}
+
+_LMT_InfoBarCallback(Built, Position := 0) {
+	global _MenuDispatchCallbacks
+	Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the shared check uses the real native dispatcher")
+	return _MenuDispatchCallbacks[Id]
+}
+
+_LMT_SharedInfoBarNativeOwner() {
+	global _LLM_Menu, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
+	global _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	HadIndent := IsSet(LLM_MENU_INDENT_OPTIONS)
+	PreviousIndent := HadIndent ? LLM_MENU_INDENT_OPTIONS : 0
+	; The unit graph omits _index.ahk; provide its independent accepted range
+	; for the unrelated remaining provider without changing its production owner.
+	LLM_MENU_INDENT_OPTIONS := [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
+	try {
+		Corpus := _LMT_InfoBarCorpus()
+		AssertEqual(2, Corpus["states"].Length)
+		for Selected in Corpus["states"] {
+			_LLM_Menu["show_info_bar"] := Selected
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle)
+			try {
+				AssertEqual(t(Corpus["row"]["i18n"]), _CTC_LabelAt(Built, 0))
+				AssertEqual(Selected, _CTC_IsChecked(Built, 0))
+				Callback := _LMT_InfoBarCallback(Built)
+				AssertTrue(Callback.Call())
+				AssertEqual(!Selected, _LLM_Menu["show_info_bar"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(1, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		}
+		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
+		SavedDefinitions := Definitions.Clone()
+		InfoRow := Definitions[2]
+		OriginalLabel := InfoRow["i18n"]
+		try {
+			InfoRow["i18n"] := Corpus["alternate_i18n"]
+			Definitions[2] := SavedDefinitions[3]
+			Definitions[3] := SavedDefinitions[2]
+			_LLM_Menu["show_info_bar"] := true
+			_LMT_WriterResult := false
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle)
+			try {
+				Position := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int") - 1
+				Assert(Position > 0, "the native remaining provider precedes the moved check")
+				AssertEqual(t(Corpus["alternate_i18n"]), _CTC_LabelAt(Built, Position))
+				Callback := _LMT_InfoBarCallback(Built, Position)
+				AssertFalse(Callback.Call())
+				AssertTrue(_LLM_Menu["show_info_bar"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		} finally {
+			InfoRow["i18n"] := OriginalLabel
+			for Index, Row in SavedDefinitions
+				Definitions[Index] := Row
+		}
+	} finally {
+		if HadIndent
+			LLM_MENU_INDENT_OPTIONS := PreviousIndent
+		else
+			LLM_MENU_INDENT_OPTIONS := unset
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: shared Info Bar state and labels retain the native transaction owner", _LMT_SharedInfoBarNativeOwner)

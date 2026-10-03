@@ -4016,6 +4016,23 @@ disabled_reason_key = "menu.about.source_run_reason"
 # applications the automatic mode ignores. The fixed modes belong to the enum
 # feature and its shared choice renderer. The backend lists and application
 # picker remain dynamic: they depend on stored API entries and native apps.
+# The common Info Bar check keeps the native display providers on either side:
+# macOS retains its leading indent selector; the other drivers supply no leading row.
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_leading"
+
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_info_bar"
+i18n = "menu.llm.show_info_bar"
+checked_when = ["llm_info_bar_enabled"]
+disabled_when = ["llm_info_bar_ready"]
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_remaining"
+
 [[menu.agent_menu]]
 type = "choice"
 id = "agent_mode"

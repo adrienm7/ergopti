@@ -302,26 +302,27 @@ _LLM_Menu_GenerationRows() {
 /**
  * Builds the display settings submenu.
  * Mirrors HS display_menu: info bar, streaming, show-all-at-once, indent.
+ * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_display", (*) => _LLM_Menu_DisplayRows())
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset) {
+	global _LLM_Menu
+	if !IsSet(InfoCommand)
+		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
+	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
+		Map("llm_display_leading", (*) => [], "llm_display_remaining", (*) => _LLM_Menu_DisplayRows()),
+		Map("llm_info_bar", InfoCommand),
+		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true))
 }
 
 /**
  * Row data for the display submenu, including the nested indent picker.
- * @returns {Array} The four toggles and the indent-level submenu.
+ * @returns {Array} Native display settings after the shared Info Bar check.
  */
 _LLM_Menu_DisplayRows() {
 	global _LLM_Menu
 	Rows := []
 	n := _LLM_Menu["n_predictions"]
-
-	; Info bar (shows model name and latency in the tooltip)
-	Rows.Push(Map(
-		"label",   t("menu.llm.show_info_bar"),
-		"checked", _LLM_Menu["show_info_bar"],
-		"action",  (*) => LLM_Menu_ToggleBool("show_info_bar")))
 
 	; Inline auto-type — when on, the prediction is typed directly into
 	; the active app instead of showing in a tooltip (Copilot-style). The
