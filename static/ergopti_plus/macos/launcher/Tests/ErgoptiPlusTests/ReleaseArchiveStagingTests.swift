@@ -49,6 +49,11 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: executable)
 		process.arguments = arguments
+		// Native signing tools can forbid forced Swift crash backtracing. Keep
+		// parent XCTest diagnostics enabled; only the owned child opts out.
+		var environment = ProcessInfo.processInfo.environment
+		environment["SWIFT_BACKTRACE"] = "enable=no"
+		process.environment = environment
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)
@@ -230,4 +235,34 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertEqual(extract.status, 22)
 		XCTAssertFalse(extract.stdout.contains("READY"))
 	}
+	func testPrivateArchiveChildEnvironmentPreservesParentAndExecutableSearchPath() throws {
+		let inherited = ProcessInfo.processInfo.environment
+		let inheritedPath = try XCTUnwrap(inherited["PATH"])
+		let root = try scratch()
+		defer { retire(root) }
+		let backtrace = try successful("/usr/bin/printenv", ["SWIFT_BACKTRACE"], root: root)
+		XCTAssertEqual(backtrace.stdout, "enable=no\n")
+		XCTAssertTrue(backtrace.stderr.isEmpty)
+		let path = try successful("/usr/bin/printenv", ["PATH"], root: root)
+		XCTAssertEqual(path.stdout, inheritedPath + "\n")
+		XCTAssertTrue(path.stderr.isEmpty)
+		XCTAssertEqual(ProcessInfo.processInfo.environment["SWIFT_BACKTRACE"], inherited["SWIFT_BACKTRACE"])
+	}
+
+	func testActualNativeRequirementDisplayKeepsBothStreamsAndExitStatus() throws {
+		let root = try scratch()
+		defer { retire(root) }
+		let app = try signedBundle(root: root)
+		let display = try child("/usr/bin/codesign", ["-d", "-r-", app.path], root: root)
+		XCTAssertEqual(display.status, 0)
+		let declarations = (display.stdout + "\n" + display.stderr)
+			.split(separator: "\n").filter { $0.hasPrefix("designated => ") }
+		XCTAssertEqual(declarations.count, 1, "The actual running signature owns one designated requirement")
+		XCTAssertFalse(try XCTUnwrap(declarations.first).dropFirst("designated => ".count).isEmpty)
+		let missing = root.appendingPathComponent("unsigned-source.app")
+		try manager.createDirectory(at: missing, withIntermediateDirectories: false)
+		let refused = try child("/usr/bin/codesign", ["-d", "-r-", missing.path], root: root)
+		XCTAssertNotEqual(refused.status, 0, "A display failure cannot authorize staged verification")
+	}
+
 }

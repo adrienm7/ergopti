@@ -41,7 +41,16 @@ app="$dir/app/$bundle"
 [ -d "$app" ] || exit 23
 found=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist") || exit 24
 [ "$found" = "$version" ] || exit 25
-requirement=$(/usr/bin/codesign -d -r- "$running" 2>/dev/null | /usr/bin/sed -n 's/^designated => //p')
+# Display owns both output streams and its true exit status, before parsing.
+displayed=$(/usr/bin/codesign -d -r- "$running" 2>&1) || exit 26
+# Count records before command substitution can erase trailing empty lines.
+designations=$(printf '%s\n' "$displayed" | /usr/bin/sed -n '/^designated => /s/.*/x/p') || exit 26
+[ "$designations" = x ] || exit 26
+requirement=$(printf '%s\n' "$displayed" | /usr/bin/sed -n 's/^designated => //p') || exit 26
 [ -n "$requirement" ] || exit 26
+case "$requirement" in
+	*'
+'*) exit 26 ;;
+esac
 /usr/bin/codesign --verify --deep --strict -R "=$requirement" "$app" || exit 27
 printf 'READY %s\n' "$app"
