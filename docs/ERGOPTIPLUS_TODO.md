@@ -635,6 +635,8 @@ admission and the physical-wait/foreign-origin assertions remain unchanged.
 Portable gates pass; repaired callbacks await native Windows CI. Explicit
 Windows/Linux start/install and local-server discovery remain unfinished.
 
+Windows live-mode unit fixtures now share one protected invoke-and-retire boundary for the actual gesture action and both actual live-menu callbacks. The real pending notice is captured and retired before the fixture releases its fake typing ports, including refusal and thrown callbacks. AllowTimers=true and every existing live-mode/state/task-count assertion remain unchanged. The new native unit regression checks exact false/error/notice behavior, exact caller Critical restoration, pending notice/surface retirement and preservation of an opaque foreign task identity/count. Run37098105470 demonstrates the original unprotected menu case task count0→1 and a later28-case foreign-task precondition cascade; these are not30 independent production faults. Local source plus qualification-onlyTODO48 selected gates passed353JavaScript checks, formatting and1801AHK BOM/LF files. Native execution and full suite recovery require the next Windows CI.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
