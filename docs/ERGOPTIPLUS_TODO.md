@@ -1314,6 +1314,14 @@ The architecture inventory was regenerated through its owner. Selected
 portable checks pass; actual AHK and full three-OS qualification remain
 pending.
 
+The Linux caption-inventory regression now enumerates source through the
+existing checked-shell owner instead of requiring LuaFileSystem. The
+LuaJIT-only CI profile reproduced the original exception; all 4,809 Linux
+cases pass with and without native Lua extensions. The same seven owners and
+exact counts remain mandatory. Foreign consumers and failed, empty or
+incomplete discovery are still rejected. Production captions and the real
+30-case Zenity proof are unchanged; fresh CI qualification remains pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

@@ -188,7 +188,6 @@ end)
 
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
-		local lfs = require("lfs")
 		local expected = {
 			["ui/text_prompt.lua"] = 1,
 			["ui/app_chooser.lua"] = 2,
@@ -200,22 +199,22 @@ h.describe("native caption consumer inventory", function()
 		}
 		local observed = {}
 		local root = h.driver_root()
-		local function visit(relative)
-			for name in lfs.dir(root .. "/" .. relative) do
-				if name ~= "." and name ~= ".." and name ~= "tests" then
-					local child = relative == "" and name or relative .. "/" .. name
-					local mode = lfs.attributes(root .. "/" .. child, "mode")
-					if mode == "directory" then visit(child)
-					elseif name:match("%.lua$") then
-						local file = assert(io.open(root .. "/" .. child, "rb"))
-						local source = assert(file:read("*a")); assert(file:close())
-						local _, count = source:gsub("%-%-title", "")
-						if count > 0 then observed[child] = count end
-					end
-				end
-			end
+		-- Match the runner's supported LuaJIT-only profile: find is available even
+		-- when the optional LuaFileSystem extension is not installed. The checked
+		-- shell owner preserves command failure instead of accepting an empty walk.
+		local listed, paths, list_error = Shell.exec_checked("find " .. Shell.quote(root)
+			.. " -type d -name tests -prune -o -type f -name '*.lua' -print0")
+		h.assert_true(listed, "production caption discovery must succeed: " .. tostring(list_error))
+		h.assert_true(#paths > 0, "production caption discovery must find real Lua source")
+		h.assert_eq(paths:sub(-1), "\0", "production discovery finishes every exact pathname record")
+		for path in paths:gmatch("([^%z]+)%z") do
+			h.assert_eq(path:sub(1, #root + 1), root .. "/", "discovered source belongs to the exact driver root")
+			local child = path:sub(#root + 2)
+			local file = assert(io.open(path, "rb"))
+			local source = assert(file:read("*a")); assert(file:close())
+			local _, count = source:gsub("%-%-title", "")
+			if count > 0 then observed[child] = count end
 		end
-		visit("")
 		h.assert_eq(observed, expected, "new native caption sites require their own behavior and policy evidence")
 		local file = assert(io.open(root .. "/uninstall.sh", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
