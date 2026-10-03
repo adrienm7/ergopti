@@ -874,6 +874,17 @@ true. Reconcile the native prediction owners and shared check polarity before
 retiring this policy; preserve Windows' explicit refusal of unsupported token
 streaming rather than infer capability from the stored setting.
 
+The Windows indentation catalogue now initializes beside its display-row reader,
+so the resident boot graph and definitions-only native test graph share the same
+owner. CI checkpoint 37104220317 failed four existing AI submenu assertions
+because the former `_index.ahk` assignment was absent from the headless include
+graph. The initializer and range are unchanged; a new native regression checks
+the complete ordered range and the selected negative, neutral and positive rows.
+The original submenu, restore, backend-caption and category-checkbox assertions
+remain intact. Local JavaScript and encoding gates are qualified separately;
+Windows native unit, parse and E2E confirmation still requires CI. Items 54 and
+81 remain partial and native row counts are unchanged.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
