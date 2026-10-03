@@ -1222,6 +1222,12 @@ interrupted modal loop from acknowledging window retirement. The fixture
 now returns that callback, waits for the actual Timeout result, then persists
 its complete snapshot. The retired-window receipt and exact expired-read
 rejection remain strict. Native Windows requalification is pending.
+Native Windows file-picker captions now pass through the same shared title
+composer; option flags, root/default paths, filters and native return shapes
+are preserved. Independent audit mutations and actual five-policy dialog
+probes retain strict result and exact process-retirement assertions. Native
+FileSelect qualification remains pending Windows CI; folder-picker captions
+remain a separate unfinished slice.
 
 ## Time estimate
 

@@ -41,6 +41,65 @@ function put(relative, content) {
 	fs.writeFileSync(target, content);
 }
 const cases = [
+	[
+		'windows',
+		'FileSelect(33, Root, "Tools", "Owned files (*.txt)")',
+		1,
+		'raw native file picker cannot bypass policy'
+	],
+	[
+		'windows',
+		'FileSelect("M33", Root, "ErgoptiPlus — Tools")',
+		1,
+		'prebranded file picker still bypasses policy'
+	],
+	[
+		'windows',
+		'Ui_FileSelect(33, "ErgoptiPlus path", "Tools", "ErgoptiPlus files (*.txt)")',
+		0,
+		'only the third file picker argument is a caption'
+	],
+	[
+		'windows',
+		'Ui_FileSelect(33, Root, "ErgoptiPlus — Tools")',
+		1,
+		'file picker caption cannot be branded twice'
+	],
+	[
+		'windows',
+		'Ui_FileSelect(33, Root, t("editor.personal_info.window_title"))',
+		1,
+		'translated file picker caption cannot retain stale branding'
+	],
+	['windows', 'Ui_FileSelect(33, Root)', 0, 'omitted file picker caption belongs to shared policy'],
+	[
+		'windows',
+		'Ui_FileSelect(Options := "", RootDir := "", Title := "", Filter := "") {\nreturn FileSelect(Options, RootDir, WindowTitle(Title), Filter)\n}',
+		0,
+		'actual file picker delegate owns the third argument',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_FileSelect(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, RootDir, Title, Filter)\n}',
+		1,
+		'file picker owner cannot drop policy',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_FileSelect(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, WindowTitle(Title), Title, Filter)\n}',
+		1,
+		'file picker policy on the root path does not own the caption',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Other(Options, RootDir, Title, Filter) {\nreturn FileSelect(Options, RootDir, WindowTitle(Title), Filter)\n}',
+		1,
+		'another file picker function cannot duplicate the native owner',
+		'static/ergopti_plus/windows/infra/native_dialogs.ahk'
+	],
 	['windows', 'MsgBox("Body", "Tools")', 1, 'raw message box has no caption owner'],
 	[
 		'windows',

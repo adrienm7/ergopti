@@ -128,6 +128,78 @@ _NDT_ProbeSource(Artifact, Owner) {
 		. '#Include ' . Owner . "`n"
 }
 
+
+/**
+ * Builds a real IFileDialog probe with exact caption, filter and result receipts.
+ * Native observations finish before any file I/O or owned dialog cancellation.
+ * @param {string} Artifact - Actual privately generated shared caption policy.
+ * @param {string} Owner - Actual native caption owner, including the file picker.
+ * @returns {string} Complete native child source.
+ */
+_NDT_FilePickerProbeSource(Artifact, Owner) {
+	return '#Requires AutoHotkey v2.0' . "`n"
+		. '#SingleInstance Off' . "`n"
+		. '#Warn All, StdOut' . "`n"
+		. 'OnError(_NFPError)' . "`n"
+		. 'global _NFPRoot := A_Args[1]' . "`n"
+		. 'global _NFPMode := ""' . "`n"
+		. 'global _NFPOwnedFile := _NFPRoot . "\selected.txt"' . "`n"
+		. 'FileAppend("Owned fixture contents", _NFPOwnedFile, "UTF-8-RAW")' . "`n"
+		. 'CanonicalBuffer := Buffer(65536, 0)' . "`n"
+		. 'CanonicalLength := DllCall("GetLongPathNameW", "Str", _NFPOwnedFile, "Ptr", CanonicalBuffer, "UInt", 32768, "UInt")' . "`n"
+		. 'if !CanonicalLength || CanonicalLength >= 32768' . "`n"
+		. 'throw Error("The privately owned fixture path must resolve")' . "`n"
+		. '_NFPOwnedFile := StrGet(CanonicalBuffer, CanonicalLength, "UTF-16")' . "`n"
+		. 'FileAppend(_NFPOwnedFile, _NFPRoot . "\owned.path", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "selected"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPSelected := Ui_FileSelect(35, _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(_NFPSelected, _NFPRoot . "\selected.result", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "cancelled"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPCancelled := Ui_FileSelect("M35", _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(Type(_NFPCancelled) . "|" . (_NFPCancelled is Array ? _NFPCancelled.Length : "wrong-shape"), _NFPRoot . "\cancelled.result", "UTF-8-RAW")' . "`n"
+		. 'FileAppend("file-picker-written", "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(0)' . "`n"
+		. '_NFPCapture() {' . "`n"
+		. 'global _NFPRoot, _NFPMode' . "`n"
+		. 'for Hwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
+		. 'if Hwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", Hwnd)' . "`n"
+		. 'continue' . "`n"
+		. 'if WinGetClass("ahk_id " . Hwnd) != "#32770"' . "`n"
+		. 'continue' . "`n"
+		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
+		. 'FilterDescription := ""' . "`n"
+		. 'for ControlHwnd in WinGetControlsHwnd("ahk_id " . Hwnd) {' . "`n"
+		. 'ControlClass := WinGetClass("ahk_id " . ControlHwnd)' . "`n"
+		. 'if ControlClass != "ComboBox"' . "`n"
+		. 'continue' . "`n"
+		. 'for Item in ControlGetItems(ControlHwnd)' . "`n"
+		. 'FilterDescription .= Item . "|"' . "`n"
+		. '}' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'if _NFPMode == "selected" {' . "`n"
+		. 'OpenButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 1, "Ptr")' . "`n"
+		. 'if !OpenButton || !DllCall("IsWindowEnabled", "Ptr", OpenButton)' . "`n"
+		. 'throw Error("The native picker requires its enabled default Open button")' . "`n"
+		. 'PostMessage(0xF5, 0, 0, , "ahk_id " . OpenButton)' . "`n}`n"
+		. 'else' . "`n"
+		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
+		. 'FileAppend(Caption, _NFPRoot . "\" . _NFPMode . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(FilterDescription, _NFPRoot . "\" . _NFPMode . ".filter", "UTF-8-RAW")' . "`n"
+		. 'return' . "`n"
+		. '}' . "`n"
+		. '}' . "`n"
+		. '_NFPError(ProbeError, *) {' . "`n"
+		. 'FileAppend(ProbeError.Message, "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(2)' . "`n"
+		. '}' . "`n"
+		. '#Include ' . Artifact . "`n"
+		. '#Include ' . Owner . "`n"
+}
+
 /**
  * Runs native dialogs with independent captions for default and customized policy.
  * Both native return shapes and exact input defaults remain observable.
@@ -217,6 +289,24 @@ _NDT_ActualNativeCaptionsAndResults() {
 				"an omitted caption preserves native options and return values")
 			AssertEqual("Cancel`n Secret value ", FileRead(Fixture . "\cancelled.result", "UTF-8"),
 				"closing the native input window preserves cancellation and exact entered text")
+			PickerRoot := Fixture . "\file_picker"
+			DirCreate(PickerRoot)
+			PickerHarness := PickerRoot . "\file_picker.ahk"
+			FileAppend(_NDT_FilePickerProbeSource(Artifact, Owner), PickerHarness, "UTF-8")
+			AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
+				["/ErrorStdOut", PickerHarness, PickerRoot], Ownership),
+				"the actual native file picker completes without hidden errors")
+			for Kind in ["selected", "cancelled"] {
+				AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
+					"the real file picker caption follows independent policy " . Index)
+				Assert(InStr(FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"), "Owned files (*.txt)") > 0,
+					"the actual native picker retains the display label and filter pattern")
+			}
+			AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
+				FileRead(PickerRoot . "\selected.result", "UTF-8"),
+				"native options, initial file and default name select the exact privately owned path")
+			AssertEqual("Array|0", FileRead(PickerRoot . "\cancelled.result", "UTF-8"),
+				"multiselect cancellation retains the original empty native Array shape")
 		}
 	} finally {
 		if Ownership.CanRetire
