@@ -753,12 +753,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			label   = i18n_safe("menu.hotstrings.enable_all_sections"),
 			checked = all_on,
 			action  = function()
-				if type(config.set_categories_sections) ~= "function" then
-					Logger.error(LOG, "The hotstrings config has no set_categories_sections — "
-						.. "the « all sections » switch did nothing.")
-					return
+				local called, committed = false, false
+				if type(config.set_categories_sections) == "function" then
+					called, committed = pcall(config.set_categories_sections, ids, not all_on)
 				end
-				config.set_categories_sections(ids, not all_on)
+				if called and committed == true then return true end
+				Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
 			end,
 		}
 	end
