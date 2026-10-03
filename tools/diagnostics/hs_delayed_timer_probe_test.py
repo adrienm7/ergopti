@@ -355,11 +355,100 @@ class ScriptingLifecycleTests(unittest.TestCase):
                     children[0].returncode, "the original child must actually be reaped"
                 )
                 self.assertEqual(owner.scripting_commands, [])
+                retained = owner.diagnostic_receipts
+                self.assertEqual(len(retained), 1)
+                self.assertEqual(retained[0]["command"], 1)
+                self.assertIn(
+                    "HSAppleScriptRunString (fixture server frame)", retained[0]["observations"]
+                )
+                self.assertNotIn("loaded image only", retained[0]["observations"])
             finally:
                 for child in children:
                     if child.poll() is None:
                         child.kill()
                     child.communicate(timeout=2)
+
+    def test_plain_native_receipts_redact_private_paths_and_bound_each_command(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.scripting_command_number = 1
+            owner.retain_diagnostics(
+                [
+                    "observed native Hammerspoon server thread: Thread_42\n"
+                    "TCCAccessRequest (source /Users/private/name/native.m:4)\n"
+                    "https://private.example/signed?secret=hidden\n"
+                    + "native frame\n"
+                    * probe.SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT,
+                ]
+            )
+            first = owner.diagnostic_receipts[0]
+            self.assertEqual(first["command"], 1)
+            self.assertNotIn("/Users/private", first["observations"])
+            self.assertNotIn("private.example", first["observations"])
+            self.assertNotIn("secret=hidden", first["observations"])
+            self.assertIn("TCCAccessRequest (location redacted)", first["observations"])
+            self.assertIn("[native diagnostic truncated]", first["observations"])
+            self.assertLessEqual(
+                len(first["observations"]), probe.SCRIPT_DIAGNOSTIC_CHARACTER_LIMIT
+            )
+            self.assertLessEqual(
+                len(first["observations"].splitlines()), probe.SCRIPT_DIAGNOSTIC_LINE_LIMIT
+            )
+            owner.scripting_command_number = 2
+            owner.retain_diagnostics(["actual cleanup sample\n" + "x\n" * 500])
+            self.assertIn(
+                "[native diagnostic truncated]", owner.diagnostic_receipts[1]["observations"]
+            )
+            self.assertLessEqual(
+                len(owner.diagnostic_receipts[1]["observations"].splitlines()),
+                probe.SCRIPT_DIAGNOSTIC_LINE_LIMIT,
+            )
+            owner.scripting_command_number = 3
+            owner.retain_diagnostics(["extra request"])
+            self.assertEqual(len(owner.diagnostic_receipts), probe.SCRIPT_DIAGNOSTIC_RECEIPT_LIMIT)
+            self.assertTrue(owner.diagnostic_receipts[-1]["additional_commands_omitted"])
+
+    def test_cleanup_refusal_keeps_lua_arguments_out_of_plain_sample_receipts(self):
+        primary = subprocess.TimeoutExpired(["osascript", "PRIMARY_LUA_ARGUMENT"], 10)
+        cleanup = subprocess.TimeoutExpired(["osascript", "CLEANUP_LUA_ARGUMENT"], 2)
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+            command = mock.Mock(pid=43, returncode=None)
+            command.poll.return_value = None
+            command.communicate.side_effect = [primary, cleanup]
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=command),
+                mock.patch.object(
+                    owner,
+                    "sample_scripting_command",
+                    return_value=["native scripting sample retained: sample-osascript-1.txt"],
+                ),
+                mock.patch.object(
+                    owner,
+                    "sample_native_runtime",
+                    return_value=["observed native Hammerspoon server thread: Thread_42"],
+                ),
+            ):
+                with self.assertRaises(RuntimeError) as raised:
+                    owner.execute("PRIVATE_FIXTURE_LUA_SOURCE")
+            self.assertIs(raised.exception.__cause__, primary)
+            self.assertIn("PRIMARY_LUA_ARGUMENT", str(raised.exception))
+            self.assertIn("CLEANUP_LUA_ARGUMENT", str(raised.exception))
+            self.assertEqual(
+                owner.scripting_commands,
+                [command],
+                "refused cleanup must retain its exact owned process",
+            )
+            retained = str(owner.diagnostic_receipts)
+            self.assertIn("Thread_42", retained)
+            self.assertNotIn("PRIMARY_LUA_ARGUMENT", retained)
+            self.assertNotIn("CLEANUP_LUA_ARGUMENT", retained)
+            self.assertNotIn("PRIVATE_FIXTURE_LUA_SOURCE", retained)
 
     def test_runtime_binding_requires_the_single_exact_live_integer_pid(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -582,6 +582,20 @@ def collect(output, state, home, executables):
     return {"errors": errors, "windows": windows}
 
 
+def print_native_probe_diagnostics(report):
+    """Keep owned native ancestry readable beyond GitHub's annotation limit."""
+    for receipt in report.get("native_probe_diagnostics", []):
+        for line in receipt["observations"].splitlines():
+            # Prefix every line so a sampled symbol or refusal cannot be parsed
+            # as a GitHub workflow command. The native owner bounds and redacts
+            # these observations before putting them in the durable report.
+            print(f"native probe command{receipt['command']}: {line}")
+        if receipt.get("additional_commands_omitted"):
+            print(
+                f"native probe command{receipt['command']}: [additional diagnostic commands omitted]"
+            )
+
+
 def print_tails(output):
     """Print the relevant log tails into the job log so a red gate is readable."""
     for name in (LAUNCHER_LOG_NAME, FALLBACK_BOOT_LOG_NAME):
@@ -736,6 +750,7 @@ def run(app, output, scenario, seed_tag):
                         previous + "; " if previous else ""
                     ) + f"preference restoration failed: {error}"
     if native_probe:
+        report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
         report[native_result_key] = observation.get(native_result_key)
         if observation.get(native_result_key + "_error"):
             report[native_result_key + "_error"] = observation[native_result_key + "_error"]
@@ -821,6 +836,7 @@ def main(argv=None):
     if report["failures"]:
         for annotation in failure_annotations(args.scenario, report["failures"]):
             print(annotation)
+        print_native_probe_diagnostics(report)
         print_tails(output)
         return 1
     print(
