@@ -624,7 +624,7 @@ BootProfile_Stamp("Paths and shared configuration loaded")
 ; Settle parse-time personal includes before any process reveals the tray icon.
 try {
 		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
-				_DriverStartupSmokeDir == "")
+				_PersonalShortcutsBootAllowsReload(A_IsCompiled, _DriverStartupSmokeDir != ""))
 				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
 		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
@@ -900,6 +900,23 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 
+
+/**
+ * Only source-mode startup can reload a newly generated parse-time include.
+ * Compiled includes are embedded at build time; restarting the same executable
+ * cannot load a newly written personal file or forwarding stub. Keep the empty
+ * first-use template durable without retiring the instance before readiness.
+ * @param {Boolean} IsCompiled - The actual A_IsCompiled capability.
+ * @param {Boolean} IsStartupSmoke - Whether the owned startup smoke is active.
+ * @returns {Boolean} Whether source-mode bootstrap may perform its terminal reload.
+ */
+_PersonalShortcutsBootAllowsReload(IsCompiled, IsStartupSmoke) {
+	if !(IsCompiled is Integer) || (IsCompiled != 0 && IsCompiled != 1)
+		throw TypeError("personal-shortcuts compiled capability must be Boolean")
+	if !(IsStartupSmoke is Integer) || (IsStartupSmoke != 0 && IsStartupSmoke != 1)
+		throw TypeError("personal-shortcuts startup-smoke capability must be Boolean")
+	return !IsCompiled && !IsStartupSmoke
+}
 
 EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 		ReplaceFn := 0, ReadFn := 0) {
