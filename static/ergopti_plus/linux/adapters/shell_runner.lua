@@ -461,8 +461,12 @@ function M.run_async(executable, args, options, callback)
 		if request.terminal then close_handle(request.process) end
 	end)
 	if not spawned or not process then
-		finish_async(request, { ok = false, error = "spawn failed: " .. tostring(pid or process) })
-		return nil, "spawn failed"
+		-- No child was dispatched. Callers handle this synchronous refusal from
+		-- the return value; invoking their completion callback would report twice.
+		local reason = "spawn failed: " .. tostring(pid or process)
+		request.silent = true
+		finish_async(request, { ok = false, error = reason })
+		return nil, reason
 	end
 	request.process, request.pid = process, pid
 	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do

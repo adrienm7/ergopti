@@ -7,6 +7,7 @@
 --- retains stdout/stderr after its leader exits. Deadlines and cancellation must
 --- terminate that descendant, not merely close the daemon's pipes. No input
 --- device or display server is required (linux-orphaned-process-group).
+--- A real ENOENT spawn also proves refusal does not publish a second outcome.
 --- ==============================================================================
 
 local uv = require("luv")
@@ -127,6 +128,20 @@ check("shell-cancel", function(path, callback)
 	return ShellRunner.run_async("python3", { "-c", PROGRAM, path }, { timeout_ms = WAIT_MS }, callback)
 end, true)
 
+local callbacks = 0
+local handle, reason = ShellRunner.run_async(directory .. "/missing-program", {},
+	{ timeout_ms = TIMEOUT_MS }, function() callbacks = callbacks + 1 end)
+local settled = await(function() return not uv.loop_alive() end)
+local refusal_ok = handle == nil and type(reason) == "string"
+	and reason:find("ENOENT", 1, true) ~= nil and callbacks == 0 and settled
+if refusal_ok then
+	print("PASS shell-spawn-refusal (native ENOENT, no callback and no live handles)")
+else
+	failures = failures + 1
+	io.stderr:write(string.format("FAIL shell-spawn-refusal: handle=%s reason=%s callbacks=%d settled=%s\n",
+		tostring(handle), tostring(reason), callbacks, tostring(settled)))
+end
+
 assert(uv.fs_rmdir(directory))
-print(string.format("Native process groups: %d passed, %d failed", 3 - failures, failures))
+print(string.format("Native process groups: %d passed, %d failed", 4 - failures, failures))
 os.exit(failures == 0 and 0 or 1)

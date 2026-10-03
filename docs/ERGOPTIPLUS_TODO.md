@@ -108,6 +108,11 @@ These are software implementations; final hardware verification remains below.
   delivery. The native harness is registered in the Linux CI lane. Windows uses
   native process handles and macOS uses Hammerspoon tasks, so neither contains
   the Linux libuv exited-leader guard. Complete three-OS CI remains pending.
+  A failed shell-runner spawn now returns its native refusal without also
+  invoking the completion callback, avoiding duplicate connector failure
+  delivery. A real ENOENT regression and the portable allocation-cleanup case
+  fail before the fix and pass after it. The process runner retains its separate
+  callback-on-refusal contract; macOS task construction uses settled handles.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
