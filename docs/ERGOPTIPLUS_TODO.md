@@ -422,6 +422,9 @@ the complete three-OS checkpoint remain pending.
       merge its Karabiner configuration in the real Hammerspoon runtime (into the
       runner's own `~/.config/karabiner/karabiner.json`) and fails on any ERROR,
       without needing the Karabiner driver.
+
+The packaged macOS launch matrix now contains a Karabiner configuration scenario. It uses the real Hammerspoon JSON runtime and production build, merge and conditional atomic-file owners for eight default/recommended and switch vectors in a runner-owned private destination, preserves foreign profiles and personal rules, proves independent codec trees, and restores exact original bytes. It acquires no remap lease and installs no driver. The selected local gates pass 353 JS checks and 13,074 portable macOS cases, including five registered publication/restoration lifecycle regressions; 65 Python judges pass. Actual signed native execution remains pending and the existing scripting transport deadline is blocking, so TODO40 stays partial until that proof is green.
+
 - [~] **41.** Remaining direct `hs.json.decode` calls (ratchet
   `tests/meta/test_json_decode_through_codec.lua`, no calls outside the adapter).
   Locale, manifest menus, personal hotstrings, keylogger

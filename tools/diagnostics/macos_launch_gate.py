@@ -32,6 +32,13 @@ driver log, never an exit: a user whose grant went stale with a new build was
 otherwise told to relaunch into the same refusal. plain_open launches the way
 a double-click does, without `open -n`.
 
+karabiner_config uses the real packaged Hammerspoon JSON runtime and production
+build, merge and conditional file publication owners for eight preset/switch
+vectors. It preserves personal rules and restores the exact private source
+bytes. It never initializes a remap lease, registers a guardian, installs a
+Karabiner driver or publishes an active configuration to the user's file.
+This qualifies private file generation, not live driver activation.
+
 `--print-matrix {ci,release}` prints the scenario list of one gate profile as
 the GitHub Actions output line that feeds the workflow matrix. It takes no
 other argument and runs on any host, because it launches nothing.
@@ -51,6 +58,10 @@ import sys
 import time
 
 from hs_delayed_timer_probe import NativeDelayedTimerProbe, validate_summary
+from hs_karabiner_config_probe import (
+    NativeKarabinerConfigProbe,
+    validate_summary as validate_karabiner_summary,
+)
 
 READY_MARKER = "Onboarding wizard opened."
 # The configured boot on a runner without Accessibility waits for the grant
@@ -89,6 +100,7 @@ LEGACY_SETTINGS = (
 )
 SCENARIOS = (
     "clean",
+    "karabiner_config",
     "upgraded",
     "source_logs",
     "symlink_config",
@@ -213,7 +225,7 @@ def seed(scenario, home, seed_tag, today):
         path.symlink_to(target, target_is_directory=True)
         state["symlinks"].append(str(path))
 
-    if scenario in ("clean", "plain_open"):
+    if scenario in ("clean", "plain_open", "karabiner_config"):
         return state
     if scenario == "upgraded":
         seed_personal_files(default, seed_tag)
@@ -287,6 +299,17 @@ def seed(scenario, home, seed_tag, today):
 def evaluate(scenario, observation):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
+    if scenario == "karabiner_config":
+        if observation.get("native_karabiner_config_error"):
+            failures.append(
+                "the native Karabiner build/merge probe failed: "
+                + observation["native_karabiner_config_error"]
+            )
+        else:
+            try:
+                validate_karabiner_summary(observation.get("native_karabiner_config"))
+            except ValueError as error:
+                failures.append(f"the native Karabiner build/merge proof is incomplete: {error}")
     if scenario == "clean":
         probe_error = observation.get("native_delayed_timer_error")
         if probe_error:
@@ -598,13 +621,20 @@ def run(app, output, scenario, seed_tag):
     started = time.monotonic()
     observation = {}
     diagnostic_errors = []
-    native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN) if scenario == "clean" else None
+    native_probe = None
+    native_result_key = None
+    if scenario == "clean":
+        native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN)
+        native_result_key = "native_delayed_timer"
+    elif scenario == "karabiner_config":
+        native_probe = NativeKarabinerConfigProbe(app, output, HS_DOMAIN)
+        native_result_key = "native_karabiner_config"
     try:
         if native_probe:
             try:
                 native_probe.enable()
             except Exception as error:
-                observation["native_delayed_timer_error"] = f"{type(error).__name__}: {error}"
+                observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
         result = subprocess.run(
             launch_command(scenario, app), capture_output=True, text=True, timeout=15
         )
@@ -629,17 +659,17 @@ def run(app, output, scenario, seed_tag):
         if (
             native_probe
             and observation["alive_after_window"]
-            and not observation.get("native_delayed_timer_error")
+            and not observation.get(native_result_key + "_error")
         ):
             try:
                 child_pids = processes(child)
                 if len(child_pids) != 1:
                     raise RuntimeError(
-                        "The native timer probe requires the launcher's single exact child"
+                        "The native probe requires the launcher's single exact child"
                     )
-                observation["native_delayed_timer"] = native_probe.observe(child_pids[0], processes)
+                observation[native_result_key] = native_probe.observe(child_pids[0], processes)
             except Exception as error:
-                observation["native_delayed_timer_error"] = f"{type(error).__name__}: {error}"
+                observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
         observation["quit_seconds"] = (
             quit_application(bundle_id, (launcher, child))
             if observation["alive_after_window"]
@@ -698,17 +728,17 @@ def run(app, output, scenario, seed_tag):
                             )
                         time.sleep(0.05)
                     native_probe.restore()
-                    if "native_delayed_timer" in observation:
-                        observation["native_delayed_timer"]["preference_restored"] = True
+                    if native_result_key in observation:
+                        observation[native_result_key]["preference_restored"] = True
                 except Exception as error:
-                    previous = observation.get("native_delayed_timer_error", "")
-                    observation["native_delayed_timer_error"] = (
+                    previous = observation.get(native_result_key + "_error", "")
+                    observation[native_result_key + "_error"] = (
                         previous + "; " if previous else ""
                     ) + f"preference restoration failed: {error}"
-    if scenario == "clean":
-        report["native_delayed_timer"] = observation.get("native_delayed_timer")
-        if observation.get("native_delayed_timer_error"):
-            report["native_delayed_timer_error"] = observation["native_delayed_timer_error"]
+    if native_probe:
+        report[native_result_key] = observation.get(native_result_key)
+        if observation.get(native_result_key + "_error"):
+            report[native_result_key + "_error"] = observation[native_result_key + "_error"]
     report["quit_seconds"] = observation.get("quit_seconds")
     report["alive_after_window"] = observation.get("alive_after_window", False)
     report["failures"] = evaluate(scenario, observation)

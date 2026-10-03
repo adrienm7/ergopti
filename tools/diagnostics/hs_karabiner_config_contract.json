@@ -1,0 +1,20 @@
+{
+	"schema_version": 1,
+	"contract": "karabiner.build-merge",
+	"presets": ["default", "recommended"],
+	"switches": [false, true],
+	"mode_values": { "normal": 1, "pause": 2 },
+	"revoked_value": 0,
+	"minimum_manipulators": 30,
+	"summary_fixed": {
+		"schema_version": 1,
+		"contract": "karabiner.build-merge",
+		"runtime": "native Hammerspoon",
+		"publication_scope": "private-file-only",
+		"complete": true,
+		"private_source_restored": true,
+		"lease_initialized": false,
+		"codec_independent": true,
+		"native_equal_values_shared": true
+	}
+}

@@ -18,6 +18,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
+const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 
 /** Requires the complete measured native admission receipt on every clean Mac. */
 function verifyNativeTimer(summary) {
@@ -57,6 +58,44 @@ function verifyNativeTimer(summary) {
 	assert.ok(Number.isSafeInteger(summary.pid) && summary.pid > 0, 'Invalid native timer PID');
 }
 
+/** Requires measured private native Karabiner graphs and acknowledged restoration. */
+function verifyNativeKarabiner(summary) {
+	assert.ok(summary && typeof summary === 'object', 'Missing native Karabiner evidence');
+	assert.deepEqual(
+		Object.keys(summary).sort(),
+		[
+			...Object.keys(karabinerContract.summary_fixed),
+			'version',
+			'nonce',
+			'pid',
+			'executable',
+			'variant_count',
+			'manipulator_count',
+			'preference_restored'
+		].sort(),
+		'Malformed native Karabiner evidence'
+	);
+	const variants = karabinerContract.presets.length * karabinerContract.switches.length ** 2;
+	for (const [key, value] of Object.entries({
+		...karabinerContract.summary_fixed,
+		version: timerContract.runtime_version,
+		variant_count: variants,
+		preference_restored: true
+	}))
+		assert.equal(summary[key], value, `Incomplete native Karabiner evidence: ${key}`);
+	assert.match(summary.nonce, /^[0-9a-f]{32}$/, 'Invalid native Karabiner nonce');
+	assert.ok(Number.isSafeInteger(summary.pid) && summary.pid > 0, 'Invalid native Karabiner PID');
+	assert.ok(
+		Number.isSafeInteger(summary.manipulator_count) &&
+			summary.manipulator_count >= variants * karabinerContract.minimum_manipulators,
+		'Missing native Karabiner condition measurements'
+	);
+	assert.equal(
+		summary.executable,
+		'/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon'
+	);
+}
+
 /** Checks mandatory job results and the exact set of successful launch records. */
 function verify({ platform, needs, evidence, sha, scenarios, release }) {
 	assert.ok(['windows', 'macos'].includes(platform), 'Unknown desktop platform');
@@ -91,6 +130,8 @@ function verify({ platform, needs, evidence, sha, scenarios, release }) {
 			assert.equal(record.crashed_early, false, 'Application exited early');
 		} else if (record.scenario === 'clean') {
 			verifyNativeTimer(record.native_delayed_timer);
+		} else if (record.scenario === 'karabiner_config') {
+			verifyNativeKarabiner(record.native_karabiner_config);
 		}
 	}
 	assert.equal(hashes.size, 1, 'Scenarios launched different packages');
@@ -111,6 +152,7 @@ function recordMac(resultFile, archive, output) {
 	assert.deepEqual(result.failures, [], 'Launch reported failures');
 	assert.equal(typeof result.scenario, 'string', 'Missing scenario');
 	if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
+	if (result.scenario === 'karabiner_config') verifyNativeKarabiner(result.native_karabiner_config);
 	fs.writeFileSync(
 		output,
 		JSON.stringify({
@@ -121,7 +163,10 @@ function recordMac(resultFile, archive, output) {
 			scenario: result.scenario,
 			package_sha256: crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
 			failures: result.failures,
-			...(result.scenario === 'clean' ? { native_delayed_timer: result.native_delayed_timer } : {})
+			...(result.scenario === 'clean' ? { native_delayed_timer: result.native_delayed_timer } : {}),
+			...(result.scenario === 'karabiner_config'
+				? { native_karabiner_config: result.native_karabiner_config }
+				: {})
 		}) + '\n'
 	);
 }

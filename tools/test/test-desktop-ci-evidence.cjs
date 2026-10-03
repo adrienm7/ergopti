@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
+const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-pipeline.cjs');
 
 /** Returns the measured native admission summary that every clean launch owes. */
@@ -39,6 +40,21 @@ function timerSummary() {
 	};
 }
 
+/** Declares the complete private-file native qualification admission receipt. */
+function karabinerSummary() {
+	return {
+		...karabinerContract.summary_fixed,
+		version: '1.1.1',
+		nonce: 'a'.repeat(32),
+		pid: 42,
+		executable:
+			'/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon',
+		variant_count: 8,
+		manipulator_count: 480,
+		preference_restored: true
+	};
+}
+
 for (const platform of ['windows', 'macos']) {
 	for (const release of [false, true]) {
 		const jobs =
@@ -51,7 +67,8 @@ for (const platform of ['windows', 'macos']) {
 				: release
 					? ['macos-15', 'macos-15-intel']
 					: ['macos-15'];
-		const scenarios = platform === 'windows' ? ['startup'] : ['clean', 'upgraded'];
+		const scenarios =
+			platform === 'windows' ? ['startup'] : ['clean', 'upgraded', 'karabiner_config'];
 		const state = {
 			platform,
 			release,
@@ -71,6 +88,9 @@ for (const platform of ['windows', 'macos']) {
 					crashed_early: false,
 					...(platform === 'macos' && scenario === 'clean'
 						? { native_delayed_timer: timerSummary() }
+						: {}),
+					...(platform === 'macos' && scenario === 'karabiner_config'
+						? { native_karabiner_config: karabinerSummary() }
 						: {})
 				}))
 			)
@@ -113,6 +133,34 @@ for (const platform of ['windows', 'macos']) {
 				value.evidence[0].crashed_early = true;
 			});
 		} else {
+			for (const [field, replacement] of [
+				['complete', false],
+				['variant_count', 7],
+				['manipulator_count', 0],
+				['publication_scope', 'runtime-active'],
+				['lease_initialized', true],
+				['private_source_restored', false],
+				['codec_independent', false],
+				['native_equal_values_shared', false],
+				['preference_restored', false],
+				['nonce', ''],
+				['pid', 0],
+				['executable', '/foreign/Hammerspoon']
+			])
+				rejects((value) => {
+					value.evidence.find(
+						(record) => record.scenario === 'karabiner_config'
+					).native_karabiner_config[field] = replacement;
+				});
+			for (const field of Object.keys(karabinerSummary()))
+				rejects((value) => {
+					delete value.evidence.find((record) => record.scenario === 'karabiner_config')
+						.native_karabiner_config[field];
+				});
+			rejects((value) => {
+				delete value.evidence.find((record) => record.scenario === 'karabiner_config')
+					.native_karabiner_config;
+			});
 			for (const [field, replacement] of [
 				['complete', false],
 				['checks', 0],
@@ -170,6 +218,50 @@ try {
 	);
 } finally {
 	fs.rmSync(timerEvidenceRoot, { recursive: true, force: true });
+}
+
+const karabinerEvidenceRoot = fs.mkdtempSync(
+	path.join(os.tmpdir(), 'ergopti-native-karabiner-evidence-')
+);
+try {
+	const resultFile = path.join(karabinerEvidenceRoot, 'result.json');
+	const archive = path.join(karabinerEvidenceRoot, 'archive.zip');
+	const output = path.join(karabinerEvidenceRoot, 'evidence.json');
+	fs.writeFileSync(archive, 'owned archive fixture');
+	for (const summary of [undefined, {}, { ...karabinerSummary(), lease_initialized: true }]) {
+		fs.writeFileSync(
+			resultFile,
+			JSON.stringify({
+				scenario: 'karabiner_config',
+				failures: [],
+				native_karabiner_config: summary
+			})
+		);
+		assert.throws(
+			() => recordMac(resultFile, archive, output),
+			'native graph qualification must precede evidence publication'
+		);
+		assert.equal(
+			fs.existsSync(output),
+			false,
+			'refused native graph evidence must never be published'
+		);
+	}
+	fs.writeFileSync(
+		resultFile,
+		JSON.stringify({
+			scenario: 'karabiner_config',
+			failures: [],
+			native_karabiner_config: karabinerSummary()
+		})
+	);
+	recordMac(resultFile, archive, output);
+	assert.deepEqual(
+		JSON.parse(fs.readFileSync(output, 'utf8')).native_karabiner_config,
+		karabinerSummary()
+	);
+} finally {
+	fs.rmSync(karabinerEvidenceRoot, { recursive: true, force: true });
 }
 
 /** Pins a fresh shallow checkout and the exact independently gated core suites. */

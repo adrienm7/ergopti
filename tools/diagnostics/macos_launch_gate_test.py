@@ -15,6 +15,7 @@ import unittest
 from unittest import mock
 
 import hs_delayed_timer_probe as timer_probe
+import hs_karabiner_config_probe as karabiner_probe
 
 spec = importlib.util.spec_from_file_location(
     "launch_gate", Path(__file__).with_name("macos_launch_gate.py")
@@ -73,6 +74,31 @@ class VerdictTests(unittest.TestCase):
             with self.subTest(value=value):
                 failures = gate.evaluate("clean", observe(native_delayed_timer=value))
                 self.assertTrue(any("native delayed-timer" in failure for failure in failures))
+
+    def test_karabiner_scenario_requires_actual_graph_and_existing_error_assertions(self):
+        from hs_karabiner_config_probe_test import receipt, EXECUTABLE, NONCE, DOMAIN
+
+        summary = karabiner_probe.validate_receipt(receipt(), NONCE, 42, EXECUTABLE, DOMAIN)
+        summary["preference_restored"] = True
+        self.assertEqual(
+            gate.evaluate("karabiner_config", observe(native_karabiner_config=summary)), []
+        )
+        for changed in (
+            None,
+            dict(summary, private_source_restored=False),
+            dict(summary, lease_initialized=True),
+        ):
+            self.assertTrue(
+                gate.evaluate("karabiner_config", observe(native_karabiner_config=changed))
+            )
+        failures = gate.evaluate(
+            "karabiner_config",
+            observe(
+                native_karabiner_config=summary,
+                driver_log=HEALTHY["driver_log"] + "[ERROR] actual production refusal\n",
+            ),
+        )
+        self.assertTrue(any("actual production refusal" in failure for failure in failures))
 
     def test_clean_launch_retains_native_probe_refusal(self):
         failures = gate.evaluate("clean", observe(native_delayed_timer_error="scripting refused"))
@@ -533,6 +559,7 @@ class StateTests(unittest.TestCase):
 # logs-directory link added when launcher and driver log ownership converged.
 CI_PROFILE = [
     "clean",
+    "karabiner_config",
     "upgraded",
     "symlink_config",
     "symlink_hammerspoon",
@@ -545,6 +572,7 @@ CI_PROFILE = [
 ]
 RELEASE_PROFILE = [
     "clean",
+    "karabiner_config",
     "upgraded",
     "source_logs",
     "symlink_config",
@@ -625,8 +653,10 @@ class ProfileTests(unittest.TestCase):
 def load_tests(loader, tests, pattern):
     """Keep native receipt and preference checks in the existing package self-test."""
     import hs_delayed_timer_probe_test
+    import hs_karabiner_config_probe_test
 
     tests.addTests(loader.loadTestsFromModule(hs_delayed_timer_probe_test))
+    tests.addTests(loader.loadTestsFromModule(hs_karabiner_config_probe_test))
     return tests
 
 
