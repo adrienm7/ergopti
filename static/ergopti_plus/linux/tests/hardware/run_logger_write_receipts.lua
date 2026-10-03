@@ -43,6 +43,12 @@ local function read(path)
 	return content
 end
 
+local function write(path, content)
+	local file = assert(io.open(path, "w"))
+	assert(file:write(content))
+	assert(file:close())
+end
+
 local function paths(path)
 	local dirs = require("app_dirs")
 	local date = os.date("%Y-%m-%d")
@@ -116,6 +122,61 @@ check("ordinary native channels retain complete independent lines", function()
 	assert(not read(errors):find("Normal main channel receipt.", 1, true))
 	assert(read(errors):find("Normal mirrored channel receipt.", 1, true))
 	assert(Sink.is_file_sink_active())
+end)
+
+for _, operation in ipairs({ "install", "prepare", "repoint" }) do
+	check(operation .. " preserves a pre-existing native probe file", function()
+		local dir
+		if operation == "repoint" then
+			assert(Sink.install(Logger, { log_dir = directory("probe-original") }))
+			local state = directory("probe-state")
+			assert(uv.os_setenv("XDG_STATE_HOME", state))
+			directory("probe-state/ergopti_plus")
+			dir = directory("probe-state/ergopti_plus/logs")
+		else dir = directory("probe-" .. operation) end
+		local path, content = dir .. "/.write_probe", "Pre-existing user-owned bytes.\n"
+		write(path, content)
+		if operation == "install" then assert(Sink.install(Logger, { log_dir = dir }))
+		elseif operation == "prepare" then assert(Sink.prepare_dir(dir))
+		else assert(Sink.repoint()) end
+		assert(read(path) == content, "logger removed or changed the pre-existing file")
+	end)
+end
+
+check("prepare leaves an existing native probe symlink and its target intact", function()
+	local dir = directory("probe-symlink")
+	local target = dir .. "/target"
+	write(target, "Unrelated target bytes.\n")
+	assert(uv.fs_symlink(target, dir .. "/.write_probe"))
+	assert(Sink.prepare_dir(dir))
+	assert(uv.fs_readlink(dir .. "/.write_probe") == target, "logger removed the unrelated symlink")
+	assert(read(target) == "Unrelated target bytes.\n")
+end)
+
+check("prepare never follows a dangling native probe symlink", function()
+	local dir = directory("probe-dangling")
+	local target = dir .. "/missing-target"
+	assert(uv.fs_symlink(target, dir .. "/.write_probe"))
+	assert(Sink.prepare_dir(dir))
+	assert(not uv.fs_lstat(target), "logger created an unrelated symlink target")
+	assert(uv.fs_readlink(dir .. "/.write_probe") == target, "logger removed the dangling symlink")
+end)
+
+check("prepare refuses a genuinely read-only native directory", function()
+	local dir = directory("probe-read-only")
+	assert(uv.fs_chmod(dir, 320)) -- owner read/execute, no write
+	local ok, err = pcall(function()
+		local ready, reason = Sink.prepare_dir(dir)
+		assert(ready == false and type(reason) == "string", "read-only directory was admitted")
+	end)
+	assert(uv.fs_chmod(dir, 448))
+	assert(ok, err)
+end)
+
+check("prepare preserves literal quotes and line breaks and retires its private probe", function()
+	local dir = directory("probe-'quoted\r\npath")
+	assert(Sink.prepare_dir(dir))
+	assert(uv.fs_scandir_next(assert(uv.fs_scandir(dir))) == nil, "successful preparation left a probe behind")
 end)
 
 for index = #directories, 1, -1 do

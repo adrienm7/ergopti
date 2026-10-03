@@ -337,6 +337,16 @@ These are software implementations; final hardware verification remains below.
   and partial-failure assertions remain intact. macOS native app events have no
   textual ps header; Windows's existing launch/quit capability gap remains
   deferred. Focus/title logic and native cross-OS/manual CI are untouched.
+- [~] **L27.** Linux logger probe ownership: installation and repointing now
+  prove file access through their real log handles; directory preparation uses
+  an exclusively-created mktemp probe and checks write, flush, close and removal.
+  The fixed .write_probe previously deleted pre-existing files and symlinks and
+  created dangling-link targets. Five native and eight portable cases failed
+  before the fix. Thirteen native cases pass on host and nonroot Debian, including
+  real read-only refusal, literal line-break paths and prior ENOSPC recovery;
+  eight portable receipt cases cover every probe failure and successful cleanup.
+  Windows/macOS logger owners do not use the fixed Linux probe. Shared logging
+  policy, native cross-OS gates and manual CI remain unchanged or unexecuted.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

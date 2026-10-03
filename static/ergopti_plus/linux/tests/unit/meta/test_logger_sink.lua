@@ -75,6 +75,82 @@ local function cleanup(dir, date)
 	os.remove(dir .. "/ErgoptiPlus_errors_" .. date .. ".log")
 end
 
+--- Exercises the production preparation path with explicit stdio receipts.
+--- Native filesystem ownership is covered by run_logger_write_receipts.lua.
+local function with_probe_receipts(failure, test)
+	local Sink = helpers.load_module("infra.logger_sink")
+	local previous_open, previous_popen = io.open, io.popen
+	local previous_execute, previous_remove = os.execute, os.remove
+	local state = { opened = {}, removed = {}, written = 0, flushed = 0, closed = 0 }
+	local path = "/logger-receipts/.ergopti-log-probe-a1B2C3d4E5"
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		helpers.assert_contains(command, "mktemp --", "probe creation must be exclusive")
+		if failure == "create" then return nil, "refused" end
+		return { read = function() return path .. "\n" end, close = function() return true end }
+	end
+	io.open = function(name)
+		state.opened[#state.opened + 1] = name
+		if failure == "open" then return nil, "refused" end
+		local handle = {}
+		function handle:write(content)
+			state.written = state.written + #content
+			if failure == "throw" then error("native write raised") end
+			if failure == "write" then return nil, "write refused" end
+			return self
+		end
+		function handle:flush()
+			state.flushed = state.flushed + 1
+			if failure == "flush" then return nil, "flush refused" end
+			return true
+		end
+		function handle:close()
+			state.closed = state.closed + 1
+			if failure == "close" then return nil, "close refused" end
+			return true
+		end
+		return handle
+	end
+	os.remove = function(name)
+		state.removed[#state.removed + 1] = name
+		if failure == "remove" then return nil, "cleanup refused" end
+		return true
+	end
+	local ok, err = xpcall(function() test(Sink, state, path) end, debug.traceback)
+	io.open, io.popen = previous_open, previous_popen
+	os.execute, os.remove = previous_execute, previous_remove
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-logger-probe-receipts", function()
+	for _, failure in ipairs({ "create", "open", "write", "throw", "flush", "close", "remove" }) do
+		helpers.it("linux-logger-probe-receipts: refuses " .. failure .. " and retires only its owned probe", function()
+			with_probe_receipts(failure, function(Sink, state, path)
+				local ready, reason = Sink.prepare_dir("/logger-receipts")
+				helpers.assert_eq(ready, false, "failed preparation cannot approve a logs directory")
+				helpers.assert_eq(type(reason), "string")
+				helpers.assert_eq(#state.removed, failure == "create" and 0 or 1)
+				if failure ~= "create" then helpers.assert_eq(state.removed[1], path) end
+				helpers.assert_eq(state.closed, (failure == "create" or failure == "open") and 0 or 1,
+					"even a failed write must retire its descriptor")
+			end)
+		end)
+	end
+
+	helpers.it("linux-logger-probe-receipts: successful preparation proves write, flush, close and cleanup", function()
+		with_probe_receipts(nil, function(Sink, state, path)
+			helpers.assert_true(Sink.prepare_dir("/logger-receipts"))
+			helpers.assert_eq(#state.opened, 1)
+			helpers.assert_eq(state.opened[1], path)
+			helpers.assert_true(state.written > 0, "opening an empty file cannot prove buffered durability")
+			helpers.assert_eq(state.flushed, 1)
+			helpers.assert_eq(state.closed, 1)
+			helpers.assert_eq(#state.removed, 1)
+			helpers.assert_eq(state.removed[1], path)
+		end)
+	end)
+end)
+
 
 
 
