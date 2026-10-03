@@ -1251,6 +1251,8 @@ The selected local gates pass 353 JS checks, 13,302 macOS units, 101 macOS E2E c
 
 Windows native registration now retains an explicitly supplied default group when category/section provenance is also present. Both metadata containers derive a group only when no explicit group exists; four registered native cases retain exact group indexes, matching, specification identity and insertion sequence for explicit default, named, future, legacy-empty and omitted owners. Supplemental actual Lua-owner probes retain their existing explicit-group behavior. Selected portable syntax, encoding and JS gates pass; actual Windows execution remains pending CI. This is a prerequisite for personal-file provenance: Windows personal-file identity, live/preview gates and menu commands remain incomplete, so item 102 stays partial.
 
+Windows ordinary personal packs now retain the authoritative recursive source label and parsed section in live metadata, matching their preview rows without changing the historical default activation owner. Selected official sections keep their existing derived group, resolved delay and priority. Registered native regressions and portable 353-check/encoding gates cover this prerequisite; actual Windows qualification remains pending CI. The shared personal-file identity, live/preview gate owner and menu commands remain incomplete, so item 102 stays partial.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
