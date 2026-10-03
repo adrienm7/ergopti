@@ -26,7 +26,7 @@
 ---    is cheaper than rediscovering it.
 --- 5. Dependency-free by construction. This module is installed before any
 ---    adapter, and `adapters/shell_runner.lua` itself requires the logger — so
----    using it here would be a load-time cycle. The one shell-out (mkdir) quotes
+---    using it here would be a load-time cycle. mkdir and mktemp quote
 ---    inline with the same POSIX idiom, and a unit test pins that quoting against
 ---    `shell_runner.quote()` so the two can never diverge.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
@@ -179,14 +179,8 @@ end
 local function ensure_dir(dir)
 	-- `mkdir -p` is idempotent, so this is safe to call on every install.
 	local ok = os.execute("mkdir -p " .. M.shell_quote(dir) .. " 2>/dev/null")
-	-- os.execute returns true / 0 / (true, "exit", 0) depending on the Lua build,
-	-- so probe the result by actually opening a file rather than trusting it.
-	local probe = io.open(dir .. "/.write_probe", "a")
-	if probe then
-		probe:close()
-		os.remove(dir .. "/.write_probe")
-		return true
-	end
+	-- The actual log handles prove writability at install/repoint. A fixed probe
+	-- here deleted unrelated files and followed unrelated symlinks.
 	return ok == true or ok == 0
 end
 
@@ -373,21 +367,43 @@ end
 --- @return boolean ready
 --- @return string|nil error_message
 function M.prepare_dir(dir)
-	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" then
+	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" or dir:find("\0", 1, true) then
 		return false, "the logs folder must be an absolute path"
 	end
 	if not ensure_dir(dir) then
 		return false, "the logs folder '" .. dir .. "' could not be created"
 	end
-	-- ensure_dir() trusts a zero mkdir status when its probe fails, which an
-	-- existing read-only folder returns: prove the write here.
-	local probe_path = dir .. "/.write_probe"
-	local probe = io.open(probe_path, "a")
-	if not probe then
+	-- mktemp exclusively creates a mode-0600 file. Only that owned path may be
+	-- opened and removed; .write_probe may already belong to somebody else.
+	local created, probe_path = pcall(function()
+		local pipe = io.popen("mktemp -- " .. M.shell_quote(dir .. "/.ergopti-log-probe-XXXXXXXXXX")
+			.. " 2>/dev/null", "r")
+		if not pipe then return nil end
+		local path = pipe:read("*a")
+		pipe:close()
+		-- Preserve any literal line breaks in dir; only mktemp's final LF frames it.
+		if type(path) ~= "string" or path:sub(-1) ~= "\n" then return nil end
+		path = path:sub(1, -2)
+		local prefix = dir .. "/.ergopti-log-probe-"
+		if path:sub(1, #prefix) ~= prefix or not path:sub(#prefix + 1):match("^%w+$") then return nil end
+		return path
+	end)
+	if not created or not probe_path then
 		return false, "the logs folder '" .. dir .. "' is not writable"
 	end
-	probe:close()
-	os.remove(probe_path)
+	local opened, probe = pcall(io.open, probe_path, "a")
+	local wrote, accepted = false, false
+	local closed_ok, closed = false, false
+	if opened and probe then
+		wrote, accepted = pcall(function()
+			return probe:write("Ergopti logger write probe.\n") and probe:flush()
+		end)
+		closed_ok, closed = pcall(probe.close, probe)
+	end
+	local removed_ok, removed = pcall(os.remove, probe_path)
+	if not wrote or not accepted or not closed_ok or not closed or not removed_ok or not removed then
+		return false, "the logs folder '" .. dir .. "' could not complete a write probe"
+	end
 	return true
 end
 
