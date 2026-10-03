@@ -1036,6 +1036,21 @@ requires CI.
 
 The Windows brightness owner also fences cancellation and post-start retirement by the captured request ID: a synchronously acquired successor cannot be retired by its predecessor. Registered native Job/quiescence and synchronous-refusal regressions preserve exact successor identity, generation, action and zero borrowed handles. These native Windows cases remain pending CI.
 
+Native Windows provider replay now avoids a String-constrained fixture
+Policy variable shadowing the dot-sourced worker JSON object, and forwards
+the exact nested-script LASTEXITCODE to its owned PowerShell process.
+Closed fixture-only stage, write-count and policy-type observations retain
+all original status/exit/readback assertions. A native typed-scope negative
+deliberately reproduces the original refusal without touching hardware.
+Corrected replay and that causal control still require Windows CI; the
+shipped worker and its real provider behavior are unchanged.
+
+      The Windows backlight owner is registered in the required suspend transaction,
+      which now requires its exact native retirement acknowledgement. A refused or
+      missing receipt retains cleanup debt and compensation; both short-lived worker
+      and debt polls expose the canonical shared 50 ms period to the strict fast-timer
+      inventory. Hosted AHK validation of these owner and period cases remains pending.
+
 ## Maintainer requests on 2026-10-01
 
 Every request the maintainer makes is written here first and removed once it

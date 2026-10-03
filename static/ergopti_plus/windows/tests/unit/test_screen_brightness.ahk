@@ -221,13 +221,14 @@ Test("screen brightness: notice refusal preserves exact terminal settlement", ()
 ; =============================================
 ; =============================================
 
-_SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit) {
+_SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
+		ExpectedStage := "readback", ExpectedPolicyType := "object") {
 	global _DriverDir, _SharedDir, _VendorDir
 	Observed := []
 	Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
-		"-Policy", _SharedDir . "\modules\actions\brightness.json",
+		"-FixturePolicyPath", _SharedDir . "\modules\actions\brightness.json",
 		"-Action", "brightness_up", "-Mode", Mode],
 		(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 	try {
@@ -238,8 +239,12 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit) {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "the actual native provider worker settles once")
-		AssertEqual(ExpectedExit, Observed[1]["exit"])
+		AssertEqual("", Observed[1]["stderr"], "the real provider fixture exposes no hidden native failure")
 		Receipt := JsonParse(Observed[1]["stdout"])
+		AssertEqual(ExpectedCalls, Receipt["fixture_calls"], "only the exact native WMI writer contributes a call")
+		AssertEqual(ExpectedStage, Receipt["fixture_stage"], "the actual provider records its closed terminal stage")
+		AssertEqual(ExpectedPolicyType, Receipt["fixture_policy_type"], "the worker retains its real policy type across the fixture scope")
+		AssertEqual(ExpectedExit, Observed[1]["exit"])
 		AssertEqual(ExpectedStatus, Receipt["status"])
 		AssertEqual("brightness_up", Receipt["action"])
 		AssertEqual(ExpectedStatus == "applied", BrightnessAcknowledged(_SBT_Data(), "brightness_up", Receipt),
@@ -249,9 +254,11 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit) {
 	}
 }
 Test("screen brightness: native PowerShell provider uses the actual WMI ABI", () => _SBT_NativeProvider("applied", "applied", 0))
-Test("screen brightness: native PowerShell refuses absent backlight providers", () => _SBT_NativeProvider("unsupported", "unsupported", 0))
-Test("screen brightness: native PowerShell refuses an unacknowledged write", () => _SBT_NativeProvider("write-refused", "refused", 1))
+Test("screen brightness: native PowerShell refuses absent backlight providers", () => _SBT_NativeProvider("unsupported", "unsupported", 0, 0, "enumerate_methods"))
+Test("screen brightness: native PowerShell refuses an unacknowledged write", () => _SBT_NativeProvider("write-refused", "refused", 1, 1, "write"))
 Test("screen brightness: native PowerShell refuses a mismatched readback", () => _SBT_NativeProvider("readback-refused", "refused", 1))
+Test("screen brightness: native String-constrained dot-source policy reproduces the original provider refusal",
+	() => _SBT_NativeProvider("typed-policy-collision", "refused", 1, 0, "before_provider", "string"))
 
 
 
