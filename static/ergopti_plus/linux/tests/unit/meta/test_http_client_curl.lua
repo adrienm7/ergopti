@@ -117,6 +117,38 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
+		for _, signal in ipairs({ 15, 9, 10, 12 }) do
+			helpers.it("linux-cli-signal-receipts: " .. method .. " rejects signal " .. signal, function()
+				local client, state
+				if method == "sha256" then client, state = fresh_digest() else client, state = fresh_client() end
+				local result, callbacks = nil, 0
+				local function done(value) result, callbacks = value, callbacks + 1 end
+				if method == "get" then client.get("http://127.0.0.1/receipt", {}, {}, done)
+				elseif method == "post" then client.post("http://127.0.0.1/receipt", {}, "{}", done)
+				elseif method == "download" then client.download("http://127.0.0.1/receipt", {}, "/tmp/receipt", {}, done)
+				elseif method == "stream" then client.postStream("http://127.0.0.1/receipt", {}, "{}", {}, function() end, done)
+				else client.sha256("/tmp/receipt", {}, function(value, failure)
+					done({ ok = value ~= nil, digest = value, error = failure })
+				end) end
+				if method == "stream" then
+					state.stdout("body")
+					state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+				elseif method == "sha256" then state.stdout(string.rep("a1", 32) .. " */tmp/receipt\0")
+				else state.stdout("body\nERGOPTI_HTTP_STATUS:200\n") end
+				state.stdout(nil)
+				state.stderr(nil)
+				state.exit(0, signal)
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_true(result.error:find(tostring(128 + signal), 1, true) ~= nil)
+				if method == "sha256" then helpers.assert_eq(result.digest, nil)
+				else helpers.assert_eq(result.status, 200); helpers.assert_eq(result.body, "") end
+				helpers.assert_true(not client.isActive())
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+			end)
+		end
+	end
 	for _, method in ipairs({ "get", "post", "download" }) do
 		for _, completed in ipairs({ false, true }) do
 			helpers.it("linux-buffered-http-receipt: " .. method .. " validates "

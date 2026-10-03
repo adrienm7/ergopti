@@ -231,6 +231,17 @@ These are software implementations; final hardware verification remains below.
   Windows decodes registry values per get; macOS hs.settings serializes values
   across its native settings boundary. No new serialization policy, TOML owner,
   personal menu, native cross-OS suite or manual CI was introduced or changed.
+- [~] **L17.** Linux HTTP/digest signal receipts: both remaining libuv process
+  owners now use the same exit-status helper as ShellRunner and ProcessRunner.
+  HTTP 200 or valid digest bytes cannot prove a successful process when its
+  separate native termination signal is nonzero. Twenty native and twenty
+  portable cases failed before the fix. Thirty native cases delegate unchanged
+  arguments to actual curl/sha256sum, then controlled wrappers signal themselves
+  or exit normally; all payloads come from the GNU tools and owned loopback HTTP.
+  Four real signals, buffered/streaming HTTP, downloads and hashing are covered.
+  Windows curl process status and CNG, and macOS native HTTP/task status, do not
+  expose this libuv split receipt. Native cross-OS validation and manual CI remain
+  deferred.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

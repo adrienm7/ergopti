@@ -13,6 +13,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local LibuvExit = require("infra.libuv_exit")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -372,7 +373,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		detached = true,
 	}, function(code, signal)
 		request.exited = true
-		request.exit_code = tonumber(code) or -1
+		request.exit_code = LibuvExit.status(code, signal)
 		request.exit_signal = signal
 		maybe_complete(request)
 		close_process(request)
