@@ -50,6 +50,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-personal-file-descriptors.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/hotstrings/personal_files.lua',
+			'static/ergopti_plus/windows/_generated/personal_file_descriptors.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-window-titles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/window_titles.lua',

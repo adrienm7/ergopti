@@ -40,9 +40,11 @@ local TomlCodec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local BulkScope = require("hotstrings.bulk_scope")
+local PersonalFiles = require("hotstrings.personal_files")
 local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
+local _personal_sources = {}
 
 -- Where per-category and per-section overrides are persisted. A TOML beside the
 -- packs rather than a storage key, because it is a file the user is expected to
@@ -1108,6 +1110,16 @@ end
 --- @return table Array of absolute paths.
 local function resolve_paths()
 	local by_stem, order, user_paths = {}, {}, {}
+	local personal_sources, descriptors_by_path = {}, {}
+	local function discover_personal(path, root)
+		local relative = path:sub(#root + 1):gsub("^/+", "")
+		local components = {}
+		for component in relative:gmatch("[^/]+") do components[#components + 1] = component end
+		if #components == 1 and components[1] == "personal_hotstrings.toml" then return end
+		local descriptor = PersonalFiles.describe(components)
+		descriptors_by_path[path] = descriptor
+		personal_sources[#personal_sources + 1] = { path = path, descriptor = PersonalFiles.copy(descriptor) }
+	end
 
 	--- @param path string
 	local function add(path)
@@ -1120,7 +1132,10 @@ local function resolve_paths()
 	-- A single file as the config is the explicit-path case, and it means exactly
 	-- that file — no merge, because the user named one thing.
 	if _config_dir and _config_dir:match("%.toml$") then
-		return { _config_dir }
+		local root = _config_dir:match("^(.*)/[^/]+$") or ""
+		discover_personal(_config_dir, root)
+		local descriptor = descriptors_by_path[_config_dir]
+		return { descriptor and { path = _config_dir, personal_source = descriptor } or _config_dir }, personal_sources
 	end
 
 	local ok_paths, Paths = pcall(require, "infra.paths")
@@ -1138,6 +1153,7 @@ local function resolve_paths()
 		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do
 			if not in_language_folder(path, _config_dir) then
 				add(path)
+				discover_personal(path, _config_dir:gsub("/+$", ""))
 				user_paths[path] = true
 			end
 		end
@@ -1176,7 +1192,21 @@ local function resolve_paths()
 		paths[#paths + 1] = entry
 	end
 
-	return paths
+	for position, source in ipairs(paths) do
+		local path = type(source) == "table" and source.path or source
+		local descriptor = descriptors_by_path[path]
+		if descriptor then
+			local owned = {}
+			if type(source) == "table" then
+				for key, value in pairs(source) do owned[key] = value end
+			else
+				owned.path = source
+			end
+			owned.personal_source = PersonalFiles.copy(descriptor)
+			paths[position] = owned
+		end
+	end
+	return paths, personal_sources
 end
 
 --- Loads one complete catalogue and reports whether runtime publication succeeded.
@@ -1194,7 +1224,7 @@ function M.load_all()
 		return #_mappings, false, "choices-unavailable"
 	end
 
-	local staged_paths = resolve_paths()
+	local staged_paths, staged_personal_sources = resolve_paths()
 
 	-- An empty catalogue is not an empty load. This used to return here, which
 	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
@@ -1300,6 +1330,7 @@ function M.load_all()
 		return #_mappings, false, reason
 	end
 	_toml_paths = staged_paths
+	_personal_sources = staged_personal_sources
 	_mappings = staged_mappings
 	_categories = staged_categories
 	_published = true
@@ -1502,6 +1533,17 @@ end
 function M.is_group_enabled(group_name)
 	if not _choices then return false end
 	return group_choice(_choices, group_name)
+end
+
+--- Returns independently owned discovered personal-source records after publication.
+--- Legacy overlay losers remain discoverable without being presented as live mappings.
+--- @return table sources
+function M.personal_file_sources()
+	local sources = {}
+	for index, source in ipairs(_personal_sources) do
+		sources[index] = { path = source.path, descriptor = PersonalFiles.copy(source.descriptor) }
+	end
+	return sources
 end
 
 function M.get_groups()

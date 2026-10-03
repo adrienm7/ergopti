@@ -126,7 +126,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		tokens_from_repl = function(value) return value end,
 		plain_text = function(value) return value end,
 	}
-	local mapping = {
+	local mapping = options.mapping or {
 		auto = false,
 		group = nil,
 		section = "fixture",
@@ -613,5 +613,30 @@ helpers.describe("llm_bridge: a no-row match stays intentionally invisible", fun
 		helpers.assert_eq(fixture.renders, 0)
 		helpers.assert_eq(fixture.resets, resets_before + 2,
 			"the ordinary match reset plus failure cleanup must leave the prediction engine closed")
+	end)
+end)
+
+
+helpers.describe("personal-file identity reaches the deferred native preview owner", function()
+	helpers.it("publishes the actual registered source id without changing the promised expansion", function()
+		local Registry = helpers.load_with_stubs("modules.keymap.registry")
+		local State = helpers.load_with_stubs("modules.keymap.state")
+		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+		helpers.assert_true(Registry.init(state))
+		Registry.set_group_context("personal_ext_memory")
+		Registry.add("abc", "replacement", { auto_expand = false, is_case_sensitive_strict = true,
+			personal_source = require("hotstrings.personal_files").describe({ "Équipe", "mémoire.toml" }) })
+		helpers.assert_eq(#state.mappings, 1)
+		Registry.set_group_context(nil)
+		local mapping = state.mappings[1]
+		helpers.assert_not_nil(mapping)
+		local fixture = load_fixture(true, true, { mapping = mapping })
+		fixture.bridge.update_preview(fixture.state.buffer)
+		drain(fixture)
+		helpers.assert_eq(fixture.renders, 1)
+		helpers.assert_eq(fixture.visible_rows[1].text, "replacement")
+		helpers.assert_eq(fixture.visible_rows[1].personal_source_id,
+			"personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c")
+		helpers.assert_eq(fixture.visible_rows[1].dimmed, false)
 	end)
 end)

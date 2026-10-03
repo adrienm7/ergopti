@@ -959,6 +959,7 @@ function M.update_preview(buf)
 					-- _shared/modules/personal_info/fields.toml — read at runtime, so
 					-- this driver holds no opinion of its own about it.
 					text          = masked_for_preview(m),
+					personal_source_id = m.mapping and m.mapping.personal_source and m.mapping.personal_source.id or nil,
 					tint          = tooltip.tint(tint_key),
 					-- This candidate came from resolve_magic_action (or a provider
 					-- interceptor that runs on the same key). An autocorrection may also

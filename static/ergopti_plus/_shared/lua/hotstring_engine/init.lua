@@ -53,6 +53,7 @@ local Logger = require("logger.shim")
 -- gets them. Reimplementing any of it here would be a second Unicode case table
 -- — the accented and French-punctuation mappings are the whole difficulty.
 local text_utils = require("text_utils")
+local PersonalFiles = require("hotstrings.personal_files")
 
 local LOG = "shared.hotstring_engine"
 
@@ -332,6 +333,7 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 			replacement = eff or mapping.replacement,
 			group       = mapping.group,
 			section     = mapping.section,
+			personal_source_id = mapping.personal_source and mapping.personal_source.id or nil,
 			fires       = fires,
 			-- Distinguished from merely losing: a mapping whose own conditions
 			-- refuse it here (word boundary, case, terminator) is struck through,
@@ -518,6 +520,7 @@ function M.new()
 				-- expansion-delay gate on the keystroke path, and the preview's
 				-- per-section "hide the bubble" override.
 				section      = source.section,
+				personal_source = source.personal_source and PersonalFiles.copy(source.personal_source) or nil,
 				-- Provenance, carried since 2026-08-05. This record is a WHITELIST —
 				-- anything the loader does not copy is gone by the time a consumer
 				-- sees a match — and both of these were being dropped here, one layer
@@ -589,6 +592,10 @@ function M.new()
 
 		local loaded = 0
 		for _, m in ipairs(mappings) do
+			if m.personal_source ~= nil and not PersonalFiles.is_descriptor(m.personal_source) then
+				Logger.error(LOG, "load_mappings(): invalid personal-file descriptor — retaining the catalogue.")
+				return false
+			end
 			if type(m.trigger) == "string" and m.trigger ~= "" and type(m.replacement) == "string" then
 				if m.is_case_sensitive_strict == true then
 					register(m.trigger, m.replacement, "exact", m)
@@ -772,6 +779,7 @@ function M.new()
 			-- it always resolved at the CATEGORY level and a per-section delay, the
 			-- third rung of five, could never take effect.
 			section            = mapping.section,
+			personal_source_id = mapping.personal_source and mapping.personal_source.id or nil,
 			-- The mapping's payload is PII and must not be persisted or logged in
 			-- clear. This travels with the RESULT rather than being looked up again
 			-- by the caller because the caller no longer holds the mapping: by the

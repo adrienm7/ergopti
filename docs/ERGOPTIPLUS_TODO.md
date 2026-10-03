@@ -1379,6 +1379,10 @@ Windows ordinary personal packs now retain the authoritative recursive source la
 
 The native Windows checkpoint 37118530448 passes the two source-retaining TOML contracts and reaches 7,988 successful tests. Its two remaining personal-provenance failures compare the short A_Temp spelling with the existing native enumerator's canonical long path before reaching the metadata assertions. The fixture now obtains its expected path independently through Win32 GetLongPathNameW and checks both actual root spellings, preserving the Unicode labels, exact live specifications, insertion order, activation owner and preview assertions. Portable source and encoding gates pass; execution of these corrected native cases and complete three-OS packaging/installation remain pending CI. Item 102 stays partial.
 
+TODO 102 remains partial. The shared personal-file policy now supplies reversible UTF-8 relative-component descriptors in a distinct, dot-free namespace; Windows, macOS and Linux transport owned descriptor snapshots through their real discovery, registry and compiled live/preview owners. Independent goldens distinguish nested names, dotted names, double underscores, Unicode normalization, bundled names and the historically admitted empty-stem `.toml` filename. Legacy activation, sparse settings, root overlays, registry order and output semantics are preserved.
+
+The descriptors are provenance, not an adopted settings key or a file lease. The next cohort must admit these exact shared identities into the existing acknowledged Dynamic scope/menu/persistence owners, with stale-source and file-alias refusal, before claiming personal-file collisions or per-file gates are fixed. Native Windows execution and full three-OS packaging/install validation remain required.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
