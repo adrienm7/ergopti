@@ -334,6 +334,14 @@ remain pending in the next macOS install/launch run.
   six regressions. Complete native Swift, helper registration and three-OS
   qualification remain pending.
 
+Signed-helper acceptance run 37081066757 passed actual native registration,
+unregistration and idempotence without a release. The replacement fixture
+now acknowledges both weak runtime retirement and actual singleton-lock
+release within its existing two-second bound. A retained native ACK callback
+must continue to block replacement until it truly exits; every generation
+and transport assertion remains intact. Native XCTest requalification and
+the complete three-OS checkpoint remain pending.
+
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 - [ ] **37.** Item 23 decisions: whether « Hotstrings Ergopti » should appear
