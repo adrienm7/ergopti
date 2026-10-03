@@ -554,7 +554,7 @@ _ConfigMigrateWriterBatch(Before, After, &DropSections) {
 
 ; A stamp-only migration has no configuration edit to serialize. Preserve the
 ; original records and comments, changing only the scalar metadata value.
-_ConfigMigrateStampCandidate(Source, Version) {
+_ConfigMigrateStampCandidate(Source, Version, Scan) {
 	Bom := SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : ""
 	Text := Bom != "" ? SubStr(Source, 2) : Source
 	Eol := InStr(Text, "`r`n") ? "`r`n" : "`n"
@@ -592,7 +592,9 @@ _ConfigMigrateStampCandidate(Source, Version) {
 		Separator := MetaInsert > StrLen(Text) && SubStr(Text, -1) != "`n" ? Eol : ""
 		return Bom . SubStr(Text, 1, MetaInsert - 1) . Separator . Stamp . SubStr(Text, MetaInsert)
 	}
-	return Bom . "[_meta]" . Eol . Stamp . Eol . Text
+	; The shared record owner inserts new metadata after opaque root records.
+	return _ConfigMigrateRenderRecords(Source,
+		[{ Section: "_meta", Key: "schema_version", Value: Version }], [], Scan)["content"]
 }
 
 ; Plans the migration of Source for Driver without I/O. Returns Map("outcome",
@@ -628,9 +630,10 @@ ConfigMigratePlan(Source, Registry, Driver) {
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
 	try {
 		if Updates.Length == 1 && DropSections.Length == 0
-				&& Updates[1].Section == "_meta" && Updates[1].Key == "schema_version"
-			Built := Map("status", "ok", "content", _ConfigMigrateStampCandidate(Source, Registry["current"]))
-		else
+				&& Updates[1].Section == "_meta" && Updates[1].Key == "schema_version" {
+			_ConfigMigrateRecordValidateTargets(Scan, Updates, DropSections)
+			Built := Map("status", "ok", "content", _ConfigMigrateStampCandidate(Source, Registry["current"], Scan))
+		} else
 			Built := _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan)
 	} catch as Err {
 		Plan["detail"] := "the migration record renderer refused: " . Err.Message
