@@ -332,13 +332,18 @@ function windowsSmokeWaitProblems(script, timeoutMinutes) {
 		// The opener declares the parameters, so a token found there proves
 		// nothing is printed: only the body counts.
 		const diagnostics = pipeline.scriptBlock(code, 'function Write-LaunchDiagnostics').slice(1);
+		const descendants = diagnostics.some(
+			(line) => line.trim() === 'Write-StartupOwnershipEvidence $Process'
+		)
+			? pipeline.scriptBlock(code, 'function Write-StartupOwnershipEvidence')
+			: [];
 		for (const [pattern, what] of [
 			[WINDOWS_SMOKE_PRINTS_ELAPSED, 'the elapsed time'],
 			[/\[SmokeWindows\]::Describe\(/, 'the windows of the process'],
 			[/\bWin32_Process\b/, 'its child processes'],
 			[/\$ergoptiDir\b/, 'the bundle tree']
 		]) {
-			if (!diagnostics.some((line) => pattern.test(line))) {
+			if (![...diagnostics, ...descendants].some((line) => pattern.test(line))) {
 				problems.push(`the Windows exe smoke diagnostics must print ${what} (${pattern.source})`);
 			}
 		}
@@ -491,6 +496,158 @@ if (windowsSmokeStep !== null) {
 	]) {
 		if (windowsSmokeWaitProblems(mutate(script), timeout).length === 0) {
 			errors.push(`the Windows exe smoke wait check cannot detect ${what}`);
+		}
+	}
+}
+
+/** The failure observer must retain actual process identity after the parent exits. */
+function windowsStartupEvidenceProblems(script) {
+	const problems = [];
+	const code = script.filter((line) => !line.trimStart().startsWith('#'));
+	try {
+		const diagnostic = pipeline.scriptBlock(code, 'function Write-LaunchDiagnostics');
+		const call = diagnostic.findIndex(
+			(line) => line.trim() === 'Write-StartupOwnershipEvidence $Process'
+		);
+		const exited = diagnostic.findIndex((line) => line.includes('if ($Process.HasExited)'));
+		if (call < 0 || exited < 0 || call >= exited) {
+			problems.push(
+				'startup identity/descendant/log evidence must run even after the tracked parent exits'
+			);
+		}
+		const body = pipeline
+			.scriptBlock(code, 'function Write-StartupOwnershipEvidence')
+			.map((line) => line.trim());
+		for (const statement of [
+			'Write-Host ($launchOwner | ConvertTo-Json -Compress)',
+			'$rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, ExecutablePath -OperationTimeoutSec 2 -ErrorAction Stop)',
+			'$parentExitUtc = if ($Process.HasExited) { $Process.ExitTime.ToUniversalTime() } else { [DateTime]::UtcNow }',
+			'for ($depth = 0; $depth -lt 4 -and $frontier.Count -gt 0; $depth++) {',
+			'if ($observed -ge 16) { $truncated = $true; continue }',
+			'$qualified = $parent.Qualified -and $null -ne $parent.Created -and $null -ne $created -and $created -ge $parent.Created -and $created -le $parent.Until',
+			'$sameExecutable = $null -ne $row.ExecutablePath -and [string]::Equals($row.ExecutablePath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)',
+			'$count = [int][Math]::Min(4096, $length)',
+			'$read = $stream.Read($bytes, 0, $count)',
+			'if ($null -ne $stream) { $stream.Dispose() }'
+		]) {
+			if (!body.includes(statement))
+				problems.push(`startup evidence lost its bounded native statement: ${statement}`);
+		}
+		for (const field of [
+			'parent_pid =',
+			'created_utc =',
+			'lineage_qualified =',
+			'same_executable =',
+			'read_bytes =',
+			'truncated =',
+			"status = 'unavailable'",
+			'modified_since_launch ='
+		]) {
+			if (!body.some((line) => line.includes(field)))
+				problems.push(`startup evidence lost truthful field ${field}`);
+		}
+		if (body.some((line) => /CommandLine|\.Kill\(|Stop-Process|ready\s*=\s*\$true/.test(line))) {
+			problems.push(
+				'diagnostic observations must neither print argv nor authorize readiness/retirement'
+			);
+		}
+		const formatter = pipeline.scriptBlock(code, 'function Format-StartupEvidenceText').join('\n');
+		if (
+			!formatter.includes('$Limit = 2048') ||
+			!formatter.includes('$Text.Substring(0, $Limit)') ||
+			!formatter.includes('[truncated]')
+		) {
+			problems.push(
+				'native errors/foreign paths must be explicitly bounded and marked when truncated'
+			);
+		}
+		for (const capture of [
+			'$launchOwner.start_utc = $proc.StartTime.ToUniversalTime()',
+			'$actualLaunchPath = $proc.MainModule.FileName',
+			'$launchOwner.observed_executable = Format-StartupEvidenceText $actualLaunchPath',
+			'$launchOwner.identity_qualified = [string]::Equals($actualLaunchPath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)'
+		]) {
+			if (!code.some((line) => line.trim() === capture))
+				problems.push(`native initial owner receipt lost ${capture}`);
+		}
+	} catch (error) {
+		problems.push(`native startup evidence is missing: ${error.message}`);
+	}
+	return problems;
+}
+
+if (windowsSmokeStep !== null) {
+	const script = pipeline.runOf(windowsSmokeStep) ?? [];
+	errors.push(...windowsStartupEvidenceProblems(script));
+	for (const [name, before, after] of [
+		[
+			'disabled collector',
+			'Write-StartupOwnershipEvidence $Process',
+			'if ($false) { Write-StartupOwnershipEvidence $Process }'
+		],
+		['missing native initial start', '$proc.StartTime.ToUniversalTime()', '$null'],
+		['missing native initial executable', '$proc.MainModule.FileName', '$exe'],
+		[
+			'guessed initial identity',
+			'$launchOwner.identity_qualified = [string]::Equals',
+			'$launchOwner.identity_qualified = $true; [string]::Equals'
+		],
+		['unbounded CIM wait', '-OperationTimeoutSec 2', ''],
+		['missing parent lifetime end', '$created -le $parent.Until', '$true'],
+		['missing parent lifetime start', '$created -ge $parent.Created', '$true'],
+		['unbounded descendant count', '$observed -ge 16', '$false'],
+		['unbounded descendant depth', '$depth -lt 4', '$true'],
+		['unbounded log read', '[Math]::Min(4096, $length)', '$length'],
+		['lost file-handle cleanup', '$stream.Dispose()', '$null'],
+		['lost observation error', "status = 'unavailable'", "status = 'observed'"],
+		['lost path/error truncation', '$Text.Substring(0, $Limit)', '$Text'],
+		['private argv', 'executable = $observedPath;', 'executable = $row.CommandLine;']
+	]) {
+		const source = script.join('\n');
+		const changed = source.replaceAll(before, after);
+		if (changed === source || windowsStartupEvidenceProblems(changed.split('\n')).length === 0) {
+			errors.push(`startup evidence regression guard missed ${name}`);
+		}
+	}
+	// Exercise the actual embedded catalogue reader against an independent parser.
+	// The Windows function is diagnostic only; no simulated process qualifies it.
+	const program = /\$catalogJson = & python -c '([^']+)'/.exec(script.join('\n'))?.[1];
+	if (!program) {
+		errors.push(
+			'native startup logs must resolve the existing shared application directory catalogue'
+		);
+	} else {
+		const { spawnSync } = require('node:child_process');
+		const TOML = require('smol-toml');
+		const catalogPath = path.join(root, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml');
+		const catalog = TOML.parse(fs.readFileSync(catalogPath, 'utf8'));
+		const expected = {
+			base: catalog.logs.windows.base,
+			segments: catalog.logs.windows.segments.map((value) =>
+				value.replaceAll('{app}', catalog.app.folder_name)
+			),
+			prefix: catalog.logs.files.unified_prefix,
+			extension: catalog.logs.files.extension
+		};
+		const result = spawnSync(
+			process.platform === 'win32' ? 'python' : 'python3',
+			['-c', program, catalogPath],
+			{ encoding: 'utf8', timeout: 5000 }
+		);
+		try {
+			if (
+				result.error ||
+				result.status !== 0 ||
+				JSON.stringify(JSON.parse(result.stdout)) !== JSON.stringify(expected)
+			) {
+				errors.push(
+					'the actual native startup catalogue program disagrees with the independent shared TOML reader'
+				);
+			}
+		} catch {
+			errors.push(
+				'the actual native startup catalogue program did not return a complete JSON receipt'
+			);
 		}
 	}
 }

@@ -824,9 +824,86 @@ jobs:
           }
           '@
 
+          # Evidence only: observations never authorize a handoff or replace the
+          # original crash/marker/dialog verdict. Process argv is never printed.
+          function Format-StartupEvidenceText([string]$Text, [int]$Limit = 2048) {
+              if ($Text.Length -le $Limit) { return $Text }
+              return $Text.Substring(0, $Limit) + " [truncated]"
+          }
+
+          function Write-StartupOwnershipEvidence([System.Diagnostics.Process]$Process) {
+              Write-Host "---- native startup identity; observations are not handoff/readiness acknowledgements ----"
+              Write-Host ($launchOwner | ConvertTo-Json -Compress)
+              try {
+                  $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, ExecutablePath -OperationTimeoutSec 2 -ErrorAction Stop)
+                  $parentExitUtc = if ($Process.HasExited) { $Process.ExitTime.ToUniversalTime() } else { [DateTime]::UtcNow }
+                  $frontier = @([pscustomobject]@{ Id = $Process.Id; Created = $launchOwner.start_utc; Until = $parentExitUtc; Qualified = $launchOwner.identity_qualified })
+                  $seen = [System.Collections.Generic.HashSet[int]]::new()
+                  $null = $seen.Add($Process.Id)
+                  $observed = 0
+                  $truncated = $false
+                  for ($depth = 0; $depth -lt 4 -and $frontier.Count -gt 0; $depth++) {
+                      $next = @()
+                      foreach ($parent in $frontier) {
+                          foreach ($row in $rows) {
+                              if ($row.ParentProcessId -ne $parent.Id -or $seen.Contains([int]$row.ProcessId)) { continue }
+                              if ($observed -ge 16) { $truncated = $true; continue }
+                              $null = $seen.Add([int]$row.ProcessId)
+                              $observed++
+                              $created = if ($null -ne $row.CreationDate) { $row.CreationDate.ToUniversalTime() } else { $null }
+                              $qualified = $parent.Qualified -and $null -ne $parent.Created -and $null -ne $created -and $created -ge $parent.Created -and $created -le $parent.Until
+                              $observedPath = Format-StartupEvidenceText ([string]$row.ExecutablePath)
+                              $sameExecutable = $null -ne $row.ExecutablePath -and [string]::Equals($row.ExecutablePath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)
+                              $receipt = [ordered]@{ pid = [int]$row.ProcessId; parent_pid = [int]$row.ParentProcessId; created_utc = $created; executable = $observedPath; lineage_qualified = [bool]$qualified; same_executable = [bool]$sameExecutable; depth = $depth + 1 }
+                              Write-Host ($receipt | ConvertTo-Json -Compress)
+                              $next += [pscustomobject]@{ Id = [int]$row.ProcessId; Created = $created; Until = [DateTime]::UtcNow; Qualified = $qualified }
+                          }
+                      }
+                      $frontier = $next
+                  }
+                  if ($frontier.Count -gt 0) { $truncated = $true }
+                  Write-Host (@{ descendant_observations = $observed; truncated = $truncated; status = 'observed' } | ConvertTo-Json -Compress)
+              } catch {
+                  Write-Host (@{ status = 'unavailable'; cause = (Format-StartupEvidenceText $_.Exception.Message) } | ConvertTo-Json -Compress)
+              }
+              Write-Host "---- native startup log bytes; bounded tails never prove readiness ----"
+              try {
+                  # Resolve the same shared catalogue as the production logger.
+                  $catalogJson = & python -c 'import json,pathlib,sys,tomllib; c=tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); w=c["logs"]["windows"]; f=c["logs"]["files"]; print(json.dumps({"base":w["base"],"segments":[v.replace("{app}",c["app"]["folder_name"]) for v in w["segments"]],"prefix":f["unified_prefix"],"extension":f["extension"]}))' "$env:GITHUB_WORKSPACE\static\ergopti_plus\_shared\modules\paths\app_dirs.toml"
+                  if ($LASTEXITCODE -ne 0) { throw "The native log catalogue could not be read (python exit $LASTEXITCODE)." }
+                  $catalog = $catalogJson | ConvertFrom-Json -ErrorAction Stop
+                  $logsDir = [Environment]::GetEnvironmentVariable($catalog.base)
+                  if ([string]::IsNullOrEmpty($logsDir)) { throw "The native log base environment is unavailable." }
+                  foreach ($segment in $catalog.segments) { $logsDir = Join-Path $logsDir $segment }
+                  $logNames = @('bootstrap.log', ($catalog.prefix + (Get-Date -Format 'yyyy-MM-dd') + $catalog.extension))
+                  foreach ($name in $logNames) {
+                      $logPath = Join-Path $logsDir $name
+                      $stream = $null
+                      try {
+                          $stream = [IO.File]::Open($logPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+                          $length = $stream.Length
+                          $count = [int][Math]::Min(4096, $length)
+                          $null = $stream.Seek(-$count, [IO.SeekOrigin]::End)
+                          $bytes = [byte[]]::new($count)
+                          $read = $stream.Read($bytes, 0, $count)
+                          $tail = [Text.Encoding]::UTF8.GetString($bytes, 0, $read)
+                          $modified = [IO.File]::GetLastWriteTimeUtc($logPath)
+                          Write-Host ([ordered]@{ log = $name; status = 'observed'; size_bytes = $length; read_bytes = $read; truncated = ($length -gt $read); modified_utc = $modified; modified_since_launch = ($null -ne $launchOwner.start_utc -and $modified -ge $launchOwner.start_utc); tail = $tail } | ConvertTo-Json -Compress)
+                      } catch {
+                          Write-Host (@{ log = $name; status = 'unavailable'; cause = (Format-StartupEvidenceText $_.Exception.Message) } | ConvertTo-Json -Compress)
+                      } finally {
+                          if ($null -ne $stream) { $stream.Dispose() }
+                      }
+                  }
+              } catch {
+                  Write-Host (@{ status = 'unavailable'; cause = (Format-StartupEvidenceText $_.Exception.Message) } | ConvertTo-Json -Compress)
+              }
+          }
+
           # Reads the live process, so it runs before the process is stopped.
           function Write-LaunchDiagnostics([System.Diagnostics.Process]$Process, [double]$Seconds, $StagingSeconds) {
               Write-Host "---- launch diagnostics, $([math]::Round($Seconds, 1)) s after launch ----"
+              Write-StartupOwnershipEvidence $Process
               if ($null -eq $StagingSeconds) {
                   Write-Host "Staging directory: not observed during the wait"
               } else {
@@ -838,13 +915,6 @@ jobs:
                   Write-Host "Process: running as PID $($Process.Id); its top-level windows:"
                   try {
                       [SmokeWindows]::Describe($Process.Id) | ForEach-Object { Write-Host "  $_" }
-                  } catch {
-                      Write-Host "  unavailable: $($_.Exception.Message)"
-                  }
-                  Write-Host "Child processes:"
-                  try {
-                      Get-CimInstance Win32_Process -Filter "ParentProcessId = $($Process.Id)" |
-                          ForEach-Object { Write-Host "  [$($_.ProcessId)] $($_.CommandLine)" }
                   } catch {
                       Write-Host "  unavailable: $($_.Exception.Message)"
                   }
@@ -899,6 +969,15 @@ jobs:
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr
           # Holding the handle keeps ExitCode readable once the process has exited.
           $null = $proc.Handle
+          $launchOwner = [ordered]@{ pid = $proc.Id; expected_executable = [IO.Path]::GetFullPath($exe); observed_executable = $null; start_utc = $null; identity_qualified = $false; identity_error = $null }
+          try {
+              $launchOwner.start_utc = $proc.StartTime.ToUniversalTime()
+              $actualLaunchPath = $proc.MainModule.FileName
+              $launchOwner.observed_executable = Format-StartupEvidenceText $actualLaunchPath
+              $launchOwner.identity_qualified = [string]::Equals($actualLaunchPath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)
+          } catch {
+              $launchOwner.identity_error = Format-StartupEvidenceText $_.Exception.Message
+          }
 
           $markerSeen = $false
           $dialogSeen = $false
