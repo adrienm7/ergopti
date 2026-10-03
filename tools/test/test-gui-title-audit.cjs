@@ -210,14 +210,49 @@ function assertNativePolicyFamilyIsolation(source) {
 		5,
 		'each native family retains all five independent policy variants'
 	);
-	for (const receipt of [
-		'AssertEqual("Owned files|All Files (*.*)|",',
-		'AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",'
-	])
-		assert.ok(
-			body('_NDT_CheckFilePickerPolicy').includes(receipt),
-			'the independent file case retains exact native friendly labels and selection'
+	const picker = body('_NDT_FilePickerProbeSource');
+	const baseline =
+		'_NFPBaseline := FileSelect(35, _NFPOwnedFile, "Owned native baseline", "Owned files (*.txt)")';
+	assert.ok(
+		picker.includes(baseline),
+		'the independent baseline calls the actual builtin directly with the exact filter'
+	);
+	assert.doesNotMatch(
+		picker,
+		/_NFPBaseline\s*:=\s*Ui_FileSelect\s*\(/,
+		'the public delegate cannot answer its own baseline'
+	);
+	assert.ok(
+		picker.indexOf(baseline) < picker.indexOf('_NFPSelected := Ui_FileSelect('),
+		'the native baseline is observed before the delegate'
+	);
+	assert.ok(
+		picker.includes('Type(_NFPBaseline) . "|" . _NFPBaseline'),
+		'the direct baseline preserves native cancellation and result type'
+	);
+	const pickerChecks = body('_NDT_CheckFilePickerPolicy');
+	for (const receipt of ['filter', 'types']) {
+		const comparison = new RegExp(
+			'AssertEqual\\(FileRead\\(PickerRoot \\. "\\\\baseline\\.' +
+				receipt +
+				'", "UTF-8"\\),\\s*FileRead\\(PickerRoot \\. "\\\\" \\. Kind \\. "\\.' +
+				receipt +
+				'", "UTF-8"\\)'
 		);
+		assert.match(
+			pickerChecks,
+			comparison,
+			'each complete native receipt is compared exactly against the independent baseline'
+		);
+	}
+	assert.ok(
+		pickerChecks.includes('"items=2,truncated=0,selected=1|"'),
+		'the actual direct baseline requires two filters and the first selection'
+	);
+	assert.ok(
+		pickerChecks.includes('"String|", FileRead(PickerRoot . "\\baseline.result"'),
+		'the direct native baseline must acknowledge cancellation'
+	);
 	assert.ok(
 		body('_NDT_CheckFolderPickerPolicy').includes('"retired", FileRead('),
 		'the independent folder case retains actual HWND retirement assertions'
@@ -229,18 +264,19 @@ const nativePolicySource = fs.readFileSync(
 );
 assertNativePolicyFamilyIsolation(nativePolicySource);
 for (const original of [
-	'AssertEqual("Owned files|All Files (*.*)|",',
-	'AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",'
+	'AssertEqual(FileRead(PickerRoot . "\\baseline.filter", "UTF-8"),',
+	'AssertEqual(FileRead(PickerRoot . "\\baseline.types", "UTF-8"),'
 ]) {
-	const mutant = nativePolicySource.replace(
-		original,
-		original.replace('Owned files', 'Wrong label')
+	const mutant = nativePolicySource.replace(original, original.replace('baseline', 'selected'));
+	assert.notEqual(
+		mutant,
+		nativePolicySource,
+		'each baseline mutation changes its actual comparison'
 	);
-	assert.notEqual(mutant, nativePolicySource, 'each label mutation changes its actual assertion');
 	assert.throws(
 		() => assertNativePolicyFamilyIsolation(mutant),
 		assert.AssertionError,
-		'exact observed friendly labels and selected file type remain independently enforced'
+		'a delegate cannot supply its own expected native receipt'
 	);
 }
 /** Guards statement separators separately from escaped child string contents. */
@@ -309,8 +345,9 @@ function assertNativeFileFilterBehavior(source) {
 		'"Array|0"',
 		'"\\selected.result"',
 		'if Index != 5',
-		'StrReplace(FilterSource, \'"Owned files (*.txt)"\', \'""\', , &FilterMutations)',
-		'AssertEqual(2, FilterMutations',
+		'_NDT_MutateDelegatedFilter(FilterSource, "")',
+		'_NDT_MutateDelegatedFilter(FilterSource, "Changed label (*.txt)")',
+		'["/ErrorStdOut", LabelMutationHarness, LabelMutationRoot], Ownership, 2)',
 		'"Owned BIN visible under the restricted file filter", _NDT_RunChild(A_AhkPath,',
 		'["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2)'
 	])
@@ -319,6 +356,24 @@ function assertNativeFileFilterBehavior(source) {
 		checks.indexOf('if Index != 5') > checks.indexOf('"Array|0"'),
 		'all positive policies and modal assertions precede the no-filter control'
 	);
+	const mutation = body('_NDT_MutateDelegatedFilter');
+	for (const invariant of [
+		'for NativeOptions in ["35", \'"M35"\']',
+		"Boundary := 'Ui_FileSelect('",
+		"Changed := 'Ui_FileSelect('",
+		'StrReplace(ProbeSource, Boundary, Changed, , &Mutations)',
+		'AssertEqual(1, Mutations',
+		'return ProbeSource'
+	])
+		assert.ok(
+			mutation.includes(invariant),
+			'filter controls mutate only each exact public delegate call'
+		);
+	assert.doesNotMatch(
+		mutation,
+		/(?<!Ui_)\bFileSelect\(/,
+		'filter controls cannot corrupt the independent builtin baseline'
+	);
 	const observer = body('_NDT_FileFilterObserverSource');
 	for (const invariant of [
 		'ObserverProcess == DllCall("GetCurrentProcessId", "UInt")',
@@ -326,6 +381,8 @@ function assertNativeFileFilterBehavior(source) {
 		'UIA.ConnectionTimeout := 500',
 		'UIA.TransactionTimeout := 500',
 		'ObserverElement.ProcessId != ObserverProcess',
+		'StrSplit(FileRead(ObserverArgs[8], "UTF-8"), "|")',
+		'ObserverItems[1] != ObserverExpectedItems[1] || ObserverItems[2] != ObserverExpectedItems[2]',
 		'"shell32\\SHCreateItemFromParsingName"',
 		'ComCall(5, ObserverItem, "UInt", 0, "Ptr*", &ObserverDisplay)',
 		'return ObserverName == ObserverTypedName ? [ObserverName] : [ObserverName, ObserverTypedName]',
@@ -375,6 +432,7 @@ function assertNativeFileFilterBehavior(source) {
 	for (const invariant of [
 		'DllCall("GetDlgCtrlID", "Ptr", PickerViewCandidate, "Int") == 1121',
 		'DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerShellView)',
+		'_NFPRoot . "\\baseline.filter"]',
 		'PickerObserverHandle := ComObject("WScript.Shell").Exec(PickerObserverCommand)',
 		'SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128)',
 		'PickerObserverHandle.StdOut.ReadAll()',
@@ -398,7 +456,8 @@ function assertNativeFileFilterBehavior(source) {
 		'DirCreate(_NFPRoot . "\\items")',
 		'"\\items\\visible-filter-owned.txt"',
 		'"\\items\\hidden-filter-owned.bin"',
-		'_NDT_FileFilterCaptureSource() . ObserverBoundary',
+		'if _NFPMode != "baseline" {',
+		'_NDT_FileFilterCaptureSource()',
 		'AssertEqual(1, ObserverBoundaries',
 		'DllCall("IsWindow", "Ptr", _NFPLastHwnd)',
 		'AssertEqual(1, RetirementBoundaries'
@@ -451,6 +510,49 @@ console.log(
 	`Native file-filter behavior mutations: ${nativeBehaviorMutations.length}/${nativeBehaviorMutations.length} passed.`
 );
 
+for (const [before, after, guard] of [
+	[
+		'_NFPBaseline := FileSelect(',
+		'_NFPBaseline := Ui_FileSelect(',
+		assertNativePolicyFamilyIsolation
+	],
+	[
+		'_NFPBaseline := FileSelect(35, _NFPOwnedFile, "Owned native baseline", "Owned files (*.txt)")',
+		'_NFPBaseline := FileSelect(35, _NFPOwnedFile, "Owned native baseline", "Wrong files (*.txt)")',
+		assertNativePolicyFamilyIsolation
+	],
+	[
+		'StrSplit(FileRead(ObserverArgs[8], "UTF-8"), "|")',
+		'StrSplit(FileRead(ObserverArgs[7], "UTF-8"), "|")',
+		assertNativeFileFilterBehavior
+	],
+	[
+		'ObserverItems[1] != ObserverExpectedItems[1]',
+		'ObserverItems[1] != ObserverItems[1]',
+		assertNativeFileFilterBehavior
+	],
+	["Boundary := 'Ui_FileSelect('", "Boundary := 'FileSelect('", assertNativeFileFilterBehavior],
+	[
+		'_NDT_MutateDelegatedFilter(FilterSource, "")',
+		'_NDT_MutateDelegatedFilter(FilterSource, "Owned files (*.txt)")',
+		assertNativeFileFilterBehavior
+	],
+	['if _NFPMode != "baseline" {', 'if true {', assertNativeFileFilterBehavior]
+]) {
+	const mutant = nativePolicySource.replace(before, after);
+	assert.notEqual(
+		mutant,
+		nativePolicySource,
+		'each independent baseline mutation targets a real source boundary'
+	);
+	assert.throws(
+		() => guard(mutant),
+		assert.AssertionError,
+		'native baseline ownership and exact observations reject each bypass'
+	);
+}
+console.log('Native independent file baseline mutations: 7/7 passed.');
+
 const nativePolicyMutations = [
 	nativePolicySource.replace(
 		/Test\("native folder picker:[\s\S]*?_NDT_ActualNativeFolderPickerCaptionsAndResults\)/,
@@ -474,8 +576,8 @@ const nativePolicyMutations = [
 		'if true\n\t\t\tDirDelete(Root, true)'
 	),
 	nativePolicySource.replace(
-		'AssertEqual("Owned files|All Files (*.*)|",',
-		'AssertEqual("Wrong files|All Files (*.*)|",'
+		'AssertEqual(FileRead(PickerRoot . "\\baseline.filter", "UTF-8"),',
+		'AssertEqual(FileRead(PickerRoot . "\\selected.filter", "UTF-8"),'
 	)
 ];
 for (const mutant of nativePolicyMutations) {
