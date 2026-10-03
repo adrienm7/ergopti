@@ -738,7 +738,7 @@ assert.doesNotMatch(WORKFLOW, /no Wayland socket appeared[^\n]*[\s\S]{0,180}exit
 assert.doesNotMatch(WORKFLOW, /WebKit\/lgi unavailable[^\n]*[\s\S]{0,180}exit 0/);
 
 // Native physical admission must retain its real X11 group/map evidence.
-assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['xkb-source-qualification'], 17);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['xkb-source-qualification'], 26);
 rejects(({ evidence }) => {
 	const document = evidence.find((row) => 'xkb-source-qualification' in row.subjects);
 	delete document.subjects['xkb-source-qualification'];
