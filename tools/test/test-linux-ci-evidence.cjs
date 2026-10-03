@@ -22,6 +22,10 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
+const { findRuntime } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 
@@ -33,6 +37,292 @@ const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const WORKFLOW = pipeline.file(LINUX_BOX);
 const GATE = pipeline.locate('linux-ok');
 const SHA = '0123456789abcdef';
+
+// The real live-updater probe must expose the same refused HTTP response while
+// its original assertion and exit remain red. No release or network is faked as
+// accepted: these children deliberately stop at the first release-check refusal.
+const updaterProbe = path.join(
+	ROOT,
+	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
+);
+const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
+const nativeLua = findRuntime();
+assert.ok(nativeLua, 'the real updater probe regression requires the shared Lua runtime');
+const updaterScratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-updater-live-evidence-'));
+try {
+	const refusal = JSON.stringify({
+		message:
+			'API rate limit exceeded. Bearer ABCDEFGHIJKLMNOP; https://private.invalid/path?sig=secret',
+		documentation_url: 'https://docs.github.com/rate-limits'
+	});
+	const injected = `
+package.preload.luv = function() return { run = function() error('a synchronous refusal needs no event loop') end } end
+local response = { ok = false, status = 403, error = 'HTTP 403', error_body = os.getenv('UPDATER_RESPONSE') }
+local headers, options = { Authorization = 'Bearer ORIGINAL_REQUEST_SECRET' }, { owner = 'updater' }
+local original_get = function(url, sent_headers, sent_options, callback)
+ assert(url == 'https://api.github.com/owned/releases')
+ assert(sent_headers == headers and sent_options == options, 'the observational wrapper changed request ownership')
+ io.stdout:write('transport stdout preserved\\n')
+ io.stderr:write('transport stderr preserved\\n')
+ assert(callback(response, 'owned callback receipt') == 'callback return preserved')
+ return true
+end
+local manager = { _http_client = { get = original_get }, init = function() end,
+ current_version = function() return '0.0.0-dev.1' end, get_channel = function() return 'dev' end }
+manager.check_for_updates = function(_, callback)
+ assert(manager._http_client.get('https://api.github.com/owned/releases', headers, options, function(received, receipt)
+  assert(receipt == 'owned callback receipt', 'the wrapper changed callback arguments')
+  assert(received == response and received.error_body == os.getenv('UPDATER_RESPONSE'), 'the wrapper changed the result')
+  callback(false, nil, received.error)
+  return 'callback return preserved'
+ end) == true, 'the wrapper changed the transport return')
+end
+package.preload['modules.updater.manager'] = function() return manager end
+local native_exit = os.exit
+os.exit = function(code)
+ assert(manager._http_client.get == original_get, 'the probe did not release its observational wrapper')
+ io.stderr:write('probe lifecycle cleanup preserved\\n')
+ native_exit(code)
+end
+`;
+	const probe = spawnSync(
+		nativeLua,
+		['-e', injected, updaterProbe, updaterDriver, updaterScratch],
+		{
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				GITHUB_ACTIONS: 'true',
+				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
+				UPDATER_RESPONSE: refusal
+			}
+		}
+	);
+	assert.ifError(probe.error);
+	assert.strictEqual(
+		probe.status,
+		1,
+		'the original failed release-check assertion remains nonzero'
+	);
+	assert.match(probe.stdout, /transport stdout preserved\n/);
+	assert.match(probe.stderr, /transport stderr preserved\n/);
+	assert.match(probe.stderr, /probe lifecycle cleanup preserved\n/);
+	assert.match(probe.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.match(
+		probe.stderr,
+		/::error title=Linux updater live HTTP::.*HTTP 403.*API rate limit exceeded/
+	);
+	assert.doesNotMatch(
+		probe.stderr,
+		/ABCDEFGHIJKLMNOP|ORIGINAL_REQUEST_SECRET|private\.invalid|sig=secret/
+	);
+	const httpReceipt = JSON.parse(fs.readFileSync(path.join(updaterScratch, 'http.json'), 'utf8'));
+	assert.strictEqual(httpReceipt.responses.length, 1);
+	assert.strictEqual(httpReceipt.responses[0].status, 403);
+	assert.strictEqual(
+		httpReceipt.responses[0].headers_available,
+		false,
+		'absent response headers are never invented'
+	);
+	assert.match(httpReceipt.responses[0].message, /API rate limit exceeded/);
+	assert.strictEqual(
+		JSON.parse(httpReceipt.responses[0].body).documentation_url,
+		'<url>',
+		'the same response body is retained with URLs masked'
+	);
+	assert.doesNotMatch(
+		JSON.stringify(httpReceipt),
+		/ABCDEFGHIJKLMNOP|ORIGINAL_REQUEST_SECRET|private\.invalid|sig=secret/
+	);
+
+	// The bounded same-response detail cannot inject a second workflow command.
+	const boundedDir = path.join(updaterScratch, 'bounded');
+	fs.mkdirSync(boundedDir);
+	const bounded = spawnSync(
+		nativeLua,
+		['-e', injected, updaterProbe, updaterDriver, updaterScratch],
+		{
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				GITHUB_ACTIONS: 'true',
+				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
+				UPDATER_RESPONSE: JSON.stringify({
+					message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000)
+				})
+			}
+		}
+	);
+	assert.ifError(bounded.error);
+	assert.strictEqual(bounded.status, 1);
+	assert.match(bounded.stderr, /probe lifecycle cleanup preserved\n/);
+	assert.match(bounded.stderr, /100%25%0D%0A::error::foreign/);
+	assert.strictEqual(
+		(bounded.stderr.match(/^::error/gm) || []).length,
+		1,
+		'response text cannot create an extra annotation'
+	);
+	const boundedMessage = JSON.parse(fs.readFileSync(path.join(boundedDir, 'http.json'), 'utf8'))
+		.responses[0].message;
+	assert.ok(Buffer.byteLength(boundedMessage) <= 2061, 'response body evidence is bounded');
+	assert.ok(boundedMessage.endsWith(' <truncated>'));
+	assert.ok(!boundedMessage.includes('�'), 'bounded evidence retains complete UTF-8 characters');
+
+	// A refused evidence write cannot replace the actual HTTP failure or
+	// interrupt the callback/return/cleanup assertions in the real probe.
+	const blockedEvidence = path.join(updaterScratch, 'not-a-directory');
+	fs.writeFileSync(blockedEvidence, 'occupied');
+	const blocked = spawnSync(
+		nativeLua,
+		['-e', injected, updaterProbe, updaterDriver, updaterScratch],
+		{
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+				GITHUB_ACTIONS: 'true',
+				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
+				UPDATER_RESPONSE: refusal
+			}
+		}
+	);
+	assert.ifError(blocked.error);
+	assert.strictEqual(blocked.status, 1);
+	assert.match(blocked.stderr, /probe lifecycle cleanup preserved\n/);
+	assert.match(blocked.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.match(blocked.stderr, /HTTP refusal evidence could not be captured/);
+
+	// Execute the actual Bash owner with controlled build/install/interpreter
+	// ports. This checks diagnostics and cleanup, never claims a real update.
+	const runnerFixture = path.join(updaterScratch, 'runner');
+	const runnerRelative = 'static/ergopti_plus/linux/tests/hardware/run_updater_live.sh';
+	const runner = path.join(runnerFixture, runnerRelative);
+	fs.mkdirSync(path.dirname(runner), { recursive: true });
+	fs.copyFileSync(path.join(ROOT, runnerRelative), runner);
+	fs.mkdirSync(path.join(runnerFixture, 'bin'), { recursive: true });
+	fs.mkdirSync(path.join(runnerFixture, 'tools/build'), { recursive: true });
+	fs.mkdirSync(path.join(runnerFixture, 'build/linux/linux'), { recursive: true });
+	fs.mkdirSync(path.join(runnerFixture, 'build/linux/_shared'), { recursive: true });
+	fs.mkdirSync(path.join(runnerFixture, 'build/linux/bin'), { recursive: true });
+	fs.writeFileSync(
+		path.join(runnerFixture, 'tools/build/build-linux-driver.sh'),
+		'#!/usr/bin/env bash\nexit "${UPDATER_TEST_BUILD_STATUS:-0}"\n'
+	);
+	fs.writeFileSync(
+		path.join(runnerFixture, 'build/linux/install.sh'),
+		`#!/usr/bin/env bash
+mkdir -p "$HOME/.local/lib/ergopti/_shared" "$XDG_STATE_HOME/ergopti_plus/logs"
+printf 'version=0.0.0-dev.2\\n' > "$HOME/.local/lib/ergopti/_shared/build_stamp.txt"
+printf 'daemon starting (version 0.0.0-dev.2, fixture)\\n' > "$XDG_STATE_HOME/ergopti_plus/logs/daemon.log"
+exit "${'${UPDATER_TEST_INSTALL_STATUS:-0}'}"
+`
+	);
+	fs.writeFileSync(
+		path.join(runnerFixture, 'bin/luajit'),
+		`#!/usr/bin/env bash
+if [ "$1" = -e ]; then exit "${'${UPDATER_TEST_ENV_STATUS:-0}'}"; fi
+printf '%s' "$UPDATER_TEST_STDOUT"
+printf '%s' "$UPDATER_TEST_STDERR" >&2
+printf '%s' "${'${HOME%/home}'}" > "$UPDATER_TEST_WORK_REPORT"
+exit "$UPDATER_TEST_STATUS"
+`,
+		{ mode: 0o755 }
+	);
+	for (const tool of ['curl', 'sha256sum', 'pkill'])
+		fs.writeFileSync(path.join(runnerFixture, 'bin', tool), '#!/usr/bin/env bash\nexit 0\n', {
+			mode: 0o755
+		});
+	for (const fixture of [
+		{ phase: 'updater', status: 1, child: 7 },
+		{ phase: 'complete', status: 0, child: 0 },
+		{ phase: 'build', status: 1, child: 0, build: 19 },
+		{ phase: 'install', status: 1, child: 0, install: 20 },
+		{ phase: 'environment', status: 2, child: 0, environment: 8 },
+		{ phase: 'updater', status: 1, child: 7, blocked: true },
+		{ phase: 'complete', status: 0, child: 0, blocked: true }
+	]) {
+		const evidence = path.join(
+			updaterScratch,
+			`evidence-${fixture.phase}${fixture.blocked ? '-blocked' : ''}`
+		);
+		if (fixture.blocked) fs.writeFileSync(evidence, 'occupied diagnostic destination');
+		const workReport = path.join(updaterScratch, `work-${fixture.phase}.txt`);
+		const stdout = 'original stdout é 100%\n';
+		const stderr = 'original stderr HTTP 403\n';
+		const result = spawnSync(
+			bashExecutable(),
+			['-c', 'PATH="./bin:$PATH"; exec bash "$UPDATER_TEST_RUNNER"'],
+			{
+				cwd: runnerFixture,
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					GITHUB_ACTIONS: 'true',
+					GITHUB_SHA: SHA,
+					UPDATER_TEST_RUNNER: runner.replaceAll('\\', '/'),
+					UPDATER_TEST_BUILD_STATUS: String(fixture.build || 0),
+					UPDATER_TEST_INSTALL_STATUS: String(fixture.install || 0),
+					UPDATER_TEST_ENV_STATUS: String(fixture.environment || 0),
+					UPDATER_TEST_STATUS: String(fixture.child),
+					UPDATER_TEST_STDOUT: stdout,
+					UPDATER_TEST_STDERR: stderr,
+					UPDATER_TEST_WORK_REPORT: workReport.replaceAll('\\', '/'),
+					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence.replaceAll('\\', '/')
+				}
+			}
+		);
+		assert.ifError(result.error);
+		assert.strictEqual(
+			result.status,
+			fixture.status,
+			`${fixture.phase}: diagnostics must retain the actual owner verdict`
+		);
+		if (!fixture.blocked) {
+			const receipt = fs.readFileSync(path.join(evidence, 'result.txt'), 'utf8');
+			assert.match(receipt, new RegExp(`^phase=${fixture.phase}$`, 'm'));
+			assert.match(receipt, new RegExp(`^exit_status=${fixture.status}$`, 'm'));
+			assert.match(
+				receipt,
+				new RegExp(
+					`^cause_exit_status=${fixture.environment || fixture.build || fixture.install || fixture.child}$`,
+					'm'
+				)
+			);
+			assert.match(receipt, new RegExp(`^sha=${SHA}$`, 'm'));
+		} else {
+			assert.match(result.stderr, /Updater evidence directory could not be created/);
+			assert.strictEqual(fs.readFileSync(evidence, 'utf8'), 'occupied diagnostic destination');
+		}
+		if (fixture.phase === 'updater' || fixture.phase === 'complete') {
+			assert.ok(result.stdout.startsWith(stdout), 'stdout bytes survive the tee unchanged');
+			assert.ok(
+				fixture.blocked ? result.stderr.includes(stderr) : result.stderr.startsWith(stderr),
+				'stderr bytes survive the tee unchanged'
+			);
+			if (!fixture.blocked) {
+				assert.strictEqual(
+					fs.readFileSync(path.join(evidence, 'updater.stdout.log'), 'utf8'),
+					stdout
+				);
+				assert.strictEqual(
+					fs.readFileSync(path.join(evidence, 'updater.stderr.log'), 'utf8'),
+					stderr
+				);
+			}
+			const cleanup = spawnSync(bashExecutable(), ['-c', 'test ! -d "$UPDATER_TEST_WORK"'], {
+				encoding: 'utf8',
+				env: { ...process.env, UPDATER_TEST_WORK: fs.readFileSync(workReport, 'utf8') }
+			});
+			assert.strictEqual(cleanup.status, 0, 'the exact owned work directory is still cleaned');
+		}
+		if (fixture.status) assert.match(result.stderr, /::error title=Linux updater live::/);
+		else assert.doesNotMatch(result.stderr, /::error/);
+	}
+} finally {
+	fs.rmSync(updaterScratch, { recursive: true, force: true });
+}
 
 function fixtures() {
 	const needs = {};
@@ -300,6 +590,49 @@ for (const subject of PACKAGE_SUBJECTS) {
 // E2E harness to the evidence record runs under !cancelled(); the record and
 // its upload run only when every harness passed.
 const testLinuxSteps = pipeline.steps(pipeline.job('e2e-linux'));
+const updaterStep = pipeline.step(
+	pipeline.job('e2e-linux'),
+	'Update to the newest release and restart'
+);
+assert.match(
+	updaterStep,
+	/^          ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: \$\{\{ runner\.temp \}\}\/linux-updater-live$/m
+);
+const updaterEvidence = pipeline.step(
+	pipeline.job('e2e-linux'),
+	'Upload live updater diagnostic evidence'
+);
+
+/**
+ * Keep failed updater observations separate from mandatory success receipts.
+ * @param {string} step The diagnostic artifact upload step.
+ */
+function assertUpdaterEvidence(step) {
+	assert.strictEqual(pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.stepField(step, 'uses'), 'actions/upload-artifact@v4');
+	assert.strictEqual(pipeline.stepField(step, 'continue-on-error'), null);
+	assert.match(step, /^          name: linux-updater-live-diagnostics$/m);
+	assert.match(step, /^          path: \$\{\{ runner\.temp \}\}\/linux-updater-live$/m);
+	assert.match(step, /^          if-no-files-found: error$/m);
+}
+assertUpdaterEvidence(updaterEvidence);
+assert.throws(() =>
+	assertUpdaterEvidence(updaterEvidence.replace('${{ !cancelled() }}', '${{ success() }}'))
+);
+assert.throws(() =>
+	assertUpdaterEvidence(
+		updaterEvidence.replace('linux-updater-live-diagnostics', 'linux-ci-evidence-e2e-linux')
+	)
+);
+assert.throws(() =>
+	assertUpdaterEvidence(
+		updaterEvidence.replace('if-no-files-found: error', 'if-no-files-found: ignore')
+	)
+);
+assert.ok(
+	pipeline.job('e2e-linux').indexOf(updaterStep) <
+		pipeline.job('e2e-linux').indexOf(updaterEvidence)
+);
 const unitAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Install LuaJIT');
 const recordAt = testLinuxSteps.findIndex(
 	(candidate) => candidate.name === 'Record mandatory E2E evidence'
