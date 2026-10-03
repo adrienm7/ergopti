@@ -29,6 +29,7 @@ local M = {}
 local Logger  = require("logger.shim")
 local Shell   = require("adapters.shell_runner")
 local Crypto  = require("adapters.crypto")
+local Base64  = require("compat.base64")
 local TextCrypto = require("keylogger.text_crypto")
 
 local LOG = "modules.keylogger.text_cipher"
@@ -208,7 +209,15 @@ function M.encrypt(device_id, event_id, plaintext)
 	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
 	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
 	-- "line" and read back as a value the user never typed.
-	local ciphertext = Shell.exec_exact_stdin(cmd, plaintext)
+	local input = plaintext
+	if plaintext:find("\0", 1, true) then
+		-- The shell command reaches exec as a C string; a raw NUL truncates the
+		-- heredoc while OpenSSL still encrypts the surviving prefix successfully.
+		-- Transport only textual bytes, then restore them at the native boundary.
+		input = Base64.encode(plaintext)
+		cmd = "openssl base64 -d -A | " .. cmd
+	end
+	local ciphertext = Shell.exec_exact_stdin(cmd, input)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
 		Logger.error(LOG, "Encryption produced no output — refusing to store plaintext.")
 		return nil
