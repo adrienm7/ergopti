@@ -191,7 +191,7 @@ local function _run_luv(opts)
 		end)
 	end
 
-	-- This call blocks until stop() is called and all handles are closed.
+	-- stop() returns control even if another component still owns active handles.
 	luv.run()
 
 	-- Cleanup any handles that were not already stopped.
@@ -315,13 +315,13 @@ function M.run(opts)
 end
 
 --- Signals the event loop to stop at the next safe point.
---- Safe to call from any callback or external thread (luv: async; pump: flag).
+--- Safe to call from callbacks on the owning event-loop thread.
 --- Idempotent: has no effect when the loop is not running.
 function M.stop()
 	if not _running then return end
 	_running = false
 
-	-- In luv mode we must also stop the watchers so luv.run() returns.
+	-- Retire our callbacks, then request return without closing foreign handles.
 	if luv then
 		if _idle_handle then
 			pcall(function() luv.idle_stop(_idle_handle) end)
@@ -329,8 +329,7 @@ function M.stop()
 		if _timer_handle then
 			pcall(function() luv.timer_stop(_timer_handle) end)
 		end
-		-- luv.stop() is NOT called — stopping handles is sufficient; luv.run()
-		-- will return on its own when no active handles remain.
+		luv.stop()
 	end
 
 	Logger.debug(LOG, "stop() called — event loop will exit at next iteration.")
