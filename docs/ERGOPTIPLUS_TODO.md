@@ -378,13 +378,24 @@ item 104 separately tracks the common-autocorrection section split.
   full three-OS CI and real-device acceptance remain pending. Linux follow-ups:
   holding the key types one ★ where the others auto-repeat, choosing Backquote,
   Minus or Equal silently
-  overrides a tap-key action, and tap-key presses leave the wrap-on-type window
-  open.
+  overrides a tap-key action. An acknowledged Linux tap-key consumption now
+  retires only the previous wrap-on-type PRIMARY window before its deferred
+  action runs; unassigned, modified and refused tap keys still reach ordinary
+  wrapping, and a new pointer selection can open another window. Actual daemon
+  E2E cases check screen output and exact queue/action/PRIMARY receipts. Native
+  CI and real-device checks remain pending.
 
 The selected local gate passed 353 JS checks, 4,946 Linux unit cases and
 144 Linux E2E checks. Nine causal menu/transaction regressions and the three
 existing macOS placement cases pass. The Windows renderer and shared menu
 declaration are unchanged; complete native qualification remains pending.
+
+The tap-key lifecycle fix reproduced two stale-selection failures before the
+change; its qualified component gate passes all 154 Linux E2E checks, including
+the 144 existing checks, 17 X11 source checks and 4,937 Linux unit cases.
+The current composition reruns JavaScript and the complete Linux E2E suite.
+Windows and macOS use separate selection cache owners; their native freshness
+and physical-device acceptance remain unqualified by these Linux results.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and

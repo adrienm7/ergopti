@@ -433,6 +433,27 @@ local DAEMON_SCENARIOS = {
 		screen = "[reader stopped]<select_all>", gesture_pump = "fails" },
 }
 
+-- These scenarios use the neutral template and explicit acknowledged choices,
+-- independently of the recommended-preset runs below. The deferred action
+-- replaces a live selection while PRIMARY retains its original bytes.
+local TAP_WRAP_SCENARIOS = {
+	{ name = "a consumed tap key retires the previous wrap selection", tap_wrap = "accepted",
+		keys = "{SELECT}{TAPKEY}{WRAP}", screen = "replacement(",
+		receipt = "attempts=1 queued=1 executed=1 reads=1 action=send_text binding=tap_key__number_row_left" },
+	{ name = "a new pointer selection can wrap after a consumed tap key", tap_wrap = "reopened",
+		keys = "{SELECT}{TAPKEY}{SELECT}{WRAP}", screen = "(fresh)",
+		receipt = "attempts=1 queued=1 executed=1 reads=3 action=send_text binding=tap_key__number_row_left" },
+	{ name = "an unassigned tap key keeps the ordinary selection wrap", tap_wrap = "unassigned",
+		keys = "{SELECT}{TAPKEY}{WRAP}", screen = "(selected)(",
+		receipt = "attempts=0 queued=0 executed=0 reads=2 action=none binding=none" },
+	{ name = "a modified tap key keeps the ordinary selection wrap", tap_wrap = "modified",
+		keys = "{SELECT}{TAPKEY}{WRAP}", screen = "(selected)(",
+		receipt = "attempts=0 queued=0 executed=0 reads=2 action=none binding=none" },
+	{ name = "a refused tap queue keeps the ordinary selection wrap", tap_wrap = "refused",
+		keys = "{SELECT}{TAPKEY}{WRAP}", screen = "(selected)(",
+		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
+}
+
 -- Each scenario runs in its own daemon child, started through the shell that
 -- io.popen and os.execute hand a command to: /bin/sh on Linux, cmd.exe on
 -- Windows. cmd.exe has no `NAME=value command` prefix, no single quotes and no
@@ -511,17 +532,27 @@ do
 	--- Runs every key scenario in one user state.
 	--- @param base_env table Ordered { name, value } pairs naming the state's folders.
 	--- @param prefix string Label prefix naming the state.
-	local function run_key_scenarios(base_env, prefix)
-		for _, scenario in ipairs(DAEMON_SCENARIOS) do
+	--- @param scenarios table|nil Explicit neutral scenarios, or the existing typing scenarios.
+	local function run_key_scenarios(base_env, prefix, scenarios)
+		for _, scenario in ipairs(scenarios or DAEMON_SCENARIOS) do
 			local env = {}
 			for _, pair in ipairs(base_env) do env[#env + 1] = pair end
 			env[#env + 1] = { "ERGOPTI_E2E_LLM", scenario.llm and "1" or "0" }
 			env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
+			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local pipe = io.popen(command, "r")
 			local output = pipe and pipe:read("*a") or ""
 			if pipe then pipe:close() end
+			if scenario.receipt then
+				local receipt = output:match("TAP_WRAP ([^\r\n]+)")
+				if receipt == scenario.receipt then
+					pass(prefix .. scenario.name .. " (exact owner receipt)")
+				else
+					fail(prefix .. scenario.name .. " (exact owner receipt)", scenario.receipt, receipt or "absent")
+				end
+			end
 			local quoted = output:match("SCREEN (%b\"\")")
 			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
 			if screen == scenario.screen then
@@ -533,6 +564,7 @@ do
 		end
 	end
 	run_key_scenarios(home_env, "")
+	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree

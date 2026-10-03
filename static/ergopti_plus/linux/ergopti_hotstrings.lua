@@ -1505,7 +1505,12 @@ local function main()
 	local on_consume = input_capture_gate.guard(function(detail)
 		if MagicKeySource.on_key(detail) then return true end
 		if script_chords.on_key(detail) then return true end
-		if tap_keys.on_key(detail) then return true end
+		if tap_keys.on_key(detail) then
+			-- This consumed press never reaches the ordinary selection consumer.
+			-- Retire its old PRIMARY window before the deferred action can run.
+			wrap_on_type.end_selection_window()
+			return true
+		end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
