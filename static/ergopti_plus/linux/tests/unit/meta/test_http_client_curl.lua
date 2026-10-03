@@ -49,6 +49,7 @@ local function fake_luv(config)
 	function fake.close(value) value.closing = true end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
+		if options.kill_failure and not state.allow_kills then return false end
 		return true
 	end
 	function fake.spawn(command, options, callback)
@@ -310,20 +311,188 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("streams chunks while the caller can keep pumping input", function()
 		local client, state = fresh_client()
 		local chunks = {}
-		local terminals = 0
+		local terminals, receipt = 0, nil
 		local dispatched = client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}",
 			{ timeout_ms = 250 }, function(chunk) chunks[#chunks + 1] = chunk end,
 			function(result)
 				terminals = terminals + 1
-				helpers.assert_true(result.ok)
+				receipt = result
 			end)
 		helpers.assert_true(dispatched and client.isActive(),
 			"a slow response remains event-loop-owned after dispatch returns")
 		state.stdout("first")
 		state.stdout(" second")
 		helpers.assert_eq(table.concat(chunks), "first second")
+		state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
 		state.complete(0)
 		helpers.assert_eq(terminals, 1)
+		helpers.assert_true(receipt.ok, "callback assertions must execute outside the production pcall")
+		helpers.assert_eq(receipt.status, 200)
+	end)
+
+	helpers.it("streams real status on stderr without protocol metadata in response chunks", function()
+		local marker = "\nERGOPTI_HTTP_STATUS:404\n"
+		local body = '{"error":"model \"fixture:latest\" not found"}'
+		for split = 1, #marker do
+			local client, state = fresh_client()
+			local chunks, result, terminals = {}, nil, 0
+			client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {},
+				function(chunk) chunks[#chunks + 1] = chunk end,
+				function(receipt) result = receipt; terminals = terminals + 1 end)
+			local arguments = table.concat(state.options.args, "\n")
+			helpers.assert_true(arguments:find("--write-out\n%{stderr}", 1, true) ~= nil)
+			for index = 1, #body do state.stdout(body:sub(index, index)) end
+			state.stderr("curl: (22) refused")
+			state.stderr(marker:sub(1, split))
+			state.stderr(marker:sub(split + 1))
+			state.complete(22)
+			helpers.assert_eq(result.ok, false, "split " .. tostring(split))
+			helpers.assert_eq(result.status, 404)
+			helpers.assert_eq(result.error_body, body)
+			helpers.assert_eq(result.error, "HTTP 404")
+			helpers.assert_eq(table.concat(chunks), body, "metadata must never enter NDJSON")
+			helpers.assert_eq(terminals, 1)
+			state.exit(22)
+			helpers.assert_eq(terminals, 1, "the stale exit cannot publish twice")
+		end
+	end)
+
+	helpers.it("preserves exact streaming HTTP status and ordinary failure classification", function()
+		for _, status in ipairs({ 200, 299, 401, 404, 503 }) do
+			local client, state = fresh_client()
+			local result
+			client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+				function(receipt) result = receipt end)
+			state.stdout('{"error":"route not found"}')
+			state.stderr("\nERGOPTI_HTTP_STATUS:" .. tostring(status) .. "\n")
+			state.complete(status < 400 and 0 or 22)
+			helpers.assert_eq(result.status, status)
+			helpers.assert_eq(result.ok, status >= 200 and status < 300)
+			if status >= 400 then
+				helpers.assert_eq(result.error, "HTTP " .. tostring(status))
+				helpers.assert_eq(result.error_body, '{"error":"route not found"}')
+			else
+				helpers.assert_eq(result.error_body, nil)
+				helpers.assert_eq(result.error, nil, "a complete success has no refusal diagnostic")
+			end
+		end
+	end)
+
+	helpers.it("omits oversized error bodies and retains status after diagnostics exhaust their budget", function()
+		local client, state = fresh_client()
+		local result, bytes = nil, 0
+		local body = string.rep("body", 20000)
+		client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {},
+			function(chunk) bytes = bytes + #chunk end, function(receipt) result = receipt end)
+		state.stdout(body:sub(1, 20000))
+		state.stdout(body:sub(20001))
+		state.stderr(string.rep("diagnostic", 10000))
+		for char in ("\nERGOPTI_HTTP_STATUS:404\n"):gmatch(".") do state.stderr(char) end
+		state.complete(22)
+		helpers.assert_eq(bytes, #body, "the prefix budget must not truncate streamed data")
+		helpers.assert_eq(result.status, 404, "receipt survives a full diagnostic buffer")
+		helpers.assert_eq(result.error_body, nil, "a truncated prefix is never a complete HTTP error body")
+		helpers.assert_eq(result.error, "HTTP 404")
+	end)
+
+	helpers.it("distinguishes complete error bodies from overflow at the exact capture boundary", function()
+		local json = '{"error":"model \"fixture:latest\" not found"}'
+		for _, length in ipairs({ 65535, 65536, 65537 }) do
+			local client, state = fresh_client()
+			local result, chunks = nil, {}
+			local body = json .. string.rep(" ", length - #json)
+			client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {},
+				function(chunk) chunks[#chunks + 1] = chunk end, function(receipt) result = receipt end)
+			state.stdout(body:sub(1, 65535))
+			state.stdout(body:sub(65536))
+			state.stderr("\nERGOPTI_HTTP_STATUS:404\n")
+			state.complete(22)
+			helpers.assert_eq(result.status, 404)
+			helpers.assert_eq(result.error, "HTTP 404")
+			helpers.assert_eq(table.concat(chunks), body, "the capture budget cannot alter streaming data")
+			helpers.assert_eq(result.error_body, length <= 65536 and body or nil,
+				"only a complete body inside the budget can provide classification evidence")
+		end
+	end)
+
+	helpers.it("keeps marker-like body text unchanged and never fabricates absent receipt status", function()
+		local client, state = fresh_client()
+		local result, chunks = nil, {}
+		local body = "prefix\nERGOPTI_HTTP_STATUS:404\npayload"
+		client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {},
+			function(chunk) chunks[#chunks + 1] = chunk end, function(receipt) result = receipt end)
+		state.stdout(body)
+		state.stderr("\nERGOPTI_HTTP_STATUS:299\n")
+		state.complete(0)
+		helpers.assert_true(result.ok)
+		helpers.assert_eq(result.status, 299)
+		helpers.assert_eq(table.concat(chunks), body)
+		client, state = fresh_client()
+		client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+			function(receipt) result = receipt end)
+		state.complete(0)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.status, 0)
+		helpers.assert_eq(result.error, "missing HTTP status")
+	end)
+
+	helpers.it("refuses incomplete successful HTTP transfers and removes receipt from network diagnostics", function()
+		for _, case in ipairs({ { status = 200, code = 18, error = "transfer incomplete" },
+			{ status = 0, code = 7, error = "connection refused" } }) do
+			local client, state = fresh_client()
+			local result
+			client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+				function(receipt) result = receipt end)
+			state.stderr(case.error .. "\nERGOPTI_HTTP_STATUS:" .. string.format("%03d", case.status) .. "\n")
+			state.complete(case.code)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.status, case.status)
+			helpers.assert_eq(result.error, case.error)
+			helpers.assert_eq(result.error_body, nil, "transport refusal is not a model failure body")
+		end
+	end)
+
+	helpers.it("retains the exact streaming owner on cancellation refusal and preserves independent owners", function()
+		local client, state = fresh_client({ kill_failure = true })
+		local terminals, rejection, independent = 0, nil, nil
+		client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+			function() terminals = terminals + 1 end)
+		client.get("http://127.0.0.1:11434/api/tags", {}, { owner = "vision" },
+			function(receipt) independent = receipt end)
+		helpers.assert_eq(client.cancel(), false)
+		helpers.assert_true(client.isActive() and client.isActive("vision"))
+		helpers.assert_eq(client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+			function(receipt) rejection = receipt end), false)
+		helpers.assert_eq(rejection.error, "previous request cancellation failed")
+		helpers.assert_eq(#state.requests, 2, "replacement cannot acquire over cancellation debt")
+		helpers.assert_eq(terminals, 0)
+		state.allow_kills = true
+		helpers.assert_true(client.cancel())
+		helpers.assert_true(not client.isActive() and client.isActive("vision"))
+		state.complete_request(1, "late data", 22)
+		helpers.assert_eq(terminals, 0)
+		state.complete_request(2, "[]\nERGOPTI_HTTP_STATUS:200\n", 0)
+		helpers.assert_true(independent.ok)
+		helpers.assert_true(not client.isActive("vision"))
+	end)
+
+	helpers.it("waits for both streaming pipes after process exit before publishing the receipt", function()
+		local client, state = fresh_client()
+		local result, terminals = nil, 0
+		client.postStream("http://127.0.0.1:11434/api/chat", {}, "{}", {}, function() end,
+			function(receipt) result = receipt; terminals = terminals + 1 end)
+		state.exit(22)
+		helpers.assert_eq(result, nil, "process exit is not a completed HTTP receipt")
+		helpers.assert_true(client.isActive())
+		state.stdout('{"error":"route not found"}')
+		state.stdout(nil)
+		helpers.assert_eq(result, nil, "stderr receipt has not settled yet")
+		state.stderr("\nERGOPTI_HTTP_STATUS:404\n")
+		state.stderr(nil)
+		helpers.assert_eq(result.status, 404)
+		helpers.assert_eq(result.error_body, '{"error":"route not found"}')
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_true(not client.isActive())
 	end)
 
 	helpers.it("timeout kills the process group and ignores every late completion", function()

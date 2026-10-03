@@ -495,6 +495,23 @@ const RULES = [
 			].includes(f) || f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
 	},
 	{
+		gate: 'linux-http-stream',
+		why: 'streaming HTTP receipts require actual libuv/curl status, complete error bodies and native owner settlement',
+		match: (f) =>
+			[
+				'static/ergopti_plus/linux/adapters/http_client.lua',
+				'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
+				'static/ergopti_plus/linux/modules/llm/local_model_probe.lua',
+				'static/ergopti_plus/linux/modules/llm/local_model_offer.lua',
+				'static/ergopti_plus/linux/tests/unit/meta/test_http_client_curl.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
+				'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua',
+				'tools/test/run-linux-http-stream-receipts.cjs',
+				'.github/workflows/ci-linux.yml',
+				'.github/linux-ci-coverage.json'
+			].includes(f)
+	},
+	{
 		gate: 'linux',
 		why: 'the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		match: (f) =>
@@ -564,6 +581,7 @@ const GATE_COMMANDS = {
 	linux: { npm: 'test:linux' },
 	'linux-e2e': { npm: 'test:linux:e2e' },
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
+	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }

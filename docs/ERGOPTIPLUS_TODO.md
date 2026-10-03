@@ -524,12 +524,15 @@ the complete three-OS checkpoint remain pending.
   Registered macOS tests pass 12908 cases, and private eager-acquisition and
   consumer-refusal mutations are rejected. Native macOS qualification and
   manual hardware acceptance remain pending.
-- [ ] **46.** The AI agent and screen reading on Windows and Linux still send a
-      local model Ollama may not have pulled (default qwen2.5:7b, vision
-      qwen2.5vl:3b) and report a bare HTTP 404; macOS now checks /api/tags, names
-      the missing model and offers its download (`ai-agent-local-model`). Each
-      driver needs its own model listing and a hook into its models manager; the
-      seven locale keys are shared.
+- [ ] **46. (partial)** Local-model presence and download offers now share one
+      policy on Windows, macOS and Linux. Agent and screen-reading requests
+      distinguish an absent model from an unavailable or malformed model list;
+      a model removed after listing is reported through the same owned offer.
+      Linux streaming HTTP keeps real status and complete bounded error-body
+      receipts, and consent resumes only after modal input ownership is restored.
+      Complete the three-OS native CI, packaging and installation validations
+      before removing this item. Cloud loopback transport and scripted owner
+      regressions do not qualify physical desktop input.
 - [ ] **47.** Running local OpenAI-compatible servers (oMLX, LM Studio,
       llama-server/LocalAI, Jan; `_shared/modules/llm/local_servers.json`) are AI
       backends on macOS only (`local-openai-backends`). Windows and Linux need an

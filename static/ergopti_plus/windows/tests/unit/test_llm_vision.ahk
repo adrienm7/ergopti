@@ -727,3 +727,31 @@ _LVS_ErrorBothAnswersFailing() {
 	}
 }
 Test("LLM vision: why this error? without any answer is reported", _LVS_ErrorBothAnswersFailing)
+
+
+_LVS_MissingLocalModelStopsScreenFlow() {
+	_LVS_Run(_LPP_Menu(), _Body)
+	_Body(Calls, Lines, Sent, Fx) {
+		global _LLM_LocalModelOfferPort, LLM_OLLAMA_BASE_URL, _LLM_Vision_Generation
+		Saved := _LLM_LocalModelOfferPort
+		Offers := []
+		try {
+			_LLM_LocalModelOfferPort := Map("confirm", (Title, Text) => (Offers.Push(Text), false))
+			AssertTrue(_LVS_Invoke("llm_screen_region", "local"))
+			_LVS_Complete(Fx.Captures[1], true)
+			AssertEqual(1, Fx.Ollama.Length)
+			Model := JsonParse(Fx.Ollama[1]["body"])["model"]
+			Fx.Ollama[1]["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "current image failure offers the exact missing local model")
+			AssertContains(Offers[1], Model)
+			AssertEqual(0, Calls.Length, "no answer is requested without a transcription")
+			AssertEqual(1, Fx.Ollama.Length, "the image failure cannot start more local requests")
+			_LLM_Vision_Generation += 1
+			Fx.Ollama[1]["on_fail"].Call(LLM_LocalModelFailure(Model, LLM_OLLAMA_BASE_URL))
+			AssertEqual(1, Offers.Length, "a stale screenshot receipt cannot open another consent")
+			AssertEqual(0, Sent.Length)
+		} finally _LLM_LocalModelOfferPort := Saved
+	}
+}
+Test("LLM vision: actual local missing-model failure stops screen answers and rejects stale offer (todo-46-local-model)",
+	_LVS_MissingLocalModelStopsScreenFlow)

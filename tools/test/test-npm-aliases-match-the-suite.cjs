@@ -58,6 +58,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Native X11/XKB qualification requires its own display and headers;
 	// verify-change and the Linux CI lane own that separate native gate.
 	'tools/test/run-linux-xkb-source.cjs',
+	// Actual libuv/curl loopback receipts run under verify-change and Linux CI,
+	// independently of the Node-only static registration contract.
+	'tools/test/run-linux-http-stream-receipts.cjs',
 	// Real-browser render runs separately from the Node-only suite;
 	// test-changelog-release-install.cjs runs the same page scripts against
 	// a recording DOM inside the suite.

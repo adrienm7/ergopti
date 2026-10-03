@@ -32,6 +32,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include local_model_offer.ahk
 
 
 
@@ -484,6 +485,10 @@ _LLM_Vision_OnReadFail(Flow, Failure := "") {
 		return
 	LoggerWarn("LLM", "Screen reading #{1}: the vision request to '{2}' failed ({3}).",
 		Flow["generation"], Flow["backend"], _LLM_Vision_FailureReason(Failure))
+	if LLM_LocalModelIsMissing(Failure) {
+		LLM_LocalModelOffer(Failure, false, _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"]))
+		return
+	}
 	_LLM_Menu_ShowManualPredictionNotice("llm.vision.read_failed")
 }
 
@@ -577,6 +582,10 @@ _LLM_Vision_OnAnswerFail(Flow, Index, Failure := "") {
 		return
 	LoggerWarn("LLM", "Screen reading #{1}: the '{2}' answer request failed ({3}).",
 		Flow["generation"], Flow["prompts"][Index]["id"], _LLM_Vision_FailureReason(Failure))
+	if LLM_LocalModelIsMissing(Failure) {
+		LLM_LocalModelOffer(Failure, false, _LLM_Vision_RenderIsCurrent.Bind(Flow["generation"]))
+		return
+	}
 	_LLM_Vision_NextAnswer(Flow)
 }
 

@@ -98,6 +98,30 @@ helpers.describe("Ollama model download: streaming transaction", function()
 	end)
 end)
 
+helpers.describe("Ollama model download: post-window consent admission", function()
+	helpers.it("rechecks the requesting owner after progress UI before actual HTTP dispatch", function()
+		local Download, transport, window = load_fixture()
+		local current = true
+		local Window = package.loaded["ui.download_window.bridge"]
+		local original_show = Window.show
+		Window.show = function(opts)
+			local session = original_show(opts)
+			current = false
+			return session
+		end
+		local ok, err = xpcall(function()
+			helpers.assert_eq(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B", nil,
+				function() return current end), false, "a reentrant native UI lifecycle change must refuse launch")
+			helpers.assert_eq(#transport.starts, 0, "the existing real owner never dispatches /api/pull")
+			helpers.assert_eq(#window.completions, 1, "the native progress session settles its refusal")
+			helpers.assert_eq(window.completions[1][2], false)
+			helpers.assert_eq(Download.is_active(), false)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)
+
 helpers.describe("shared model catalogue projection", function()
 	helpers.it("derives Ollama runtime tags and keeps active/install identities coherent", function()
 		local Catalogue = require("llm.model_catalogue")

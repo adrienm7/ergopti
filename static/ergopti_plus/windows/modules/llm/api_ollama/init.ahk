@@ -454,6 +454,7 @@ global LLM_OLLAMA_MAX_INFLIGHT := 16
 ; the deadline — never a COM object, because the Ollama transport is curl. The
 ; cancelled flag flips to true when LLM_OllamaCancelAllAsync is called; the
 ; polling tick checks it and bails before invoking the user's callback.
+global _LLM_Ollama_PreflightPort := 0
 global _LLM_Ollama_Async := Map()
 global _LLM_Ollama_AsyncCounter := 0
 ; Latest-only queue when Ollama is busy — coalesces rapid re-fires instead of
@@ -529,6 +530,7 @@ LLM_Ollama_SetPort(port) {
 
 
 
+#Include ../../../../_shared/modules/llm/local_model_policy.ahk
 #Include ollama_payload.ahk
 #Include curl_environment.ahk
 #Include ollama_http.ahk

@@ -306,7 +306,7 @@ function M.list_local_models(world, names)
 	pending.answered = true
 	local models = {}
 	for index, name in ipairs(names) do models[index] = { name = name, model = name } end
-	pending.callback({ ok = true, status = 200, body = json.encode({ models = models }), headers = {} })
+	pending.callback({ ok = true, status = 200, body = json.encode({ models = json.array(models) }), headers = {} })
 	return true
 end
 
