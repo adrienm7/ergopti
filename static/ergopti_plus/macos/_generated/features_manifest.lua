@@ -873,12 +873,6 @@ M.features = {
 		path = "metrics.float_colors", id = "float_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "hs" }, recommended = true, input_altering = false,
 	},
 	{
-		path = "metrics.shortcut", id = "shortcut", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.metrics_shortcut_typing", platforms = { "hs" }, recommended = false, input_altering = false,
-	},
-	{
-		path = "metrics.apps_shortcut", id = "apps_shortcut", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.metrics_shortcut_apps", platforms = { "hs" }, recommended = false, input_altering = false,
-	},
-	{
 		path = "layout.pause_switch_enabled", id = "pause_switch_enabled", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "hs" }, recommended = false, input_altering = true,
 	},
 	{
@@ -913,12 +907,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.metrics_enabled", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_shortcut_typing", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_shortcut_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },

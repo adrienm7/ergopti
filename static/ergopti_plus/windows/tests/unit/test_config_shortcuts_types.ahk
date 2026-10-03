@@ -30,8 +30,6 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 			["secure_filter_enabled", '""'],
 			["system_auth_filter_enabled", "-1"],
 			["encrypt", '"true"'],
-			["metrics_shortcut_typing", "2"],
-			["metrics_shortcut_apps", "false"],
 			["metrics_disabled_apps", '"chrome.exe"']
 		]
 		for Fixture in Cases {
@@ -82,3 +80,16 @@ TestConfigShortcutsValidatesBeforePublishing() {
 }
 Test("metrics config: validation precedes live publication (AHK-105)",
 	TestConfigShortcutsValidatesBeforePublishing)
+
+_CSTT_RetiredShortcutValuesAreUnknown() {
+	for Value in ["ctrl+alt+m", 9, false, Map("future", "keep")] {
+		Section := Map("metrics_shortcut_typing", Value, "metrics_shortcut_apps", Value,
+			"metrics_enabled", true)
+		Validated := _CS_ValidateMetricsSection(Section)
+		AssertFalse(Validated.Has("metrics_shortcut_typing"), "the retired typing field has no live owner")
+		AssertFalse(Validated.Has("metrics_shortcut_apps"), "the retired apps field has no live owner")
+		AssertTrue(Validated["metrics_enabled"], "retirement preserves collection consent validation")
+		AssertEqual(Value, Section["metrics_shortcut_typing"], "validation must not mutate unknown data")
+	}
+}
+Test("metrics config: retired bindings are unknown regardless of their historical type", _CSTT_RetiredShortcutValuesAreUnknown)

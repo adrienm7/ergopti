@@ -1098,8 +1098,6 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
 		Updates.Push({ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
-		Updates.Push({ Section: "metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
 		Updates.Push({ Section: "metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
 		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
 		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })

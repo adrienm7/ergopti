@@ -904,23 +904,22 @@ Windows native unit, parse and E2E confirmation still requires CI. Items 54 and
 Every request the maintainer makes is written here first and removed once it
 is committed; one request is one commit with its regression test.
 
-- [ ] **71.** Metrics windows: retire what is left of their dedicated
-      shortcuts. The two menu rows that set them are gone on the three
-      drivers (2026-10-01): a shortcut that opens a metrics window is assigned
-      in the Gestures or the Shortcuts menu, to `open_metrics_typing` or
-      `open_metrics_apps`, which the catalogue declares for every driver.
-      What remains is the machinery behind the removed rows, which still
-      binds a shortcut already stored: on Windows the manifest features
-      `metrics.metrics_shortcut_typing` / `metrics_shortcut_apps`, their
-      loading (`config_shortcuts.ahk`), saving (`config_io.ahk`), binding and
-      prompt (`infra/metrics/metrics_shortcuts.ahk`, `MS_ApplyAll` at boot)
-      and six test files; on macOS `metrics.shortcut` / `metrics.apps_shortcut`
-      with `apply_metrics_shortcut` / `apply_apps_time_shortcut`
-      (`ui/menu/init.lua`, `menu_state.lua`, `preferences.lua`) and their
-      tests; the locale keys `menu.metrics.shortcut_*` and
-      `metrics.shortcut_*`; and the second half of the Linux reason
-      `platform_reason.metrics_extras_are_not_on_linux`, which still speaks
-      of a shortcut.
+- [~] **71.** Retire the dedicated Metrics-window shortcut machinery.
+  The Windows and macOS legacy fields no longer belong to defaults,
+  loaders, full-save, native binding or scoped reset owners. Existing
+  values and comments remain unknown configuration data; no migration
+  guesses a replacement. Collection consent, privacy filters, encryption,
+  menubar and widget transactions keep their existing acknowledgement and
+  compensation boundaries. The shared `open_metrics_typing` and
+  `open_metrics_apps` actions remain available through ordinary Shortcuts
+  and Gestures on all three drivers. Linux's exclusion-list reason no
+  longer mentions the retired shortcut UI, in all 21 locales. Local
+  unit, E2E, unknown-source preservation and refusal regressions cover the
+  retirement; complete native three-OS CI, packaging and installation
+  validation remain pending.
+
+The exact composed source retirement passes 13,281 macOS unit cases, 4,960 Linux cases and E2E suites of 101 and 154 checks. Four comment-banner widths caused the initial JS parent failure; the exact comment-only correction range and complete 353-check JS rerun pass, with the original failed receipt retained. Both canonical generators produced the owned artifacts. Exactly two save calls disappeared with the retired binding methods; every one of the remaining 57 calls and strict acknowledgement predicates is unchanged, and independent missing-call and unguarded-call mutations are rejected. Fresh integration retains the existing native Metrics consent and compensation owners, general action catalogue and exact historical unknown-source preservation. Native Windows and complete packaging/installation qualification remain pending.
+
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
       physical keys through the same catalogue and invalidates its picker

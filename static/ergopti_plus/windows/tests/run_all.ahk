@@ -516,8 +516,8 @@ InstallSendNoOps()
 #Include unit/test_shortcuts.ahk
 #Include unit/test_keepawake_visible_cancellation.ahk
 
-; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
-; registered at top level) so the file is safe to include in the headless runner.
+; Metrics boolean preferences retain their existing transaction owner; ordinary
+; chord syntax tests use the shared parser and registrar without binding hotkeys.
 #Include ../infra/app_picker.ahk
 #Include ../infra/config_shortcuts.ahk
 #Include ../infra/metrics/metrics_filters.ahk
@@ -525,8 +525,6 @@ InstallSendNoOps()
 #Include ../ui/menu/menu_metrics.ahk
 #Include ../ui/menu/menu_metrics_actions.ahk
 #Include unit/test_metrics_shortcut_named_key.ahk
-#Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
-#Include unit/test_metrics_shortcut_transactions.ahk
 #Include unit/test_config_shortcuts_types.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 

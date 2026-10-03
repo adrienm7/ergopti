@@ -64,8 +64,14 @@ _CTT_RealCollector(OnboardingSeen) {
 		_LLM_Menu["app_profile_overrides"] := Map()
 		_LLM_Menu["user_profiles"] := []
 		_LLM_Menu_Loaded := true
+		Legacy := '# unowned dashboard shortcuts`n[metrics]`nmetrics_shortcut_typing = "ctrl+alt+m" # keep typing`nmetrics_shortcut_apps = { future = "keep" } # keep apps`n'
+		AssertTrue(FSWrite(Path, Legacy))
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true),
 			"the real full-save collector must produce valid typed updates")
+		for Line in StrSplit(Legacy, "`n") {
+			if Line != ""
+				AssertContains(FSRead(Path), Line . "`n", "the real full-save owns no retired binding bytes")
+		}
 		Target := ManifestBuildFeaturesMap()
 		if !OnboardingSeen
 			AssertEqual("absent", TOML_Read(Path, "llm", "onboarding_seen", "absent"),

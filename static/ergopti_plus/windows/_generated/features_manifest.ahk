@@ -153,8 +153,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "metrics.system_auth_filter_enabled", "id", "system_auth_filter_enabled", "section", "metrics", "default", true, "type", "boolean", "description_key", "menu.metrics.system_auth_filter_enabled", "platforms", ["ahk", "hs", "linux"], "recommended", true, "input_altering", false),
         Map("path", "metrics.encrypt", "id", "encrypt", "section", "metrics", "default", false, "type", "boolean", "description_key", "menu.metrics.encrypt_toggle", "platforms", ["ahk", "hs", "linux"], "recommended", false, "input_altering", false),
         Map("path", "metrics.metrics_enabled", "id", "metrics_enabled", "section", "metrics", "default", false, "type", "boolean", "description_key", "menu.metrics.metrics_enabled", "platforms", ["ahk"], "recommended", true, "input_altering", true),
-        Map("path", "metrics.metrics_shortcut_typing", "id", "metrics_shortcut_typing", "section", "metrics", "default", "", "type", "string", "description_key", "menu.metrics.metrics_shortcut_typing", "platforms", ["ahk"], "recommended", "", "input_altering", false),
-        Map("path", "metrics.metrics_shortcut_apps", "id", "metrics_shortcut_apps", "section", "metrics", "default", "", "type", "string", "description_key", "menu.metrics.metrics_shortcut_apps", "platforms", ["ahk"], "recommended", "", "input_altering", false),
         Map("path", "metrics.metrics_wpm_menubar_colors", "id", "metrics_wpm_menubar_colors", "section", "metrics", "default", false, "type", "boolean", "description_key", "menu.metrics.metrics_wpm_menubar_colors", "platforms", ["ahk"], "recommended", false, "input_altering", false),
         Map("path", "metrics.metrics_disabled_apps", "id", "metrics_disabled_apps", "section", "metrics", "default", [], "type", "array", "description_key", "menu.metrics.metrics_disabled_apps", "platforms", ["ahk"], "recommended", [], "input_altering", false),
         Map("path", "metrics.wpm_widget_visible", "id", "wpm_widget_visible", "section", "metrics", "default", false, "type", "boolean", "description_key", "menu.metrics.wpm_widget_visible", "platforms", ["ahk", "linux"], "recommended", false, "input_altering", false),
@@ -401,8 +399,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "metrics.float_wpm", "section", "metrics", "reason_key", "", "platforms", ["hs"]),
         Map("path", "metrics.float_graph", "section", "metrics", "reason_key", "", "platforms", ["hs"]),
         Map("path", "metrics.float_colors", "section", "metrics", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "metrics.shortcut", "section", "metrics", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "metrics.apps_shortcut", "section", "metrics", "reason_key", "", "platforms", ["hs"]),
         Map("path", "layout.pause_switch_enabled", "section", "layout", "reason_key", "", "platforms", ["hs"]),
         Map("path", "layout.on_pause", "section", "layout", "reason_key", "", "platforms", ["hs"]),
         Map("path", "layout.on_resume", "section", "layout", "reason_key", "", "platforms", ["hs"])

@@ -30,8 +30,6 @@ local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
-local Chord         = require("chord")
-local Hotkeys       = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
@@ -114,126 +112,6 @@ local core_mods = {
 }
 
 M._active_tasks = {}
-
---- Creates a native-compatible facade over an opaque registrar handle.
---- MenuState still owns the delayed :enable() warm-up, while all creation,
---- delivery fencing, and teardown remain centralized in the adapter.
---- @param mods table Modifier array.
---- @param key string Key name.
---- @param callback function Press callback.
---- @return table|nil Managed hotkey facade.
-local function bind_managed_hotkey(mods, key, callback)
-	local chord, chord_err = Chord.format(mods, key)
-	if not chord then
-		Logger.error(LOG, "Cannot bind menu hotkey: %s.", tostring(chord_err))
-		return nil
-	end
-	local handle = Hotkeys.bind(chord, callback)
-	if not handle then return nil end
-	local posture = true
-	local function set_enabled(value)
-		local result = Hotkeys.setEnabled(handle, value)
-		if result == true then posture = value else posture = nil end
-		return result
-	end
-	local saved_mods = {}
-	for index, value in ipairs(mods) do saved_mods[index] = value end
-	return {
-		enable = function() return set_enabled(true) end,
-		disable = function() return set_enabled(false) end,
-		snapshot = function()
-			if posture == nil then return nil end
-			local copy = {}
-			for index, value in ipairs(saved_mods) do copy[index] = value end
-			return { mods = copy, key = key, enabled = posture }
-		end,
-		delete = function()
-			if not handle then return true end
-			if Hotkeys.unbind(handle) ~= true then posture = nil; return false end
-			handle = nil
-			return true
-		end,
-	}
-end
-
--- Candidate cleanup that could not settle remains logically fenced by the
--- registrar, but its exact facade must stay reachable for a later retry.
-local _retired_menu_hotkeys = {}
-
---- Invokes one exact facade mutation and accepts only literal true.
---- @param owner table Managed hotkey facade.
---- @param method string Facade method name.
---- @param label string Diagnostic owner.
---- @return boolean committed
-local function mutate_managed_hotkey(owner, method, label)
-	local ok, result = xpcall(function() return owner[method](owner) end, debug.traceback)
-	if not ok or result ~= true then
-		Logger.error(LOG, "%s %s did not commit; exact owner retained: %s.",
-			label, method, tostring(result))
-		return false
-	end
-	return true
-end
-
---- Retries every fenced candidate left by an earlier failed rollback.
---- @return boolean settled True when no cleanup debt remains.
-local function settle_retired_menu_hotkeys()
-	local settled = true
-	for index = #_retired_menu_hotkeys, 1, -1 do
-		local retired = _retired_menu_hotkeys[index]
-		if mutate_managed_hotkey(retired.owner, "delete", retired.label) then
-			table.remove(_retired_menu_hotkeys, index)
-		else
-			settled = false
-		end
-	end
-	return settled
-end
-
---- Replaces one acknowledged hotkey without losing either native owner.
---- The candidate is acquired first. A refused predecessor release fences and
---- rolls the candidate back, then re-enables the exact acknowledged facade.
---- @param current table|nil Acknowledged managed hotkey facade.
---- @param mods table|nil Desired modifiers, or nil to clear.
---- @param key string|nil Desired key, or nil to clear.
---- @param callback function Press callback for a replacement candidate.
---- @param label string Diagnostic owner.
---- @return boolean committed
---- @return table|nil next_owner
-local function replace_managed_hotkey(current, mods, key, callback, label)
-	if not settle_retired_menu_hotkeys() then
-		Logger.error(LOG, "%s replacement blocked by retained candidate cleanup.", label)
-		return false, current
-	end
-
-	local candidate = nil
-	if mods and key then
-		local acquired, owner_or_err = xpcall(function()
-			return bind_managed_hotkey(mods, key, callback)
-		end, debug.traceback)
-		if not acquired or owner_or_err == nil then
-			Logger.error(LOG, "%s candidate acquisition did not commit: %s.",
-				label, tostring(owner_or_err))
-			return false, current
-		end
-		candidate = owner_or_err
-	end
-
-	if current and not mutate_managed_hotkey(current, "delete", label .. " prior owner") then
-		if candidate and not mutate_managed_hotkey(candidate, "delete", label .. " candidate rollback") then
-			_retired_menu_hotkeys[#_retired_menu_hotkeys + 1] = {
-				owner = candidate,
-				label = label .. " retired candidate",
-			}
-		end
-		if not mutate_managed_hotkey(current, "enable", label .. " prior owner rollback") then
-			Logger.error(LOG, "%s prior owner remains fenced and retryable after rollback.", label)
-		end
-		return false, current
-	end
-
-	return true, candidate
-end
 
 
 
@@ -528,11 +406,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ===== 1.2) Module Synchronization =====
 	-- =======================================
 
-	-- Forward-declared so apply_metrics_shortcut and apply_apps_time_shortcut
-	-- (defined below) capture these as upvalues rather than seeing global nil.
-	local _metrics_hk_box   = {}
-	local _apps_time_hk_box = {}
-
 	--- Delegates an open dashboard close to the module that owns its full runtime.
 	--- Only a dashboard the user is looking at is closed: a covered one answers
 	--- nil, so the caller opens it and the module presents the open window.
@@ -556,67 +429,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return true
 	end
 
-	local _metrics_hk = nil
-	local function apply_metrics_shortcut(mods, key, persist)
-		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
-				-- Toggle: close the dashboard if it is open and focused, otherwise
-				-- open or present it. Using package.loaded so we don't accidentally
-				-- trigger require() on close.
-				local closed = close_loaded_dashboard(
-					"ui.metrics_typing", "Typing dashboard")
-				if closed ~= nil then return closed end
-				local kl = core_mods.keylogger
-				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
-			end, "Metrics shortcut")
-		if not committed then return false end
-		_metrics_hk = next_owner
-		if mods and key then
-			state.metrics_shortcut = { mods = mods, key = key }
-		else
-			state.metrics_shortcut = false
-		end
-		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
-		if _metrics_hk_box then _metrics_hk_box[1] = _metrics_hk end
-		if persist ~= false then
-			if save_prefs() ~= true then return false end
-			if type(updateMenu) == "function" then updateMenu() end
-		end
-		return true
-	end
-
-	local _apps_time_hk = nil
-	local function apply_apps_time_shortcut(mods, key, persist)
-		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
-				-- Toggle behaviour: close if open and focused, else open or present
-				local closed = close_loaded_dashboard(
-					"ui.metrics_apps", "Apps dashboard")
-				if closed ~= nil then return closed end
-				local ok_mod, at = pcall(require, "ui.metrics_apps")
-				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
-			end, "Application-time shortcut")
-		if not committed then return false end
-		_apps_time_hk = next_owner
-		if mods and key then
-			state.apps_time_shortcut = { mods = mods, key = key }
-		else
-			state.apps_time_shortcut = false
-		end
-		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
-		if _apps_time_hk_box then _apps_time_hk_box[1] = _apps_time_hk end
-		if persist ~= false then
-			if save_prefs() ~= true then return false end
-			if type(updateMenu) == "function" then updateMenu() end
-		end
-		return true
-	end
-
-	-- Build the dependency bag for MenuState.sync_state_to_modules
-	-- _metrics_hk and _apps_time_hk are boxed in single-element tables so
-	-- MenuState can read their current value even after they are reassigned
-	-- by apply_metrics_shortcut / apply_apps_time_shortcut.
-	-- (Boxes forward-declared above so apply_metrics/apps_time_shortcut can
-	-- capture them as upvalues at definition time.)
-
 	sync_state_to_modules = function(saved, config_absent, restoring)
 		local committed, report = MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
@@ -633,10 +445,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
 			core_mods                = core_mods,
-			apply_metrics_shortcut   = apply_metrics_shortcut,
-			apply_apps_time_shortcut = apply_apps_time_shortcut,
-			_metrics_hk              = _metrics_hk_box,
-			_apps_time_hk            = _apps_time_hk_box,
 			restoring                 = restoring == true,
 			-- A deferred engine refusal (keylogger start) lands after this sync
 			-- returned; it keeps the acknowledged value on disk like a boot one.
@@ -1375,24 +1183,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
 					script_control = core_mods.shortcuts_mod,
 					activation_pending = MenuState.metrics_start_pending,
-					capture_shortcuts = function()
-						if #_retired_menu_hotkeys > 0 then return nil end
-						local captured = {}
-						for name, box in pairs({ metrics_shortcut = _metrics_hk_box, apps_time_shortcut = _apps_time_hk_box }) do
-							if box[1] then
-								captured[name] = box[1].snapshot()
-								if captured[name] == nil then return nil end
-							else captured[name] = false end
-						end
-						return captured
-					end,
-					apply_shortcut = function(name, mods, key, enabled)
-						local callback = name == "metrics_shortcut" and apply_metrics_shortcut or apply_apps_time_shortcut
-						if callback(mods, key, false) ~= true then return false end
-						local box = name == "metrics_shortcut" and _metrics_hk_box or _apps_time_hk_box
-						if enabled == false and box[1] then return box[1]:disable() == true end
-						return true
-					end,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
 					paused = function()
@@ -1573,8 +1363,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		gestures                 = gestures,
 		shortcuts                = core_mods.shortcuts_mod,
 		script_control           = core_mods.shortcuts_mod,
-		apply_metrics_shortcut   = apply_metrics_shortcut,
-		apply_apps_time_shortcut = apply_apps_time_shortcut,
 		llm_handler              = llm_handler,
 		karabiner                = karabiner,
 		channel_owner            = channel_owner,
