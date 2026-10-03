@@ -185,10 +185,20 @@ if (windowsSmokeStep !== null) {
 	try {
 		const verdict = pipeline.scriptBlock(
 			pipeline.runOf(windowsSmokeStep) ?? [],
-			'if ($crashedEarly -or -not $markerSeen) {'
+			'if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {'
 		);
-		if (!pipeline.blockExits(verdict, '1')) {
-			errors.push('the Windows exe smoke must end its crash branch with exit 1');
+		if (
+			!/^throw\s/.test(
+				verdict
+					.slice(1, -1)
+					.map((line) => line.trim())
+					.filter(Boolean)
+					.at(-1) ?? ''
+			)
+		) {
+			errors.push(
+				'the Windows exe smoke must end its failed readiness branch with an unconditional throw'
+			);
 		}
 	} catch (error) {
 		errors.push(`the Windows exe smoke lost its crash verdict: ${error.message}`);
@@ -212,13 +222,13 @@ const WINDOWS_SMOKE_HANG_HEADROOM = 3;
 const WINDOWS_SMOKE_STEP_MARGIN_SECONDS = 60;
 // PowerShell names are case-insensitive, so $seconds is the same parameter.
 const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
-const WINDOWS_SMOKE_VERDICT = 'if ($crashedEarly -or -not $markerSeen) {';
+const WINDOWS_SMOKE_VERDICT =
+	'if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {';
 const WINDOWS_SMOKE_WAIT_OPENER = 'while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {';
-// The only ways out of the wait, in order. Any other exit, such as a
-// wall-clock deadline, turns a slow extraction back into a false failure.
+// Process completion and a dialog end the wait. The extraction marker is
+// diagnostic only: its presence cannot prove input/menu readiness.
 const WINDOWS_SMOKE_WAIT_EXITS = [
 	'if ($proc.HasExited) { break }',
-	'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }',
 	'if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }'
 ];
 
@@ -310,7 +320,7 @@ function windowsSmokeWaitProblems(script, timeoutMinutes) {
 		);
 		if (exits.join('\n') !== WINDOWS_SMOKE_WAIT_EXITS.join('\n')) {
 			problems.push(
-				`the Windows exe smoke wait must end only on a crash, the marker or a dialog: ` +
+				`the Windows exe smoke wait must end only on process exit or a dialog: ` +
 					`expected ${WINDOWS_SMOKE_WAIT_EXITS.join(' | ')}; got ${exits.join(' | ')}`
 			);
 		}
@@ -348,6 +358,14 @@ function windowsSmokeWaitProblems(script, timeoutMinutes) {
 			}
 		}
 		const verdict = pipeline.scriptBlock(code, WINDOWS_SMOKE_VERDICT);
+		const lastStatement = verdict
+			.slice(1, -1)
+			.map((line) => line.trim())
+			.filter(Boolean)
+			.at(-1);
+		if (!/^throw\s/.test(lastStatement ?? '')) {
+			problems.push('the failed readiness verdict must end with an unconditional throw');
+		}
 		const callInVerdict = verdict.findIndex((line) => /^\s*Write-LaunchDiagnostics\b/.test(line));
 		if (callInVerdict < 0) {
 			problems.push('the Windows exe smoke must print its diagnostics before it fails');
@@ -458,6 +476,24 @@ if (windowsSmokeStep !== null) {
 			(lines) =>
 				lines.map((line) =>
 					line.replace('if (owner == (uint)processId) found.Add(window);', 'found.Add(window);')
+				)
+		],
+		[
+			'an extraction marker admitted before readiness',
+			(lines) =>
+				lines.map((line) =>
+					line.replace(
+						'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true }',
+						'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }'
+					)
+				)
+		],
+		[
+			'a failure without a failing process status',
+			(lines) =>
+				lines.filter(
+					(line) =>
+						!line.trimStart().startsWith('throw "ErgoptiPlus.exe did not complete native readiness')
 				)
 		],
 		[

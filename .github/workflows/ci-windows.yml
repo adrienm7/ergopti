@@ -703,19 +703,23 @@ jobs:
           name: assets-windows
           path: ${{ runner.temp }}/package
 
+      - name: Test native compiled startup admission
+        shell: pwsh
+        timeout-minutes: 3
+        run: node tools/test/test-desktop-ci-evidence.cjs
+
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
         # The unit test suite (test-ahk job) runs against source .ahk files with
         # A_IsCompiled == false, so it never exercises compiled-mode-only code
         # paths like Bundle_Init(). That gap let a 100%-reproducible startup
         # crash (unassigned A_LocalAppData — not a real AHK v2 built-in) ship
         # through fully-green CI. This step launches the actual compiled exe
-        # and proves it gets past first-launch bundle extraction instead of
-        # dying on the very first line of the auto-execute section.
+        # and requires a nonce/PID/build-bound receipt after input/menu readiness,
+        # durable error-free logs and the disposable probe's native exit code 0.
         #
-        # The wait ends on what it observes: the marker of the extracted bundle
-        # (pass), the process exiting (crash), or a dialog window of the process,
-        # the blocking MsgBox a runtime error raises (fail at once, with its
-        # text). Elapsed time is no verdict. The first launch expands about 550
+        # The wait ends on process exit or a runtime error dialog. The bundle
+        # marker is diagnostic only; it must never admit an incomplete boot.
+        # Elapsed time is no verdict. The first launch expands about 550
         # files through Windows PowerShell while Defender scans each of them,
         # and this step took 8-19 s on the green runs 582-613, so the former
         # 20 s deadline read the slow end of a healthy extraction as a dialog
@@ -725,12 +729,17 @@ jobs:
         timeout-minutes: 5
         run: |
           $exe = "$env:RUNNER_TEMP\package\ergopti_plus\windows\ErgoptiPlus.exe"
+          $launchRoot = Join-Path $env:RUNNER_TEMP ("ergopti-compiled-" + [guid]::NewGuid().ToString('N'))
+          $env:LOCALAPPDATA = Join-Path $launchRoot 'local-app-data'
+          $env:ERGOPTI_STARTUP_SMOKE_DIR = Join-Path $launchRoot 'startup'
+          $env:ERGOPTI_STARTUP_SMOKE_NONCE = [guid]::NewGuid().ToString('N')
+          New-Item -ItemType Directory -Path $env:LOCALAPPDATA, $env:ERGOPTI_STARTUP_SMOKE_DIR -Force | Out-Null
+          $receiptFile = Join-Path $env:ERGOPTI_STARTUP_SMOKE_DIR 'ready.json'
           $ergoptiDir = "$env:LOCALAPPDATA\Ergopti"
           $bundleDir = "$ergoptiDir\bundle"
           $markerFile = "$bundleDir\.bundle-version"
-          Remove-Item $bundleDir -Recurse -Force -ErrorAction SilentlyContinue
-          $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
-          $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
+          $stdout = Join-Path $launchRoot 'stdout.txt'
+          $stderr = Join-Path $launchRoot 'stderr.txt'
           # Six times the slowest green smoke measured when this bound was set.
           $hangBoundSeconds = 120
 
@@ -1023,9 +1032,10 @@ jobs:
 
           # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
           # to stderr; a RUNTIME error like the one this step guards against
-          # still pops a blocking MsgBox, so the real signal below is
-          # behavioural (marker file written / dialog / early exit), not the exit code.
+          # may raise a blocking dialog. Require the native ready receipt AND a
+          # clean exit after boot; a bundle marker is only extraction diagnostics.
           $clock = [System.Diagnostics.Stopwatch]::StartNew()
+          $launchedDigest = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -WindowStyle Hidden -PassThru `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr
           # Holding the handle keeps ExitCode readable once the process has exited.
@@ -1052,6 +1062,7 @@ jobs:
           $markerSeen = $false
           $dialogSeen = $false
           $stagingSeconds = $null
+          try {
           while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {
               # The moment Bundle_Init creates its staging directory splits the
               # launch time into interpreter start-up and the extraction itself.
@@ -1059,16 +1070,17 @@ jobs:
                   $stagingSeconds = $clock.Elapsed.TotalSeconds
               }
               if ($proc.HasExited) { break }
-              if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }
+              if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true }
               if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }
               Start-Sleep -Milliseconds 250
           }
           $seconds = $clock.Elapsed.TotalSeconds
-          $crashedEarly = $proc.HasExited
           $exitCode = $null
-          if ($crashedEarly) { $exitCode = $proc.ExitCode }
+          if ($proc.HasExited) { $exitCode = $proc.ExitCode }
+          $markerSeen = Test-Path -LiteralPath $markerFile
+          $crashedEarly = -not (Test-Path -LiteralPath $receiptFile) -or $exitCode -ne 0
 
-          if ($crashedEarly -or -not $markerSeen) {
+          if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {
               $startupEvidence.failure_phase = 'verdict'
               $startupEvidence.failures = @('startup_guard_failed')
               $startupEvidence.marker_seen = $markerSeen
@@ -1088,26 +1100,35 @@ jobs:
               } else {
                   Write-Error "ErgoptiPlus.exe neither extracted its runtime bundle nor raised a dialog within ${hangBoundSeconds}s — see the diagnostics above."
               }
-              exit 1
+              throw "ErgoptiPlus.exe did not complete native readiness (exit=$exitCode, dialog=$dialogSeen) within ${hangBoundSeconds}s."
           }
-          Stop-LaunchedApp $proc
           $markerSeconds = [math]::Round($seconds, 1)
-          $stagingNote = 'not observed'
-          if ($null -ne $stagingSeconds) { $stagingNote = "$([math]::Round($stagingSeconds, 1)) s" }
-          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile after $markerSeconds s (staging directory seen after $stagingNote)"
-          $evidence = @{
-              schema_version = 1
-              platform = 'windows'
-              sha = $env:GITHUB_SHA
-              runner = 'windows-latest'
-              scenario = 'startup'
-              package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $logs = @(Get-ChildItem -LiteralPath $env:ERGOPTI_STARTUP_SMOKE_DIR -Recurse -File -Filter '*.log')
+          $loggedErrors = @($logs | Select-String -Pattern '\[(ERROR|FATAL)\]|the error window for' |
+              ForEach-Object { "$($_.Path): $($_.Line)" })
+          $observation = @{
               marker_seen = $markerSeen
               crashed_early = $crashedEarly
               marker_seconds = $markerSeconds
-              failures = @()
+              native_startup = @{
+                  nonce = $env:ERGOPTI_STARTUP_SMOKE_NONCE
+                  pid = $proc.Id
+                  executable = [IO.Path]::GetFullPath($exe)
+                  launched_sha256 = $launchedDigest
+                  exit_code = $exitCode
+                  log_files = $logs.Count
+                  logged_errors = $loggedErrors
+                  receipt = Get-Content -LiteralPath $receiptFile -Raw -Encoding utf8 | ConvertFrom-Json
+              }
           }
-          $evidence | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
+          $observationFile = Join-Path $launchRoot 'observation.json'
+          [IO.File]::WriteAllText($observationFile, ($observation | ConvertTo-Json -Depth 6) + "`n", [Text.UTF8Encoding]::new($false))
+          node tools/test/desktop-ci-evidence.cjs record-windows $observationFile $exe "$env:RUNNER_TEMP/evidence.json"
+          if ($LASTEXITCODE -ne 0) { throw 'The native compiled startup evidence was refused.' }
+          Write-Host "OK: the exact packaged ErgoptiPlus.exe reached input/menu readiness and exited cleanly after $markerSeconds s."
+          } finally {
+              Stop-LaunchedApp $proc
+          }
 
       - name: Upload mandatory launch evidence
         if: always()
