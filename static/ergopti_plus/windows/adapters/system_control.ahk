@@ -198,6 +198,27 @@ class SystemControl {
 			return ""
 	}
 
+	; Reads exactly one window, including a hidden one, without choosing a new
+	; foreground target. HWND, process and class are the available Win32 receipt;
+	; they do not claim an unavailable unique window-generation identity.
+	; @param {Integer} Hwnd The admitted window handle, 0 when no window was read.
+	; @returns {Object|String} Detached { Hwnd, Pid, Class }, or "" when absent.
+	WindowSnapshot(Hwnd) {
+		if !(Hwnd is Integer)
+			throw TypeError("A window snapshot requires an integer HWND.")
+		if !Hwnd || !DllCall("IsWindow", "Ptr", Hwnd, "Int")
+			return ""
+		PreviousHidden := DetectHiddenWindows(true)
+		try {
+			Pid := WinGetPID("ahk_id " . Hwnd)
+			ClassName := WinGetClass("ahk_id " . Hwnd)
+			if !DllCall("IsWindow", "Ptr", Hwnd, "Int")
+				return ""
+			return { Hwnd: Hwnd, Pid: Pid, Class: ClassName }
+		} catch TargetError {
+			return ""
+		} finally DetectHiddenWindows(PreviousHidden)
+	}
 	; @returns {Integer} The process id of the desktop shell, whose explorer.exe
 	;   owns the desktop and the taskbar, or 0 when no shell is running.
 	ShellPid() {

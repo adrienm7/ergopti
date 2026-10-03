@@ -380,16 +380,35 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 ; unblock_file_selection, force_quit_frontmost) only asks here, off the hotkey
 ; thread; it runs from the answer. Sys is the SystemControl adapter, a recording double in tests.
 GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
-		global GESTURE_ACTIONS
-		if !GESTURE_ACTIONS.Has(ActionName)
-				return
-		if GestureActionNeedsConfirm(ActionName) {
-				Sys := IsObject(Sys) ? Sys : SystemControl()
-				Active := Sys.ActiveWindow()
-				Sys.Defer(_GestureConfirmThenInvoke.Bind(ActionName, BindingId, IsObject(Active) ? Active.Hwnd : 0, Sys))
-				return
+		try {
+			global GESTURE_ACTIONS, GESTURE_ACTIONS_ON_ACTIVE_WINDOW
+			if !GESTURE_ACTIONS.Has(ActionName)
+					return
+			if GestureActionNeedsConfirm(ActionName) {
+					Sys := IsObject(Sys) ? Sys : SystemControl()
+					Target := _GestureCopyWindowSnapshot(Sys.ActiveWindow())
+					if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
+							if !_GestureConfirmedTargetIsLive(Target, Sys) {
+									LoggerWarn("gestures", "'{1}' was refused before confirmation: no original window target is owned.", ActionName)
+									return false
+							}
+							if ActionName == "force_quit_frontmost" {
+									Resolved := GestureSysForceQuitTarget(Target, Sys)
+									if Resolved.Refusal != "" {
+											LoggerWarn("gestures", "'{1}' was refused before confirmation: {2}.", ActionName, Resolved.Refusal)
+											return false
+									}
+									Target.TargetPid := Resolved.Pid
+							}
+					}
+					Sys.Defer(_GestureConfirmThenInvoke.Bind(ActionName, BindingId, Target, Sys))
+					return
+			}
+			return _GestureRunAction(ActionName, BindingId)
+		} catch as Err {
+				LoggerError("gestures", "Action '{1}' failed during confirmation preflight: {2}.", ActionName, Err.Message)
+				return false
 		}
-		return _GestureRunAction(ActionName, BindingId)
 }
 
 ; The actions that read the active window only once they run: its process
@@ -409,42 +428,89 @@ GestureActionNeedsConfirm(ActionName) {
 ; Asks whether a destructive action may run (Cancel is the default button),
 ; then gives the window the user acted on its focus back and runs it. The
 ; question can outlive a Suspend, which disarms hotkeys and not this thread.
+; Native reads remain contained here because this timer is outside the
+; registered action runner's containment.
 ; When that window cannot get its focus back, an action that reads the active
 ; window does not run: the active window is then another one, which
 ; force_quit_frontmost would kill. Any other action (empty_trash) still runs.
-_GestureConfirmThenInvoke(ActionName, BindingId, PriorHwnd, Sys) {
-		global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
-		if A_IsSuspended {
-				LoggerInfo("gestures", "'{1}' was cancelled before its confirmation: the script is suspended.", ActionName)
+; Detaches the admitted window from an adapter or extension's mutable state.
+_GestureCopyWindowSnapshot(Window) {
+	if !IsObject(Window)
+		return ""
+	if !Window.HasOwnProp("Hwnd") || !Window.HasOwnProp("Pid") || !Window.HasOwnProp("Class")
+		throw TypeError("A confirmed window target requires HWND, PID and class.")
+	if !(Window.Hwnd is Integer) || !Window.Hwnd || !(Window.Pid is Integer) || Window.Pid <= 0
+		return ""
+	if !(Window.Class is String) || Window.Class == ""
+		return ""
+	return { Hwnd: Window.Hwnd, Pid: Window.Pid, Class: Window.Class }
+}
+
+; Validates the original window receipt, never whichever window is foreground
+; now. A packaged app also retains the PID behind its original shared frame.
+_GestureConfirmedTargetIsLive(Target, Sys) {
+	if !IsObject(Target)
+		return false
+	Current := Sys.WindowSnapshot(Target.Hwnd)
+	if !IsObject(Current) || Current.Hwnd != Target.Hwnd || Current.Pid != Target.Pid || !(Current.Class == Target.Class)
+		return false
+	if Target.HasOwnProp("TargetPid") {
+		Resolved := GestureSysForceQuitTarget(Target, Sys)
+		if Resolved.Refusal != "" || Resolved.Pid != Target.TargetPid
+			return false
+	}
+	return true
+}
+_GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
+		try {
+			global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
+			if A_IsSuspended {
+					LoggerInfo("gestures", "'{1}' was cancelled before its confirmation: the script is suspended.", ActionName)
+					return false
+			}
+			if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) && !_GestureConfirmedTargetIsLive(Target, Sys) {
+					LoggerWarn("gestures", "'{1}' was refused before its question: its original window target is no longer owned.", ActionName)
+					return false
+			}
+			Label := _GestureActionLabel(ActionName)
+			Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
+			if (Answer != "OK") {
+					LoggerInfo("gestures", "'{1}' was cancelled at its confirmation.", ActionName)
+					return
+			}
+			if A_IsSuspended {
+					LoggerInfo("gestures", "'{1}' was confirmed while the script was suspended — not run.", ActionName)
+					return
+			}
+			LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
+			if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) && !_GestureConfirmedTargetIsLive(Target, Sys) {
+					LoggerWarn("gestures", "'{1}' was refused after its question: its original window target is no longer owned.", ActionName)
+					return false
+			}
+			if (IsObject(Target) && !Sys.Activate(Target.Hwnd)) {
+					if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
+							LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
+							return
+					}
+					LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
+			}
+			if A_IsSuspended {
+					LoggerInfo("gestures", "'{1}' was cancelled after focus restoration: the script is suspended.", ActionName)
+					return false
+			}
+			if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) && !_GestureConfirmedTargetIsLive(Target, Sys) {
+					LoggerWarn("gestures", "'{1}' was refused after focus restoration: its original window target is no longer owned.", ActionName)
+					return false
+			}
+			_GestureRunAction(ActionName, BindingId, Target, Sys)
+		} catch as Err {
+				LoggerError("gestures", "Action '{1}' failed during confirmation callback: {2}.", ActionName, Err.Message)
 				return false
 		}
-		Label := _GestureActionLabel(ActionName)
-		Answer := Sys.Ask(StrReplace(t("dialog.confirm_action.message"), "{1}", Label), t("dialog.confirm_action.title"))
-		if (Answer != "OK") {
-				LoggerInfo("gestures", "'{1}' was cancelled at its confirmation.", ActionName)
-				return
-		}
-		if A_IsSuspended {
-				LoggerInfo("gestures", "'{1}' was confirmed while the script was suspended — not run.", ActionName)
-				return
-		}
-		LoggerInfo("gestures", "'{1}' was confirmed.", ActionName)
-		if (PriorHwnd && !Sys.Activate(PriorHwnd)) {
-				if GESTURE_ACTIONS_ON_ACTIVE_WINDOW.Has(ActionName) {
-						LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated — not run.", ActionName)
-						return
-				}
-				LoggerWarn("gestures", "'{1}': the window it was asked from could not be reactivated.", ActionName)
-		}
-		if A_IsSuspended {
-				LoggerInfo("gestures", "'{1}' was cancelled after focus restoration: the script is suspended.", ActionName)
-				return false
-		}
-		_GestureRunAction(ActionName, BindingId)
 }
 
 ; Runs one registered action, contained and timed.
-_GestureRunAction(ActionName, BindingId) {
+_GestureRunAction(ActionName, BindingId, ConfirmedTarget := 0, Sys := 0) {
 		global GESTURE_ACTIONS
 		; The single choke point all three dispatchers share (gesture, keyboard-shortcut
 		; slot, tap-hold), so one segment here covers every user-triggered action.
@@ -458,7 +524,9 @@ _GestureRunAction(ActionName, BindingId) {
 		; or a tap-hold (_TapHoldInvokeConfiguredAction) propagated uncaught into the error
 		; net. Fail loud in the log, never rethrow (§5.3) — every dispatcher keeps working.
 		try {
-				if (GestureActionParameterSpec(ActionName) != "")
+				if IsObject(ConfirmedTarget) && GESTURE_ACTIONS[ActionName].HasOwnProp("ConfirmedFn")
+						Result := GESTURE_ACTIONS[ActionName].ConfirmedFn.Call(ConfirmedTarget, Sys)
+				else if (GestureActionParameterSpec(ActionName) != "")
 						Result := Fn.Call(BindingId)
 				else
 						Result := Fn.Call()
