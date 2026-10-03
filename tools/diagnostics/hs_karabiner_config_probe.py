@@ -61,6 +61,76 @@ SUMMARY_FIELDS = set(CONTRACT["summary_fixed"]) | {
 }
 
 
+NATIVE_FAILURE_FLAGS = (
+    "complete",
+    "lease_initialized",
+    "private_source_restored",
+    "codec_independent",
+    "native_equal_values_shared",
+)
+NATIVE_FAILURE_ERROR_LIMIT = 4
+NATIVE_FAILURE_INPUT_LIMIT = 2048
+
+
+def native_failure_error(value):
+    """Expose only public probe stages or fixed messages, never arbitrary Lua text."""
+    if type(value) is not str:
+        return "unclassified native error omitted"
+    # The native xpcall traceback starts with a source location and its primary
+    # assertion. Do not retain that location, subsequent frames or unowned data.
+    first = value[:NATIVE_FAILURE_INPUT_LIMIT].splitlines()[0] if value else ""
+    first = re.sub(r"^.*:[0-9]+: ", "", first, count=1)
+    for message in (
+        "Equal native JSON values did not become independent trees",
+        "The actual merge source receipt differs",
+        "Identical native rules were not confirmed unchanged",
+    ):
+        if first == message:
+            return message
+    for stage in (
+        "Native rule build refused",
+        "Native merge refused",
+        "Native publication refused",
+        "Owned source restoration refused",
+    ):
+        prefix = stage + ": "
+        if first.startswith(prefix):
+            detail = first[len(prefix) :]
+            if re.fullmatch(
+                r"generated rule [1-9][0-9]{0,5} manipulator [1-9][0-9]{0,5} "
+                r"has inconsistent managed conditions",
+                detail,
+            ):
+                return prefix + detail
+            return stage + " (detail omitted)"
+    return "unclassified native error omitted"
+
+
+def native_failure_summary(result):
+    """Describe an identity-admitted refusal without walking any configuration."""
+    errors = result["errors"]
+    variants = result["variants"]
+    error_count = len(errors) if type(errors) is list else "invalid"
+    return json.dumps(
+        {
+            "variant_count": len(variants) if type(variants) is list else "invalid",
+            "variant_expected": len(VARIANTS),
+            "error_count": error_count,
+            "flags": {
+                key: result[key] if type(result[key]) is bool else "invalid"
+                for key in NATIVE_FAILURE_FLAGS
+            },
+            "errors": [native_failure_error(value) for value in errors[:NATIVE_FAILURE_ERROR_LIMIT]]
+            if type(errors) is list
+            else [],
+            "errors_omitted": max(0, error_count - NATIVE_FAILURE_ERROR_LIMIT)
+            if type(error_count) is int
+            else "invalid",
+        },
+        separators=(",", ":"),
+    )
+
+
 def typed_equal(left, right):
     """Keep JSON Boolean, number, array and object identities distinct."""
     if type(left) is not type(right):
@@ -98,9 +168,17 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
     }
     for key, expected in fixed.items():
         if type(result[key]) is not type(expected) or result[key] != expected:
-            raise ValueError(f"Native Karabiner identity or observation differs: {key}")
+            detail = f"Native Karabiner identity or observation differs: {key}"
+            # Inventory, every runtime identity and private-only publication are
+            # admitted first. Foreign receipts must reveal no observed details.
+            if key in NATIVE_FAILURE_FLAGS:
+                detail += "; native_failure=" + native_failure_summary(result)
+            raise ValueError(detail)
     if result["errors"] != [] or not isinstance(result["variants"], list):
-        raise ValueError("Native Karabiner generation or restoration failed")
+        raise ValueError(
+            "Native Karabiner generation or restoration failed; native_failure="
+            + native_failure_summary(result)
+        )
     seen = []
     manipulator_count = 0
     for variant in result["variants"]:
