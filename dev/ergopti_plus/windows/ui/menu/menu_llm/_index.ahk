@@ -57,14 +57,6 @@
 ; The suggestion count choices live beside their only reader, in
 ; menu_settings.ahk (LLM_MENU_N_OPTIONS).
 
-; Available backend IDs — Ollama is the only Windows backend today; the list
-; is kept as an array so adding a future backend only requires appending here.
-; "api" routes through the LLM_RemoteGenerate adapter in api_remote.ahk and
-; lets the user plug into OpenAI / Anthropic / Google Gemini / any
-; OpenAI-compatible endpoint via the "+ Add an API…" item in the model
-; submenu. "mlx" is macOS-only — kept out of the AHK list deliberately.
-global LLM_MENU_BACKEND_OPTIONS := ["ollama", "api"]
-
 ; Indent level options for multi-prediction display. Range mirrors the HS
 ; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
 ; build_indent_menu): negative values produce a leading deletion of N chars so

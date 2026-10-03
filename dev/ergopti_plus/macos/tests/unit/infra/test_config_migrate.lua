@@ -14,6 +14,7 @@
 local helpers = require("tests.helpers")
 
 require("test.config_migrate_contract").register(helpers, { driver = "hs" })
+require("test.config_migrate_records_contract").register(helpers, { driver = "hs" })
 
 --- Returns root init.lua with line comments removed.
 local function init_code()

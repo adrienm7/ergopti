@@ -519,6 +519,125 @@ TestHSE_EqualPriorityFallsBackToSeq() {
 Test("HSE equal priority falls back to first-registered (Seq)",
     TestHSE_EqualPriorityFallsBackToSeq)
 
+TestHSE_RegistrationOwnsSequenceAfterClear() {
+    global HSE_SeqCounter
+    HSE_TestReset()
+    try {
+        EarlierMeta := _MakeHotstringMeta("earlier construction", "seq", true, false, 0)
+        LaterMeta := _MakeHotstringMeta("later construction", "seq", true, false, 0)
+        AssertEqual(0, HSE_SeqCounter, "constructing metadata must not reserve a registry identity")
+        HSE_Register("*?", "discarded", () => 0, EarlierMeta)
+        HSE_RegistryClear()
+        First := HSE_Register("*?", "seq", () => 0, LaterMeta)
+        Second := HSE_Register("*?", "seq", () => 0, EarlierMeta)
+        AssertEqual(1, First.Seq, "the first registration after clear starts at one, regardless of construction history")
+        AssertEqual(2, Second.Seq, "reverse metadata construction order cannot reverse insertion precedence")
+        AssertEqual(2, HSE_SeqCounter, "only live registry allocations own the sequence")
+        AssertTrue(_HSE_Beats(First, Second), "the first real registration wins an equal-priority collision")
+        AssertFalse(_HSE_Beats(Second, First), "an older metadata object cannot outrank an earlier registration")
+    } finally HSE_TestReset()
+}
+Test("HSE registration owns insertion sequence after metadata construction and registry clear (hotstring-sequence-owner)",
+    TestHSE_RegistrationOwnsSequenceAfterClear)
+
+TestHSE_MetadataCannotReplaceRegistrationSequence() {
+    global HSE_SeqCounter
+    HSE_TestReset()
+    try {
+        MapMeta := Map("group", "sequence.map", "Seq", 999, "FutureField", "map transport")
+        ObjectMeta := { group: "sequence.object", SEQ: -1, FutureField: "object transport" }
+        LowercaseMeta := Map("group", "sequence.lowercase", "seq", 77, "FutureField", "lowercase transport")
+        for Index, Meta in [MapMeta, ObjectMeta, LowercaseMeta] {
+            Spec := HSE_Register("*?", "seq", () => 0, Meta)
+            AssertEqual(Index, Spec.Seq, "Map and object metadata, including case variants, cannot assign registry identity")
+            ExpectedField := Index == 1 ? "map transport" : Index == 2 ? "object transport" : "lowercase transport"
+            AssertEqual(ExpectedField, Spec.FutureField, "unrelated metadata must retain its existing transport contract")
+        }
+        AssertEqual(3, HSE_SeqCounter)
+        AssertEqual(999, MapMeta["Seq"], "the owner must not mutate caller metadata")
+        AssertEqual(-1, ObjectMeta.SEQ)
+        AssertEqual(77, LowercaseMeta["seq"])
+    } finally HSE_TestReset()
+}
+Test("HSE metadata preserves arbitrary fields while the registry owns sequence identity (hotstring-sequence-owner)",
+    TestHSE_MetadataCannotReplaceRegistrationSequence)
+
+TestHSE_MixedFactoriesKeepSequenceAndGroupIsolation() {
+    global _HotstringRegistrar, HSE_SeqCounter, HSE_RegistryByGroup, HSE_RegistryByLastChar, HSE_StarSpecs
+    SavedRegistrar := _HotstringRegistrar
+    HSE_TestReset()
+    try {
+        _HotstringRegistrar := 0
+        RawFirst := HSE_Register("*?", "seqmix", () => 0, Map("group", "sequence.first", "Priority", 10))
+        CreateHotstring("*?", "seqmix", "builder", Map("Category", "sequence", "Section", "builder", "Priority", 10))
+        CreateRawCallbackHotstring("*?", "seqmix", () => 0,
+            Map("Category", "sequence", "Section", "callback", "Priority", 10))
+        RawLast := HSE_Register("*?", "seqmix", () => 0, Map("group", "sequence.last", "Priority", 10))
+        Built := HSE_RegistryByGroup["sequence.builder"][1]
+        Callback := HSE_RegistryByGroup["sequence.callback"][1]
+        for Index, Spec in [RawFirst, Built, Callback, RawLast]
+            AssertEqual(Index, Spec.Seq, "bare, builder and raw-callback paths share exactly one insertion order")
+        AssertEqual(4, HSE_SeqCounter)
+        AssertEqual(4, HSE_RegistryByLastChar["x"].Length)
+        AssertEqual(4, HSE_StarSpecs.Length)
+        HSE_FeedReset(true)
+        for Char in StrSplit("seqmix")
+            Match := HSE_FeedChar(Char)
+        AssertEqual("sequence.first", Match.Group, "the first registration keeps equal-priority precedence")
+        HSE_DisableGroup("sequence.builder")
+        AssertEqual(3, HSE_RegistryByLastChar["x"].Length, "disabling the builder removes only its own spec")
+        AssertEqual(3, HSE_StarSpecs.Length, "star identities cannot collide across registration paths")
+        Seen := Map()
+        for Spec in HSE_RegistryByLastChar["x"]
+            Seen[Spec.Group] := true
+        AssertEqual(3, Seen.Count)
+        AssertTrue(Seen.Has("sequence.first") && Seen.Has("sequence.callback") && Seen.Has("sequence.last"),
+            "every foreign group survives the builder disable")
+        HSE_DisableGroup("sequence.first")
+        HSE_DisableGroup("sequence.last")
+        AssertEqual(1, HSE_RegistryByLastChar["x"].Length)
+        AssertEqual("sequence.callback", HSE_RegistryByLastChar["x"][1].Group)
+        HSE_EnableGroup("sequence.builder")
+        HSE_EnableGroup("sequence.builder")
+        AssertEqual(2, HSE_RegistryByLastChar["x"].Length, "repeated enable is idempotent across factory paths")
+        AssertEqual(2, HSE_StarSpecs.Length)
+        HSE_FeedReset(true)
+        for Char in StrSplit("seqmix")
+            Match := HSE_FeedChar(Char)
+        AssertEqual("sequence.builder", Match.Group, "the earlier builder wins after its isolated group is restored")
+    } finally {
+        HSE_TestReset()
+        _HotstringRegistrar := SavedRegistrar
+    }
+}
+Test("HSE mixed registration factories preserve order and isolate idempotent group toggles (hotstring-sequence-owner)",
+    TestHSE_MixedFactoriesKeepSequenceAndGroupIsolation)
+
+TestHSE_GroupTogglesRejectMetadataIdentityCollisions() {
+    global HSE_RegistryByLastChar, HSE_StarSpecs
+    HSE_TestReset()
+    try {
+        Keep := HSE_Register("*?", "alias", () => 0, Map("group", "sequence.keep", "Seq", 42))
+        Toggle := HSE_Register("*?", "alias", () => 0, Map("group", "sequence.toggle", "Seq", 42))
+        HSE_DisableGroup("sequence.toggle")
+        AssertEqual(1, HSE_RegistryByLastChar["s"].Length, "a repeated caller identity cannot remove another group's live spec")
+        AssertEqual("sequence.keep", HSE_RegistryByLastChar["s"][1].Group)
+        AssertEqual(1, HSE_StarSpecs.Length)
+        HSE_EnableGroup("sequence.toggle")
+        HSE_EnableGroup("sequence.toggle")
+        AssertEqual(2, HSE_RegistryByLastChar["s"].Length, "a repeated caller identity cannot suppress the restored spec")
+        AssertEqual(2, HSE_StarSpecs.Length, "repeated enable does not duplicate either owned identity")
+        AssertEqual(1, Keep.Seq)
+        AssertEqual(2, Toggle.Seq)
+        HSE_FeedReset(true)
+        for Char in StrSplit("alias")
+            Match := HSE_FeedChar(Char)
+        AssertEqual("sequence.keep", Match.Group, "the earlier foreign spec retains precedence after a toggle")
+    } finally HSE_TestReset()
+}
+Test("HSE group toggles preserve foreign specs despite repeated caller sequence metadata (hotstring-sequence-owner)",
+    TestHSE_GroupTogglesRejectMetadataIdentityCollisions)
+
 TestHSE_LongerBeatsHigherPriority() {
     HSE_TestReset()
     ; Length stays primary: a longer trigger wins even with far lower priority.
@@ -1418,3 +1537,71 @@ TestHSE_InputContextGenerationGuardsRelocation() {
 }
 Test("HSE input-context-generation: focused-control ownership blocks stale Ctrl+F/Ctrl+L fires",
     TestHSE_InputContextGenerationGuardsRelocation)
+
+
+; Invalid conform input is not an executable candidate. Its earlier sequence or
+; higher priority must never mask an exact spelling that the user can type.
+_TestHSE_ConformCompetition(Star, ExactFirst) {
+    HSE_TestReset()
+    Calls := []
+    Callback := (*) => Calls.Push("unexpected matcher callback")
+    Flags := Star ? "*?" : "?"
+    ExactMeta := { Replacement: "EXACT", Priority: 1 }
+    ConformMeta := { Replacement: "conformed", CaseConform: true,
+        ConformOneChar: false, Priority: 100 }
+    if ExactFirst
+        HSE_Register(Flags . "C", "aBc", Callback, ExactMeta)
+    HSE_Register(Flags, "abc", Callback, ConformMeta)
+    if !ExactFirst
+        HSE_Register(Flags . "C", "aBc", Callback, ExactMeta)
+    for Char in StrSplit("aBc")
+        Match := HSE_FeedChar(Char)
+    if !Star
+        Match := HSE_FeedChar(" ")
+    Assert(IsObject(Match), "the executable exact entry must survive conform refusal")
+    AssertEqual("aBc", Match.Trigger)
+    AssertEqual(1, Match.Priority, "a declined high-priority candidate never participates in arbitration")
+    AssertEqual(ExactFirst ? 1 : 2, Match.Seq,
+        "case admission leaves the registry's own insertion sequence unchanged")
+    Decision := _HSE_PrepareDispatchDecision(Match, Star ? "aBc" : "aBc ", Star ? "" : " ")
+    Assert(IsObject(Decision), "the matcher winner must have an executable dispatch decision")
+    AssertEqual("EXACT", Decision.Replacement)
+    AssertEqual(0, Calls.Length, "matching and preparation invoke no user callback")
+}
+
+TestHSE_ConformAdmissionPrecedesArbitration() {
+    for Star in [true, false]
+        for ExactFirst in [true, false]
+            _TestHSE_ConformCompetition(Star, ExactFirst)
+}
+Test("HSE: mixed conform case yields to exact STAR and END candidates in either insertion order",
+    TestHSE_ConformAdmissionPrecedesArbitration)
+
+TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking() {
+    for Typed in ["abc", "Abc", "ABC"] {
+        HSE_TestReset()
+        HSE_Register("*?", "abc", (*) => 0,
+            { Replacement: "word", CaseConform: true, ConformOneChar: false, Priority: 100 })
+        HSE_Register("*?C", Typed, (*) => 0, { Replacement: "fallback", Priority: 1 })
+        for Char in StrSplit(Typed)
+            Match := HSE_FeedChar(Char)
+        Assert(IsObject(Match), "clean lower, Title and UPPER remain conform candidates")
+        AssertEqual(100, Match.Priority, "admitted conform candidates retain their actual priority")
+        AssertEqual(1, Match.Seq, "admitted conform candidates retain their actual insertion order")
+    }
+    HSE_TestReset()
+    HSE_Register("*?", "abc", (*) => 0,
+        { Replacement: "abc", CaseConform: true, ConformOneChar: false, Priority: 100 })
+    HSE_Register("*?C", "ABC", (*) => 0, { Replacement: "fallback", Priority: 1 })
+    for Char in StrSplit("ABC")
+        Match := HSE_FeedChar(Char)
+    AssertEqual("", Match, "an admitted conform identity still masks lower-priority replacements")
+    HSE_TestReset()
+    HSE_Register("*?", "abc", (*) => 0,
+        { Replacement: "word", CaseConform: true, ConformOneChar: false })
+    for Char in StrSplit("aBc")
+        Match := HSE_FeedChar(Char)
+    AssertEqual("", Match, "a declined mixed form invents no fallback when none is registered")
+}
+Test("HSE: conform admission preserves clean casing, registry precedence and identity masking",
+    TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking)

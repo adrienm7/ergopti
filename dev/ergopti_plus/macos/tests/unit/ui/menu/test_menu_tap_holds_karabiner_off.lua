@@ -33,7 +33,8 @@ local function menu_over_double(integration_enabled)
 		-- first hand header, where the hint belongs. Rows are labelled from the
 		-- catalogue's label keys, not from this double's label.
 		TAP_HOLD_KEYS = { { id = "tab", label = "Tab" } },
-		MOD_COMBOS = { { id = "left_shift+right_shift", label = "Shift chord", group = "Shift" } },
+		MOD_COMBOS = { { id = "left_shift+right_shift", label = "Shift chord", group = "Shift",
+			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return integration_enabled end,
 		get_tap_holds_enabled = function() return true end,

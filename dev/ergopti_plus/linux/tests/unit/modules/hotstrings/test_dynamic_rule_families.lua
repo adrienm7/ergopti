@@ -88,6 +88,28 @@ local function manager(import_families)
 	return dh
 end
 
+helpers.describe("dynamic rule families: bulk owner dispatch", function()
+	helpers.it("dynamic bulk: passes an explicit posture, actual manager and ordinary matcher to one owner", function()
+		with_storage()
+		local dh = manager()
+		local previous = package.loaded["infra.dynamic_hotstrings_scope"]
+		local requests, config = {}, {}
+		package.loaded["infra.dynamic_hotstrings_scope"] = {
+			apply = function(enabled, dynamic, ordinary)
+				requests[#requests + 1] = { enabled = enabled, dynamic = dynamic, config = ordinary }
+				return false, "refused"
+			end,
+		}
+		local called, committed, detail = pcall(function() return dh.set_scope_enabled(true, config) end)
+		package.loaded["infra.dynamic_hotstrings_scope"] = previous
+		drop_storage()
+		helpers.assert_true(called, tostring(committed))
+		helpers.assert_eq(committed, false, "the manager does not replace refusal with success")
+		helpers.assert_eq(detail, "refused")
+		helpers.assert_eq(requests, { { enabled = true, dynamic = dh, config = config } })
+	end)
+end)
+
 -- What each date family expands, so a preview can be attributed to a family.
 local TRIGGER_FOR = { date = "td", datefr = "dt", datelongfr = "date" }
 
@@ -352,13 +374,16 @@ helpers.describe("dynamic rule families: the rows", function()
 		local sub = dynamic_submenu(dh)
 		dh.set_enabled(true)
 
-		-- The first row is the category's own switch, a checkbox since it stopped
-		-- alternating « Activée / Désactivée (cliquer pour …) »: it is the one row
-		-- that must stay clickable, or the category could never come back on.
-		local gate = (sub or {})[1]
-		helpers.assert_true(gate ~= nil and gate.checked == false and not gate.disabled
-			and type(gate.fn) == "function",
-			"the switched-off category's own switch is an unticked, clickable checkbox")
+		-- Explicit scoped commands remain available so a closed category can
+		-- recover in one transaction; individual family choices still stay grey.
+		for index, key in ipairs({ "menu.hotstrings.scope_enable_all", "menu.hotstrings.scope_disable_all" }) do
+			local command = (sub or {})[index]
+			helpers.assert_not_nil(command)
+			helpers.assert_eq(command.title, require("infra.i18n").get(key))
+			helpers.assert_nil(command.checked)
+			helpers.assert_eq(command.disabled == true, false)
+			helpers.assert_type(command.fn, "function")
+		end
 
 		local seen = 0
 		for i, row in ipairs(sub or {}) do

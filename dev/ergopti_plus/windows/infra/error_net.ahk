@@ -201,9 +201,9 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				; pipeline is owned yet and we are about to ExitApp. i18n may not be loaded
 				; this early, so the message is a hardcoded French string (last-resort path).
 				if !(IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
-						try MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
+						try Ui_MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
 								. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
-								"ErgoptiPlus — erreur de démarrage", "Iconx")
+								"erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
 				ExitApp(1)

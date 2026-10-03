@@ -21,8 +21,8 @@
 ; 2. The loader's model. A section is a ``[header]`` path and a key one entry
 ;    inside it, exactly as the typed TOML parse returns them. Booleans stay
 ;    TOML_Bool, so map_value tells ``true`` from ``1`` like the other drivers.
-; 3. The writer's layout. The candidate is rendered from the exact bytes the
-;    backup holds by the canonical writer every Windows save uses, read back,
+; 3. Physical records. A migration-specific renderer preserves every untouched
+;    source byte while applying explicit deltas. The candidate is read back
 ;    and must equal the migrated model before it may replace the file. The
 ;    stamp is set after every op; the publication refuses when the file
 ;    changed since it was read.
@@ -32,6 +32,9 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include config_migrate_records.ahk
+
+#Include config_registry_cache.ahk
 
 
 
@@ -56,6 +59,7 @@ ConfigMigrateRegistryPath() {
 _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
+		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
@@ -121,8 +125,8 @@ _ConfigMigrateValidateOp(Op, Where) {
 		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be one bare segment")
 	}
-	if (Op["op"] == "rename" && !Op.Has("to_section") && !Op.Has("to_key"))
-		throw Error(Where . ": rename needs to_section or to_key")
+	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
+		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
 	if (Op["op"] == "map_value") {
 		if !(Op["map"] is Array) || Op["map"].Length == 0
 			throw Error(Where . ": map_value needs a non-empty map")
@@ -237,7 +241,8 @@ ConfigMigrateLoadRegistry(Path) {
 ConfigMigrateShippedRegistry() {
 	static Registry := 0
 	if !(Registry is Map)
-		Registry := ConfigMigrateLoadRegistry(ConfigMigrateRegistryPath())
+		Registry := ConfigRegistryCacheLoad(ConfigMigrateRegistryPath(),
+			EnvGet("LOCALAPPDATA") . "\ergopti_plus\cache\migration-registry-v1.cache")
 	return Registry
 }
 
@@ -379,6 +384,21 @@ _ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
 		ToSection, ToKey, Section, Key)
 }
 
+; Ancestor values and child sections occupy their whole destination namespace.
+; This check belongs only to conditional copies; existing operations keep
+; their own conflict rules.
+_ConfigMigrateCopyDestinationAbsent(Model, Section, Key) {
+	if Model.Has(Section) && Model[Section].Has(Key)
+		return false
+	Parent := ""
+	for Name in StrSplit(Section, ".") {
+		if Model.Has(Parent) && Model[Parent].Has(Name)
+			return false
+		Parent := Parent == "" ? Name : Parent . "." . Name
+	}
+	return _ConfigMigrateSectionsAtOrBelow(Model, Section . "." . Key).Length == 0
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op) {
 	Section := Op["section"]
@@ -388,6 +408,16 @@ _ConfigMigrateApplyOp(Model, Op) {
 			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
 			_ConfigMigrateDropIfEmpty(Model, Section)
 			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "copy_if_absent":
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			ToSection := Op.Get("to_section", Section)
+			ToKey := Op.Get("to_key", Op["key"])
+			if !_ConfigMigrateCopyDestinationAbsent(Model, ToSection, ToKey)
+				return
+			if !Model.Has(ToSection)
+				Model[ToSection] := Map()
+			Model[ToSection][ToKey] := ManifestCloneValue(Model[Section][Op["key"]])
 		case "move_section":
 			for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section) {
 				Target := Op["to_section"] . SubStr(Name, StrLen(Section) + 1)
@@ -522,6 +552,51 @@ _ConfigMigrateWriterBatch(Before, After, &DropSections) {
 	return Updates
 }
 
+; A stamp-only migration has no configuration edit to serialize. Preserve the
+; original records and comments, changing only the scalar metadata value.
+_ConfigMigrateStampCandidate(Source, Version, Scan) {
+	Bom := SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : ""
+	Text := Bom != "" ? SubStr(Source, 2) : Source
+	Eol := InStr(Text, "`r`n") ? "`r`n" : "`n"
+	Section := ""
+	MetaInsert := 0
+	Offset := 1
+	Depth := 0
+	Quote := ""
+	Escaped := false
+	loop parse, Text, "`n" {
+		Row := A_LoopField
+		Line := Trim(Row, " `t`r")
+		if Depth > 0 {
+			Depth := _TOML_ArrayScanFragment(TOML_StripInlineComment(Line), Depth, &Quote, &Escaped)
+		} else if SubStr(Line, 1, 1) == "[" {
+			Header := TOML_StripInlineComment(Line)
+			Section := Trim(RegExReplace(Header, "^\[+|\]+$", ""))
+			if Section == "_meta"
+				MetaInsert := Offset + StrLen(Row) + (Offset + StrLen(Row) <= StrLen(Text) ? 1 : 0)
+		} else if RegExMatch(Line, '^(?:"schema_version"|schema_version)\s*=', &KeyMatch) && Section == "_meta" {
+			if !RegExMatch(Row, '^(\s*(?:"schema_version"|schema_version)\s*=\s*)([^\s#]+)', &ValueMatch)
+				throw Error("The migration metadata stamp cannot be located.")
+			Start := Offset + ValueMatch.Pos(2) - 1
+			return Bom . SubStr(Text, 1, Start - 1) . Version . SubStr(Text, Start + ValueMatch.Len(2))
+		} else {
+			Eq := InStr(Line, "=")
+			Value := Eq ? TOML_StripInlineComment(Trim(SubStr(Line, Eq + 1))) : ""
+			if SubStr(Value, 1, 1) == "["
+				Depth := _TOML_ArrayScanFragment(Value, 0, &Quote, &Escaped)
+		}
+		Offset += StrLen(Row) + 1
+	}
+	Stamp := "schema_version = " . Version . Eol
+	if MetaInsert {
+		Separator := MetaInsert > StrLen(Text) && SubStr(Text, -1) != "`n" ? Eol : ""
+		return Bom . SubStr(Text, 1, MetaInsert - 1) . Separator . Stamp . SubStr(Text, MetaInsert)
+	}
+	; The shared record owner inserts new metadata after opaque root records.
+	return _ConfigMigrateRenderRecords(Source,
+		[{ Section: "_meta", Key: "schema_version", Value: Version }], [], Scan)["content"]
+}
+
 ; Plans the migration of Source for Driver without I/O. Returns Map("outcome",
 ; "version", "detail") where outcome is "current", "migrated", "newer",
 ; "invalid", "unsupported" or "failed"; a "migrated" plan also carries the
@@ -533,18 +608,39 @@ ConfigMigratePlan(Source, Registry, Driver) {
 		Plan["detail"] := "the file is not valid TOML: " . Err.Message
 		return Plan
 	}
+	try {
+		Scan := _ConfigMigrateRecordScan(Source)
+		_ConfigMigrateRecordValidateModel(Scan, Before)
+	} catch as Err {
+		Plan["detail"] := "the migration record owner refused: " . Err.Message
+		return Plan
+	}
 	Outcome := ConfigMigrateClassify(Before, Registry, &Version)
 	Plan["version"] := Version
 	if (Outcome != "migrate") {
 		Plan["outcome"] := Outcome
 		return Plan
 	}
+	try _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, Version)
+	catch as Err {
+		Plan["detail"] := "the migration record source refused: " . Err.Message
+		return Plan
+	}
 	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version)
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
-	Built := _TOML_BatchWriteImpl("config-migration:candidate", Updates, DropSections,
-		"build", Source)
+	try {
+		if Updates.Length == 1 && DropSections.Length == 0
+				&& Updates[1].Section == "_meta" && Updates[1].Key == "schema_version" {
+			_ConfigMigrateRecordValidateTargets(Scan, Updates, DropSections)
+			Built := Map("status", "ok", "content", _ConfigMigrateStampCandidate(Source, Registry["current"], Scan))
+		} else
+			Built := _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan)
+	} catch as Err {
+		Plan["detail"] := "the migration record renderer refused: " . Err.Message
+		return Plan
+	}
 	if !(Built is Map) || Built.Get("status", "") != "ok" || !(Built.Get("content", 0) is String) {
-		Plan["detail"] := "the canonical writer refused the migrated configuration"
+		Plan["detail"] := "the record renderer refused the migrated configuration"
 		return Plan
 	}
 	try Reread := _ConfigMigrateParse(Built["content"], "the migrated candidate")
@@ -643,13 +739,21 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 	if !(Owner is Object)
 		return Refuse("failed", "another configuration transaction owns the file")
 	try {
-		; The loader's own lenient read decides the version, so a current file
-		; the loader can read never needs the exact bytes a backup does.
+		; Keep the loader's lenient current-file contract, but prove physical
+		; ownership before a fabricated version could authorize later writes.
 		Before := TOML_ParseFreshFileTyped(FilePath, &Discarded)
 		if TOML_ReadFailed(FilePath)
 			return Refuse("failed", "the file could not be read")
 		if Discarded
 			return Refuse("failed", "the file has " . Discarded . " unterminated array(s)")
+		try {
+			VersionSource := FSReadStrict(FilePath)
+			VersionScan := _ConfigMigrateRecordScan(VersionSource)
+			_ConfigMigrateRecordValidateModel(VersionScan, Before)
+			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
+				return Refuse("failed", "the file changed while its physical version ownership was checked")
+		} catch as Err
+			return Refuse("failed", "the physical version owner refused: " . Err.Message)
 		Outcome := ConfigMigrateClassify(Before, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {

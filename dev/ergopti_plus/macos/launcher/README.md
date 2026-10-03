@@ -66,8 +66,21 @@ reads « Ergopti uses Karabiner », so the driver registers the guardian through
 the headless `--register-remap-guardian` role, on the first guardian
 observation of a lifecycle, which it reaches only while that switch is on. A
 user who never turns the integration on never gets a Background Item from
-ErgoptiPlus. Turning it off later does not unregister a guardian registered
-earlier: it stays in Login Items until uninstall (tracked as TODO item 13).
+ErgoptiPlus. Turning it off, or removing Ergopti from Karabiner with the switch
+already off, joins exact lease retirement and calls the headless
+`--unregister-remap-guardian` role. The driver keeps its transition exclusive
+until the child actually settles; accepted termination is not an exit receipt.
+The native owner checks durable record retirement, removes only the exact
+legacy plist, confirms ServiceManagement removal and waits for guardian exit.
+Only the exact missing-job launchctl status acknowledges absence. A refusal
+keeps the previous preference and recovers a fresh READY lease when it was on;
+the next enable registers the guardian again. Personal rules remain byte-owned
+by their existing removal transaction.
+
+The hosted `helper_registration` diagnostic qualifies the signed headless roles
+without opening the application UI: a wrong inode cannot remove the live job,
+successful removal requires the exact receipt plus launchctl absence, and a
+second removal is idempotent. Primary and cleanup failures are recorded together.
 
 This is deliberately not a Karabiner process watchdog. In the shared mode,
 Karabiner's UI, menubar, root Core Service, console user server, user/session

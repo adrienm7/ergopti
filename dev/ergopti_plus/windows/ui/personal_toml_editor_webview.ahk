@@ -100,7 +100,7 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 	SessionEpoch := _HsEdWeb_SessionEpoch
 	_HsEdWeb_ResetDone := false
 
-	g := Gui("+Resize +MinSize720x520", t("editor.hotstrings.window_title"))
+	g := Gui_Create("+Resize +MinSize720x520", t("editor.hotstrings.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

@@ -112,6 +112,8 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 			continue ; called below
 		if (C == "CapsWordEnabled")
 			continue ; CapsWord's own Space and Enter, a separate mode
+		if (C == "KeyCombinationOwnsHotkey()")
+			continue ; a key combination the user bound, held first key and all
 		if RegExMatch(C, "^\(?\s*LayerEnabled\b") {
 			LayerMapped[Keys[Hotkey.Key]] := true
 			continue
@@ -132,6 +134,10 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 	AssertTrue(Resolved["ok"], "the recommended layer must resolve")
 	AltGrLabels := Map()
 	for Row in NavLayer_BuildTable(Resolved["layers"]["nav"], Ctx) {
+		; CapsLock's mapping is the layer's own too, since LAlt then CapsLock
+		; became a key combination and left its static label on the layer.
+		if (Row["code"] == "CapsLock")
+			LayerMapped["caps_lock"] := true
 		if (Row["code"] != "AltRight")
 			continue
 		AssertEqual(NAV_LAYER_CRITERION_LAYER, Row["criterion"], "AltGr must only map while the layer is active")

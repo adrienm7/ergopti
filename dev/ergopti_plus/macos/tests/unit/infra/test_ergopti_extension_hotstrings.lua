@@ -15,6 +15,7 @@ local helpers = require("tests.helpers")
 
 local Packs     = require("infra.extension_packs")
 local TomlCodec = require("toml_codec.codec")
+local Json = require("json")
 
 --- The repository's static folder, from this driver's shared tree.
 --- @return string
@@ -92,7 +93,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local ergopti
 		for _, pack in ipairs(found) do if pack.id == "ergopti" then ergopti = pack end end
 		helpers.assert_true(ergopti ~= nil, "the Ergopti extension the app ships is installed")
-		helpers.assert_eq(#ergopti.bound_files, 3)
+		helpers.assert_eq(#ergopti.bound_files, 4)
 		helpers.assert_eq(#ergopti.toml_files, 0, "none of its files becomes an ext: category")
 		local sfbs = Packs.route("sfbsreduction", nil)
 		local rolls = Packs.route("rolls", nil)
@@ -103,7 +104,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		helpers.assert_eq(#sources, 1)
 		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
 		local unbundled = Packs.unbundled_routes({ magickey = true })
-		helpers.assert_eq(#unbundled, 2, "SFB reduction and rolls load although no bundled file carries them")
+		helpers.assert_eq(#unbundled, 3, "the three whole categories load without a bundled copy")
 
 		-- One historical expansion per moved group, with the flags it always had.
 		for _, case in ipairs({
@@ -212,5 +213,113 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 			{ "/bundled/magickey.toml", n = 2 })
 		helpers.assert_eq(Packs.unbundled_routes({}), {})
 		Packs._reset()
+	end)
+end)
+
+--- The independent pre-move reference shared by all three native suites.
+--- @return table
+local function distance_reference()
+	local path = static_dir() .. "/ergopti_plus/_shared/tests/corpus/hotstrings/distance_reduction_entries.json"
+	local fh = assert(io.open(path, "r"))
+	local reference = Json.decode(fh:read("*a"))
+	fh:close()
+	return reference
+end
+
+helpers.describe("Ergopti extension distance reduction", function()
+	helpers.it("(ergopti-distance-ext) owns all 101 historical rules and their metadata without a common duplicate", function()
+		Packs._reset()
+		Packs.discover(roots(true), real_io())
+		local path = Packs.route("distancesreduction", nil)
+		helpers.assert_true(type(path) == "string", "Ergopti owns the historical category")
+		helpers.assert_true(path:find("/layouts/registry/ergopti/hotstrings/distancesreduction.toml", 1, true) ~= nil)
+		local reference = distance_reference()
+		helpers.assert_eq(#reference.entries, 101)
+		local document = TomlCodec.decode(assert(real_io().read_file(path)))
+		helpers.assert_eq(document._meta, reference.meta, "all localized descriptions, delays and section ordering survive")
+		local count = 0
+		for name, blocks in pairs(document) do
+			if name ~= "_meta" then
+				for _, block in ipairs(blocks) do for _ in pairs(block) do count = count + 1 end end
+			end
+		end
+		helpers.assert_eq(count, #reference.entries, "no rule is added or lost")
+		for _, row in ipairs(reference.entries) do
+			local found = entry(path, row.section, row.trigger)
+			helpers.assert_true(found ~= nil, row.section .. "/" .. row.trigger)
+			for _, flag in ipairs({ "output", "is_word", "auto_expand", "is_case_sensitive", "final_result" }) do
+				helpers.assert_eq(found[flag], row[flag], row.trigger .. "/" .. flag)
+			end
+		end
+		helpers.assert_nil(real_io().read_file(static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/distancesreduction.toml"))
+		local user = os.tmpname()
+		local fh = assert(io.open(user, "w"))
+		fh:write('[[mine]]\n"qa" = { output = "user" }\n')
+		fh:close()
+		local routed = Packs.route("distancesreduction", user, true)
+		os.remove(user)
+		helpers.assert_eq(routed, user, "a user copy retains precedence")
+		Packs._reset()
+		Packs.discover(roots(false), real_io())
+		helpers.assert_nil(Packs.route("distancesreduction", nil), "without Ergopti no source supplies these rules")
+		Packs._reset()
+	end)
+
+	helpers.it("(ergopti-distance-ext) loads the reference through the registry and preserves disabled sections on reload", function()
+		helpers.with_stub_scope({
+			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
+			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+		}, function()
+			local State = helpers.load_with_stubs("modules.keymap.state")
+			local Registry = helpers.load_with_stubs("modules.keymap.registry")
+			local Storage = require("adapters.storage")
+			local reference = distance_reference()
+			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+			Registry.init(state)
+			Packs._reset()
+			Packs.discover(roots(true), real_io())
+			local path = Packs.route("distancesreduction", nil)
+			for section in pairs(reference.section_counts) do
+				helpers.assert_true(Storage.set("hotstrings_section_distancesreduction_" .. section, true))
+			end
+			helpers.assert_true(Registry.load_toml("distancesreduction", path))
+			for _, row in ipairs(reference.entries) do
+				local found
+				for _, mapping in ipairs(state.mappings) do
+					if mapping.group == "distancesreduction" and mapping.section == row.section
+						and mapping.trigger == row.trigger then found = mapping; break end
+				end
+				helpers.assert_true(found ~= nil, row.section .. "/" .. row.trigger)
+				helpers.assert_eq(found.repl, row.output)
+				helpers.assert_eq(found.is_word, row.is_word)
+				helpers.assert_eq(found.auto, row.auto_expand)
+				-- Comma rules keep explicit shifted-symbol variants; ordinary
+				-- case-insensitive rules use the conforming registry entry.
+				local mode = row.is_case_sensitive and "fold"
+					or (row.trigger:find("[,'.]") and "exact" or "conform")
+				helpers.assert_eq(found.match_mode, mode, row.trigger .. " matching mode")
+				helpers.assert_eq(found.final_result, row.final_result)
+				helpers.assert_eq(found.priority, Registry.PRIORITY_COMMON)
+			end
+			local metadata = state.groups.distancesreduction.delay_metadata
+			for _, key in ipairs({ "delay", "section_delays", "show_tooltip", "description", "sections_order" }) do
+				helpers.assert_eq(metadata[key], reference.meta[key], "native metadata: " .. key)
+			end
+			for section, description in pairs(reference.meta.sections) do
+				helpers.assert_eq(metadata.sections[section].description, description, section .. " native description")
+			end
+			helpers.assert_true(Storage.set("hotstrings_section_distancesreduction_comma_j", false))
+			helpers.assert_true(Registry.reload_toml("distancesreduction", path))
+			helpers.assert_eq(Registry.is_section_enabled("distancesreduction", "comma_j"), false)
+			for _, mapping in ipairs(state.mappings) do
+				helpers.assert_true(mapping.section ~= "comma_j", "disabled rules stay absent after reload")
+			end
+			helpers.assert_true(Registry.disable_group("distancesreduction"))
+			helpers.assert_true(Registry.reload_toml("distancesreduction", path))
+			helpers.assert_eq(Registry.is_group_enabled("distancesreduction"), false)
+			helpers.assert_eq(#state.mappings, 0)
+			Packs._reset()
+		end)
 	end)
 end)

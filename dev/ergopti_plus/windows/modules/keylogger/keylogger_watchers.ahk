@@ -244,8 +244,12 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 		Owner := KLWatch.session_close
 		for Kind in ["idle_end", "session_end"] {
 			if Owner.Has(Kind) && !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind],
-				_KL_Watchers_CommitClose.Bind(Owner, Kind))
+				_KL_Watchers_CommitClose.Bind(Owner, Kind)) {
+				try LoggerWarn("Keylogger", Format(
+					"Session close '{1}' retained after publication refusal (shutdown={2}, privacy_interrupted={3}).",
+					Kind, Keylogger._shutting_down ? 1 : 0, KLWatch.privacy_interrupted ? 1 : 0))
 				return false
+			}
 		}
 		KLWatch.session_close := false
 		return true

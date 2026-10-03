@@ -10,7 +10,7 @@
 ; (an icon here, since Win32 menus cannot render flag emoji). The Configuration
 ; submenu opens with the global restore and clear (the first group of every
 ; settings menu), a separator, the cleanup, a separator, then the rows that
-; open a window and login startup, and ends there: Uninstall closes the
+; open a window, and ends there: startup precedes Uninstall in the
 ; Version / Updates submenu, after a separator, since 2026-09.
 ; ============================================================================
 
@@ -38,7 +38,7 @@ Test("menu layout: the hotstring language rows sit under their own header (menu-
 
 _MLG_LanguageRowCarriesItsFlag() {
 	Path := I18nFlagIconPath("fr")
-	AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.png")) == "\img\flags\fr.png",
+	AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.bmp")) == "\img\flags\fr.bmp",
 		"the French flag icon must be the one the language selector draws, got " . Path)
 	AssertTrue(FileExist(Path) != "", "the French flag icon must ship at " . Path)
 	AssertEqual("", I18nFlagIconPath("xx"), "a locale without a flag icon draws none")
@@ -59,12 +59,13 @@ _MLG_Order(MenuName) {
 }
 
 ; The Configuration submenu: the global restore and clear, a separator, the
-; cleanup, a separator, then configuration windows, login startup, the
-; macOS-only Karabiner rows and the Windows-only touchpad restore, with no
-; separator left dangling at its end.
+; cleanup and, right under it, the Windows-only touchpad restore (the
+; maintainer's request of 2026-10-02: it stood at the very end), a separator,
+; then configuration windows and the macOS-only Karabiner rows,
+; with no separator left dangling at its end.
 _MLG_ConfigurationRowsInOrder() {
-	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, setup_wizard, "
-		. "start_at_login, karabiner_integration, remove_from_karabiner, restore_touchpad_gestures",
+	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, restore_touchpad_gestures, ---, config_folder, "
+		. "setup_wizard, karabiner_integration, remove_from_karabiner",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
 	Assert(Body != "", "the Configuration builder must exist before checking its commands")
@@ -78,20 +79,34 @@ _MLG_ConfigurationRowsInOrder() {
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
-			["start_at_login", "ToggleStartAtLogin"],
 			["restore_touchpad_gestures", "TouchpadRegistryRestoreFromMenu"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 	AssertEqual(0, InStr(Body, "ShowUninstallErgopti"), "Configuration no longer offers Uninstall")
+	AssertEqual(0, InStr(Body, "start_at_login"), "Configuration no longer offers login startup")
 }
 Test("menu layout: the Configuration rows rewrite first, then open windows (menu-configuration)",
 	_MLG_ConfigurationRowsInOrder)
 
+; Versions, Configuration, then Language at the top level, and « Afficher une
+; fenêtre à chaque erreur » right under « Diagnostic système » in Debug (the
+; maintainer's requests of 2026-10-02).
+_MLG_RowsFollowTheRequestedOrder() {
+	TopLevel := ", " . _MLG_Order("top_level") . ", "
+	Assert(InStr(TopLevel, ", about, configuration, language, ") > 0,
+		"the top level must list Versions, Configuration, then Language: " . TopLevel)
+	Debug := ", " . _MLG_Order("debug_menu") . ", "
+	Assert(InStr(Debug, ", healthcheck, show_error_dialog, ") > 0,
+		"the error-window switch must follow the system diagnostics row: " . Debug)
+}
+Test("menu layout: Versions, Configuration, Language; the error window under the diagnostics (menu-order-2026-10-02)",
+	_MLG_RowsFollowTheRequestedOrder)
+
 ; Uninstall closes the Version / Updates submenu, after a separator, and keeps
 ; its label key and its action owner.
 _MLG_UninstallClosesTheAboutMenu() {
-	AssertEqual("about_updates, ---, about_changelog, about_releases_page, ---, uninstall",
-		_MLG_Order("about_menu"), "about_menu must end with a separator and Uninstall")
+	AssertEqual("about_updates, ---, about_changelog, about_releases_page, ---, start_at_login, uninstall",
+		_MLG_Order("about_menu"), "about_menu must end with startup immediately above Uninstall")
 	Entries := _MM_GetManifestRoot()["about_menu"]
 	AssertEqual("menu.global.uninstall", Entries[Entries.Length]["i18n"], "Uninstall keeps its label key")
 	Body := _DriverFuncBody("_MI_BuildAboutMenu")
@@ -101,3 +116,41 @@ _MLG_UninstallClosesTheAboutMenu() {
 }
 Test("menu layout: Uninstall closes the Version / Updates submenu (menu-about-uninstall)",
 	_MLG_UninstallClosesTheAboutMenu)
+
+; Native labels, checked state and callbacks come from the unchanged startup owner.
+_MLG_StartupRecord(State, *) {
+	State.Calls += 1
+	State.Enabled := !State.Enabled
+}
+
+_MLG_StartupPrecedesUninstall() {
+	global _MenuDispatchCallbacks
+	Body := _DriverFuncBody("_MI_BuildAboutMenu")
+	Assert(Body != "", "the About builder must exist before checking its owner")
+	AssertContains(Body, "StartupCommand := ToggleStartAtLogin", "the default command remains the native owner")
+	AssertContains(Body, "StartupState := StartAtLoginEnabled", "the default state remains the native owner")
+	for _, Enabled in [false, true] {
+		State := { Enabled: Enabled, Calls: 0 }
+		Built := _MI_BuildAboutMenu(_MLG_StartupRecord.Bind(State), () => State.Enabled)
+		try {
+			Count := TrayMenuItemCount(Built)
+			AssertTrue(Count >= 3, "the installation group must be drawn")
+			Position := Count - 2
+			AssertEqual(t("menu.global.start_at_login"), _CTC_LabelAt(Built, Position),
+				"startup sits immediately above Uninstall")
+			AssertEqual(Enabled, _CTC_IsChecked(Built, Position), "the native owner supplies the checkmark")
+			AssertEqual(0, State.Calls, "building the menu never changes startup")
+			Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+			AssertTrue(_MenuDispatchCallbacks.Has(Id), "the startup row retains its dispatcher callback")
+			_MenuDispatchCallbacks[Id].Call("", Position + 1, Built)
+			AssertEqual(1, State.Calls, "the row invokes its startup owner once")
+			AssertEqual(!Enabled, State.Enabled, "the owner toggles the requested state")
+		} finally _CTC_ReleaseMenu(Built)
+		Rebuilt := _MI_BuildAboutMenu(_MLG_StartupRecord.Bind(State), () => State.Enabled)
+		try AssertEqual(!Enabled, _CTC_IsChecked(Rebuilt, TrayMenuItemCount(Rebuilt) - 2),
+			"the next build reads the owner's acknowledged state")
+		finally _CTC_ReleaseMenu(Rebuilt)
+	}
+}
+Test("menu layout: startup immediately precedes Uninstall and reads its native owner (menu-startup-placement)",
+	_MLG_StartupPrecedesUninstall)

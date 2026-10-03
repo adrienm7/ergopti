@@ -43,7 +43,9 @@
 
 _HLSL_SharedOwnerBody() {
 	Src := _DriverDirConcat("infra")
-	Start := InStr(Src, "TapHoldOwnImmediateLayer(")
+	; The definition, not a call: infra/key_combinations.ahk calls the owner
+	; and is read before the file that defines it.
+	Start := InStr(Src, "`nTapHoldOwnImmediateLayer(KeyId, KeyName")
 	Assert(Start > 0, "the shared immediate layer owner must exist")
 	return SubStr(Src, Start, 2400)
 }

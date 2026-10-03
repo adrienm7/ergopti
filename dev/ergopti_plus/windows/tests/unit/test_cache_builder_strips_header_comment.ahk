@@ -47,7 +47,9 @@ _CBHC_CommentedHeaderKeepsItsEntries() {
 	HsDir := Base . "\modules\hotstrings"
 	PrevShared := IsSet(_SharedDir) ? _SharedDir : ""
 	try DirCreate(HsDir)
-	TomlPath := HsDir . "\distancesreduction.toml"
+	TomlPath := HsDir . "\magickey.toml"
+	IndexPath := HsDir . "\_index.toml"
+	FileCopy(PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
 	_SharedDir := Base
 	try {
 		try FileDelete(TomlPath)
@@ -59,15 +61,16 @@ _CBHC_CommentedHeaderKeepsItsEntries() {
 
 		Rows := _HotstringsCacheBuildRows()
 
-		Assert(Rows.Has("distancesreduction.cs"),
+		Assert(Rows.Has("magickey.cs"),
 			"sanity: an ordinary section header must still be parsed — otherwise this test would pass for the wrong reason")
-		Assert(Rows.Has("distancesreduction.ct"),
+		Assert(Rows.Has("magickey.ct"),
 			"a section header carrying a trailing TOML comment must still open its section. The raw anchored match failed on it, so the line fell through to the entry parser and was skipped, leaving every entry beneath it attributed to the previous section — or dropped, as here, when the commented header is the first one")
-		AssertEqual(1, Rows["distancesreduction.ct"].Length,
+		AssertEqual(1, Rows["magickey.ct"].Length,
 			"and its entries must land in it, not in a neighbour")
 	} finally {
 		_SharedDir := PrevShared
 		try FileDelete(TomlPath)
+		try FileDelete(IndexPath)
 		try DirDelete(HsDir)
 		try DirDelete(Base . "\modules")
 		try DirDelete(Base)

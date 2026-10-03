@@ -349,6 +349,20 @@ KLPF_WorkerTimingArgs() {
 	return Args
 }
 
+; The worker re-runs the driver entry (or its executable), so from the creation
+; of its main window to its first statement (22 to 34 ms measured on AutoHotkey
+; v2.0.26) it owns the driver's exact window title. A reload successor closes
+; the newest window with that title: one that finished loading inside that span
+; closed the worker instead of the driver, then waited on the driver mutex and
+; left, and the reload was refused (reload-worker-identity). The warm-up chain
+; made it likely, starting its next worker in the millisecond the successor
+; launched. No worker starts while a reload hand-off exists; the reload ends
+; this process, and a refused one leaves the next request free to start.
+; @returns {Boolean} True while a reload hand-off forbids a new worker.
+KLPF_ReloadKeepsWorkersOut() {
+		return ReloadTerminalHandoffActive()
+}
+
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true,
 		HistorySeed := unset) {
 		global _ConfigDir
@@ -356,6 +370,10 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
 				|| (mode != "full" && mode != "live" && mode != "manifest") {
 				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
+				return false
+		}
+		if KLPF_ReloadKeepsWorkersOut() {
+				KLPF_InvokeTerminal(terminal, "canceled")
 				return false
 		}
 
@@ -468,6 +486,10 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				|| !query.Has("start_date") || !query.Has("end_date")
 				|| !(query["start_date"] is String) || !(query["end_date"] is String) {
 				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
+				return false
+		}
+		if KLPF_ReloadKeepsWorkersOut() {
+				KLPF_InvokeTerminal(terminal, "canceled")
 				return false
 		}
 		job_key := "range:" . which

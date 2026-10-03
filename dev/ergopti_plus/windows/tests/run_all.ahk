@@ -117,8 +117,12 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
 #Include ../infra/tray_bootstrap.ahk
+#Include ../adapters/tray_startup_click.ahk
+#Include ../adapters/tray_startup_commands.ahk
 #Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
+#Include ../_generated/window_titles.ahk
+#Include ../infra/native_dialogs.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
@@ -149,6 +153,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/wrap_pair.ahk
 #Include ../infra/send_input_parameter.ahk
 #Include ../infra/tap_keys.ahk
+#Include ../infra/key_combinations.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/altgr_family.ahk
@@ -186,6 +191,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../ui/menu/menu_submenus.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
+; Native manifest-built menu rows use the same pure label owner as tray boot.
+#Include ../infra/manifest_descriptions.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
@@ -243,6 +250,7 @@ global _DefaultLogsDir := _LogsDir
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
+#Include ../adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
 #Include ../infra/uninstall.ahk
 #Include ../infra/start_at_login.ahk
@@ -293,8 +301,10 @@ InstallHotstringHooks()
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
+; Contract tests must not launch a provider against the user's foreground app.
+; Worker behavior is covered separately with explicit owned-process fixtures.
 SFD_ConfigureUiaWorker(
-	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
+	(Context, Terminal) => false, () => false, UIASW_ContextMatches)
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
@@ -323,6 +333,7 @@ InstallSendNoOps()
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_window_manager_present_window.ahk
+#Include unit/test_native_dialog_titles.ahk
 #Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
@@ -363,6 +374,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk
+#Include unit/test_tooltip_position_refinement.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_llm_tooltip_layout.ahk
@@ -380,6 +392,7 @@ InstallSendNoOps()
 #Include unit/test_gesture_unhook_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/test_boot_menu_wait_clock.ahk
 #Include unit/test_llm_menu_build_coordinator.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
@@ -438,6 +451,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk
 #Include unit/test_tap_hold_scope.ahk
@@ -582,6 +596,7 @@ _LogBootProgress("loading LLM modules")
 ; llm_bridge.ahk is needed by the canonical HSE -> LLM effect behaviour tests.
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
+#Include unit/test_prefix_char_admission.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
@@ -596,6 +611,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_layout_extension_refresh.ahk
 #Include unit/test_ergopti_extension_hotstrings.ahk
 #Include ../ui/layout_manager/init.ahk
+#Include ../ui/menu/menu_layout.ahk
 #Include unit/test_layout_manager_host.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk
 #Include unit/test_layout_supersession.ahk
@@ -713,6 +729,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
+#Include unit/test_llm_line_style.ahk
 #Include unit/test_llm_tone.ahk
 #Include unit/test_llm_vision.ahk
 #Include unit/test_llm_translate.ahk
@@ -721,10 +738,12 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_llm_live_mode.ahk
 #Include unit/test_send_input_actions.ahk
 #Include unit/test_tap_keys.ahk
+#Include unit/test_key_combinations.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_reload_terminal_pending.ahk
+#Include unit/test_reload_worker_identity.ahk
 #Include unit/test_reload_deferral.ahk
 #Include unit/test_tray_menu_separator_popup.ahk
 #Include unit/test_tap_hold_hold_picker_options.ahk
@@ -1202,6 +1221,10 @@ _LogBootProgress("keylogger modules + tests included")
 ; statements, no includes — so pulling it in is side-effect free, and it lets
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../infra/manifest_menu.ahk
+#Include unit/test_menu_population.ahk
+#Include unit/test_menu_startup_commands.ahk
+#Include unit/test_config_registry_cache.ahk
+#Include unit/test_llm_runtime_activation.ahk
 ; The tray root builder: its top-level dispatcher and the id → builder table.
 ; Function definitions only, and the table names only its own _MI_ builders,
 ; so pulling it in stages nothing and resolves no menu dependency at load.
@@ -1221,6 +1244,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk
+#Include unit/test_metrics_widget_menu_parity.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk
@@ -1304,7 +1328,6 @@ _LogBootProgress("keylogger modules + tests included")
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
-#Include meta/test_altgr_reregister_guard.ahk
 #Include meta/test_app_picker_t_variable_shadows_i18n.ahk
 #Include meta/test_appstate_orphaned_parallel_state.ahk
 #Include meta/test_av_focus_mode_dead_code.ahk
@@ -1471,7 +1494,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tickcount_lib_wrap.ahk
 #Include meta/test_llm_token_budget_min5.ahk
 #Include meta/test_llm_parser_nul_strip.ahk
-#Include meta/test_altgr_hotif_dynamic.ahk
 #Include meta/test_ergo_pinky_modifier_skip.ahk
 #Include meta/test_watchers_idle_end_ordering.ahk
 #Include meta/test_timer_scheduler_ms_guard.ahk
@@ -1514,7 +1536,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_capsword_reset_on_suspend.ahk
 #Include meta/test_capsword_space_release_timeout.ahk
 #Include meta/test_gesture_toggle_ui_errors_logged.ahk
-#Include meta/test_lalt_capslock_enabled_gate.ahk
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
@@ -1524,7 +1545,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_deferred_crash_report_catch.ahk
 #Include meta/test_keylogger_webview_bridge_and_i18n.ahk
 #Include meta/test_keylogger_webview_range_bridge.ahk
-#Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
 #Include meta/test_keylogger_tick_overflow.ahk
@@ -1743,11 +1763,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
-#Include meta/test_llm_diff_french_accents.ahk
 #Include unit/test_audit_v5_fixes.ahk
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
+#Include unit/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include ../ui/healthcheck/probes.ahk
 #Include ../ui/healthcheck/report.ahk
@@ -1866,7 +1886,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_manifest_single_decode.ahk
 #Include meta/test_menu_prune_keeps_detached_registrations.ahk
 #Include meta/test_metrics_filter_secure_field_fails_closed.ahk
-#Include meta/test_nav_layer_lalt_capslock_group_gate.ahk
 #Include meta/test_network_info_single_wlan_roundtrip.ahk
 #Include meta/test_onboarding_unbraced_if_scope.ahk
 #Include meta/test_personal_info_save_surfaces_failure.ahk
@@ -1898,6 +1917,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_suspend_boundary.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_latency_statistics.ahk
 #Include unit/test_hotpath_breakdown_reentry.ahk
 #Include unit/test_hook_timing_input_privacy.ahk
 #Include unit/test_hotpath_per_segment_threshold.ahk
@@ -2011,4 +2031,3 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
-

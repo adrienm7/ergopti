@@ -99,7 +99,7 @@ end
 --- @param view any
 --- @return table
 local function controller_for(view)
-	return ManagerBridge.new({
+	local controller = ManagerBridge.new({
 		registry = require("modules.keymap.layout_registry"),
 		push = function(function_name, payload) return push_to(view, function_name, payload) end,
 		strings = page_strings,
@@ -112,6 +112,23 @@ local function controller_for(view)
 		end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
+	local on_message = controller.on_message
+	local ready = false
+	controller.on_message = function(payload)
+		local is_ready = type(payload) == "table" and payload.action == "ready"
+		if is_ready then
+			if ready then return false end
+			-- Native navigation and page readiness both target this exact window.
+			ready = true
+		end
+		local ok, result = pcall(on_message, payload)
+		if not ok then
+			if is_ready then ready = false end
+			error(result, 0)
+		end
+		return result
+	end
+	return controller
 end
 
 

@@ -59,9 +59,17 @@ local function load(with_ergopti)
 	local found = Extensions.scan(roots(with_ergopti), {
 		list_dirs = Loader.list_subdirs, list_files = Loader.find_toml_files, read_file = Loader.read_file,
 	})
-	local paths = {}
-	for _, path in ipairs(Loader.find_toml_files(Paths.shared("modules/hotstrings"))) do
-		paths[#paths + 1] = path
+	local paths, language_sources = {}, {}
+	local root = Paths.shared("modules/hotstrings")
+	local Languages = require("hotstrings.languages")
+	for _, pack in ipairs(Config.language_packs()) do
+		for _, stem in ipairs(pack.categories) do
+			local path = root .. "/" .. pack.id .. "/" .. stem .. ".toml"
+			language_sources[path] = { path = path, category = Languages.group_id(pack.id, stem) }
+		end
+	end
+	for _, path in ipairs(Loader.find_toml_files(root)) do
+		paths[#paths + 1] = language_sources[path] or path
 	end
 	local catalogue = Loader.load_catalogue(Config.route_bound_sources(paths, found))
 	return catalogue, found
@@ -85,22 +93,22 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		local ergopti
 		for _, pack in ipairs(found) do if pack.id == "ergopti" then ergopti = pack end end
 		helpers.assert_true(ergopti ~= nil, "the shipped Ergopti extension is discovered")
-		helpers.assert_eq(#ergopti.bound_files, 3)
+		helpers.assert_eq(#ergopti.bound_files, 4)
 		helpers.assert_eq(#ergopti.toml_files, 0, "none of its files becomes an ext: category")
 
 		local sfbs, rolls = catalogue.categories.sfbsreduction, catalogue.categories.rolls
 		helpers.assert_true(sfbs ~= nil and rolls ~= nil, "SFB reduction and rolls keep their category ids")
 		helpers.assert_true(sfbs.path:find("layouts/registry/ergopti/hotstrings/sfbsreduction.toml", 1, true) ~= nil,
 			sfbs.path)
-		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti" }, "the menu files it under Ergopti")
-		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti" })
+		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti+" }, "the menu files it under Ergopti+")
+		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti+" })
 		helpers.assert_eq(sfbs.count, 34)
 		helpers.assert_eq(rolls.count, 35)
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, 14,
 			"the repeat corrections stay a section of the magic key category")
 		helpers.assert_nil(catalogue.categories.magickey.extension, "the magic key category stays bundled")
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.extension,
-			{ id = "ergopti", name = "Ergopti" }, "its bound section names the extension the menu lists it under")
+			{ id = "ergopti", name = "Ergopti+" }, "its bound section names the extension the menu lists it under")
 		helpers.assert_nil(catalogue.categories.magickey.sections.text_expansion_symbols.extension)
 	end)
 
@@ -129,6 +137,58 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		helpers.assert_nil(catalogue.categories.rolls)
 		helpers.assert_nil(catalogue.categories.magickey.sections.repeat_corrections)
 		helpers.assert_true(catalogue.categories.magickey.count > 0, "the bundled magic key category still loads")
+	end)
+end)
+
+--- The independent pre-move reference shared by all three native suites.
+--- @return table
+local function distance_reference()
+	local text = assert(require("modules.hotstrings.loader").read_file(
+		Paths.shared("tests/corpus/hotstrings/distance_reduction_entries.json")))
+	return Json.decode(text)
+end
+
+helpers.describe("Ergopti extension distance reduction", function()
+	helpers.it("(ergopti-distance-ext) loads all 101 reference rules under the historical category and common priority", function()
+		local catalogue = load(true)
+		local reference = distance_reference()
+		helpers.assert_eq(#reference.entries, 101)
+		local category = catalogue.categories.distancesreduction
+		helpers.assert_true(category ~= nil)
+		helpers.assert_eq(category.extension, { id = "ergopti", name = "Ergopti+" })
+		helpers.assert_true(category.path:find("layouts/registry/ergopti/hotstrings/distancesreduction.toml", 1, true) ~= nil)
+		helpers.assert_eq(category.count, #reference.entries)
+		helpers.assert_eq(category.delay, reference.meta.delay)
+		helpers.assert_eq(category.description, reference.meta.description)
+		helpers.assert_eq(category.sections.comma_j.delay, reference.meta.section_delays.comma_j)
+		local order = {}
+		for _, section in ipairs(reference.meta.sections_order) do
+			if section ~= "-" then order[#order + 1] = section end
+		end
+		helpers.assert_eq(category.sections_order, order)
+		local total = 0
+		for _, mapping in ipairs(catalogue.mappings) do
+			if mapping.group == reference.category then total = total + 1 end
+		end
+		helpers.assert_eq(total, #reference.entries, "each rule is loaded once")
+		for _, row in ipairs(reference.entries) do
+			local m = mapping(catalogue, reference.category, row.trigger)
+			helpers.assert_true(m ~= nil, row.section .. "/" .. row.trigger)
+			helpers.assert_eq(m.section, row.section)
+			helpers.assert_eq(m.replacement, row.output)
+			helpers.assert_eq(m.priority, 10)
+			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result" }) do
+				helpers.assert_eq(m[flag], row[flag], row.trigger .. "/" .. flag)
+			end
+		end
+		helpers.assert_eq(exists(Paths.shared("modules/hotstrings") .. "/distancesreduction.toml"), false)
+		local without = load(false)
+		helpers.assert_nil(without.categories.distancesreduction)
+		helpers.assert_eq(without.categories.french_distancesreduction.count, 24,
+			"the separate French language category keeps every rule")
+		for _, m in ipairs(without.mappings) do
+			helpers.assert_true(m.group ~= reference.category, "no extension means no distance rules")
+		end
 	end)
 end)
 
@@ -174,6 +234,59 @@ local function load_with_user_folder(dir)
 end
 
 helpers.describe("Ergopti extension hotstrings: the user's own copies", function()
+	helpers.it("(ergopti-distance-ext) keeps a user's distance reduction copy without appending shipped rules", function()
+		local dir = user_folder()
+		write(dir .. "/distancesreduction.toml", one_entry_pack("qu", "qa", "my distance"))
+		local ok, categories = pcall(load_with_user_folder, dir)
+		os.remove(dir .. "/distancesreduction.toml")
+		os.remove(dir)
+		helpers.assert_true(ok, tostring(categories))
+		helpers.assert_eq(categories.distancesreduction.path, dir .. "/distancesreduction.toml")
+		helpers.assert_eq(categories.distancesreduction.count, 1)
+		helpers.assert_eq(categories.distancesreduction.extension, { id = "ergopti", name = "Ergopti+" })
+	end)
+
+	helpers.it("(ergopti-distance-ext) preserves canonical disabled group and section choices across reloads", function()
+		local dir = user_folder()
+		local config_path = dir .. "/config.toml"
+		local original = '[hotstrings.groups]\ndistancesreduction = true\n'
+			.. '[hotstrings.modules.distancesreduction]\nqu = true\ncomma_j = false\n'
+		write(config_path, original)
+		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		Config._set_config_file_for_test(config_path)
+		local observed = {}
+		local ok, failure = pcall(function()
+			local engine = { load_mappings = function(_, mappings) observed = mappings; return true end }
+			helpers.assert_true(Config.init(engine, dir))
+			for _ = 1, 2 do
+				local _, committed = Config.load_all()
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(Config.is_group_enabled("distancesreduction"), true)
+				helpers.assert_eq(Config.is_section_enabled("distancesreduction", "qu"), true)
+				helpers.assert_eq(Config.is_section_enabled("distancesreduction", "comma_j"), false)
+				local count = 0
+				for _, m in ipairs(observed) do
+					if m.group == "distancesreduction" then
+						count = count + 1
+						helpers.assert_eq(m.section, "qu", "only the historically enabled section runs")
+					end
+				end
+				helpers.assert_eq(count, 10)
+				helpers.assert_eq(require("modules.hotstrings.loader").read_file(config_path), original)
+			end
+			write(config_path, original:gsub("distancesreduction = true", "distancesreduction = false"))
+			helpers.assert_true(Config.init(engine, dir))
+			local _, committed = Config.load_all()
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(Config.is_group_enabled("distancesreduction"), false)
+			helpers.assert_eq(Config.is_section_checked("distancesreduction", "qu"), true)
+			for _, m in ipairs(observed) do helpers.assert_true(m.group ~= "distancesreduction") end
+		end)
+		Config._set_config_file_for_test(nil)
+		os.remove(config_path)
+		os.remove(dir)
+		helpers.assert_true(ok, tostring(failure))
+	end)
 	helpers.it("(ergopti-hotstrings-ext) keeps a user's rolls.toml over the extension's file", function()
 		local dir = user_folder()
 		write(dir .. "/rolls.toml", one_entry_pack("mine", "zqx", "my roll"))
@@ -185,7 +298,7 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 			"the user's copy of a category is an explicit override, extension or not")
 		helpers.assert_eq(categories.rolls.count, 1, "and it is the only source of the category")
 		helpers.assert_eq(categories.rolls.sections.mine.count, 1)
-		helpers.assert_eq(categories.rolls.extension, { id = "ergopti", name = "Ergopti" },
+		helpers.assert_eq(categories.rolls.extension, { id = "ergopti", name = "Ergopti+" },
 			"the category is still listed under the extension that binds it")
 		helpers.assert_eq(categories.sfbsreduction.count, 34, "the other bound category still comes from the extension")
 	end)
@@ -214,7 +327,7 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 			helpers.assert_eq(categories.magickey.sections.replace.count, 1)
 			helpers.assert_eq(categories.magickey.sections.repeat_corrections.count, 14)
 			helpers.assert_eq(categories.magickey.sections.repeat_corrections.extension,
-				{ id = "ergopti", name = "Ergopti" })
+				{ id = "ergopti", name = "Ergopti+" })
 		end)
 end)
 
@@ -225,7 +338,7 @@ helpers.describe("Ergopti extension hotstrings: the Hotstrings scope", function(
 	helpers.it("(ergopti-hotstrings-ext) keeps the moved categories bundled for restore and clear", function()
 		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local bundled = Config.bundled_categories()
-		for _, id in ipairs({ "sfbsreduction", "rolls", "magickey" }) do
+		for _, id in ipairs({ "distancesreduction", "sfbsreduction", "rolls", "magickey" }) do
 			helpers.assert_true(bundled[id] == true, id .. " is restored to its manifest recommendation")
 		end
 	end)

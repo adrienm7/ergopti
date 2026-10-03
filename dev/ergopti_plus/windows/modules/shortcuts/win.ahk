@@ -576,7 +576,7 @@ if Features["shortcuts"]["teleport_mouse"] {
 				}
 
 				if (Count < 2) {
-						MsgBox(t("shortcuts.no_other_monitor"))
+						Ui_MsgBox(t("shortcuts.no_other_monitor"))
 						return
 				}
 

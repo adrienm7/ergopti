@@ -60,6 +60,8 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 		Parsed := TOML_ParseFreshFile(RestartPath)
 		AssertEqual("keep", Parsed["gestures"]["unknown_user"])
 		AssertEqual("keep", Parsed["private"]["credential"])
+		if Mode == "recommended" && Outcome == "complete"
+			AssertEqual("alt_tab_monitor", Parsed["gestures"]["tap_4"], "explicit restore imports the monitor-local tap")
 		; The clear once deleted the switch with the assignments, so the next
 		; gesture the user set did nothing until the switch was found again.
 		if Mode == "clear" && Outcome == "complete" {

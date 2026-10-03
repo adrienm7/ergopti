@@ -255,7 +255,7 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				; One line per shipped locale: the language list needs the height of 22 rows
 				if (Spec = "llm_language")
 						Size := "w680 h560"
-				Result := InputBox(Prompt, Title, Size, Existing)
+				Result := Ui_InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
 						return false
 				; A text to type keeps its spaces; every other kind is trimmed.
@@ -265,7 +265,7 @@ GesturePromptActionParameter(BindingId, ActionName) {
 						return Map("has_value", true,
 								"key", GestureActionParameterKey(BindingId, ActionName),
 								"value", Value)
-				MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+				Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
 		}
 }
@@ -296,7 +296,7 @@ _GesturePickApplication(BindingId, ActionName, Prompt) {
 				return Map("has_value", true,
 						"key", GestureActionParameterKey(BindingId, ActionName),
 						"value", Picked)
-		MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+		Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 		return false
 }
 
@@ -763,7 +763,7 @@ GestureBuildSetupInstructions() {
 ; Replaces the previous two-step ``Show instructions`` + ``Open touchpad
 ; settings`` menu items — the user only needs one path now.
 GestureShowManualTutorialDialog() {
-		tg := Gui("", t("onboarding.gestures.register_manual"))
+		tg := Gui_Create("", t("onboarding.gestures.register_manual"))
 		tg.SetFont("s9", "Segoe UI")
 		tg.MarginX := 18
 		tg.MarginY := 14

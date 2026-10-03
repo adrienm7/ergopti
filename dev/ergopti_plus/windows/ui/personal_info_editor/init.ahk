@@ -78,7 +78,7 @@ _PiEdWeb_TryOpen() {
 	SessionEpoch := _PiEdWeb_SessionEpoch
 	_PiEdWeb_ResetDone := false
 
-	g := Gui("+Resize +MinSize480x400", t("dialog.personal_info.title"))
+	g := Gui_Create("+Resize +MinSize480x400", t("dialog.personal_info.title"))
 	g.BackColor := "0xf5f5f7"
 	g.MarginX   := 0
 	g.MarginY   := 0

@@ -23,11 +23,10 @@
 ;    post-ready startup task offers the existing configuration cleanup tool.
 ; 4. Dormant until cut-over: written ahead of the migration so the disruptive
 ;    PR can be focused on call-site rewrites only.
-; 5. ``hotstrings.personal.<user-chosen-name>`` and ``personal_editor`` are
-;    exempt from the manifest-tree validation in (3): their leaf names are
-;    per-user runtime data (personal hotstring categories, editor UI prefs),
-;    not compile-time schema, so missing segments are auto-vivified rather
-;    than logged as an error.
+; 5. ``hotstrings.personal.<user-chosen-name>`` is dynamic per-user data:
+;    missing category segments are auto-vivified. The three known
+;    ``personal_editor`` preferences retain their editor owner instead of
+;    entering the manifest-built Features tree.
 ; 6. An EXISTING ``config.toml`` that cannot be READ latches
 ;    ``_ConfigBootReadFailed`` (declared with its siblings in ``toml_helpers``).
 ;    It is the session-wide "the feature tree in memory is defaults, not the
@@ -57,12 +56,8 @@
 ;   - ``hotstrings.personal.<name>`` — <name> is a user-chosen personal
 ;     hotstring category created at runtime via the personal TOML editor
 ;     (see EnsurePersonalHotstringFeature in infra/personal_features.ahk).
-;   - ``personal_editor`` — flat UI-preference keys written directly by
-;     ui/personal_toml_editor.ahk via TOML_Write/TOML_Read, never routed
-;     through the manifest-built Features tree at all.
-; Both would otherwise fail the "every segment must already exist in the
-; manifest" walk below on every single boot, since neither can be declared
-; ahead of time in manifest.toml.
+; Editor UI preferences are separately enumerated in the foreign ownership
+; registry. Their keys never become dynamic feature paths during this walk.
 /**
  * Decodes a dotted TOML section without splitting dots inside quoted keys.
  * @param {String} Header - Section contents without brackets.
@@ -112,8 +107,6 @@ TomlSectionIsDynamicPersonalNamespace(SectionPath) {
 	Parts := TomlConfigSectionParts(SectionPath)
 	if !(Parts is Array)
 		return false
-	if (Parts.Length == 1 && Parts[1] == "personal_editor")
-		return true
 	return Parts.Length >= 2 && Parts[1] == "hotstrings" && Parts[2] == "personal"
 }
 
@@ -131,6 +124,10 @@ TomlConfigForeignOwnershipRegistry() {
 			"sfbs_reduction", "FeatureState"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
+		"personal_editor", Map(
+			"compact_view", "PersonalEditor",
+			"close_on_add", "PersonalEditor",
+			"default_section", "PersonalEditor"),
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
 			"ollama_port", "LLMMenu"),
@@ -147,11 +144,21 @@ TomlConfigForeignOwnershipRegistry() {
 	return Registry
 }
 
+; The keys of a key combination, as a regex alternation: the Windows column of
+; [tap_hold.catalog] in _shared/tap_hold/defaults.toml. Spelled here because
+; this loader runs before that catalogue is read, and in a function because a
+; key can be asked about before this file's include position has run;
+; tests/unit/test_key_combinations.ahk holds the two together.
+TomlConfigKeyCombinationKeys() {
+	static Keys := "escape|tab|caps_lock|left_shift|left_ctrl|win|left_alt|space|alt_gr|right_ctrl|right_shift|enter|backspace|delete"
+	return Keys
+}
+
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 TomlConfigActionParameterIsOwned(Key) {
 	static Actions := GestureActionCatalogueData().Actions
-	if !RegExMatch(Key, "^(?:gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
 	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
 }
@@ -173,6 +180,13 @@ TomlConfigForeignOwner(SectionPath, Key) {
 			&& RegExMatch(Key,
 				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
 		return "ConfigIO"
+	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
+	; « first_then_second » (infra/key_combinations.ahk); the manifest declares
+	; only the pairs that ship a recommendation. The reader refuses a pair of
+	; one key twice.
+	if ((SectionPath == "shortcuts.key_combination_taps" || SectionPath == "shortcuts.key_combination_holds")
+			&& RegExMatch(Key, "^(?:" . TomlConfigKeyCombinationKeys() . ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
+		return "KeyCombinations"
 	return ""
 }
 
@@ -607,8 +621,8 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			continue
 		}
 
-		; Resolve the node. hotstrings.personal.<user-chosen-name> and
-		; personal_editor are dynamic, per-user namespaces that structurally
+		; Resolve the node. hotstrings.personal.<user-chosen-name> is a dynamic,
+		; per-user namespace that structurally
 		; cannot appear in the static manifest (see
 		; TomlSectionIsDynamicPersonalNamespace): missing segments are
 		; auto-vivified as empty Maps instead of being rejected.

@@ -774,6 +774,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-download-publication-yield) drops stale detached-download continuations", function()
 		local modules = {
+			"adapters.json_codec",
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
 			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",

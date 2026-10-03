@@ -424,3 +424,64 @@ _SRCL_SweepRemovesOnlyDeadOwnersFolders() {
 }
 Test("shell runner: the capture sweep removes only exited owners' folders (shell-capture-lock)",
 	_SRCL_SweepRemovesOnlyDeadOwnersFolders)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 5/ Removal stays inside its claim =======
+; =================================================
+; =================================================
+
+; A scanner may briefly hold a newly closed file; retry only that known native
+; refusal. The test still fails if cleanup never reaches the requested outcome.
+_SRCL_RemoveUntilOutcome(Capture, Expected) {
+	Started := A_TickCount
+	loop {
+		Refusal := _SR_CaptureRemove(Capture)
+		if (Refusal == Expected)
+			return Refusal
+		Assert(TickElapsed(Started) < SR_CAPTURE_LOCK_BUDGET_MS,
+			"native capture removal must settle its bounded transient refusal")
+		Sleep(SRTOW_PID_POLL_MS)
+	}
+}
+
+_SRCL_RemovalKeepsOtherOwners(Nonempty) {
+	Owned := _SR_AcquireCaptureDirectory()
+	Other := _SR_AcquireCaptureDirectory()
+	Output := Owned . "output.tmp"
+	OtherOutput := Other . "output.tmp"
+	Canary := Owned . "keep.txt"
+	try {
+		FileAppend("owned output", Output, "UTF-8-RAW")
+		FileAppend("other owner", OtherOutput, "UTF-8-RAW")
+		if Nonempty
+			FileAppend("unclaimed file", Canary, "UTF-8-RAW")
+		Capture := Map("TmpFile", Output, "CaptureDir", Owned)
+		Expected := Nonempty ? SR_ERROR_DIR_NOT_EMPTY : 0
+		AssertEqual(Expected, _SRCL_RemoveUntilOutcome(Capture, Expected))
+		AssertFalse(FileExist(Output) != "", "only the claimed output is removed")
+		AssertTrue(Capture.Get("CaptureFileRemoved", false), "the claim records its completed file removal")
+		AssertEqual("other owner", FileRead(OtherOutput, "UTF-8"), "the adjacent owner stays byte-exact")
+		if Nonempty {
+			AssertEqual("unclaimed file", FileRead(Canary, "UTF-8"), "removal never recursively deletes an unclaimed file")
+			Assert(DirExist(Owned), "a nonempty capture directory is retained for recovery")
+		} else
+			AssertFalse(DirExist(Owned) != "", "the empty claimed directory is removed")
+	} finally {
+		_SRTLC_DeleteCapture(Output)
+		_SRTLC_DeleteCapture(Canary)
+		_SRTLC_DeleteCapture(OtherOutput)
+		if DirExist(Owned)
+			DirDelete(Owned)
+		if DirExist(Other)
+			DirDelete(Other)
+	}
+}
+Test("shell runner: capture removal keeps an adjacent owner's output",
+	_SRCL_RemovalKeepsOtherOwners.Bind(false))
+Test("shell runner: capture removal keeps an unclaimed file in its directory",
+	_SRCL_RemovalKeepsOtherOwners.Bind(true))

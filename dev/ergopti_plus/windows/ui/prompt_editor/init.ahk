@@ -142,15 +142,15 @@ _PromptEdWeb_TryOpen(Existing) {
 	if (_PromptEdWeb_Gui != 0) {
 		try LoggerDebug("PromptEditor", "Re-using open editor for profile '{1}' (edit={2}).",
 			_PromptEdWeb_EditId, _PromptEdWeb_IsEdit ? "yes" : "no")
-		try _PromptEdWeb_Gui.Title := _PromptEdWeb_IsEdit
+		try _PromptEdWeb_Gui.Title := WindowTitle(_PromptEdWeb_IsEdit
 			? t("prompt_editor.title_edit")
-			: t("prompt_editor.title_new")
+			: t("prompt_editor.title_new"))
 		try _PromptEdWeb_PushInit(Context.EditId, Context.Epoch)
 		WMPresentWindow(_PromptEdWeb_Gui)
 		return true
 	}
 
-	g := Gui("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
+	g := Gui_Create("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

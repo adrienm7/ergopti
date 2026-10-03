@@ -101,10 +101,10 @@ _SFND_BuildTrayMenuDeferredTryFinally() {
 		"the boot timer must not bypass the shared tray-root generation owner")
 	Worker := _DriverFuncBody("_TrayRootBuildBoot")
 	PublishPos := InStr(Worker, "Published := initMenu(PublishAuthorizeFn)")
-	MarkPos := InStr(Worker, 'BootProfile_Mark("Tray menu built', false,
+	MarkPos := InStr(Worker, 'BootProfile_Mark("Configured tray menu published', false,
 		PublishPos)
 	Assert(PublishPos > 0 and MarkPos > PublishPos
-		and InStr(BootRequest, 'BootProfile_Mark("Tray menu built') = 0,
+		and InStr(BootRequest, 'BootProfile_Mark("Configured tray menu published') = 0,
 		"the boot profiler may report the root only after its actual terminal publication")
 }
 Test("ErgoptiPlus: BuildTrayMenuDeferred restores _DriverReady in finally block (buildtraymenu-driverready-lost-on-error)", _SFND_BuildTrayMenuDeferredTryFinally)

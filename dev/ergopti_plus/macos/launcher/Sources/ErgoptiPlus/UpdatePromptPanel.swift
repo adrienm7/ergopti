@@ -69,7 +69,8 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 	}
 
 	func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?) {
-		if let indicator = progressIndicator, let message = progressMessage, panel != nil {
+		if let indicator = progressIndicator, let message = progressMessage, let panel {
+			panel.title = WindowTitles.compose(text.title)
 			message.stringValue = text.message
 			apply(fraction: fraction, to: indicator)
 			return
@@ -157,7 +158,7 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 			styleMask: [.titled, .closable],
 			backing: .buffered,
 			defer: false)
-		panel.title = title
+		panel.title = WindowTitles.compose(title)
 		panel.isReleasedWhenClosed = false
 		panel.hidesOnDeactivate = false
 		// Normal level: the prompt is ordered front (and focused when the user

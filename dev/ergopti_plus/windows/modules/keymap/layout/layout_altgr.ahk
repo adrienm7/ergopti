@@ -50,6 +50,9 @@ global ALTGR_NUMBER_ROW := ""
 global ALTGR_BASE_ROWS := ""
 global CTRL_ALT_NUMPAD := ""
 
+; The physical-state port is shared by captured criteria and direct gate calls.
+global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsDown
+
 ; ``{Plain, Shifted}`` callables of every key of two parallel spec tables.
 _AltGrTableFromSpec(Plain, Shifted, DeadTables) {
     Table := Map()
@@ -125,8 +128,12 @@ _BuildAltGrTables() {
 ; of the foreground window's layout, without a reload. Manual TOML override
 ; available via ScriptInformation["AltGrIsKanaRemap"] in case the probe ever
 ; misfires.
-IsRealAltGrPress() {
-    global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
+; PhysicalStateFn optionally replaces the KeyState port for a direct call.
+IsRealAltGrPress(PhysicalStateFn := unset) {
+    global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH, _ALTGR_PHYSICAL_STATE_QUERY
+    Query := IsSet(PhysicalStateFn) ? PhysicalStateFn : _ALTGR_PHYSICAL_STATE_QUERY
+    if !HasMethod(Query, "Call")
+        throw TypeError("AltGr eligibility requires a physical-state query.")
     ; While the onboarding wizard is on screen the user has not yet committed
     ; any Ergopti feature, so every SC138-prefixed hotkey in the driver must
     ; defer to the host Windows layout. Returning false here neutralises every
@@ -149,11 +156,13 @@ IsRealAltGrPress() {
         return false
     }
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-        ; Kana remap: SC138 stands alone, no LCtrl/RAlt — no ghost to filter.
-        return true
+        ; AHK can retain a Kana prefix after release. Reject it before the
+        ; suffix is captured; the callback's later guard cannot restore it.
+        ; The unconditional prefix anchor still arms SC138 on its own press.
+        return Query.Call("SC138")
     }
     ; Vanilla AltGr: real press keeps RAlt physically held; ghost releases it.
-    return GetKeyState("RAlt", "P")
+    return Query.Call("RAlt")
 }
 
 ; #HotIf of the script chords (AltGr+Escape quits, +Enter toggles the pause,
@@ -258,12 +267,9 @@ AltGrShiftDispatch(SC, Table, *) {
         return
     }
     ; Regression guard-rail (kept on purpose for future debugging): the AltGr
-    ; layer must only ever dispatch while SC138 is PHYSICALLY held. A dispatch
-    ; with SC138 up means AHK's custom-combination prefix flag has latched on —
-    ; the « AltGr bloqué » bug that a non-keyboard resume used to trigger. It is
-    ; prevented at the source now (ToggleSuspend waits for SC138 to lift before
-    ; suspending), so this should never fire; logging it loudly as a WARNING means
-    ; any future recurrence is caught immediately in ErgoptiPlus_layout.log.
+    ; layer must only ever dispatch while SC138 is PHYSICALLY held. The hotkey
+    ; criterion checks that authority on both layout families; this second check
+    ; covers a release before the queued callback runs and reports it explicitly.
     if !GetKeyState("SC138", "P") {
         try LoggerWarn("LayoutAltGr",
             "Spurious AltGr dispatch (SC138 not physically held — prefix flag latched?): SC={1}, SC138 logical={2}, suspended={3}.",
@@ -271,8 +277,8 @@ AltGrShiftDispatch(SC, Table, *) {
         ; AHK can retain the custom-combination prefix internally after Suspend
         ; even though the key is physically up.  Never run an AltGr callback in
         ; that state: doing so turns the next ordinary key into an unsolicited
-        ; layer character/action.  The original physical key event remains
-        ; available to the native/base path once this handler returns.
+        ; layer character/action. This callback cannot restore a captured key:
+        ; the criterion must reject a stale prefix before the suffix is taken.
         return
     }
     ; This dispatcher only runs on a real AltGr/Kana press — the HotIf in

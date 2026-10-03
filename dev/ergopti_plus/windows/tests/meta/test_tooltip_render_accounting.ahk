@@ -91,22 +91,29 @@ _TRA_EveryResolveExitIsCounted() {
 ; ==============================================
 
 _TRA_PresentedRendersAreCounted() {
-	Body := _DriverFuncBody("_TooltipShowNow")
-	Assert(Body != "", "_TooltipShowNow() must exist in the driver source")
+	Body := _DriverFuncBody("_TooltipPresentStack")
+	Assert(Body != "", "the common pixel presenter must exist in the driver source")
 
 	NotePos := InStr(Body, "_TooltipNoteRenderPresented(")
-	PresentPos := InStr(Body, "_TooltipPresentStack(")
-	Assert(PresentPos > 0, "_TooltipShowNow must still present the stack")
+	PresentPos := InStr(Body, "_TooltipRevealPreparedSurfaces(")
+	Assert(PresentPos > 0, "the common presenter must reveal its prepared surface")
 	Assert(NotePos > PresentPos,
-		"_TooltipShowNow must count the render AFTER the present succeeds. Counted before, the total would include renders that threw and painted nothing, and the slow-render ratio it exists to make computable would be diluted by them")
+		"ordinary, destack and rich LLM renders must count only after successful pixel commit")
+	Assert(InStr(Body, "if CommitAllowed {") > 0,
+		"refused or failed commits must not count as visible renders")
+	Show := _DriverFuncBody("_TooltipShowNow")
+	Assert(Show != "", "the ordinary presenter must exist")
+	Assert(InStr(Show, "_TooltipNoteRenderPresented(") == 0,
+		"the ordinary presenter must not double-count the common commit")
 
 	Counter := _DriverFuncBody("_TooltipNoteRenderPresented")
-	Assert(Counter != "", "_TooltipNoteRenderPresented() must exist in the driver source")
+	Sink := _DriverFuncBody("_TooltipLogRenderAccounting")
+	Assert(Counter != "" and Sink != "", "the counter and snapshot sink must exist")
 	Assert(InStr(Counter, "_TOOLTIP_STATS_LOG_EVERY") > 0,
 		"the render counter must flush periodically — a total that is only ever held in memory is lost with the process and can never be read next to the slow-segment warnings it explains")
-	Assert(InStr(Counter, "_TooltipResolveExits") > 0,
+	Assert(InStr(Sink, "_TooltipResolveExits") > 0,
 		"the accounting line must carry the cascade exit distribution: the two numbers are only useful together, and emitting them separately means correlating two log lines by timestamp")
-	Assert(InStr(Counter, "LoggerInfo(") > 0,
+	Assert(InStr(Sink, "LoggerInfo(") > 0,
 		"the accounting line must be INFO — it is the context for WARNING-level slow lines, so it has to survive the default log level they are read at")
 }
 

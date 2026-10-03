@@ -84,11 +84,12 @@ class KeystrokeVectorReplay(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.vectors = load_vectors()
+        cls.seeds = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))["dead_reset_seeds"]
         cls.names = xkb_names()
         cls.keysyms = keylayout_to_xkb.load_keysym_table()
         cls.conversions = {}
         cls.compose = {}
-        for layout in sorted({vector["layout"] for vector in cls.vectors}):
+        for layout in sorted({vector["layout"] for vector in cls.vectors + cls.seeds}):
             conversion = convert_registry_layout(layout)
             cls.conversions[layout] = conversion
             cls.compose[layout] = parse_compose(conversion.compose_text)
@@ -107,6 +108,20 @@ class KeystrokeVectorReplay(unittest.TestCase):
         sc, mods = parse_press(press)
         self.assertIn(mods, LEVELS, "unknown modifiers in vector press %r" % press)
         return self.conversions[layout].key_symbols[self.names[sc]][LEVELS[mods]]
+
+    def test_windows_reset_seeds_are_real_dead_keys_on_linux(self):
+        self.assertGreaterEqual(len(self.seeds), 5)
+        self.assertEqual(
+            {seed["layout"] for seed in self.seeds}, {"ergol", "ergopti", "ergopti_plus"}
+        )
+        for seed in self.seeds:
+            with self.subTest(seed=seed):
+                symbol = self.key_keysym(seed["layout"], seed["press"])
+                self.assertIn(
+                    symbol,
+                    self.conversions[seed["layout"]].dead_triggers.values(),
+                    f"{seed}: {symbol} is not a dead-key trigger",
+                )
 
     def test_every_vector_is_replayed_or_skipped_by_name(self):
         ids = {vector["id"] for vector in self.vectors}

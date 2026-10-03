@@ -12,6 +12,72 @@
 
 #Requires AutoHotkey v2.0
 
+class _TLL_SpanGui {
+	__New() {
+		this.Options := ""
+		this.Text := ""
+		this.Font := ""
+	}
+	SetFont(Options, Name) {
+		this.Font := Options . "|" . Name
+	}
+	Add(Kind, Options, Text) {
+		this.Options := Options
+		this.Text := Text
+	}
+}
+
+_TLL_RetainedSpanSizePreservesGeometry() {
+	G := _TLL_SpanGui()
+	Size := { W: 37, H: 13 }
+	Width := _LLM_TooltipDrawText(G, 11, 7, 20, "112233", 10, "fresh span", "norm", Size)
+	AssertEqual(37, Width)
+	AssertEqual("BackgroundTrans x11 y14 w39 h13", G.Options,
+		"retained sizing must preserve bottom alignment and glyph overhang")
+	AssertEqual("fresh span", G.Text)
+	AssertEqual(0, _LLM_TooltipDrawText(G, 0, 0, 0, "112233", 10, "", "norm", Size))
+}
+
+Test("LLM tooltip: retained per-render span size preserves geometry (llm-span-cache-2026-10-02)",
+	_TLL_RetainedSpanSizePreservesGeometry)
+
+class _TLL_SegmentGui extends _TLL_SpanGui {
+	__New() {
+		super.__New()
+		this.Spans := []
+	}
+	Add(Kind, Options, Text) {
+		super.Add(Kind, Options, Text)
+		this.Spans.Push({ Font: this.Font, Options: Options })
+	}
+}
+
+_TLL_RetainedSegmentSizesPreserveEmphasis() {
+	Slot := { Text: "", Chunks: [{ type: "equal", text: "a" },
+		{ type: "insert", text: "b" }], NextWords: " c", HasCorrections: true }
+	Row := _LLM_TooltipMeasurePredictionRow(Slot, { W: 30, H: 18 },
+		{ W: 5, H: 18 }, 10, 7,
+		(Text, Bold) => { W: StrLen(Text) * (Bold ? 20 : 10), H: Bold ? 22 : 18 })
+	for Selected in [true, false] {
+		G := _TLL_SegmentGui()
+		Segments := _LLM_SlotSegments(Slot, Selected)
+		Body := Selected ? Row.Selected : Row.Unselected
+		Width := _LLM_TooltipDrawSegments(G, 0, 0, 40,
+			Segments, Selected, Body.Pieces)
+		AssertEqual(Body.W, Width,
+			"cached painting must use the dimensions of this exact emphasis state")
+		AssertEqual(3, G.Spans.Length)
+		for Index, Span in G.Spans {
+			AssertEqual(Segments[Index].Bold, InStr(Span.Font, "bold") > 0,
+				"retained dimensions must not erase the requested font weight")
+			Assert(InStr(Span.Options, " w" . (Body.Pieces[Index].W + 2)
+				. " h" . Body.Pieces[Index].H), "every retained piece controls native geometry")
+		}
+	}
+}
+Test("LLM tooltip: retained segments preserve shared emphasis geometry (llm-span-cache-2026-10-02)",
+	_TLL_RetainedSegmentSizesPreserveEmphasis)
+
 class _TLL_Native {
 	static Dpi := 120
 
@@ -27,7 +93,7 @@ class _TLL_Native {
 		return this.Dpi
 	}
 
-	static CreateFont(HeightPx, FontName) {
+	static CreateFont(HeightPx, FontName, Bold := false) {
 		return 301
 	}
 

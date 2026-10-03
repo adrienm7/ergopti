@@ -24,6 +24,7 @@
 local M = {}
 
 local hs               = hs
+local JsonCodec        = require("adapters.json_codec")
 local Logger           = require("infra.logger")
 local fs_dir           = require("infra.fs_dir")
 local menu_paths       = require("infra.config_paths")
@@ -74,8 +75,8 @@ function M.load(ctx)
 		if fh then
 			local raw = fh:read("*a")
 			fh:close()
-			local ok, parsed = pcall(hs.json.decode, raw)
-			if ok and type(parsed) == "table" and type(parsed.personal) == "number" then
+			local parsed, decode_error = JsonCodec.decode(raw)
+			if not decode_error and type(parsed) == "table" and type(parsed.personal) == "number" then
 				personal_default_priority = parsed.personal
 			end
 		end

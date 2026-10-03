@@ -94,6 +94,28 @@ TooltipRUpdateElement(DrawCall) {
 	TooltipRShow(Payload)
 }
 
+; Windows-only preview seams; the shared port contract stays unchanged.
+TooltipRHasNativeCaret() {
+	CoordMode("Caret", "Screen")
+	X := 0, Y := 0
+	return CaretGetPos(&X, &Y) && (X != 0 || Y != 0)
+}
+
+TooltipRScheduleRefinement(Callback, DelayMs) {
+	if DelayMs > 0
+		SetTimer(Callback, -DelayMs)
+	else
+		SetTimer(Callback, 0)
+}
+
+TooltipRSetPositionWarm(Enabled) {
+	global TOOLTIP_POSITION_WARM_PERIOD_MS
+	if Enabled
+		SetTimer(_TooltipPositionWarmPump, TOOLTIP_POSITION_WARM_PERIOD_MS, -1)
+	else
+		SetTimer(_TooltipPositionWarmPump, 0)
+}
+
 ; Port dispatch map (ADAPTER_TOOLTIP_RENDERER) — the single-source-of-truth
 ; contract surface, verified against _shared/core/ports/contracts.json by
 ; tools/test/test-port-compliance.cjs.

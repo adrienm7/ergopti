@@ -129,7 +129,7 @@ _MagicKeyEditorStopOwned(IH) {
 
 _EditorWriteToml(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 	if !HasMethod(NotifyFn, "Call") {
-		NotifyFn := (Message, Options) => MsgBox(t("onboarding.error.write_failed"),
+		NotifyFn := (Message, Options) => Ui_MsgBox(t("onboarding.error.write_failed"),
 			t("editor.hotstrings.save_error"), "Icon!")
 	}
 	Committed := ConfigCommitBuilt(Path, Context, BuildFn, WriterFn, NotifyFn)
@@ -292,7 +292,7 @@ MagicKeySourceCapture(*) {
 		if (IH.EndReason != "Stopped")
 				return
 		if State.Refused {
-				MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
+				Ui_MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
 				return
 		}
 		if (State.Scan == "")
@@ -542,7 +542,7 @@ _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(t("dialog.personal_info.save_failed"), "Iconx")
 		else
-			MsgBox(t("dialog.personal_info.save_failed"),
+			Ui_MsgBox(t("dialog.personal_info.save_failed"),
 				t("dialog.personal_info.save_failed_title"), "Iconx")
 	} catch as Err {
 		try LoggerError("PersonalInfo",
@@ -557,7 +557,7 @@ PersonalInformationEditor(*) {
 		; multi-field dialog below remains as an automatic fallback.
 		if _PiEdWeb_TryOpen()
 				return
-		GuiToShow := Gui(, t("dialog.personal_info.title"))
+		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
 		UpdatedPersonalInformation := Map()
 		ReverseLetters := Map()
 		for k, v in PersonalInformationLetters
@@ -627,7 +627,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		if HasMethod(ConfirmFn, "Call")
 			ConfirmFn.Call(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
 		else
-			MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
+			Ui_MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
 	}
 	catch as Err
 		try LoggerError("PersonalInfo", "Could not display the personal-information save confirmation: {1}.", Err.Message)
@@ -643,7 +643,7 @@ GPTLinkEditor(*) {
 		CurrentLink := ""
 		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
 				CurrentLink := Features["shortcuts"]["gpt"]["link"]
-		GuiToShow := Gui(, t("dialog.gpt_link.title"))
+		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

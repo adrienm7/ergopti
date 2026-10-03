@@ -42,9 +42,10 @@ local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
-local ControlSignals = require("platform.remap.control_signals")
+local ControlSignals = require("keymap.control_signals")
 local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
+local Defaults = require("platform.remap.defaults")
 
 local LOG = "karabiner"
 
@@ -332,18 +333,10 @@ end
 --- (hs.json.decode shares equal JSON values, see adapters/json_codec.lua):
 --- it is refused here, where the graph is built, instead of deploying a
 --- manipulator with duplicated gates.
---- @param rules table Rules generated for one pause mode.
---- @param token string Canonical generation token.
---- @param mode string Managed mode (`normal` or `pause`).
---- @return table|nil rules The same list after central gating.
+--- @param rules table Independently owned raw rule graph.
+--- @return boolean|nil valid Identity and shape validation receipt.
 --- @return string|nil error_message Validation failure.
-local function gate_managed_rules(rules, token, mode)
-	if not LeaseContract.is_valid_token(token) then
-		return nil, LeaseContract.invalid_token_error(token)
-	end
-	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then
-		return nil, "managed rule mode must be 'normal' or 'pause'"
-	end
+local function validate_managed_rule_graph(rules)
 	if not is_dense_array(rules) then return nil, "managed rules must be a dense array" end
 
 	local gated = {}
@@ -404,6 +397,24 @@ local function gate_managed_rules(rules, token, mode)
 			end
 		end
 	end
+	return true
+end
+
+--- Applies the exact lease after the raw graph has passed identity validation.
+--- @param rules table Independently owned rule graph.
+--- @param token string Canonical lease token.
+--- @param mode string Normal or paused mode.
+--- @return table|nil rules
+--- @return string|nil error_message
+local function gate_managed_rules(rules, token, mode)
+	if not LeaseContract.is_valid_token(token) then
+		return nil, LeaseContract.invalid_token_error(token)
+	end
+	if mode ~= MANAGED_MODE_NORMAL and mode ~= MANAGED_MODE_PAUSE then
+		return nil, "managed rule mode must be 'normal' or 'pause'"
+	end
+	local valid, validation_err = validate_managed_rule_graph(rules)
+	if not valid then return nil, validation_err end
 	local scoped, scope_err = scope_runtime_variable_references(rules, token)
 	if not scoped then return nil, scope_err end
 
@@ -427,6 +438,13 @@ local function gate_managed_rules(rules, token, mode)
 				name = revoked_name,
 				value = 0,
 			}
+			-- Timer callbacks outlive the original match. They must consult live
+			-- authority before starting a hold after pause, revocation or shutdown.
+			for _, event in ipairs(manipulator.to_if_held_down or {}) do
+				event.conditions = event.conditions or {}
+				event.conditions[#event.conditions + 1] = { type = "variable_if", name = mode_name, value = mode_value }
+				event.conditions[#event.conditions + 1] = { type = "variable_if", name = revoked_name, value = 0 }
+			end
 		end
 	end
 	return rules
@@ -503,6 +521,11 @@ local function apply_managed_timing_parameters(
 							rule_index,
 							manipulator_index
 						)
+					end
+					if manipulator.to_if_held_down and manipulator.to_delayed_action then
+						local threshold = manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+						manipulator.parameters["basic.to_if_held_down_threshold_milliseconds"] = threshold
+						manipulator.parameters["basic.to_delayed_action_delay_milliseconds"] = threshold
 					end
 				end
 				if has_simultaneous then
@@ -795,17 +818,21 @@ local function exact_modifier_manipulators(manipulator)
 	if not accepts_any_held_modifier(from.modifiers) then return { manipulator } end
 	local own = type(from.modifiers.mandatory) == "table" and from.modifiers.mandatory or {}
 
-	local to = manipulator.to
-	local last = type(to) == "table" and to[#to] or nil
-	if #own == 0 and type(last) == "table" and FLAG_KEY_CODES[last.key_code] then
-		local extended = {}
-		for _, event in ipairs(to) do extended[#extended + 1] = event end
+	--- Preserves hand modifiers after either immediate or timed hold output.
+	--- @param events table|nil To-event list.
+	--- @return table|nil output
+	local function with_restore_trailer(events)
+		local last = type(events) == "table" and events[#events] or nil
+		if #own ~= 0 or type(last) ~= "table" or not FLAG_KEY_CODES[last.key_code] then return events end
+		local extended = deep_copy(events)
 		extended[#extended + 1] = {
 			key_code   = NEVER_POSTED_KEY_CODE,
 			conditions = { { type = "expression_if", expression = NEVER_POSTED_EXPRESSION } },
 		}
-		to = extended
+		return extended
 	end
+	local to = with_restore_trailer(manipulator.to)
+	local held = with_restore_trailer(manipulator.to_if_held_down)
 
 	--- Builds one variant whose `from` requires the given modifiers.
 	--- @param modifiers table Karabiner from.modifiers.
@@ -814,6 +841,7 @@ local function exact_modifier_manipulators(manipulator)
 		local copy = deep_copy(manipulator)
 		copy.from.modifiers = modifiers
 		copy.to = deep_copy(to)
+		copy.to_if_held_down = deep_copy(held)
 		return copy
 	end
 
@@ -850,6 +878,25 @@ end
 --- @param rules table Owned production rule graph.
 local function rewrite_control_output(rules)
 	local function rewrite(value)
+		-- Capture historical graphs above this boundary. Only the deployed graph
+		-- notifies the current watcher, before each variable edge and before the
+		-- last held key; exact hand-modifier variants keep tags unambiguous.
+		local index = 1
+		while index <= #value do
+			local event = value[index]
+			local variable = type(event) == "table" and event.set_variable or nil
+			if type(variable) == "table" and variable.name == "capsword"
+				and (variable.value == 0 or variable.value == 1) then
+				local signal = variable.value == 1 and "capsword_activated" or "capsword_deactivated"
+				table.insert(value, index, {
+					key_code = LAYER_NAV_SENTINEL_NAME,
+					modifiers = ControlSignals.modifiers_for(signal),
+					["repeat"] = false,
+				})
+				index = index + 1
+			end
+			index = index + 1
+		end
 		local emits_control = value.key_code == LAYER_NAV_SENTINEL_NAME
 		if emits_control then value["repeat"] = false end
 		local sticky_index, sticky_count = nil, 0
@@ -915,8 +962,9 @@ end
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
+--- @param typing_priority boolean|nil False only when reconstructing historical rules.
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority)
 	hold_action = native_tap_only_hold(key_def.from.key_code, tap_action, hold_action)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
@@ -963,9 +1011,24 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	-- typed two keys for one tap. A "none" tap under a hold stays the native key,
 	-- typed on release.
 	local key_down_action = hold_action
+	local rollover_hold_var
 	if #hold_to == 0 then
 		key_down_action = tap_action
 		for _, ev in ipairs(tap_to) do to_events[#to_events + 1] = ev end
+	elseif typing_priority ~= false and Defaults.rollover_keys[key_def.id] and
+		same_output((#tap_to > 0) and tap_to or { { key_code = key_code } }, { { key_code = key_code } })
+		and not same_output(tap_to, hold_to) then
+		-- Karabiner cancels both timers at the next key-down. The canceled
+		-- branch emits the native tap first; a slow isolated hold still works.
+		rollover_hold_var = var_name .. "_rollover_hold"
+		to_events[#to_events + 1] = set_var_event(rollover_hold_var, 0)
+		local native_tap = { { key_code = key_code } }
+		manipulator.to_if_alone = native_tap
+		manipulator.to_delayed_action = { to_if_canceled = native_tap }
+		manipulator.to_if_held_down = { set_var_event(rollover_hold_var, 1) }
+		for _, ev in ipairs(hold_to) do
+			manipulator.to_if_held_down[#manipulator.to_if_held_down + 1] = deep_copy(ev)
+		end
 	else
 		for _, ev in ipairs(hold_to) do to_events[#to_events + 1] = ev end
 		local effective_tap_to = (#tap_to > 0) and tap_to or { { key_code = key_code } }
@@ -1017,9 +1080,17 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	-- set_variable=0
 	if key_down_action.karabiner_to_after_key_up then
 		for _, ev in ipairs(key_down_action.karabiner_to_after_key_up) do
-			after_key_up_tail[#after_key_up_tail + 1] = ev
+			local release = deep_copy(ev)
+			if rollover_hold_var then
+				release.conditions = release.conditions or {}
+				release.conditions[#release.conditions + 1] = {
+					type = "variable_if", name = rollover_hold_var, value = 1,
+				}
+			end
+			after_key_up_tail[#after_key_up_tail + 1] = release
 		end
 	end
+	if rollover_hold_var then after_key_up_tail[#after_key_up_tail + 1] = set_var_event(rollover_hold_var, 0) end
 	manipulator.to_after_key_up = after_key_up_tail
 	local manipulators = { manipulator }
 	if has_exact_modifier_action(tap_action, hold_action) then
@@ -1691,6 +1762,7 @@ function M.build_karabiner_json(
 	-- script-control sentinels need, so switching Tap-Holds off (like a pause)
 	-- must never cost the user the way back.
 	local tap_hold_feature_rules = {}
+	local legacy_tap_hold_rules = {}
 	-- Rules owned by the key-combinations switch (M.key_combinations_enabled).
 	-- They were Tap-Holds feature rules until the combinations got a switch
 	-- of their own, under Shortcuts.
@@ -1868,6 +1940,8 @@ function M.build_karabiner_json(
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms)
 		if rule then
 			all_rules[#all_rules + 1] = rule
+			-- Historical ownership evidence must retain the pre-timer graph.
+			legacy_tap_hold_rules[rule] = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms, false)
 			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
 				tap_hold_feature_rules[rule] = true
 				tap_hold_rule_of[key_def.from.key_code] = { rule = rule, key_def = key_def }
@@ -1885,7 +1959,7 @@ function M.build_karabiner_json(
 	local legacy_rules = {}
 	for index, rule in ipairs(all_rules) do
 		if rule ~= nav_rule then
-			local legacy_rule = deep_copy(rule)
+			local legacy_rule = deep_copy(legacy_tap_hold_rules[rule] or rule)
 			strip_exit_sentinels(legacy_rule)
 			legacy_rules[#legacy_rules + 1] = legacy_rule
 		end
@@ -1958,6 +2032,10 @@ function M.build_karabiner_json(
 		all_rules = kept
 	end
 
+	-- Native control expansion detaches manipulators, so reject aliased source
+	-- graphs first instead of accidentally hiding the decoder's identity error.
+	local control_graph_valid, control_graph_err = validate_managed_rule_graph(all_rules)
+	if not control_graph_valid then return nil, control_graph_err end
 	rewrite_control_output(all_rules)
 
 	-- A single deployed config contains both pause states. Pause and resume only

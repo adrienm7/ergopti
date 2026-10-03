@@ -77,8 +77,8 @@ local function load_inference_constants()
 		if fh then
 			local raw = fh:read("*a")
 			fh:close()
-			local ok, parsed = pcall(hs.json.decode, raw)
-			if ok and type(parsed) == "table" then
+			local parsed, decode_err = JsonCodec.decode(raw)
+			if decode_err == nil and type(parsed) == "table" then
 				Logger.debug(LOG, "Loaded inference constants from %s.", p)
 				return parsed
 			end
@@ -173,7 +173,7 @@ function M.get_retry_policy()
 end
 
 --- Returns the stop-sequence array for the given backend variant.
---- Reads directly from the INFERENCE table (arrays survive hs.json.decode natively).
+--- Reads directly from the INFERENCE tree returned by the JSON codec.
 --- Falls back to FALLBACK on a missing key so a corrupt inference.json never
 --- leaves the engine with a nil stop list.
 --- @param variant string One of "batch", "line".

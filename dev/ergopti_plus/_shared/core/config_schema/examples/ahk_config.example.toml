@@ -535,62 +535,34 @@ ergopti_base = true
 direct_access_digits = true
 ergopti_alt_gr = true
 ergopti_plus = true
-# ==========================================
-# ===== 6.3 shortcuts.alt_gr_caps_lock =====
-# ==========================================
+# ==============================================
+# ===== 6.3 shortcuts.key_combination_taps =====
+# ==============================================
 
-[shortcuts.alt_gr_caps_lock]
-backspace = false
-caps_lock = false
-caps_word = false
-ctrl_backspace = false
-ctrl_delete = true
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
+# « Combinaisons de touches »: the action a tap-hold key runs on a tap while
+# another one is held, keyed by « first_then_second » (the key held first,
+# then the key struck under it). Any ordered pair of tap-hold keys may be set.
+[shortcuts.key_combination_taps]
+alt_gr_then_caps_lock = "ctrl_delete"
+alt_gr_then_left_alt = "ctrl_backspace"
+left_alt_then_caps_lock = "caps_word"
 
 
 
-# =====================================
-# ===== 6.4 shortcuts.alt_gr_lalt =====
-# =====================================
+# ===============================================
+# ===== 6.4 shortcuts.key_combination_holds =====
+# ===============================================
 
-[shortcuts.alt_gr_lalt]
-backspace = false
-caps_lock = false
-caps_word = false
-ctrl_backspace = true
-ctrl_delete = false
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
-
-
-
-# ========================================
-# ===== 6.5 shortcuts.lalt_caps_lock =====
-# ========================================
-
-[shortcuts.lalt_caps_lock]
-backspace = false
-caps_lock = false
-caps_word = true
-ctrl_backspace = false
-ctrl_delete = false
-delete = false
-enter = false
-escape = false
-one_shot_shift = false
-tab = false
+# What the second key of a pair holds while it stays down: a modifier
+# combination or a layer of the tap-hold hold picker ("ctrl", "ctrl+shift",
+# "nav"...). Absent: the pair holds nothing.
+[shortcuts.key_combination_holds]
+caps_lock_then_left_alt = "shift"
 
 
 
 # ==================================
-# ===== 6.6 shortcuts.personal =====
+# ===== 6.5 shortcuts.personal =====
 # ==================================
 
 [shortcuts.personal]
@@ -603,7 +575,7 @@ programmable_keyboard = true
 
 
 # ========================================
-# ===== 6.7 shortcuts.script_control =====
+# ===== 6.6 shortcuts.script_control =====
 # ========================================
 
 [shortcuts.script_control]
@@ -615,7 +587,7 @@ script_altgr_escape = "script_quit"
 
 
 # ====================================
-# ===== 6.7.1 shortcuts.tap_keys =====
+# ===== 6.6.1 shortcuts.tap_keys =====
 # ====================================
 
 # The number-row keys tapped alone: any action id, or "none" to keep the key's
@@ -633,7 +605,7 @@ tap_key__number_row_right_2__send_shortcut = "primary+a"
 
 
 # ========================
-# ===== 6.8 gestures =====
+# ===== 6.7 gestures =====
 # ========================
 
 # AHK vocabulary is limited to Windows Precision Touchpad gestures (3/4 fingers).

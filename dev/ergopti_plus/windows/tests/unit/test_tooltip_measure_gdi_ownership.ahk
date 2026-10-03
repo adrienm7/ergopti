@@ -37,9 +37,9 @@ class _TMGO_Native {
 		return 96
 	}
 
-	static CreateFont(HeightPx, FontName) {
+	static CreateFont(HeightPx, FontName, Bold := false) {
 		this.CreateCount += 1
-		this.Events.Push("create-font:" . HeightPx)
+		this.Events.Push("create-font:" . HeightPx . ":" . FontName . ":" . (Bold ? "bold" : "regular"))
 		return 301
 	}
 
@@ -149,3 +149,65 @@ _TMGO_RefusedReleaseBlocksAllocationUntilDebtClears() {
 }
 Test("tooltip measurement GDI: refused cleanup blocks allocations until retry (tooltip-measure-gdi-ownership)",
 	_TMGO_RefusedReleaseBlocksAllocationUntilDebtClears)
+
+_TMGO_CacheOwnsEveryFontIdentity() {
+	global _TooltipMeasureGdiCleanupDebt, _TOOLTIP_FONT_NAME
+	SavedDebt := _TooltipMeasureGdiCleanupDebt, SavedName := _TOOLTIP_FONT_NAME
+	_TooltipMeasureGdiCleanupDebt := []
+	try {
+		_TMGO_Native.Reset()
+		Cache := Map()
+		_TOOLTIP_FONT_NAME := "First family"
+		_TooltipMeasureTextSize("regular", 12, _TMGO_Native, Cache, false)
+		_TooltipMeasureTextSize("bold", 12, _TMGO_Native, Cache, true)
+		_TooltipMeasureTextSize("bold again", 12, _TMGO_Native, Cache, true)
+		_TOOLTIP_FONT_NAME := "Second family"
+		_TooltipMeasureTextSize("another family", 12, _TMGO_Native, Cache, false)
+		AssertEqual(3, Cache.Count, "font family and weight are distinct cache identities")
+		AssertEqual(3, _TMGO_Native.CreateCount, "repeated bold measurement reuses only the same font")
+		AssertEqual(1, _TMGO_CountEvent(_TMGO_Native.Events, "create-font:-16:First family:regular"))
+		AssertEqual(1, _TMGO_CountEvent(_TMGO_Native.Events, "create-font:-16:First family:bold"))
+		AssertEqual(1, _TMGO_CountEvent(_TMGO_Native.Events, "create-font:-16:Second family:regular"))
+		AssertEqual(4, _TMGO_CountEvent(_TMGO_Native.Events, "release-dc:201"),
+			"every new identity and cache hit still settle their measurement DC")
+		AssertEqual(0, _TooltipMeasureGdiCleanupDebt.Length)
+	} finally {
+		_TOOLTIP_FONT_NAME := SavedName
+		_TooltipMeasureGdiCleanupDebt := SavedDebt
+	}
+}
+Test("tooltip measurement GDI: font cache identity includes family and bold weight",
+	_TMGO_CacheOwnsEveryFontIdentity)
+
+; Actual native fonts are created in a private cache and deleted in finally.
+; The production process-lifetime cache is never replaced or borrowed here.
+_TMGO_NativeFontWeightsHaveSeparateHandles() {
+	Cache := Map()
+	Released := []
+	try {
+		Regular := _TooltipMeasureTextSize("Regular font", 12, , Cache, false)
+		Bold := _TooltipMeasureTextSize("Bold font", 12, , Cache, true)
+		AssertEqual(2, Cache.Count, "actual regular/bold native handles must be independently owned")
+		Weights := Map(), Handles := Map()
+		for Key, Font in Cache {
+			LogFont := Buffer(92, 0)
+			AssertEqual(92, DllCall("Gdi32\GetObjectW", "Ptr", Font,
+				"Int", LogFont.Size, "Ptr", LogFont, "Int"), "the actual cached font must expose LOGFONTW")
+			Weights[NumGet(LogFont, 16, "Int")] := true
+			Handles[Font] := true
+		}
+		AssertEqual(2, Handles.Count, "native bold cannot reuse the regular HFONT")
+		AssertTrue(Weights.Has(400), "FW_NORMAL is painted with regular weight")
+		AssertTrue(Weights.Has(700), "FW_BOLD is painted with bold weight")
+		Assert(Regular.W > 0 && Bold.W > 0 && Regular.H > 0 && Bold.H > 0,
+			"both weights produce real nonempty geometry")
+	} finally {
+		for Key, Font in Cache
+			Released.Push(_TooltipMeasureGdiNative.DeleteObject(Font))
+	}
+	AssertEqual(2, Released.Length)
+	for Acknowledged in Released
+		AssertTrue(Acknowledged, "the isolated native font must acknowledge deletion")
+}
+Test("tooltip measurement GDI: actual regular and bold fonts own different acknowledged handles",
+	_TMGO_NativeFontWeightsHaveSeparateHandles)

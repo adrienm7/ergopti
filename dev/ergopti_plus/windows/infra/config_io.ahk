@@ -912,6 +912,24 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 		"the '" . V1Cat . "' section toggle")
 }
 
+/**
+ * Publishes the dynamic families through the conditional reload journal.
+ * This category follows the Hotstrings master and owns no additional gate.
+ * @param {Integer} Enabled Explicit Boolean posture for every dynamic family.
+ * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ */
+HotstringsDynamicScopeApply(Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	Operations() {
+		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
+			throw TypeError("A dynamic hotstring scope requires an explicit Boolean target.")
+		return _ConfigBuildHotstringIntentPlan("dynamic", "", Enabled).updates
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
 ; Select one language pack in a single transaction without changing its masters.
 ToggleLanguageAllSections(Pack, Enable) {
 	return _ConfigCommitHotstringIntent("language", Pack, Enable,
@@ -950,6 +968,11 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 				throw Error("Unknown hotstring category: " . Selector)
 			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
 				Entries.Push(Map("path", Entry["path"], "value", Bool))
+		case "dynamic":
+			; Discover the canonical families inside the admitted lease, independent
+			; of a menu preview or the mixed legacy tray map. There is no extra gate.
+			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
+				Entries.Push(Map("path", Entry["path"], "value", Bool))
 		case "language":
 			for Category in Selector["categories"] {
 				for Entry in ManifestFeaturesForSection("hotstrings." . Category["v2"])
@@ -959,7 +982,8 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
 			if PersonalPath == "" || !FSExists(PersonalPath)
 				throw Error("Personal hotstring configuration is unavailable.")
-			for Section in ReadPersonalToml()["sections_order"] {
+			; A menu preview must not freeze a later admitted scope inventory.
+			for Section in ReadPersonalToml(true)["sections_order"] {
 				if Section == "-"
 					continue
 				_ConfigSeedPersonalHotstring(Desired, Section)
@@ -1411,7 +1435,7 @@ _ConfigResetShowFailure(ReasonKey, Result := 0) {
 			? Result["kind"] : "malformed_result"
 		Reason := Format(Reason, Status, Kind)
 	}
-	try MsgBox(Format(t("dialog.reset_defaults.failed"), Reason),
+	try Ui_MsgBox(Format(t("dialog.reset_defaults.failed"), Reason),
 		t("dialog.reset_defaults.failed_title"), "Iconx")
 }
 
@@ -1885,7 +1909,10 @@ KeyboardSlotRows() {
 		return Rows
 }
 
-/** Removes custom keyboard slots accepted by this persistence owner's grammar. */
+/**
+ * Removes the custom keyboard slots accepted by this persistence owner's
+ * grammar, and the key-combination slots the manifest does not declare.
+ */
 ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 	global KeyboardShortcutAssignments
 	if ScopeId != "shortcuts" || !(Mode == "recommended" || Mode == "clear")
@@ -1900,5 +1927,7 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 			continue
 		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
 	}
+	for Row in KeyCombinationScopeRows()
+		Rows.Push(Row)
 	return Rows
 }

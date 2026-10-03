@@ -1,0 +1,16 @@
+[_meta]
+schema_version = 2
+
+[source]
+choice = true
+
+[settings]
+scalar = "future owner"
+disabled = false
+array = ["future", "values"]
+numeric = 42
+
+[settings.existing.child]
+color = "keep"
+
+[settings.empty]

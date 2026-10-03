@@ -21,6 +21,7 @@ local Paths = require("infra.paths")
 local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 
 --- Monotonic milliseconds for webview open, load and close durations.
 --- @return number
@@ -29,9 +30,8 @@ local function now_ms()
 end
 local LOG = "ui_builder"
 
--- Product name and separator of every webview window title (see M.window_title).
-local WINDOW_TITLE_PRODUCT = "ErgoptiPlus"
-local WINDOW_TITLE_SEPARATOR = " — "
+-- The generated shared policy owns branding for every native host.
+local WindowTitles = require("window_titles")
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -388,8 +388,8 @@ local function load_apps_manifest()
 	end
 	local content = fh:read("*a")
 	fh:close()
-	local ok_j, data = pcall(hs.json.decode, content)
-	if not ok_j or type(data) ~= "table" or type(data.apps) ~= "table" then
+	local data, decode_err = JsonCodec.decode(content)
+	if decode_err ~= nil or type(data) ~= "table" or type(data.apps) ~= "table" then
 		Logger.error(LOG, "Failed to parse apps.manifest.json.")
 		return nil
 	end
@@ -593,8 +593,7 @@ end
 --- @param title string|nil Brand-less, already-translated title.
 --- @return string
 function M.window_title(title)
-	if type(title) ~= "string" or title == "" then return WINDOW_TITLE_PRODUCT end
-	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. title
+	return WindowTitles.compose(title)
 end
 
 --- Retitles an open webview, e.g. after a live language switch.

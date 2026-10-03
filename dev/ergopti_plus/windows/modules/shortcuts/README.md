@@ -17,23 +17,20 @@ No domain spec directly consumed. The module reads its enabled state from the sh
 
 ## Public API (per sub-module)
 
-| File                 | Entry point / Description                                                    |
-| -------------------- | ---------------------------------------------------------------------------- |
-| `altgr.ahk`          | AltGr+LAlt and AltGr+CapsLock combo dispatchers (10 configurable slots each) |
-| `capslock.ahk`       | CapsLock remap and CapsWord activation                                       |
-| `lalt.ahk`           | LAlt tap-to-modifier shortcuts (nav, app launch, window ops)                 |
-| `lshift_lctrl.ahk`   | LShift+LCtrl chord shortcuts                                                 |
-| `one_shot_shift.ahk` | One-shot capitalisation on tap, sticky shift on double-tap                   |
-| `nav_layer.ahk`      | Full navigation layer hotkeys (included by `tap_holds`)                      |
-| `base_modifier.ahk`  | Shared modifier-remapping helpers                                            |
+| File                 | Entry point / Description                                    |
+| -------------------- | ------------------------------------------------------------ |
+| `capslock.ahk`       | CapsLock remap and CapsWord activation                       |
+| `lalt.ahk`           | LAlt tap-to-modifier shortcuts (nav, app launch, window ops) |
+| `lshift_lctrl.ahk`   | LShift+LCtrl chord shortcuts                                 |
+| `one_shot_shift.ahk` | One-shot capitalisation on tap, sticky shift on double-tap   |
+| `nav_layer.ahk`      | Full navigation layer hotkeys (included by `tap_holds`)      |
 
 ## Init pattern
 
 ```ahk
 ; Included by ErgoptiPlus.ahk after onboarding
-#Include modules/shortcuts/altgr.ahk
 #Include modules/shortcuts/capslock.ahk
 ; …etc.
 ```
 
-AltGr bindings are registered dynamically after onboarding (not at parse time). That is not what keeps native AltGr in the wizard window: the `~SC138 & ~F24` anchor in `platform/remap/altgr.ahk` makes `SC138` a prefix key from parse time, every AltGr combination is false while the wizard is up (`IsRealAltGrPress`), and AutoHotkey, which reads `SC138` as the RAlt modifier, never suppresses a modifier prefix that no variant fires for. Non-ASCII glyphs in string literals use `Chr(0xNNNN)` to avoid encoding regressions.
+The key combinations (AltGr then LAlt, LAlt then CapsLock, any ordered pair of tap-hold keys) are not here: their slots and their handler are `infra/key_combinations.ahk`, their hotkeys `platform/remap/key_combination_keys.ahk`. Native AltGr in the wizard window comes from the `~SC138 & ~F24` anchor in `platform/remap/altgr.ahk` makes `SC138` a prefix key from parse time, every AltGr combination is false while the wizard is up (`IsRealAltGrPress`), and AutoHotkey, which reads `SC138` as the RAlt modifier, never suppresses a modifier prefix that no variant fires for. Non-ASCII glyphs in string literals use `Chr(0xNNNN)` to avoid encoding regressions.

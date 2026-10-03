@@ -66,7 +66,25 @@ FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 	if (Parts.Length < 1)
 		return false
 
-	Node := FeaturesMap
+	return _FeatureLocateParts(FeaturesMap, Parts, Prop)
+}
+
+; Read-only intent lookup selects one root without cloning the entire view.
+FeatureDesiredLocateV2(FeaturesSource, V2Path) {
+	if !(FeaturesSource is Map)
+		return false
+	Parts := StrSplit(V2Path, ".")
+	if !Parts.Length
+		return false
+	Desired := MasterGateState()
+	Root := Parts[1]
+	Source := Desired["initialized"] && (Root == "layout" || Root == "shortcuts" || Root == "hotstrings")
+		&& Desired["features"].Has(Root) ? Desired["features"] : FeaturesSource
+	return _FeatureLocateParts(Source, Parts, "")
+}
+
+; Canonical traversal keeps plain leaves and alpha-property path semantics alike.
+_FeatureLocateParts(Node, Parts, Prop) {
 	Parent := false
 	LastKey := ""
 	Idx := 0
@@ -267,7 +285,7 @@ ReadFeatureStateV2(V2Path) {
 	State := Map()
 	if !IsSet(Features) or !(Features is Map)
 		return State
-	Loc := FeatureLocateV2(MasterGateDesiredFeatures(Features), V2Path)
+	Loc := FeatureDesiredLocateV2(Features, V2Path)
 	if (Loc == false)
 		return State
 	Node := Loc["v2_node"]
@@ -285,49 +303,4 @@ ReadFeatureStateV2(V2Path) {
 			State["enabled"] := (Node[K] = true)
 	}
 	return State
-}
-
-
-
-
-
-; ===========================================
-; ===========================================
-; ======= 3/ Mutex sibling resolution =======
-; ===========================================
-; ===========================================
-
-; The three Shortcuts modifier-combo sub-Maps are mutually exclusive: a single
-; chord (AltGr+LAlt, AltGr+CapsLock, LAlt+CapsLock) can be bound to exactly one
-; action, so enabling one key must force every sibling key in the same group
-; off. Their v2 ids match the manifest section headers consumed below.
-global _FEATURE_MUTEX_GROUPS := Map(
-	"alt_gr_lalt",      true,
-	"alt_gr_caps_lock", true,
-	"lalt_caps_lock",   true,
-)
-
-; Return the v2 paths of the sibling keys that must be forced false when the
-; user enables ``V2Path``. Empty list = no mutex semantics (independent toggle).
-; Siblings are enumerated from the manifest section itself, so the set is always
-; exactly the group's declared keys — no hand-maintained sibling table.
-; @param V2Path  Canonical v2 path (e.g. "shortcuts.alt_gr_lalt.backspace").
-; @return        Array of sibling v2 paths (shortcuts.<group>.<key>).
-_MutexSiblingPathsForV2(V2Path) {
-	global _FEATURE_MUTEX_GROUPS
-	Parts := StrSplit(V2Path, ".")
-	if (Parts.Length != 3 or Parts[1] != "shortcuts" or !_FEATURE_MUTEX_GROUPS.Has(Parts[2])) {
-		return []
-	}
-	GroupSection := "shortcuts." . Parts[2]
-	CurrentKey := Parts[3]
-	Siblings := []
-	for _, Entry in ManifestFeaturesForSection(GroupSection) {
-		EParts := StrSplit(Entry["path"], ".")
-		SibKey := EParts[EParts.Length]
-		if (SibKey != CurrentKey) {
-			Siblings.Push(GroupSection . "." . SibKey)
-		}
-	}
-	return Siblings
 }

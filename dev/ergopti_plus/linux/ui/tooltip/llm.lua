@@ -11,7 +11,9 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Config = require("ui.tooltip.config")
 local DisplaySettings = require("modules.llm.display_settings")
+local LlmLine = require("tooltip.llm_line")
 
 local LOG = "ui.tooltip.llm"
 
@@ -38,27 +40,79 @@ local function validation_label(index, modifiers)
 	return prefix ~= "" and (prefix .. "+" .. digit) or digit
 end
 
+--- The pieces a candidate's line reads, each with its role.
+---
+--- A parsed prediction carries its own (the typed tail, the corrections, the
+--- next words). A candidate that is only text to type — a screen answer, a
+--- translation — is one piece: a correction when it replaces the selection,
+--- a continuation otherwise.
+--- @param candidate table
+--- @param active boolean
+--- @return table Array of { text, role, bold }.
+local function line_segments(candidate, active)
+	local segments = LlmLine.segments(candidate, active)
+	if #segments > 0 then return segments end
+	local text = candidate.to_type:gsub("^%s+", "")
+	if text == "" then return segments end
+	return { {
+		text = text,
+		role = candidate.replaces_selection == true and "corrected" or "next",
+		bold = false,
+	} }
+end
+
 --- Builds renderer rows without touching GTK.
---- @param candidates table Array of { to_type = string }.
+---
+--- A prediction row is a prefix and coloured segments, as on macOS: the mark
+--- in front of the selected line, the typed text grey, the corrections green
+--- and the continuation orange on it, every other line grey, and the
+--- validation chord after each line.
+--- @param candidates table Array of { to_type, chunks?, nw?, has_corrections? }.
 --- @param active_index integer
 --- @param meta table { model?, profile?, validation_modifiers?, loading? }
 --- @return table
 function M.build_rows(candidates, active_index, meta)
 	meta = type(meta) == "table" and meta or {}
 	local rows = {}
-	local indent = DisplaySettings.get("pred_indent") or 0
-	local active_prefix = indent < 0 and string.rep(" ", -indent) or ""
-	local inactive_prefix = indent > 0 and string.rep(" ", indent) or ""
+	local shown = {}
 	for index, candidate in ipairs(candidates or {}) do
 		local text = type(candidate) == "table" and candidate.to_type or nil
 		if type(text) == "string" and text ~= "" then
-			local active = index == active_index
-			rows[#rows + 1] = {
-				text = (active and active_prefix or inactive_prefix) .. text,
-				label = validation_label(index, meta.validation_modifiers),
-				dimmed = not active,
+			shown[#shown + 1] = { index = index, candidate = candidate }
+		end
+	end
+
+	local chrome = #shown > 0 and Config.llm_line() or nil
+	local selected_prefix, unselected_prefix
+	if chrome then
+		selected_prefix, unselected_prefix = LlmLine.prefixes(
+			DisplaySettings.get("pred_indent") or 0, #shown, chrome.mark, chrome.align)
+	end
+	for _, entry in ipairs(shown) do
+		local active = entry.index == active_index
+		local segments = {}
+		for _, segment in ipairs(line_segments(entry.candidate, active)) do
+			segments[#segments + 1] = {
+				text = segment.text,
+				role = segment.role,
+				bold = segment.bold,
+				color = active and chrome.colors[segment.role] or chrome.colors.typed,
 			}
 		end
+		segments[#segments + 1] = {
+			text = chrome.label_gap .. validation_label(entry.index, meta.validation_modifiers),
+			role = "label",
+			small = true,
+			color = active and chrome.colors.label_selected or chrome.colors.label_unselected,
+		}
+		rows[#rows + 1] = {
+			-- The mark is drawn on the selected line only; elsewhere the prefix
+			-- is spacing, of the width its characters would take.
+			prefix = active and selected_prefix or unselected_prefix,
+			prefix_color = active and chrome.colors.cursor or nil,
+			segments = segments,
+			selected = active,
+		}
 	end
 	if meta.loading == true and #rows == 0 then
 		rows[1] = { text = "…", label = "", dimmed = true }

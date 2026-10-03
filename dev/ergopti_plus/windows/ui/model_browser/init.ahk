@@ -115,7 +115,7 @@ _LLM_ModelBrowser_Build() {
 	; variable has not been assigned a value" the first time the menu
 	; fires. ``g`` (matching the convention used elsewhere in the driver)
 	; sidesteps the collision entirely.
-	g := Gui("+Resize +MinSize720x420", t("menu.llm.browse_models_title"))
+	g := Gui_Create("+Resize +MinSize720x420", t("menu.llm.browse_models_window_title"))
 	g.OnEvent("Close", _LLM_ModelBrowser_OnClose)
 	g.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
 	g.MarginX := 10
@@ -382,7 +382,7 @@ _LLM_ModelBrowser_ShowWeb() {
 		Critical(EpochCritical)
 	}
 
-	g := Gui("+Resize +MinSize780x460", t("model_browser.window_title"))
+	g := Gui_Create("+Resize +MinSize780x460", t("model_browser.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0

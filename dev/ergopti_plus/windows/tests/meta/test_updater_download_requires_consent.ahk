@@ -6,10 +6,12 @@
 ; The updater may check for releases in the background and on demand, but it
 ; must download only after the user explicitly chose to install. A "Check for
 ; updates" click used to download, swap and restart on a newer release at once
-; (updater-consent-2026-09-25). Three consent points remain: the update prompt's
+; (updater-consent-2026-09-25). Explicit consent points are the update prompt's
 ; Install button, the tray row that already names the release it installs
-; ("Update to vX", the "available" state of Updater_OneClickUpdate), and the
-; update-check window's Update button, which installs the release it shows.
+; ("Update to vX", the "available" state of Updater_OneClickUpdate), the
+; update-check window's Update button, and the native/shared Versions windows'
+; explicit Install buttons. The latter first back up the configuration and
+; reach the download through their observed-install ports.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -25,11 +27,41 @@ _UDRC_CountCalls(Body, Callee) {
 	return Count
 }
 
+; Every audited caller must remain present, and no other caller is admitted.
+_UDRC_OnlyAuditedDownloadCalls(Code, Bodies) {
+	Audited := 0
+	for _, Body in Bodies {
+		Calls := _UDRC_CountCalls(Body, "Updater_DownloadAndInstall")
+		if (Calls != 1)
+			return false
+		Audited += Calls
+	}
+	return Audited == _UDRC_CountCalls(Code, "Updater_DownloadAndInstall")
+}
+
+_UDRC_ConsentCensusRejectsUnauditedCalls() {
+	Call := "Updater_DownloadAndInstall(Release, Request)"
+	AssertTrue(_UDRC_OnlyAuditedDownloadCalls(Call . "`n" . Call, [Call, Call]),
+		"all audited consent paths are accepted")
+	AssertFalse(_UDRC_OnlyAuditedDownloadCalls(Call . "`n" . Call . "`n" . Call, [Call, Call]),
+		"an extra background download cannot disappear behind an updated census")
+	AssertFalse(_UDRC_OnlyAuditedDownloadCalls(Call, [Call, ""]),
+		"a missing consent path cannot leave the guard vacuous")
+}
+Test("updater: consent census rejects an extra download and a missing caller",
+	_UDRC_ConsentCensusRejectsUnauditedCalls)
+
 _UDRC_DownloadStartsOnlyFromConsent() {
 	Src := _DriverSourceConcat()
 	Assert(Src != "", "the driver source must be readable")
 	Code := _DriverMaskNonCode(&Src)
-	Total := _UDRC_CountCalls(Code, "Updater_DownloadAndInstall")
+	Bodies := []
+	for Name in ["_Updater_InstallPromptRelease", "_Updater_ActivateCachedRelease",
+		"_Updater_StartObservedInstall", "_CLW_StartUpdatePath"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", "the audited consent caller must exist: " . Name)
+		Bodies.Push(Body)
+	}
 	Prompt := _DriverFuncBody("_Updater_InstallPromptRelease")
 	Activate := _DriverFuncBody("_Updater_ActivateCachedRelease")
 	Assert(Prompt != "" && Activate != "", "both consent points must exist")
@@ -37,8 +69,16 @@ _UDRC_DownloadStartsOnlyFromConsent() {
 		"the prompt's Install button must start the download")
 	AssertEqual(1, _UDRC_CountCalls(Activate, "Updater_DownloadAndInstall"),
 		"the named 'Update to vX' row must start the download")
-	AssertEqual(2, Total,
-		"no other code may start an update download: a check must stop at the consent prompt")
+	AssertTrue(_UDRC_OnlyAuditedDownloadCalls(Code, Bodies),
+		"only the four audited consent ports may start a download; checks stop before consent")
+	AssertEqual(1, _UDRC_CountCalls(Code, "_Updater_StartObservedInstall"),
+		"only the native Versions window's install port may start its observed update")
+	AssertEqual(1, _UDRC_CountCalls(_DriverFuncBody("_Updater_InstallChosenRelease"), "_Updater_StartObservedInstall"),
+		"the native Versions install button owns the observed update port")
+	AssertEqual(1, _UDRC_CountCalls(Code, "_CLW_StartUpdatePath"),
+		"only the shared Versions window's install port may start its observed update")
+	AssertEqual(1, _UDRC_CountCalls(_DriverFuncBody("_CLW_InstallDeps"), "_CLW_StartUpdatePath"),
+		"the shared Versions window owns its observed update port")
 
 	Publish := _DriverFuncBody("_Updater_PublishOneClickRelease")
 	Assert(Publish != "", "_Updater_PublishOneClickRelease must exist")

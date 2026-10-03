@@ -1,0 +1,40 @@
+{
+	"description": "Independent number-row expectations read from the French/US Windows layouts and the checked-in Ergo-L XML. Never regenerate expected levels from the production resolver. Native plain expectations describe CapsLock off; Ergo-L expectations apply with CapsLock off or on.",
+	"digits": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+	"scancodes": [
+		"SC002",
+		"SC003",
+		"SC004",
+		"SC005",
+		"SC006",
+		"SC007",
+		"SC008",
+		"SC009",
+		"SC00A",
+		"SC00B"
+	],
+	"native": [
+		{
+			"id": "azerty",
+			"klid": "0000040C",
+			"plain": ["&", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"swapped": true
+		},
+		{
+			"id": "qwerty",
+			"klid": "00000409",
+			"plain": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"shift": ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+			"swapped": false
+		}
+	],
+	"emulated": {
+		"id": "ergol",
+		"plain": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+		"shift": ["€", "«", "»", "$", "%", "^", "&", "*", "#", "@"],
+		"altgr": ["₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉", "₀"],
+		"altgr_shift": ["¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹", "⁰"],
+		"swapped": false
+	}
+}

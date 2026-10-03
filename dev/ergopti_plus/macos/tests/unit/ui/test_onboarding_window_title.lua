@@ -103,6 +103,26 @@ helpers.describe("onboarding window title", function()
 end)
 
 helpers.describe("ui_builder window title", function()
+	helpers.it("(shared-window-titles) layout and navigation captions use every shipped translation", function()
+		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local Json = require("json")
+		local file = assert(io.open(helpers.shared("data/locale_order.json"), "r"))
+		local locales = Json.decode(file:read("*a")).order
+		file:close()
+		helpers.assert_eq(#locales, 21)
+		for _, locale in ipairs(locales) do
+			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "r"))
+			local strings = Json.decode(file:read("*a"))
+			file:close()
+			for _, key in ipairs({ "layout_manager.window_title", "layer_editor.window_title" }) do
+				local applied
+				local view = { windowTitle = function(_, value) applied = value end }
+				helpers.assert_true(ui_builder.set_window_title(view, strings[key]))
+				helpers.assert_eq(applied, "ErgoptiPlus — " .. strings[key], locale .. " " .. key)
+			end
+		end
+	end)
+
 	helpers.it("(onboarding-window-title) the product name is prefixed exactly once", function()
 		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
 		local title = ui_builder.window_title("Setup")

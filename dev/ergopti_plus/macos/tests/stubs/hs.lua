@@ -33,10 +33,77 @@ local NATIVE_OS_EXECUTE = os.execute
 
 local SETTINGS_STORE = {}
 
+--- Converts valid acyclic settings values at the native ownership boundary.
+--- Hammerspoon 1.1.1's settings binding snapshots through toNSObjectAtIndex
+--- on set and calls pushNSObject on every get. LuaSkin allocates a fresh
+--- equality cache for each push, so equal arrays or objects alias inside a
+--- read, while separate reads and the persisted snapshot stay independent.
+--- Cyclic and unsupported fixture values fail loudly here: their native
+--- conversion/error policy is outside this stub's supported contract.
+--- @param value any Valid acyclic settings value.
+--- @param native_read boolean Whether to model LuaSkin's per-read equality cache.
+--- @return any graph
+local function settings_value_graph(value, native_read)
+	local active, copied, canonical, interned = {}, {}, {}, {}
+	local function value_key(candidate)
+		local kind = type(candidate)
+		if kind == "table" then return canonical[candidate] end
+		if kind == "number" then
+			local integer = math.tointeger(candidate)
+			return "n" .. (integer and tostring(integer) or string.format("%.17g", candidate))
+		end
+		if kind == "string" then return "s" .. string.format("%q", candidate) end
+		return kind:sub(1, 1) .. tostring(candidate)
+	end
+	local copy
+	copy = function(candidate)
+		local kind = type(candidate)
+		if kind ~= "table" then
+			assert(kind == "nil" or kind == "string" or kind == "number" or kind == "boolean",
+				"settings stub only supports ordinary acyclic settings values")
+			return candidate
+		end
+		assert(not active[candidate], "settings stub does not model cyclic native conversions")
+		if copied[candidate] then return copied[candidate] end
+		active[candidate] = true
+		local graph, count, maximum = {}, 0, 0
+		for key, child in pairs(candidate) do
+			graph[copy(key)] = copy(child)
+			count = count + 1
+			if type(key) == "number" and math.type(key) == "integer" and key > maximum then
+				maximum = key
+			end
+		end
+		active[candidate] = nil
+		if native_read then
+			local parts = {}
+			if maximum == count then
+				for index = 1, count do parts[index] = value_key(graph[index]) end
+			else
+				for key, child in pairs(graph) do
+					parts[#parts + 1] = value_key(key) .. "=" .. value_key(child)
+				end
+				table.sort(parts)
+			end
+			local identity = (maximum == count and "a[" or "o{") .. table.concat(parts, ",")
+				.. (maximum == count and "]" or "}")
+			canonical[graph] = identity
+			if interned[identity] then graph = interned[identity] else interned[identity] = graph end
+		end
+		copied[candidate] = graph
+		return graph
+	end
+	return copy(value)
+end
+
 M.settings = {
-	get = function(key) return SETTINGS_STORE[key] end,
-	set = function(key, value) SETTINGS_STORE[key] = value end,
-	clear = function(key) SETTINGS_STORE[key] = nil end,
+	get = function(key) return settings_value_graph(SETTINGS_STORE[key], true) end,
+	set = function(key, value) SETTINGS_STORE[key] = settings_value_graph(value, false) end,
+	clear = function(key)
+		local existed = SETTINGS_STORE[key] ~= nil
+		SETTINGS_STORE[key] = nil
+		return existed
+	end,
 	__store = SETTINGS_STORE,
 }
 
@@ -82,20 +149,49 @@ M.timer = {
 	-- absoluteTime returns nanoseconds since an arbitrary epoch, matching macOS semantics
 	absoluteTime = function() return math.floor(os.clock() * 1e9) end,
 	usleep = function(_) end,
-	-- delayed is a one-shot timer that can be restarted/stopped by the caller
+	-- Native delayed timers retain a repeating timer whose next fire date is
+	-- moved on every start. Keep the inspectable registry entry separate from
+	-- the handle, whose running field must be a method rather than an arm bit.
 	delayed = {
 		new = function(delay, fn)
-			local t = make_timer(delay, fn, false)
-			t.running = false  -- delayed timers don't auto-run until setDelay/start
-			function t:setDelay(d) self.delay = d end
-			function t:start(next_delay)
-				if next_delay ~= nil then self.delay = next_delay end
-				self.running = true
+			local default_delay = delay
+			local entry = make_timer(delay, fn, false)
+			entry.running = false
+			local handle = {}
+			function handle:start(next_delay)
+				entry.delay = next_delay == nil and default_delay or next_delay
+				entry.running = true
 				return self
 			end
-			function t:stop()  self.running = false ; return self end
-			function t:running_() return self.running end
-			return t
+			function handle:stop()
+				entry.running = false
+				return self
+			end
+			function handle:nextTrigger()
+				-- Hammerspoon 1.1.1 filters even armed zero-delay countdowns and
+				-- overrides above the configured delay (extensions/timer/timer.lua).
+				if entry.running and entry.delay > 0 and entry.delay <= default_delay then
+					return entry.delay
+				end
+				return nil
+			end
+			function handle:running() return self:nextTrigger() ~= nil end
+			function handle:setDelay(next_delay)
+				local restart = self:running()
+				default_delay = next_delay
+				if restart then self:start() end
+				return self
+			end
+			function entry:fire()
+				if not self.running or not self.fn then return end
+				-- CFRunLoop honors a later fire date set from a repeating timer's
+				-- callback. Settle this delivery before invoking the callback so
+				-- its rearm survives; ordinary doAfter keeps its own native policy.
+				self.running = false
+				self.fired = self.fired + 1
+				self.fn()
+			end
+			return handle
 		end,
 	},
 	__timers = TIMERS,
@@ -834,6 +930,15 @@ M.drawing = {
 
 local CANVASES = {}
 
+--- Snapshots native rect values at the constructor, setter and getter boundaries.
+--- Hammerspoon 1.1.1's extensions/canvas/canvas.lua frame wrapper builds a fresh
+--- NSRect table from the native topLeft/size values on every read.
+--- @param frame table Valid canvas rect.
+--- @return table rect Independently owned native-style rect value.
+local function canvas_frame_snapshot(frame)
+	return { __luaSkinType = "NSRect", x = frame.x, y = frame.y, w = frame.w, h = frame.h }
+end
+
 --- Builds a stateful canvas double that preserves the native commit surface.
 --- Returning one generic function for every lookup made numeric element reads
 --- such as `canvas[7]` callable instead of mutable, while `isShowing()` returned
@@ -843,7 +948,7 @@ local CANVASES = {}
 --- @return table canvas Stateful canvas double.
 local function make_canvas(initial_frame)
 	local canvas = {
-		_frame = initial_frame or { x = 0, y = 0, w = 0, h = 0 },
+		_frame = canvas_frame_snapshot(initial_frame or { x = 0, y = 0, w = 0, h = 0 }),
 		_showing = false,
 		_deleted = false,
 	}
@@ -867,8 +972,8 @@ local function make_canvas(initial_frame)
 	end
 
 	function canvas:frame(value)
-		if value == nil then return self._frame end
-		self._frame = value
+		if value == nil then return canvas_frame_snapshot(self._frame) end
+		self._frame = canvas_frame_snapshot(value)
 		return self
 	end
 
@@ -1157,11 +1262,59 @@ M.urlevent = {
 	end,
 	__reset   = function() M.urlevent.__opened = {} end,
 }
+local PASTEBOARD_DATA = {}
+local GENERAL_PASTEBOARD = {}
+local PASTEBOARD_TEXT_UTI = "public.utf8-plain-text"
+
+local function pasteboard_key(name)
+	if name == nil then return GENERAL_PASTEBOARD end
+	assert(type(name) == "string" or type(name) == "number",
+		"pasteboard name must be a string or number")
+	return tostring(name)
+end
+
+-- The healthy native contract stores independent UTI-to-byte maps, not Lua
+-- table references. Raw strings are immutable, so one table copy suffices.
+-- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
-	getContents  = function() return "" end,
-	setContents  = function(_) return true end,
-	readAllData  = function() return {} end,
-	writeAllData = function(_) return true end,
+	getContents = function(name)
+		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
+		local text = data[PASTEBOARD_TEXT_UTI]
+		if text == nil or utf8.len(text) == nil then return nil end
+		-- libpasteboard.m pushes UTF8String with lua_pushstring, stopping at NUL.
+		return text:match("^[^%z]*")
+	end,
+	setContents = function(text, name)
+		PASTEBOARD_DATA[pasteboard_key(name)] = { [PASTEBOARD_TEXT_UTI] = tostring(text) }
+		return true
+	end,
+	readAllData = function(name)
+		local snapshot = {}
+		for uti, bytes in pairs(PASTEBOARD_DATA[pasteboard_key(name)] or {}) do
+			snapshot[uti] = bytes
+		end
+		return snapshot
+	end,
+	writeAllData = function(...)
+		local name, contents
+		if select("#", ...) == 1 then
+			contents = ...
+		else
+			name, contents = ...
+		end
+		local key = pasteboard_key(name)
+		local data = {}
+		PASTEBOARD_DATA[key] = data
+		for uti, bytes in pairs(contents) do
+			assert(type(uti) == "string" and type(bytes) == "string",
+				"pasteboard raw data must map UTI strings to byte strings")
+			data[uti] = bytes
+		end
+		return true
+	end,
+	clearContents = function(name)
+		PASTEBOARD_DATA[pasteboard_key(name)] = nil
+	end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
 M.spaces = {
@@ -1306,6 +1459,7 @@ M.host = {
 function M.__reset()
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
+	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end

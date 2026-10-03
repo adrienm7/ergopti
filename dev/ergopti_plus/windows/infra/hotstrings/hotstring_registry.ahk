@@ -328,6 +328,7 @@ _PrefixWatcherCategoryIsCached(Category) {
 ; test_prefix_index_cache_equiv). Returns the number of entries registered.
 _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "") {
 	global Features, ScriptInformation, _HS_CACHE_ROWS, _PrefixIndex, _TriggerSet, HS_CACHE_MARKER
+	global HSE_PRIORITY_COMMON
 	if !IsObject(IndexTarget)
 		IndexTarget := _PrefixIndex
 	if !IsObject(SetTarget)
@@ -375,6 +376,11 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 		if !(IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
 			continue
 		}
+		; Every variant in this section shares the same priority cascade. Resolve
+		; it once per build; individual row overrides still win in the indexer.
+		Resolved := HotstringsResolve(Category, SecId)
+		SectionPriority := (Resolved.HasOwnProp("Priority") and Resolved.Priority != "")
+			? Resolved.Priority : HSE_PRIORITY_COMMON
 		for Row in RowList {
 			; Row layout (hotstrings_cache.ahk): [flags, trigger(★ preserved),
 			; output, finalResult, isRepeat, isCaseSens, priorityOverride]. The
@@ -388,7 +394,8 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 			; substitutes it before indexing so the index reflects real keystrokes.
 			Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
 			Output := StrReplace(Row[3], HS_CACHE_MARKER, MagicKey)
-			_AddTriggerVariants(Trigger, Output, Category, SecId, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
+			_AddTriggerVariants(Trigger, Output, Category, SecId, IsCaseSensitive, IsStrict,
+				Individual, IndexTarget, SetTarget, SectionPriority)
 			Count += 1
 		}
 	}
@@ -488,8 +495,9 @@ _AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTa
 	; cascade via HotstringsResolve. Stored on the entry so _LookupAndRender can
 	; rank colliding candidates so the non-dimmed preview = the engine's fire winner.
 	;
-	; SourceDefault is set only by the extension-pack caller, and it BYPASSES the
-	; override cascade on purpose, because the engine does too: LoadExtTomlFile
+	; SourceDefault carries either an already-resolved bundled section cascade,
+	; or the extension-pack source priority. It bypasses repeated resolution;
+	; LoadExtTomlFile
 	; applies _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE) — an individual
 	; `priority = N`, else the package default — and never consults
 	; HotstringsResolve, because a pack is not in the hotstrings config and has no

@@ -360,7 +360,7 @@ _Updater_SubscribeChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn :=
 	Question := StrReplace(t("changelog_window.subscribe_restart"), "{channel}", _Updater_ChannelLabel(Channel))
 	Answer := IsObject(ConfirmFn)
 		? ConfirmFn.Call(Question)
-		: MsgBox(Question, t("updater.title_changelog"), "YesNo Icon?")
+		: Ui_MsgBox(Question, t("changelog_window.window_title"), "YesNo Icon?")
 	if (Answer !== "Yes") {
 		try LoggerInfo("Updater", "Subscription to channel {1} cancelled from the Versions window.", Channel)
 		return false
@@ -476,9 +476,9 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	if !_Updater_RequestMayPublish(Request)
 		return
 
-	WinTitle := t("updater.title_changelog")
+	WinTitle := t("changelog_window.window_title")
 
-	G := Gui("+Resize +MinSize930x400", WinTitle)
+	G := Gui_Create("+Resize +MinSize930x400", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 8
@@ -646,7 +646,7 @@ _Updater_ReportChosenInstall(Message) {
 	Text := StrReplace(Text, "{path}", Message.Has("backup_path") ? Message["backup_path"] : "")
 	if (Message.Has("backup_path") && Message["backup_path"] != "")
 		Text .= "`n`n" . StrReplace(t("changelog_window.install_backup_kept"), "{path}", Message["backup_path"])
-	MsgBox(Text, t("updater.title_changelog"), "Icon!")
+	Ui_MsgBox(Text, t("changelog_window.window_title"), "Icon!")
 }
 
 

@@ -66,6 +66,19 @@ var BOARD_ROWS = 6;
 // (style.css .key .binding).
 var KEY_HEIGHT_RATIO = 1.5;
 
+// Reading order follows the physical clicks, history, then scrolling axes.
+var MOUSE_INPUT_ORDER = [
+	'MouseLeft',
+	'MouseMiddle',
+	'MouseRight',
+	'MouseBack',
+	'MouseForward',
+	'WheelUp',
+	'WheelDown',
+	'WheelLeft',
+	'WheelRight'
+];
+
 // Mouse buttons and wheel directions, by registry code, and their label keys.
 var INPUT_LABEL_KEYS = {
 	MouseLeft: 'layer_editor.input.mouse_left',
@@ -502,12 +515,25 @@ function renderBoard(current, recommended) {
 function renderMouse(current, recommended) {
 	var pane = el('mouse');
 	pane.innerHTML = '';
-	DATA.keys.forEach(function (k) {
-		if (k.kind !== 'mouse_button' && k.kind !== 'wheel') return;
-		pane.appendChild(
-			buildInput(k.code, inputState(k.code, current, recommended), inputLabel(k.code), 'pointer')
-		);
-	});
+	DATA.keys
+		.filter(function (k) {
+			return k.kind === 'mouse_button' || k.kind === 'wheel';
+		})
+		.sort(function (a, b) {
+			return MOUSE_INPUT_ORDER.indexOf(a.code) - MOUSE_INPUT_ORDER.indexOf(b.code);
+		})
+		.forEach(function (k) {
+			var position = MOUSE_INPUT_ORDER.indexOf(k.code);
+			var primary = position >= 0 && position < 3;
+			pane.appendChild(
+				buildInput(
+					k.code,
+					inputState(k.code, current, recommended),
+					inputLabel(k.code),
+					'pointer' + (primary ? ' primary-click' : '')
+				)
+			);
+		});
 }
 
 function pickerRow(label, value, current, available, reason) {

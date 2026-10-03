@@ -94,10 +94,22 @@ AltGrFamilyDecide(Hkl) {
 	}
 	Override := _ReadKanaTomlOverride()
 	if (Override != "") {
+		Probe["override_against_probe"] := Probe["valid"] and Probe["kana"] != (Override == "true")
 		Probe["kana"] := (Override == "true")
 		Probe["source"] := "override"
 	}
 	return Probe
+}
+
+; Whether the TOML override decided against what the layout's own probe read:
+; a Kana-style layout forced to the standard family, or the reverse. That is
+; what the override is for when the probe is wrong, and otherwise a
+; configuration that makes every AltGr feature name the wrong key, so the boot
+; log names it. A probe that read nothing has no verdict to contradict.
+; @param Probe {Map} A record from AltGrFamilyDecide.
+; @return {Boolean}
+AltGrFamilyOverrideContradictsProbe(Probe) {
+	return Probe["source"] == "override" and Probe["override_against_probe"]
 }
 
 ; Makes Probe the family every reader sees from now on.

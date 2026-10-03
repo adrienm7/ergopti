@@ -417,7 +417,7 @@ _LLM_Agent_OnSelection(Generation, Backend, Text) {
 ; The native text dialog of the command action.
 ; @returns {Map} Map("ok", Boolean, "value", String).
 _LLM_Agent_NativePrompt(Title, Text, Default) {
-	Result := InputBox(Text, Title, "w560 h160", Default)
+	Result := Ui_InputBox(Text, Title, "w560 h160", Default)
 	return Map("ok", Result.Result == "OK", "value", Result.Value)
 }
 
@@ -734,17 +734,29 @@ LLM_Agent_WatchesTyping() {
  * @param {String} Buffer The typed context, most recent character last.
  * @returns {Boolean} True when the pause timer was armed.
  */
-LLM_Agent_OnTyping(Buffer) {
+LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
 	global _LLM_Agent_Generation, _LLM_Agent_Auto
-	_LLM_Agent_SettleOffer(false)
-	_LLM_Agent_Generation += 1
-	_LLM_Agent_CancelPause()
-	if (LLM_Agent_Setting("agent_mode") != "auto")
+	if IsSet(PublishGuard) && !PublishGuard.Call()
 		return false
-	Timer := _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer)
-	_LLM_Agent_Auto["timer"] := Timer
-	_LLM_Agent_Schedule(Timer, -LLM_Agent_Config()["system1"]["pause_ms"])
-	return true
+	_LLM_Agent_SettleOffer(false)
+	Automatic := LLM_Agent_Setting("agent_mode") == "auto"
+	; Configuration may be cold; resolve it before mutating the pause owner.
+	PauseMs := Automatic ? LLM_Agent_Config()["system1"]["pause_ms"] : 0
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		_LLM_Agent_Generation += 1
+		_LLM_Agent_CancelPause()
+		if !Automatic
+			return false
+		Timer := _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer)
+		_LLM_Agent_Auto["timer"] := Timer
+		_LLM_Agent_Schedule(Timer, -PauseMs)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 /**

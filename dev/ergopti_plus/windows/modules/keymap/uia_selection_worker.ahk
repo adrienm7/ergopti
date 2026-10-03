@@ -376,6 +376,11 @@ UIASW_Start() {
 	global UIASW_START_DEADLINE_MS, UIASW_START_BACKOFF_MS
 	if A_IsSuspended
 		return false
+	; A compiled worker reuses the driver's executable and holds its window title
+	; while it starts; a reload successor would close it instead of the driver
+	; (reload-worker-identity, see KLPF_ReloadKeepsWorkersOut).
+	if ReloadTerminalHandoffActive()
+		return false
 	UIASW_EnsureHandlers()
 	; A replacement must not coexist with a worker whose termination request was
 	; refused. Retry the exact retained handle before considering new admission.

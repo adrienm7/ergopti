@@ -57,25 +57,20 @@ Test("manifest_menu: every accented-letter row names a picker id", () => (
 	)
 ))
 
-Test("manifest_menu: key_combinations_group carries the three Windows combination families", () => (
-	; The families moved from the retired modifier_combos_group into the
-	; « Combinaisons de touches » group, after its own first-row switch; the
-	; renderer expands each feature row naming a section and a group_label.
+Test("manifest_menu: key_combinations_group lists the pairs through its provider", () => (
+	; The three fixed families were ``feature`` rows naming a section and a
+	; group_label. Every ordered pair of tap-hold keys is listed now, as data the
+	; driver supplies (KeyCombinationRows): a leftover feature row would draw a
+	; submenu of toggles that no hotkey reads.
 	AssertEqual(
-		"shortcuts.alt_gr_lalt,shortcuts.alt_gr_caps_lock,shortcuts.lalt_caps_lock",
-		_MM_AhkFeatureRowValues("key_combinations_group", "path"),
-		"the key-combinations submenu expands the features under exactly these sections"
-	)
-))
-
-Test("manifest_menu: every key-combination family names its submenu label", () => (
-	; group_label is what the sub-submenu is titled with. It used to be the KEY of
-	; the _SHORTCUTS_SUBMAP_V1V2 Map, which is why the manifest section could not
-	; drive the render on its own and stayed decorative.
+		"key_combination_rows_left,key_combination_rows_right",
+		_MM_AhkRowIds("key_combinations_group", "list"),
+		"the key-combinations submenu lists its pairs through exactly these providers, one per hand"
+	),
 	AssertEqual(
-		"AltGrLAlt,AltGrCapsLock,LAltCapsLock",
-		_MM_AhkFeatureRowValues("key_combinations_group", "group_label"),
-		"a row without group_label would render no family submenu"
+		"",
+		_MM_AhkRowIds("key_combinations_group", "feature"),
+		"no fixed family row remains"
 	)
 ))
 
@@ -87,13 +82,14 @@ Test("manifest_menu: the key-combinations group opens with its own switch", () =
 	)
 ))
 
-; Joins one field of the Windows ``feature`` rows of a manifest section, in order.
-_MM_AhkFeatureRowValues(SectionKey, Key) {
+; Joins the ids (the paths, for ``feature`` rows) of the Windows rows of one type
+; of a manifest section, in order.
+_MM_AhkRowIds(SectionKey, RowType) {
 	Joined := ""
 	for Row in _MR_GetMenuDef(SectionKey) {
-		if (_MR_Get(Row, "type") != "feature" or !_MR_IsForAhk(Row))
+		if (_MR_Get(Row, "type") != RowType or !_MR_IsForAhk(Row))
 			continue
-		Joined .= (Joined == "" ? "" : ",") . _MR_Get(Row, Key)
+		Joined .= (Joined == "" ? "" : ",") . _MR_Get(Row, RowType == "feature" ? "path" : "id")
 	}
 	return Joined
 }

@@ -51,11 +51,11 @@
 	},
 	"hotstring_groups": {
 		"standard": [
-			"distances_reduction",
 			"autocorrection",
 			"magic_key"
 		],
 		"ergopti": [
+			"distances_reduction",
 			"sfbs_reduction",
 			"rolls"
 		],
@@ -132,13 +132,13 @@
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
+			"id": "about"
+		},
+		{
 			"id": "configuration"
 		},
 		{
 			"id": "language"
-		},
-		{
-			"id": "about"
 		},
 		{
 			"id": "---"
@@ -321,6 +321,14 @@
 			"type": "---"
 		},
 		{
+			"type": "check",
+			"id": "start_at_login",
+			"i18n": "menu.global.start_at_login",
+			"checked_when": [
+				"start_at_login_enabled"
+			]
+		},
+		{
 			"type": "command",
 			"id": "uninstall",
 			"i18n": "menu.global.uninstall",
@@ -393,6 +401,15 @@
 			"i18n": "menu.global.clean_unused_keys"
 		},
 		{
+			"type": "command",
+			"id": "restore_touchpad_gestures",
+			"i18n": "menu.global.restore_touchpad_gestures",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
+		},
+		{
 			"type": "---"
 		},
 		{
@@ -404,14 +421,6 @@
 			"type": "command",
 			"id": "setup_wizard",
 			"i18n": "menu.global.setup_wizard"
-		},
-		{
-			"type": "check",
-			"id": "start_at_login",
-			"i18n": "menu.global.start_at_login",
-			"checked_when": [
-				"start_at_login_enabled"
-			]
 		},
 		{
 			"type": "check",
@@ -433,15 +442,6 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
-		},
-		{
-			"type": "command",
-			"id": "restore_touchpad_gestures",
-			"i18n": "menu.global.restore_touchpad_gestures",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
 		}
 	],
 	"debug_menu": [
@@ -505,14 +505,6 @@
 			"i18n": "menu.debug.open_error_log"
 		},
 		{
-			"type": "check",
-			"id": "show_error_dialog",
-			"i18n": "menu.debug.show_error_dialog",
-			"checked_when": [
-				"error_dialog_enabled"
-			]
-		},
-		{
 			"type": "---",
 			"id": "---"
 		},
@@ -520,6 +512,14 @@
 			"type": "command",
 			"id": "healthcheck",
 			"i18n": "menu.debug.healthcheck"
+		},
+		{
+			"type": "check",
+			"id": "show_error_dialog",
+			"i18n": "menu.debug.show_error_dialog",
+			"checked_when": [
+				"error_dialog_enabled"
+			]
 		},
 		{
 			"type": "command",
@@ -624,6 +624,9 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "group",
 			"id": "key_combinations",
 			"i18n": "menu.shortcuts.key_combinations",
@@ -683,6 +686,26 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
 			"type": "---",
 			"platforms": [
 				"ahk",
@@ -723,38 +746,82 @@
 		},
 		{
 			"type": "list",
-			"id": "key_combination_rows",
+			"id": "key_combination_rows_left",
 			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.alt_gr_lalt",
-			"group_label": "AltGrLAlt",
+			"type": "---",
 			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+				"ahk",
+				"hs"
+			]
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.alt_gr_caps_lock",
-			"group_label": "AltGrCapsLock",
+			"type": "list",
+			"id": "key_combination_rows_right",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		}
+	],
+	"hotstring_category_menu": [
+		{
+			"type": "command",
+			"id": "hotstring_category_enable_all",
+			"i18n": "menu.hotstrings.scope_enable_all"
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.lalt_caps_lock",
-			"group_label": "LAltCapsLock",
-			"platforms": [
-				"ahk"
+			"type": "command",
+			"id": "hotstring_category_disable_all",
+			"i18n": "menu.hotstrings.scope_disable_all"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_category_file"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_category_sections"
+		}
+	],
+	"key_combination_pair_menu": [
+		{
+			"type": "command",
+			"id": "key_combination_clear",
+			"i18n": "menu.tapholds.nothing_combo",
+			"disabled_when": [
+				"key_combination_pair_assigned"
 			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "key_combination_slots",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
 	],
 	"script_control_group": [
@@ -856,23 +923,35 @@
 			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "wpm_widget",
+			"i18n": "menu.metrics.show_wpm_widget",
+			"checked_when": [
+				"wpm_widget_visible"
+			],
 			"disabled_when": [
 				"keylogger_enabled"
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "widget_colors",
+			"i18n": "menu.metrics.colors_by_source",
+			"checked_when": [
+				"metrics_widget_colors"
+			],
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "check",
 			"id": "include_realtime",
+			"i18n": "menu.metrics.include_realtime",
+			"checked_when": [
+				"metrics_widget_graph"
+			],
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"

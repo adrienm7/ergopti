@@ -67,7 +67,7 @@ UninstallCommit(Reason) {
 		|| !PLC_SetEventHandle(Owner["Commit"]) {
 		UninstallCancel()
 		LoggerError("Uninstall", "The removal worker did not accept terminal authorization.")
-		MsgBox(t("dialog.uninstall.failed"), t("menu.global.uninstall"), "Icon!")
+		Ui_MsgBox(t("dialog.uninstall.failed"), t("dialog.uninstall.window_title"), "Icon!")
 		return false
 	}
 	State.Delete("Owner")
@@ -100,10 +100,10 @@ ShowUninstallErgopti(*) {
 		if State.Get("Owner", 0) == Owner
 			UninstallCancel()
 		LoggerError("Uninstall", "Executable identity capture failed: {1}.", Err.Message)
-		MsgBox(t("dialog.uninstall.failed"), t("menu.global.uninstall"), "Icon!")
+		Ui_MsgBox(t("dialog.uninstall.failed"), t("dialog.uninstall.window_title"), "Icon!")
 		return false
 	}
-	if MsgBox(t("dialog.uninstall.confirm"), t("menu.global.uninstall"), "YesNo Default2 Icon?") != "Yes" {
+	if Ui_MsgBox(t("dialog.uninstall.confirm"), t("dialog.uninstall.window_title"), "YesNo Default2 Icon?") != "Yes" {
 		if State.Get("Owner", 0) == Owner
 			UninstallCancel()
 		return false
@@ -133,7 +133,7 @@ ShowUninstallErgopti(*) {
 			"-File", Owner["Script"], "-ParentHandle", Owner["Parent"],
 			"-ReadyName", ReadyName, "-CommitName", CommitName,
 			"-ExpectedHash", ExecutableDigest,
-			"-Executable", A_ScriptFullPath, "-FailureTitle", t("menu.global.uninstall"),
+			"-Executable", A_ScriptFullPath, "-FailureTitle", t("dialog.uninstall.window_title"),
 			"-FailureText", t("dialog.uninstall.failed")]
 		Command := ""
 		for Arg in Args
@@ -160,7 +160,7 @@ ShowUninstallErgopti(*) {
 		ExitApp()
 		; ExitApp returns only when an OnExit owner refuses the shutdown.
 		UninstallCancel()
-		MsgBox(t("dialog.uninstall.failed"), t("menu.global.uninstall"), "Icon!")
+		Ui_MsgBox(t("dialog.uninstall.failed"), t("dialog.uninstall.window_title"), "Icon!")
 		return false
 	} catch as Err {
 		if State.Get("Owner", 0) == Owner
@@ -170,7 +170,7 @@ ShowUninstallErgopti(*) {
 			; buffer. Clean the local owner even after its global slot was revoked.
 			_UninstallClose(Owner, true)
 		LoggerError("Uninstall", "Removal preparation failed: {1}.", Err.Message)
-		MsgBox(t("dialog.uninstall.failed"), t("menu.global.uninstall"), "Icon!")
+		Ui_MsgBox(t("dialog.uninstall.failed"), t("dialog.uninstall.window_title"), "Icon!")
 		return false
 	}
 }

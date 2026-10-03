@@ -241,7 +241,7 @@ Since we're going clean-state with no backward compatibility, this mapping is **
 | `[Layout] ErgoptiBase`                                                               | `[ahk.layout] ergopti_base`                                                         | AHK-only, prefixed            |
 | `[TapHolds.CapsLock]` (AHK)                                                          | `[tap_hold.keys.caps_lock]` (per-driver tap_hold.toml)                              | Dedicated file                |
 | `[Shortcuts] AGrave = true` + `AGrave_Letter = "v"`                                  | `[shortcuts.a_grave] enabled = true; letter = "v"`                                  | Modelling α extended          |
-| `[Shortcuts.AltGrCapsLock]`                                                          | `[ahk.shortcuts.alt_gr_caps_lock]`                                                  | AHK-only                      |
+| `[Shortcuts.AltGrCapsLock]`                                                          | `[shortcuts.key_combination_taps] alt_gr_then_caps_lock`                            | AHK-only                      |
 | `[Gestures]` (AHK, limited vocab)                                                    | `[ahk.gestures]`                                                                    | Prefixed (Win vocab)          |
 | `[gestures]` (HS, rich vocab)                                                        | `[hs.gestures]` + `[hs.gestures.modes]` + `[hs.gestures.sensitivities]`             | Prefixed (Mac vocab)          |
 | `[Script] Locale` (PascalCase)                                                       | `[script] locale`                                                                   | Casing                        |

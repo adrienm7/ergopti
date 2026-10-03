@@ -56,6 +56,10 @@ local ORIGINAL_OVERRIDES = table.concat({
 	"",
 }, "\n")
 
+local DELIMITER_CONFIG = ORIGINAL_CONFIG:gsub("future = { keep = 1 }",
+	'future = { keep = 1 }\nterminators = [{ key = "custom_¤", char = "¤", label = "¤", consume = true }]')
+	.. '\n[hotstrings.terminator_states]\nspace = false\nslash = true\n"custom_¤" = false\nretired = true\n'
+
 --- The file a bundled category loads from: the bundled folder, or the file the
 --- shipped Ergopti extension binds to that category (SFB reduction and rolls
 --- moved there), resolved by the shared extension scanner the drivers use.
@@ -118,6 +122,9 @@ end
 local function fake_keymap(controls)
 	local Manifest = require("infra.manifest_reader")
 	local Preferences = require("infra.preferences")
+	package.loaded["keymap.terminators"] = nil
+	package.loaded["keymap.terminators_catalogue"] = nil
+	local Terminators = require("keymap.terminators")
 	local registered = { autocorrection = corpus("autocorrection"), rolls = corpus("rolls"),
 		personal = { sections = { { name = "code" } }, metadata = {} } }
 	local groups = { autocorrection = true, rolls = false, personal = true, dynamichotstrings = true }
@@ -125,6 +132,18 @@ local function fake_keymap(controls)
 	local km = { DELAY_KEY_TO_CATEGORY = { autocorrection = "autocorrection", rolls = "rolls" },
 		delays = {}, chosen = {}, previews = {}, reloads = {}, repeat_enabled = false, base = 0.9, trigger = "§",
 		projected = {} }
+	km.get_terminator_defs = Terminators.get_terminator_defs
+	km.is_terminator_enabled = Terminators.is_terminator_enabled
+	km.add_custom_terminator = Terminators.add_custom_terminator
+	km.is_terminator = Terminators.is_terminator
+	function km.set_terminators_enabled(changes)
+		km.terminator_calls = (km.terminator_calls or 0) + 1
+		if controls.refuse_terminators or controls.refuse_terminator_call == km.terminator_calls then
+			controls.refuse_terminators = false
+			return false
+		end
+		return Terminators.set_terminators_enabled(changes)
+	end
 	function km.list_groups()
 		local copy = {}
 		for name, enabled in pairs(groups) do copy[name] = enabled end
@@ -252,6 +271,19 @@ local function fixture(options)
 		preview_colored_tooltips = false, dynamichotstrings_enabled = false,
 		hotstrings = { autocorrection = true, rolls = false, personal = true, dynamichotstrings = true },
 		delays = { autocorrection = 3.0, dynamichotstrings = 1.5 } }
+	local hotstrings = Codec.decode(files.config).hotstrings or {}
+	state.terminator_states = hotstrings.terminator_states or {}
+	state.custom_terminators = hotstrings.terminators or {}
+	for _, entry in ipairs(state.custom_terminators) do
+		assert(km.add_custom_terminator(entry.key, entry.char, entry.label, entry.consume))
+	end
+	local known = {}
+	for _, entry in ipairs(km.get_terminator_defs()) do
+		if entry.key and type(state.terminator_states[entry.key]) == "boolean" then
+			known[entry.key] = state.terminator_states[entry.key]
+		end
+	end
+	assert(km.set_terminators_enabled(known))
 	local hotfiles = { "autocorrection", "rolls", "personal", "dynamichotstrings" }
 	local core = { keymap = km }
 	local PT = require("ui.menu.preferences_transaction")
@@ -587,5 +619,85 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		helpers.assert_eq(f.config.parse_override_content(f.files.overrides).autocorrection.sections.caps.delay, 0.5)
 		helpers.assert_eq(f.km.projected["autocorrection/caps"], 0.5)
+	end)
+end)
+
+helpers.describe("hotstrings scope: delimiter parity (hotstrings-delimiter-scope-parity)", function()
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("resets shipped delimiters and retains personal entries on " .. mode, function()
+			local f = fixture({ config = DELIMITER_CONFIG })
+			helpers.assert_eq(f.km.is_terminator(" "), false, "the configured space is initially off")
+			helpers.assert_eq(f.km.is_terminator("/"), true, "the configured slash is initially on")
+			helpers.assert_eq(f.owner.apply(mode), true)
+			local states = Codec.decode(f.files.config).hotstrings.terminator_states or {}
+			helpers.assert_nil(states.space, "the file inherits the shipped space default")
+			helpers.assert_nil(states.slash, "the file inherits the shipped slash default")
+			helpers.assert_eq(states["custom_¤"], false)
+			helpers.assert_eq(states.retired, true, "cleanup still owns the outdated entry")
+			helpers.assert_eq(f.km.is_terminator(" "), true, "the runtime adopts the restored space")
+			helpers.assert_eq(f.km.is_terminator("/"), false, "the runtime adopts the restored slash")
+			helpers.assert_eq(f.km.is_terminator_enabled("custom_¤"), false)
+			helpers.assert_nil(f.state.terminator_states.space, "the next save must not resurrect the override")
+			helpers.assert_nil(f.state.terminator_states.slash)
+			helpers.assert_eq(backup(f.files, "config-backup-"), DELIMITER_CONFIG)
+			helpers.assert_eq(f.save(), true)
+			local saved = Codec.decode(f.files.config).hotstrings
+			helpers.assert_nil((saved.terminator_states or {}).space)
+			helpers.assert_eq(saved.terminators,
+				{ { key = "custom_¤", char = "¤", label = "¤", consume = true } })
+		end)
+	end
+
+	helpers.it("keeps a hand-written delimiter table array while resetting shipped states", function()
+		local source = ORIGINAL_CONFIG .. '\n[hotstrings.terminator_states]\nspace = false\n'
+			.. '\n[[hotstrings.terminators]]\nkey = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
+		local f = fixture({ config = source })
+		helpers.assert_eq(f.owner.apply("clear"), true)
+		helpers.assert_nil((Codec.decode(f.files.config).hotstrings.terminator_states or {}).space)
+		helpers.assert_true(f.files.config:find("[[hotstrings.terminators]]", 1, true) ~= nil)
+		helpers.assert_eq(f.km.is_terminator("¤"), true)
+	end)
+
+	for _, refusal in ipairs({ "config", "refuse_terminators" }) do
+		helpers.it("restores exact delimiters after " .. refusal .. " refusal", function()
+			local f = fixture({ config = DELIMITER_CONFIG })
+			if refusal == "config" then f.controls.refuse = "config" else f.controls[refusal] = true end
+			helpers.assert_eq(f.owner.apply("clear"), false)
+			helpers.assert_eq(f.files.config, DELIMITER_CONFIG)
+			helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES)
+			helpers.assert_eq(f.km.is_terminator(" "), false)
+			helpers.assert_eq(f.km.is_terminator("/"), true)
+			helpers.assert_eq(f.state.terminator_states.space, false)
+			helpers.assert_eq(f.owner.pending(), false)
+		end)
+	end
+
+	helpers.it("reverts a composed restore to the exact delimiter runtime and source", function()
+		local f = fixture({ config = DELIMITER_CONFIG })
+		helpers.assert_eq(f.owner.apply("recommended"), true)
+		helpers.assert_eq(f.km.is_terminator(" "), true)
+		helpers.assert_eq(f.owner.revert(), true)
+		helpers.assert_eq(f.files.config, DELIMITER_CONFIG)
+		helpers.assert_eq(f.km.is_terminator(" "), false)
+		helpers.assert_eq(f.km.is_terminator("/"), true)
+		helpers.assert_eq(f.state.terminator_states.space, false)
+	end)
+
+	helpers.it("retains a refused delimiter inverse and settles it before admitting another scope", function()
+		local f = fixture({ config = DELIMITER_CONFIG })
+		f.controls.refuse = "config"
+		f.controls.refuse_terminator_call = f.km.terminator_calls + 2
+		helpers.assert_eq(f.owner.apply("clear"), false)
+		helpers.assert_eq(f.owner.pending(), true, "a refused runtime inverse stays owned")
+		helpers.assert_eq(f.km.is_terminator(" "), true, "the un-restored runtime is visible")
+		helpers.assert_eq(f.owner.apply("recommended"), false, "no second scope before settlement")
+		f.controls.refuse = nil
+		helpers.assert_eq(f.owner.retry_restore(), true)
+		helpers.assert_eq(f.owner.pending(), false)
+		helpers.assert_eq(f.files.config, DELIMITER_CONFIG)
+		helpers.assert_eq(f.km.is_terminator(" "), false)
+		helpers.assert_eq(f.km.is_terminator("/"), true)
+		helpers.assert_eq(f.state.terminator_states.space, false)
+		helpers.assert_eq(f.owner.apply("recommended"), true, "ordinary scopes resume after settlement")
 	end)
 end)

@@ -21,7 +21,7 @@
 
 local M = {}
 
-local hs          = hs
+local JsonCodec   = require("adapters.json_codec")
 local Chord       = require("chord")
 local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
@@ -164,8 +164,8 @@ local function catalogue_keys()
 	if _catalogue == false then return nil end
 	if _catalogue == nil then
 		local raw = FileSystem.read(KEY_CATALOGUE_PATH)
-		local ok, decoded = pcall(hs.json.decode, raw or "")
-		if not raw or not ok or type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
+		local decoded, decode_error = JsonCodec.decode(raw or "")
+		if not raw or decode_error or type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
 			-- No local fallback list: an unsynchronised private copy of the key
 			-- space is exactly what the shared catalogue exists to prevent, so an
 			-- unreadable catalogue means an empty picker, not a made-up one.

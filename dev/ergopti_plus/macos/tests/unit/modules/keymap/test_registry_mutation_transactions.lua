@@ -268,6 +268,80 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 	end)
 end)
 
+helpers.describe("hotstring category scope: runtime and persistence acknowledgement", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, publication in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("(hotstring-category-owner) " .. tostring(enabled) .. "/" .. publication, function()
+				local state, registry = fresh_registry()
+				local before = not enabled
+				registry.register_lua_group("rolls", "Rolls", { { name = "hc" }, { name = "sx" } })
+				registry.register_lua_group("spare", "Spare", {})
+				add_group_mapping(registry, "spare", "untouched")
+				local spare_mapping = state.mappings[1]
+				for _, name in ipairs({ "hc", "sx" }) do
+					hs.settings.set("ergopti.hotstrings_section_rolls_" .. name, before)
+				end
+				registry.set_post_load_hook("rolls", function()
+					for _, name in ipairs({ "hc", "sx" }) do
+						if registry.is_section_enabled("rolls", name) then add_group_mapping(registry, "rolls", name) end
+					end
+				end)
+				if before then
+					add_group_mapping(registry, "rolls", "hc")
+					add_group_mapping(registry, "rolls", "sx")
+				else
+					helpers.assert_eq(registry.disable_group("rolls"), true)
+				end
+				local previous_mappings = {}
+				for index, mapping in ipairs(state.mappings) do previous_mappings[index] = mapping end
+				local publications, candidate = 0, {}
+				local committed = registry.set_category_scope_enabled({ "rolls" }, enabled, function()
+					publications = publications + 1
+					candidate.group = registry.is_group_enabled("rolls")
+					for _, name in ipairs({ "hc", "sx" }) do
+						candidate[name] = registry.is_section_enabled("rolls", name)
+					end
+					if publication == "throw" then error("injected publication failure") end
+					if publication == "nil" then return nil end
+					return publication == "true"
+				end)
+				local accepted = publication == "true"
+				local wanted = before
+				if accepted then wanted = enabled end
+				helpers.assert_eq(committed, accepted)
+				helpers.assert_eq(publications, 1)
+				helpers.assert_eq(candidate.group, enabled, "the persistence owner sees the complete candidate runtime")
+				for _, name in ipairs({ "hc", "sx" }) do helpers.assert_eq(candidate[name], enabled) end
+				helpers.assert_eq(registry.is_group_enabled("rolls"), wanted)
+				for _, name in ipairs({ "hc", "sx" }) do
+					helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_" .. name), wanted)
+				end
+				helpers.assert_eq(registry.is_group_enabled("spare"), true)
+				helpers.assert_eq(state.mappings[1], spare_mapping, "another group's exact mapping survives")
+				helpers.assert_eq(#state.mappings, wanted and 3 or 1)
+				if not accepted then
+					for index, mapping in ipairs(previous_mappings) do
+						helpers.assert_eq(state.mappings[index], mapping, "refusal restores exact native authority")
+					end
+				end
+			end)
+		end
+	end
+
+	helpers.it("(hotstring-category-owner) rejects an unknown sibling before publication", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("rolls", "Rolls", { { name = "hc" } })
+		add_group_mapping(registry, "rolls", "hc")
+		local mapping = state.mappings[1]
+		local writes = 0
+		helpers.assert_eq(registry.set_category_scope_enabled({ "rolls", "missing" }, false,
+			function() writes = writes + 1; return true end), false)
+		helpers.assert_eq(writes, 0)
+		helpers.assert_eq(registry.is_group_enabled("rolls"), true)
+		helpers.assert_eq(state.mappings[1], mapping)
+	end)
+end)
+
 helpers.describe("canonical hotstring cache projection", function()
 	local function fixture(source)
 		local state, registry = fresh_registry()
@@ -412,4 +486,70 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_eq(registry.is_group_enabled("rolls"), false)
 		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
 	end)
+end)
+
+helpers.describe("personal menu: the real category persistence owner", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, publication in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("personal menu transaction " .. tostring(enabled) .. "/" .. publication, function()
+				local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local state, registry = fresh_registry()
+				local names = { "personal", "personal_ext_work", "custom" }
+				for _, group in ipairs(names) do
+					registry.register_lua_group(group, group, { { name = "one" }, { name = "two" } })
+					for _, section in ipairs({ "one", "two" }) do
+						hs.settings.set("ergopti.hotstrings_section_" .. group .. "_" .. section, not enabled)
+					end
+					registry.set_post_load_hook(group, function()
+						for _, section in ipairs({ "one", "two" }) do
+							if registry.is_section_enabled(group, section) then add_group_mapping(registry, group, group .. section) end
+						end
+					end)
+					if enabled then helpers.assert_eq(registry.disable_group(group), true) end
+				end
+				registry.register_lua_group("spare", "Spare", {})
+				add_group_mapping(registry, "spare", "untouched")
+				local spare_mapping = state.mappings[#state.mappings]
+				local menu_state = { hotstrings = {}, keymap = false, trigger_char = "★" }
+				for _, group in ipairs(names) do menu_state.hotstrings[group] = not enabled end
+				local starts, updates, candidate = 0, 0, {}
+				registry.start = function() starts = starts + 1; return true end
+				local ctx = { state = menu_state, paused = true, keymap = registry,
+					hotfiles = { "personal.toml", "personal_ext_work.toml" },
+					get_group_name = function(path) return path:gsub("%.toml$", "") end,
+					applyTriggerChar = function(value) return value end,
+					hotstring_editor = { open = function() end },
+					updateMenu = function() updates = updates + 1 end,
+					save_prefs = function()
+						for _, group in ipairs(names) do
+							candidate[group] = { registry.is_group_enabled(group), menu_state.hotstrings[group],
+								registry.is_section_enabled(group, "one"), registry.is_section_enabled(group, "two") }
+						end
+						if publication == "throw" then error("personal owner publication refused") end
+						if publication == "nil" then return nil end
+						return publication == "true"
+					end,
+				}
+				local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+				local committed = rows[enabled and 1 or 2].fn()
+				local accepted, wanted = publication == "true", not enabled
+				if accepted then wanted = enabled end
+				helpers.assert_eq(committed, accepted)
+				for _, group in ipairs(names) do
+					helpers.assert_eq(candidate[group], { enabled, enabled, enabled, enabled }, "one complete candidate reaches publication")
+					helpers.assert_eq(registry.is_group_enabled(group), wanted)
+					helpers.assert_eq(menu_state.hotstrings[group], wanted)
+					for _, section in ipairs({ "one", "two" }) do
+						helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_" .. group .. "_" .. section), wanted)
+					end
+				end
+				helpers.assert_eq(registry.is_group_enabled("spare"), true)
+				local found_spare = false
+				for _, mapping in ipairs(state.mappings) do if mapping == spare_mapping then found_spare = true end end
+				helpers.assert_true(found_spare, "an unrelated group's exact native mapping survives")
+				helpers.assert_eq({ starts, updates }, { 0, accepted and 1 or 0 })
+				helpers.assert_eq(menu_state.keymap, false)
+			end)
+		end
+	end
 end)

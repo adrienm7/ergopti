@@ -334,11 +334,11 @@ Test("ManifestBuildFeaturesMap: take_note shortcut carries dated_notes + destina
 
 TestFMv2_AhkShortcutsSubsections() {
 	Built := ManifestBuildFeaturesMap()
-	AssertTrue(Built["shortcuts"].Has("alt_gr_caps_lock"))
-	AssertTrue(Built["shortcuts"]["alt_gr_caps_lock"].Has("ctrl_delete"))
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["backspace"])
-	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["caps_lock"])
+	AssertTrue(Built["shortcuts"].Has("key_combination_taps"))
+	Taps := Built["shortcuts"]["key_combination_taps"]
+	AssertEqual(3, Taps.Count, "the three declared pairs")
+	for PairId in ["alt_gr_then_left_alt", "alt_gr_then_caps_lock", "left_alt_then_caps_lock"]
+		AssertEqual("none", Taps[PairId], PairId . " binds nothing in an empty configuration")
 }
 Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their defaults",
 	TestFMv2_AhkShortcutsSubsections)
@@ -451,6 +451,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 	try {
 		LayoutDefault := Features["layout"]["ergopti_base"]
 		ContextDefault := Features["llm"]["generation"]["context_length"]
+		KanaDefault := Features["script"]["alt_gr_is_kana_remap"]
 		DelayDefault := (Features["hotstrings"]["french_autocorrection"]["accents"]
 			["time_activation_seconds"])
 		Path := _FM_WriteFixture("boolean_integer_aliasing",
@@ -465,7 +466,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		AssertEqual(0, Applied,
 			"TOML booleans and integers must retain their source types")
 		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
-		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(KanaDefault, Features["script"]["alt_gr_is_kana_remap"])
 		AssertEqual(ContextDefault,
 			Features["llm"]["generation"]["context_length"])
 		AssertEqual(DelayDefault,
@@ -857,7 +858,8 @@ TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped() {
 Test("ApplyConfigToml: a second hotstrings.personal.<user-chosen-name> section is also applied",
 	TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped)
 
-TestFMv2_ApplyPersonalEditorSectionNotSkipped() {
+TestFMv2_PersonalEditorPreferencesKeepTheirOwner() {
+	global _LLM_Menu
 	; [personal_editor] (ahk. prefix already stripped) holds flat UI-preference
 	; keys written by ui/personal_toml_editor.ahk (_EditorPrefSet/_EditorPrefGet)
 	; via the legacy flat TOML_Write/TOML_Read path -- it is never part of the
@@ -866,17 +868,37 @@ TestFMv2_ApplyPersonalEditorSectionNotSkipped() {
 	try {
 		Path := _FM_WriteFixture("personal_editor_section",
 			"[personal_editor]`r`n"
-			. "default_section = " . '"' . "code" . '"' . "`r`n")
+			. 'default_section = "code"' . "`r`n"
+			. 'compact_view = "1"' . "`r`n"
+			. 'close_on_add = "0"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
-		AssertEqual(1, Applied)
-		AssertTrue(Features.Has("personal_editor"))
-		AssertEqual("code", Features["personal_editor"]["default_section"])
-		FileDelete(Path)
+		AssertEqual(0, Applied, "editor-owned preferences never enter the Features tree")
+		AssertTrue(!Features.Has("personal_editor"))
+		for Key in ["compact_view", "close_on_add", "default_section"] {
+			AssertEqual("PersonalEditor", TomlConfigForeignOwner("personal_editor", Key))
+			AssertEqual("", TomlConfigUnknownKind(Features, "personal_editor", Key))
+		}
+		AssertTrue(TomlConfigUnknownKind(Features, "personal_editor", "compact_veiw") != "",
+			"a typo does not inherit a broad namespace exemption")
+		Menu := _HSDeepCloneMap(_LLM_Menu)
+		Menu["onboarding_seen"] := false
+		Menu["app_profile_overrides"] := Map()
+		Menu["user_profiles"] := []
+		Updates := _ConfigCollectFullSaveUpdates(Features, Menu)
+		AssertTrue(Updates.Length > 0, "the full-save collector must complete")
+		AssertTrue(TOML_BatchWrite(Path, Updates), "the collected full save must publish")
+		Prefs := TOML_ParseFreshFile(Path)["personal_editor"]
+		AssertEqual("code", Prefs["default_section"])
+		AssertEqual("1", Prefs["compact_view"])
+		AssertEqual("0", Prefs["close_on_add"])
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigToml: [personal_editor] is applied, not skipped as unknown",
-	TestFMv2_ApplyPersonalEditorSectionNotSkipped)
+Test("ApplyConfigToml: editor preferences stay owned and survive full saves (personal-editor-config-owner)",
+	TestFMv2_PersonalEditorPreferencesKeepTheirOwner)
 
 TestFMv2_ApplyArrayValue() {
 	OldFeatures := _FM_BeginIsolated()
@@ -1109,100 +1131,31 @@ Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 
 
 
-; ==================================================================
-; ===== 7.1) #HotIf-reachable HELPERS must self-guard Features =====
-; ==================================================================
-
-; F01 (audit 2026-07-20): base_modifier.ahk's parse-time `SC038 & SC03A` #HotIf is
-; `_LAltKeepsBareModifierForCapsLockCombo() and _AnyShortcutEnabled("lalt_caps_lock")`.
-; The helper _AnyShortcutEnabled dereferenced the global Features with a bare .Has().
-; The #HotIf arms at parse time, but Features is assigned only later in auto-execute
-; (ErgoptiPlus.ahk pre-pump seeds TapHold/LayerEnabled/CapsWordEnabled but NOT
-; Features) -- and never at all on an aborted boot -- so a keypress in that window threw
-; UnsetError INSIDE the #HotIf evaluator and the fatal-before-ready error net escalated
-; it to ExitApp(1) (field crash_reports/2026-07-19T08-03-45Z.json + 3 signatures on
-; 07-16). The section-7 scan above only sees literal `#HotIf ...Features[...` lines, so
-; the helper indirection was invisible to it. Root-cause guard: every function reachable
-; from a #HotIf (via helper) OR from a direct tap-hold call that bypasses the #HotIf must
-; guard IsSet(Features) BEFORE its first Features dereference.
-
-; Returns { ok, reason }: whether FuncName guards IsSet(Features) before its first
-; `Features.`/`Features[` dereference (full-line comments already stripped by
-; _DriverFuncBody, so only real code positions are compared).
-_FMv2_FeaturesGuardedBeforeDeref(FuncName) {
-	Body := _DriverFuncBody(FuncName)
-	if (Body == "")
-		return { ok: false, reason: FuncName . ": function body not found in driver source" }
-	GuardPos := InStr(Body, "IsSet(Features)")
-	DerefPos := 0
-	for Needle in ["Features.", "Features["] {
-		p := InStr(Body, Needle)
-		if (p and (DerefPos == 0 or p < DerefPos))
-			DerefPos := p
-	}
-	if (DerefPos == 0)
-		return { ok: true, reason: "" }  ; no dereference -> nothing to guard
-	if (GuardPos == 0)
-		return { ok: false, reason: FuncName . ": dereferences Features with no IsSet(Features) guard" }
-	if (GuardPos > DerefPos)
-		return { ok: false, reason: FuncName . ": IsSet(Features) guard comes AFTER first Features dereference" }
-	return { ok: true, reason: "" }
-}
-
-TestFMv2_HotIfReachableFeaturesGuarded() {
-	; _AnyShortcutEnabled is the #HotIf criterion helper; the three *Shortcut
-	; dispatchers are also reachable by direct tap-hold calls that bypass the #HotIf
-	; (capslock.ahk / nav_layer.ahk), so all four can run before Features is assigned.
-	Funcs := ["_AnyShortcutEnabled", "AltGrLAltShortcut", "AltGrCapsLockShortcut", "LAltCapsLockShortcut"]
-	Violations := []
-	for FuncName in Funcs {
-		Res := _FMv2_FeaturesGuardedBeforeDeref(FuncName)
-		if !Res.ok
-			Violations.Push(Res.reason)
-	}
-	AssertEqual(0, Violations.Length,
-		"#HotIf-reachable Features deref without preceding IsSet guard: "
-		. (Violations.Length > 0 ? Violations[1] : ""))
-}
-Test("#HotIf-reachable helpers: Features guarded by IsSet before first deref",
-	TestFMv2_HotIfReachableFeaturesGuarded)
-
-; F42 (audit 2026-07-20): the Win+<magic-key-source> hotkey that opens the personal
-; editor was registered with no #HotIf and outside the magic-key feature block, so it
-; stole an OS Win+<key> combo even with every Ergopti feature disabled — "all features
-; off" must mean no keyboard interception.
-TestFMv2_PersonalEditorHotkeyIsFeatureGated() {
+; The personal editor is an ordinary, neutral keyboard slot. Its former fixed
+; Win+magic-key owner intercepted input outside that assignment model and could
+; not be removed or rebound from the Shortcuts menu.
+TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	Src := ""
-	try Src := FileRead(WindowsDir . "\modules\keymap\layout.ahk")
-	Assert(Src != "", "modules/keymap/layout.ahk must be readable")
-	Code := _StripFullLineComments(Src)
-
-	HotkeyPos := InStr(Code, "OpenPersonalEditor()")
-	Assert(HotkeyPos > 0, "layout.ahk must register the personal-editor hotkey")
-	; A HotIf criterion must be established immediately before the registration.
-	Before := SubStr(Code, 1, HotkeyPos)
-	GatePos := InStr(Before, "HotIf(", , -1)
-	Assert(GatePos > 0 && (HotkeyPos - GatePos) < 400,
-		"the personal-editor Win hotkey must be registered under a HotIf feature criterion, so disabling the feature releases the OS Win combo")
-}
-Test("layout: personal-editor Win hotkey is feature-gated, not unconditional",
-	TestFMv2_PersonalEditorHotkeyIsFeatureGated)
-
-; F43 (audit 2026-07-20): the three chord dispatchers guarded only the GROUP
-; (Features["shortcuts"].Has(group)) but then raw-indexed all ten action leaves. A
-; config missing a single action key therefore turned every chord press into an
-; UnsetItemError — post-ready that means an error-net toast and a crash report on each
-; press. Every leaf read must degrade per-key via .Get(id, false).
-TestFMv2_ShortcutDispatchersUseGuardedLeafReads() {
-	for FuncName in ["LAltCapsLockShortcut", "AltGrLAltShortcut", "AltGrCapsLockShortcut"] {
-		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in modules/shortcuts/")
-		Assert(RegExMatch(Body, 'Features\["shortcuts"\]\["\w+"\]\["') = 0,
-			FuncName . " must read action flags with .Get(id, false), never a raw leaf index — one missing action key otherwise throws on every chord press")
-		Assert(InStr(Body, '.Get("backspace", false)') > 0,
-			FuncName . " must still dispatch its action cascade through guarded reads")
+	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
+	Assert(!InStr(Code, "OpenPersonalEditor()"),
+		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
+	for Chosen in [false, true] {
+		for CtrlSave in [false, true] {
+			for Entry in LayoutRegistry_MagicKeyHotkeys("SC02E", Chosen, CtrlSave)
+				Assert(Entry["kind"] != "editor",
+					"neither chosen nor layout-owned physical magic sources may reserve an editor chord")
+		}
 	}
+	Personal := _StripFullLineComments(_DriverFuncBody("_HS_PersonalRows"))
+	Assert(Personal != "", "the actual personal-hotstring provider must be readable")
+	Assert(!InStr(Personal, '"menu.hotstrings.shortcut_prefix"'),
+		"the Personal menu must not advertise a dedicated fixed editor chord")
+	Assert(InStr(Personal, "OpenPersonalEditor()") > 0,
+		"the ordinary editor opening command remains in the Personal menu")
+	AssertEqual("none", ManifestDefaultFor("shortcuts.keyboard.win_d"),
+		"an empty configuration must never install the editor recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.win_d"),
+		"the shared recommendation remains an ordinary editable Win slot")
 }
-Test("shortcuts: chord dispatchers read action flags with guarded .Get, not raw indexes",
-	TestFMv2_ShortcutDispatchersUseGuardedLeafReads)
+Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
+	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)

@@ -27,6 +27,125 @@ HotstringsScopeApply(Mode, Options := unset) {
 	return ConfigScopeCommitOperations("hotstrings", Mode, Operations, Options, Owner)
 }
 
+/**
+ * Plans the same explicit category and section choices as the shared Lua owner.
+ * @param {Map} Inventory Discovered category ids to actionable section names.
+ * @param {Array} Targets Category ids selected by the menu.
+ * @param {Integer} Enabled Boolean target, never inferred from mixed state.
+ * @param {String} Reason Stable refusal identifier without user values.
+ * @returns {Array|Integer} Detached choice batch, or false before any side effect.
+ */
+HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason) {
+	Reason := ""
+	if !(Inventory is Map) || !(Targets is Array) || !(Enabled is Integer)
+			|| (Enabled != 0 && Enabled != 1) {
+		Reason := "invalid-request"
+		return false
+	}
+	if !Targets.Length {
+		Reason := "empty-scope"
+		return false
+	}
+	Changes := [], Selected := Map()
+	for Id in Targets {
+		if !_HotstringsScopeAddressable(Id) || Selected.Has(Id) {
+			Reason := "invalid-category"
+			return false
+		}
+		if !Inventory.Has(Id) || !(Inventory[Id] is Array) {
+			Reason := "unknown-category"
+			return false
+		}
+		Selected[Id] := true
+		Changes.Push(Map("group", Id, "enabled", Enabled))
+		Sections := Map()
+		for Name in Inventory[Id] {
+			if !_HotstringsScopeAddressable(Name) || Name == "-" || Sections.Has(Name) {
+				Reason := "invalid-section"
+				return false
+			}
+			Sections[Name] := true
+			; This legacy remapping belongs to Layout, outside Hotstrings controls.
+			if !(StrLower(StrReplace(Id, "_")) == "magickey" && Name == "replace")
+				Changes.Push(Map("group", Id, "section", Name, "enabled", Enabled))
+		}
+	}
+	return Changes
+}
+
+_HotstringsScopeAddressable(Value) {
+	return Value is String && Value != "" && !InStr(Value, ".")
+}
+
+; The legacy tray map also contains Layout, Gestures and Shortcuts. Only the
+; Hotstrings namespace belongs to this owner's discoverable category inventory.
+_HotstringsCategoryScopeInventory(Categories, ReadSections := ManifestFeaturesForSection) {
+	Inventory := Map()
+	for Id, Prefix in Categories {
+		if SubStr(Prefix, 1, StrLen("hotstrings.")) != "hotstrings."
+			continue
+		Inventory[Id] := []
+		for Entry in ReadSections.Call(Prefix) {
+			Parts := StrSplit(Entry["path"], ".")
+			Inventory[Id].Push(Parts[Parts.Length])
+		}
+	}
+	return Inventory
+}
+
+/**
+ * Publishes a category/section batch through the existing fenced reload owner.
+ * @param {Array} Targets Native category ids from the discovered tray catalogue.
+ * @param {Integer} Enabled Explicit Boolean target.
+ * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @returns {Map} Pending or terminal reload receipt; native refusal restores bytes.
+ */
+HotstringsCategoryScopeApply(Targets, Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	Operations() {
+		global Features, _LegacyTopCategoryMap
+		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
+		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason)
+		if !(Choices is Array)
+			throw Error("Hotstring category selection refused: " . Reason)
+		Candidate := _HSDeepCloneMap(Features)
+		Rows := [], Entries := []
+		for Choice in Choices {
+			Id := Choice["group"]
+			if Choice.Has("section") {
+				Entries.Push(Map("path", _LegacyTopCategoryMap[Id] . "." . Choice["section"],
+					"value", Choice["enabled"]))
+			} else {
+				Rows.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Id), Choice["enabled"]))
+			}
+		}
+		if _ConfigStageFeatureEntries(Candidate, Entries, Rows) != Entries.Length
+			throw Error("A category scope feature could not be resolved.")
+		return Rows
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
+/**
+ * Publishes every discovered personal section through the fenced reload owner.
+ * The existing typed planner discovers and seeds personal paths inside the
+ * lease; runtime choices remain unpublished until replacement acknowledgement.
+ * @param {Integer} Enabled Explicit Boolean target.
+ * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ */
+HotstringsPersonalScopeApply(Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	Operations() {
+		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
+			throw TypeError("A personal hotstring scope requires an explicit Boolean target.")
+		return _ConfigBuildHotstringIntentPlan("personal", "", Enabled).updates
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
 ; Catalogue identity comes from the same owners as the settings window and L4.
 _HotstringsScopeCatalogue() {
 	Entries := []

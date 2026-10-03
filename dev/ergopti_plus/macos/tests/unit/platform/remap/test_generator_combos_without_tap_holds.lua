@@ -35,9 +35,12 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- layer hold taps the F19 exit sentinel on release (layer-wheel-slots), and
 -- the shared script chords add the Delete chord's running and paused rules in
 -- the shared slot order (script-chords-three-os-2026-09-30).
+-- CapsWord control edges now notify the keymap before every variable write.
+-- Exact hand-modifier variants preserve native output and isolate those tags;
+-- historical migration snapshot pins remain unchanged (capsword-control-signal).
 local TAP_HOLDS_ON_PINS = {
-	default     = { rules = 24, digest = "7daf21a75cee322f" },
-	recommended = { rules = 30, digest = "c4ac599a14ff7dce" },
+	default     = { rules = 24, digest = "3ba59a303df80b4f" },
+	recommended = { rules = 30, digest = "2da61660630da029" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

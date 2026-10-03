@@ -14,6 +14,50 @@
 
 #Requires AutoHotkey v2.0
 
+_FIL_DesiredRootLookup() {
+	global Features
+	SavedFeatures := Features
+	Owner := MasterGateState()
+	SavedInitialized := Owner["initialized"]
+	SavedDesired := Owner["features"]
+	try {
+		Features := _FIL_Fixture()
+		Desired := _HSDeepCloneMap(Features)
+		Desired["layout"]["ergopti_base"] := true
+		Desired["shortcuts"]["gpt"]["enabled"] := true
+		Owner["initialized"] := true
+		Owner["features"] := Desired
+		for Path in ["layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.link",
+			"gestures", "hotstrings.autocorrection.accents", "unknown", "shortcuts.absent"] {
+			Expected := FeatureLocateV2(MasterGateDesiredFeatures(Features), Path)
+			Actual := FeatureDesiredLocateV2(Features, Path)
+			if Expected is Map {
+				AssertEqual(Expected["section"], Actual["section"])
+				AssertEqual(Expected["key"], Actual["key"])
+				AssertEqual(Expected["is_alpha"], Actual["is_alpha"])
+				AssertTrue(Expected["v2_node"] == Actual["v2_node"], "canonical root identity is preserved")
+			} else
+				AssertFalse(Actual)
+		}
+		State := ReadFeatureStateV2("shortcuts.gpt")
+		AssertTrue(State["enabled"])
+		State["enabled"] := false
+		AssertTrue(Desired["shortcuts"]["gpt"]["enabled"], "returned UI state remains detached")
+		Replacement := _HSDeepCloneMap(Desired)
+		Replacement["layout"]["ergopti_base"] := false
+		Owner["features"] := Replacement
+		AssertFalse(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "committed desired-map replacements invalidate naturally")
+		Owner["features"].Delete("layout")
+		Features["layout"]["ergopti_base"] := true
+		AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "missing retained roots use their ordinary live owner")
+	} finally {
+		Features := SavedFeatures
+		Owner["initialized"] := SavedInitialized
+		Owner["features"] := SavedDesired
+	}
+}
+Test("feature_io: desired reads preserve canonical roots without cloning the view", _FIL_DesiredRootLookup)
+
 
 
 
@@ -114,64 +158,7 @@ Test("feature_io: unknown path returns false", _FIL_Unresolved)
 
 ; =================================================================
 ; =================================================================
-; ======= 2/ Mutex sibling enumeration (real manifest) ============
-; =================================================================
-; =================================================================
-
-; The mutex enumerator reads the live manifest (not the Features fixture), so it
-; certifies that enabling one modifier-combo key forces exactly the other keys
-; of its [shortcuts.<group>] section off — the v2-native equivalent of the
-; retired translator's hand-written sibling table.
-
-_FIL_MutexEnumeratesGroupSiblings() {
-	ManifestEnsureLoaded()
-	Siblings := _MutexSiblingPathsForV2("shortcuts.alt_gr_lalt.backspace")
-	; The alt_gr_lalt group declares 10 keys; enabling one leaves 9 siblings.
-	AssertEqual(9, Siblings.Length, "alt_gr_lalt has 9 siblings of backspace")
-	for _, P in Siblings {
-		AssertEqual(1, InStr(P, "shortcuts.alt_gr_lalt."), "sibling stays in the group: " . P)
-		AssertTrue(P != "shortcuts.alt_gr_lalt.backspace", "the toggled key is excluded")
-	}
-}
-Test("feature_io: mutex enumerator returns the group's other keys", _FIL_MutexEnumeratesGroupSiblings)
-
-_FIL_MutexResolvesEveryGroup() {
-	ManifestEnsureLoaded()
-	Siblings := _MutexSiblingPathsForV2("shortcuts.alt_gr_caps_lock.tab")
-	AssertEqual(9, Siblings.Length, "alt_gr_caps_lock has 9 siblings of tab")
-}
-Test("feature_io: mutex enumerator resolves every declared group", _FIL_MutexResolvesEveryGroup)
-
-; The enumerator used to accept "ahk.shortcuts.<group>.<key>" and strip the
-; prefix, because the manifest filed these groups under the AHK silo. Lot 4
-; removed the silo. Pinning the rejection matters more than it looks: the
-; enumerator returns [] for anything it does not recognise, and [] means "this
-; key has no mutually exclusive siblings" — so a path shape that silently stops
-; resolving does not fail, it quietly lets two chords bind the same combo.
-_FIL_MutexRejectsDriverNamespacedPath() {
-	ManifestEnsureLoaded()
-	AssertEqual(0, _MutexSiblingPathsForV2("ahk.shortcuts.alt_gr_caps_lock.tab").Length,
-		"a driver-namespaced path is not a path this driver knows")
-}
-Test("feature_io: mutex enumerator rejects a driver-namespaced path",
-	_FIL_MutexRejectsDriverNamespacedPath)
-
-_FIL_MutexEmptyForPlain() {
-	ManifestEnsureLoaded()
-	; A plain (non-mutex) shortcut toggle has no siblings.
-	AssertEqual(0, _MutexSiblingPathsForV2("shortcuts.microsoft_bold").Length,
-		"plain shortcut has no mutex siblings")
-	AssertEqual(0, _MutexSiblingPathsForV2("layout.ergopti_base").Length,
-		"layout feature has no mutex siblings")
-}
-Test("feature_io: mutex enumerator empty for non-mutex paths", _FIL_MutexEmptyForPlain)
-
-
-
-
-; =================================================================
-; =================================================================
-; ======= 3/ Personal-hotstring section seeding (F4) ==============
+; ======= 2/ Personal-hotstring section seeding (F4) ==============
 ; =================================================================
 ; =================================================================
 

@@ -194,7 +194,7 @@ _MasterCategoryFor(FeatureCategoryPath) {
 ; whenever the feature is enabled, and its label remains the canonical
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
 MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
-	global Features
+	global Features, _MenuPopulationBuilding
 	; Everything — label, state read, letter writes — is driven by the canonical
 	; v2 alpha path (e.g. "shortcuts.e_grave"). MasterCategory is the PascalCase
 	; gate category used only for greying.
@@ -207,16 +207,10 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 	IsEnabled := State.Has("enabled") and State["enabled"]
 	CurrentLetter := State.Has("letter") ? StrLower(State["letter"]) : ""
 
-	LetterMenu := Menu()
-
 	; Entry that disables the remap without touching letter
 	DisabledLabel := t("common.disabled")
-	RegisterMenuItem(LetterMenu, DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(V2Path))
-	if !IsEnabled {
-		LetterMenu.Check(DisabledLabel)
-	}
-
-	LetterMenu.Add() ; Separator
+	Rows := [Map("label", DisabledLabel, "checked", !IsEnabled,
+		"action", ((p) => (*) => SetFeatureLetterOff(p))(V2Path)), Map("separator", true)]
 
 	; 26 letters a-z, displayed uppercase for menu legibility.
 	; RegisterMenuItem (instead of LetterMenu.Add) installs the OnMessage
@@ -224,11 +218,14 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 	loop 26 {
 		L := Chr(Ord("a") + A_Index - 1)
 		UpperL := StrUpper(L)
-		RegisterMenuItem(LetterMenu, UpperL,
-			((p, l) => (*) => SetFeatureLetter(p, l))(V2Path, L))
-		if IsEnabled and CurrentLetter == L {
-			LetterMenu.Check(UpperL)
-		}
+		Rows.Push(Map("label", UpperL, "checked", IsEnabled && CurrentLetter == L,
+			"action", ((p, l) => (*) => SetFeatureLetter(p, l))(V2Path, L)))
+	}
+	if _MenuPopulationBuilding is MenuPopulation
+		LetterMenu := _MenuPopulationBuilding.Create(Rows, V2Path, 1)
+	else {
+		LetterMenu := Menu()
+		_MR_RenderRows(LetterMenu, Rows, V2Path, 1, 0)
 	}
 
 	MenuParent.Add(MenuTitle, LetterMenu)
@@ -371,9 +368,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 
 ; v2-native toggle dispatcher — driven by a canonical v2 manifest path. Mirrors the
 ; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
-; in-process (no Reload); a Shortcuts modifier-combo sub-Map key forces its
-; siblings off in the same atomic batch (mutual exclusion); everything else
-; persists the flip and Reloads. Reads + writes go through infra/feature_io.ahk, so
+; in-process (no Reload); everything else persists the flip and Reloads. Reads + writes go through infra/feature_io.ahk, so
 ; no v1 PascalCase path or rename table is consulted.
 ToggleFeatureV2(V2Path) {
 	global Features
@@ -395,13 +390,7 @@ ToggleFeatureV2(V2Path) {
 	try LoggerInfo("Menu", "Feature '{1}' toggled to {2}; reloading to apply.", V2Path,
 		NewValue ? "enabled" : "disabled")
 
-	; Force every mutex sibling false in the same write so the persisted state
-	; reflects the picked variant alone (empty for independent toggles).
-	Batch := []
-	for _, SiblingPath in _MutexSiblingPathsForV2(V2Path) {
-		Batch.Push(Map("path", SiblingPath, "value", false))
-	}
-	Batch.Push(Map("path", V2Path, "value", NewValue))
+	Batch := [Map("path", V2Path, "value", NewValue)]
 	if (WriteFeatureBatchV2(Features, Batch) != Batch.Length)
 		return ConfigReportPersistenceFailure("the feature toggle '" . V2Path . "'")
 	return ReloadPreservingSuspend()

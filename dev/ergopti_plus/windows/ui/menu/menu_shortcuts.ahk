@@ -14,15 +14,10 @@
 
 
 
-; The three Shortcuts sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock) now
-; live in the manifest's ``key_combinations_group`` section, one entry per
-; sub-submenu carrying its section path and its ``group_label``, after the
-; group's own first-row switch. They used to be a Map here as well, which made
-; the manifest section decorative: nothing read it, so adding a fourth combo
-; there changed nothing until someone also edited this file. The sub-submenu
-; label is still the raw v1 key, as the legacy render had it — those are key
-; names (AltGr, LAlt, CapsLock), identical in every locale, so they carry no
-; i18n key.
+; The key combinations are the manifest's ``key_combinations_group``: its own
+; first-row switch, then one row per ordered pair of tap-hold keys, in two
+; lists (the hand of the key held first) supplied as data by
+; KeyCombinationRows (infra/key_combinations.ahk).
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
@@ -70,12 +65,24 @@ _SC_Getters() {
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
-; KeyCombinations gate, independent of Shortcuts), then one submenu per AltGr / LAlt /
-; CapsLock combination family, all declared by key_combinations_group.
-_SC_KeyCombinationsSubmenu() {
-	Commands := Map("key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"))
+; KeyCombinations gate, independent of Shortcuts), then one submenu per first
+; key listing the pairs it begins, all declared by key_combinations_group.
+_SC_KeyCombinationsSubmenu(Options := unset) {
+	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
 	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
-	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", "", Commands, Getters)
+	ListProviders := Map(
+		"key_combination_rows_left", () => KeyCombinationRows("left"),
+		"key_combination_rows_right", () => KeyCombinationRows("right"))
+	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
+}
+
+; Shared group commands use the combination owner, not the whole Shortcuts scope.
+_SC_KeyCombinationCommands(Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	return Map(
+		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
+		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
+		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
@@ -360,24 +367,24 @@ _WS_MenuRemoveCustom(Idx, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 ; Open a two-step GUI dialog to add a custom wrap-symbol pair.
 _WS_MenuAddCustom() {
 	; Step 1 — opening character
-	IB1 := InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
+	IB1 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
 	if (IB1.Result != "OK") {
 		return
 	}
 	LeftChar := Trim(IB1.Value, " `t")
 	if (StrLen(LeftChar) != 1) {
-		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
+		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
 		return
 	}
 
 	; Step 2 — closing character (optional — empty means symmetric)
-	IB2 := InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
+	IB2 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
 	if (IB2.Result != "OK") {
 		return
 	}
 	RightChar := Trim(IB2.Value, " `t")
 	if (RightChar != "" and StrLen(RightChar) != 1) {
-		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
+		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
 		return
 	}
 	if (RightChar == "") {

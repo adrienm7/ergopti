@@ -190,9 +190,9 @@ _PersonalTomlCanonicalSectionOrder(Data, &Detail) {
 ;   .sections_order  — Array of section names in meta order (or file order if no meta)
 ;   .sections        — Map(name → {description, entries[]})
 ;   .meta_description — string
-ReadPersonalToml() {
+ReadPersonalToml(Refresh := false) {
 	global _ReadPersonalTomlCache
-	if (_ReadPersonalTomlCache != false)
+	if (!Refresh && _ReadPersonalTomlCache != false)
 		return _ReadPersonalTomlCache
 
 	FilePath := PersonalTomlPath()

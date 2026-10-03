@@ -150,7 +150,7 @@ _ONA_CommitErrorsUseSelectedLocale() {
 	Assert(InStr(ErrorBody, "IsSet(_ob_locale)") > 0
 		&& InStr(ErrorBody, '_Onboarding_Translate(Code, Key)') > 0
 		&& InStr(ErrorBody,
-			'_Onboarding_Translate(Code, "onboarding.error.title")') > 0,
+			'_Onboarding_Translate(Code, "common.error_title")') > 0,
 		"the message and title must resolve in the wizard-selected locale with a safe first-boot fallback")
 	Assert(InStr(ErrorBody, "MsgBox(Message, Title") > 0,
 		"the renderer must display only translated values")

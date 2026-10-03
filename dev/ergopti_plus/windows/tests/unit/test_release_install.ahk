@@ -188,6 +188,59 @@ _RIT_FailuresReachTheObserver() {
 Test("Release install: the update path's failures reach the Versions window (release-install-observer)",
 	_RIT_FailuresReachTheObserver)
 
+; Capture the real central logger without replacing its state or file sinks.
+_RIT_WithLifecycleLogs(Body) {
+	global _LOGGER_TEST_SINK
+	SavedSink := _LOGGER_TEST_SINK
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	_RIT_Reset()
+	try Body.Call(Lines)
+	finally {
+		_RIT_Reset()
+		LoggerSetTestSink(SavedSink)
+	}
+}
+
+_RIT_LogKinds(Lines) {
+	Kinds := []
+	for _, Line in Lines {
+		if RegExMatch(Line, "\[(START|SUCCESS|ERROR|WARNING)\] \[ReleaseInstall\]", &Match)
+			Kinds.Push(Match[1])
+	}
+	return _RIT_Joined(Kinds)
+}
+
+_RIT_LogClosesAtAcknowledgedHandoff(Lines) {
+	Tag := "v-lifecycle-handoff"
+	Deps := _RIT_Deps()
+	AssertTrue(ReleaseInstall_Start(Tag, "dev", Deps))
+	AssertEqual("START", _RIT_LogKinds(Lines), "starting the download is not a completed handoff")
+	_ReleaseInstall_OnPhase(Deps, Tag, "backup", "installing")
+	AssertEqual("START", _RIT_LogKinds(Lines), "an unacknowledged swap is not a completed handoff")
+	_ReleaseInstall_OnPhase(Deps, Tag, "backup", "restarting")
+	AssertEqual("START,SUCCESS", _RIT_LogKinds(Lines), "the acknowledged restart closes the lifecycle")
+}
+Test("Release install: lifecycle succeeds only at acknowledged worker handoff",
+	_RIT_WithLifecycleLogs.Bind(_RIT_LogClosesAtAcknowledgedHandoff))
+
+_RIT_LogRefusalIsTerminal(Lines) {
+	AssertFalse(ReleaseInstall_Start("v-lifecycle-refusal", "dev", _RIT_Deps(Map("install", "fail"))))
+	AssertEqual("START,ERROR", _RIT_LogKinds(Lines), "a refused download closes with failure, never success")
+	AssertFalse(ReleaseInstall_Busy(), "failure frees the next request")
+}
+Test("Release install: download refusal logs a failure terminal",
+	_RIT_WithLifecycleLogs.Bind(_RIT_LogRefusalIsTerminal))
+
+_RIT_LogObserverFailureIsTerminal(Lines) {
+	AssertFalse(ReleaseInstall_Start("v-lifecycle-verification", "dev",
+		_RIT_Deps(Map("install", "observer_fail"))))
+	AssertEqual("START,ERROR", _RIT_LogKinds(Lines), "the observer's refusal logs one failure terminal")
+	AssertFalse(ReleaseInstall_Busy(), "observer failure frees the next request")
+}
+Test("Release install: observer failure logs one failure terminal",
+	_RIT_WithLifecycleLogs.Bind(_RIT_LogObserverFailureIsTerminal))
+
 
 
 

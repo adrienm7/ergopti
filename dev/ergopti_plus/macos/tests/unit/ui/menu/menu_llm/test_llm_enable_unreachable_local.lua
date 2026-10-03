@@ -404,6 +404,7 @@ end)
 helpers.describe("The API backend has no local requirement (llm-enable-unreachable-local)", function()
 	helpers.it("a local OpenAI server's requirement holds without asking Ollama (llm-enable-unreachable-local)", function()
 		local modules = {
+			"adapters.json_codec",
 			"infra.logger", "infra.dialog_util", "infra.i18n", "infra.paths", "modules.llm",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager",

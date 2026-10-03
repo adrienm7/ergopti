@@ -176,3 +176,64 @@ Test("output host: titleless readers share cached identity (ahk-002)",
 	_OHR_TitlelessReadersDoNotPayForTitle)
 
 OutputHostResolverConfigure()
+
+_OHR_KnownTerminalSkipsTitleButEditorsStayFresh() {
+	global HSE_TERMINAL_INPUT_EXES, _OHR_TitleReads, _OHR_IdentityReads, _OHR_Title
+	try {
+		for Exe in HSE_TERMINAL_INPUT_EXES {
+			_OHR_Reset(" " . StrUpper(Exe) . " ")
+			Receipt := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+			AssertTrue(Receipt["Valid"])
+			AssertTrue(_HSE_IsTerminalInputHost(Receipt["Exe"], Receipt["Title"]))
+			AssertEqual(0, _OHR_TitleReads, "known terminal routing must avoid a caption round trip")
+			AssertEqual(2, _OHR_IdentityReads, "skipping a title never skips final HWND/PID validation")
+		}
+		_OHR_Reset("Code.exe")
+		Editor := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+		AssertFalse(_HSE_IsTerminalInputHost(Editor["Exe"], Editor["Title"]))
+		_OHR_Title := Map("Ok", true, "Title", "Codebuff", "TimedOut", false)
+		Terminal := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+		AssertTrue(_HSE_IsTerminalInputHost(Terminal["Exe"], Terminal["Title"]))
+		AssertEqual(2, _OHR_TitleReads, "a same-window editor title change must alter routing immediately")
+	} finally OutputHostResolverConfigure()
+}
+Test("output host: terminal executables skip captions while editors stay fresh (host-title-perf-2026-10-02)",
+	_OHR_KnownTerminalSkipsTitleButEditorsStayFresh)
+
+_OHR_TitlePolicyChangesFocus(Exe) {
+	global _OHR_Identity
+	_OHR_Identity := Map("Hwnd", 1002, "Pid", 2002)
+	return false
+}
+
+_OHR_TitlePolicyReenters(Exe) {
+	AssertTrue(OutputHostResolve(false)["Valid"])
+	return false
+}
+
+_OHR_TitlePolicyThrows(Exe) {
+	throw Error("forced title policy failure")
+}
+
+_OHR_TitlePolicyKeepsIdentityAndFailureFences() {
+	try {
+		_OHR_Reset("WindowsTerminal.exe")
+		Changed := OutputHostResolve(_OHR_TitlePolicyChangesFocus)
+		AssertFalse(Changed["Valid"])
+		AssertEqual("focus_changed", Changed["Failure"])
+		_OHR_Reset("WindowsTerminal.exe")
+		Reentered := OutputHostResolve(_OHR_TitlePolicyReenters)
+		AssertFalse(Reentered["Valid"])
+		AssertEqual("superseded", Reentered["Failure"])
+		_OHR_Reset("WindowsTerminal.exe")
+		Failed := OutputHostResolve(_OHR_TitlePolicyThrows)
+		AssertFalse(Failed["Valid"])
+		AssertEqual("title_policy_error", Failed["Failure"])
+		_OHR_Reset("WindowsTerminal.exe")
+		Invalid := OutputHostResolve((Exe) => "false")
+		AssertFalse(Invalid["Valid"])
+		AssertEqual("title_policy_invalid", Invalid["Failure"])
+	} finally OutputHostResolverConfigure()
+}
+Test("output host: caption policies retain identity and failure fences (host-title-perf-2026-10-02)",
+	_OHR_TitlePolicyKeepsIdentityAndFailureFences)

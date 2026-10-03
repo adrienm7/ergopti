@@ -39,8 +39,8 @@ struct UpdateProgressText: Equatable {
 struct UpdatePromptTexts {
 	/// Every catalog key the update flow shows; each locale must define them all.
 	static let requiredKeys = [
-		"updater.title_update",
-		"updater.title_update_available",
+		"updater.window_title",
+		"updater.available_window_title",
 		"updater.update_found_body",
 		"updater.update_dialog_install",
 		"updater.update_dialog_later",
@@ -84,7 +84,7 @@ struct UpdatePromptTexts {
 
 	/// The offer of a found update, by Sparkle's stage of that update.
 	func updateFound(version: String, stage: SPUUserUpdateStage, informationOnly: Bool) -> UpdateOffer {
-		let title = text("updater.title_update_available")
+		let title = text("updater.available_window_title")
 		switch stage {
 		case .installing:
 			// Already staged: "later" still installs it when ErgoptiPlus quits.
@@ -124,7 +124,7 @@ struct UpdatePromptTexts {
 	func readyToInstall() -> UpdateOffer {
 		return UpdateOffer(
 			prompt: UpdatePrompt(
-				title: text("updater.title_update"),
+				title: text("updater.window_title"),
 				message: text("updater.ready_to_install_body"),
 				buttons: [text("updater.install_and_restart"), text("updater.install_on_quit")]),
 			choices: [.install, .dismiss])
@@ -133,7 +133,7 @@ struct UpdatePromptTexts {
 	/// A user-initiated check found nothing newer.
 	func upToDate(currentVersion: String) -> UpdatePrompt {
 		return UpdatePrompt(
-			title: text("updater.title_update"),
+			title: text("updater.window_title"),
 			message: text("updater.up_to_date", [currentVersion]),
 			buttons: [text("updater.close")])
 	}
@@ -142,7 +142,7 @@ struct UpdatePromptTexts {
 	/// never shown: it is English, and only the log needs its detail.
 	func failure(domain: String, code: Int) -> UpdatePrompt {
 		return UpdatePrompt(
-			title: text("updater.title_update"),
+			title: text("updater.window_title"),
 			message: text(Self.failureKey(domain: domain, code: code)),
 			buttons: [text("updater.close")])
 	}
@@ -170,21 +170,21 @@ struct UpdatePromptTexts {
 
 	func checking() -> UpdateProgressText {
 		return UpdateProgressText(
-			title: text("updater.title_update"),
+			title: text("updater.window_title"),
 			message: text("menu.about.update_checking"),
 			cancelTitle: text("button.cancel"))
 	}
 
 	func downloading() -> UpdateProgressText {
 		return UpdateProgressText(
-			title: text("updater.title_update"),
+			title: text("updater.window_title"),
 			message: text("menu.about.update_downloading"),
 			cancelTitle: text("button.cancel"))
 	}
 
 	func installing() -> UpdateProgressText {
 		return UpdateProgressText(
-			title: text("updater.title_update"),
+			title: text("updater.window_title"),
 			message: text("menu.about.update_installing"),
 			cancelTitle: nil)
 	}

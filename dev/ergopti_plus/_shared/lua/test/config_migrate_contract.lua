@@ -474,6 +474,67 @@ end
 -- ===============================
 -- ===============================
 
+--- Registers mutation probes that semantic TOML replay alone cannot expose.
+local function register_copy_ownership(h, driver)
+	h.describe("config migration conditional copies (" .. driver .. ")", function()
+		h.it("retains every occupied namespace byte, including empty table headers", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/copy_preserves_occupied_namespaces"
+			local _, input = read_corpus_file(dir .. "/input.toml")
+			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
+			local plan = Engine.plan(input, registry, driver)
+			h.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+			local without_stamp, removed = plan.candidate:gsub("%[_meta%]\nschema_version = 2\n\n", "", 1)
+			h.assert_eq(removed, 1, "only the new schema stamp may be added")
+			h.assert_eq(without_stamp, input, "conditional copies retain the complete original file")
+		end)
+
+		h.it("owns each copied nested value independently of its source and sibling", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/op_copy_if_absent"
+			local _, input = read_corpus_file(dir .. "/input.toml")
+			local expected = read_corpus_file(dir .. "/expected.toml")
+			local registry = assert(Engine.load_registry(dir .. "/migrations.toml"))
+			local model = assert(Engine.model_from_source(input))
+			Engine.apply_steps(model, registry, driver, 1)
+			local source = model.sections.source.records.value
+			local copied = model.sections.destination.records.value
+			local sibling = model.sections.sibling.records.value
+			h.assert_eq(copied, expected.destination.records, "the whole copied value matches independent expectations")
+			h.assert_eq(sibling, expected.sibling.records, "the second copy matches independent expectations")
+			source[1].palette[1].Key = "edited source"
+			source[#source + 1] = { future = "source only" }
+			h.assert_eq(copied, expected.destination.records, "source edits cannot change the copied value")
+			h.assert_eq(sibling, expected.sibling.records, "source edits cannot change the sibling copy")
+			copied[1].palette[1].key = "edited copy"
+			copied[1].visible = true
+			h.assert_eq(source[1].palette[1].key, "lower", "copy edits cannot change the source's nested map")
+			h.assert_eq(source[1].visible, false, "copy edits cannot change the source's Boolean")
+			h.assert_eq(sibling, expected.sibling.records, "copy edits cannot change another destination")
+			model.sections.source.rows.value[1][1] = 99
+			h.assert_eq(model.sections.destination.rows.value, expected.destination.rows, "nested copied arrays own every child")
+		end)
+
+		h.it("preserves the exact inline ancestor bytes and the complete source choice", function()
+			local dir = shared_root() .. "/tests/corpus/config_migrations/copy_preserves_occupied_namespaces"
+			local _, input = read_corpus_file(dir .. "/inline_ancestor.toml")
+			local registry = registry_from(table.concat({
+				"[registry]", "current_version = 2", "unstamped_version = 1",
+				"[steps.v1_to_v2]", "from = 1", "to = 2", 'drivers = ["ahk", "hs", "linux"]',
+				'reason = "Contract: preserve occupied inline namespaces."',
+				'ops = [{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.inline.deep", to_key = "child" },',
+				'{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "inline" }]',
+			}, "\n"))
+			local plan = Engine.plan(input, registry, driver)
+			h.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+			local expected = assert(Engine.model_from_source(input))
+			expected.sections._meta = { schema_version = { value = 2 } }
+			h.assert_eq(Engine.plain(plan.model), Engine.plain(expected), "every original source and inline choice remains intact")
+			local without_stamp, removed = plan.candidate:gsub("%[_meta%]\nschema_version = 2\n\n", "", 1)
+			h.assert_eq(removed, 1, "only the new schema stamp may be added")
+			h.assert_eq(without_stamp, input, "all original bytes survive the conditional no-ops")
+		end)
+	end)
+end
+
 --- Registers the whole contract for one driver.
 --- @param h table Driver test helpers (describe, it, assert_*).
 --- @param opts table `{ driver = "hs" | "linux" }`.
@@ -483,6 +544,7 @@ function M.register(h, opts)
 	end
 	register_corpus(h, opts.driver)
 	register_registry(h, opts.driver)
+	register_copy_ownership(h, opts.driver)
 	register_boot(h, opts.driver)
 end
 

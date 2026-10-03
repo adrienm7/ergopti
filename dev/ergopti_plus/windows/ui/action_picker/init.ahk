@@ -164,7 +164,7 @@ FilePathsEditor(*) {
 		; single-field dialog below remains as an automatic fallback.
 		if _PathsEdWeb_TryOpen()
 				return
-		W := Gui(, t("dialog.config_folder.title"))
+		W := Gui_Create(, t("dialog.config_folder.window_title"))
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12

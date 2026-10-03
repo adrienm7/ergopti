@@ -41,6 +41,8 @@ import ServiceManagement
 let kKarabinerLeaseGuardianFlag = "--karabiner-lease-guardian"
 let kRemapGuardianStatusFlag = "--remap-guardian-status"
 let kRegisterRemapGuardianFlag = "--register-remap-guardian"
+let kUnregisterRemapGuardianFlag = "--unregister-remap-guardian"
+let kGuardianLaunchctlUnknownServiceStatus: Int32 = 113
 let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
 let kRemapGuardianLabel = "com.ergoptiplus.remap-guardian"
 let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"
@@ -1841,9 +1843,14 @@ protocol GuardianLaunchctlRunning {
 final class PosixGuardianLaunchctlRunner: GuardianLaunchctlRunning {
 	/// Spawns and reaps only the exact launchctl child, with bounded owned-PID signals.
 	func run(arguments: [String]) -> Bool {
+		return exitStatus(arguments: arguments) == 0
+	}
+
+	/// Preserves an exact reaped exit code; spawn, signal and timeout failures are nil.
+	func exitStatus(arguments: [String]) -> Int32? {
 		prepareLeaseChildReaping()
 		let openedNull = Darwin.open("/dev/null", O_RDWR | O_CLOEXEC)
-		guard openedNull >= 0 else { return false }
+		guard openedNull >= 0 else { return nil }
 		let nullDescriptor: Int32
 		if openedNull <= STDERR_FILENO {
 			nullDescriptor = fcntl(openedNull, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
@@ -1851,29 +1858,29 @@ final class PosixGuardianLaunchctlRunner: GuardianLaunchctlRunning {
 		} else {
 			nullDescriptor = openedNull
 		}
-		guard nullDescriptor > STDERR_FILENO else { return false }
+		guard nullDescriptor > STDERR_FILENO else { return nil }
 		defer { Darwin.close(nullDescriptor) }
 
 		var fileActions: posix_spawn_file_actions_t?
-		guard posix_spawn_file_actions_init(&fileActions) == 0 else { return false }
+		guard posix_spawn_file_actions_init(&fileActions) == 0 else { return nil }
 		defer { posix_spawn_file_actions_destroy(&fileActions) }
 		for target in [STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO] {
 			guard posix_spawn_file_actions_adddup2(
 				&fileActions,
 				nullDescriptor,
 				target
-			) == 0 else { return false }
+			) == 0 else { return nil }
 		}
 		if nullDescriptor > STDERR_FILENO {
 			guard posix_spawn_file_actions_addclose(&fileActions, nullDescriptor) == 0
-			else { return false }
+			else { return nil }
 		}
 
 		let launchctlPath = "/bin/launchctl"
 		guard let rawArguments = duplicateLeaseArguments([launchctlPath] + arguments)
-		else { return false }
+		else { return nil }
 		defer { for case let pointer? in rawArguments { free(pointer) } }
-		guard let rawEnvironment = duplicateProcessEnvironment() else { return false }
+		guard let rawEnvironment = duplicateProcessEnvironment() else { return nil }
 		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
 		var mutableEnvironment = rawEnvironment
@@ -1890,15 +1897,15 @@ final class PosixGuardianLaunchctlRunner: GuardianLaunchctlRunning {
 				)
 			}
 		}
-		guard spawnStatus == 0 else { return false }
+		guard spawnStatus == 0 else { return nil }
 
 		let deadline = ProcessInfo.processInfo.systemUptime
 			+ kLegacyLaunchctlTimeoutSeconds
 		var status: Int32 = 0
 		while ProcessInfo.processInfo.systemUptime < deadline {
 			let waited = Darwin.waitpid(childPID, &status, WNOHANG)
-			if waited == childPID { return childExitedSuccessfully(status) }
-			if waited == -1 && errno != EINTR { return false }
+			if waited == childPID { return childExitStatus(status) }
+			if waited == -1 && errno != EINTR { return nil }
 			usleep(kGuardianArmPollMicroseconds)
 		}
 
@@ -1906,18 +1913,19 @@ final class PosixGuardianLaunchctlRunner: GuardianLaunchctlRunning {
 		let terminationDeadline = ProcessInfo.processInfo.systemUptime + 0.25
 		while ProcessInfo.processInfo.systemUptime < terminationDeadline {
 			let waited = Darwin.waitpid(childPID, &status, WNOHANG)
-			if waited == childPID { return false }
-			if waited == -1 && errno != EINTR { return false }
+			if waited == childPID { return nil }
+			if waited == -1 && errno != EINTR { return nil }
 			usleep(kGuardianArmPollMicroseconds)
 		}
 		_ = Darwin.kill(childPID, SIGKILL)
 		while Darwin.waitpid(childPID, &status, 0) == -1 && errno == EINTR {}
-		return false
+		return nil
 	}
 
 	/// Decodes a waitpid status without trusting a signalled child as success.
-	private func childExitedSuccessfully(_ status: Int32) -> Bool {
-		return status & 0x7F == 0 && ((status >> 8) & 0xFF) == 0
+	private func childExitStatus(_ status: Int32) -> Int32? {
+		guard status & 0x7F == 0 else { return nil }
+		return (status >> 8) & 0xFF
 	}
 }
 
@@ -1986,6 +1994,118 @@ enum RemapGuardianRegistrationStatus: String, Equatable {
 enum RemapGuardianSettingsResult: String, Equatable {
 	case opened
 	case notRequired = "not_required"
+}
+
+/// A receipt is emitted only after both own registration paths are absent.
+enum RemapGuardianUnregistrationResult: String, Equatable {
+	case unregistered
+	case refused
+}
+
+@available(macOS 13.0, *)
+protocol RemapGuardianUnregisteringService: AnyObject {
+	var status: SMAppService.Status { get }
+	/// Removes the exact bundle-owned background item.
+	func unregister() throws
+}
+
+@available(macOS 13.0, *)
+extension SMAppService: RemapGuardianUnregisteringService {}
+
+/// An accepted request alone is not proof that Background Items removed it.
+@available(macOS 13.0, *)
+func unregisterModernRemapGuardian(service: RemapGuardianUnregisteringService) -> Bool {
+	switch service.status {
+	case .notRegistered, .notFound:
+		return true
+	case .enabled, .requiresApproval:
+		do { try service.unregister() } catch { return false }
+		return service.status == .notRegistered || service.status == .notFound
+	@unknown default:
+		return false
+	}
+}
+
+/// Observes the fixed durable-record namespace without creating or following it.
+func remapGuardianLeaseRecordsAreEmpty(_ paths: LeaseGuardianPaths) -> Bool {
+	var root = stat()
+	if Darwin.lstat(paths.root, &root) != 0 { return errno == ENOENT }
+	guard let rootIdentity = guardianDirectoryPathIdentity(paths.root) else { return false }
+	var records = stat()
+	if Darwin.lstat(paths.records, &records) != 0 {
+		return errno == ENOENT && guardianDirectoryPathIdentity(paths.root) == rootIdentity
+	}
+	guard let identity = guardianDirectoryPathIdentity(paths.records),
+		let names = try? FileManager.default.contentsOfDirectory(atPath: paths.records),
+		names.isEmpty,
+		guardianDirectoryPathIdentity(paths.records) == identity,
+		guardianDirectoryPathIdentity(paths.root) == rootIdentity
+	else { return false }
+	return true
+}
+
+/// Refuses removal while durable lease retirement or a guardian drain remains.
+func performRemapGuardianUnregistration(
+	leasesAreEmpty: () -> Bool,
+	removeLegacy: () -> Bool,
+	unregisterModern: () -> Bool,
+	guardianHasExited: () -> Bool
+) -> RemapGuardianUnregistrationResult {
+	guard leasesAreEmpty(), removeLegacy(), unregisterModern(),
+		guardianHasExited(), leasesAreEmpty()
+	else { return .refused }
+	return .unregistered
+}
+
+/// STOPPED and service removal may precede their final native exit receipts.
+func waitForRemapGuardianUnregistrationObservation(
+	observe: () -> Bool,
+	now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+	pause: () -> Void = { usleep(kGuardianArmPollMicroseconds) },
+	timeout: TimeInterval = kLegacyLaunchctlTimeoutSeconds
+) -> Bool {
+	let deadline = now() + timeout
+	while !observe() {
+		guard now() < deadline else { return false }
+		pause()
+	}
+	return true
+}
+
+/// Removes only this bundle's guardian; stock Karabiner is never controlled.
+func unregisterRemapGuardian(executablePath: String) -> RemapGuardianUnregistrationResult {
+	let paths = LeaseGuardianPaths()
+	return performRemapGuardianUnregistration(
+		leasesAreEmpty: {
+			waitForRemapGuardianUnregistrationObservation(
+				observe: { remapGuardianLeaseRecordsAreEmpty(paths) }
+			)
+		},
+		removeLegacy: { removeLegacyRemapGuardian(executablePath: executablePath) },
+		unregisterModern: {
+			if #available(macOS 13.0, *) {
+				return unregisterModernRemapGuardian(
+					service: SMAppService.agent(plistName: kRemapGuardianPlistName)
+				)
+			}
+			return true
+		},
+		guardianHasExited: {
+			let target = "gui/\(getuid())/" + kRemapGuardianLabel
+			guard PosixGuardianLaunchctlRunner().exitStatus(arguments: ["print", target])
+				== kGuardianLaunchctlUnknownServiceStatus else { return false }
+			return waitForRemapGuardianUnregistrationObservation(observe: {
+			let descriptor = Darwin.open(paths.singletonLock, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
+			guard descriptor >= 0 else { return errno == ENOENT }
+			defer { Darwin.close(descriptor) }
+			guard guardianFileIdentity(descriptor: descriptor) != nil,
+				ergoptiFlock(descriptor, LOCK_SH | LOCK_NB) == 0
+			else { return false }
+			_ = ergoptiFlock(descriptor, LOCK_UN)
+			return true
+			})
+		}
+	)
 }
 
 @available(macOS 13.0, *)

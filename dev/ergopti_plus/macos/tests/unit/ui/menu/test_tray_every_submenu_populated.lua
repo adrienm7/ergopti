@@ -65,7 +65,8 @@ local function remap_double()
 			{ id = "ctrl", label = "Ctrl", category = "Modifiers", holdable = true, tappable = false },
 		},
 		TAP_HOLD_KEYS = { { id = "left_shift", label = "Left Shift" }, { id = "return_or_enter", label = "Enter" } },
-		MOD_COMBOS = { { id = "shift_pair", label = "Shift pair", group = "Shift" } },
+		MOD_COMBOS = { { id = "shift_pair", label = "Shift pair", group = "Shift",
+			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
@@ -337,7 +338,6 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			"-",
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
-			i18n.get("menu.global.start_at_login"),
 			i18n.get("menu.global.karabiner_integration"),
 			i18n.get("menu.global.remove_from_karabiner"),
 		}, " | "))
@@ -364,6 +364,8 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		end
 		helpers.assert_eq(rows[#rows].title, label)
 		helpers.assert_eq(rows[#rows].disabled == true, source_run, "greyed exactly on a source run")
-		helpers.assert_eq(rows[#rows - 1].title, "-", "a separator sets Uninstall apart")
+		helpers.assert_eq(rows[#rows - 1].title, i18n.get("menu.global.start_at_login"),
+			"startup immediately precedes Uninstall")
+		helpers.assert_eq(rows[#rows - 2].title, "-", "a separator sets the installation group apart")
 	end)
 end)

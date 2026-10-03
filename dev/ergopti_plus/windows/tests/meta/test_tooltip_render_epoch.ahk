@@ -3,6 +3,7 @@
 
 Test_TooltipRenderUsesImmutableGeneration() {
 	Body := _DriverFuncBody("_TooltipShowNow")
+	Assert(Body != "", "_TooltipShowNow must exist before checking render fences")
 	Assert(InStr(Body, "RenderGeneration := _TooltipGeneration") > 0,
 		"_TooltipShowNow must capture the generation it owns before rendering")
 	Assert(InStr(Body, "if (RenderGeneration != _TooltipGeneration") > 0,
@@ -12,7 +13,8 @@ Test_TooltipRenderUsesImmutableGeneration() {
 		and InStr(Body, "RequestSerial") > 0,
 		"a failed render must pass its generation + request owner into the central hide transaction, which refuses stale A after B")
 
-	ResolvePos := InStr(Body, "Pos := _TooltipResolvePosition()")
+	ResolvePos := InStr(Body, "_TooltipResolvePosition(IsPreview)")
+	Assert(ResolvePos > 0, "position resolution must exist before searching its guard")
 	ResolveGuard := InStr(Body, "if (RenderGeneration != _TooltipGeneration", false, ResolvePos)
 	Present := InStr(Body, "_TooltipPresentStack")
 	Assert(ResolvePos > 0 and ResolveGuard > ResolvePos and Present > ResolveGuard,

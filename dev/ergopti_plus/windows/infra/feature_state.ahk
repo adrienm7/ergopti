@@ -43,10 +43,10 @@ global ScriptInformation := Map(
 		; only for a key the user chose or the active layout declares, so an
 		; emulated layout declaring none keeps its own character; decided at boot.
 		"MagicKeySourceOverridesEmulation", false,
-		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
-		; false here is overwritten by HotstringEngineInit() which auto-detects via
-		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
-		; explicitly set to "true" or "false"; "auto" (or absent) defers to the
+		; Manual override for the AltGr-as-Kana / custom-remap detection. The
+		; manifest default is "auto": HotstringEngineInit() detects the family via
+		; a reverse VK_RMENU→SC probe. The TOML value (under [script]) wins when
+		; explicitly set to true or false; "auto" (or absent) defers to the
 		; probe. Kept as an escape hatch in case the probe ever misfires on an
 		; exotic layout.
 		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault("script.alt_gr_is_kana_remap"),

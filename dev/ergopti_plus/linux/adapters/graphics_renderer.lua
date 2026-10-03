@@ -145,9 +145,44 @@ local function measure(layout, text, font, size)
 	return w, h
 end
 
+--- The font and point size one segment of a segmented row is set in.
+--- @param segment table { bold?, small? }
+--- @param style table
+--- @return string font, number size
+local function segment_font(segment, style)
+	return segment.bold and style.fonts.bold or style.fonts.main,
+		segment.small and style.sizes.hint or style.sizes.main
+end
+
+--- Measures a segmented row: a prefix, then pieces that each have their own
+--- colour, weight and size, laid out one after the other on a single line.
+--- @param row table { prefix?, segments }
+--- @param style table
+--- @param pango_layout userdata
+--- @return table { text_w, text_h, label_w, height, prefix_w, segments }
+local function measure_segmented_row(row, style, pango_layout)
+	local prefix_w, height = 0, 0
+	if row.prefix and row.prefix ~= "" then
+		prefix_w, height = measure(pango_layout, row.prefix, style.fonts.main, style.sizes.main)
+	end
+	local width = prefix_w
+	local sizes = {}
+	for index, segment in ipairs(row.segments) do
+		local font, size = segment_font(segment, style)
+		local w, h = measure(pango_layout, segment.text or "", font, size)
+		sizes[index] = { w = w, h = h }
+		width = width + w
+		height = math.max(height, h)
+	end
+	return {
+		text_w = width, text_h = height, label_w = 0, height = height,
+		prefix_w = prefix_w, segments = sizes,
+	}
+end
+
 --- Computes the panel size for a set of rows.
 ---
---- @param rows table Array of { text, label }.
+--- @param rows table Array of { text, label } or { prefix, segments }.
 --- @param style table From ui/tooltip/config.lua.
 --- @param pango_layout userdata
 --- @return table { w, h }, table Per-row metrics.
@@ -159,18 +194,24 @@ function M.measure_rows(rows, style, pango_layout)
 	local widest, total_height = 0, 0
 
 	for i, row in ipairs(rows) do
-		local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
-		local label_w, label_h = 0, 0
-		if row.label and row.label ~= "" then
-			label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+		local row_w, row_h
+		if type(row.segments) == "table" then
+			metrics[i] = measure_segmented_row(row, style, pango_layout)
+			row_w, row_h = metrics[i].text_w, metrics[i].height
+		else
+			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
+			local label_w, label_h = 0, 0
+			if row.label and row.label ~= "" then
+				label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+			end
+
+			-- The label is right-aligned on the same line, so the row is as wide as
+			-- both plus the gap between them — not as wide as the wider of the two.
+			row_w = text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
+			row_h = math.max(text_h, label_h)
+
+			metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h }
 		end
-
-		-- The label is right-aligned on the same line, so the row is as wide as
-		-- both plus the gap between them — not as wide as the wider of the two.
-		local row_w = text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
-		local row_h = math.max(text_h, label_h)
-
-		metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h }
 		widest = math.max(widest, row_w)
 		total_height = total_height + row_h
 		if i < #rows then total_height = total_height + style.layout.line_spacing end
@@ -206,6 +247,42 @@ local function rounded_rect(cr, w, h, radius)
 	cr:close_path()
 end
 
+--- Paints a segmented row: the prefix when it has a colour (without one it is
+--- spacing only), then each piece in its own colour, weight and size. The
+--- pieces sit on the row's bottom edge, so a smaller one lines up with the
+--- text beside it instead of hanging from the top.
+--- @param cr userdata Cairo context.
+--- @param pango_layout userdata
+--- @param row table { prefix?, prefix_color?, segments }
+--- @param m table The row's metrics from measure_segmented_row.
+--- @param style table
+--- @param y number Top of the row.
+local function paint_segmented_row(cr, pango_layout, row, m, style, y)
+	local g = bind()
+	local x = style.layout.pad_x
+
+	local function draw(text, font, size, color, height)
+		local description = g.Pango.FontDescription.from_string(font)
+		description:set_size(size * PANGO_SCALE)
+		pango_layout:set_font_description(description)
+		pango_layout:set_text(text, -1)
+		cr:set_source_rgba(color.red, color.green, color.blue, 1)
+		cr:move_to(x, y + (m.height - height))
+		g.PangoCairo.show_layout(cr, pango_layout)
+	end
+
+	if row.prefix_color and m.prefix_w > 0 then
+		draw(row.prefix, style.fonts.main, style.sizes.main, row.prefix_color, m.height)
+	end
+	x = x + m.prefix_w
+
+	for index, segment in ipairs(row.segments) do
+		local font, size = segment_font(segment, style)
+		draw(segment.text or "", font, size, segment.color, m.segments[index].h)
+		x = x + m.segments[index].w
+	end
+end
+
 --- Paints the panel and its rows.
 --- @param cr userdata Cairo context.
 --- @param rows table
@@ -238,6 +315,11 @@ local function paint(cr, rows, metrics, style, size, background)
 
 	for i, row in ipairs(rows) do
 		local m = metrics[i]
+		if type(row.segments) == "table" then
+			paint_segmented_row(cr, pango_layout, row, m, style, y)
+			y = y + m.height + style.layout.line_spacing
+			goto continue
+		end
 		-- A dimmed row is one the engine will not fire — a candidate whose
 		-- category is off, or one a higher-priority mapping beats. Showing it
 		-- greyed rather than hiding it is what tells the user WHY nothing
@@ -287,6 +369,7 @@ local function paint(cr, rows, metrics, style, size, background)
 		end
 
 		y = y + m.height + style.layout.line_spacing
+		::continue::
 	end
 end
 
