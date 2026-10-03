@@ -122,19 +122,20 @@ _SCFS_SwitchOffLeavesEveryChord() {
 Test("script chords: the submenu switch off leaves every chord to the system (script-chords-switch-2026-09-30)",
 	_SCFS_SwitchOffLeavesEveryChord)
 
-; The real criteria of the plan, on a Kana-style layout, where an AltGr press
-; needs no physical RAlt: the combination is the driver's only while its slot
-; holds an action. The Kana and paused twins read the physical SC138, which is
-; up here, so they stay off whatever the slot holds.
-_SCFS_CriteriaAskTheSlot() {
-	global TapHold
-	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+; Evaluate the actual plan criteria with a modeled physical press, without
+; injecting host input. The suffix-only twins retain their actual released-host
+; check; this isolates the combination route and its slot ownership.
+_SCFS_CriteriaAskTheSlot(Pressed := true) {
+	global TapHold, _ALTGR_PHYSICAL_STATE_QUERY
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true), Query: _ALTGR_PHYSICAL_STATE_QUERY }
 	try {
 		TapHold := Map("keys", Map(), "layers", Map())
+		_ALTGR_PHYSICAL_STATE_QUERY := (Key) => Pressed
 		_SCFS_WithAssignments(_SCFS_Assignments("none"), _SCFS_CriteriaExpect.Bind(false))
-		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(true))
+		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(Pressed))
 		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(false), false)
 	} finally {
+		_ALTGR_PHYSICAL_STATE_QUERY := Saved.Query
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
 	}
@@ -150,3 +151,6 @@ _SCFS_CriteriaExpect(Assigned) {
 }
 Test("script chords: every chord criterion asks its own slot (script-chord-slot-2026-09-30)",
 	_SCFS_CriteriaAskTheSlot)
+
+Test("script chords: released AltGr never admits assigned chords (altgr-physical-eligibility)",
+	_SCFS_CriteriaAskTheSlot.Bind(false))

@@ -17,6 +17,7 @@ _TPCR_Receipt(Monitor, Left := 0, Top := 0, Right := 1920, Bottom := 1080,
 _TPCR_Cache(Environment, Hwnd := 7001, Tick := 1000) {
 	return Map(
 		"hwnd", Hwnd,
+		"control", 8001,
 		"x", 400,
 		"y", 500,
 		"tick", Tick,
@@ -29,21 +30,27 @@ _TPCR_PositionCacheRequiresExactEnvironmentReceipt() {
 	Cache := _TPCR_Cache(Baseline)
 
 	AssertTrue(_TooltipPositionCacheCanReuse(Cache, 7001,
-		_TPCR_Receipt(101, -1920, 0, 0, 1040, 120), 1200, 600),
+		_TPCR_Receipt(101, -1920, 0, 0, 1040, 120), 1200, 600, 8001),
 		"the same HWND, monitor, work area, and DPI must reuse a fresh position")
 	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001,
-		_TPCR_Receipt(202, -1920, 0, 0, 1040, 120), 1200, 600),
+		_TPCR_Receipt(202, -1920, 0, 0, 1040, 120), 1200, 600, 8001),
 		"moving the same HWND to another monitor must invalidate the position")
 	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001,
-		_TPCR_Receipt(101, -1920, 0, 0, 1000, 120), 1200, 600),
+		_TPCR_Receipt(101, -1920, 0, 0, 1000, 120), 1200, 600, 8001),
 		"a work-area change on the same monitor must invalidate the position")
 	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001,
-		_TPCR_Receipt(101, -1920, 0, 0, 1040, 144), 1200, 600),
+		_TPCR_Receipt(101, -1920, 0, 0, 1040, 144), 1200, 600, 8001),
 		"a DPI change on the same monitor must invalidate the position")
-	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7002, Baseline, 1200, 600),
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7002, Baseline, 1200, 600, 8001),
 		"a different foreground HWND must never reuse the receipt")
-	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1700, 600),
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1700, 600, 8001),
 		"an expired receipt must miss even when its environment is unchanged")
+	Cache["control"] := 8001
+	AssertTrue(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1200, 600, 8001))
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1200, 600, 8002),
+		"a different editor in the same HWND must never reuse a caret position")
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1200, 600, 0),
+		"an unknown focused control must refuse cached coordinates")
 }
 
 _TPCR_QueryComposesMonitorWorkAreaAndDpi() {
@@ -69,10 +76,10 @@ _TPCR_QueryComposesMonitorWorkAreaAndDpi() {
 _TPCR_InvalidEnvironmentFailsClosed() {
 	Baseline := _TPCR_Receipt(101)
 	Cache := _TPCR_Cache(Baseline)
-	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, 0, 1200, 600),
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, 0, 1200, 600, 8001),
 		"an unavailable current environment must force a fresh probe")
 	Cache.Delete("environment")
-	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1200, 600),
+	AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Baseline, 1200, 600, 8001),
 		"a legacy cache entry without an environment receipt must miss")
 	AssertFalse(IsObject(_TooltipReadPositionReceipt(8001, (*) => 0,
 		(*) => _TPCR_Receipt(1), (*) => 96)),

@@ -271,6 +271,15 @@ KL_FlushShutdownReady(Port := 0, FlushBufferFn := KL_FlushBuffer) {
 	}
 	if !KL_DataSqlShutdownReady()
 		return false
+	; No persistence owner exists before KL_Init. Only a genuinely empty owner
+	; may exit here; failed initialization with accepted data still refuses.
+	if !Keylogger.initialized
+		return Keylogger.buffer_events.Length = 0 && Keylogger.buffer_text = ""
+			&& Keylogger.rich_chunks.Length = 0 && Keylogger.session_clicks = 0
+			&& Keylogger.session_scrolls = 0 && Keylogger.mouse_distance = 0
+			&& Keylogger._retry_snapshots.Length = 0 && Keylogger._pending_entries.Length = 0
+			&& !_KL_RolloverPending() && !IsObject(_KL_JournalOwnerFor(Port)._Token)
+			&& !_KL_JournalOwnerFor(Port).HasDebt()
 	FlushComplete := false
 	try FlushComplete := FlushBufferFn.Call() = true
 	if !FlushComplete

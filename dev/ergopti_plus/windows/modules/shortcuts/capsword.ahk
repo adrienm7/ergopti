@@ -17,8 +17,8 @@
 ; initializer instead of a top-level `global := .Bind()`. A module-scope
 ; assignment executes only when auto-exec reaches this file's #Include position
 ; (~700 ms into boot), but ToggleCapsWord/DisableCapsWord are reachable far
-; earlier — the default-enabled lalt_caps_lock.caps_word action fires from a
-; parse-time-armed hotkey once Features exists (~420 ms) — so the old global was
+; earlier — a key combination bound to caps_word fires from a parse-time-armed
+; hotkey once its slots are read — so the old global was
 ; unset in that window and dereferencing it threw UnsetError -> ExitApp(1) via the
 ; pre-ready error net. The static initializer runs on first call (any time after
 ; parse) and returns the SAME object every call, so HookDispatcher's identity
@@ -83,17 +83,15 @@ DisableCapsWord() {
 ; once, at load, so a CapsLock already on when the driver starts is respected.
 global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
 
-; UpdateCapsLockLED is the SINGLE owner of the physical CapsLock LED. Three
-; logical states can independently want the LED lit: CapsWord, the nav layer,
-; and a real hardware CapsLock toggle (AltGr+CapsLock). Computing the LED from
-; the OR of all three — instead of letting each state drive SetCapsLockState
-; on its own — keeps the LED a reliable indicator no matter how the three are
-; interleaved. ToggleCapsLock flips the hardware intent then routes through
-; here so the LED can never disagree with the union of the logical states.
+; The CapsLock toggle changes native character case as well as its LED. Only
+; CapsWord and the user's genuine CapsLock intent may drive it. Navigation has
+; its own tray indicator: lighting this LED for the layer capitalised every
+; unbound key, even when the layer had no bindings.
 UpdateCapsLockLED() {
 	global _HardwareCapsLockOn
-	LedOn := CapsWordEnabled or LayerEnabled or _HardwareCapsLockOn
+	LedOn := CapsWordEnabled or _HardwareCapsLockOn
 	SetCapsLockState(LedOn ? "On" : "Off")
+	NavigationLayerUpdateIndicator(LayerEnabled and !A_IsSuspended)
 	try {
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("CapsLockState",

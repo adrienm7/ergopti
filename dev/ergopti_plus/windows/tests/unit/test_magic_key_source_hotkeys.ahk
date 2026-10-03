@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; The magic key's hotkeys were registered one way for every source key: RemapKey
 ; on the key's scan code with the source character ("j"), which binds every
-; level of it (*SC → {Blind}j, ^SC, !SC, #SC), plus Ctrl+★ → Ctrl+S and Win+★ →
-; the personal editor. That fits the layout's own magic-key position, whose
-; Shift level is J. A key the user chose from the Layout menu is some other key
+; level of it (*SC → {Blind}j, ^SC, !SC, #SC), plus Ctrl+★ → Ctrl+S. The
+; editor action belongs to an ordinary user-owned slot. The layout's own
+; magic-key position has J on Shift. A key the user chose from the Layout menu is some other key
 ; of their layout: with Semicolon chosen, Shift+; typed "J", and with KeyV chosen
 ; Ctrl+V sent Ctrl+J, or Ctrl+S with ctrl_magic_save on. These cases pin the
 ; plan layout.ahk registers.
@@ -29,13 +29,13 @@ _MKH_ChosenKeyCase() {
 	}
 }
 
-Test("magic key source: the layout's own key keeps its levels, Ctrl+S and the editor (magic-key-source)",
+Test("magic key source: the layout's own key keeps its levels and Ctrl+S without an editor chord (magic-key-source)",
 	_MKH_LayoutKeyCase)
 
 _MKH_LayoutKeyCase() {
-	AssertEqual("remap SC02E, ctrl_save ^SC02E, editor #SC02E",
+	AssertEqual("remap SC02E, ctrl_save ^SC02E",
 		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, true)))
-	AssertEqual("remap SC02E, editor #SC02E",
+	AssertEqual("remap SC02E",
 		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, false)))
 }
 

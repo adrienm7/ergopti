@@ -86,16 +86,22 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "6c768979b9b4886fd78c2bc4428d837a0f9d1557b3469229533a2c2b6d9f9ebd",
+				"sha256": "f149953a2b2dc16bc33886d9e96b93f46027d932e58725c79777e6f85e8105ea",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
 						"file": "ergopti/ergopti.keylayout",
 						"size": 46791,
 						"sha256": "91764c4f3879f8046a3198354259cb4ed324b28973d47b6e2cd0eb1c576a0e83"
+					},
+					{
+						"path": "hotstrings/distancesreduction.toml",
+						"file": "ergopti/hotstrings/distancesreduction.toml",
+						"size": 23634,
+						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -118,8 +124,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1312,
+						"sha256": "3954961706116766a1555f2abfb98a01be1981f65cb45be7dcf79db4457464c4"
 					}
 				]
 			},
@@ -185,16 +191,22 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "55dc514a86a63c61e21f4cebd883a8abf40c085b6e41e08d6be101249947a8ad",
+				"sha256": "7bf4f1dcb5407e375b4b6c5252f994d7572f8cb99a0113c784345d7dcf223d1e",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
 						"file": "ergopti_ansi/ergopti_ansi.keylayout",
 						"size": 46796,
 						"sha256": "c8b3c7a7e51e1622b305d35628bbc4f2766b3be0b9288ce24b06812541e4d87c"
+					},
+					{
+						"path": "hotstrings/distancesreduction.toml",
+						"file": "ergopti/hotstrings/distancesreduction.toml",
+						"size": 23634,
+						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -217,8 +229,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1312,
+						"sha256": "3954961706116766a1555f2abfb98a01be1981f65cb45be7dcf79db4457464c4"
 					}
 				]
 			},
@@ -284,16 +296,22 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "cae8cdca3695b794ea8f06bc7aad9506211a6daf180e2f36f0d21851d6b23a0c",
+				"sha256": "a71de1d8d39d34a5abdd54664a457c175d87f5a86615773a1c2019bc56153159",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
 						"file": "ergopti_plus/ergopti_plus.keylayout",
 						"size": 46930,
 						"sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059"
+					},
+					{
+						"path": "hotstrings/distancesreduction.toml",
+						"file": "ergopti/hotstrings/distancesreduction.toml",
+						"size": 23634,
+						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -316,8 +334,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1312,
+						"sha256": "3954961706116766a1555f2abfb98a01be1981f65cb45be7dcf79db4457464c4"
 					}
 				]
 			},
@@ -383,16 +401,22 @@
 			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
 			"extension": {
 				"id": "ergopti",
-				"name": "Ergopti",
+				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "fce69b8b3e0f3607bd39daec26032fd20abcba09b80d415916d1f758f2f0fd60",
+				"sha256": "866a19329c538841af4f0a7710516be203065ab93d50300ad7a08bfeff632bcb",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
 						"file": "ergopti_plus_ansi/ergopti_plus_ansi.keylayout",
 						"size": 46935,
 						"sha256": "955898fa3afde201ca7d6f68b9ee22675723e6ce68f773e162d9d43336be5757"
+					},
+					{
+						"path": "hotstrings/distancesreduction.toml",
+						"file": "ergopti/hotstrings/distancesreduction.toml",
+						"size": 23634,
+						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -415,8 +439,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1155,
-						"sha256": "b8c8c5b0810dabe30cf07e48bbb0eb3be546a8625c3a38cb37ace0230bd04fef"
+						"size": 1312,
+						"sha256": "3954961706116766a1555f2abfb98a01be1981f65cb45be7dcf79db4457464c4"
 					}
 				]
 			},

@@ -332,4 +332,32 @@ helpers.describe("remap setters: a hold that enters the layer brings it along", 
 	end)
 end)
 
+
+helpers.describe("the combination menu has its own native scope", function()
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("applies " .. mode .. " to pairs and recovers a negative terminal", function()
+			with_fixture(function(fixture)
+				local remap, calls, disk = scoped_remap(fixture)
+				helpers.assert_true(remap.set_mod_combos_enabled(false))
+				calls.save, calls.saved_payloads = 0, {}
+				local accepted, settled = request(remap, "key_combinations", mode, "/remap/combination-backup")
+				helpers.assert_true(accepted)
+				helpers.assert_eq(disk.files["/remap/combination-backup"], SOURCE)
+				local saved = calls.saved_payloads[1]
+				helpers.assert_eq(saved.tap_hold_config[KEY].tap, "escape", "other keys remain intact")
+				helpers.assert_eq(saved.mod_combos_config[COMBO].tap, mode == "recommended" and "paste" or "none")
+				if mode == "clear" then
+					helpers.assert_eq(saved.mod_combos_enabled, false, "clear preserves the switch")
+				end
+				helpers.assert_eq(#settled, 0, "acceptance is not success")
+				disk.terminal(false, "activation-failed")
+				disk.terminal(true, "ready")
+				helpers.assert_eq(settled[1].ok, false)
+				helpers.assert_eq(remap.get_combo_tap_action(COMBO), "escape")
+				helpers.assert_eq(remap.get_mod_combos_enabled(), false)
+			end)
+		end)
+	end
+end)
+
 return true

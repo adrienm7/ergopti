@@ -53,6 +53,15 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 		"initMenu(PublishAuthorizeFn)") > 0,
 		"the narrow LLM projection must pass its terminal authorizer to initMenu")
 
+	Shell := _DriverFuncBody("_TrayRootBuildShell")
+	Assert(Shell != "", "the early global-command worker must exist")
+	Assert(InStr(Shell, "initMenu(PublishAuthorizeFn, true)") > 0,
+		"the global-command root must join the sole authorized native publisher")
+	ShellRequest := _DriverFuncBody("BuildReadyTrayShell")
+	Assert(ShellRequest != "", "the shell request must exist")
+	Assert(InStr(ShellRequest, "RebuildTrayMenu(0, _TrayRootBuildShell, false)") > 0,
+		"the shell worker must receive the root coordinator's terminal ticket")
+
 	InitBody := _DriverFuncBody("initMenu")
 	Assert(InitBody != "", "initMenu() must exist")
 	Assert(InStr(InitBody,
@@ -75,12 +84,19 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 	DriverSource := _DriverSourceNoComments()
 	Assert(DriverSource != "", "driver source must be readable")
 	StrReplace(DriverSource, "initMenu(", "", true, &InitMenuSiteCount)
-	AssertEqual(4, InitMenuSiteCount,
-		"initMenu may appear only at its declaration and the three coordinator-owned production workers")
+	AssertEqual(5, InitMenuSiteCount,
+		"initMenu may appear only at its declaration and the four coordinator-owned production workers, including the ready shell")
 	StrReplace(DriverSource, "TrayMenuStage_Publish(", "", true,
 		&PublishSiteCount)
 	AssertEqual(2, PublishSiteCount,
 		"TrayMenuStage_Publish may appear only at its declaration and inside initMenu")
+	BootBody := _DriverFuncBody("_TrayRootBuildBoot")
+	Assert(BootBody != "", "the boot publication owner must exist")
+	StageClosed := InStr(BootBody, 'BootProfile_StageEnd("tray menu"')
+	AdmissionOpen := InStr(BootBody, "_TrayRootBootDetailsPending := false")
+	Handoff := InStr(BootBody, "_TrayStartupClick.NotifyReady()")
+	Assert(StageClosed > 0 && AdmissionOpen > StageClosed && Handoff > AdmissionOpen,
+		"both ordinary clicks and retained navigation must wait until construction timing closes")
 }
 Test("tray root: production terminal authorization reaches native publication (tray-root-terminal-forwarding)",
 	_TRF_ProductionChainForwardsExactTerminalAuthorization)

@@ -431,6 +431,35 @@
 	}
 
 	/**
+	 * Orders feature labels in the reader's language, leaving the host snapshot
+	 * untouched. Decorative prefixes must not decide alphabetical position.
+	 * @param {object} section
+	 * @param {object} data
+	 * @param {object} schema
+	 * @param {function(string, ...*): string} t
+	 * @returns {object[]}
+	 */
+	function sectionItems(section, data, schema, t) {
+		var items = Array.isArray(data.items) ? data.items : [];
+		if (section.id !== 'features') return items;
+		var labelled = items.map(function (item) {
+			return {
+				item: item,
+				label: itemText(section, schema, 'id', item.id, t).replace(/^[^\p{L}\p{N}]+/u, '')
+			};
+		});
+		labelled.sort(function (left, right) {
+			return (
+				left.label.localeCompare(right.label, global._i18n_locale, { sensitivity: 'base' }) ||
+				String(left.item.id).localeCompare(String(right.item.id))
+			);
+		});
+		return labelled.map(function (entry) {
+			return entry.item;
+		});
+	}
+
+	/**
 	 * What an items section that a probe completes says while that probe has
 	 * not answered with the whole list, or null.
 	 * @param {object} section
@@ -455,7 +484,7 @@
 	 * @returns {string}
 	 */
 	function renderItems(section, data, snapshot, schema, t) {
-		var items = Array.isArray(data.items) ? data.items : [];
+		var items = sectionItems(section, data, schema, t);
 		var note = itemsProbeNote(section, snapshot, t);
 		var noteHtml = note ? '<p class="' + note.state + '">' + escapeHtml(note.text) + '</p>' : '';
 		if (items.length === 0) {
@@ -651,7 +680,7 @@
 			return lines;
 		}
 		if (section.kind === 'items') {
-			var items = Array.isArray(data.items) ? data.items : [];
+			var items = sectionItems(section, data, schema, t);
 			var note = itemsProbeNote(section, snapshot, t);
 			if (items.length === 0) {
 				lines.push(note ? note.text : t('healthcheck.value.none'), '');

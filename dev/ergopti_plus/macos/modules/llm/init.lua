@@ -19,6 +19,7 @@ local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
+local JsonCodec = require("adapters.json_codec")
 
 local LOG = "llm.core"
 
@@ -85,8 +86,8 @@ local function load_shared_defaults()
 		error("ergopti_plus: _shared/modules/llm/defaults.json is required but was not found")
 	end
 
-	local ok, parsed = pcall(hs.json.decode, raw)
-	if not ok or type(parsed) ~= "table" then
+	local parsed, decode_err = JsonCodec.decode(raw)
+	if decode_err ~= nil or type(parsed) ~= "table" then
 		Logger.error(LOG, "_shared/modules/llm/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
 		error("ergopti_plus: _shared/modules/llm/defaults.json failed to parse")
 	end
@@ -1913,8 +1914,8 @@ local function get_model_index()
 		if ok and fh then
 			local raw = fh:read("*a")
 			pcall(function() fh:close() end)
-			local dec_ok, data = pcall(hs.json.decode, raw)
-			if dec_ok and type(data) == "table" then presets = data end
+			local data, decode_err = JsonCodec.decode(raw)
+			if decode_err == nil and type(data) == "table" then presets = data end
 		end
 	end
 	-- Flatten all models into a single index keyed by label

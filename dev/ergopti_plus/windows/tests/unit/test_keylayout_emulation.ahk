@@ -532,19 +532,20 @@ _KLT_MagicKeyDeclarationCase() {
 Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
 	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
-; Evaluates an AltGr row's criterion on the Kana layout family, with no AltGr
-; tap-hold. On the standard family IsRealAltGrPress also requires the physical
-; RAlt, which no test can press, so the criterion is false there whatever the
-; row decides (see test_altgr_combos_stand_down.ahk).
+; Evaluates the actual registered criterion with a modeled physical press.
+; Host input is never injected; the physical-state port is restored on refusal.
 ; @param Criterion {Func} The #HotIf criterion the row was registered under.
+; @param Pressed {Boolean} Whether the modeled AltGr key is physically held.
 ; @returns {Boolean} The criterion's answer while AltGr is held as AltGr.
-_KLT_AltGrRowOnKanaFamily(Criterion) {
-	global TapHold
-	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+_KLT_AltGrRowOnKanaFamily(Criterion, Pressed := true) {
+	global TapHold, _ALTGR_PHYSICAL_STATE_QUERY
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true), Query: _ALTGR_PHYSICAL_STATE_QUERY }
 	try {
 		TapHold := Map("keys", Map(), "layers", Map())
+		_ALTGR_PHYSICAL_STATE_QUERY := (Key) => Pressed
 		return Criterion.Call()
 	} finally {
+		_ALTGR_PHYSICAL_STATE_QUERY := Saved.Query
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
 	}
@@ -578,6 +579,8 @@ _KLT_MagicKeyYieldCase() {
 		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
 		AssertTrue(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"]),
 			"AltGr keeps the emulated layout's character")
+		AssertFalse(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"], false),
+			"released AltGr leaves the magic-key suffix to its current owner")
 		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
 		ScriptInformation["MagicKeySourceScan"] := "SC027"
 		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the chosen key, not a fixed position")
@@ -619,7 +622,7 @@ _KLT_RegistrationCase() {
 		AssertEqual(Expected, Names.Length)
 		Joined := " " . _KLT_Join(Names, " ") . " "
 		for Name in ["SC010", "+SC010", "^SC010", "!+SC056", "#+SC029", "SC138 & SC010", "SC039", "+SC039",
-			"SC138 & SC039", "~BackSpace"]
+			"SC138 & SC039", "~SC00E"]
 			Assert(InStr(Joined, " " . Name . " "), Name . " must be registered")
 		for Name in ["^SC039", "#SC039", "!SC039"]
 			AssertEqual(0, InStr(Joined, " " . Name . " "), Name . " is a system shortcut and must stay native")
@@ -714,3 +717,54 @@ _KLT_BootCase() {
 		KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadNothing, Failing)))
 	AssertFalse(IsObject(KLE_Model), "nothing is emulated after a failed download")
 }
+
+; Capture the actual registration boundary, including names built by concatenation.
+; Resolve expectations independently from the shared physical-key registry.
+_KLT_ResetKeyCase(Code) {
+	global CategoryEnabled, LayerEnabled, KLE_Registered
+	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	Record := Registry["keys"][Code]
+	Saved := [CategoryEnabled, LayerEnabled, KLE_Registered]
+	try {
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		KLE_Registered := false
+		Capture := {Criterion: 0, Rows: Map()}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, Options) => Capture.Rows[Name] := Map("callback", Callback,
+				"criterion", Capture.Criterion, "options", Options),
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+		Name := "~" . Record["ahk"]
+		AssertTrue(Capture.Rows.Has(Name), Code . ": the computed reset must share its scan-code identity")
+		AssertFalse(Capture.Rows.Has("~" . Record["ahk_send"]), Code . ": no shadowed name twin")
+		Row := Capture.Rows[Name]
+		Seeds := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\keylayout_vectors.json", "UTF-8"))["dead_reset_seeds"]
+		Assert(Seeds.Length >= 5, "all shipped dead-key seed cases must be replayed")
+		for Seed in Seeds {
+			_KLT_Load(Seed["layout"])
+			Plain := KeylayoutEmulation_Press("SC020", false, false, false)
+			AssertFalse(Row["criterion"].Call(), "a reset stays inert without a pending dead key")
+			AssertEqual("", _KLT_Press(Seed["press"]),
+				Seed["layout"] . " " . Seed["press"] . ": the seed starts a dead key")
+			AssertTrue(Row["criterion"].Call(), Name . ": the registered reset owns a pending dead key")
+			CategoryEnabled["Layout"] := false
+			AssertFalse(Row["criterion"].Call(), "a disabled layout leaves navigation native")
+			CategoryEnabled["Layout"] := true
+			LayerEnabled := true
+			AssertFalse(Row["criterion"].Call(), "an active navigation layer keeps its ownership")
+			LayerEnabled := false
+			Row["callback"].Call(Name)
+			AssertFalse(Row["criterion"].Call(), "the actual registered callback cancels the pending accent")
+			AssertEqual(Plain, KeylayoutEmulation_Press("SC020", false, false, false),
+				Code . " on " . Seed["layout"] . ": the next letter must have no stale accent")
+		}
+	} finally {
+		CategoryEnabled := Saved[1]
+		LayerEnabled := Saved[2]
+		KLE_Registered := Saved[3]
+	}
+}
+for Code in ["Backspace", "Escape", "Enter", "Tab", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp",
+	"ArrowDown", "Home", "End", "PageUp", "PageDown"]
+	Test("keylayout emulation: " . Code . " cancels pending accents by physical identity (keylayout-dead-reset-identity)",
+		_KLT_WithEmulation.Bind(_KLT_ResetKeyCase.Bind(Code)))

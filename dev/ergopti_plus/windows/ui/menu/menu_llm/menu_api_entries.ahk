@@ -233,8 +233,8 @@ _LLM_Menu_ApiEntryIdsAreUnique(Entries) {
 ; Headless-safe: the stubbed MsgBox declines.
 ; @returns {Boolean} True when the user confirmed.
 _LLM_Menu_AskTestNewApiEntry() {
-	try return MsgBox(t("menu.llm.api_test_entry"),
-		t("menu.llm.api_dialog_title"), "YesNo Icon?") == "Yes"
+	try return Ui_MsgBox(t("menu.llm.api_test_entry"),
+		t("menu.llm.api_window_title"), "YesNo Icon?") == "Yes"
 	catch
 		return false
 }
@@ -292,15 +292,15 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 1 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
-	ib := InputBox(
+	ib := Ui_InputBox(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
-		t("menu.llm.api_dialog_title"), "w520 h150", def_provider)
+		t("menu.llm.api_window_title"), "w520 h150", def_provider)
 	if (ib.Result != "OK")
 		return
 	if LLM_API_PROVIDERS.Count == 0 {
 		try LoggerError("LLM.menu",
 			"Cannot add an API entry: the provider catalogue is empty (api_providers.json failed to load).")
-		try MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_dialog_title"), "Iconx")
+		try Ui_MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_window_title"), "Iconx")
 		return
 	}
 	if !_LLM_Menu_TryProviderPrompt(ib.Result, ib.Value,
@@ -310,7 +310,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 
 	; Step 2 — base URL (prefilled with the provider default).
 	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
-	ib := InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_dialog_title"),
+	ib := Ui_InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
 		"w520 h130", def_url)
 	if (ib.Result != "OK")
 		return
@@ -319,7 +319,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
-	ib := InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_dialog_title"),
+	ib := Ui_InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_window_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
 		return
@@ -327,7 +327,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 
 	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
-	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
+	ib := Ui_InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"),
 		"w420 h130", def_model)
 	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
 		return
@@ -502,7 +502,7 @@ _LLM_Menu_RemoveActiveApiEntry() {
 		}
 	}
 	entry_name := (active_entry != "") ? _LLM_Menu_ApiEntryDisplayName(active_entry) : active_id
-	confirm := MsgBox(
+	confirm := Ui_MsgBox(
 		t("menu.llm.api_remove_confirm_body"),
 		StrReplace(t("menu.llm.api_remove_confirm_title"), "%s", entry_name),
 		"4 48"  ; Yes/No + warning icon
@@ -589,7 +589,7 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
 	_LLM_Menu_ApiTestProgress := State
 	try {
-		Worker := Gui("", t("menu.llm.api_dialog_title"))
+		Worker := Gui_Create("", t("menu.llm.api_window_title"))
 		State["label"] := Worker.Add("Text", "w300",
 			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
@@ -685,7 +685,7 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 		try NotifyFn.Call(Ok, Map("title", Title, "body", Body))
 		return true
 	}
-	try MsgBox(Body, Title, Icon)
+	try Ui_MsgBox(Body, Title, Icon)
 	return true
 }
 

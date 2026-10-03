@@ -1,0 +1,15 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Independent contract: preserve every untouched migration record byte."
+ops = [
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.inline.deep", to_key = "child" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "scalar" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "disabled" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "empty" },
+]

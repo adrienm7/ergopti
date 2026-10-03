@@ -6,17 +6,16 @@
 ; Sub-millisecond timing for the per-keystroke hot path. BootProfile measures
 ; one-shot startup phases with A_TickCount (~15 ms resolution); that is far too
 ; coarse for a keystroke that should complete in well under a millisecond. This
-; module uses QueryPerformanceCounter (sub-microsecond) and logs ONLY keystrokes
-; that exceed a threshold, so normal typing produces zero log noise while any
-; real hitch identifies its segment and duration without recording input content.
+; module uses QueryPerformanceCounter and retains numeric distributions for every
+; measured callback. Slow callbacks log immediately; one-minute summaries retain
+; fast samples without recording input content or writing a line per keystroke.
 ;
 ; FEATURES & RATIONALE:
 ; 1. QPC precision: the only way to see a 2 ms vs 0.2 ms keystroke difference.
 ; 2. Threshold-gated: a slow keystroke is logged, a fast one is silent — the
 ;    log stays useful instead of drowning in one line per character.
-; 3. Near-zero overhead: two QPC reads and a subtraction per keystroke (~100 ns),
-;    negligible against the HSE match + tooltip work it wraps, so it can stay on
-;    permanently as a latency tripwire.
+; 3. Bounded overhead: existing QPC reads feed numeric counters, without another
+;    clock, formatting or I/O on the fast path. A fixed label limit bounds memory.
 ; 4. Nesting-aware: a segment reports how much of its wall clock was spent inside
 ;    OTHER segments that opened and closed within it. AHK is single-threaded but
 ;    Gui creation and COM calls PUMP the message loop, so a physically typed key's
@@ -70,10 +69,10 @@ global _HOTPATH_NEST_TRACK_CAP := 16
 ; Upper bound on the sub-steps one segment may attribute. A segment with more
 ; parts than this is not a segment any more, and the cap keeps the accumulator
 ; allocation-free in the steady state.
-; _TooltipPresentStack currently emits 15 marks. The cap must exceed the largest
+; _TooltipPresentStack currently emits 19 marks including transitive reveal. The cap must exceed the largest
 ; instrumented transaction or its tail labels are silently discarded while the
 ; QPC work is still paid. Guarded by test_tooltip_present_subsegmented.ahk.
-global _HOTPATH_BREAKDOWN_CAP := 16
+global _HOTPATH_BREAKDOWN_CAP := 24
 
 
 
@@ -132,7 +131,7 @@ _HotPathNestedMs(Closed, StartTicks, EndTicks) {
 }
 
 ; Log a WARNING when the elapsed time since StartTicks exceeds _HOTPATH_SLOW_MS.
-; Silent (and nearly free) for fast keystrokes so the hot path stays clean.
+; Fast callbacks update only their bounded numeric distribution.
 ; When other segments ran nested inside this one, the line also reports the
 ; exclusive time, because the raw delta alone reads as this segment's own cost.
 ; @param Label {String} Hot-path segment name (e.g. "OnChar").
@@ -161,6 +160,7 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	; .Get, never a bracket read: an absent key THROWS in AHK v2, and this runs on
 	; the keystroke path where a throw would take the hook down.
 	SlowMs := _HOTPATH_SLOW_MS_BY_SEGMENT.Get(Label, _HOTPATH_SLOW_MS)
+	HotPath_RecordLatency(Label, ElapsedMs, SlowMs)
 	if (ElapsedMs > SlowMs) {
 		; Computed before this segment joins the ring, or it would contain itself.
 		NestedMs := _HotPathNestedMs(Closed, StartTicks, now)
@@ -207,7 +207,7 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 ; @param StartTicks {Integer} QPC value at sub-step entry, for "mark".
 ; @returns {String} For "drain", the rendered attribution; "" otherwise.
 _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
-	global _HOTPATH_QPC_FREQ, _HOTPATH_BREAKDOWN_CAP
+	global _HOTPATH_QPC_FREQ, _HOTPATH_BREAKDOWN_CAP, _HOTPATH_SLOW_MS
 	if !(Marks is Array)
 		throw TypeError("Hot-path breakdown requires an owned marks array.")
 	if (Op == "mark") {
@@ -217,9 +217,10 @@ _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 		if (_HOTPATH_QPC_FREQ == 0)
 			DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
 		DllCall("QueryPerformanceCounter", "Int64*", &now)
-		Marks.Push({ L: Label,
-			Ms: (_HOTPATH_QPC_FREQ > 0)
-				? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0 })
+		ElapsedMs := (_HOTPATH_QPC_FREQ > 0)
+			? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
+		Marks.Push({ L: Label, Ms: ElapsedMs })
+		HotPath_RecordLatency("Substep." . Label, ElapsedMs, _HOTPATH_SLOW_MS)
 		return ""
 	}
 	if Op != "drain"
@@ -252,4 +253,115 @@ HotPath_BreakdownMark(Label, StartTicks, Marks) {
 ; @returns {String} e.g. "prepare 0.15 ms + corners 0.46 ms + border 4.33 ms".
 HotPath_BreakdownDetail(Marks) {
 	return _HotPathBreakdown(Marks, "drain")
+}
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 3/ Bounded latency distributions =======
+; ================================================
+; ================================================
+
+/** Owns numeric aggregates without retaining callback detail or input text. */
+class HotPathLatencyStatistics {
+	__New(Limit := 128) {
+		if !(Limit is Integer) || Limit < 1
+			throw ValueError("Latency statistics limit must be a positive integer")
+		this.Limit := Limit
+		this.Series := Map()
+		this.Refused := 0
+	}
+
+	/** Records all samples, including fast ones; a full label registry refuses visibly. */
+	Record(Label, ElapsedMs, SlowMs) {
+		if !this.Series.Has(Label) {
+			if this.Series.Count >= this.Limit {
+				this.Refused += 1
+				return false
+			}
+			this.Series[Label] := { Count: 0, TotalMs: 0.0, MinMs: ElapsedMs, MaxMs: 0.0,
+				Slow: 0, Ge1: 0, Ge5: 0, Ge10: 0, Ge50: 0 }
+		}
+		Sample := this.Series[Label]
+		Sample.Count += 1
+		Sample.TotalMs += ElapsedMs
+		Sample.MinMs := Min(Sample.MinMs, ElapsedMs)
+		Sample.MaxMs := Max(Sample.MaxMs, ElapsedMs)
+		Sample.Slow += ElapsedMs > SlowMs
+		Sample.Ge1 += ElapsedMs >= 1
+		Sample.Ge5 += ElapsedMs >= 5
+		Sample.Ge10 += ElapsedMs >= 10
+		Sample.Ge50 += ElapsedMs >= 50
+		return true
+	}
+}
+
+/** Static ownership survives early include-order callbacks. */
+_HotPathStatisticsOwner() {
+	static Owner := { Stats: HotPathLatencyStatistics(), Started: false, Timer: 0 }
+	return Owner
+}
+
+/** Adds a sample with no clock reads, formatting or I/O on the usual path. */
+HotPath_RecordLatency(Label, ElapsedMs, SlowMs) {
+	Owner := _HotPathStatisticsOwner()
+	PreviousCritical := Critical("On")
+	try {
+		Accepted := Owner.Stats.Record(Label, ElapsedMs, SlowMs)
+		FirstRefusal := !Accepted && Owner.Stats.Refused == 1
+	}
+	finally Critical(PreviousCritical)
+	if FirstRefusal
+		try LoggerWarn("HotPath", "Latency statistics label capacity reached; refused samples are counted.")
+}
+
+/** Starts one low-priority summary timer after LoggerInit; duplicate ownership is invalid. */
+HotPath_StartStatistics() {
+	Owner := _HotPathStatisticsOwner()
+	if Owner.Started
+		throw Error("Latency statistics already started")
+	Owner.Started := true
+	Owner.Timer := HotPath_FlushStatistics
+	; One minute retains distributions without turning normal typing into log I/O.
+	SetTimer(Owner.Timer, 60000, -1)
+	try LoggerInfo("HotPath", "Latency statistics started (interval=60000 ms, labels={1}).", Owner.Stats.Limit)
+}
+
+/** Detaches the numeric snapshot before logging can pump callbacks into the next window. */
+HotPath_FlushStatistics(*) {
+	Owner := _HotPathStatisticsOwner()
+	if !Owner.Started
+		return
+	PreviousCritical := Critical("On")
+	try {
+		Snapshot := Owner.Stats
+		if Snapshot.Series.Count == 0 && Snapshot.Refused == 0
+			return
+		Owner.Stats := HotPathLatencyStatistics(Snapshot.Limit)
+	} finally Critical(PreviousCritical)
+	for Label, Sample in Snapshot.Series {
+		; Format before emission: template repeat collapsing must retain every segment.
+		try LoggerInfo("HotPath", Format(
+			"Latency '{1}': count={2}, mean={3:.4f} ms, min={4:.4f} ms, max={5:.4f} ms, slow={6}, ge1={7}, ge5={8}, ge10={9}, ge50={10}.",
+			Label, Sample.Count, Sample.TotalMs / Sample.Count, Sample.MinMs, Sample.MaxMs,
+			Sample.Slow, Sample.Ge1, Sample.Ge5, Sample.Ge10, Sample.Ge50))
+	}
+	if Snapshot.Refused
+		try LoggerWarn("HotPath", "Latency statistics refused {1} samples beyond its label capacity.", Snapshot.Refused)
+}
+
+/** Closes the summary timer before the logger's durable exit flush. */
+HotPath_StopStatistics() {
+	Owner := _HotPathStatisticsOwner()
+	if !Owner.Started
+		return false
+	SetTimer(Owner.Timer, 0)
+	Owner.Timer := 0
+	HotPath_FlushStatistics()
+	Owner.Started := false
+	try LoggerInfo("HotPath", "Latency statistics stopped.")
+	return true
 }

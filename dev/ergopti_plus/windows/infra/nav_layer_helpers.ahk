@@ -9,7 +9,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. ActivateLayer / DisableLayer: toggle the LayerEnabled global and update
-;    the CapsLock LED indicator to reflect the active state visually.
+;    the tray indicator without changing native character case.
 ; 2. SetNumberOfRepetitions / ResetNumberOfRepetitions: manage the numeric
 ;    multiplier read by ActionLayer to repeat navigation keystrokes.
 ; 3. ActionLayer: fire a SendInput payload then reset the repetition counter,
@@ -43,7 +43,7 @@ ActivateLayer() {
 	; A hold-layer KeyWait can outlive the hotkey that started it: Suspend only
 	; disarms future hotkeys, not an already-running pseudo-thread.  This is the
 	; common final activation boundary for every hold-layer variant, so reject a
-	; stale candidate here before mutating LayerEnabled or the CapsLock LED.
+	; stale candidate here before mutating LayerEnabled or its tray indicator.
 	if A_IsSuspended {
 		try LoggerDebug("NavLayer", "Ignoring layer activation while the driver is suspended.")
 		return false
@@ -66,6 +66,39 @@ DisableLayer() {
 	; is no separate "idle" ceiling single-sourced anywhere in this codebase.
 	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 	UpdateCapsLockLED()
+}
+
+; Publishes the layer's translated status through the tray presentation owner.
+; Capture before the first publication and retain that exact text until its
+; restoration is acknowledged. A refused write may already have taken effect,
+; so retain ownership for a later cleanup attempt instead of claiming success.
+; Indicator failure never prevents layer deactivation or physical key release.
+; @param IsActive {Boolean} Whether the navigation layer is visibly active.
+; @returns {Boolean} Whether the requested tray state was acknowledged.
+NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0) {
+	static Owner := 0
+	if !IsObject(ReadFn)
+		ReadFn := TrayMenuGetTooltip
+	if !IsObject(WriteFn)
+		WriteFn := TrayMenuSetTooltip
+	if !IsObject(LabelFn)
+		LabelFn := () => t("layer_editor.window_title")
+	try {
+		if IsActive {
+			if !IsObject(Owner)
+				Owner := {PreviousText: ReadFn.Call()}
+			if WriteFn.Call(LabelFn.Call()) != true
+				throw Error("The navigation layer indicator publication was not acknowledged")
+		} else if IsObject(Owner) {
+			if WriteFn.Call(Owner.PreviousText) != true
+				throw Error("The navigation layer indicator restoration was not acknowledged")
+			Owner := 0
+		}
+		return true
+	} catch as Err {
+		try LoggerWarn("NavLayer", "Navigation layer indicator failed: {1}.", Err.Message)
+		return false
+	}
 }
 
 _TapHoldLayerWaitRelease(KeyName, TimeoutSec) {

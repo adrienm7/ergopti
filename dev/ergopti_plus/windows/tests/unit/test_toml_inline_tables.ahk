@@ -134,3 +134,48 @@ _TIT_LiteralStrings(BuildOnly) {
 }
 Test("TOML: literal object strings survive writes (toml-inline-tables-literal-write)", _TIT_LiteralStrings.Bind(false))
 Test("TOML: literal object strings survive builds (toml-inline-tables-literal-build)", _TIT_LiteralStrings.Bind(true))
+
+_TIT_SimpleMembers(Coerce) {
+	Value := Coerce.Call('{ A = "001", a = 2, flag = false, text = "a,b=#", escaped = "a\"b", nested.first = 3, nested.second = 4, "nested.first" = 5 }')
+	AssertTrue(Value["A"] is String, "quoted numeric values retain the caller's scalar type")
+	AssertEqual("001", Value["A"])
+	AssertTrue(Value["a"] is Integer)
+	AssertEqual(2, Value["a"])
+	AssertEqual("a,b=#", Value["text"])
+	AssertEqual('a"b', Value["escaped"])
+	AssertEqual(3, Value["nested"]["first"])
+	AssertEqual(4, Value["nested"]["second"])
+	AssertEqual(5, Value["nested.first"])
+	for Literal in ['{ x = 1, "x" = 2 }', '{ "x" = 1, x = 2 }',
+		'{ x = "a", x.y = 1 }', '{ x.y = 1, x = 2 }'] {
+		AssertThrows(Coerce.Bind(Literal), "invalid simple-member structure: " . Literal)
+	}
+}
+Test("TOML: simple inline members preserve fresh scalar contracts (inline-member-perf-2026-10-02)",
+	_TIT_SimpleMembers.Bind(TOML_CoerceValue))
+Test("TOML: simple inline members preserve feature scalar contracts (inline-member-perf-2026-10-02)",
+	_TIT_SimpleMembers.Bind(TomlCoerceValueExt))
+Test("TOML: simple inline members preserve shortcut scalar contracts (inline-member-perf-2026-10-02)",
+	_TIT_SimpleMembers.Bind(CS_CoerceValue))
+
+_TIT_SimpleMemberWhitespace() {
+	Identity := (Value) => Value
+	LineFeed := Chr(10)
+	Value := TOML_ParseInlineTable("{a" . LineFeed . "=true}", Identity)
+	AssertTrue(Value.Has("a" . LineFeed), "uncommon key whitespace retains the generic decoder's ownership")
+	for Prefix in [LineFeed, Chr(11), Chr(12), Chr(13)] {
+		Value := TOML_ParseInlineTable("{a=" . Prefix . "true}", Identity)
+		AssertEqual(Prefix . "true", Value["a"], "the caller receives its original scalar token")
+	}
+	for Raw in ["true" . LineFeed, '"value"' . LineFeed] {
+		Value := TOML_ParseInlineTable("{a=" . Raw . "}", Identity)
+		AssertEqual(Raw, Value["a"], "an end anchor cannot discard the final newline")
+	}
+	for Separator in [Chr(11), Chr(12)] {
+		AssertThrows(TOML_ParseInlineTable.Bind("{a" . Separator . "=true}", Identity),
+			"nonstandard whitespace cannot become a valid simple key")
+	}
+	AssertEqual("true", TOML_ParseInlineTable("{a`t = `ttrue}", Identity)["a"])
+}
+Test("TOML: simple-member optimization preserves whitespace token boundaries (inline-member-perf-2026-10-02)",
+	_TIT_SimpleMemberWhitespace)

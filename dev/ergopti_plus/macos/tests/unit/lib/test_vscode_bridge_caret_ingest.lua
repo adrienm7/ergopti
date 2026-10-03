@@ -20,9 +20,10 @@ local helpers = require("tests.helpers")
 -- =================================
 
 --- Loads the real bridge and captures its committed HTTP callback.
+--- @param decode function|nil Native JSON decoder override.
 --- @return table bridge Loaded bridge module.
 --- @return function callback Committed server callback.
-local function load_fixture()
+local function load_fixture(decode)
 	local callback = nil
 	local listening_port = 0
 	local server = nil
@@ -44,9 +45,11 @@ local function load_fixture()
 		end,
 	}
 
-	local bridge = helpers.load_with_stubs("infra.vscode_bridge", {
+	local overrides = {
 		httpserver = { new = function() return server end },
-	})
+	}
+	if decode then overrides.json = { decode = decode } end
+	local bridge = helpers.load_with_stubs("infra.vscode_bridge", overrides)
 	helpers.assert_true(bridge.start_server(), "the HTTP fixture must commit")
 	helpers.assert_true(type(callback) == "function", "the HTTP callback must be installed")
 	return bridge, callback
@@ -63,6 +66,22 @@ end
 -- =======================================
 
 helpers.describe("vscode_bridge caret ingest", function()
+	helpers.it("keeps equal caret metadata independent of its sibling and the native graph", function()
+		helpers.with_fresh_modules({ "adapters.json_codec" }, function()
+			local rectangle = { x = 10, y = 20 }
+			local native = { active = true, first = rectangle, second = rectangle }
+			local bridge, callback = load_fixture(function() return native end)
+			callback("POST", "/caret", {}, '{"active":true,"first":{"x":10,"y":20},"second":{"x":10,"y":20}}')
+			local caret = bridge.get_caret(5)
+			helpers.assert_true(type(caret) == "table", "the valid caret must be published")
+			caret.first.x = 99
+			helpers.assert_eq(caret.second.x, 10, "editing one equal object must preserve its sibling")
+			helpers.assert_eq(native.first.x, 10, "the native decoder's graph must stay untouched")
+			helpers.assert_nil(native._ts, "ingest metadata belongs to the owned snapshot")
+			helpers.assert_true(bridge.stop_server(), "the HTTP fixture must settle")
+		end)
+	end)
+
 	helpers.it("HS-053 rejects scalar JSON without losing the last valid caret", function()
 		local bridge, callback = load_fixture()
 		local response_body, status, headers = callback(
@@ -79,7 +98,7 @@ helpers.describe("vscode_bridge caret ingest", function()
 		helpers.assert_true(type(seeded) == "table", "the valid object must seed caret state")
 		helpers.assert_eq(seeded.line, 7)
 
-		for _, scalar_body in ipairs({ "5", "true", '"text"' }) do
+		for _, scalar_body in ipairs({ "5", "true", '"text"', "null", "{broken" }) do
 			local call_ok, body, scalar_status, scalar_headers = xpcall(function()
 				return callback("POST", "/caret", {}, scalar_body)
 			end, debug.traceback)

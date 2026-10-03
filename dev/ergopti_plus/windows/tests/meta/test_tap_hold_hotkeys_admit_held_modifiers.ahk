@@ -122,8 +122,8 @@ _THAM_EveryModifierTapHoldFiresUnderAHeldModifier() {
 	AssertEqual("", Offenders,
 		"these tap-hold variants do not fire under a held modifier, so the key's native function replaces the configured tap and hold")
 	Assert(Subjects >= 30, "every tap-hold variant of the modifier keys must be scanned, got " . Subjects)
-	AssertEqual(2, Exempt,
-		"only the LAlt one-shot Shift and its CapsLock rescue may stay native under a held modifier")
+	AssertEqual(1, Exempt,
+		"only the LAlt one-shot Shift may stay native under a held modifier")
 }
 Test("tap-hold admission: CapsLock and modifier-key tap-holds fire under a held modifier (held-modifier-tap-2026-09-25)",
 	_THAM_EveryModifierTapHoldFiresUnderAHeldModifier)
@@ -156,7 +156,10 @@ _THAM_SpaceStaysItselfUnderAnotherLayerHolder() {
 		Seen++
 		if (InStr(Variant.HotIf, "not LayerEnabled")
 				or Variant.HotIf == '#HotIf TapHoldPressIsOwned("space")'
-				or Variant.HotIf == "#HotIf CapsWordEnabled")
+				or Variant.HotIf == "#HotIf CapsWordEnabled"
+				; A key combination that ends on Space is the user's own binding:
+				; it takes Space only while its first key is held and a slot is set.
+				or Variant.HotIf == "#HotIf KeyCombinationOwnsHotkey()")
 			continue
 		Eligible .= (Eligible = "" ? "" : " | ") . Variant.Label . " under " . Variant.HotIf
 	}

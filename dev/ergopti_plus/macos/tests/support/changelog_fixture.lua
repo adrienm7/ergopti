@@ -21,6 +21,7 @@ local function with_changelog(callback)
 			"ui.changelog",
 			"ui.ui_builder",
 			"adapters.file_system",
+			"adapters.json_codec",
 			"infra.deferred_work",
 			"infra.i18n",
 			"infra.logger",

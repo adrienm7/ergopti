@@ -448,7 +448,7 @@ _LLM_Menu_NotifyInvalidInput(NotifyFn := 0) {
 	if HasMethod(NotifyFn, "Call")
 		NotifyFn.Call(Body, Title)
 	else
-		MsgBox(Body, Title, "Icon!")
+		Ui_MsgBox(Body, Title, "Icon!")
 	return false
 }
 
@@ -520,7 +520,7 @@ LLM_Menu_PromptNumeric(key, title, prompt) {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(prompt, title, "w400 h120", _LLM_Menu[key])
+	ib := Ui_InputBox(prompt, title, "w400 h120", _LLM_Menu[key])
 	if !_LLM_Menu_TryNormalizeIntegerPrompt(ib.Result, ib.Value, key, &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM numeric '" . key . "' setting",
@@ -587,7 +587,7 @@ LLM_Menu_PromptOllamaPort() {
 	}
 	global _LLM_Menu
 	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
-	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
+	ib := Ui_InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
 	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
@@ -635,7 +635,7 @@ LLM_Menu_PromptMaxWords() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["max_words"])
+	ib := Ui_InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["max_words"])
 	if !_LLM_Menu_TryNormalizeIntegerPrompt(ib.Result, ib.Value,
 			"max_words", &val)
 		return
@@ -652,7 +652,7 @@ LLM_Menu_PromptTemperature() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(t("menu.llm.temperature_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["temperature"])
+	ib := Ui_InputBox(t("menu.llm.temperature_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["temperature"])
 	if !_LLM_Menu_TryNormalizeTemperaturePrompt(ib.Result, ib.Value,
 			&Normalized)
 		return
@@ -670,7 +670,7 @@ LLM_Menu_PromptNavModifiers() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
+	ib := Ui_InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
 	if (ib.Result != "OK")
 		return
 	return LLM_Menu_CommitNavModifier("nav_modifiers", ib.Value)
@@ -684,7 +684,7 @@ LLM_Menu_PromptValModifiers() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
+	ib := Ui_InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
 	if (ib.Result != "OK")
 		return
 	return LLM_Menu_CommitNavModifier("val_modifiers", ib.Value)
@@ -914,7 +914,7 @@ LLM_Menu_PromptAddModel() {
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
-	ib := InputBox(t("menu.llm.ollama_model_hint"), t("menu.llm.add_custom_model"), "w450 h130")
+	ib := Ui_InputBox(t("menu.llm.ollama_model_hint"), t("menu.llm.add_custom_model"), "w450 h130")
 	if (ib.Result != "OK" || Trim(ib.Value) == "")
 		return
 	name := Trim(ib.Value)

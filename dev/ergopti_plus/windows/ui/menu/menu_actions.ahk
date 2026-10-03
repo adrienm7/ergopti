@@ -62,7 +62,8 @@ OpenErrorLog(*) {
 ; user has a starter file with the canonical header. The header below is the
 ; same one the user is expected to keep at the top of their personal file, so
 ; both views stay perfectly aligned across ErgoptiPlus updates.
-global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`n"
+PersonalShortcutsTemplate() {
+	return "; personal_shortcuts.ahk`n"
 	. ";`n"
 	. "; ==============================================================================`n"
 	. "; MODULE: Personal Shortcuts`n"
@@ -123,3 +124,4 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`n"
 	. "`n"
 	. "; (Add #HotIf-gated hotkey blocks here — see the example in the header.)`n"
 	. "`n"
+}

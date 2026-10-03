@@ -41,9 +41,13 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\first_boot.ahk
 
 try {
-    if (A_Args.Length != 1)
+    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+        case "distance_gate":
+			ReadCategoryEnabled(TOML_ParseFreshFile(A_Args[2]))
+			if CategoryEnabled["DistancesReduction"] != (A_Args[3] == "true")
+				throw Error("The native distance gate differs from the saved preference.")
         case "parsed":
             _FeatureStateSmokeParsedConfig()
         case "missing":
@@ -156,7 +160,9 @@ _FeatureStateSmokeNeutral() {
 	_FeatureStateSmokeAssert(4, AssertedScriptSlots, "the four script shortcut slots")
 	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
 		_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
-	_FeatureStateSmokeAssert(false, ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
+	; Not an activation: "auto" lets the layout's own probe name the AltGr key.
+	; A neutral false forced the standard family on every Kana-style layout.
+	_FeatureStateSmokeAssert("auto", ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
 }
 
 ; A config.toml that names "none" for a script slot keeps that chord off now

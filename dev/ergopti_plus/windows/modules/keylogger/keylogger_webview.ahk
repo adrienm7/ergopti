@@ -48,6 +48,12 @@ class KLWV {
 		; windows[key] := { which, gui, controller, webview, hwnd_host }
 		; key is "typing" or "apps".
 		static windows := Map()
+		; At most one inactive native host for each of the two dashboard keys.
+		; No bridge subscriptions, workers or data snapshots belong to this cache.
+		static warm_hosts := Map()
+		static opening := Map()
+		static close_during_open := Map()
+		static retiring := Map()
 
 		; Every open receives an ownership epoch. Timers and bridge callbacks bind
 		; it so an old host cannot target a dashboard reopened under the same key.
@@ -174,192 +180,316 @@ KLWV_LocalesUrl() {
 ; ===========================================
 ; ===========================================
 
+/** Records UI stage resources separately; process CPU includes nested callbacks. */
+KLWV_OpenTimingMark(which, Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	MenuWait := BootProfile_MenuWaitMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Dashboard." . which . "." . Phase, Elapsed, 5)
+	try LoggerInfo("Keylogger", Format(
+		"Dashboard {1} stage '{2}': wall={3:.3f} ms, process_cpu={4} ms, native_menu_wait={5:.3f} ms.",
+		which, Phase, Elapsed, CpuText, Max(0, MenuWait - Timing.MenuWait)))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+	Timing.MenuWait := MenuWait
+}
+
 KLWV_Open(which, metrics_dir) {
-		try LoggerDebug("Keylogger", "KLWV_Open: dashboard={1} begin.", which)
-
-		if !KLWV_IsAvailable() {
-				try LoggerWarn("Keylogger", "KLWV_Open: WebView2 is unavailable.")
-				return false
+		global _SharedDir
+		if !(which == "typing" || which == "apps")
+				throw ValueError("Unknown metrics dashboard")
+		if KLWV.retiring.Has(which) {
+				KLWV.retiring[which]["metrics_dir"] := metrics_dir
+				return true
 		}
-		if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
-				return true   ; Already open; caller should foreground via KLWV_Focus.
-
-		asset_path := KLWV_AssetPath(which)
-		if !FileExist(asset_path) {
-				try LoggerError("Keylogger", "KLWV_Open: dashboard asset is missing: '{1}'.", asset_path)
-				return false
+		if KLWV.opening.Has(which) {
+				try LoggerDebug("Keylogger", "Dashboard {1} opening already in progress.", which)
+				return true
 		}
-
-		KLWV.metrics_dir := metrics_dir
-
-		; Do NOT build here — on a cold DB the full build takes 30-75 s and
-		; blocks the window from appearing at all. The window navigates first;
-		; KLWV_DelayedFirstPush (on NavigationCompleted, with a 1.5 s timer as
-		; backstop) paints the published sidecar straight from disk, which the
-		; background warm-up (section 9) keeps current. Only when no sidecar
-		; exists does it start a manifest-only build.
-
-		title := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("metrics_apps.window_title")
-		g := Gui("+Resize +MinSize800x600", title)
-		g.MarginX := 0
-		g.MarginY := 0
-
-		; Pick the monitor under the mouse cursor (where the user just
-		; clicked the tray menu) — defaulting to the primary monitor stuck
-		; the window on the wrong screen on multi-monitor setups. From
-		; there, take 70 % of the work area (taskbar already excluded by
-		; MonitorGetWorkArea) so the window comfortably fits with both
-		; the title bar AND a bit of breathing room around it.
-		MouseGetPos(&mx, &my)
-		mon := KLWV_MonitorFromPoint(mx, my)
-		if !mon
-				mon := MonitorGetPrimary()
-		MonitorGetWorkArea(mon, &work_left, &work_top, &work_right, &work_bottom)
-		work_w := work_right - work_left
-		work_h := work_bottom - work_top
-		initial_w := Min(Round(work_w * 0.70), 1300)
-		initial_h := Min(Round(work_h * 0.70), 800)
-
-		g.OnEvent("Size", KLWV_OnGuiSize.Bind(which))
-		g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
-		; Show first with the requested size, read the real outer-window
-		; rectangle, then WinMove to the centred position. Doing it in
-		; this order — instead of computing the centre from the client
-		; size up-front — accounts for the title bar + borders properly,
-		; and unlike Gui.GetPos on a hidden window it always returns the
-		; actual on-screen dimensions. The brief unmoved frame between
-		; the Show and the WinMove is imperceptible in practice.
-		g.Show("w" . initial_w . " h" . initial_h)
-		WinGetPos(, , &win_w, &win_h, "ahk_id " . g.Hwnd)
-		pos_x := work_left + ((work_w - win_w) // 2)
-		pos_y := work_top + ((work_h - win_h) // 2)
-		WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
-		try LoggerDebug("Keylogger",
-				"KLWV_Open: centered dashboard work={1}x{2} window={3}x{4}.",
-				work_w, work_h, win_w, win_h)
-
-		; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
-		; launch so cached state from a previous open never bleeds in.
-		udir := WebView_NewProfilePath("ergopti_webview2_")
-		WebView_SweepStaleProfiles("ergopti_webview2_")
-		if !_KLWV_CreateProfileDir(udir) {
-				WebView_ConfirmProfileExit(udir)
-				try g.Destroy()
-				return false
-		}
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-
-		; thqby's wrapper resolves WebView2 asynchronously through a
-		; Promise; we await it inline so the rest of the wiring runs
-		; synchronously against a ready controller.
-		try LoggerDebug("Keylogger", "KLWV_Open: creating WebView2 controller.")
+		KLWV.opening[which] := true
 		try {
-				controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
-				WebView_WatchProfile(udir, controller.CoreWebView2)
-		} catch as err {
-				try LoggerError("Keylogger",
-						"KLWV_Open: WebView2 controller create failed ('{1}') at {2}:{3} — dashboard cannot open.",
-						err.Message, err.File, err.Line)
-				if IsSet(controller)
-						try controller.Close()
-				WebView_AbandonProfile(udir)
-				try g.Destroy()
-				return false
+			Started := BootClockWallMs()
+			Timing := { Wall: Started, Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
+			try LoggerDebug("Keylogger", "KLWV_Open: dashboard={1} begin.", which)
+
+			if !KLWV_IsAvailable() {
+					try LoggerWarn("Keylogger", "KLWV_Open: WebView2 is unavailable.")
+					return false
+			}
+			if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
+					return true   ; Already open; caller should foreground via KLWV_Focus.
+			if KLWV.windows.Has(which)
+					KLWV_Close(which)
+
+			asset_path := KLWV_AssetPath(which)
+			if !FileExist(asset_path) {
+					try LoggerError("Keylogger", "KLWV_Open: dashboard asset is missing: '{1}'.", asset_path)
+					return false
+			}
+
+			KLWV.metrics_dir := metrics_dir
+			ReuseKey := _SharedDir . "`n" . I18nGetLocale() . "`n" . metrics_dir
+			Cached := KLWV_TakeWarmHost(which, ReuseKey)
+
+			; Do NOT build here — on a cold DB the full build takes 30-75 s and
+			; blocks the window from appearing at all. The window navigates first;
+			; KLWV_DelayedFirstPush (on NavigationCompleted, with a 1.5 s timer as
+			; backstop) paints the published sidecar straight from disk, which the
+			; background warm-up (section 9) keeps current. Only when no sidecar
+			; exists does it start a manifest-only build.
+
+			title := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("metrics_apps.window_title")
+			g := Cached ? Cached["gui"] : Gui_Create("+Resize +MinSize800x600", title)
+			KLWV.opening[which] := g
+			g.MarginX := 0
+			g.MarginY := 0
+
+			; Pick the monitor under the mouse cursor (where the user just
+			; clicked the tray menu) — defaulting to the primary monitor stuck
+			; the window on the wrong screen on multi-monitor setups. From
+			; there, take 70 % of the work area (taskbar already excluded by
+			; MonitorGetWorkArea) so the window comfortably fits with both
+			; the title bar AND a bit of breathing room around it.
+			MouseGetPos(&mx, &my)
+			mon := KLWV_MonitorFromPoint(mx, my)
+			if !mon
+					mon := MonitorGetPrimary()
+			MonitorGetWorkArea(mon, &work_left, &work_top, &work_right, &work_bottom)
+			work_w := work_right - work_left
+			work_h := work_bottom - work_top
+			initial_w := Min(Round(work_w * 0.70), 1300)
+			initial_h := Min(Round(work_h * 0.70), 800)
+
+			if !Cached {
+					g.OnEvent("Size", KLWV_OnGuiSize.Bind(which))
+					g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
+			}
+			; Show first with the requested size, read the real outer-window
+			; rectangle, then WinMove to the centred position. Doing it in
+			; this order — instead of computing the centre from the client
+			; size up-front — accounts for the title bar + borders properly,
+			; and unlike Gui.GetPos on a hidden window it always returns the
+			; actual on-screen dimensions. The brief unmoved frame between
+			; the Show and the WinMove is imperceptible in practice.
+			g.Show("w" . initial_w . " h" . initial_h)
+			WinGetPos(, , &win_w, &win_h, "ahk_id " . g.Hwnd)
+			pos_x := work_left + ((work_w - win_w) // 2)
+			pos_y := work_top + ((work_h - win_h) // 2)
+			WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
+			try LoggerDebug("Keylogger",
+					"KLWV_Open: centered dashboard work={1}x{2} window={3}x{4}.",
+					work_w, work_h, win_w, win_h)
+
+			try LoggerInfo("Keylogger", "Dashboard {1} host shown in {2} ms (reused={3}).",
+					which, Round(BootClockWallMs() - Started, 2), Cached ? 1 : 0)
+			KLWV_OpenTimingMark(which, "host", Timing)
+			; Reuse only the native host. A fresh navigation below resets page state.
+			if Cached
+					udir := Cached["udir"]
+			else {
+					udir := WebView_NewProfilePath("ergopti_webview2_")
+					WebView_SweepStaleProfiles("ergopti_webview2_")
+					if !_KLWV_CreateProfileDir(udir) {
+							WebView_ConfirmProfileExit(udir)
+							try g.Destroy()
+							return false
+					}
+			}
+			loader := _VendorDir . "\64bit\WebView2Loader.dll"
+			KLWV_OpenTimingMark(which, "profile", Timing)
+
+			; thqby's wrapper resolves WebView2 asynchronously through a
+			; Promise; we await it inline so the rest of the wiring runs
+			; synchronously against a ready controller.
+			try LoggerDebug("Keylogger", "KLWV_Open: creating WebView2 controller.")
+			try {
+					controller := Cached ? Cached["controller"] : WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+					controller.IsVisible := false
+					if Cached
+							WebView_ClearDocumentCache(controller.CoreWebView2)
+					if !Cached
+							WebView_WatchProfile(udir, controller.CoreWebView2)
+			} catch as err {
+					try LoggerError("Keylogger",
+							"KLWV_Open: WebView2 controller create failed ('{1}') at {2}:{3} — dashboard cannot open.",
+							err.Message, err.File, err.Line)
+					if IsSet(controller)
+							try controller.Close()
+					WebView_AbandonProfile(udir)
+					try g.Destroy()
+					return false
+			}
+			try LoggerDebug("Keylogger", "KLWV_Open: WebView2 controller created.")
+			KLWV_OpenTimingMark(which, "controller", Timing)
+			webview := controller.CoreWebView2
+
+			; Disable Edge UI surfaces we don't want bleeding through —
+			; the dashboard is a chromeless single-page app.
+			settings := webview.Settings
+			; Keep DevTools accelerators (F12, Ctrl+Shift+I) AND right-click
+			; "Inspect" available — they're the only way to triage live-update
+			; problems in a chromeless --app= window. Other Edge UI surfaces
+			; (status bar etc.) stay off; the dashboard is single-page and
+			; doesn't benefit from them.
+			try settings.AreDevToolsEnabled := true
+			try settings.AreDefaultContextMenusEnabled := true
+			try settings.IsStatusBarEnabled := false
+			try settings.AreBrowserAcceleratorKeysEnabled := true
+
+			; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
+			; we receive a string here. Must be a METHOD CALL, not a property
+			; assignment -- vendor WebView2.ahk's base class has no __Set
+			; meta-method, so `webview.WebMessageReceived := handler` is a silent
+			; no-op and the bridge never actually subscribes. The subscription
+			; handle is stored in KLWV.windows[which] (not discarded) so AHK's
+			; refcounting does not __Delete it and unsubscribe near-immediately.
+			Epoch := ++KLWV.epoch
+			msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which, Epoch))
+			; The metrics pages post no "ready" message, so navigation completion is
+			; the earliest moment a push can land. Painting there, rather than on the
+			; fixed 1.5 s timer alone, is what makes a cached sidecar appear at once.
+			nav_sub := 0
+			try nav_sub := webview.NavigationCompleted(KLWV_OnNavigationCompleted.Bind(which, Epoch))
+			catch as err
+					try LoggerWarn("Keylogger",
+							"KLWV_Open: NavigationCompleted subscription failed ('{1}'); first paint waits for the backstop timer.",
+							err.Message)
+
+			; Inject i18n base URL and locale code before page scripts run so
+			; i18n.js can resolve locale files without relying on currentScript
+			; path heuristics (which are unreliable across WebView2 versions).
+			locales_url := KLWV_LocalesUrl()
+			locale_code := I18nGetLocale()
+			seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
+			try {
+					if !Cached
+							webview.AddScriptToExecuteOnDocumentCreated(seed_script)
+			}
+			catch as err {
+					try LoggerError("Keylogger",
+							"KLWV_Open: WebView2 i18n bridge setup failed ('{1}') — dashboard cannot open.", err.Message)
+					KLWV_AbortOpen(g, controller, udir)
+					return false
+			}
+			try LoggerDebug("Keylogger", "KLWV_Open: i18n seed prepared for locale={1}.", locale_code)
+			KLWV_OpenTimingMark(which, "bindings", Timing)
+
+			; Map the virtual host BEFORE navigating — the mapping must exist when the
+			; document is created or the https:// URL cannot resolve.
+			global KLWV_VHOST, KLWV_HOST_ACCESS_ALLOW, _SharedDir
+			try webview.SetVirtualHostNameToFolderMapping(KLWV_VHOST, _SharedDir, KLWV_HOST_ACCESS_ALLOW)
+			catch as err {
+					try LoggerError("Keylogger",
+							"KLWV_Open: virtual-host mapping failed ('{1}') — the JS bridge would be dead, aborting.", err.Message)
+					KLWV_AbortOpen(g, controller, udir)
+					return false
+			}
+
+			asset := KLWV_AssetUrl(which) . "&epoch=" . Epoch
+			KLWV_OpenTimingMark(which, "mount", Timing)
+			try LoggerDebug("Keylogger", "KLWV_Open: navigating dashboard={1}.", which)
+			try {
+					webview.Navigate(asset)
+			} catch as err {
+					try LoggerWarn("Keylogger",
+							"KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
+							asset, err.Message)
+					KLWV_AbortOpen(g, controller, udir)
+					return false
+			}
+			; Belt-and-suspenders alongside the "ready" handshake wired above:
+			; push the freshest blob a beat after navigation too, in case the page's
+			; own chrome.webview.postMessage('ready') races the subscription above
+			; (e.g. fires before AddScriptToExecuteOnDocumentCreated has run). 1.5 s
+			; is enough for a local file:// page + CDN-backed scripts to be ready.
+			KLWV.windows[which] := Map(
+					"which", which,
+					"metrics_dir", metrics_dir,
+					"epoch", Epoch,
+					"gui", g,
+					"controller", controller,
+					"webview", webview,
+					"udir", udir,
+					"msg_sub", msg_sub,
+					"nav_sub", nav_sub,
+					"reuse_key", ReuseKey,
+					"navigation_url", asset,
+					"open_started", Started,
+					"pending_ingest_mode", "",
+					"ingest_drain_armed", false
+			)
+			if KLWV.close_during_open.Get(which, false)
+					KLWV_Hide(which, g)
+			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
+			KLWV_ArmRebuildWatch(which, Epoch)
+			KLWV_FitWebView(which)
+			KLWV_OpenTimingMark(which, "navigate", Timing)
+			try LoggerInfo("Keylogger", "Dashboard {1} controller prepared in {2} ms (reused={3}).",
+					which, Round(BootClockWallMs() - Started, 2), Cached ? 1 : 0)
+			return true
+		} finally {
+				if IsSet(Started)
+						HotPath_RecordLatency("Dashboard." . which . ".total", BootClockWallMs() - Started, 5)
+				KLWV.opening.Delete(which)
+				if KLWV.close_during_open.Has(which)
+						KLWV.close_during_open.Delete(which)
 		}
-		try LoggerDebug("Keylogger", "KLWV_Open: WebView2 controller created.")
-		webview := controller.CoreWebView2
+}
 
-		; Disable Edge UI surfaces we don't want bleeding through —
-		; the dashboard is a chromeless single-page app.
-		settings := webview.Settings
-		; Keep DevTools accelerators (F12, Ctrl+Shift+I) AND right-click
-		; "Inspect" available — they're the only way to triage live-update
-		; problems in a chromeless --app= window. Other Edge UI surfaces
-		; (status bar etc.) stay off; the dashboard is single-page and
-		; doesn't benefit from them.
-		try settings.AreDevToolsEnabled := true
-		try settings.AreDefaultContextMenusEnabled := true
-		try settings.IsStatusBarEnabled := false
-		try settings.AreBrowserAcceleratorKeysEnabled := true
+/** Detach a certified inactive host; configuration changes dispose its old owner. */
+KLWV_TakeWarmHost(which, Key) {
+	if !KLWV.warm_hosts.Has(which)
+		return 0
+	Entry := KLWV.warm_hosts[which]
+	if !(Entry["reuse_key"] == Key) || !KLWV_IsAlive(Entry) {
+		KLWV_Close(which)
+		return 0
+	}
+	KLWV.warm_hosts.Delete(which)
+	return Entry
+}
 
-		; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
-		; we receive a string here. Must be a METHOD CALL, not a property
-		; assignment -- vendor WebView2.ahk's base class has no __Set
-		; meta-method, so `webview.WebMessageReceived := handler` is a silent
-		; no-op and the bridge never actually subscribes. The subscription
-		; handle is stored in KLWV.windows[which] (not discarded) so AHK's
-		; refcounting does not __Delete it and unsubscribe near-immediately.
-		Epoch := ++KLWV.epoch
-		msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which, Epoch))
-		; The metrics pages post no "ready" message, so navigation completion is
-		; the earliest moment a push can land. Painting there, rather than on the
-		; fixed 1.5 s timer alone, is what makes a cached sidecar appear at once.
-		nav_sub := 0
-		try nav_sub := webview.NavigationCompleted(KLWV_OnNavigationCompleted.Bind(which, Epoch))
-		catch as err
-				try LoggerWarn("Keylogger",
-						"KLWV_Open: NavigationCompleted subscription failed ('{1}'); first paint waits for the backstop timer.",
-						err.Message)
-
-		; Inject i18n base URL and locale code before page scripts run so
-		; i18n.js can resolve locale files without relying on currentScript
-		; path heuristics (which are unreliable across WebView2 versions).
-		locales_url := KLWV_LocalesUrl()
-		locale_code := I18nGetLocale()
-		seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
-		try webview.AddScriptToExecuteOnDocumentCreated(seed_script)
-		catch as err {
-				try LoggerError("Keylogger",
-						"KLWV_Open: WebView2 i18n bridge setup failed ('{1}') — dashboard cannot open.", err.Message)
-				KLWV_AbortOpen(g, controller, udir)
-				return false
-		}
-		try LoggerDebug("Keylogger", "KLWV_Open: i18n seed prepared for locale={1}.", locale_code)
-
-		; Map the virtual host BEFORE navigating — the mapping must exist when the
-		; document is created or the https:// URL cannot resolve.
-		global KLWV_VHOST, KLWV_HOST_ACCESS_ALLOW, _SharedDir
-		try webview.SetVirtualHostNameToFolderMapping(KLWV_VHOST, _SharedDir, KLWV_HOST_ACCESS_ALLOW)
-		catch as err {
-				try LoggerError("Keylogger",
-						"KLWV_Open: virtual-host mapping failed ('{1}') — the JS bridge would be dead, aborting.", err.Message)
-				KLWV_AbortOpen(g, controller, udir)
-				return false
-		}
-
-		asset := KLWV_AssetUrl(which)
-		try LoggerDebug("Keylogger", "KLWV_Open: navigating dashboard={1}.", which)
-		try {
-				webview.Navigate(asset)
-		} catch as err {
-				try LoggerWarn("Keylogger",
-						"KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
-						asset, err.Message)
-				KLWV_AbortOpen(g, controller, udir)
-				return false
-		}
-		; Belt-and-suspenders alongside the "ready" handshake wired above:
-		; push the freshest blob a beat after navigation too, in case the page's
-		; own chrome.webview.postMessage('ready') races the subscription above
-		; (e.g. fires before AddScriptToExecuteOnDocumentCreated has run). 1.5 s
-		; is enough for a local file:// page + CDN-backed scripts to be ready.
-		KLWV.windows[which] := Map(
-				"which", which,
-				"metrics_dir", metrics_dir,
-				"epoch", Epoch,
-				"gui", g,
-				"controller", controller,
-				"webview", webview,
-				"udir", udir,
-				"msg_sub", msg_sub,
-				"nav_sub", nav_sub,
-				"pending_ingest_mode", "",
-				"ingest_drain_armed", false
-		)
-		SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
-		KLWV_ArmRebuildWatch(which, Epoch)
-		KLWV_FitWebView(which)
-		return true
+/** Retire the session before retaining only its inactive native resources. */
+KLWV_Hide(which, GuiObj) {
+	if !KLWV.windows.Has(which)
+		return 1
+	Entry := KLWV.windows[which]
+	if !(Entry["gui"] == GuiObj)
+		return 1
+	if KLWV.retiring.Has(which)
+		return 1
+	if KLWV.warm_hosts.Has(which)
+		throw Error("Duplicate inactive metrics host")
+	Pending := Map()
+	KLWV.retiring[which] := Pending
+	try {
+		KLWV.windows.Delete(which)
+		KLWV_DisarmRebuildWatch(Entry)
+		KLWV_RetireRangeStage(Entry)
+		if Entry.Has("msg_sub")
+			Entry.Delete("msg_sub")
+		if Entry.Has("nav_sub")
+			Entry.Delete("nav_sub")
+		Entry["controller"].IsVisible := false
+		GuiObj.Hide()
+		KLWV.warm_hosts[which] := Map("gui", GuiObj, "controller", Entry["controller"],
+			"webview", Entry["webview"], "udir", Entry["udir"], "reuse_key", Entry["reuse_key"])
+		try LoggerDebug("Keylogger", "Dashboard {1} session retired; native host retained.", which)
+	} catch as Err {
+		if KLWV.warm_hosts.Has(which)
+			KLWV.warm_hosts.Delete(which)
+		KLWV.windows[which] := Entry
+		KLWV_Close(which)
+		try LoggerError("Keylogger", "Dashboard {1} host retention failed: {2}.", which, Err.Message)
+		throw Err
+	} finally {
+		KLWV.retiring.Delete(which)
+		if Pending.Has("metrics_dir")
+			SetTimer(KLWV_Open.Bind(which, Pending["metrics_dir"]), -1)
+	}
+	return 1
 }
 
 ; Unwind an unpublished WebView setup transaction. No KLWV.windows entry exists
@@ -382,7 +512,7 @@ KLWV_IsCurrent(which, Epoch := 0) {
 KLWV_IsAlive(entry) {
 		if !(entry is Map) || !entry.Has("gui")
 				return false
-		try return WinExist("ahk_id " . entry["gui"].Hwnd) ? true : false
+		try return WMHandleExists(entry["gui"].Hwnd) ? true : false
 		return false
 }
 
@@ -393,6 +523,10 @@ KLWV_Focus(which) {
 }
 
 KLWV_Close(which) {
+		if !KLWV.windows.Has(which) && KLWV.warm_hosts.Has(which) {
+				KLWV.windows[which] := KLWV.warm_hosts[which]
+				KLWV.warm_hosts.Delete(which)
+		}
 		if !KLWV.windows.Has(which)
 				return
 		entry := KLWV.windows[which]
@@ -418,6 +552,8 @@ KLWV_Close(which) {
 
 KLWV_CloseAll() {
 		for which, _ in KLWV.windows.Clone()
+				KLWV_Close(which)
+		for which, _ in KLWV.warm_hosts.Clone()
 				KLWV_Close(which)
 }
 
@@ -446,8 +582,13 @@ KLWV_OnGuiSize(which, gui, minMax, w, h) {
 		KLWV_FitWebView(which)
 }
 
-KLWV_OnGuiClose(which, *) {
-		KLWV_Close(which)
+KLWV_OnGuiClose(which, GuiObj, *) {
+		if KLWV.opening.Get(which, 0) == GuiObj && !KLWV.windows.Has(which) {
+				KLWV.close_during_open[which] := true
+				GuiObj.Hide()
+				return 1
+		}
+		return KLWV_Hide(which, GuiObj)
 }
 
 
@@ -475,6 +616,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		return
 	entry := KLWV.windows[which]
 	if !entry.Has("webview") || !(sender == entry["webview"])
+		return
+	if entry.Has("navigation_url") && !(args.Source == entry["navigation_url"])
 		return
 		msg := ""
 		try msg := args.TryGetWebMessageAsString()
@@ -666,6 +809,7 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
 		}
 		js := KLWV_BuildRangeScript(url, request_id, Owner["token"])
+		js := KLWV_PageScript(entry, js)
 		if !WebView_RunScriptAsync(entry["webview"], js, "Keylogger.range." . which,
 				KLWV_RangeScriptSettled.Bind(which, Epoch, entry, request_id, Owner))
 				return false
@@ -744,7 +888,7 @@ KLWV_SendRangeTerminal(which, Epoch, request_id, status) {
 		envelope["request_id"] := request_id
 		envelope["status"] := status
 		msg := KL_JsonEncode(envelope)
-		try entry["webview"].PostWebMessageAsString(msg)
+		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
 		catch as err {
 				try LoggerError("Keylogger", "KLWV_SendRangeTerminal: terminal delivery failed for '{1}': {2}", which, err.Message)
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, status)
@@ -870,7 +1014,7 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
 				; Parsing and provenance validation are interruptible AHK work.
 				if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch, DeliveryOwner)
 						return false
-				entry["webview"].PostWebMessageAsString(msg)
+				entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
 		} catch as err {
 				try LoggerError("Keylogger", "KLWV_PushPrefetch: dashboard delivery failed for '{1}': {2}", which, err.Message)
 				return false
@@ -954,8 +1098,23 @@ KLWV_InjectI18n(which, ExpectedEpoch := 0) {
 KLWV_RunScript(which, js, locale_code, ExpectedEpoch := 0) {
 		if !KLWV_IsCurrent(which, ExpectedEpoch)
 				return false
-		return WebView_RunScriptAsync(KLWV.windows[which]["webview"], js,
+		Entry := KLWV.windows[which]
+		return WebView_RunScriptAsync(Entry["webview"], KLWV_PageScript(Entry, js),
 				Format("Keylogger.locale.{1}.{2}.epoch={3}", which, locale_code, ExpectedEpoch))
+}
+
+/** Native script queues may outlive a navigation of their retained controller. */
+KLWV_PageScript(Entry, Script) {
+	if !Entry.Has("navigation_url")
+		return Script
+	return "if(location.href===" . JsonStringLiteral(Entry["navigation_url"]) . "){" . Script . "}"
+}
+
+/** Tag every pushed envelope so a replacement document refuses a queued predecessor. */
+KLWV_PageMessage(Entry, Json) {
+	if !Entry.Has("navigation_url")
+		return Json
+	return '{"host_epoch":' . Entry["epoch"] . ',' . SubStr(Json, 2)
 }
 
 ; Resolve which AHK monitor index contains the (x, y) point. Walks the
@@ -979,6 +1138,14 @@ KLWV_MonitorFromPoint(x, y) {
 KLWV_OnNavigationCompleted(which, Epoch, *) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
+		Entry := KLWV.windows[which]
+		if Entry.Has("navigation_url") {
+				if !(Entry["webview"].Source == Entry["navigation_url"])
+						return false
+				Entry["controller"].IsVisible := true
+				try LoggerInfo("Keylogger", "Dashboard {1} page ready in {2} ms.",
+						which, Round(BootClockWallMs() - Entry["open_started"], 2))
+		}
 		return KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1)
 }
 
@@ -988,6 +1155,8 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return
 		entry := KLWV.windows[which]
+		if entry.Has("navigation_url") && (entry["webview"].Source == entry["navigation_url"])
+				entry["controller"].IsVisible := true
 		; A canceled predecessor may already have armed this callback before its
 		; replacement completed. First-paint ownership is terminal: once the
 		; replacement painted, that older retry must not push or schedule phase 2.
@@ -1583,8 +1752,8 @@ KLWV_SettleRebuildProgress(which, Epoch, status) {
 		if State = "failed"
 				try LoggerWarn("Keylogger", "Metrics rebuild worker for '{1}' ended with '{2}'; the dashboard shows the failure.",
 						which, status)
-		try Entry["webview"].PostWebMessageAsString('{"type":"rebuild_progress","progress":{"state":"'
-				. State . '"}}')
+		try Entry["webview"].PostWebMessageAsString(KLWV_PageMessage(Entry,
+				'{"type":"rebuild_progress","progress":{"state":"' . State . '"}}'))
 		catch as Err {
 				try LoggerError("Keylogger", "Rebuild state delivery failed for '{1}': {2}", which, Err.Message)
 				return false
@@ -1608,7 +1777,7 @@ KLWV_DeliverRebuildFile(which, Entry, Epoch, Job, Path, Slot, Prefix, Suffix) {
 		if !(Body is String) || (Body = "") || !_KLWV_OwnsDelivery(which, Entry, Epoch)
 				return false
 		Entry[Slot] := Stamp
-		try Entry["webview"].PostWebMessageAsString(Prefix . Body . Suffix)
+		try Entry["webview"].PostWebMessageAsString(KLWV_PageMessage(Entry, Prefix . Body . Suffix))
 		catch as Err {
 				try LoggerError("Keylogger", "Rebuild snapshot delivery failed for '{1}': {2}", which, Err.Message)
 				return false
@@ -1674,6 +1843,12 @@ KLWV_ArmWarmTimer(Callback, DelayMs) {
 KLWV_WarmRun(Index := 1, *) {
 	if A_IsSuspended {
 		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while suspended.")
+		return false
+	}
+	; KLPF_RequestBuild refuses during a reload; standing down here keeps that
+	; expected refusal out of the warnings.
+	if KLPF_ReloadKeepsWorkersOut() {
+		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while a reload is under way.")
 		return false
 	}
 	MetricsDir := KLWV.warm_metrics_dir

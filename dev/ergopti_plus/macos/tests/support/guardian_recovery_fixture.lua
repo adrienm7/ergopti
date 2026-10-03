@@ -406,6 +406,14 @@ local function with_remap(options, body)
 	end
 
 	package.loaded["platform.remap.lease_controller"] = {
+		unregister_guardian = function(on_done)
+			calls.guardian_unregistrations = (calls.guardian_unregistrations or 0) + 1
+			calls.guardian_registration_due = true
+			calls.guardian_cached_status = nil
+			append("guardian-unregistered")
+			on_done(true, "unregistered")
+			return true
+		end,
 		init = function(listener)
 			calls.phase_listener = listener
 			return true

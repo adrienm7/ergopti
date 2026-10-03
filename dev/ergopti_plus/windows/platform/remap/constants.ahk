@@ -281,12 +281,53 @@ TapHoldTrackScrollCancel() {
 	}
 }
 
+; The reason a tap is cancelled with when a key combination used the key's
+; press as its first key (infra/key_combinations.ahk).
+global TAPHOLD_CANCEL_BY_COMBINATION := "first key of a key combination"
+; Tap-hold key id -> the tick a key combination used its press as its first
+; key. The activity tracker only sees the keys the hook passes on, and the
+; second key of a pair is suppressed by its hotkey, so the pair says so itself.
+global _TH_PressesTakenByCombination := Map()
+
+; Record that a key combination used KeyId's current press as its first key:
+; that press is a hold, and its tap must not follow on release.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param TickNow {Integer} Test seam; A_TickCount by default.
+TapHoldMarkPressTakenByCombination(KeyId, TickNow := unset) {
+	global _TH_PressesTakenByCombination
+	_TH_PressesTakenByCombination[KeyId] := IsSet(TickNow) ? TickNow : A_TickCount
+}
+
+; Whether a key combination used the press KeyId's owner is now deciding;
+; clears the mark. The owner asks on release, and only a press shorter than
+; GuardMs can be a tap, so an older mark belongs to a press nobody asked
+; about (a key with no tap) and is dropped rather than charged to this one.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param GuardMs {Integer} The longest press the asking owner calls a tap.
+; @param TickNow {Integer} Test seam; A_TickCount by default.
+; @return {Boolean}
+_TH_TakePressTakenByCombination(KeyId, GuardMs, TickNow := unset) {
+	global _TH_PressesTakenByCombination
+	if !_TH_PressesTakenByCombination.Has(KeyId)
+		return false
+	TakenAt := _TH_PressesTakenByCombination[KeyId]
+	_TH_PressesTakenByCombination.Delete(KeyId)
+	return TickElapsed(TakenAt, IsSet(TickNow) ? TickNow : A_TickCount) <= GuardMs
+}
+
 ; Return the cancellation reason for this tap dispatch, or "" when dispatch is allowed.
 ; Keeping the reason as a return value lets us avoid ByRef quirks in AHK v2 and
 ; keeps all call sites compatible with debug logging.
 TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 	global _TH_TapHoldTrackState, _TH_LastTapHoldCancelReason
 	_TH_LastTapHoldCancelReason := ""
+	if _TH_TakePressTakenByCombination(KeyId, GuardMs) {
+		_TH_LastTapHoldCancelReason := TAPHOLD_CANCEL_BY_COMBINATION
+		if LoggerIsDebugEnabled() {
+			LoggerDebug("TapHoldTrack", "Tap canceled for '{1}' because a key combination used its press.", KeyId)
+		}
+		return TAPHOLD_CANCEL_BY_COMBINATION
+	}
 	state := false
 	if (_TH_TapHoldTrackState.Has(KeyId)) {
 		state := _TH_TapHoldTrackState[KeyId]

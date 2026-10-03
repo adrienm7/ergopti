@@ -40,6 +40,16 @@ helpers.describe("native navigation layer bindings", function()
 		helpers.assert_eq(trail(instance:process(KEY_J, UP, 20)), "pass")
 	end)
 
+	helpers.it("(navigation-native-case) passes every unbound letter phase without synthesizing CapsLock or Shift", function()
+		local instance = engine({ [KEY_T] = chord({}, 62) })
+		for _, value in ipairs({ DOWN, REPEAT, UP }) do
+			helpers.assert_eq(trail(instance:process(KEY_J, value, 10)), "pass",
+				"a sparse layer must preserve the native key and its existing case modifiers")
+		end
+		helpers.assert_eq(trail(instance:release_all()), "",
+			"navigation may not retain a synthesized Shift or CapsLock for its indicator")
+	end)
+
 	helpers.it("uses the configured key instead of the old hardcoded navigation action", function()
 		local instance = engine({ [KEY_T] = chord({}, 62) })
 		helpers.assert_eq(trail(instance:process(KEY_T, DOWN, 10)), "62:1")

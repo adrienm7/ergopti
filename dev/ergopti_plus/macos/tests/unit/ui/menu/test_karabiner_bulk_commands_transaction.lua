@@ -99,6 +99,8 @@ package.loaded["infra.config_paths"] = {
 local function find_item(item, label)
 	for _, row in ipairs(item.submenu or item.menu or item.items or {}) do
 		if row.title == label or row.label == label then return row end
+		local nested = find_item(row, label)
+		if nested then return nested end
 	end
 	return nil
 end
@@ -216,7 +218,8 @@ local function make_remap(observations, mode)
 			{ id = "escape", label = "Escape", category = "Navigation", holdable = true, tappable = true },
 		},
 		TAP_HOLD_KEYS = { { id = "left_shift", label = "Left Shift" } },
-		MOD_COMBOS = { { id = "shift_pair", label = "Shift pair", group = "Shift" } },
+		MOD_COMBOS = { { id = "shift_pair", label = "Shift pair", group = "Shift",
+			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		set_enabled = function() return true end,
@@ -356,7 +359,9 @@ local function build_menu(mode, configure)
 	-- de touches » group under Shortcuts, which the same module builds; both
 	-- trees are searched as one.
 	local group = menu.build_key_combinations(ctx)
-	for _, row in ipairs(group) do built.submenu[#built.submenu + 1] = row end
+	-- Preserve the second group's boundary: its scope rows belong to that
+	-- group, not to the Tap-Holds first-row contract asserted below.
+	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
 	package.loaded["infra.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
 	package.loaded["infra.manifest_menu"] = saved_manifest

@@ -554,7 +554,7 @@ _DeleteEntry(W, LV, StatusText) {
 		return
 	}
 	E := Entries[Row]
-	Confirm := MsgBox(
+	Confirm := Ui_MsgBox(
 		t("editor.hotstrings.btn_delete") . ' "' . E["trigger"] . '" → "' . E["output"] . '" ?',
 		t("editor.hotstrings.title_confirm"), "YesNo Icon?"
 	)
@@ -577,17 +577,17 @@ _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp
 
 _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
 	global _PersonalEditorData, _PersonalEditorSection
-	Res := InputBox(t("editor.hotstrings.new_section_prompt"), t("editor.hotstrings.new_section_title"), "w300 h120")
+	Res := Ui_InputBox(t("editor.hotstrings.new_section_prompt"), t("editor.hotstrings.new_section_title"), "w300 h120")
 	if Res.Result != "OK" or Trim(Res.Value) == "" {
 		return
 	}
 	SecName := StrLower(Trim(Res.Value))
 	SecName := RegExReplace(SecName, "[^a-z0-9_]", "_")
 	if _PersonalEditorData["sections"].Has(SecName) {
-		MsgBox(t("editor.hotstrings.err_section_exists"), t("editor.hotstrings.title_error"), "Icon!")
+		Ui_MsgBox(t("editor.hotstrings.err_section_exists"), t("editor.hotstrings.title_error"), "Icon!")
 		return
 	}
-	Res2 := InputBox(t("editor.hotstrings.desc_prompt"), t("editor.hotstrings.desc_title"), "w300 h120", SecName)
+	Res2 := Ui_InputBox(t("editor.hotstrings.desc_prompt"), t("editor.hotstrings.desc_title"), "w300 h120", SecName)
 	if Res2.Result != "OK" {
 		return
 	}
@@ -639,7 +639,7 @@ _PersonalEditorRequireSection(FuncName) {
 		or !_PersonalEditorData["sections"].Has(_PersonalEditorSection)) {
 		try LoggerWarn("PersonalEditor",
 			"'{1}' called with no live section selected ('{2}').", FuncName, _PersonalEditorSection)
-		MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
+		Ui_MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
 		return false
 	}
 	return true
@@ -650,7 +650,7 @@ _RenameSection(W, SectionDrop) {
 	if !_PersonalEditorRequireSection("_RenameSection")
 		return
 	OldDesc := _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
-	Res := InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), _PersonalEditorSection), t("editor.hotstrings.rename_title"),
+	Res := Ui_InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), _PersonalEditorSection), t("editor.hotstrings.rename_title"),
 		"w300 h120", OldDesc)
 	if Res.Result != "OK" or Trim(Res.Value) == "" {
 		return
@@ -666,7 +666,7 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
 	if !_PersonalEditorRequireSection("_DeleteSection")
 		return
 	EntryCount := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
-	Confirm := MsgBox(
+	Confirm := Ui_MsgBox(
 		t("editor.hotstrings.btn_delete") . ' "' . _PersonalEditorSection . '" (' . EntryCount . ') ?',
 		t("editor.hotstrings.title_confirm"), "YesNo Icon?"
 	)

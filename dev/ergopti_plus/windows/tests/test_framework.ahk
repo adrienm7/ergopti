@@ -210,6 +210,12 @@ _Enumerate(arr, n) {
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
 ; resolves to the single definition. Cache only after every selected file was
 ; read successfully; a transient read failure must not poison later tests.
+; One ownership rule for source censuses and include-graph audits. Both path
+; separators are accepted so generated user code never changes their scope.
+_DriverIsProductionSource(Path) {
+	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|_generated)/")
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
@@ -217,8 +223,7 @@ _DriverSourceConcat() {
 	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Combined := ""
 	Loop Files, Root . "\*.ahk", "FR" {
-		p := StrReplace(A_LoopFileFullPath, "\", "/")
-		if (InStr(p, "/tests/") or InStr(p, "/vendor/") or InStr(p, "/_generated/"))
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
 			continue
 		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
 	}

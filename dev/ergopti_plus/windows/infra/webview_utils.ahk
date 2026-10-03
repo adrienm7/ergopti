@@ -11,14 +11,8 @@
 ; Shared helper functions for WebView2 instances.
 ; ==============================================================================
 
-; A single WebView2 environment shared by every short-lived UI window for the
-; whole session. Creating an environment boots an Edge/Chromium browser process,
-; the expensive part (seconds under RAM pressure). Reusing one environment for
-; every window means each new window only spins up a cheap controller, all
-; windows share ONE browser process (lower peak RAM), and the on-disk cache is
-; reused across opens -- so the second and later opens are near-instant even on a
-; RAM-starved machine. Booted lazily on the first WebView open, cached for the
-; rest of the session.
+; Environment objects share profile settings; a retained real-HWND controller
+; keeps the browser alive. Environment creation alone does not boot Chromium.
 global _WebView_SharedEnv := 0
 
 ; True while a CreateEnvironmentAsync boot is in flight. Promise.await() pumps
@@ -30,11 +24,27 @@ global _WebView_SharedEnv := 0
 ; ``finally`` so a boot failure cannot leave a waiting caller stuck forever.
 global _WebView_SharedEnvCreating := false
 global _WebView_SharedEnvBootPromise := 0
+global _WebView_SharedEnvBackground := false
+global _WebView_SharedEnvBackgroundAwaiting := false
+global _WebView_SharedEnvRetired := false
 
 ; A lost or wedged WebView2 COM completion must not freeze AHK's only
 ; interpreter indefinitely. The host catches the propagated TimeoutError and
 ; opens its native fallback, leaving the rest of the driver responsive.
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
+global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
+
+/** Invalidate virtual-host subresources before reusing a native document host. */
+WebView_ClearDocumentCache(WebView) {
+	global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS
+	LoggerTrace("WebView", "Invalidating the retained browser document cache…")
+	try WebView.CallDevToolsProtocolMethodAsync("Network.clearBrowserCache", "{}").await(WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS)
+	catch as Err {
+		LoggerError("WebView", "Browser document cache invalidation failed: {1}.", Err.Message)
+		throw Err
+	}
+	LoggerDone("WebView", "Retained browser document cache invalidated.")
+}
 
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
@@ -48,6 +58,10 @@ global WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"
 WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR
 	global _WebView_SharedEnvBootPromise, WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS
+	global _WebView_SharedEnvBackground, _WebView_SharedEnvBackgroundAwaiting
+	global _WebView_SharedEnvRetired
+	if _WebView_SharedEnvRetired
+		throw Error("Shared browser ownership has retired")
 	; Warm path -- reuse the already-running browser process.
 	if _WebView_SharedEnv
 		return _WebView_SharedEnv
@@ -58,6 +72,12 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	; Fail this second open immediately so its normal native/unavailable fallback
 	; runs; the first owner publishes the shared environment when it completes.
 	if _WebView_SharedEnvCreating {
+		if _WebView_SharedEnvBackground && !_WebView_SharedEnvBackgroundAwaiting
+				&& IsObject(_WebView_SharedEnvBootPromise) {
+			_WebView_SharedEnvBackgroundAwaiting := true
+			try return _WebView_SharedEnvBootPromise.await(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS)
+			finally _WebView_SharedEnvBackgroundAwaiting := false
+		}
 		throw Error("WebView shared environment is still initializing")
 	}
 
@@ -111,14 +131,17 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 
 _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 	global _WebView_SharedEnv, _WebView_SharedEnvCreating
-	global _WebView_SharedEnvBootPromise
+	global _WebView_SharedEnvBootPromise, _WebView_SharedEnvBackground, _WebView_SharedEnvRetired
 	if (_WebView_SharedEnvBootPromise !== BootPromise)
 		return
-	if Succeeded
+	if Succeeded && !_WebView_SharedEnvRetired
 		_WebView_SharedEnv := Value
 	_WebView_SharedEnvBootPromise := 0
 	_WebView_SharedEnvCreating := false
+	_WebView_SharedEnvBackground := false
 }
+
+#Include webview_browser_warmup.ahk
 
 
 ; Below this much free physical RAM (MiB), a WebView window that has a native
@@ -141,9 +164,13 @@ WebView_AvailRamMb() {
 ; True when free RAM is too low to comfortably boot Chromium, so a WebView window
 ; should use its native fallback. An unknown reading never gates (returns false),
 ; leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback() {
-	global WEBVIEW_MIN_AVAIL_RAM_MB
-	Avail := WebView_AvailRamMb()
+WebView_ShouldUseNativeFallback(AvailRamFn := 0) {
+	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
+	; A warm environment already owns the browser process; this open needs only
+	; a controller, so the cold-start RAM heuristic must not suppress it.
+	if _WebView_SharedEnv
+		return false
+	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
 	if Avail < 0
 		return false
 	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
@@ -306,6 +333,16 @@ class WebViewHost {
 				return {w: W, h: H, min_w: MW, min_h: MH}
 		}
 
+		/**
+		 * Creates the native host window before attaching the WebView controller.
+		 * @param {string} MinSize - The manifest's minimum window dimensions.
+		 * @returns {Gui} The window with a shared-policy caption.
+		 */
+		_NewWindow(MinSize) {
+				Title := this.Opts.Get("Title", "")
+				return Gui_Create("+Resize +MinSize" . MinSize, Title)
+		}
+
 		; --------------------------------------------------------------------------
 		; Internal: builds Gui, creates WebView2 controller, hardens settings,
 		; sets up the bridge, maps vhost, seeds i18n, navigates, and fills.
@@ -316,14 +353,13 @@ class WebViewHost {
 				this.Epoch += 1
 
 				Opts  := this.Opts
-				Title := Opts.Has("Title") ? Opts["Title"] : "ErgoptiPlus"
 				Geo   := this._Geometry()
 				Vhost := this._VhostName()
 				BackColor := Opts.Has("BackColor") ? Opts["BackColor"] : "0x1e1e1e"
 				MinSize   := Opts.Has("MinSize")   ? Opts["MinSize"]   : (Geo.min_w . "x" . Geo.min_h)
 
 				; ── Gui ──────────────────────────────────────────────────────────────
-				g := Gui("+Resize +MinSize" . MinSize, Title)
+				g := this._NewWindow(MinSize)
 				g.BackColor := BackColor
 				g.MarginX   := 0
 				g.MarginY   := 0

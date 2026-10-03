@@ -935,8 +935,8 @@ _Updater_SurfaceInheritedSwapFailure(*) {
 		return false
 	try LoggerError("Updater", "Previous executable replacement failed after shutdown: {1}.", Terminal)
 	try {
-		MsgBox(t("updater.install_error") . "`n`n" . Terminal,
-			t("updater.title_update"), "Icon!")
+		Ui_MsgBox(t("updater.install_error") . "`n`n" . Terminal,
+			t("updater.window_title"), "Icon!")
 		if (_UpdaterInheritedSwapFailurePath != ""
 			and !FSDelete(_UpdaterInheritedSwapFailurePath))
 			throw Error("Consumed swap failure receipt could not be deleted")
@@ -1214,7 +1214,7 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 			_Updater_CloseGui(_Updater_PromptGui)
 		return
 	}
-	G := Gui("+Resize +MinSize720x420", t("updater.update_dialog_title"))
+	G := Gui_Create("+Resize +MinSize720x420", t("updater.update_window_title"))
 	_Updater_PromptGui := G
 	G.SetFont("s11 bold", "Segoe UI")
 	G.MarginX := 14
@@ -1399,7 +1399,7 @@ _Updater_ShowAvailableUpdateRunning() {
 		return
 	}
 	if Updater_IsLocalSource() {
-		MsgBox(t("updater.local_source"), t("updater.title_update"), "Iconi")
+		Ui_MsgBox(t("updater.local_source"), t("updater.window_title"), "Iconi")
 		return
 	}
 	; No cached release — fetch one ASYNCHRONOUSLY so the network round-trip
@@ -1408,7 +1408,7 @@ _Updater_ShowAvailableUpdateRunning() {
 	; connect / receive budget on a stalled or captive-portal network). ``T2``
 	; auto-dismisses the brief "Verification…" notice; the actual update prompt
 	; is surfaced from the async callback once the response arrives.
-	MsgBox(Format(t("updater.checking"), _Updater_ChannelLabel(UPDATER_CHANNEL)), t("updater.title_update"), "Iconi T2")
+	Ui_MsgBox(Format(t("updater.checking"), _Updater_ChannelLabel(UPDATER_CHANNEL)), t("updater.window_title"), "Iconi T2")
 	; ``Current`` is captured with the request, as on the background path.
 	Current := Updater_CurrentVersion()
 	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, Request,
@@ -1435,20 +1435,20 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 		if IsObject(NotifyFn)
 			NotifyFn.Call(t("updater.no_connection"), t("updater.title_update"), "Icon!")
 		else
-			MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
+			Ui_MsgBox(t("updater.no_connection"), t("updater.window_title"), "Icon!")
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
 		if !_Updater_RequestMayPublish(Request)
 			return
-		MsgBox(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"), "Iconi")
+		Ui_MsgBox(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.window_title"), "Iconi")
 		return
 	}
 	Tag := Updater_ParseTagName(Json)
 	if (Tag == "") {
 		if !_Updater_RequestMayPublish(Request)
 			return
-		MsgBox(t("updater.parse_failed"), t("updater.title_update"), "Icon!")
+		Ui_MsgBox(t("updater.parse_failed"), t("updater.window_title"), "Icon!")
 		return
 	}
 	if !IsSet(Current)
@@ -1465,7 +1465,7 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 		if IsObject(NotifyFn)
 			NotifyFn.Call(Message, t("updater.title_update"), "Iconi")
 		else
-			MsgBox(Message, t("updater.title_update"), "Iconi")
+			Ui_MsgBox(Message, t("updater.window_title"), "Iconi")
 		return
 	}
 	Release := {
@@ -1524,7 +1524,7 @@ _Updater_NotifyInstallPhase(Phase, ReasonKey := "") {
 _Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!") {
 	if _Updater_NotifyInstallPhase("failed", ReasonKey)
 		return
-	MsgBox(t(MessageKey), t("updater.title_update"), Icon)
+	Ui_MsgBox(t(MessageKey), t("updater.window_title"), Icon)
 }
 
 ; Whether the staging worker's ERR line is a refused verification (a missing or
@@ -2790,7 +2790,7 @@ _Updater_ShowDeferredSwapFailureNotice(*) {
 	if _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn,
 		ReloadPreservingSuspend)
 		return
-	try MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+	try Ui_MsgBox(t("updater.install_error"), t("updater.window_title"), "Icon!")
 }
 
 ; A launched Reload returns at once and destroys this process only when its

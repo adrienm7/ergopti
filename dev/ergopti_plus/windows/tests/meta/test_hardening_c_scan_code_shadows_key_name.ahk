@@ -101,6 +101,46 @@ _HCSC_Declarations(Code, Masked, &LabelCount, &CallCount) {
 		CallCount++
 		Found.Push(Call[2])
 	}
+	for Declaration in _HCSC_ArrayLoopDeclarations(Code) {
+		CallCount++
+		Found.Push(Declaration)
+	}
+	return Found
+}
+
+; The bounded computed-registration form: a literal key array and a loop
+; concatenating a literal modifier prefix with each key. Dynamic expressions
+; remain outside this source scan; runtime registration tests judge them.
+_HCSC_ArrayLoopDeclarations(Code) {
+	Quotes := Chr(34) . "'"
+	Arrays := Map()
+	Position := 1
+	while (At := RegExMatch(Code, "im)^global\s+(\w+)\s*:=\s*\[([^\]]*)\]", &Literal, Position)) {
+		Position := At + Literal.Len
+		Keys := []
+		Valid := true
+		for Token in StrSplit(Literal[2], ",") {
+			Token := Trim(Token, " `t`n`r")
+			if (Token == "")
+				continue
+			if !RegExMatch(Token, "^([" . Quotes . "])([A-Za-z][A-Za-z0-9_]*)\1$", &Key) {
+				Valid := false
+				break
+			}
+			Keys.Push(Key[2])
+		}
+		if Valid && Keys.Length
+			Arrays[Literal[1]] := Keys
+	}
+	Found := []
+	Position := 1
+	Pattern := "for\s+(\w+)\s+in\s+(\w+)\s*\{\s*Hotkey(?:\w*\.Call)?\(\s*([" . Quotes . "])([~*$#!^+<>]*)\3\s*\.\s*\1\s*,"
+	while (At := RegExMatch(Code, Pattern, &Registration, Position)) {
+		Position := At + Registration.Len
+		if Arrays.Has(Registration[2])
+			for Key in Arrays[Registration[2]]
+				Found.Push(Registration[4] . Key)
+	}
 	return Found
 }
 
@@ -225,12 +265,16 @@ _HCSC_ApplyDirective(Line, State, Cursor) {
 
 ; Visits one file in parse order, following its #Include directives in place,
 ; and records every static label with its file and the directive context at
-; its line.
-_HCSC_WalkIncludes(File, State, Seen, Labels) {
+; its line. A label is "owned" when its file is production source and so is
+; every file that led to it: the generated personal-shortcuts stub includes
+; the user's own file, which lives outside the driver and whose hotkeys are
+; theirs (15 of them failed this census on the maintainer's machine).
+_HCSC_WalkIncludes(File, State, Seen, Labels, Owned := true) {
 	global _HCSC_LABEL_LINE
 	if Seen.Has(StrLower(File))
 		return
 	Seen[StrLower(File)] := true
+	Owned := Owned && _DriverIsProductionSource(File)
 	Src := FileRead(File, "UTF-8")
 	Masked := _DriverMaskNonCode(&Src)
 	SplitPath(File, , &Dir)
@@ -238,9 +282,9 @@ _HCSC_WalkIncludes(File, State, Seen, Labels) {
 	for Line in StrSplit(Masked, "`n", "`r") {
 		Target := _HCSC_ApplyDirective(Line, State, Cursor)
 		if (Target != "")
-			_HCSC_WalkIncludes(Target, State, Seen, Labels)
+			_HCSC_WalkIncludes(Target, State, Seen, Labels, Owned)
 		else if RegExMatch(Line, _HCSC_LABEL_LINE, &Label)
-			Labels.Push(Map("text", Label[1], "file", File, "context", State.Clone()))
+			Labels.Push(Map("text", Label[1], "file", File, "owned", Owned, "context", State.Clone()))
 	}
 }
 
@@ -297,6 +341,24 @@ _HCSC_ScannerFindsTheShadowedShape() {
 }
 Test("hotkeys: the scan-code precedence scanner flags exactly the shadowed shapes (hardening-c-scan-code-precedence)",
 	_HCSC_ScannerFindsTheShadowedShape)
+
+_HCSC_ComputedResetNamesAreScanned() {
+	Fixture := "SC00E:: return`nSC001:: return`n"
+		. 'global ResetKeys := ["BackSpace", "Escape"]' . "`n"
+		. 'for Key in ResetKeys {' . "`n"
+		. '    HotkeyFn.Call("~" . Key, Reset)' . "`n}" . "`n"
+		. 'global Unknown := [SomeFunction()]' . "`n"
+		. 'for Key in Unknown {' . "`n"
+		. '    Hotkey("~" . Key, Reset)' . "`n}"
+	Masked := _DriverMaskNonCode(&Fixture)
+	Found := _HCSC_Declarations(Fixture, Masked, &LabelCount, &CallCount)
+	AssertEqual(2, LabelCount)
+	AssertEqual(2, CallCount, "only the literal array's computed registrations are resolvable")
+	AssertEqual("~BackSpace, ~Escape", _HCSC_Offenders(Found, _HCSC_NameTable()),
+		"computed reset names retain the same shadowing rule as literal hotkeys")
+}
+Test("hotkeys: computed dead-key reset names are scanned (keylayout-dead-reset-identity)",
+	_HCSC_ComputedResetNamesAreScanned)
 
 _HCSC_NoNameHotkeyOnAScanCodeKey() {
 	Src := _DriverSourceConcat()
@@ -395,7 +457,7 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 	}
 	Labels := []
 	for Entry in Walked {
-		if !RegExMatch(Entry["file"], "i)\\(tests|vendor|_generated)\\")
+		if Entry["owned"]
 			Labels.Push(Entry)
 	}
 	Assert(Seen.Count > 100, "the #Include walk from the driver root scripts must reach the driver, reached " . Seen.Count)
@@ -420,3 +482,64 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 }
 Test("hotkeys: no hook-owned hotkey names a character key (hardening-c-scan-code-precedence)",
 	_HCSC_NoHookHotkeyNamesACharacter)
+
+_HCSC_ProductionPathOwnership() {
+	for Path, Expected in Map(
+		"C:\driver\ui\hotkeys.ahk", true,
+		"C:/driver/ui/hotkeys.ahk", true,
+		"C:\driver\_generated\personal_shortcuts.ahk", false,
+		"C:/driver/_generated/personal_shortcuts.ahk", false,
+		"C:/driver/_GENERATED/personal_shortcuts.ahk", false,
+		"C:/driver/tests/fixture.ahk", false,
+		"C:/driver/vendor/fixture.ahk", false,
+		"C:/driver/ui/vendor_picker.ahk", true,
+		"C:/driver/_generated_extra/owned.ahk", true)
+		AssertEqual(Expected, _DriverIsProductionSource(Path), "source ownership: " . Path)
+}
+Test("hotkeys: source and include censuses share generated-code ownership",
+	_HCSC_ProductionPathOwnership)
+
+; Generated personal shortcuts affect directives after their include even
+; though their own hotkeys are not part of the production source census.
+_HCSC_PersonalIncludePreservesContext() {
+	Root := A_Temp . "\ergopti-hcsc-" . A_TickCount . "-" . Random(10000, 99999)
+	Driver := Root . "\driver.ahk"
+	Personal := Root . "\_generated\personal_shortcuts.ahk"
+	; The user's own file, outside the driver, which the generated stub includes.
+	UserFile := Root . "\elsewhere\personal_shortcuts.ahk"
+	Owned := Root . "\ui\hotkeys.ahk"
+	DirCreate(Root . "\_generated")
+	DirCreate(Root . "\elsewhere")
+	DirCreate(Root . "\ui")
+	try {
+		FileAppend("#InputLevel 0`n#Include _generated/personal_shortcuts.ahk`n#Include ui/hotkeys.ahk`n",
+			Driver, "UTF-8")
+		FileAppend('#InputLevel 2`n#HotIf WinActive("fixture")`n^v::return`n#Include *i ' . UserFile
+			. '`n#UseHook true`n', Personal, "UTF-8")
+		FileAppend("^k::return`n+SC02E::return`n", UserFile, "UTF-8")
+		FileAppend("SC02F::return`n", Owned, "UTF-8")
+		State := Map("level", 0, "hotif", false, "usehook", false)
+		Seen := Map(), Walked := [], Labels := []
+		_HCSC_WalkIncludes(Driver, State, Seen, Walked)
+		AssertEqual(4, Seen.Count, "the generated include is traversed too, and the user's file it includes")
+		for Entry in Walked {
+			if Entry["owned"]
+				Labels.Push(Entry)
+		}
+		AssertEqual(1, Labels.Length,
+			"personal hotkeys never enter the driver census, wherever the user's own file lives")
+		AssertEqual("SC02F", Labels[1]["text"], "the owned label remains visible")
+		AssertEqual(2, Labels[1]["context"]["level"], "generated directives still affect later code")
+		AssertTrue(Labels[1]["context"]["hotif"], "the generated criterion remains in force")
+		AssertTrue(Labels[1]["context"]["usehook"], "the generated hook directive remains in force")
+		Source := FileRead(Driver, "UTF-8") . "`n" . FileRead(Owned, "UTF-8")
+		Masked := _DriverMaskNonCode(&Source)
+		_HCSC_Declarations(Source, Masked, &Count, &Calls)
+		AssertEqual(Count, Labels.Length, "both ownership-aware censuses agree with a personal include")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("hotkeys: a generated personal include preserves context without changing the census",
+	_HCSC_PersonalIncludePreservesContext)

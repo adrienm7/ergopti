@@ -109,3 +109,40 @@ _TBES_StageVerificationRejectsPartialWrites() {
 }
 Test("TOML BatchWrite: exact stage verification rejects partial writes "
 	. "(toml-stage-readback)", _TBES_StageVerificationRejectsPartialWrites)
+
+_TBES_NoOpVector(Vector) {
+	Path := A_Temp . "\ergopti_toml_noop_" . A_ScriptHwnd . "_"
+		. A_TickCount . "_" . Vector["id"] . ".toml"
+	Source := Chr(0xFEFF) . Vector["input"]
+	try {
+		AssertTrue(FSWrite(Path, Source))
+		FileSetTime("20000101000000", Path, "M")
+		BeforeTime := FileGetTime(Path, "M")
+		Update := { Section: Vector["section"], Key: Vector["key"] }
+		if Vector.Has("delete")
+			Update.Delete := true
+		else
+			Update.Value := Vector["kind"] == "boolean"
+				? TOML_Bool(Vector["value"]) : Vector["value"]
+		AssertTrue(TOML_BatchWrite(Path, [Update]))
+		if Vector["writes"] == 0 {
+			AssertEqual(Source, FSReadUtf8Exact(Path), "a no-op retains the complete byte image")
+			AssertEqual(BeforeTime, FileGetTime(Path, "M"),
+				"a no-op must retain the existing inode rather than replacing it")
+		} else {
+			AssertFalse(Source == FSReadUtf8Exact(Path), "changed values and types must publish")
+			AssertFalse(BeforeTime == FileGetTime(Path, "M"), "a real change must replace the old image")
+		}
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+_TBES_RegisterNoOpVectors() {
+	global _SharedDir
+	Fixture := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_noop\vectors.json", "UTF-8"))
+	for Vector in Fixture["cases"]
+		Test("toml-noop-parity " . Vector["id"], _TBES_NoOpVector.Bind(Vector))
+}
+_TBES_RegisterNoOpVectors()

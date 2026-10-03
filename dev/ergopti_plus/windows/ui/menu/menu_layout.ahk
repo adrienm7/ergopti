@@ -14,32 +14,35 @@
 
 
 
-; List provider: the custom layout picker. The built-in Ergopti emulation and
-; the registry layouts the layout manager installed, the one typing uses
-; checked; choosing another writes the selection and reloads, the only moment
-; the emulation registers its hotkeys (ui/layout_manager/init.ahk).
-_LAY_CustomLayoutRows() {
-	global _ConfigDir
-	Active := LayoutManager_ActiveId()
-	Builtin := LayoutManager_BuiltinIds()
-	Rows := [Map(
-		"label",   t("menu.layout.builtin_ergopti"),
-		"checked", Builtin.Has(Active),
-		"action",  (*) => LayoutManager_SelectBuiltin())]
-	try Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
-	catch as Err {
-		LoggerError("TrayMenu", "The installed layouts could not be listed: {1}", Err.Message)
-		return Rows
+/**
+ * Reports the enabled emulation; selection belongs to the shared layout manager.
+ * macOS and Linux's same list provider selects native input sources instead.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Integer} Enabled Layout category gate; the live gate when omitted.
+ * @param {Map} Index Registry metadata; the current catalogue when omitted.
+ * @returns {Array} One disabled status row without a selection callback.
+ */
+_LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset) {
+	global Features
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !IsSet(Enabled)
+		Enabled := IsCategoryGated("Layout")
+	Active := Enabled ? LayoutManager_ActiveId(FeaturesSource) : ""
+	Name := ""
+	if Active != "" {
+		if !IsSet(Index) {
+			Index := LayoutCatalogue_Last()["index"]
+			if !(Index is Map)
+				Index := LayoutCatalogue_BundledIndex()
+		}
+		Entry := LayoutCatalogue_Entry(Index, Active)
+		; A previously selected layout absent from the current catalogue remains
+		; identified explicitly; it must never be reported as no emulation.
+		Name := (Entry is Map) ? Entry.Get("name", Active) : Active
 	}
-	for Id, Entry in Installed {
-		if Builtin.Has(Id)
-			continue
-		Rows.Push(Map(
-			"label",   Entry.Get("name", Id),
-			"checked", Active == Id,
-			"action",  ((Selected) => (*) => LayoutManager_Select(Selected))(Id)))
-	}
-	return Rows
+	Label := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
+	return [Map("label", Label, "disabled", true)]
 }
 
 ; List provider: Ergopti base-layer feature only (ergopti_base).
@@ -83,4 +86,3 @@ _LAY_LayoutFeatureAltGrRows() {
 
 
 ; ── Hotstrings dynamic handlers ────────────────────────────────────────────────
-

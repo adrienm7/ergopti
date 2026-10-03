@@ -99,10 +99,11 @@ left_modifier_aliases = { lctrl = "ctrl", lshift = "shift", lalt = "alt", lwin =
 # under it never waits. That rule made « word, Space, a » type « wordA » with
 # Shift on the hold of Space: the letter was struck under a Shift already down.
 #
-# Read by the Windows driver (platform/remap/tap_hold_roll.ahk) and the Linux
-# engine (platform/remap/tap_hold_engine.lua). macOS hands its tap-holds to
-# Karabiner-Elements, which decides a dual-role key at the next key's press
-# and has no rule on the order of the releases.
+# Windows and Linux decide from release order. macOS resolves these same keys
+# through the shared catalogue and prioritizes typing before the hold threshold:
+# another press types the native tap, while a long hold starts its configured
+# action. Karabiner cannot decide from release order, so very fast chords on
+# these typing keys become taps instead of immediate holds.
 [tap_hold.rollover]
 keys = ["escape", "tab", "enter", "space", "backspace", "delete"]
 

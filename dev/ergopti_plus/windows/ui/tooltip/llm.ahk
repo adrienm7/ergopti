@@ -418,8 +418,8 @@ _LLM_TooltipReserveLlmRender(PresentationMeta := 0) {
 ; Show the LLM multi-slot tooltip using the shared Gui engine.
 ; Each slot may be a plain string (streaming) or a diff object:
 ;   { Text, Chunks: [{type:"equal"|"insert", text}], NextWords, HasCorrections }
-; Active slot: equal chunks in green, NextWords in orange, insert in white.
-; Inactive slots: full Text in gray.
+; Active slot: equal chunks (typed) in gray, insert chunks (corrected) in green,
+; NextWords in orange. Inactive slots: the same pieces, all in gray.
 ; @returns {Integer} Positive render generation on committed paint, otherwise 0.
 LLM_TooltipShow(payload, active := 1, is_final := false,
 		PresentationMeta := 0) {
@@ -996,25 +996,122 @@ _LLM_RepeatChar(ch, count) {
 	return out
 }
 
-; Prefixes for active/inactive rows — mirrors tooltip_llm.lua assemble_blocks.
+; The prefix of the selected line and the one of every other line — the Windows
+; port of prefixes() in _shared/lua/tooltip/llm_line.lua, pinned to it by
+; _shared/tests/corpus/tooltip/llm_line_vectors.json. The indentation is a
+; signed number of spaces:
+;   above 0  the selected line is pushed right, mark included;
+;   0        the mark sits where the other lines start;
+;   -1, -2   the other lines are pushed right by as many spaces;
+;   -3       every line starts at the same column and only the mark moves (the
+;            other lines carry the mark's own width, which is never drawn);
+;   below    the other lines are pushed right past the selected one.
+; @param {Integer} Indent - The user's indentation setting.
+; @param {Integer} LineCount - Lines the tooltip shows.
+; @param {String} Mark - The cursor mark of the selected line.
+; @param {String} Align - What compensates the mark's side bearing on the others.
+; @returns {Object} { Selected, Unselected }
+_LLM_LinePrefixes(Indent, LineCount, Mark, Align) {
+	static ALIGNED_FROM := -3
+	Selected := (LineCount >= 2 and Indent > 0) ? _LLM_RepeatChar(" ", Indent) . Mark : Mark
+	Unselected := ""
+	if (Indent < 0 and Indent > ALIGNED_FROM)
+		Unselected := _LLM_RepeatChar(" ", -Indent)
+	else if (Indent <= ALIGNED_FROM)
+		Unselected := Selected . _LLM_RepeatChar(" ", ALIGNED_FROM - Indent)
+	if (Indent > ALIGNED_FROM)
+		Unselected .= Align
+	return { Selected: Selected, Unselected: Unselected }
+}
+
+; Prefixes for active/inactive rows, at the configured indentation.
 _LLM_GetActivePrefix(slotCount) {
-	global _LLM_Tooltip_PredIndent, UI_LLM_ACTIVE_PREFIX
-	sparkle := UI_LLM_ACTIVE_PREFIX
-	indent := Integer(_LLM_Tooltip_PredIndent)
-	if (slotCount >= 2 and indent > 0)
-		return _LLM_RepeatChar(" ", indent) . sparkle
-	return sparkle
+	global _LLM_Tooltip_PredIndent, UI_LLM_ACTIVE_PREFIX, UI_LLM_INACTIVE_ALIGN_CHAR
+	return _LLM_LinePrefixes(Integer(_LLM_Tooltip_PredIndent), slotCount,
+		UI_LLM_ACTIVE_PREFIX, UI_LLM_INACTIVE_ALIGN_CHAR).Selected
 }
 
 _LLM_GetInactivePrefix(slotCount) {
-	global _LLM_Tooltip_PredIndent, UI_LLM_INACTIVE_ALIGN_CHAR
-	indent := Integer(_LLM_Tooltip_PredIndent)
-	if (indent < 0 and indent > -3)
-		return _LLM_RepeatChar(" ", -indent)
-	if (indent <= -3)
-		return _LLM_GetActivePrefix(slotCount) . _LLM_RepeatChar(" ", Max(0, -indent - 3))
-	align := UI_LLM_INACTIVE_ALIGN_CHAR
-	return (indent > -3) ? align : ""
+	global _LLM_Tooltip_PredIndent, UI_LLM_ACTIVE_PREFIX, UI_LLM_INACTIVE_ALIGN_CHAR
+	return _LLM_LinePrefixes(Integer(_LLM_Tooltip_PredIndent), slotCount,
+		UI_LLM_ACTIVE_PREFIX, UI_LLM_INACTIVE_ALIGN_CHAR).Unselected
+}
+
+; The pieces a slot's line reads, in reading order, each with its role — the
+; Windows port of segments() in _shared/lua/tooltip/llm_line.lua, pinned to it
+; by the same corpus. The chunks are the end of what the user typed as the
+; model corrected it: an "equal" chunk is text left as typed, an "insert" chunk
+; a correction; the next words follow. The line's leading spacing is dropped,
+; and a space is restored between the corrected tail and the next words when
+; neither side brings one. A slot that carries neither (a stream still coming
+; in) is words to come as a whole.
+; Unselected corrections and next words are bold only when typed reference
+; text exists and the parser has not disabled emphasis, as in the shared rule.
+; @param {Object|String} slot - A tooltip slot (LLM_TooltipShow).
+; @param {Integer} IsSelected - Whether this line owns the selected marker.
+; @returns {Array} of { Text, Role, Bold } - Role "typed" | "corrected" | "next".
+_LLM_SlotSegments(slot, IsSelected := true) {
+	; The ASCII spacing Lua's %s matches, so both ports cut at the same place.
+	static SPACING := "[ \t\n\x0B\f\r]"
+	Segments := []
+	LeadingDropped := false
+	LastChar := ""
+	Chunks := (IsObject(slot) and slot.HasOwnProp("Chunks")) ? slot.Chunks : []
+	HasTypedReference := false
+	for Chunk in Chunks {
+		if IsObject(Chunk) && Chunk.HasOwnProp("type") && Chunk.type == "equal"
+				&& Chunk.HasOwnProp("text") && RegExMatch(Chunk.text, "[^ \t\n\x0B\f\r]") {
+			HasTypedReference := true
+			break
+		}
+	}
+	Emphasis := !IsSelected && IsObject(slot)
+		&& slot.HasOwnProp("HasCorrections") && slot.HasCorrections == true
+		&& HasTypedReference && !(slot.HasOwnProp("DisableBold") && slot.DisableBold)
+	for , Chunk in Chunks {
+		Text := Chunk.HasOwnProp("text") ? Chunk.text : ""
+		if (!LeadingDropped and Text != "") {
+			Text := RegExReplace(Text, "^" . SPACING . "+")
+			LeadingDropped := (Text != "")
+		}
+		if (Text == "")
+			continue
+		LastChar := SubStr(Text, -1)
+		Kind := Chunk.HasOwnProp("type") ? Chunk.type : ""
+		if (Kind == "insert")
+			Segments.Push({ Text: Text, Role: "corrected", Bold: Emphasis })
+		else if (Kind == "equal")
+			Segments.Push({ Text: Text, Role: "typed", Bold: false })
+	}
+	NextWords := (IsObject(slot) and slot.HasOwnProp("NextWords")) ? slot.NextWords : ""
+	if (Segments.Length == 0 and NextWords == "")
+		NextWords := _LLM_SlotGetText(slot)
+	if (!LeadingDropped and NextWords != "")
+		NextWords := RegExReplace(NextWords, "^" . SPACING . "+")
+	if (NextWords != "") {
+		if (LastChar != "" and !(LastChar ~= SPACING) and !(NextWords ~= "^" . SPACING))
+			NextWords := " " . NextWords
+		Segments.Push({ Text: NextWords, Role: "next", Bold: Emphasis })
+	}
+	return Segments
+}
+
+; The colour of one piece of a line: on the selected line the typed text is
+; grey, the correction green and the continuation orange; every other line is
+; grey throughout.
+; @param {String} Role - "typed" | "corrected" | "next".
+; @param {Integer} is_active - True on the selected line.
+; @returns {String} Hex colour.
+_LLM_SegmentColorHex(Role, is_active) {
+	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX
+	if !is_active
+		return UI_LLM_UNSEL_GRAY_HEX
+	switch Role {
+		case "corrected": return UI_LLM_CORR_SEL_HEX
+		case "next": return UI_LLM_NW_SEL_HEX
+		case "typed": return UI_LLM_UNSEL_GRAY_HEX
+	}
+	throw ValueError("Unknown prediction line role: " . Role, -1)
 }
 
 _LLM_FormatValModifiers(valMods) {
@@ -1321,33 +1418,79 @@ _LLM_TooltipLayout(PredRows, Footer, Style) {
 	return L
 }
 
-; What a slot row reads, without its prefix or shortcut: the diff chunks plus
-; the next words the renderer appends, or the plain text of a streaming slot.
+; What a slot row reads, without its prefix or shortcut: its pieces end to end.
 _LLM_SlotBodyText(slot) {
-	if !(IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0)
-		return _LLM_SlotGetText(slot)
 	Body := ""
-	HasInsert := false
-	for , chunk in slot.Chunks {
-		Body .= chunk.HasOwnProp("text") ? chunk.text : ""
-		if (chunk.HasOwnProp("type") and chunk.type == "insert")
-			HasInsert := true
+	for , Segment in _LLM_SlotSegments(slot)
+		Body .= Segment.Text
+	return Body
+}
+
+; The width and height of a slot's pieces laid out one after the other, each
+; measured alone as the renderer draws it, so the row is never narrower than
+; what is painted into it.
+; @param {Array} Segments - _LLM_SlotSegments() result.
+; @returns {Object} { W, H }
+_LLM_TooltipMeasureSegments(Segments, Measure := _TooltipMeasureText) {
+	Size := { W: 0, H: 0, Pieces: [] }
+	for , Segment in Segments {
+		Piece := Measure.Call(Segment.Text, Segment.Bold)
+		Size.W += Piece.W
+		Size.H := Max(Size.H, Piece.H)
+		Size.Pieces.Push(Piece)
 	}
-	NextWords := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
-	return HasInsert ? Body : Body . NextWords
+	return Size
+}
+
+; Reserve the widest selected/unselected body so navigation never clips an
+; emphasized correction or makes the panel jump to another width.
+_LLM_TooltipMeasureSlotBody(Slot, Measure := _TooltipMeasureText) {
+	Selected := _LLM_TooltipMeasureSegments(_LLM_SlotSegments(Slot, true), Measure)
+	Unselected := _LLM_TooltipMeasureSegments(_LLM_SlotSegments(Slot, false), Measure)
+	return { W: Max(Selected.W, Unselected.W), H: Max(Selected.H, Unselected.H),
+		Selected: Selected, Unselected: Unselected }
+}
+
+; Prefix, body weight and acceptance suffix belong to one rendering. Taking
+; their maxima separately can reserve a width that neither rendering uses.
+_LLM_TooltipMeasurePredictionRow(Slot, ActivePrefix, InactivePrefix, SuffixW,
+		ShortcutW, Measure := _TooltipMeasureText) {
+	Body := _LLM_TooltipMeasureSlotBody(Slot, Measure)
+	return { W: Max(ActivePrefix.W + Body.Selected.W + SuffixW,
+		InactivePrefix.W + Body.Unselected.W) + ShortcutW,
+		H: Max(ActivePrefix.H, InactivePrefix.H, Body.H),
+		Selected: Body.Selected, Unselected: Body.Unselected }
 }
 
 ; One transparent text span; the Gui background shows through.
-_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm") {
+_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm", Size := 0) {
 	global _TOOLTIP_FONT_NAME
 	if (Text = "")
 		return 0
-	Size := _TooltipMeasureTextSize(Text, FontSize)
+	; Sizing and drawing share exact dimensions within this render only. The
+	; measure owner has already released its GDI objects; no native resource leaks
+	; into the next streaming update, font change or DPI context.
+	if !IsObject(Size) {
+		Bold := RegExMatch(Style, "i)(^|\s)bold(\s|$)") != 0
+		Size := _TooltipMeasureTextSize(Text, FontSize, , , Bold)
+	}
 	G.SetFont(Style . " c" . ColorHex . " s" . FontSize, _TOOLTIP_FONT_NAME)
 	; +2: a GDI extent rounded to layout units can clip the last glyph's overhang.
 	G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 		X, Y + Max(0, H - Size.H), Size.W + 2, Size.H), Text)
 	return Size.W
+}
+
+; Keep the paint owner and its measured advance together for every line piece.
+_LLM_TooltipDrawSegments(G, X, Y, H, Segments, IsSelected, Pieces := 0) {
+	global _TOOLTIP_FONT_SIZE
+	Start := X
+	for Index, Segment in Segments
+		X += _LLM_TooltipDrawText(G, X, Y, H,
+			_LLM_SegmentColorHex(Segment.Role, IsSelected), _TOOLTIP_FONT_SIZE,
+			Segment.Text, Segment.Bold ? "bold" : "norm",
+			Pieces is Array ? Pieces[Index] : 0)
+	return X - Start
 }
 
 ; Draws the 1 px rule and the footer rows at the positions _LLM_TooltipLayout
@@ -1365,20 +1508,20 @@ _LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
 		X := (Layout.W - Footer.Combined.W) // 2
 		H := Footer.Combined.H
 		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_HINT_COLOR_HEX,
-			_TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+			_TOOLTIP_LABEL_FONT_SIZE, Texts.Hint, "norm", Footer.Hint)
 		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_SEP_COLOR_HEX,
 			_TOOLTIP_LABEL_FONT_SIZE, UI_LLM_FOOTER_SPACE_DIV . UI_LLM_FOOTER_COMBINED_SEP
-				. UI_LLM_FOOTER_SPACE_DIV)
+				. UI_LLM_FOOTER_SPACE_DIV, "norm", Footer.Sep)
 		_LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_INFO_COLOR_HEX,
-			_TOOLTIP_INFO_FONT_SIZE, Texts.Info)
+			_TOOLTIP_INFO_FONT_SIZE, Texts.Info, "norm", Footer.Info)
 		return
 	}
 	if IsObject(Footer.Hint)
 		_LLM_TooltipDrawText(G, (Layout.W - Footer.Hint.W) // 2, Layout.HintY,
-			Footer.Hint.H, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+			Footer.Hint.H, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, Texts.Hint, "norm", Footer.Hint)
 	if IsObject(Footer.Info)
 		_LLM_TooltipDrawText(G, (Layout.W - Footer.Info.W) // 2, Layout.InfoY,
-			Footer.Info.H, _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_INFO_FONT_SIZE, Texts.Info)
+			Footer.Info.H, _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_INFO_FONT_SIZE, Texts.Info, "norm", Footer.Info)
 }
 
 
@@ -1389,9 +1532,10 @@ _LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
 
 ; Build a single Gui that renders all LLM slots with per-chunk coloring, laid
 ; out like the macOS canvas: one plain panel, the lines stacked as one block,
-; the shortcut label inline after each line. Active slot: equal chunks gray,
-; insert chunks corr_sel (green), next words nw_sel (orange). Inactive slots:
-; unsel_gray. Placeholder slots: italic slot placeholder in the loading color.
+; the shortcut label inline after each line. Active slot: the typed text
+; (equal chunks) unsel_gray, the corrections (insert chunks) corr_sel (green),
+; the next words nw_sel (orange). Inactive slots: unsel_gray throughout.
+; Placeholder slots: italic slot placeholder in the loading color.
 _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		PresentationMeta, RequestSerial) {
 	global _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
@@ -1403,6 +1547,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 
 	G := 0
 	CandidateHandedOff := false
+	BuildStarted := HotPath_Now()
 	try {
 	slotCount := slots.Length
 	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
@@ -1417,25 +1562,51 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	PredRows := []
 	Bodies := []
 	Shortcuts := []
+	RowSegments := []
+	RowSpanSizes := []
+	SuffixSize := 0
+	ActivePrefixSize := _TooltipMeasureText(activePrefix)
+	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
 	for i, slot in slots {
+		Segments := []
 		if all_placeholder {
 			Body := (i == 1) ? loading_label : ""
 			Shortcut := ""
+		} else if _LLM_SlotIsEmpty(slot) {
+			Body := LLM_TOOLTIP_PLACEHOLDER
+			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		} else {
-			Body := _LLM_SlotIsEmpty(slot) ? LLM_TOOLTIP_PLACEHOLDER
-				: _LLM_SlotBodyText(slot) . LLM_TOOLTIP_TAB_SUFFIX
+			Segments := _LLM_SlotSegments(slot, i == active_idx)
+			Body := ""
 			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		}
 		Bodies.Push(Body)
 		Shortcuts.Push(Shortcut)
+		RowSegments.Push(Segments)
+		SpanSizes := { Shortcut: 0, Body: 0, Pieces: [] }
+		RowSpanSizes.Push(SpanSizes)
 		if (all_placeholder and i > 1) {
 			PredRows.Push({ W: 0, H: 0 })
 			continue
 		}
+		SpanSizes.Shortcut := _LLM_TooltipMeasureOptional(Shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
+		if (Segments.Length > 0) {
+			; A real line is drawn piece by piece after its prefix, so it is
+			; measured the same way.
+			if !IsObject(SuffixSize)
+				SuffixSize := _LLM_TooltipMeasureOptional(LLM_TOOLTIP_TAB_SUFFIX, _TOOLTIP_FONT_SIZE)
+			SuffixW := IsObject(SuffixSize) ? SuffixSize.W : 0
+			MeasuredRow := _LLM_TooltipMeasurePredictionRow(slot,
+				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutW)
+			SpanSizes.Pieces := i == active_idx
+				? MeasuredRow.Selected.Pieces : MeasuredRow.Unselected.Pieces
+			PredRows.Push(MeasuredRow)
+			continue
+		}
 		Active := _TooltipMeasureText(activePrefix . Body)
 		Inactive := _TooltipMeasureText(inactivePrefix . Body)
-		ShortcutW := (Shortcut != "")
-			? _TooltipMeasureTextSize(Shortcut, _TOOLTIP_LABEL_FONT_SIZE).W : 0
+		SpanSizes.Body := _LLM_TooltipMeasureOptional(Body, _TOOLTIP_FONT_SIZE)
 		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutW,
 			H: Max(Active.H, Inactive.H) })
 	}
@@ -1458,50 +1629,35 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		RowY := Layout.RowY[Idx]
 		RowH := PredRows[Idx].H
 		X := _TOOLTIP_PADDING_X
+		SpanSizes := RowSpanSizes[Idx]
 		if all_placeholder {
 			if (Idx == 1)
 				_LLM_TooltipDrawText(G, X, RowY, RowH, _TOOLTIP_LOADING_TEXT_HEX,
-					_TOOLTIP_FONT_SIZE, Bodies[1], "norm italic")
+					_TOOLTIP_FONT_SIZE, Bodies[1], "norm italic", SpanSizes.Body)
 			continue
 		}
 		is_active := (Idx == active_idx)
 		if _LLM_SlotIsEmpty(slot) {
-			X += _TooltipMeasureText(inactivePrefix).W
+			X += InactivePrefixSize.W
 			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_LOADING_HEX,
-				_TOOLTIP_FONT_SIZE, Bodies[Idx], "norm italic")
-		} else if !is_active {
-			X += _TooltipMeasureText(inactivePrefix).W
-			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_UNSEL_GRAY_HEX,
-				_TOOLTIP_FONT_SIZE, Bodies[Idx])
+				_TOOLTIP_FONT_SIZE, Bodies[Idx], "norm italic", SpanSizes.Body)
 		} else {
-			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_CURSOR_HEX,
-				_TOOLTIP_FONT_SIZE, activePrefix)
-			has_chunks := IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0
-			if has_chunks {
-				has_insert := false
-				for , chunk in slot.Chunks {
-					is_insert := chunk.HasOwnProp("type") and chunk.type == "insert"
-					has_insert := has_insert or is_insert
-					X += _LLM_TooltipDrawText(G, X, RowY, RowH,
-						is_insert ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX,
-						_TOOLTIP_FONT_SIZE, chunk.HasOwnProp("text") ? chunk.text : "")
-				}
-				nw := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
-				if !has_insert
-					X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
-						_TOOLTIP_FONT_SIZE, nw)
-			} else {
-				; A streaming slot is words still to come: macOS colours them as
-				; next words.
+			; The mark is drawn on the selected line only; on the others the
+			; prefix is spacing, of the width its characters would take.
+			if is_active
+				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_CURSOR_HEX,
+					_TOOLTIP_FONT_SIZE, activePrefix, "norm", ActivePrefixSize)
+			else
+				X += InactivePrefixSize.W
+			X += _LLM_TooltipDrawSegments(G, X, RowY, RowH,
+				RowSegments[Idx], is_active, SpanSizes.Pieces)
+			if is_active
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
-					_TOOLTIP_FONT_SIZE, _LLM_SlotGetText(slot))
-			}
-			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
-				_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX)
+					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX, "norm", SuffixSize)
 		}
 		; Inline after the line, bottom-aligned at the smaller hint size.
 		_LLM_TooltipDrawText(G, X, RowY, RowH, is_active ? UI_LLM_CMD_SEL_HEX : UI_LLM_CMD_DIM_HEX,
-			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx])
+			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx], "norm", SpanSizes.Shortcut)
 	}
 	_LLM_TooltipDrawFooter(G, Layout, Texts, Footer)
 	TotalW := Layout.W
@@ -1511,6 +1667,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	; generation-fenced commit in _TooltipPresentStack.
 	Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
 	_TooltipPrepareContent(Row)
+	HotPath_LogIfSlow("Tooltip.LlmBuild", BuildStarted, "slots=" . slotCount)
 	CandidateSurface := _TooltipCreateDetachedSurface(Row, RenderGeneration)
 	; A newer show/hide can take ownership while this renderer performs GUI
 	; work. Dispose only this detached candidate; never consult active globals.

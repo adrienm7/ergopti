@@ -18,6 +18,8 @@
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
 
+#Include menu_population.ahk
+
 
 
 
@@ -124,8 +126,13 @@ _MR_Get(Obj, Key, Default := "") {
 ;   macOS renderer takes the same shape, which is what lets a section rendered on
 ;   both drivers finally be compared.
 ;
+; An optional empty target keeps caller-owned references used by native repaint
+; callbacks while the shared declaration still owns command and separator order.
 ; Returns the populated Menu object.
-MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "") {
+MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := "", ListProviders := "", Commands := "", StateGetters := "", TargetMenu := unset) {
+	if IsSet(TargetMenu) && (!(TargetMenu is Menu)
+			|| TrayMenuItemCount(TargetMenu) != 0)
+		throw Error("A manifest menu target must be an empty native menu.")
 	if (GroupBuilders == "") {
 		GroupBuilders := Map()
 	}
@@ -144,7 +151,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	}
 
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
-	Result     := Menu()
+	if IsSet(TargetMenu)
+		Result := TargetMenu
+	else
+		Result := Menu()
 	ItemCount  := 0      ; real items added so far
 	PendingSep := false  ; separator deferred until next real item
 
@@ -314,8 +324,11 @@ _MR_ReportDriverDialect(Row, ListId) {
 ; the user cannot identify and cannot report.
 ;
 ; Returns the number of items added.
-_MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
+_MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, RequireTracking := false) {
 	global MR_MAX_LIST_DEPTH
+	global _MenuPopulationBuilding
+	if !IsSet(PopulationOwner)
+		PopulationOwner := _MenuPopulationBuilding
 
 	if (Depth > MR_MAX_LIST_DEPTH) {
 		try LoggerError("MenuRenderer", "List '{1}' nests deeper than {2} level(s) — truncated.", ListId, MR_MAX_LIST_DEPTH)
@@ -352,9 +365,13 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 		Label := StrReplace(Label, "&", "&&")
 
 		if (Row.Has("items") and Row["items"] is Array) {
-			SubMenu := Menu()
-			_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1)
-			_MR_NormalizeSeparators(SubMenu)
+			if PopulationOwner is MenuPopulation && MenuPopulation_IsLeaf(Row["items"]) {
+				SubMenu := PopulationOwner.Create(Row["items"], ListId, Depth + 1)
+			} else {
+				SubMenu := Menu()
+				_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1, PopulationOwner)
+				_MR_NormalizeSeparators(SubMenu)
+			}
 			TargetMenu.Add(Label, SubMenu)
 		} else if (Row.Has("submenu") and Row["submenu"] is Menu) {
 			; A submenu this driver has ALREADY built as a native Menu.
@@ -370,12 +387,17 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 			; is handing over, so a Menu passed where row data was expected fails
 			; here instead of rendering an empty submenu.
 			TargetMenu.Add(Label, Row["submenu"])
-		} else if (Row.Has("action") and Row["action"] is Func and !Greyed) {
-			RegisterMenuItem(TargetMenu, Label, Row["action"])
+		} else if (Row.Has("action") and (Row["action"] is Func
+				or Row["action"] is MenuStartupUiCommand) and !Greyed) {
+			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"])
+			if RequireTracking && Tracked != 1
+				throw Error("Native leaf command registration was refused")
 		} else {
 			; A row with neither a submenu nor an action is a label; AHK needs a
 			; callback regardless, so it gets an inert one and is disabled below
-			RegisterMenuItem(TargetMenu, Label, (*) => "")
+			Tracked := RegisterMenuItem(TargetMenu, Label, (*) => "")
+			if RequireTracking && Tracked != 1
+				throw Error("Native leaf label registration was refused")
 		}
 
 		; An optional per-row icon. Win32 menus can carry one and hs.menubar rows
@@ -841,6 +863,7 @@ MenuRenderer_ResolveCheckedWhen(MenuKey, ItemId, Getters) {
 ; @param Provider Func Returns the row array.
 ; @returns {Integer} Rows added.
 MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
+	global _MenuPopulationBuilding
 	try TargetMenu.Delete()
 	Rows := ""
 	try {
@@ -848,6 +871,10 @@ MenuRenderer_FillFromList(TargetMenu, MenuKey, ListId, Provider) {
 	} catch as e {
 		try LoggerError("MenuRenderer", "List '{1}.{2}' provider threw ({3}) — menu left empty.", MenuKey, ListId, e.Message)
 		return 0
+	}
+	if _MenuPopulationBuilding is MenuPopulation && MenuPopulation_IsLeaf(Rows) {
+		_MenuPopulationBuilding.Fill(TargetMenu, Rows, ListId, 1)
+		return TrayMenuItemCount(TargetMenu)
 	}
 	return _MR_RenderRows(TargetMenu, Rows, ListId, 1)
 }

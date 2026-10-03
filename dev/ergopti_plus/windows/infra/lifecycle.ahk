@@ -21,9 +21,8 @@ ActivateEdit(*) {
 		Edit()
 }
 ; Physical keys registered as an AHK custom-combination PREFIX (the left side of
-; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk or
-; "SC038 & SC03A::" in modules/shortcuts/base_modifier.ahk). AHK's custom-
-; combination prefix-down flag latches across Suspend() and cannot be cleared by
+; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk).
+; AHK's custom-combination prefix-down flag latches across Suspend() and cannot be cleared by
 ; synthetic events -- see _SuspendPrefixesAreClear / _SuspendPendingPoll below.
 ; Single source of truth: EVERY key used as the prefix of an "X & Y" custom
 ; combination anywhere in the driver must appear here, so it is drained
@@ -32,8 +31,10 @@ ActivateEdit(*) {
 ; F42, F-30). The list is hand-maintained, so
 ; test_suspend_prefix_drain_covers_all_combos.ahk DERIVES the real prefix set
 ; from driver source and fails when a newly introduced combination is missing.
-;   SC138 = AltGr/Kana   SC038 = LAlt   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
-global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038", "SC01D", "SC02A", "SC11D"]
+; LAlt left the list with "SC038 & SC03A::": the key combinations are plain
+; hotkeys of their second key now (platform/remap/key_combination_keys.ahk).
+;   SC138 = AltGr/Kana   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
+global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC01D", "SC02A", "SC11D"]
 global _SuspendPending := false
 
 ; Wall-clock bound on the deferred suspend. The gate waits for a physically
@@ -271,10 +272,38 @@ _ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
 ; successor that died while loading and stop one whose request was refused.
 ; @returns {Map} The successor's "pid" and owned process "handle".
 LifecycleLaunchSuccessor() {
+	LifecycleRetireWorkers()
 	Target := A_IsCompiled
 		? '"' . A_ScriptFullPath . '" /restart'
 		: '"' . A_AhkPath . '" /restart "' . A_ScriptFullPath . '"'
 	return ReloadSuccessorLaunch(Target, A_InitialWorkingDir)
+}
+
+; Stops the detached workers before a successor launches. A worker that re-runs
+; the driver entry (the metrics projection always, the UIA probe when compiled)
+; holds the driver's window title while it starts, and /restart closes the
+; newest window with that title (reload-worker-identity, see
+; KLPF_ReloadKeepsWorkersOut). Workers are disposable and end with this instance
+; anyway, and none starts again while the hand-off exists. A worker that could
+; not be confirmed stopped is reported and the reload goes on: past its first
+; statement it no longer shares the title, and a successor that still closes it
+; is caught by the hand-off's liveness probe.
+; @returns {Boolean} False when a worker could not be confirmed stopped.
+LifecycleRetireWorkers() {
+	PrefetchStopped := false
+	try PrefetchStopped := KLPF_CancelAll()
+	catch as Err
+		try LoggerError("Lifecycle", "Metrics projection workers could not be stopped before the reload: {1}.", Err.Message)
+	; UIASW_Stop reports false when it owned nothing, which is a stopped worker.
+	UiaLive := IsObject(UIASWState.handle)
+	UiaStopped := !UiaLive
+	try UiaStopped := UIASW_Stop("canceled") || !UiaLive
+	catch as Err
+		try LoggerError("Lifecycle", "The UIA probe worker could not be stopped before the reload: {1}.", Err.Message)
+	if !(PrefetchStopped && UiaStopped)
+		try LoggerWarn("Lifecycle", "A detached worker was not confirmed stopped before the reload successor launched (metrics projection stopped={1}, UIA probe stopped={2}).",
+			PrefetchStopped ? "true" : "false", UiaStopped ? "true" : "false")
+	return PrefetchStopped && UiaStopped
 }
 
 ; Logs successful publication immediately before Reload. Destructive UI cleanup
@@ -1012,6 +1041,7 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("a metrics projection worker is still alive")
 		}
 		LoggerReady := false
+		try _TooltipLogRenderAccounting("shutdown preflight")
 		try LoggerReady := LoggerPrepareShutdown()
 		catch as Err
 			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)
@@ -1103,9 +1133,19 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
+		try MenuPopulation_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Native menu preparation teardown failed: {1}.", Err.Message)
+		try MenuStartupCommands_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Startup menu command teardown failed: {1}.", Err.Message)
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try _HC_Close()
+		try WebView_StopBrowserWarmup()
+		catch as Err
+			try LoggerError("Lifecycle", "Shared browser warmup teardown failed: {1}.", Err.Message)
 		try OllamaWV_Close()
 		try _Updater_AbortStagingOnExit()
 		if (TerminalHandoff is Map) {
@@ -1136,21 +1176,31 @@ Ergopti_OnShutdown(reason, code) {
 				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
-; Build the full tray menu off the boot critical path (armed after "ready").
+; Publish the configured tray before input registration, then prewarm its leaves.
 ; initMenu stages every subtree while the old root remains live and enters
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
+	global _DriverInputInitPending, _DriverMenuReady
+	global _TrayRootBootDetailsPending
+	global _MenuPopulationBuilding, _MenuPopulationPublished
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
 	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
 	_DriverReady := false
 	BootProfile_StageBegin("tray menu")
+	if _MenuPopulationBuilding is MenuPopulation
+		throw Error("Native menu population already has a build owner")
+	PopulationOwner := MenuPopulation()
+	_MenuPopulationBuilding := PopulationOwner
 	try {
 		InitSubMenus()
 		Published := initMenu(PublishAuthorizeFn)
 	} finally {
 		_DriverReady := _SavedReady
+		_MenuPopulationBuilding := false
+		if _MenuPopulationPublished != PopulationOwner
+			PopulationOwner.Pending.Clear()
 	}
 	if !((Published is Integer) and Published == 1) {
 		; Closes the stage explicitly: a refused publication retries later, and an
@@ -1161,9 +1211,12 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	}
 	UpdateTrayIcon()
 	BootProfile_StageEnd("tray menu", "published")
-	if _LangMenuBuildPending
+	InputPending := IsSet(_DriverInputInitPending) && _DriverInputInitPending
+	if !InputPending
+		PopulationOwner.Start()
+	if _LangMenuBuildPending && !InputPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+	BootProfile_Mark("Configured tray menu published")
 	; The independent LLM timer used to preempt this root worker, invalidate
 	; its generation, and force a second full InitSubMenus scan. Arm the cheap
 	; OFF-state population only after this root and its boot finalizer publish.
@@ -1171,7 +1224,7 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; Either projection stands down when initMenu already populated the IA
 	; handle inline: re-running the whole menu then only re-renders an
 	; unchanged tree (~109-156 ms wall on real boots for 13 free rows).
-	if _TrayRootBootIaPopulationNeeded() && _TrayRootScheduleBootProjectionIfDisabled(
+	if !InputPending && _TrayRootBootIaPopulationNeeded() && _TrayRootScheduleBootProjectionIfDisabled(
 			_LLM_Menu["enabled"], LLM_Menu_RequestBuild.Bind("boot"),
 			SetTimer, LLM_MENU_BUILD_DEFER_MS) {
 		try LoggerDebug("TrayMenu",
@@ -1182,8 +1235,16 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; case nothing else populates the IA submenu after boot. Arm the same
 	; deferred population whenever the api backend is enabled (predicates owned
 	; by menu_rebuild.ahk, next to the IfDisabled gate).
-	if _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
+	if !InputPending && _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
 		SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
+	; Release navigation only after every timed build stage is closed, otherwise
+	; the user's menu-reading time is charged to construction.
+	_TrayRootBootDetailsPending := false
+	_DriverMenuReady := true
+	try LoggerInfo("BootProfile", "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
+		BootProfile_TotalBootMs(), InputPending ? "true" : "false")
+	if IsSet(_TrayStartupClick)
+		_TrayStartupClick.NotifyReady()
 	return true
 }
 
@@ -1235,6 +1296,7 @@ UpdateTrayIcon() {
 		; sees: grey every feature submenu on pause and restore them on resume.
 		; The global rows, « Suspendre » included, are not feature rows.
 		TrayMenu_ApplyPauseGreying(A_IsSuspended)
+		MenuPopulation_Resume()
 }
 ; The tray menu's own « Recharger » item — the single most obviously
 ; paused-reachable reload in the driver, and it dropped the pause like all the
@@ -1253,7 +1315,7 @@ WindowSpy(*) {
 		if FileExist(spyPath)
 				Run(spyPath)
 		else
-				MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
+				Ui_MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
 }
 ActivateListVars(*) {
 		return ConsoleWindow_Open("list_vars")
@@ -1263,4 +1325,42 @@ ActivateKeyHistory(*) {
 }
 ShowHealthCheck(*) {
 		HealthCheck_ShowWindow()
+}
+
+/**
+ * Publishes global commands before scanning and rendering feature submenus.
+ * @returns {Boolean} Whether the root coordinator accepted the publication.
+ */
+BuildReadyTrayShell() {
+	global _TrayRootBootDetailsPending
+	_TrayRootBootDetailsPending := true
+	return RebuildTrayMenu(0, _TrayRootBuildShell, false)
+}
+
+; The manifest decides both the order and which rows belong to features. Global
+; commands remain usable while the ordinary boot worker stages its detached tree.
+; The shell uses the same publication owner and dispatcher as every later root.
+_TrayRootBuildShell(PublishAuthorizeFn) {
+	global _DriverReady, _LangMenuBuildPending
+	SavedReady := _DriverReady
+	_DriverReady := false
+	BootProfile_StageBegin("tray global commands")
+	try {
+		Published := initMenu(PublishAuthorizeFn, true)
+	} catch as Err {
+		TrayMenuStage_Abort()
+		BootProfile_StageAbort("tray global commands", Err.Message)
+		throw Err
+	} finally {
+		_DriverReady := SavedReady
+	}
+	if !((Published is Integer) && Published == 1) {
+		BootProfile_StageAbort("tray global commands", "publication refused")
+		return false
+	}
+	UpdateTrayIcon()
+	BootProfile_StageEnd("tray global commands", "published; feature submenus are pending")
+	LoggerInfo("BootProfile", Format("Tray global commands usable at {1} ms since process start.",
+		BootProfile_TotalBootMs()))
+	return true
 }

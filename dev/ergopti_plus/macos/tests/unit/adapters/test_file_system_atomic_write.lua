@@ -480,3 +480,109 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		end)
 	end)
 end)
+
+local noop_file = assert(io.open(helpers.shared("tests/corpus/config_noop/vectors.json"), "rb"))
+local noop_fixture = assert(require("json").decode(noop_file:read("*a")))
+noop_file:close()
+
+helpers.describe("FileSystem native no-op publication parity", function()
+	for _, vector in ipairs(noop_fixture.cases) do
+		helpers.it("native-toml-noop-parity " .. vector.id, function()
+			with_fixture(function(fixture)
+				local path = os.tmpname():gsub("\\", "/")
+				local seed = assert(io.open(path, "w"))
+				assert(seed:write(vector.input))
+				assert(seed:close())
+				-- The fixture simulates cp -p rather than spawning macOS cp. Carry
+				-- the real source metadata into that simulation: tmpname is 0600,
+				-- while a newly opened staging file follows the runner's umask.
+				local metadata = { records = { [path] = fixture.HOST_ATTRIBUTES(path) } }
+				local held, locks, unlocks, stages, publications = false, 0, 0, 0, 0
+				local adapter = fixture.make_adapter(nil, nil, nil, nil,
+					function() locks, held = locks + 1, true; return true end,
+					function() unlocks, held = unlocks + 1, false; return true end, nil, metadata)
+				local original_read = adapter.read_with_status
+				local original_open, original_rename = io.open, os.rename
+				local prepared, detail, candidate, source = require("toml_codec.writer").prepare_batch(path, {
+					{ section = vector.section, key = vector.key, value = vector.value, delete = vector.delete },
+				}, adapter)
+				helpers.assert_eq(prepared, true, detail)
+				adapter.read_with_status = function(target)
+					helpers.assert_eq(held, true, "an unchanged acknowledgement must retain the native lock")
+					return original_read(target)
+				end
+				io.open = function(target, mode)
+					if mode == "w" and target:find(fixture.STAGING_LOCK_SUFFIX .. "/payload", 1, true) then
+						stages = stages + 1
+					end
+					return original_open(target, mode)
+				end
+				os.rename = function(from, target)
+					if target == path then publications = publications + 1 end
+					return original_rename(from, target)
+				end
+				local ran, committed, commit_detail = xpcall(function()
+					return adapter.write_if_unchanged(path, candidate, source)
+				end, debug.traceback)
+				io.open, os.rename = original_open, original_rename
+				local live = assert(io.open(path, "r"))
+				local actual = live:read("*a")
+				assert(live:close())
+				os.remove(path)
+				os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				if not ran then error(committed, 0) end
+				helpers.assert_eq(committed, true, commit_detail)
+				helpers.assert_eq(actual, candidate)
+				helpers.assert_eq(locks, 1)
+				helpers.assert_eq(unlocks, 1)
+				helpers.assert_eq(held, false)
+				helpers.assert_eq(stages, vector.writes)
+				helpers.assert_eq(publications, vector.writes)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("FileSystem no-op retains its native source fence", function()
+	helpers.it("native-toml-noop-parity an owned sibling refuses even identical bytes", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local handle = assert(io.open(path, "w"))
+			assert(handle:write("same bytes"))
+			assert(handle:close())
+			local adapter = fixture.make_adapter()
+			local group, acquired = adapter.acquire_write_locks({ path })
+			helpers.assert_eq(acquired, true)
+			local committed = adapter.write_if_unchanged(path, "same bytes", { status = "ok", content = "same bytes" })
+			local released = adapter.release_write_locks(group)
+			os.remove(path)
+			os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(committed, false, "a no-op may not bypass the exact existing writer owner")
+			helpers.assert_eq(released, true)
+		end)
+	end)
+
+	helpers.it("native-toml-noop-parity a source changed during lock acquisition is refused", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			local handle = assert(io.open(path, "w"))
+			assert(handle:write("same bytes"))
+			assert(handle:close())
+			local adapter, staging = fixture.make_adapter(nil, nil, nil, nil, function()
+				local foreign = assert(io.open(path, "w"))
+				assert(foreign:write("foreign bytes"))
+				assert(foreign:close())
+				return true
+			end)
+			local committed = adapter.write_if_unchanged(path, "same bytes", { status = "ok", content = "same bytes" })
+			local live = assert(io.open(path, "r"))
+			local content = live:read("*a")
+			assert(live:close())
+			os.remove(path)
+			os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(content, "foreign bytes")
+			helpers.assert_eq(next(staging), nil)
+		end)
+	end)
+end)

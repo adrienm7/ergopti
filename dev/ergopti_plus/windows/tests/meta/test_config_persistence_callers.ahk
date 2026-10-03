@@ -103,14 +103,18 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Audited inventory: config_io (6), config_shortcuts (2), unused-key cleanup
+	; Audited inventory: config_io (7), config_shortcuts (2), unused-key cleanup
 	; (2), feature_io (2), gestures (4), and one each in i18n, TOML_Write,
 	; updater, editors, menu rebuild, personal editor, WPM, the error window and scoped configuration.
 	; Both admitted builders and direct-update gateways count. Pin the census so
 	; deleting a caller cannot make this class guard progressively vacuous, while
 	; every future sibling is still inspected by the loop above before the
 	; inventory assertion is reached.
-	AssertEqual(25, Calls,
+	; SetScriptShortcutChordsOn added the seventh config_io caller: its strict
+	; false return precedes reload, covered by the real refused-write case.
+	; SetKeyCombinationHold and ClearKeyCombination (infra/key_combinations.ahk)
+	; added two: each returns false before its reload when the commit is refused.
+	AssertEqual(28, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -164,9 +168,14 @@ _CPC_RelatedFeatureFieldsUseOneBatch() {
 		and InStr(LetterBody, '"value", true') > 0,
 		"the shared letter batch must contain both related fields")
 	AssertEqual(1, _CPC_CountOccurrences(ToggleBody, "WriteFeatureBatchV2("),
-		"a reload-path feature toggle and its mutex siblings must share one feature batch")
-	Assert(InStr(ToggleBody, "_MutexSiblingPathsForV2(V2Path)") > 0,
-		"the shared toggle batch must still enumerate every mutually exclusive sibling")
+		"a reload-path feature toggle must write one feature batch")
+	; The two slots of a key combination, its tap and its hold, are emptied
+	; together: one batch, or a refused second write leaves half a pair.
+	ClearBody := _StripFullLineComments(_DriverFuncBody("ClearKeyCombination"))
+	AssertEqual(1, _CPC_CountOccurrences(ClearBody, "ConfigCommitUpdates("),
+		"clearing a key combination must empty its tap and its hold in one batch")
+	Assert(InStr(ClearBody, "KEY_COMBINATION_HOLD_SECTION") > 0 and InStr(ClearBody, "KeyCombinationTapClearRow(PairId)") > 0,
+		"that batch must carry both slots")
 }
 Test("AHK-15-persistence: related feature fields share one batch",
 	_CPC_RelatedFeatureFieldsUseOneBatch)

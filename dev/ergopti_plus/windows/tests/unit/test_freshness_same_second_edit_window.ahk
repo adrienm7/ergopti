@@ -34,7 +34,7 @@
 
 _FreshSameSec_TieIsStale() {
 	; Build an isolated temp shared tree so the real bundled TOMLs are untouched.
-	; Only distancesreduction.toml exists here; _HotstringsCacheIsFresh skips the
+	; Only magickey.toml exists here; _HotstringsCacheIsFresh skips the
 	; other bundled categories via FileExist, so one TOML controls the verdict.
 	Base := A_Temp . "\ergopti_freshness_samesecond_test"
 	HsDir := Base . "\modules\hotstrings"
@@ -47,7 +47,10 @@ _FreshSameSec_TieIsStale() {
 	_FreshSameSec_PrevShared := _SharedDir
 	_SharedDir := Base
 	TsvPath := _HotstringsCacheTsvPath()
-	TomlPath := _HotstringsCacheTomlPath("distancesreduction")
+	TomlPath := _HotstringsCacheTomlPath("magickey")
+	IndexPath := HsDir . "\_index.toml"
+	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
+	FileSetTime("20240101115900", IndexPath, "M")
 
 	try {
 		try FileDelete(TsvPath)
@@ -68,6 +71,7 @@ _FreshSameSec_TieIsStale() {
 		_SharedDir := _FreshSameSec_PrevShared
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
+		try FileDelete(IndexPath)
 		try DirDelete(HsDir)
 		try DirDelete(Base)
 	}
@@ -95,7 +99,10 @@ _FreshSameSec_NewerTsvStillFresh() {
 	_FreshSameSec_PrevShared := _SharedDir
 	_SharedDir := Base
 	TsvPath := _HotstringsCacheTsvPath()
-	TomlPath := _HotstringsCacheTomlPath("distancesreduction")
+	TomlPath := _HotstringsCacheTomlPath("magickey")
+	IndexPath := HsDir . "\_index.toml"
+	FileCopy(_FreshSameSec_PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
+	FileSetTime("20240101115900", IndexPath, "M")
 
 	try {
 		try FileDelete(TsvPath)
@@ -112,6 +119,7 @@ _FreshSameSec_NewerTsvStillFresh() {
 		_SharedDir := _FreshSameSec_PrevShared
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
+		try FileDelete(IndexPath)
 		try DirDelete(HsDir)
 		try DirDelete(Base)
 	}

@@ -128,6 +128,22 @@ Test("script-control submenu: the switch row turns the chords off (script-chords
 Test("script-control submenu: the switch row turns the chords back on (script-chords-switch-2026-09-30)",
 	_SCSM_SwitchCase.Bind(false))
 
+; A directory cannot accept config.toml bytes. The real persistence refusal
+; must stop before the reload seam, keeping the current configuration intact.
+_SCSM_RefusedSwitchDoesNotReload() {
+	Fixture := _ScopeOwnerFixture()
+	Reloads := []
+	try {
+		AssertFalse(SetScriptShortcutChordsOn(false, Fixture.directory,
+			() => Reloads.Push("reload")), "the actual writer refuses a directory target")
+		AssertEqual(0, Reloads.Length, "a failed commit cannot reload into uncommitted choices")
+		AssertEqual(Fixture.source, FSReadStrict(Fixture.path), "the existing configuration stays byte-exact")
+		Assert(DirExist(Fixture.directory), "the refusal cannot replace the directory")
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("script-control submenu: refused persistence never reloads the driver",
+	_SCSM_RefusedSwitchDoesNotReload)
+
 ; The restore and the clear rows publish through the scope owner at once, with
 ; its backup and its rollback: the restore returns every slot and the switch to
 ; their preset (absent keys), the clear writes "none" in every slot and keeps

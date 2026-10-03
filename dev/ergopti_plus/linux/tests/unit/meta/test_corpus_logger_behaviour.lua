@@ -36,6 +36,13 @@ local assert_eq   = helpers.assert_eq
 local driver_root = helpers.driver_root()
 local corpus_path = driver_root .. "/../_shared/tests/corpus/logger/behaviour_vectors.json"
 
+describe("Logger capacity ownership", function()
+	it("publishes before a reentrant sink (logger-repeat-atomic)", function()
+		local fresh = dofile(driver_root .. "/../_shared/lua/logger/init.lua")
+		dofile(driver_root .. "/../_shared/tests/corpus/logger/capacity_reentry.lua")(fresh)
+	end)
+end)
+
 
 
 

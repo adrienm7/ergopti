@@ -45,6 +45,7 @@ if not _ok_log or type(Logger) ~= "table" then
 end
 local TomlCodec  = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local LeafRows   = require("toml_codec.leaf_rows")
 local Records    = require("config_unused_keys")
 local LOG        = "config_migrate"
 
@@ -72,6 +73,7 @@ local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops
 --- Fields of each op of the closed set.
 local OPS = {
 	rename        = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
+	copy_if_absent = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
 	move_section  = { required = { "section", "to_section" }, optional = {} },
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
@@ -206,8 +208,8 @@ local function validate_op(op)
 			return false, "'" .. field .. "' must be one bare segment"
 		end
 	end
-	if op.op == "rename" and op.to_section == nil and op.to_key == nil then
-		return false, "rename needs to_section or to_key"
+	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
+		return false, op.op .. " needs to_section or to_key"
 	end
 	if op.op == "map_value" then
 		if not is_array(op.map) or #op.map == 0 then return false, "map_value needs a non-empty map" end
@@ -437,6 +439,33 @@ function APPLY.rename(sections, op)
 	move_entry(sections, op.section, op.key, to_section, op.to_key or op.key)
 	drop_if_empty(sections, op.section)
 	drop_if_empty(sections, to_section)
+end
+
+--- Explicit ancestor values and child tables also occupy a destination path.
+--- A conditional copy must not replace them or extend a closed inline value.
+local function copy_destination_absent(sections, section, key)
+	if sections[section] and sections[section][key] ~= nil then return false end
+	local path = section
+	while true do
+		local parent, name = path:match("^(.*)%.([^%.]+)$")
+		if not parent then parent, name = "", path end
+		if sections[parent] and sections[parent][name] ~= nil then return false end
+		if parent == "" then break end
+		path = parent
+	end
+	local destination = section .. "." .. key
+	return #sections_at_or_below(sections, destination) == 0
+end
+
+function APPLY.copy_if_absent(sections, op)
+	local source = sections[op.section]
+	if source == nil or source[op.key] == nil then return end
+	local to_section, to_key = op.to_section or op.section, op.to_key or op.key
+	local target = sections[to_section]
+	if not copy_destination_absent(sections, to_section, to_key) then return end
+	if target == nil then target = {}; sections[to_section] = target end
+	local entry = source[op.key]
+	target[to_key] = { value = LeafRows.clone_value(entry.value), record = entry.record }
 end
 
 function APPLY.move_section(sections, op)

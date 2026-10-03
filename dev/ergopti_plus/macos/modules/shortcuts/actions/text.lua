@@ -18,6 +18,7 @@ local M = {}
 
 local hs         = hs
 local pasteboard = hs.pasteboard
+local JsonCodec  = require("adapters.json_codec")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local Timings    = require("infra.timings")
@@ -500,10 +501,10 @@ local function load_shared_groups()
 	local content = fh:read("*a")
 	fh:close()
 	if type(content) == "string" and content ~= "" then
-		-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
+		-- Strip a leading UTF-8 BOM before native JSON decoding.
 		if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
-		local ok, data = pcall(hs.json.decode, content)
-		if ok and type(data) == "table" and type(data.groups) == "table" and #data.groups > 0 then
+		local data, decode_error = JsonCodec.decode(content)
+		if not decode_error and type(data) == "table" and type(data.groups) == "table" and #data.groups > 0 then
 			return data.groups
 		end
 	end

@@ -28,9 +28,9 @@ GestureAutoConfigureAction() {
 		return
 	}
 	if !GestureAutoConfigureRegistry(_GestureAutoConfigureActionDone) {
-		MsgBox(
+		Ui_MsgBox(
 			t("dialog.gestures.auto_configure_error"),
-			t("dialog.gestures.auto_configure_error_title"),
+			t("common.error_title"),
 			"Icon!"
 		)
 	}
@@ -38,9 +38,9 @@ GestureAutoConfigureAction() {
 
 _GestureAutoConfigureActionDone(Ok) {
 	if !Ok {
-		MsgBox(
+		Ui_MsgBox(
 			t("dialog.gestures.auto_configure_error"),
-			t("dialog.gestures.auto_configure_error_title"),
+			t("common.error_title"),
 			"Icon!"
 		)
 	}

@@ -50,6 +50,7 @@ local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local Json       = require("json")
+local JsonCodec  = require("adapters.json_codec")
 local ReleaseSources = require("updater.release_sources")
 local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
@@ -358,9 +359,9 @@ local function fetch_and_inject(channel)
 		end
 		local body = result.body
 
-		-- Parse JSON via hs.json.
-		local ok, data = pcall(hs.json.decode, body)
-		if not ok or type(data) ~= "table" then
+		-- Decode native null semantics into an independently owned tree.
+		local data, decode_err = JsonCodec.decode(body)
+		if decode_err ~= nil or type(data) ~= "table" then
 			Logger.warn(LOG, "GitHub API JSON parse failed.")
 			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
 				request_generation)

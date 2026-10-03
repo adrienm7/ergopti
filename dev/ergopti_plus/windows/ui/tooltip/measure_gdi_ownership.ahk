@@ -30,10 +30,11 @@ class _TooltipMeasureGdiNative {
 			"Int", 90, "Int")
 	}
 
-	static CreateFont(HeightPx, FontName) {
+	static CreateFont(HeightPx, FontName, Bold := false) {
+		static FW_NORMAL := 400, FW_BOLD := 700
 		return DllCall("Gdi32\CreateFontW",
 			"Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
-			"Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
+			"Int", Bold ? FW_BOLD : FW_NORMAL, "UInt", 0, "UInt", 0, "UInt", 0,
 			"UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
 			"WStr", FontName, "Ptr")
 	}
@@ -134,21 +135,22 @@ _TooltipMeasureDrainGdiDebt(Native := _TooltipMeasureGdiNative) {
 ; transaction. Otherwise two AHK threads can both observe a miss and the later
 ; Map assignment silently loses the first process-lifetime HFONT handle.
 _TooltipMeasureAcquireCachedFont(HeightPx, FontName, FontCache,
-		Native := _TooltipMeasureGdiNative) {
+		Native := _TooltipMeasureGdiNative, Bold := false) {
 	if !(FontCache is Map)
 		throw TypeError("Tooltip measurement font cache must be a Map")
+	Key := HeightPx . "|" . (Bold ? "bold" : "regular") . "|" . FontName
 	CandidateReceipt := _TooltipMeasureNewGdiReceipt()
 	PreviousCritical := Critical("On")
 	try {
-		if FontCache.Has(HeightPx)
-			return FontCache[HeightPx]
+		if FontCache.Has(Key)
+			return FontCache[Key]
 		CandidateReceipt["uncached_font"] := Native.CreateFont(HeightPx,
-			FontName)
+			FontName, Bold)
 		if !CandidateReceipt["uncached_font"]
 			return 0
-		FontCache[HeightPx] := CandidateReceipt["uncached_font"]
+		FontCache[Key] := CandidateReceipt["uncached_font"]
 		CandidateReceipt["uncached_font"] := 0
-		return FontCache[HeightPx]
+		return FontCache[Key]
 	} finally {
 		try _TooltipMeasureSettleGdiReceipt(CandidateReceipt, Native)
 		finally Critical(PreviousCritical)

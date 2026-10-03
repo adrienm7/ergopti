@@ -17,6 +17,7 @@ local i18n          = require("infra.i18n")
 local Labels        = require("menu.labels")
 local Extensions    = require("hotstrings.extensions")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local ManifestMenu = require("infra.manifest_menu")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
@@ -190,33 +191,6 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 		end, function()
 			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
-			ctx.updateMenu()
-		end)
-	end
-end
-
---- Force every section of one group on or off (bulk action). Enabling also
---- lifts the group gate (and starts the engine) so the change is immediately
---- effective; disabling just clears the sections.
---- @param ctx table Context.
---- @param group_name string Group name.
---- @param enable boolean true = enable all sections, false = disable all.
---- @return function
-local function setGroupSectionsFn(ctx, group_name, enable)
-	return function()
-		local km = ctx.keymap
-		if enable and not KeymapLifecycle.ensure_started(ctx, "enable group sections") then return end
-		local changes = { {
-			name = group_name,
-			sections = section_names_for(km, group_name),
-			enable_group = enable,
-		} }
-		KeymapLifecycle.commit_mutation(ctx, "set hotstring group sections", function()
-			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
-			return km.set_groups_sections_enabled(changes, enable)
-		end, function()
-			if enable then ctx.state.hotstrings[group_name] = true end
-			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end)
 	end
@@ -438,42 +412,7 @@ function M.build_groups(ctx, only, counts)
 				ordered_secs = sections
 			end
 
-			-- THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
-			-- them until 2026-08-07:
-			--
-			--   1. the category gate — everything under it is inert while it is off
-			--   2. « ouvrir le fichier », when the category has one
-			--   3. ─────────
-			--   4. the « all sections » checkbox
-			--   5. ─────────
-			--   6. the sections
-			--
-			-- The gate row is the only way to switch the group from its submenu.
-			-- This driver relied on the parent row toggling the group when clicked,
-			-- which never happens: AppKit sends no action for an item that opens a
-			-- submenu, and the renderer drops it. Both controls are checkboxes with
-			-- one label: the gate alternated « ✅ Activée (cliquer pour désactiver) »
-			-- and « ❌ Désactivée (cliquer pour activer) », and the sections had a
-			-- « tout activer » / « tout désactiver » pair.
 			local sec_menu = {}
-			sec_menu[#sec_menu + 1] = {
-				label    = i18n.get("menu.hotstrings.category_enable"),
-				checked  = enabled,
-				action   = not ctx.paused and toggleGroupFn(ctx, name) or nil,
-				disabled = ctx.paused or nil,
-			}
-			local toml_path = toml_path_for_group(ctx, name)
-			if toml_path then
-				sec_menu[#sec_menu + 1] = {
-					label = i18n.get("menu.hotstrings.open_file"),
-					action    = function() open_toml_path(toml_path) end,
-				}
-			end
-			sec_menu[#sec_menu + 1] = { separator = true }
-			sec_menu[#sec_menu + 1] = Custom.all_sections_row(ctx, { name }, function(enable)
-				return setGroupSectionsFn(ctx, name, enable)
-			end)
-			sec_menu[#sec_menu + 1] = { separator = true }
 			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
@@ -517,13 +456,22 @@ function M.build_groups(ctx, only, counts)
 					end
 				end
 			end
-			-- `items`, not `menu`: this row is DATA handed to a `list` provider, and
-			-- the renderer reads `items` for nested rows. Written as `menu` — the
-			-- hs.menubar field — the sections were attached to a field nothing reads,
-			-- so every standard and Ergopti category rendered as a bare clickable row
-			-- with its whole submenu gone: no « ouvrir le fichier », no bulk actions,
-			-- no section toggles, and not one warning to say so.
-			item.items = sec_menu
+			local toml_path = toml_path_for_group(ctx, name)
+			local render_ctx = { commands = {
+				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true),
+				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false),
+			} }
+			-- The renderer owns the head and separator order. A rendered child is
+			-- attached as `submenu` so its native commands are not rendered twice.
+			item.submenu = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+				render_ctx, {
+					["hotstring_category_file"] = function()
+						if not toml_path then return {} end
+						return { { label = i18n.get("menu.hotstrings.open_file"),
+							action = function() open_toml_path(toml_path) end } }
+					end,
+					["hotstring_category_sections"] = function() return sec_menu end,
+				})
 		end
 		items[#items + 1] = item
 		::continue_group::

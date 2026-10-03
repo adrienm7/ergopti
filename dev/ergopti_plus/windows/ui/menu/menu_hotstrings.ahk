@@ -157,13 +157,13 @@ _HS_PromptDefaultDelay() {
 	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
 	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
 	CurMs     := Round((HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY) * 1000)
-	IB := InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
+	IB := Ui_InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
 	if (IB.Result != "OK") {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
 	if !RegExMatch(Val, "^\d+$") {
-		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
 	return _HS_CommitDelayOverride("_global", (Val + 0) / 1000)
@@ -192,13 +192,13 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	R     := HotstringsResolve(Cat, "")
 	Sec   := R.HasOverride ? R.Delay : ((DefaultSec != "") ? DefaultSec : R.Delay)
 	CurMs := Round(Sec * 1000)
-	IB := InputBox(t("menu.hotstrings.delay_prompt"), t(I18nKey), "w340 h140", CurMs)
+	IB := Ui_InputBox(t("menu.hotstrings.delay_prompt"), t(I18nKey), "w340 h140", CurMs)
 	if (IB.Result != "OK") {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
 	if !RegExMatch(Val, "^\d+$") {
-		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
 	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
@@ -397,7 +397,7 @@ _HS_DelimAddCustom() {
 		WMPresentWindow(_HS_DelimAddGui)
 		return
 	}
-	G := Gui("", t("dialog.hotstrings.new_delimiter_title"))
+	G := Gui_Create("", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
@@ -441,7 +441,7 @@ _HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
 _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 	Ch := EditCtrl.Value
 	if (StrLen(Ch) != 1) {
-		MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
+		Ui_MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
 		return
 	}
 	Result.Char    := Ch
@@ -452,7 +452,7 @@ _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 
 ; Confirm then remove a custom delimiter character (and its consume flag if set).
 _HS_DelimRemoveCustom(Char) {
-	Res := MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
+	Res := Ui_MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
 	if (Res != "Yes") {
 		return
 	}
@@ -732,7 +732,9 @@ _HS_PersonalSectionsAllOn(TomlData) {
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
-_HS_PersonalRows() {
+_HS_PersonalRows(Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
 	global ScriptInformation, Features, _PersonalExtTree
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
@@ -768,9 +770,6 @@ _HS_PersonalRows() {
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
 		PersonalRows.Push(Map("separator", true))
-		; A row with a label and nothing else renders inert and greyed — which is
-		; what this shortcut reminder is: it states the trigger, it is not a button.
-		PersonalRows.Push(Map("label", t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]))
 
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultRows := []
@@ -804,10 +803,6 @@ _HS_PersonalRows() {
 			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalRows.Push(Map("separator", true))
-			; One « all sections » checkbox for the personal hotstrings.
-			PersonalRows.Push(_HS_AllSectionsRow(_HS_PersonalSectionsAllOn(TomlData),
-				(Bool) => HS_TogglePersonalAllSections(Bool)))
-			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
 					PersonalRows.Push(Map("separator", true))
@@ -825,7 +820,8 @@ _HS_PersonalRows() {
 				}
 			}
 		}
-		MenuRenderer_AppendRows(PersonalMenu, "hotstrings_menu", "hotstring_personal", PersonalRows)
+		_HS_CategoryMenu("Personal", "", PersonalRows,
+			(_Targets, Enabled) => HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0
@@ -1006,14 +1002,7 @@ _HS_ExtensionRows(Options := unset) {
 		} else {
 			for _, TF in Ext.toml_files {
 				GroupPath := "hotstrings.groups." . TF.category
-				TFRows := [
-					Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path)),
-					Map("separator", true),
-					Map("label", t("menu.hotstrings.category_enable"),
-						"checked", ReadFeatureStateV2(GroupPath)["enabled"],
-						"action", _HS_ExtensionToggle.Bind(GroupPath, Options)),
-					Map("separator", true)
-				]
+				TFRows := []
 				if (TF.sections.Length == 0) {
 					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
 				} else {
@@ -1028,7 +1017,9 @@ _HS_ExtensionRows(Options := unset) {
 				ExtRows.Push(Map(
 					"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
 						[{ toml_files: [TF] }], MasterOn)) . ")",
-					"items", TFRows))
+					"checked", ReadFeatureStateV2(GroupPath)["enabled"],
+					"submenu", _HS_CategoryMenu(TF.category, TF.path, TFRows,
+						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))))
 			}
 		}
 		Rows.Push(Map(

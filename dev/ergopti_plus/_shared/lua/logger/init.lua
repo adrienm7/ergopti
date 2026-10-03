@@ -377,10 +377,10 @@ local function expire_repeat_streaks(now, ts)
 	end
 end
 
---- Evicts the least recently used streak to make room for a new one, reporting
---- its count first so a bounded table never loses a suppressed occurrence.
---- @param ts string Timestamp the eviction summary is stamped with.
-local function evict_least_recent_streak(ts)
+--- Detaches the least recently used streak. The caller publishes its replacement
+--- before emitting the summary, because a sink may synchronously reenter.
+--- @return table victim Detached streak whose summary the caller owns.
+local function evict_least_recent_streak()
 	local victim = nil
 	for _, streak in pairs(_repeat.streaks) do
 		if victim == nil or streak.used < victim.used then victim = streak end
@@ -388,7 +388,7 @@ local function evict_least_recent_streak(ts)
 	_repeat.streaks[victim.key] = nil
 	_repeat.size = _repeat.size - 1
 	if victim.start == _repeat.oldest then recompute_oldest_streak() end
-	if victim.count > 0 then emit_repeat_summary(victim, ts) end
+	return victim
 end
 
 --- Decides whether one line is a repeat to withhold, recording it when it is and
@@ -417,7 +417,8 @@ local function withhold_repeat(variant, module_text, msg, body, ts, now)
 		return true
 	end
 
-	if _repeat.size >= REPEAT_CAPACITY then evict_least_recent_streak(ts) end
+	local evicted = nil
+	if _repeat.size >= REPEAT_CAPACITY then evicted = evict_least_recent_streak() end
 	_repeat.seq = _repeat.seq + 1
 	_repeat.streaks[key] = {
 		key = key, variant = variant, module = module_text, text = text,
@@ -425,6 +426,7 @@ local function withhold_repeat(variant, module_text, msg, body, ts, now)
 	}
 	_repeat.size = _repeat.size + 1
 	if _repeat.oldest == nil or now < _repeat.oldest then _repeat.oldest = now end
+	if evicted and evicted.count > 0 then emit_repeat_summary(evicted, ts) end
 	return false
 end
 

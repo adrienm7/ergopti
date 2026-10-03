@@ -1,15 +1,16 @@
 ﻿; static/ergopti_plus/windows/tests/unit/test_llm_parser_refuses_uninjectable_deletes.ahk
 
 ; ==============================================================================
-; MODULE: Regression — a prediction needing an erasure must never reach the
-;         tooltip on Windows (llm-parser-deletes-never-applied)
+; MODULE: Regression — a prediction needing an erasure reaches the tooltip on
+;         Windows only with the exact text it erases
+;         (llm-parser-deletes-never-applied, llm-correction-erases)
 ; DESCRIPTION:
 ; LLM_Parser_ProcessPrediction returns the full physical-injection record —
 ; deletes / to_type / nw. `to_type` is deliberately NOT the whole prediction: it
 ; is only the suffix that survives after `deletes` characters have been erased.
 ; LLM_Parser_ParseResponse then collapsed that record to a bare `to_type` string,
 ; and from there the deletion count did not exist anywhere in this driver:
-; LLM_Bridge_OnAccept types the text with no erase step.
+; LLM_Bridge_OnAccept typed the text with no erase step.
 ;
 ; ROOT CAUSE ENCODED: accepting an "advanced"-profile correction therefore
 ; APPENDED the fix to the very characters it was meant to replace —
@@ -17,23 +18,17 @@
 ; corpus already pins those numbers row by row, which is what made the value look
 ; covered: the parser was tested, the consumer never was.
 ;
-; Until the accept path can erase (it lives in modules/keymap/llm_bridge.ahk and
-; the tooltip slot layer, neither of which carries the count today), the honest
-; behaviour is to REFUSE the suggestion: a missing correction is recoverable by
-; hand, a garbled sentence is not. This test pins that refusal AND pins that the
-; parser keeps measuring the erasure, so the day the erase step lands the count
-; is still there to drive it.
+; The first repair refused every such correction, until the accept path could
+; erase. It can since rewrites: a slot that names the text it erases has it
+; erased inside the same admission-guarded output as the replacement, and only
+; while that text still ends what was typed. The refusal had stayed for
+; ordinary corrections, so the advanced prompt never fixed a typo on Windows.
+; Every erase-bearing prediction now names its erasure, rewrite or not
+; (test_llm_prompt_prediction.ahk drives both end to end); what is still refused
+; is an erasure that names nothing.
 ;
 ; The set of erase-bearing vectors is derived from the shared corpus rather than
 ; enumerated here, so a new vector joins this test automatically.
-;
-; THE REWRITE EXCEPTION: a rewrite (REWRITE: answer to a rewrite prompt) is the
-; one erase-bearing prediction the accept path now applies. Its record names the
-; exact text it erases, a suffix of the span the engine chose, and the bridge
-; erases it inside the same admission-guarded output as the replacement
-; (test_llm_prompt_prediction.ahk drives that end to end). Section 3 pins that
-; rewrites reach the tooltip with that erasure; sections 1 and 2 still pin the
-; refusal of every other correction.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -42,17 +37,17 @@
 
 
 
-; ===============================================================
-; ===============================================================
-; ======= 1/ Every erase-bearing corpus vector is refused =======
-; ===============================================================
-; ===============================================================
+; ======================================================================
+; ======================================================================
+; ======= 1/ Every erase-bearing corpus vector names its erasure =======
+; ======================================================================
+; ======================================================================
 
 _LPRD_CorpusPath() {
 	return A_ScriptDir . "\..\..\_shared\tests\corpus\llm\process_prediction_vectors.json"
 }
 
-_LPRD_EveryEraseBearingVectorIsRefused() {
+_LPRD_EveryEraseBearingVectorNamesItsErasure() {
 	Path := _LPRD_CorpusPath()
 	Assert(FileExist(Path) != "", "the shared process_prediction corpus must be readable: " . Path)
 	Data := JsonParse(FileRead(Path, "UTF-8"))
@@ -68,26 +63,44 @@ _LPRD_EveryEraseBearingVectorIsRefused() {
 			continue
 		Checked += 1
 
-		; The parser must still COUNT the erasure — the fix refuses the prediction,
-		; it does not stop measuring it. Losing the measurement would make the
-		; eventual erase step unimplementable.
+		; The count is the shared parser's, vector by vector.
 		Pred := LLM_Parser_ProcessPrediction(Vec["full_text"], Vec["tail_text"],
 			Vec["block"], Vec["min_words"], Vec["max_words"])
-		AssertTrue(Pred is Map, "vector " . Vec["id"] . ": the record must still be produced")
+		AssertTrue(Pred is Map, "vector " . Vec["id"] . ": the record must be produced")
 		AssertEqual(Expd["deletes"], Pred["deletes"],
 			"vector " . Vec["id"] . ": the parser must keep counting the characters to erase")
 
+		; The slot is offered WITH the erasure, and the erasure is exact: the
+		; erased text ends the span, and the span ends the context. Offered
+		; without it, to_type would be appended to the typo it replaces
+		; (llm-parser-deletes-never-applied).
 		Slots := LLM_Parser_ParseResponse(Vec["block"], Vec["full_text"], Vec["tail_text"],
-			Vec["min_words"], Vec["max_words"], false, 1)
-		AssertEqual(0, Slots.Length,
-			"vector " . Vec["id"] . ": a prediction needing " . Expd["deletes"] . " character(s) erased must not become a tooltip slot. to_type is only the suffix that survives the erasure, and the Windows accept path types without erasing — so offering it appends the fix to the typo and corrupts the user's sentence (llm-parser-deletes-never-applied)")
+			Vec["min_words"], Vec["max_words"], false, 1, , &Edits)
+		AssertEqual(1, Slots.Length,
+			"vector " . Vec["id"] . ": a correction needing an erasure must be offered (llm-correction-erases)")
+		if (Slots.Length != 1)
+			continue
+		AssertEqual(Expd["to_type"], Slots[1], "vector " . Vec["id"] . ": the slot types to_type")
+		AssertTrue(Edits.Has(Slots[1]), "vector " . Vec["id"] . ": the slot carries its erasure")
+		if !Edits.Has(Slots[1])
+			continue
+		Edit := Edits[Slots[1]]
+		AssertEqual(Expd["deletes"], Edit["deletes"], "vector " . Vec["id"] . ": Backspaces to send")
+		AssertFalse(Edit["rewrite"], "vector " . Vec["id"] . ": a correction is not a rewrite")
+		Span := Edit["span"]
+		Full := Vec["full_text"]
+		AssertEqual(Span, SubStr(Full, StrLen(Full) - StrLen(Span) + 1),
+			"vector " . Vec["id"] . ": the span is the end of the context")
+		AssertEqual(Edit["deleted_text"],
+			SubStr(Span, StrLen(Span) - StrLen(Edit["deleted_text"]) + 1),
+			"vector " . Vec["id"] . ": the erased text is the end of the span")
 	}
 
 	Assert(Checked >= 3,
 		"the corpus must still carry erase-bearing vectors for this test to assert anything (found " . Checked . ") — if they were removed, restore them rather than lowering this floor")
 }
-Test("LLM parser: a prediction that needs an erasure is refused, not appended",
-	_LPRD_EveryEraseBearingVectorIsRefused)
+Test("LLM parser: a prediction that needs an erasure names the exact text it erases",
+	_LPRD_EveryEraseBearingVectorNamesItsErasure)
 
 
 

@@ -109,6 +109,7 @@ graph TD
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
         WINDOWS_app_launcher["AppLauncher.ahk"]
+        WINDOWS_boot_clock["BootClock.ahk"]
         WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
@@ -132,6 +133,8 @@ graph TD
         WINDOWS_timer_scheduler["TimerScheduler.ahk"]
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
+        WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
+        WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_uia_worker["UiaWorker.ahk"]
         WINDOWS_webview_profiles["WebviewProfiles.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]

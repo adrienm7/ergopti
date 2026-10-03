@@ -105,14 +105,31 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		end
 	end)
 
-	helpers.it("every hotstring category still carries its sections", function()
-		local src = helpers.read_driver_unit("function M.build_groups")
-		helpers.assert_true(src ~= nil, "the hotstring category builder must be locatable")
-
-		helpers.assert_true(src:find("item.items = sec_menu", 1, true) ~= nil,
-			"the section list must be attached as `items`. Written as `menu` it is attached to a field "
-			.. "the renderer never reads, and every standard and Ergopti category renders as a bare "
-			.. "clickable row: no « ouvrir le fichier », no bulk actions, no section toggles, no warning")
+	helpers.it("every hotstring category carries its rendered sections and commands intact", function()
+		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx = {
+			hotfiles = { "alpha.toml" }, get_group_name = function() return "alpha" end,
+			state = { hotstrings = {}, sections_order_overrides = {} },
+			applyTriggerChar = function(value) return value end,
+			keymap = {
+				is_group_enabled = function() return true end,
+				is_section_enabled = function() return true end,
+				get_sections = function() return {
+					{ name = "one", description = "One", count = 1 },
+					{ name = "two", description = "Two", count = 3 },
+				} end,
+			},
+		}
+		local rows = Hotstrings.build_groups(ctx, nil, {})
+		local rendered = require("infra.manifest_menu").render_rows(rows, "category-dialect-proof")
+		helpers.assert_eq(#rendered, 1)
+		helpers.assert_true(rendered[1].menu == rows[1].submenu,
+			"an already-rendered child passes through without translating or rebuilding commands")
+		helpers.assert_eq(#rendered[1].menu, 5, "two commands, a separator and both native sections")
+		helpers.assert_eq(rendered[1].menu[4].title, "One (1)")
+		helpers.assert_eq(rendered[1].menu[5].title, "Two (3)")
+		helpers.assert_eq(type(rendered[1].menu[1].fn), "function")
+		helpers.assert_eq(type(rendered[1].menu[2].fn), "function")
 	end)
 
 	helpers.it("the extension tree emits rows in the dialect it also reads", function()
@@ -121,14 +138,57 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 
 		helpers.assert_true(src:find("label = folder_label, items = folder_menu", 1, true) ~= nil,
 			"a folder row is `label` + `items`; as `title` + `menu` the folder renders empty")
-		helpers.assert_true(src:find("label = file.label, items = file.items", 1, true) ~= nil,
+		helpers.assert_true(src:find("label = file.label, submenu = file.submenu", 1, true) ~= nil,
 			"a file row must read the fields the nodes actually carry — reading `file.title`/`file.menu` "
-			.. "off a node built with `label`/`items` yields a row with no label at all, which the "
+			.. "off a node built with `label`/`submenu` yields a row with no label at all, which the "
 			.. "renderer drops")
 		helpers.assert_true(src:find("a.label < b.label", 1, true) ~= nil,
 			"and the sort must compare that same field: `a.title < b.title` on those nodes compares two "
 			.. "nils, which throws inside the provider and takes the whole hotstrings menu with it as "
 			.. "soon as one folder holds two extension files")
+	end)
+
+	helpers.it("nested personal files retain their sorted native command subtrees", function()
+		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+		local asked = {}
+		local ctx = {
+			paused = false,
+			state = { hotstrings = {}, trigger_char = "★" },
+			hotfiles = { "personal.toml", "personal_ext_tools__zeta.toml", "personal_ext_tools__alpha.toml" },
+			get_group_name = function(path) return path:gsub("%.toml$", "") end,
+			applyTriggerChar = function(value) return value end,
+			hotstring_editor = { open = function() end },
+			keymap = {
+				is_group_enabled = function() return false end,
+				is_section_enabled = function() return true end,
+				get_sections = function(group)
+					if group:sub(1, 13) == "personal_ext_" then
+						return { { name = "part", description = "Part", count = 1 } }
+					end
+				end,
+				set_category_scope_enabled = function(names, enabled, publish)
+					asked[#asked + 1] = { names = names, enabled = enabled }
+					return publish()
+				end,
+			},
+			save_prefs = function() return true end,
+			updateMenu = function() end,
+		}
+		local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+		local folder
+		for _, row in ipairs(rows) do if row.title == "tools (2)" then folder = row end end
+		helpers.assert_true(folder ~= nil, "a folder with two personal files must survive rendering")
+		helpers.assert_eq(#folder.menu, 2)
+		helpers.assert_eq(folder.menu[1].title, "alpha (1)")
+		helpers.assert_eq(folder.menu[2].title, "zeta (1)")
+		for _, file in ipairs(folder.menu) do
+			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+			helpers.assert_eq(file.menu[3].title, "-")
+			helpers.assert_eq(file.menu[4].title, "Part (1)")
+		end
+		helpers.assert_eq(folder.menu[2].menu[1].fn(), true)
+		helpers.assert_eq(asked, { { names = { "personal_ext_tools__zeta" }, enabled = true } })
 	end)
 
 	helpers.it("the About submenu keeps its version header and native update action", function()

@@ -44,3 +44,65 @@ helpers.describe("hs.canvas stub: observable native state", function()
 			"minimumTextSize must expose numeric geometry")
 	end)
 end)
+
+
+helpers.describe("hs.canvas stub: frame snapshots", function()
+	helpers.it("copies the constructor frame instead of borrowing the caller's table", function()
+		helpers.with_fresh_modules({ "tests.stubs.hs" }, function()
+			local native = require("tests.stubs.hs")
+			local requested = { x = 1, y = 2, w = 30, h = 40 }
+			local canvas = native.canvas.new(requested)
+			requested.x, requested.w = 900, 999
+			helpers.assert_eq(canvas:frame().x, 1, "only a native frame setter may move the surface")
+			helpers.assert_eq(canvas:frame().w, 30, "the allocated dimensions are independently owned")
+		end)
+	end)
+
+	helpers.it("copies each accepted setter frame and keeps its native chainable receipt", function()
+		helpers.with_fresh_modules({ "tests.stubs.hs" }, function()
+			local native = require("tests.stubs.hs")
+			local canvas = native.canvas.new({ x = 1, y = 2, w = 30, h = 40 })
+			local requested = { x = 5, y = 6, w = 70, h = 80 }
+			helpers.assert_true(canvas:frame(requested) == canvas)
+			requested.y, requested.h = 900, 999
+			helpers.assert_eq(canvas:frame().y, 6, "a later caller mutation cannot move the accepted frame")
+			helpers.assert_eq(canvas:frame().h, 80, "a later caller mutation cannot resize the accepted frame")
+		end)
+	end)
+
+	helpers.it("returns independent native rect snapshots for every getter", function()
+		helpers.with_fresh_modules({ "tests.stubs.hs" }, function()
+			local native = require("tests.stubs.hs")
+			local canvas = native.canvas.new({ x = 1, y = 2, w = 30, h = 40 })
+			local first, second = canvas:frame(), canvas:frame()
+			first.x, first.h = 900, 999
+			helpers.assert_eq(second.x, 1, "a second getter retains its independently captured position")
+			helpers.assert_eq(second.h, 40, "a second getter retains its independently captured dimensions")
+			helpers.assert_eq(canvas:frame().x, 1, "editing a getter never moves the native surface")
+			helpers.assert_eq(second.__luaSkinType, "NSRect", "the native frame wrapper returns a rect table")
+		end)
+	end)
+
+	helpers.it("keeps a GraphicsRenderer drawing callback's frame edits behind the explicit setter", function()
+		helpers.with_stub_scope({ "adapters.graphics_renderer" }, function()
+			local renderer = helpers.load_with_stubs("adapters.graphics_renderer")
+			local canvas = renderer.createWindow({ x = 1, y = 2, w = 30, h = 40 })
+			helpers.assert_true(canvas ~= 0, "the real adapter must allocate its native surface")
+			local observations = { callbacks = 0 }
+			renderer.drawBitmap(canvas, function(surface)
+				observations.callbacks = observations.callbacks + 1
+				local proposed = surface:frame()
+				proposed.x = 5
+				observations.before_setter = surface:frame().x
+				surface:frame(proposed)
+				proposed.x = 900
+				observations.after_setter = surface:frame().x
+			end)
+			helpers.assert_eq(observations.callbacks, 1, "the real production draw callback executed")
+			helpers.assert_eq(observations.before_setter, 1, "the getter mutation alone cannot move the canvas")
+			helpers.assert_eq(observations.after_setter, 5, "only the explicit native setter commits the move")
+			helpers.assert_eq(canvas:frame().x, 5, "later mutation never changes the committed native geometry")
+			renderer.destroyWindow(canvas)
+		end)
+	end)
+end)

@@ -34,15 +34,11 @@ InitSubMenus() {
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
-		; Rows first, in the order the user sees them, and the renderer draws them
-		; at the end. This block used to append the open-file item and the sections
-		; and THEN splice the category toggle and the two bulk actions on top with
-		; RegisterMenuItemInsert("1&"/"2&"/"3&") — three inserts by position to
-		; express « these three come first », which building the array in order says
-		; on its own.
+		; Native section data keeps the file's order; the shared declaration adds
+		; the explicit category commands and optional source-file row.
 		TomlPath := HotstringsBundledTomlPath(V1Cat)
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
-		Rows := _HS_CategoryHeadRows(V1Cat, V2Section, TomlPath)
+		Rows := []
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
 			; Build a map from the section-name part of the v2 path to its entry
@@ -98,8 +94,7 @@ InitSubMenus() {
 				}
 			}
 		}
-		SubMenu := Menu()
-		MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_" . V1Cat, Rows)
+		SubMenu := _HS_CategoryMenu(V1Cat, TomlPath, Rows)
 		SubMenus[V1Cat] := SubMenu
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,
@@ -149,9 +144,8 @@ _HS_RegisterLanguageMenuCategories() {
 ; is exactly the state ToggleAllHotstrings(true) establishes.
 _HS_AllHotstringsOn() {
 	global Features
-	; A detached copy: the collector seeds runtime-discovered personal nodes into
-	; the map it is given, and a menu read must not publish them.
-	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(_HSDeepCloneMap(MasterGateDesiredFeatures(Features))))
+	; Menu enumeration discovers paths without seeding or copying configuration.
+	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(Features, false))
 }
 
 ; List provider: one row per language pack, labelled with the language's native
@@ -191,13 +185,17 @@ _HS_LanguageRows() {
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring
 ; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
 ; the personal-info editor entry right after the text-expansion item.
-_BuildDynamicHotstringsSubmenu() {
+_BuildDynamicHotstringsSubmenu(Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	; The tray module owns these declarations before it includes this builder.
+	; A direct caller must supply the same initialized boot model, never an
+	; invented order or a private copy of the manifest inventory.
+	if !IsSet(_LegacyDynamicHotstringsKeyMap) || !(_LegacyDynamicHotstringsKeyMap is Map)
+			|| !IsSet(_DYNAMIC_HOTSTRINGS_ORDER) || !(_DYNAMIC_HOTSTRINGS_ORDER is Array)
+		throw Error("Dynamic hotstring menu requires its initialized tray boot model.")
 	Rows := []
-	; One « all sections » checkbox for the dynamic-hotstrings category.
-	Rows.Push(_HS_AllSectionsRow(_HS_ScopeAllOn(["DynamicHotstrings"], _HS_SectionPaths("hotstrings.dynamic")),
-		(Bool) => ToggleCategoryAllSections("DynamicHotstrings", Bool)))
-	Rows.Push(Map("separator", true))
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
 			Rows.Push(Map("separator", true))
@@ -225,9 +223,8 @@ _BuildDynamicHotstringsSubmenu() {
 				"action", PersonalInformationEditor))
 		}
 	}
-	SubMenu := Menu()
-	MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_DynamicHotstrings", Rows)
-	return SubMenu
+	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
+		(_Targets, Enabled) => HotstringsDynamicScopeApply(Enabled, Options))
 }
 
 ; Sum hotstring entries for a flat category (Autocorrection, Rolls, …)
@@ -257,7 +254,7 @@ _CountEnabledForCategory(V1Cat) {
 ; dynamic hotstrings, and personal TOML sections. Runtime-discovered personal
 ; nodes are seeded only in the caller's detached candidate, never in live state
 ; before persistence succeeds.
-_CollectAllHotstringsV2Paths(FeaturesTarget) {
+_CollectAllHotstringsV2Paths(FeaturesTarget, SeedPersonal := true) {
 	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
 	Paths := []
 
@@ -284,7 +281,8 @@ _CollectAllHotstringsV2Paths(FeaturesTarget) {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
-				_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
+				if SeedPersonal
+					_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
 				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}

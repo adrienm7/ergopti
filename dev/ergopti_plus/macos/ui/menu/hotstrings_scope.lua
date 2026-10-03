@@ -35,6 +35,8 @@ local Writer = require("toml_codec.writer")
 local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
 local Planner = require("hotstrings.scope_overrides")
+local TerminatorScope = require("hotstrings.terminator_scope")
+local Codec = require("toml_codec")
 local ScopeFile = require("config_scope_file")
 local Extensions = require("hotstrings.extensions")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
@@ -125,6 +127,9 @@ function M.new(options)
 		"apply_hotstring_preferences", "hotstring_delay_inventory", "registry_transaction", "disable_group",
 		"enable_group", "set_delay" }) do
 		assert(type(keymap[name]) == "function", "hotstrings scope keymap port missing: " .. name)
+	end
+	for _, name in ipairs({ "get_terminator_defs", "is_terminator_enabled", "set_terminators_enabled" }) do
+		assert(type(keymap[name]) == "function", "hotstrings scope delimiter port missing: " .. name)
 	end
 	for _, owner in ipairs(OWNERS) do
 		for _, name in ipairs({ owner.setter, owner.getter }) do
@@ -310,6 +315,10 @@ function M.new(options)
 			for key in pairs(keymap.DELAY_KEY_TO_CATEGORY) do
 				operations[#operations + 1] = { path = { "hotstrings", "delays", key }, delete = true }
 			end
+			local document = assert(Codec.decode(content or ""), "hotstring preferences are malformed")
+			for _, segments in ipairs(TerminatorScope.builtin_state_leaves(document)) do
+				operations[#operations + 1] = { path = segments, delete = true }
+			end
 			local prepared, why, file, parsed = prepare_overrides(current_mode)
 			if prepared ~= true then return false, "override file: " .. tostring(why) end
 			secondary, active = file, { overrides = parsed }
@@ -368,9 +377,14 @@ function M.new(options)
 			end
 			local values = { [ENGINE_KEY] = state[ENGINE_KEY] }
 			for _, owner in ipairs(OWNERS) do values[owner.key] = clone(current(owner.key)) end
+			local terminators = {}
+			for _, def in ipairs(keymap.get_terminator_defs()) do
+				if def.key then terminators[def.key] = keymap.is_terminator_enabled(def.key) end
+			end
 			local snapshot = { config = config, groups = groups, sections = sections, values = values,
 				hotstrings = clone(state.hotstrings), delays = clone(state.delays), reloaded = {},
-				candidate = active.overrides }
+				candidate = active.overrides, terminators = terminators,
+				terminator_states = clone(state.terminator_states) }
 			active = snapshot
 			return snapshot
 		end,
@@ -406,6 +420,11 @@ function M.new(options)
 			end
 			table.sort(active.reloaded)
 			if not reload_groups(active.reloaded) then return false end
+			local defaults = TerminatorScope.defaults()
+			if keymap.set_terminators_enabled(defaults) ~= true then return false end
+			local retained = clone(state.terminator_states or {})
+			for key in pairs(defaults) do retained[key] = nil end
+			state.terminator_states = retained
 			return apply_values(values)
 		end,
 		restore = function(snapshot)
@@ -417,6 +436,8 @@ function M.new(options)
 			if keymap.apply_hotstring_preferences({ hotstrings = snapshot.groups,
 				section_states = snapshot.sections }) ~= true then return false end
 			if not reload_groups(snapshot.reloaded) then return false end
+			if keymap.set_terminators_enabled(snapshot.terminators) ~= true then return false end
+			state.terminator_states = clone(snapshot.terminator_states)
 			if apply_values(snapshot.values) ~= true then return false end
 			state.hotstrings = clone(snapshot.hotstrings)
 			return true

@@ -23,6 +23,7 @@ local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 
@@ -513,11 +514,11 @@ function M.new(ctx)
 				local sf = io.open("/tmp/hs_mlx_active_download.json", "r")
 				if sf then
 					local raw = sf:read("*a"); sf:close()
-					local ok_j, sess = pcall(hs.json.decode, raw)
+					local sess, decode_err = JsonCodec.decode(raw)
 					if _startup_paused == true or not runtime_current(callback_epoch) then
 						return false
 					end
-					if ok_j and type(sess) == "table" and type(sess.log_path) == "string" then
+					if decode_err == nil and type(sess) == "table" and type(sess.log_path) == "string" then
 					Logger.info(LOG, "Active download session found after reload — reattaching.")
 					if models_mgr and type(models_mgr.reattach_download) == "function" then
 						local reattach_epoch = pause_epoch()

@@ -12,9 +12,9 @@
 --- ROOT CAUSE ENCODED (json-shared-tables):
 --- The Karabiner generator decoded its rule files with hs.json.decode and then
 --- appended each manipulator's generation gate to CapsWord's shared conditions
---- list: dev.148 refused every deploy. The direct calls left below only read
---- what they decode. This ratchet admits no new one and must be lowered when a
---- call moves to the codec.
+--- list: dev.148 refused every deploy. Every production reader now goes through
+--- the codec; the only direct call belongs to the adapter itself. This ratchet
+--- admits no new direct reader.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,26 +23,7 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Production modules that still call hs.json.decode directly, with their
 -- count of calls. Only ever lower these.
 local DIRECT_DECODE_BASELINE = {
-	["adapters.json_codec"]                          = 1,
-	["infra.locale"]                                 = 1,
-	["infra.manifest_menu"]                          = 1,
-	["infra.personal_hotstrings"]                    = 1,
-	["infra.vscode_bridge"]                          = 1,
-	["modules.gestures.actions"]                     = 1,
-	["modules.keylogger.aggregator.core"]            = 1,
-	["modules.keymap.registry"]                      = 1,
-	["modules.llm.api_common"]                       = 1,
-	["modules.llm.api_mlx"]                          = 1,
-	["modules.llm"]                                  = 2,
-	["modules.shortcuts.actions.text"]               = 1,
-	["modules.shortcuts.keyboard_shortcuts"]         = 1,
-	["ui.changelog"]                                 = 1,
-	["ui.console_window"]                            = 1,
-	["ui.menu.menu_llm.models_manager"]              = 1,
-	["ui.menu.menu_llm.models_manager_mlx_download"] = 2,
-	["ui.menu.menu_llm.models_manager_mlx_server"]   = 1,
-	["ui.menu.menu_llm.startup_controller"]          = 1,
-	["ui.ui_builder"]                                = 1,
+	["adapters.json_codec"] = 1,
 }
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.

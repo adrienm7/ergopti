@@ -842,8 +842,14 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		disable_bold := (chunks.Length > 0 and chunks[chunks.Length]["type"] = "insert" and (display_nw ~= "\S") > 0)
 
 		if is_rewrite
-			return _LLM_Parser_RewriteRecord(orig_context, true_deletes, true_to_type,
-				has_corr, chunks, disable_bold)
+			return _LLM_Parser_ErasingRecord(orig_context, true_deletes, true_to_type,
+				"", has_corr, chunks, disable_bold, true)
+		; A correction that replaces typed text names it the same way: the window
+		; diffed above is an exact suffix of the context, and the operations cover
+		; it from the first change to its end.
+		if (true_deletes > 0)
+			return _LLM_Parser_ErasingRecord(orig_context, true_deletes, true_to_type,
+				display_nw, has_corr, chunks, disable_bold, false)
 
 		return Map(
 			"deletes", true_deletes,
@@ -954,21 +960,25 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 }
 
 /**
- * Builds the record of a rewrite, whose erasure the accept step performs.
+ * Builds the record of a prediction that erases typed text before typing: a
+ * rewrite, or a correction of the last words. The accept step performs the
+ * erasure, so the record names the exact text it removes.
  * The physical operations cover every character of the span from the first
  * change on, so the erased text is exactly the span's last ``Units`` code
  * units. The count reaching the accept step is in codepoints (one Backspace
  * per character, as the shared parser counts it); an erasure that would start
  * inside a surrogate pair takes the whole character and retypes its lead.
- * @param {String} Span The rewritten span, an exact suffix of the context.
+ * @param {String} Span The span the model answered, an exact suffix of the context.
  * @param {Integer} Units UTF-16 code units the diff erases from its end.
  * @param {String} ToType Text typed after the erasure.
+ * @param {String} NextWords The continuation shown after the corrected tail.
+ * @param {Integer} IsRewrite True for the answer to a rewrite prompt.
  * @returns {Map} The prediction record, with deleted_text and span.
  */
-_LLM_Parser_RewriteRecord(Span, Units, ToType, HasCorrections, Chunks, DisableBold) {
+_LLM_Parser_ErasingRecord(Span, Units, ToType, NextWords, HasCorrections, Chunks, DisableBold, IsRewrite) {
 	SpanLength := StrLen(Span)
 	if (Units < 0 or Units > SpanLength)
-		throw ValueError("A rewrite cannot erase " . Units . " of its " . SpanLength . " span units.")
+		throw ValueError("A prediction cannot erase " . Units . " of its " . SpanLength . " span units.")
 	DeletedText := (Units > 0) ? SubStr(Span, SpanLength - Units + 1) : ""
 	FirstUnit := (DeletedText != "") ? Ord(SubStr(DeletedText, 1, 1)) : 0
 	if (FirstUnit >= 0xDC00 and FirstUnit <= 0xDFFF and Units < SpanLength) {
@@ -981,32 +991,31 @@ _LLM_Parser_RewriteRecord(Span, Units, ToType, HasCorrections, Chunks, DisableBo
 		"deleted_text", DeletedText,
 		"span", Span,
 		"to_type", ToType,
-		"nw", "",
+		"nw", NextWords,
 		"has_corrections", HasCorrections,
 		"chunks", Chunks,
 		"disable_bold", DisableBold,
-		"rewrite", true
+		"rewrite", IsRewrite ? true : false
 	)
 }
 
 /**
- * True when a parsed prediction can be injected without erasing anything first.
+ * True when accepting a parsed prediction leaves the sentence right.
  *
  * ``deletes`` counts characters the accept step must ERASE before typing
  * ``to_type``, because ``to_type`` is deliberately only the suffix that survives
- * that erasure — not the whole corrected tail. The Windows accept path
- * (LLM_Bridge_OnAccept) types without erasing, so a prediction carrying
- * ``deletes > 0`` is appended to the very characters it was meant to replace and
- * the sentence comes out garbled. Refusing the suggestion costs the user a
- * correction they can still make by hand; accepting it costs them their sentence.
+ * that erasure — not the whole corrected tail. Typed without the erasure, it is
+ * appended to the very characters it was meant to replace and the sentence
+ * comes out garbled.
  *
- * A rewrite is the one exception. Its record names the exact text it erases
- * (``deleted_text``, a suffix of the span the caller chose), and the accept
- * path erases it inside the same admission-guarded output transaction that
- * types the replacement (_LLM_Bridge_InjectionOptions, "erase_before"). An
- * ordinary correction keeps no such record, so it is still refused.
+ * The accept path erases what a record names: ``deleted_text``, the end of the
+ * ``span`` the model answered, inside the same admission-guarded output
+ * transaction that types the replacement (_LLM_Bridge_InjectionOptions,
+ * "erase_before"), and only while that span still ends the typed text. A
+ * record that counts an erasure without naming it cannot be applied, and is
+ * refused: a missing correction is made by hand, a garbled sentence is not.
  * @param {Map} pred A record returned by LLM_Parser_ProcessPrediction.
- * @returns {Integer} 1 when the prediction needs no erasure, or is a rewrite.
+ * @returns {Integer} 1 when the prediction erases nothing, or names what it erases.
  */
 _LLM_Parser_IsPhysicallyInjectable(pred) {
 	if !(pred is Map)
@@ -1014,22 +1023,47 @@ _LLM_Parser_IsPhysicallyInjectable(pred) {
 	deletes := pred.Has("deletes") ? pred["deletes"] : 0
 	if (deletes <= 0)
 		return true
-	if (pred.Get("rewrite", false) == true)
+	if (pred.Get("deleted_text", "") != "" and pred.Get("span", "") != "")
 		return true
-	try LoggerWarn("LLM.parser", "Dropping a correction that needs {1} character(s) erased — the Windows accept path types without erasing, so injecting it would append the fix to the typo instead of replacing it.", deletes)
+	try LoggerWarn("LLM.parser", "Dropping a correction that needs {1} character(s) erased and does not name them: typing it would append the fix to the typo instead of replacing it.", deletes)
 	return false
 }
 
 /**
+ * What the tooltip line of a parsed prediction reads, apart from what
+ * accepting it types: the typed tail as the model corrected it (equal chunks
+ * left as typed, insert chunks corrected), then the next words.
+ * @param {Map} pred A record returned by LLM_Parser_ProcessPrediction.
+ * @returns {Map} Map("chunks", [{type, text}], "nw", Text, "has_corrections", Flag).
+ */
+_LLM_Parser_DisplayOf(pred) {
+	Chunks := []
+	for , Chunk in pred.Get("chunks", [])
+		Chunks.Push({ type: Chunk["type"], text: Chunk["text"] })
+	return Map(
+		"chunks", Chunks,
+		"nw", pred.Get("nw", ""),
+		"has_corrections", pred.Get("has_corrections", false) ? true : false,
+		"disable_bold", pred.Get("disable_bold", false) ? true : false)
+}
+
+/**
  * Full post-API parse path — mirrors api_ollama.lua post_and_parse.
- * @param {VarRef} out_edits Receives Map(slot text → rewrite edit) for the
- *     slots that are rewrites: Map("deletes", Codepoints, "deleted_text",
- *     Text, "span", Span). The slots stay plain strings, so the tooltip, the
- *     cache and the dedup keep their shape; the edit travels beside them.
+ * @param {VarRef} out_edits Receives Map(slot text → edit) for the slots that
+ *     erase typed text, rewrites and corrections alike: Map("deletes",
+ *     Codepoints, "deleted_text", Text, "span", Span, "rewrite", Flag). The
+ *     slots stay plain strings, so the tooltip and the dedup keep their
+ *     shape; the edit travels beside them.
+ * @param {VarRef} out_displays Receives Map(slot text → what the tooltip line
+ *     reads): Map("chunks", [{type, text}], "nw", NextWords, "has_corrections",
+ *     Flag). A slot's text is only what accepting it types; the typed tail it
+ *     corrects and the split between correction and next words exist nowhere
+ *     else, so they travel beside the slots like the edits.
  * @returns {Array} Slot strings (to_type) ready for the tooltip.
  */
-LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "", &out_edits := "") {
+LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "", &out_edits := "", &out_displays := "") {
 	out_edits := Map()
+	out_displays := Map()
 	raw := LLM_Parser_StripThinking(raw)
 	if (raw = "")
 		return []
@@ -1057,11 +1091,14 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 	for _, p in slots {
 		text := _LLM_ApiCommon_PredText(p)
 		out.Push(text)
-		if (p is Map and p.Get("rewrite", false) == true)
+		if (p is Map and text != "")
+			out_displays[text] := _LLM_Parser_DisplayOf(p)
+		if (p is Map and p.Has("deleted_text") and p.Has("span"))
 			out_edits[text] := Map(
 				"deletes", p["deletes"],
 				"deleted_text", p["deleted_text"],
-				"span", p["span"])
+				"span", p["span"],
+				"rewrite", p.Get("rewrite", false) == true)
 	}
 	return out
 }

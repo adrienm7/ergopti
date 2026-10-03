@@ -78,65 +78,62 @@ _MetricsToggleEncryptionAndReload(WriterFn := 0, NotifyFn := 0,
 	return _MetricsReloadAfterCommit(Committed, ReloadFn)
 }
 
-; ── WPM toggle helpers — closures capture the menu reference and label strings
-; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
+; WPM commands persist first, then let the shared renderer rebuild the tray.
+; Keep durable I/O and native effects outside inherited Critical sections.
+_MET_RebuildWidgetMenu(RebuildFn := 0) {
+	try {
+		Rebuilt := HasMethod(RebuildFn, "Call") ? RebuildFn.Call() : RebuildTrayMenu()
+		return (Rebuilt is Integer) && Rebuilt == 1
+	} catch as Err {
+		try LoggerError("MetricsMenu", "WPM menu rebuild failed: {1}.", Err.Message)
+		return false
+	}
+}
 
-_ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl, ToggleFn := 0) {
+_ToggleWpmWidget(ToggleFn := 0, RebuildFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl,
-			ToggleFn)
+		try return _ToggleWpmWidget(ToggleFn, RebuildFn)
 		finally Critical(InheritedCritical)
 	}
 	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMWidget_Toggle()
 	if !(Toggled is Integer) || Toggled != 1
-		return
-	try menu.ToggleCheck(widget_lbl)
-	if WPMWidget.visible {
-		try menu.Enable(colors_lbl)
-		try menu.Enable(graph_lbl)
-	} else {
-		try menu.Disable(colors_lbl)
-		try menu.Disable(graph_lbl)
-	}
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
 }
 
-_ToggleWpmWidgetColors(menu, label, WriterFn := 0, NotifyFn := 0) {
+_ToggleWpmWidgetColors(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _ToggleWpmWidgetColors(menu, label, WriterFn, NotifyFn)
+		try return _ToggleWpmWidgetColors(WriterFn, NotifyFn, RebuildFn)
 		finally Critical(InheritedCritical)
 	}
 	if !WPMWidget_ToggleColorsConfig(WriterFn, NotifyFn)
-		return
-	try menu.ToggleCheck(label)
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
 }
 
-_ToggleWpmWidgetGraph(menu, label, WriterFn := 0, NotifyFn := 0, HideFn := 0,
-		ShowFn := 0) {
+_ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
+		ShowFn := 0, RebuildFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _ToggleWpmWidgetGraph(menu, label, WriterFn, NotifyFn,
-			HideFn, ShowFn)
+		try return _ToggleWpmWidgetGraph(WriterFn, NotifyFn, HideFn, ShowFn,
+			RebuildFn)
 		finally Critical(InheritedCritical)
 	}
-    ; Graph and its anchor form one persisted state. Commit the reset before
-    ; destroying the live surface, so a disk failure leaves the current widget
-    ; fully usable and its menu checkmark unchanged.
-    if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn)
-        return
-    was_visible := WPMWidget.visible
-    ; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
-	if was_visible {
+	; Commit graph and anchor together before destroying the live surface.
+	if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn)
+		return false
+	WasVisible := WPMWidget.visible
+	if WasVisible {
 		if HasMethod(HideFn, "Call")
 			HideFn.Call()
 		else
 			WPMWidget_Hide()
 	}
-	; Destroy existing GUI so it is rebuilt in the correct layout on next show.
 	if WPMWidget._gui {
 		try WPMWidget._gui.Destroy()
 		WPMWidget._gui      := false
@@ -147,13 +144,13 @@ _ToggleWpmWidgetGraph(menu, label, WriterFn := 0, NotifyFn := 0, HideFn := 0,
 		try WPMWidget._graph_gui.Destroy()
 		WPMWidget._graph_gui := false
 	}
-    try menu.ToggleCheck(label)
-	if was_visible {
+	if WasVisible {
 		if HasMethod(ShowFn, "Call")
 			ShowFn.Call()
 		else
 			WPMWidget_Show()
 	}
+	return _MET_RebuildWidgetMenu(RebuildFn)
 }
 
 OpenMetricsAppPicker(*) {
@@ -198,7 +195,7 @@ _MetricsSetEnabledAndReload(Target, WriterFn := 0, NotifyFn := 0,
 ToggleMetricsEnabled() {
 	if MetricsShortcuts.enabled {
 		; Disabling — no warning needed, just confirm.
-		res := MsgBox(
+		res := Ui_MsgBox(
 			t("dialog.metrics.disable_confirm"),
 			t("dialog.metrics.title"),
 			"OKCancel Icon?"
@@ -218,7 +215,7 @@ ToggleMetricsEnabled() {
 	; Icon! = exclamation triangle (warning). Iconx is the red error stop
 	; sign and was the wrong choice for a "you are about to enable a
 	; logging feature" notice.
-	res := MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
+	res := Ui_MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
 	if (res != "OK")
 		return
 	return _MetricsSetEnabledAndReload(true)

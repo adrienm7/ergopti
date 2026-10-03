@@ -140,6 +140,12 @@ local function load_remap(options)
 		notify_ready = function() end,
 	}
 	package.loaded["platform.remap.lease_controller"] = {
+		unregister_guardian = function(on_done)
+			calls.guardian_unregistrations = (calls.guardian_unregistrations or 0) + 1
+			calls.unregister_callback = on_done
+			if options.unregister_async ~= true then on_done(true, "unregistered") end
+			return true
+		end,
 		init = function(listener)
 			calls.phase_listener = listener
 			return true
@@ -929,8 +935,8 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		helpers.assert_eq(calls.rebind, 1)
 	end)
 
-	helpers.it("replays in disabled mode only after STOPPED and preference commit", function()
-		local remap, calls = load_remap()
+	helpers.it("replays in disabled mode only after STOPPED, guardian removal and preference commit", function()
+		local remap, calls = load_remap({ unregister_async = true })
 		calls.activate_initial()
 		local disable_results = {}
 		helpers.assert_true(remap.set_enabled(false, function(ok, reason)
@@ -948,6 +954,9 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		helpers.assert_eq(calls.resolve, 0,
 			"IDLE publication alone must not outrun the disable transaction callback")
 		calls.deliver_stop_callbacks(true, "stopped")
+		helpers.assert_eq(#disable_results, 0, "STOPPED cannot outrun guardian removal")
+		helpers.assert_eq(calls.guardian_unregistrations, 1)
+		calls.unregister_callback(true, "unregistered")
 		helpers.assert_eq(#disable_results, 1)
 		helpers.assert_true(disable_results[1].ok)
 		local replay_timer = calls.latest_timer()

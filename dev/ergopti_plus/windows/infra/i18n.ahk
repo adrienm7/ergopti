@@ -157,7 +157,12 @@ I18nInit(Cache) {
 		; language rather than always French.
 		_I18nLocale := _I18nDetectSystemLocale()
 	}
-	_I18nCacheLoaded := false
+	if I18nActiveCacheCanReuse() {
+		try LoggerInfo("i18n", "Active locale '{1}' cache retained after configuration initialization.", _I18nLocale)
+	} else {
+		_I18nCacheLoaded := false
+		try LoggerDebug("i18n", "Active locale cache requires loading after configuration initialization.")
+	}
 	try LoggerDone("i18n", "i18n initialised (locale: '{1}').", _I18nLocale)
 }
 
@@ -302,8 +307,8 @@ I18n_LocaleRows() {
 }
 
 ; Path of a locale's flag icon for a Win32 menu row, or "" when none ships.
-; Win32 menus cannot render flag emoji, so this driver draws the PNG the site
-; ships for the locale; every menu row that shows a language (the selector and
+; Win32 menus cannot render flag emoji. Generated BMP sidecars avoid decoding
+; the site's authoritative PNG per row; every language row (the selector and
 ; the hotstring language packs) takes its flag from here.
 I18nFlagIconPath(Code) {
 	global _StaticDir, _I18nFlagExistsCache
@@ -315,7 +320,7 @@ I18nFlagIconPath(Code) {
 		_I18nFlagExistsCache := Map()
 	}
 
-	Path := _StaticDir . "\img\flags\" . Code . ".png"
+	Path := _StaticDir . "\img\flags\" . Code . ".bmp"
 	HasFlag := false
 	try {
 		if _I18nFlagExistsCache.Has(Code) {

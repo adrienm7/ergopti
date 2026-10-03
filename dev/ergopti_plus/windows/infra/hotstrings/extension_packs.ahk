@@ -10,10 +10,9 @@
 ; A manifest may bind one of its files to a historical category
 ; ([extension.hotstring_bindings.<stem>]): the file then supplies that bundled
 ; category, or some of its sections, and is listed in bound_files instead of
-; toml_files, so it never becomes an ext: category. The Lua drivers load those
-; files into their category; this driver does not route them into its TOML
-; loader yet, so each one is reported at boot rather than dropped without a
-; word. A layout extension may also declare the physical key that types its
+; toml_files, so it never becomes an ext: category. Every driver routes those
+; files into their category through its TOML loader. A layout extension may
+; also declare the physical key that types its
 ; magic key ([extension.magic_key]).
 ; The Lua scanner (_shared/lua/hotstrings/extensions.lua) applies the same
 ; rules; both replay the extension_binding_vectors.json and
@@ -112,12 +111,6 @@ HotstringExtensions_Prepare(Target, Roots) {
 	Packs := HotstringExtensions_Scan(Roots)
 	_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
 	HotstringExtensions_Seed(Target, Packs, ManifestDefaultFor)
-	for Pack in Packs {
-		for File in Pack.bound_files
-			LoggerWarn("HotstringExtensions",
-				"Extension '{1}' binds '{2}' to the '{3}' category; bound files are not loaded on Windows yet.",
-				Pack.id, File.stem, File.binding["category"])
-	}
 	return Packs
 }
 
@@ -482,6 +475,48 @@ HotstringExtensions_SetEnabled(Path, Value, Options := unset) {
 		throw ValueError("The extension no longer owns this preference.")
 	}
 	return ConfigScopeCommitOperations("hotstrings", "extension_preference", Operations, Options)
+}
+
+/**
+ * Publishes a discovered file's category and sections in one reload transaction.
+ * @param {String} Category Canonical namespaced extension category id.
+ * @param {Integer} Value Explicit desired Boolean.
+ * @param {Map} Options Lifecycle ports and optional discovery roots callback.
+ * @returns {Map} Pending or terminal receipt owned by the reload journal.
+ */
+HotstringExtensions_SetCategoryEnabled(Category, Value, Options := unset) {
+	_HotstringExtensions_Boolean(Value)
+	if !IsSet(Options)
+		Options := Map()
+	if !(Options is Map)
+		throw TypeError("Extension publication requires an options map.")
+	RootsFn := Options.Get("roots", _HotstringExtensions_CurrentRoots)
+	Operations() {
+		Inventory := Map()
+		; Resolve current ownership under the configuration lease, including a
+		; file removed since the tray was built. No cached menu metadata can write.
+		for Pack in HotstringExtensions_Scan(RootsFn.Call()) {
+			for File in Pack.toml_files {
+				if Inventory.Has(File.category)
+					throw ValueError("Extension category ownership is ambiguous.")
+				Inventory[File.category] := []
+				for Section in File.sections
+					Inventory[File.category].Push(Section["name"])
+			}
+		}
+		Changes := HotstringsCategoryScopePlan(Inventory, [Category], Value, &Reason)
+		if !(Changes is Array)
+			throw ValueError("Extension category selection refused: " . Reason)
+		Rows := []
+		for Change in Changes {
+			Path := Change.Has("section")
+				? "hotstrings.modules." . Change["group"] . "." . Change["section"]
+				: "hotstrings.groups." . Change["group"]
+			Rows.Push(ManifestSparseOperation(Path, Change["enabled"]))
+		}
+		return Rows
+	}
+	return ConfigScopeCommitOperations("hotstrings", "extension_category_preference", Operations, Options)
 }
 
 _HotstringExtensions_CurrentRoots() {

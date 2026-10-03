@@ -22,6 +22,7 @@ local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
+local LlmLine = require("tooltip.llm_line")
 local HotPath = require("infra.hotpath_profiler")
 
 local MAC_KEYCODES_NUMBERS = {
@@ -988,74 +989,23 @@ local function append_segment(result, text, color, is_bold)
 	return result and (result .. segment) or segment
 end
 
+-- The colour each role of a line wears on the selected line. colorization_enabled
+-- controls the background tint only: these accents always apply to the selected
+-- line so it stays distinct, and every other line is unsel_gray throughout.
+local SELECTED_ROLE_COLOR = { typed = "unsel_gray", corrected = "corr_sel", next = "nw_sel" }
+
 --- Builds a single line of text reflecting the diff states with precise coloring.
+--- What the line reads and the role of each piece is the shared rule
+--- (tooltip/llm_line.lua); this only gives each piece its colour and weight.
 --- @param prediction table The prediction payload.
 --- @param is_selected boolean True if this prediction is currently highlighted.
 --- @return userdata|nil The styled text object.
 local function build_line(prediction, is_selected)
-	if type(prediction) ~= "table" then return nil end
-
 	local result = nil
-	local diff_chunks = type(prediction.chunks) == "table" and prediction.chunks or {}
-	local next_words = prediction.nw or ""
-
-	local has_corrections = prediction.has_corrections == true
-	local has_gray_reference = false
-	
-	for _, chunk in ipairs(diff_chunks) do
-		if chunk.type == "equal" and tostring(chunk.text or ""):match("%S") then
-			has_gray_reference = true
-			break
-		end
+	for _, segment in ipairs(LlmLine.segments(prediction, is_selected)) do
+		local color_key = is_selected and SELECTED_ROLE_COLOR[segment.role] or "unsel_gray"
+		result = append_segment(result, segment.text, Config.colors[color_key], segment.bold)
 	end
-
-	local apply_bold = has_corrections and has_gray_reference
-	if prediction.disable_bold then apply_bold = false end
-
-	local is_first_chunk_cleaned = false
-	local function clean_leading_spaces(str)
-		local safe_str = tostring(str or "")
-		if not is_first_chunk_cleaned and safe_str ~= "" then
-			safe_str = safe_str:gsub("^%s+", "")
-			if safe_str ~= "" then is_first_chunk_cleaned = true end
-		end
-		return safe_str
-	end
-
-	local last_character = ""
-
-	if #diff_chunks > 0 then
-		for _, chunk in ipairs(diff_chunks) do
-			if type(chunk) == "table" then
-				local chunk_text = clean_leading_spaces(chunk.text)
-				if chunk_text and chunk_text ~= "" then
-					last_character = chunk_text:sub(-1)
-					
-					if chunk.type == "insert" then
-						-- colorization_enabled controls the background tint only; text accent colors
-						-- always apply to the selected item so it remains visually distinct
-						local chunk_color = is_selected and Config.colors.corr_sel or Config.colors.unsel_gray
-						local chunk_bold = (not is_selected) and apply_bold
-						result = append_segment(result, chunk_text, chunk_color, chunk_bold)
-					elseif chunk.type == "equal" then
-						result = append_segment(result, chunk_text, Config.colors.unsel_gray, false)
-					end
-				end
-			end
-		end
-	end
-
-	local safe_next_words = clean_leading_spaces(next_words)
-	if safe_next_words and safe_next_words ~= "" then
-		if last_character ~= "" and not last_character:match("%s") and not safe_next_words:match("^%s") then
-			safe_next_words = " " .. safe_next_words
-		end
-		
-		local nw_color = is_selected and Config.colors.nw_sel or Config.colors.unsel_gray
-		local nw_bold = (not is_selected) and apply_bold
-		result = append_segment(result, safe_next_words, nw_color, nw_bold)
-	end
-
 	return result
 end
 
@@ -1072,24 +1022,8 @@ local function assemble_blocks(state, reserved_count)
 	end
 
 	local ui = Config.llm_ui
-	local active_mark = ui.active_prefix
-	local prefix_selected = ""
-	local prefix_unselected = ""
-	local visual_compensation_space = ui.inactive_align_char
-
-	if display_count == 1 then prefix_selected = active_mark
-	elseif display_count >= 2 and state.indent > 0 then prefix_selected = string.rep(" ", state.indent) .. active_mark
-	else prefix_selected = active_mark
-	end
-
-	local indent_numeric = math.floor(tonumber(state.indent) or 0)
-	if indent_numeric < 0 and indent_numeric > -3 then
-		prefix_unselected = string.rep(" ", -indent_numeric)
-	elseif indent_numeric <= -3 then
-		prefix_unselected = prefix_selected .. string.rep(" ", math.max(0, (-indent_numeric) - 3))
-	end
-
-	if indent_numeric > -3 then prefix_unselected = prefix_unselected .. visual_compensation_space end
+	local prefix_selected, prefix_unselected = LlmLine.prefixes(
+		state.indent, display_count, ui.active_prefix, ui.inactive_align_char)
 
 	local styled_prefix_unselected = hs.styledtext.new(prefix_unselected, { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })
 	local styled_prefix_empty = hs.styledtext.new("", { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })

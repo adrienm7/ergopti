@@ -39,6 +39,7 @@ global _LayMgrWeb_MsgSub     := unset
 global _LayMgrWeb_NavSub     := unset
 global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
+global _LayMgrWeb_ReadyEpoch := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
 ; A durable catalogue operation still waits for its terminal runtime refresh.
@@ -330,23 +331,6 @@ LayoutManager_Select(Id) {
 	return ReloadPreservingSuspend()
 }
 
-/**
- * Makes the built-in Ergopti emulation the layout typing uses, keeping its
- * Ergopti+ setting (the menu's Ergopti row). Persists, then reloads.
- * @returns {boolean} Whether the reload was started.
- */
-LayoutManager_SelectBuiltin() {
-	global Features
-	Entries := [
-		Map("path", "layout.emulated_layout", "value", ""),
-		Map("path", "layout.ergopti_base", "value", true),
-	]
-	LoggerInfo("LayoutManager", "Selecting the built-in Ergopti emulation and reloading.")
-	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
-		return ConfigReportPersistenceFailure("the layout selection")
-	return ReloadPreservingSuspend()
-}
-
 ; The successor discovers committed extension roots even for nonselected layouts.
 ; A launch acknowledgement is deliberately separate from terminal completion.
 _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
@@ -418,6 +402,14 @@ _LayMgrWeb_Available() {
 }
 
 /**
+ * Creates the native layout window before attaching its WebView controller.
+ * @returns {Gui} The window with the shared-policy translated caption.
+ */
+_LayMgrWeb_NewWindow() {
+	return Gui_Create("+Resize +MinSize560x400", t("layout_manager.window_title"))
+}
+
+/**
  * Opens the layout manager, or focuses it when it is already open.
  * @returns {boolean} Whether the window is shown.
  */
@@ -427,7 +419,7 @@ LayoutManager_Open(*) {
 	global LAYMGR_HOST_ACCESS_ALLOW
 	if !_LayMgrWeb_Available() {
 		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
-		MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
+		Ui_MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
 		return false
 	}
 	if (_LayMgrWeb_Gui != 0) {
@@ -438,7 +430,7 @@ LayoutManager_Open(*) {
 	_LayMgrWeb_SessionEpoch += 1
 	SessionEpoch := _LayMgrWeb_SessionEpoch
 	_LayMgrWeb_ResetDone := false
-	g := Gui("+Resize +MinSize560x400", t("layout_manager.window_title"))
+	g := _LayMgrWeb_NewWindow()
 	g.BackColor := "0x1e1e1e"
 	g.MarginX := 0
 	g.MarginY := 0
@@ -501,10 +493,23 @@ _LayMgrWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
 }
 
 _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
-	global _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_ReadyEpoch
 	if (SessionEpoch != _LayMgrWeb_SessionEpoch)
 		return false
-	Callback(Params*)
+	IsReady := Callback == LayoutManager_HandleMessage && Params.Length > 0
+		&& Params[1] is Map && Params[1].Get("action", "") == "ready"
+	if IsReady {
+		if _LayMgrWeb_ReadyEpoch == SessionEpoch
+			return false
+		; Claim before dispatch: both native navigation and the page emit ready.
+		_LayMgrWeb_ReadyEpoch := SessionEpoch
+	}
+	try Callback(Params*)
+	catch as Err {
+		if IsReady && _LayMgrWeb_ReadyEpoch == SessionEpoch
+			_LayMgrWeb_ReadyEpoch := 0
+		throw Err
+	}
 	return true
 }
 

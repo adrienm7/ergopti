@@ -1,0 +1,194 @@
+{
+	"description": "Cross-driver vectors of one line of the AI prediction tooltip: the prefix in front of it for each indentation, and the pieces of its text with their role (typed = already in the document, corrected = changed by the model, next = the continuation). The reference is _shared/lua/tooltip/llm_line.lua, read by macOS and Linux; Windows ports it in ui/tooltip/llm.ahk. Every driver replays text, role and selected/unselected bold emphasis.",
+	"mark": "> ",
+	"align": "|",
+	"prefixes": [
+		{
+			"id": "single_line_mark_alone",
+			"description": "One line: nothing to align, whatever the indentation.",
+			"indent": 2,
+			"line_count": 1,
+			"expected": { "selected": "> ", "unselected": "|" }
+		},
+		{
+			"id": "zero_mark_at_other_lines_start",
+			"description": "0: the mark sits where the other lines start.",
+			"indent": 0,
+			"line_count": 3,
+			"expected": { "selected": "> ", "unselected": "|" }
+		},
+		{
+			"id": "positive_pushes_selected_line",
+			"description": "+2: the selected line is pushed right, mark included.",
+			"indent": 2,
+			"line_count": 3,
+			"expected": { "selected": "  > ", "unselected": "|" }
+		},
+		{
+			"id": "minus_one_pushes_other_lines",
+			"description": "-1: the other lines are pushed right by one space.",
+			"indent": -1,
+			"line_count": 3,
+			"expected": { "selected": "> ", "unselected": " |" }
+		},
+		{
+			"id": "minus_two_pushes_other_lines",
+			"description": "-2: the other lines are pushed right by two spaces.",
+			"indent": -2,
+			"line_count": 3,
+			"expected": { "selected": "> ", "unselected": "  |" }
+		},
+		{
+			"id": "minus_three_aligns_every_line",
+			"description": "-3: every line starts at the same column; only the mark moves.",
+			"indent": -3,
+			"line_count": 3,
+			"expected": { "selected": "> ", "unselected": "> " }
+		},
+		{
+			"id": "below_minus_three_pushes_past_the_mark",
+			"description": "-5: the other lines start two spaces past the selected one.",
+			"indent": -5,
+			"line_count": 3,
+			"expected": { "selected": "> ", "unselected": ">   " }
+		}
+	],
+	"segments": [
+		{
+			"id": "continuation_is_next_words",
+			"description": "A plain continuation carries no chunk: it is all next words.",
+			"prediction": { "chunks": [], "nw": "le monde", "has_corrections": false },
+			"selected": true,
+			"expected": [{ "text": "le monde", "role": "next", "bold": false }]
+		},
+		{
+			"id": "leading_spacing_dropped",
+			"description": "The line never starts with the space that joins it to the text.",
+			"prediction": { "chunks": [], "nw": "  le monde", "has_corrections": false },
+			"selected": true,
+			"expected": [{ "text": "le monde", "role": "next", "bold": false }]
+		},
+		{
+			"id": "typed_corrected_next",
+			"description": "A completed word: what was typed, the correction, then the continuation.",
+			"prediction": {
+				"chunks": [
+					{ "type": "equal", "text": "bonjou" },
+					{ "type": "insert", "text": "r" }
+				],
+				"nw": " le monde",
+				"has_corrections": true
+			},
+			"selected": true,
+			"expected": [
+				{ "text": "bonjou", "role": "typed", "bold": false },
+				{ "text": "r", "role": "corrected", "bold": false },
+				{ "text": " le monde", "role": "next", "bold": false }
+			]
+		},
+		{
+			"id": "unselected_correction_is_bold",
+			"description": "Not selected: the same pieces, the correction and the continuation bold.",
+			"prediction": {
+				"chunks": [
+					{ "type": "equal", "text": "bonjou" },
+					{ "type": "insert", "text": "r" }
+				],
+				"nw": " le monde",
+				"has_corrections": true
+			},
+			"selected": false,
+			"expected": [
+				{ "text": "bonjou", "role": "typed", "bold": false },
+				{ "text": "r", "role": "corrected", "bold": true },
+				{ "text": " le monde", "role": "next", "bold": true }
+			]
+		},
+		{
+			"id": "unselected_bold_disabled",
+			"description": "disable_bold wins over the correction emphasis.",
+			"prediction": {
+				"chunks": [
+					{ "type": "equal", "text": "bonjou" },
+					{ "type": "insert", "text": "r" }
+				],
+				"nw": " le monde",
+				"has_corrections": true,
+				"disable_bold": true
+			},
+			"selected": false,
+			"expected": [
+				{ "text": "bonjou", "role": "typed", "bold": false },
+				{ "text": "r", "role": "corrected", "bold": false },
+				{ "text": " le monde", "role": "next", "bold": false }
+			]
+		},
+		{
+			"id": "unselected_without_typed_reference",
+			"description": "A correction with no typed text beside it is not emphasised.",
+			"prediction": {
+				"chunks": [{ "type": "insert", "text": "x" }],
+				"nw": " y",
+				"has_corrections": true
+			},
+			"selected": false,
+			"expected": [
+				{ "text": "x", "role": "corrected", "bold": false },
+				{ "text": " y", "role": "next", "bold": false }
+			]
+		},
+		{
+			"id": "space_restored_before_next_words",
+			"description": "Neither side brings a space: one is put between the tail and the next words.",
+			"prediction": {
+				"chunks": [
+					{ "type": "equal", "text": "je" },
+					{ "type": "insert", "text": " suis" }
+				],
+				"nw": "content",
+				"has_corrections": true
+			},
+			"selected": true,
+			"expected": [
+				{ "text": "je", "role": "typed", "bold": false },
+				{ "text": " suis", "role": "corrected", "bold": false },
+				{ "text": " content", "role": "next", "bold": false }
+			]
+		},
+		{
+			"id": "no_space_after_trailing_space",
+			"description": "The tail already ends with a space: none is added.",
+			"prediction": {
+				"chunks": [{ "type": "equal", "text": "je suis " }],
+				"nw": "content",
+				"has_corrections": false
+			},
+			"selected": true,
+			"expected": [
+				{ "text": "je suis ", "role": "typed", "bold": false },
+				{ "text": "content", "role": "next", "bold": false }
+			]
+		},
+		{
+			"id": "blank_first_chunk_skipped",
+			"description": "A first chunk of spaces is dropped, and the next one loses its leading space.",
+			"prediction": {
+				"chunks": [
+					{ "type": "equal", "text": "  " },
+					{ "type": "insert", "text": " mot" }
+				],
+				"nw": "",
+				"has_corrections": true
+			},
+			"selected": true,
+			"expected": [{ "text": "mot", "role": "corrected", "bold": false }]
+		},
+		{
+			"id": "empty_prediction_has_no_piece",
+			"description": "Nothing to read gives no piece; the driver shows its placeholder.",
+			"prediction": { "chunks": [], "nw": "", "has_corrections": false },
+			"selected": true,
+			"expected": []
+		}
+	]
+}

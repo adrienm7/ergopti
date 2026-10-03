@@ -336,3 +336,44 @@ _TestHC_FunctionsExist() {
 
 Test("HealthCheck: core functions are defined (core.ahk included in run_all)",
 	_TestHC_FunctionsExist)
+
+_TestHC_StructuredNativeFallback() {
+	Snapshot := Map("driver", "windows", "generated_at", "2026-10-01T21:35:37Z",
+		"sections", Map(
+			"system", Map("ram_free", 1512222720, "keyboard_layout", "0xFC06040C"),
+			"issues", Map("recent", ["first warning", "second warning"], "warn_count", 2)))
+	Window := _HC_NewWindow()
+	try {
+		Tree := _HC_ShowNativeSnapshot(Window, Snapshot)
+		Assert(Window.NativeDiagnostics == Tree,
+			"the window must own the native control for resize and destruction")
+		Summary := Tree.GetNext(0)
+		AssertEqual(t("healthcheck.section.summary"), Tree.GetText(Summary))
+		System := Tree.GetNext(Summary)
+		AssertEqual(t("healthcheck.section.system"), Tree.GetText(System),
+			"sections must follow the shared schema, not Map's key order")
+		Item := Tree.GetChild(System)
+		AssertEqual(t("healthcheck.field.keyboard_layout") . ": 0xFC06040C", Tree.GetText(Item))
+		Item := Tree.GetNext(Item)
+		AssertEqual(t("healthcheck.field.ram_free") . ": 1512222720", Tree.GetText(Item))
+		Issues := Tree.GetNext(System)
+		AssertEqual(t("healthcheck.section.issues"), Tree.GetText(Issues))
+		Node := Tree.GetChild(Issues)
+		while Node && Tree.GetText(Node) != t("healthcheck.field.recent")
+			Node := Tree.GetNext(Node)
+		Assert(Node != 0, "recent issues must be a separate expandable field")
+		First := Tree.GetChild(Node)
+		AssertEqual("1: first warning", Tree.GetText(First))
+		AssertEqual("2: second warning", Tree.GetText(Tree.GetNext(First)),
+			"each log record must be readable separately")
+		AssertEqual(0, Tree.GetNext(Issues), "absent sections must not create empty headings")
+		_HC_OnSize(Tree, Window, 0, 720, 520)
+		Tree.GetPos(, , &Width, &Height)
+		AssertEqual(720, Width, "the native view must resize with the host")
+		AssertEqual(520, Height)
+	} finally {
+		Window.Destroy()
+	}
+}
+Test("HealthCheck: real browser failure retains schema-ordered native sections and separate logs",
+	_TestHC_StructuredNativeFallback)

@@ -8,17 +8,15 @@
 ; (Ctrl/Shift/Alt/AltGr/Win) or nav layer on hold.
 ;
 ; Preserved subtleties:
-; - LAlt+CapsLock shortcut is intercepted in every branch that remaps CapsLock,
-;   so the LAltCapsLockShortcut() combo keeps working regardless of tap/hold config.
 ; - "plain backspace" variant (tap=backspace, hold=none): uses *SC03A with Blind
 ;   so modifiers are passed through — identical to the original v1 behaviour.
 ; - Hold-modifier variants (Ctrl/Shift/Alt/Win): pre-arm the modifier on key-down,
 ;   then release immediately if it was a tap so the tap action fires clean.
 ; - Hold-layer (nav): mirrors LAlt — activate layer on press, tap action fires on
 ;   release if under threshold, no modifier ever sent.
-; - "no remapping" fallback: when CapsLock has no tap action AND no hold action,
-;   and LAlt is remapped to one_shot_shift, the LAltCapsLockShortcut must still
-;   be reachable — handled by the dedicated first #HotIf block.
+; - A key combination that ends on CapsLock (LAlt then CapsLock) is not
+;   intercepted here: its hotkeys are created before these and fire first
+;   (platform/remap/key_combination_keys.ahk).
 ; - A Ctrl the user holds while tapping CapsLock stays down: the synthetic owner
 ;   leaves a key the user holds to the user, so Ctrl+CapsLock gives Ctrl+tap.
 ; ==============================================================================
@@ -71,35 +69,6 @@ _CapsLockHoldModKey() {
 
 
 
-; ==================================================
-; ==================================================
-; ======= 2.1) No-remap LAlt+CapsLock rescue =======
-; ==================================================
-; ==================================================
-
-; When CapsLock is not remapped at all but LAlt is on one_shot_shift, the
-; LAlt+CapsLock shortcut must still fire. Without this block AHK would let
-; CapsLock pass to the OS and LAltCapsLockShortcut() would never be called.
-#HotIf (
-	TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift"
-	and not _CapsLockIsRemapped()
-	and not LayerEnabled
-)
-SC03A:: {
-	if (KS_IsDown("SC038")) { ; LAlt physically held
-		LAltCapsLockShortcut()
-		return
-	}
-	ToggleCapsLock()
-}
-#HotIf
-
-
-
-
-
-
-
 ; =======================================================================
 ; =======================================================================
 ; ======= 2.2) Plain-backspace variant (tap=backspace, hold=none) =======
@@ -110,10 +79,6 @@ SC03A:: {
 ; still produce Shift+BackSpace / Ctrl+BackSpace as expected.
 #HotIf _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
-	if (KS_IsDown("SC038")) { ; LAlt physically held
-		LAltCapsLockShortcut()
-		return
-	}
 	TextPressKey("BackSpace", "Blind")
 }
 #HotIf
@@ -136,11 +101,6 @@ SC03A:: {
 ; itself runs clean (e.g. Enter without Ctrl).
 #HotIf _CapsLockHasHoldModifier() and not LayerEnabled
 *$SC03A:: {
-	if (KS_IsDown("SC038")) { ; LAlt physically held — shortcut intercept
-		LAltCapsLockShortcut()
-		return
-	}
-
 	ModKey := _CapsLockHoldModKey()
 	Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", ModKey,
 		TapHoldDuration(TapHold, "caps_lock"))
@@ -164,10 +124,6 @@ SC03A:: {
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
 #HotIf _CapsLockHasHoldLayer() and not LayerEnabled
 *$SC03A:: {
-	if (KS_IsDown("SC038")) { ; LAlt physically held
-		LAltCapsLockShortcut()
-		return
-	}
 
 	UpdateLastSentCharacter("CapsLock")
 	Result := TapHoldOwnImmediateLayer("caps_lock", "CapsLock", TapHoldDuration(TapHold, "caps_lock"))
@@ -196,10 +152,6 @@ SC03A:: {
 ; Simple gate: fire the tap action on every press (no hold behaviour).
 #HotIf TapHoldTapAction(TapHold, "caps_lock") != "" and not _CapsLockHasHoldModifier() and not _CapsLockHasHoldLayer() and not _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
-	if (KS_IsDown("SC038")) { ; LAlt physically held
-		LAltCapsLockShortcut()
-		return
-	}
 	_CapsLockDispatch()
 }
 #HotIf

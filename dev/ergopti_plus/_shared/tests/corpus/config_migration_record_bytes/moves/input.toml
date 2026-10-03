@@ -1,0 +1,24 @@
+# Original order of surviving records remains visible.
+[_meta]
+schema_version = 1
+
+[old] # moved header removed
+flag = false
+# Independent note below a moved row.
+
+[old.child]
+label = "owned text"
+
+[legacy]
+choice = true
+extra = "transferred"
+
+[target] # existing choice wins
+choice = false # explicit stored choice
+
+[retired]
+obsolete = "removed"
+# Future explanation survives deleting its former owned table.
+
+[future]
+unknown = "untouched" # keep byte spacing

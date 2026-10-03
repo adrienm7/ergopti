@@ -82,6 +82,12 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	-- does not short-circuit before reaching hs.task.new on the first call.
 	local function make_watchers_with_throwing_task()
 		package.loaded["platform.remap.watchers"] = nil
+	-- The control owner needs only its deferred diagnostic port in these native
+	-- watcher doubles; callbacks never post synthetic keyboard input here.
+	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["adapters.synthetic_input"] = {
+		defer_after_callback = function(_label, callback) callback(); return true end,
+	}
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["adapters.timer_scheduler"] = nil
 		-- TaskLifecycle captures `hs` at require time, so every fresh watcher

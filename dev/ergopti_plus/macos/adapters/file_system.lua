@@ -1635,6 +1635,25 @@ local function write_atomic(path, content, expected_source)
 			return false, reason
 		end
 
+		-- A no-op still acquires the same native owner and revalidates its route
+		-- and exact source. It must not bypass a sibling writer's lock or allocate
+		-- a staging payload merely to replace an already identical inode.
+		if type(expected_source) == "table" and expected_source.status == "ok"
+			and expected_source.content == content then
+			local current, status, detail = M.read_with_status(path)
+			if status ~= "ok" or current ~= content then
+				local reason = "source changed before unchanged acknowledgement: " .. tostring(detail or status)
+				Logger.error(LOG, "write(): %s.", reason)
+				return false, reason
+			end
+			local same_route, route_detail = revalidate_write_path(path, resolved_path, symlink_chain)
+			if not same_route then
+				Logger.error(LOG, "write(): no-op destination changed under its lock — %s.", tostring(route_detail))
+				return false, route_detail
+			end
+			return true
+		end
+
 		staging_area, resolve_err = reserve_staging_area(resolved_path)
 		if not staging_area then
 			Logger.error(

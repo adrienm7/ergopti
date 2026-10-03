@@ -210,8 +210,8 @@ Bundle_Init() {
 	if (BundleDir == "") {
 		; Neither %LOCALAPPDATA% nor %USERPROFILE% resolved — the exe has no
 		; usable extraction root, so it cannot serve any runtime asset.
-		MsgBox("Bundle extraction failed: could not resolve the Local AppData directory.",
-			"ErgoptiPlus", "Icon!")
+		Ui_MsgBox("Bundle extraction failed: could not resolve the Local AppData directory.",
+			"", "Icon!")
 		ExitApp(1)
 	}
 	global _BundleDir := BundleDir
@@ -250,23 +250,23 @@ Bundle_Init() {
 		FileInstall("build\static_bundle.zip", TmpZip, 1)
 	} catch as Err {
 		; If FileInstall fails the exe is unusable — surface a hard error.
-		MsgBox("Bundle extraction failed (FileInstall): " . Err.Message,
-			"ErgoptiPlus", "Icon!")
+		Ui_MsgBox("Bundle extraction failed (FileInstall): " . Err.Message,
+			"", "Icon!")
 		ExitApp(1)
 	}
 
 	if !_Bundle_Unzip(TmpZip, StagingDir) {
 		try FileDelete(TmpZip)
 		try DirDelete(StagingDir, true)
-		MsgBox("Bundle extraction failed (Expand-Archive returned non-zero).",
-			"ErgoptiPlus", "Icon!")
+		Ui_MsgBox("Bundle extraction failed (Expand-Archive returned non-zero).",
+			"", "Icon!")
 		ExitApp(1)
 	}
 
 	try FileDelete(TmpZip)
 	if !_Bundle_VerifyStaging(StagingDir) or !_Bundle_WriteMarker(StagingDir) {
 		try DirDelete(StagingDir, true)
-		MsgBox("Bundle extraction failed (staging verification).", "ErgoptiPlus", "Icon!")
+		Ui_MsgBox("Bundle extraction failed (staging verification).", "", "Icon!")
 		ExitApp(1)
 	}
 	; Preserve the known-good runtime until the new tree has been fully staged.
@@ -274,15 +274,15 @@ Bundle_Init() {
 		try DirMove(BundleDir, RollbackDir, 0)
 		catch as Err {
 			try DirDelete(StagingDir, true)
-			MsgBox("Bundle extraction failed (could not preserve current bundle): " . Err.Message,
-				"ErgoptiPlus", "Icon!")
+			Ui_MsgBox("Bundle extraction failed (could not preserve current bundle): " . Err.Message,
+				"", "Icon!")
 			ExitApp(1)
 		}
 	}
 	try DirMove(StagingDir, BundleDir, 0)
 	catch as Err {
 		try DirMove(RollbackDir, BundleDir, 0)
-		MsgBox("Bundle extraction failed (commit): " . Err.Message, "ErgoptiPlus", "Icon!")
+		Ui_MsgBox("Bundle extraction failed (commit): " . Err.Message, "", "Icon!")
 		ExitApp(1)
 	}
 	if DirExist(RollbackDir)

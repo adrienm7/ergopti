@@ -140,8 +140,6 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; guessing from the text. HSE_Register copies every Meta field onto the Spec, so
 ; the flag reaches HSEMatch.IsPrivate at each of the three fire paths.
 _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false) {
-		static _NextSeq := 0
-		_NextSeq += 1
 		return {
 				Replacement: Replacement,
 				Trigger: Abbreviation,
@@ -154,8 +152,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				Category: Category,
 				Section: Section,
 				Priority: Priority,
-				IsPrivate: IsPrivate ? true : false,
-				Seq: _NextSeq
+				IsPrivate: IsPrivate ? true : false
 		}
 }
 

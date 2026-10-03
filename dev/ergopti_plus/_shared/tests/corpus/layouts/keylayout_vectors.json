@@ -1,5 +1,12 @@
 {
-	"description": "What typing on a registry layout produces, read by hand from the layout's .keylayout (static/layouts/registry/<layout>/<layout>.keylayout): the keyMap its modifierMap selects, the <key> element, the <action> <when> for the dead-key state and the <terminators>. Keys are named by AutoHotkey scan code, the Windows emulation's input, and mapped to macOS codes through _shared/modules/layouts/mac_keycodes.json and the layout's keycode_convention. Each press is a space-separated list of modifiers (shift, caps, altgr) ending with the scan code. 'shortcut' vectors give the character a Ctrl/Alt/Win chord sends: the layout's Command level, or nothing on a dead key. Consumed by the Windows emulation tests (tests/unit/test_keylayout_emulation.ahk).",
+	"description": "What typing on a registry layout produces, read by hand from the layout's .keylayout (static/layouts/registry/<layout>/<layout>.keylayout): the keyMap its modifierMap selects, the <key> element, the <action> <when> for the dead-key state and the <terminators>. Keys are named by AutoHotkey scan code, the Windows emulation's input, and mapped to macOS codes through _shared/modules/layouts/mac_keycodes.json and the layout's keycode_convention. Each press is a space-separated list of modifiers (shift, caps, altgr) ending with the scan code. 'shortcut' vectors give the character a Ctrl/Alt/Win chord sends: the layout's Command level, or nothing on a dead key. Consumed by Windows emulation and Linux conversion tests. dead_reset_seeds lists real pending-dead-key inputs, replayed by the Windows reset tests and checked against Linux dead-state triggers.",
+	"dead_reset_seeds": [
+		{ "layout": "ergol", "press": "SC018" },
+		{ "layout": "ergopti", "press": "SC02B" },
+		{ "layout": "ergopti", "press": "SC01B" },
+		{ "layout": "ergopti_plus", "press": "SC02B" },
+		{ "layout": "ergopti_plus", "press": "altgr shift SC01B" }
+	],
 	"vectors": [
 		{ "id": "ergol_base_letter", "layout": "ergol", "press": ["SC010"], "types": "q" },
 		{ "id": "ergol_shift_letter", "layout": "ergol", "press": ["shift SC010"], "types": "Q" },

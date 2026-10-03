@@ -26,7 +26,7 @@ _MetaHsDelimiterDialogReachable() {
 
 	OpenPos := InStr(Body, "if IsObject(_HS_DelimAddGui) {")
 	PresentPos := InStr(Body, "WMPresentWindow(_HS_DelimAddGui)", , Max(OpenPos, 1))
-	BuildPos := InStr(Body, "Gui(")
+	BuildPos := InStr(Body, "Gui_Create(")
 	Assert(OpenPos > 0 && PresentPos > OpenPos && BuildPos > PresentPos,
 		"a request while the dialog is open must present it instead of building a second one")
 

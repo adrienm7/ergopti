@@ -34,6 +34,7 @@ local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local ShellRunner   = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 
 -- Required to inform the discovery poller of the active server PID so it can
 -- exclude it from zombie kills; safe to require here because api_mlx holds no
@@ -730,8 +731,8 @@ function M.install(ctx)
 
 		local function probe_matches_target(body)
 			if type(body) ~= "string" or body == "" then return false end
-			local ok, parsed = pcall(hs.json.decode, body)
-			if not ok or type(parsed) ~= "table" then return false end
+			local parsed, decode_err = JsonCodec.decode(body)
+			if decode_err ~= nil or type(parsed) ~= "table" then return false end
 
 			local target_l = (target_model or ""):lower()
 			local repo_l = (repo or ""):lower()

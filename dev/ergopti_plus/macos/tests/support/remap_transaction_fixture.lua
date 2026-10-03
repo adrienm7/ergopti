@@ -253,6 +253,14 @@ return function(run)
 				notify_ready = function() end,
 			}
 			package.loaded["platform.remap.lease_controller"] = {
+				unregister_guardian = function(on_done)
+					calls.unregister_guardian = (calls.unregister_guardian or 0) + 1
+					calls.unregister_callback = on_done
+					if options.unregister_mode == "throw" then error("synthetic unregister refusal") end
+					if options.unregister_mode == "refuse" then return false end
+					if options.unregister_mode ~= "async" then on_done(true, "unregistered") end
+					return true
+				end,
 				init = function(phase_listener)
 					calls.lease_init = calls.lease_init + 1
 					calls.phase_listener = phase_listener
@@ -260,6 +268,7 @@ return function(run)
 				end,
 				token = function()
 					calls.token_requests = (calls.token_requests or 0) + 1
+					if calls.lease_phase == "idle" then publish_phase("prepared") end
 					return lease_token
 				end,
 				start = function(on_done)

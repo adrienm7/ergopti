@@ -42,6 +42,7 @@ global _I18nMissWarned := Map()
 
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
+global _I18nActiveCacheIdentity := false
 
 ; Fallback caches: English first, French second.
 global _I18nCacheEn := Map()
@@ -114,6 +115,8 @@ _I18nUnescapeTSV(s) {
 ; than the recursive-descent JsonParse for the identical key/value set.
 _I18nParseTSV(Content, MagicKey, Status := unset) {
 	global _I18N_TSV_SENTINEL
+	if IsSet(Status) && IsObject(Status)
+		Status.Templates := Map()
 	m := Map()
 	ExpectedCount := -1
 	Loop Parse Content, "`n", "`r" {
@@ -133,8 +136,11 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
-		if InStr(v, "★")
+		if InStr(v, "★") {
+			if IsSet(Status) && IsObject(Status)
+				Status.Templates[k] := v
 			v := StrReplace(v, "★", MagicKey)
+		}
 		m[k] := v
 	}
 	if IsSet(Status) and IsObject(Status)
@@ -207,11 +213,11 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 ; whenever a source was parsed successfully — INCLUDING a valid but empty ``{}``,
 ; which is distinct from a missing/unparseable file (Ok false → caller shows raw
 ; key names); Fast records whether the .tsv cache was hit, for log clarity only.
-_I18nLoadLocaleMap(JsonPath, MagicKey) {
+_I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	TsvPath := RegExReplace(JsonPath, "\.json$", ".tsv")
 
 	; ── Fast path: a fresh .tsv cache ──
-	if FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
+	if AllowFast && FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
 		try {
 			ParseStatus := { Complete: false }
 			Fast := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey,
@@ -219,7 +225,7 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 			; Only a terminal sentinel with the exact parsed cardinality proves that
 			; the cache is complete. Old-format and truncated caches rebuild once.
 			if ParseStatus.Complete
-				return { Cache: Fast, Ok: true, Fast: true }
+				return { Cache: Fast, Ok: true, Fast: true, Templates: ParseStatus.Templates }
 			try LoggerWarn("i18n", "Fast cache '{1}' is incomplete; rebuilding from JSON.", TsvPath)
 		} catch as err {
 			try LoggerWarn("i18n", "Fast cache '{1}' unreadable ({2}); rebuilding from JSON.", TsvPath, err.Message)
@@ -245,16 +251,18 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 		return { Cache: Map(), Ok: false, Fast: false }
 	}
 	Out := Map()
+	Templates := Map()
 	for Key, Val in Parsed {
-		if InStr(Val, "★")
+		if InStr(Val, "★") {
+			Templates[Key] := Val
 			Out[Key] := StrReplace(Val, "★", MagicKey)
-		else
+		} else
 			Out[Key] := Val
 	}
 	; Regenerate from the RAW parsed values (★ preserved) so the cache mirrors the
 	; source exactly and stays MagicKey-independent.
 	_I18nWriteTsvCache(TsvPath, Parsed)
-	return { Cache: Out, Ok: true, Fast: false }
+	return { Cache: Out, Ok: true, Fast: false, Templates: Templates }
 }
 
 ; Populate _I18nCache for the active locale from FilePath's .json, via the
@@ -263,15 +271,58 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 ; missing/unparseable source.
 _I18nLoadFile(FilePath) {
 	global _I18nCache, _I18nCacheLoaded, _I18nLocale, ScriptInformation
+	global _I18nActiveCacheIdentity
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"]
 		: "★"
-	R := _I18nLoadLocaleMap(FilePath, MagicKey)
+	BeforeHash := _I18nSourceHash(FilePath)
+	; A source edit already proved by exact bytes also invalidates a TSV whose
+	; timestamp happens to survive that edit. Reload must not bless the old model
+	; with the new source hash.
+	AllowFast := !IsObject(_I18nActiveCacheIdentity)
+		|| _I18nActiveCacheIdentity.Path != FilePath
+		|| _I18nActiveCacheIdentity.Hash == BeforeHash
+	R := _I18nLoadLocaleMap(FilePath, MagicKey, AllowFast)
 	_I18nCache := R.Cache
 	_I18nCacheLoaded := R.Ok
+	AfterHash := R.Ok ? _I18nSourceHash(FilePath) : ""
+	_I18nActiveCacheIdentity := R.Ok && BeforeHash != "" && BeforeHash == AfterHash
+		? {Locale: _I18nLocale, MagicKey: MagicKey, Path: FilePath, Hash: AfterHash,
+			Cache: R.Cache, Templates: R.Templates} : false
 	if R.Ok
 		try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s), {3}).", _I18nLocale, _I18nCache.Count,
 			R.Fast ? "fast" : "regenerated")
+}
+
+; Exact source bytes fence reuse across initialization, including same-size edits.
+_I18nSourceHash(Path) {
+	try return CryptoSha256Bytes(FSReadBytesStrict(Path))
+	catch as Err {
+		try LoggerWarn("i18n", "Locale cache reuse cannot verify its source: {1}.", Err.Message)
+		return ""
+	}
+}
+
+; Startup may have translated native lifecycle rows before reading user settings.
+I18nActiveCacheCanReuse() {
+	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nLocale, ScriptInformation
+	Identity := _I18nActiveCacheIdentity
+	MagicKey := IsSet(ScriptInformation) && ScriptInformation.Has("MagicKey")
+		? ScriptInformation["MagicKey"] : "★"
+	if !_I18nCacheLoaded || !IsObject(Identity) || Identity.Cache != _I18nCache
+			|| Identity.Locale != _I18nLocale
+			|| Identity.Path != _I18nLocalePath(_I18nLocale)
+		return false
+	Hash := _I18nSourceHash(Identity.Path)
+	if StrLen(Hash) != 64 || Hash != Identity.Hash
+		return false
+	if Identity.MagicKey != MagicKey {
+		for Key, Template in Identity.Templates
+			_I18nCache[Key] := StrReplace(Template, "★", MagicKey)
+		Identity.MagicKey := MagicKey
+		try LoggerDebug("i18n", "Retained locale cache refreshed {1} magic-key template(s).", Identity.Templates.Count)
+	}
+	return true
 }
 
 ; Load a fallback locale into a provided Map reference via the same self-healing

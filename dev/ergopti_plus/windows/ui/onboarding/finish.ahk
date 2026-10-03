@@ -343,6 +343,6 @@ _Onboarding_ShowError(Key) {
 	Code := IsSet(_ob_locale) && (_ob_locale is String) && _ob_locale != ""
 		? _ob_locale : ONBOARDING_FIRST_RUN_LOCALE
 	Message := _Onboarding_Translate(Code, Key)
-	Title := _Onboarding_Translate(Code, "onboarding.error.title")
-	try MsgBox(Message, Title, "Icon!")
+	Title := _Onboarding_Translate(Code, "common.error_title")
+	try Ui_MsgBox(Message, Title, "Icon!")
 }

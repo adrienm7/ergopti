@@ -50,14 +50,74 @@ _CTC_LabelAt(TargetMenu, Position) {
 	return StrGet(Buffer_, "UTF-16")
 }
 
-; Frees a menu this file built, before the runner exits. The WPM rows of the
-; Metrics menu hold that menu in their callbacks, which the dispatcher registry
-; keeps alive: AHK then destroyed it during its exit teardown, and the runner
-; ended in STATUS_HEAP_CORRUPTION after every test had passed.
-_CTC_ReleaseMenu(TargetMenu) {
+; Release the owned tree while its native menus are still strongly held.
+; Deleting only the parent detaches live children: their dispatcher callbacks
+; retain the children and parent until AHK exit teardown, which can end in
+; STATUS_HEAP_CORRUPTION after every assertion has passed. Preserve unrelated
+; detached menus; dispatcher ownership must not be reduced to tray reachability.
+_CTC_ReleaseMenu(TargetMenu, Seen := unset) {
+	if !IsSet(Seen)
+		Seen := Map()
+	Handle := TargetMenu.Handle
+	if Seen.Has(Handle)
+		return
+	Seen[Handle] := true
+	Children := []
+	loop TrayMenuItemCount(TargetMenu) {
+		ChildHandle := DllCall("GetSubMenu", "ptr", Handle, "int", A_Index - 1, "ptr")
+		if ChildHandle
+			Children.Push(MenuFromHandle(ChildHandle))
+	}
+	for Child in Children
+		_CTC_ReleaseMenu(Child, Seen)
 	TargetMenu.Delete()
 	MenuDispatcher_PruneMenu(TargetMenu)
 }
+
+_CTC_OwnedMenuProbe(Owned, Parent, *) => ObjPtr(Owned) + ObjPtr(Parent)
+
+; Keep a foreign detached registration alive while disposing three owned levels.
+; The root-only negative control proves why clearing one menu is insufficient.
+_CTC_ReleaseOwnedTree() {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens
+	Root := Menu(), Child := Menu(), Grandchild := Menu(), Foreign := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(Child, "child command", _CTC_OwnedMenuProbe.Bind(Child, Root)))
+		AssertEqual(1, RegisterMenuItem(Grandchild, "grandchild command", _CTC_OwnedMenuProbe.Bind(Grandchild, Child)))
+		AssertEqual(1, RegisterMenuItem(Foreign, "foreign command", _CTC_OwnedMenuProbe.Bind(Foreign, Foreign)))
+		ChildId := DllCall("GetMenuItemID", "ptr", Child.Handle, "int", 0, "uint")
+		GrandchildId := DllCall("GetMenuItemID", "ptr", Grandchild.Handle, "int", 0, "uint")
+		ForeignId := DllCall("GetMenuItemID", "ptr", Foreign.Handle, "int", 0, "uint")
+		Child.Add("grandchild", Grandchild)
+		Root.Add("child", Child)
+		Root.Delete()
+		MenuDispatcher_PruneMenu(Root)
+		for Id in [ChildId, GrandchildId] {
+			Assert(_MenuDispatchCallbacks.Has(Id), "root-only cleanup retains a detached child's callback")
+			Assert(_MenuDispatchTokens.Has(Id), "detached ownership retains its dispatch token")
+		}
+		Root.Add("child", Child)
+		_CTC_ReleaseMenu(Root)
+		for Id in [ChildId, GrandchildId] {
+			AssertFalse(_MenuDispatchCallbacks.Has(Id), "owned descendants release their capturing callbacks")
+			AssertFalse(_MenuDispatchTokens.Has(Id), "owned descendants release their dispatch tokens")
+		}
+		for Owned in [Root, Child, Grandchild]
+			AssertEqual(0, TrayMenuItemCount(Owned), "all owned native rows are removed before exit")
+		Assert(_MenuDispatchCallbacks.Has(ForeignId), "foreign detached callbacks remain live")
+		Assert(_MenuDispatchTokens.Has(ForeignId), "foreign detached tokens remain live")
+		AssertEqual(1, TrayMenuItemCount(Foreign))
+	} finally {
+		; Explicit children also clean up the negative control if an assertion fails.
+		for Owned in [Grandchild, Child, Root, Foreign] {
+			Owned.Delete()
+			MenuDispatcher_PruneMenu(Owned)
+		}
+	}
+}
+
+Test("hotstring-personal-menu-owner: releases owned descendants and preserves foreign detached menus",
+	_CTC_ReleaseOwnedTree)
 
 ; How many rows of a menu carry exactly Label.
 _CTC_CountLabel(TargetMenu, Label) {

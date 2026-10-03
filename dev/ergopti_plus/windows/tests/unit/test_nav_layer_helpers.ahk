@@ -297,3 +297,73 @@ _NL_ActivateDisableCycleNeverDropsBelowRaisedLimit() {
 		"After an Activate→Disable cycle A_MaxHotkeysPerInterval must remain at the raised ceiling, never clobbered back down toward the AHK default")
 }
 Test("Activate/DisableLayer cycle: A_MaxHotkeysPerInterval stays at the raised ceiling (layer-rate-limit)", _NL_ActivateDisableCycleNeverDropsBelowRaisedLimit)
+
+; The tray status borrows the exact pre-existing title, and repeated activation
+; never recaptures the layer's own output as the title to restore.
+_NL_IndicatorRestoresExactPriorText(PreviousText) {
+	Writes := []
+	Reads := 0
+	ReadTitle() {
+		Reads += 1
+		return PreviousText
+	}
+	WriteTitle(Text) {
+		Writes.Push(Text)
+		return true
+	}
+	Label := () => "translated navigation layer"
+	try {
+		AssertTrue(NavigationLayerUpdateIndicator(true, ReadTitle, WriteTitle, Label))
+		AssertTrue(NavigationLayerUpdateIndicator(true, ReadTitle, WriteTitle, Label))
+		AssertEqual(1, Reads, "the borrowed title must be captured only once")
+		AssertTrue(NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label))
+		AssertEqual(3, Writes.Length)
+		AssertEqual("translated navigation layer", Writes[1])
+		AssertEqual("translated navigation layer", Writes[2])
+		AssertEqual(PreviousText, Writes[3])
+		AssertTrue(NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label))
+		AssertEqual(3, Writes.Length, "acknowledged cleanup must be idempotent")
+	} finally {
+		NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label)
+	}
+}
+Test("navigation indicator: restores the exact prior tray title", _NL_IndicatorRestoresExactPriorText.Bind("foreign tray title — unchanged"))
+Test("navigation indicator: restores an empty prior tray title", _NL_IndicatorRestoresExactPriorText.Bind(""))
+
+; Production can refuse before or after a native write. Collect calls in the
+; callback and assert afterwards, because the owner's catch must not swallow a
+; regression assertion. An unacknowledged cleanup keeps the original receipt.
+_NL_IndicatorRecoversRefusal(Mode, CleanupFails) {
+	Writes := []
+	ReadTitle := () => "original title"
+	FailureAt := CleanupFails ? 2 : 1
+	WriteTitle(Text) {
+		Writes.Push(Text)
+		if Writes.Length != FailureAt
+			return true
+		if Mode == "throws"
+			throw Error("injected tray refusal")
+		if Mode == "empty"
+			return
+		return false
+	}
+	Label := () => "layer title"
+	try {
+		AssertEqual(CleanupFails, NavigationLayerUpdateIndicator(true, ReadTitle, WriteTitle, Label),
+			"publication must report an unacknowledged native write")
+		AssertEqual(!CleanupFails, NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label),
+			"cleanup must retain an unacknowledged restoration")
+		AssertTrue(NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label),
+			"a later cleanup must restore the original borrowed title")
+		AssertEqual("original title", Writes[Writes.Length])
+		AssertEqual(CleanupFails ? 3 : 2, Writes.Length)
+	} finally {
+		NavigationLayerUpdateIndicator(false, ReadTitle, WriteTitle, Label)
+	}
+}
+Test("navigation indicator: recovers a false publication", _NL_IndicatorRecoversRefusal.Bind("false", false))
+Test("navigation indicator: recovers an empty publication", _NL_IndicatorRecoversRefusal.Bind("empty", false))
+Test("navigation indicator: recovers a throwing publication", _NL_IndicatorRecoversRefusal.Bind("throws", false))
+Test("navigation indicator: retries a false restoration", _NL_IndicatorRecoversRefusal.Bind("false", true))
+Test("navigation indicator: retries an empty restoration", _NL_IndicatorRecoversRefusal.Bind("empty", true))
+Test("navigation indicator: retries a throwing restoration", _NL_IndicatorRecoversRefusal.Bind("throws", true))

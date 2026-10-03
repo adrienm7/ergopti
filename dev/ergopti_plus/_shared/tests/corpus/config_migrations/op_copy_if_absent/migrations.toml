@@ -1,0 +1,27 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: preserve legacy choices while conditionally copying them."
+ops = [
+	{ op = "copy_if_absent", section = "source", key = "on", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "off", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "text", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "on", to_section = "destination", to_key = "new_on" },
+	{ op = "copy_if_absent", section = "source", key = "off", to_section = "destination", to_key = "new_off" },
+	{ op = "copy_if_absent", section = "source", key = "text", to_section = "destination", to_key = "new_text" },
+	{ op = "copy_if_absent", section = "source", key = "numeric_text", to_key = "numeric_text_copy" },
+	{ op = "copy_if_absent", section = "source", key = "empty", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "rows", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "records", to_section = "destination" },
+	{ op = "copy_if_absent", section = "source", key = "records", to_section = "sibling" },
+	{ op = "copy_if_absent", section = "source", key = "on", to_key = "on" },
+	{ op = "copy_if_absent", section = "source", key = "absent", to_section = "destination" },
+	{ op = "copy_if_absent", section = "missing_source", key = "absent", to_section = "missing_destination" },
+	{ op = "copy_if_absent", section = "destination", key = "new_on", to_key = "second_on" },
+	{ op = "copy_if_absent", section = "source", key = "records", to_section = "destination" },
+]

@@ -25,6 +25,36 @@
 
 _LMH_Index() => JsonParse(FileRead(_StaticDir . "\layouts\registry\index.json", "UTF-8-RAW"))
 
+_LMH_ReadyOncePerEpoch() {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_ReadyEpoch, _LayoutCatalogueLast
+	SavedEpoch := _LayMgrWeb_SessionEpoch
+	SavedReady := _LayMgrWeb_ReadyEpoch
+	SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LMH_TempDir()
+	try {
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		_LayMgrWeb_SessionEpoch := 9876
+		_LayMgrWeb_ReadyEpoch := 0
+		Log := []
+		Deps := _LMH_Deps(Dir, Log)
+		AssertTrue(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertFalse(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertEqual(1, _LMH_Calls(Log).Length, "page and native ready refresh only once")
+		_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "refresh"), Deps)
+		AssertEqual(2, _LMH_Calls(Log).Length, "explicit refresh remains available")
+		_LayMgrWeb_SessionEpoch += 1
+		AssertFalse(_LayMgrWeb_SessionCall(9876, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertTrue(_LayMgrWeb_SessionCall(9877, LayoutManager_HandleMessage, Map("action", "ready"), Deps))
+		AssertEqual(3, _LMH_Calls(Log).Length, "replacement window receives its own initial refresh")
+	} finally {
+		_LayMgrWeb_SessionEpoch := SavedEpoch
+		_LayMgrWeb_ReadyEpoch := SavedReady
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+	}
+}
+Test("layout manager: dual ready signals refresh once per epoch (layout-ready-once)", _LMH_ReadyOncePerEpoch)
+
 _LMH_TempDir() {
 	Dir := A_Temp . "\ergopti_layout_manager_" . A_TickCount . "_" . Random(1000, 9999) . "\"
 	DirCreate(Dir)
@@ -164,3 +194,61 @@ Test("layout manager host: the active layout follows the emulation settings (lay
 	AssertEqual("", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "", "ergopti_base", false))),
 		"without the Ergopti emulation Windows types its own layout")
 ))
+
+; The status displays the selected emulation only while its category is on;
+; its row never acts as a second, ambiguous layout-selection command.
+_LMH_EmulationStatusCase(Layout, Enabled, Name) {
+	Index := LayoutCatalogue_BundledIndex()
+	Assert(Index is Map, "the actual shipped registry must load")
+	Rows := _LAY_CustomLayoutRows(Map("layout", Layout), Enabled, Index)
+	AssertEqual(1, Rows.Length)
+	Expected := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
+	AssertEqual(Expected, Rows[1]["label"])
+	AssertTrue(Rows[1].Get("disabled", false), "the status must be visibly disabled")
+	AssertFalse(Rows[1].Has("action"), "the status must not select or reload anything")
+	AssertFalse(Rows[1].Has("checked"), "a disabled status is not an emulation switch")
+}
+
+Test("layout menu: no base emulation explicitly reports none (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", false), true, ""))
+Test("layout menu: the built-in Ergopti emulation is named (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_plus", false), true, "Ergopti"))
+Test("layout menu: the built-in Ergopti+ variant is distinguished (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_plus", true), true, "Ergopti+"))
+Test("layout menu: a selected registry layout takes precedence (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("emulated_layout", "ergol", "ergopti_base", true), true, "Ergo-L"))
+Test("layout menu: a disabled category does not claim its saved emulation is active (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("emulated_layout", "ergol", "ergopti_base", true), false, ""))
+Test("layout menu: AltGr-only adjustments do not claim base-layout emulation (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("ergopti_base", false, "ergopti_alt_gr", true), true, ""))
+Test("layout menu: a selection absent from the catalogue stays identified (layout-menu-emulation-status)",
+	() => _LMH_EmulationStatusCase(Map("emulated_layout", "custom-installed-layout"), true, "custom-installed-layout"))
+
+_LMH_NativeEmulationStatus() {
+	static PROBE_KEY := "_test_layout_emulation_status"
+	Root := _MR_GetManifestRoot()
+	Assert(Root is Map, "the actual menu manifest must load")
+	Fragment := []
+	for Item in Root["layout_menu"] {
+		if _MR_Get(Item, "id") == "custom_layouts" || _MR_Get(Item, "id") == "layout_manager"
+			Fragment.Push(Item)
+	}
+	AssertEqual(2, Fragment.Length, "the actual declaration must contain status and management")
+	Root[PROBE_KEY] := Fragment
+	try {
+		Providers := Map("custom_layouts", () => _LAY_CustomLayoutRows(Map("layout", Map("ergopti_base", false)), true))
+		Rendered := MenuRenderer_Build(PROBE_KEY, "Layout", "", "", Providers,
+			Map("layout_manager", (*) => 0))
+		AssertEqual(2, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"))
+		AssertEqual(t("menu.layout.emulated_none"), _SRR_LabelAt(Rendered, 0))
+		AssertEqual(t("menu.layout.manage"), _SRR_LabelAt(Rendered, 1))
+		State := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(State != 0xFFFFFFFF && (State & 3) != 0, "the real Win32 status item must be disabled")
+		Manager := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 1, "uint", 0x400, "uint")
+		Assert(Manager != 0xFFFFFFFF && (Manager & 3) == 0, "layout management must remain usable")
+	} finally {
+		Root.Delete(PROBE_KEY)
+	}
+}
+Test("layout menu: the native status is grayed and management remains usable (layout-menu-emulation-status)",
+	_LMH_NativeEmulationStatus)

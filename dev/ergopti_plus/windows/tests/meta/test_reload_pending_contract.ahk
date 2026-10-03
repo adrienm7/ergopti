@@ -189,3 +189,36 @@ Test("reload: the layout poll's reload never forces a veto nor shows a save noti
 _RBL_Count(Haystack, Needle) {
 	return (StrLen(Haystack) - StrLen(StrReplace(Haystack, Needle))) // StrLen(Needle)
 }
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 4/ Workers stop before the successor =======
+; ====================================================
+; ====================================================
+
+; A detached worker that re-runs the driver entry holds the driver's window
+; title while it starts, and a /restart successor closes the newest window with
+; that title: it closed a worker instead of the driver and the reload was
+; refused (reload-worker-identity). The launcher must stop the workers before
+; it starts the successor, and every worker kind must be among them.
+_RBL_WorkersStopBeforeTheSuccessorLaunches() {
+	Launch := _StripFullLineComments(_DriverFuncBody("LifecycleLaunchSuccessor"))
+	Retire := _StripFullLineComments(_DriverFuncBody("LifecycleRetireWorkers"))
+	Assert(Launch != "" && Retire != "",
+		"the successor launcher and its worker retirement must be source-visible")
+	RetirePos := InStr(Launch, "LifecycleRetireWorkers()", true)
+	LaunchPos := InStr(Launch, "ReloadSuccessorLaunch(", true)
+	Assert(RetirePos > 0 && LaunchPos > RetirePos,
+		"the detached workers must be stopped before the successor is launched, "
+		. "or it can close one of them instead of this instance")
+	for Stop in ["KLPF_CancelAll()", 'UIASW_Stop("canceled")']
+		Assert(InStr(Retire, Stop, true) > 0,
+			"the retirement must stop every worker that re-runs the driver entry: "
+			. Stop)
+}
+Test("reload: the workers stop before the successor launches (reload-worker-identity)",
+	_RBL_WorkersStopBeforeTheSuccessorLaunches)

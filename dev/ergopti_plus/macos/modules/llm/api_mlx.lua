@@ -91,8 +91,8 @@ local function load_mlx_server_config()
 		if fh then
 			local raw = fh:read("*a")
 			fh:close()
-			local ok, parsed = pcall(hs.json.decode, raw)
-			if ok and type(parsed) == "table" then
+			local parsed, decode_err = JsonCodec.decode(raw)
+			if decode_err == nil and type(parsed) == "table" then
 				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
 				if parsed.port ~= nil then
 					local configured_port = normalize_mlx_port(parsed.port)

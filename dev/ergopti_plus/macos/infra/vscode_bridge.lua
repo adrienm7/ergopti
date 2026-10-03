@@ -12,6 +12,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
+local JsonCodec = require("adapters.json_codec")
 local i18n   = require("infra.i18n")
 local LOG    = "vscode_bridge"
 
@@ -768,8 +769,8 @@ local _server_cleanup = nil
 --- @return table headers Response headers.
 local function handle_server_request(method, path, _headers, body)
 	if path == "/caret" and method == "POST" then
-		local ok, data = pcall(hs.json.decode, body)
-		if ok and type(data) == "table" then
+		local data, decode_err = JsonCodec.decode(body)
+		if decode_err == nil and type(data) == "table" then
 			data._ts = hs.timer.secondsSinceEpoch()
 			_caret = data
 		end

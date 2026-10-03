@@ -247,8 +247,8 @@ function M.build(ctx, actions)
 
 	-- The updater block above is the manifest's `about_updates` list; the rows
 	-- below it are `command` declarations, set apart by `---` rows: Versions,
-	-- its GitHub page, then Uninstall, which closes the submenu. Until 2026-08-07
-	-- the whole submenu was assembled here and described nowhere, on all three
+	-- its GitHub page, then startup and Uninstall, which closes the submenu.
+	-- Until 2026-08-07 the whole submenu was assembled here and described nowhere, on all three
 	-- drivers at once.
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
@@ -260,6 +260,7 @@ function M.build(ctx, actions)
 		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
 		-- The menu session's uninstall transaction; an unregistered command is
 		-- reported by the renderer and draws no row that would do nothing.
+		["start_at_login"] = type(actions) == "table" and actions.start_at_login or nil,
 		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 	-- A local version run from source has nothing to uninstall: the row stays,
@@ -269,6 +270,9 @@ function M.build(ctx, actions)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not is_local_source() end
+	getters["start_at_login_enabled"] = function()
+		return require("ui.menu.start_at_login").enabled()
+	end
 	render_ctx.state_getters = getters
 
 	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {

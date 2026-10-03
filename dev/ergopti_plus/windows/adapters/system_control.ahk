@@ -361,6 +361,6 @@ class SystemControl {
 	; Asks OK/Cancel with Cancel as the default button.
 	; @returns {String} "OK" or "Cancel".
 	Ask(Text, Title) {
-		return MsgBox(Text, Title, "OKCancel Icon! Default2")
+		return Ui_MsgBox(Text, Title, "OKCancel Icon! Default2")
 	}
 }

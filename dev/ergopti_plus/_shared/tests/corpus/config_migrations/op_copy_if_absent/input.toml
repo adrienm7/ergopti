@@ -1,0 +1,15 @@
+# Independent legacy choices; a copy must retain every source value.
+[source]
+on = true
+off = false
+text = "legacy"
+numeric_text = "001"
+empty = []
+rows = [[1, 2], [3]]
+records = [{ delay = 1.25, visible = false, palette = [{ Key = "upper", key = "lower" }] }]
+
+[destination]
+on = false
+off = true
+text = 42
+unrelated = "keep"

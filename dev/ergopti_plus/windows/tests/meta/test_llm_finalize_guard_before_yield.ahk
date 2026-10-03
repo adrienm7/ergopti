@@ -100,9 +100,9 @@ _LFGY_GuardAlsoPrecedesTheCacheSeed() {
 ; =============================================================
 ; =============================================================
 
-; LLM_Diff_Compute and the display-opts resolution run inside the render, after
-; the caller's guard. The render therefore needs its own final check, and the
-; caller has to hand it the id to check against.
+; The display-opts resolution runs inside the render, after the caller's guard.
+; The render therefore needs its own final check, and the caller has to hand it
+; the id to check against.
 _LFGY_RenderCarriesItsOwnGuard() {
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in the driver source")
@@ -121,7 +121,7 @@ _LFGY_RenderCarriesItsOwnGuard() {
 		Pos := Found + 1
 	}
 	Assert(GuardAt > 0 and GuardAt < ShowAt,
-		"LLM_Engine_OnResults must re-check staleness before it paints. LLM_Diff_Compute runs a RegExMatch per character over every slot and the display-opts resolution queries the focused window, so the caller's check is already stale by the time the paint happens")
+		"LLM_Engine_OnResults must re-check staleness before it paints. The display-opts resolution queries the focused window, so the caller's check is already stale by the time the paint happens")
 	ConditionAt := 0
 	Pos := 1
 	while (Found := InStr(Body, "if (", false, Pos)) {

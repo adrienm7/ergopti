@@ -216,7 +216,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control", "tap_keys"]
+subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -232,20 +232,12 @@ platforms = ["ahk", "hs"]
 description_key = "menu.ui"
 platforms = ["hs"]
 
-[sections.shortcuts.alt_gr_caps_lock]
-description_key = "menu.shortcuts.alt_gr_caps_lock"
-platforms = ["ahk"]
-
-[sections.shortcuts.alt_gr_lalt]
-description_key = "menu.shortcuts.alt_gr_lalt"
+[sections.shortcuts.key_combination_taps]
+description_key = "menu.shortcuts.key_combinations"
 platforms = ["ahk"]
 
 [sections.shortcuts.keyboard]
 description_key = "menu.shortcuts.keyboard"
-platforms = ["ahk"]
-
-[sections.shortcuts.lalt_caps_lock]
-description_key = "menu.shortcuts.lalt_caps_lock"
 platforms = ["ahk"]
 
 [sections.shortcuts.personal]
@@ -339,11 +331,17 @@ input_altering = false
 type = "boolean"
 description_key = "menu.debug.show_error_dialog"
 
+# "auto" reads the AltGr family from the layout; true and false force it when
+# that probe is wrong. It is a parameter, not an activation: it tells the driver
+# which key the layout's AltGr is and changes no input by itself, so an empty
+# configuration keeps "auto". A neutral false here forced the standard family
+# on every configuration that did not name the setting, and nothing built on
+# AltGr worked on a Kana-style layout (the script chords, 2026-10-01).
 [[features.script]]
 id = "alt_gr_is_kana_remap"
-default = false
+default = "auto"
 recommended = "auto"
-input_altering = true
+input_altering = false
 type = "enum"
 enum_values = ["auto", true, false]
 description_key = "menu.script.alt_gr_is_kana_remap"
@@ -1897,296 +1895,51 @@ platforms = ["ahk"]
 
 
 
-# ============================================
-# ===== 3.5.5 shortcuts.alt_gr_caps_lock =====
-# ============================================
+# ================================================
+# ===== 3.5.5 shortcuts.key_combination_taps =====
+# ================================================
 
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "backspace"
+# « Combinaisons de touches » on Windows: what a tap-hold key does on a tap while
+# another one is held. A slot is keyed by its ordered pair of keys of
+# [tap_hold.catalog], « first_then_second », and holds a catalogue action; its
+# sibling section [shortcuts.key_combination_holds] holds what the second key
+# holds instead (a value of [tap_hold.hold_picker]). Every ordered pair has both
+# slots (windows/infra/key_combinations.ahk); only the pairs that ship a
+# recommendation are declared here, the three chords the driver always had:
+# AltGr then LAlt, AltGr then CapsLock, and LAlt then CapsLock. They were three
+# sections of ten mutually exclusive booleans each, one per action, for those
+# three pairs only and in that order only (2026-10-01).
+[[features.shortcuts.key_combination_taps]]
+id = "alt_gr_then_left_alt"
 platforms = ["ahk"]
-default = false
-recommended = false
+default = "none"
+recommended = "ctrl_backspace"
 input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.backspace"
+type = "action"
+description_key = "menu.shortcuts.key_combinations"
 
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "caps_lock"
+[[features.shortcuts.key_combination_taps]]
+id = "alt_gr_then_caps_lock"
 platforms = ["ahk"]
-default = false
-recommended = false
+default = "none"
+recommended = "ctrl_delete"
 input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.caps_lock"
+type = "action"
+description_key = "menu.shortcuts.key_combinations"
 
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "caps_word"
+[[features.shortcuts.key_combination_taps]]
+id = "left_alt_then_caps_lock"
 platforms = ["ahk"]
-default = false
-recommended = false
+default = "none"
+recommended = "caps_word"
 input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.caps_word"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "ctrl_backspace"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.ctrl_backspace"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "ctrl_delete"
-platforms = ["ahk"]
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.ctrl_delete"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "delete"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.delete"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "enter"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.enter"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "escape"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.escape"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "one_shot_shift"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.one_shot_shift"
-
-[[features.shortcuts.alt_gr_caps_lock]]
-id = "tab"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_caps_lock.tab"
-
-
-
-# =======================================
-# ===== 3.5.6 shortcuts.alt_gr_lalt =====
-# =======================================
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "backspace"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.backspace"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "caps_lock"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.caps_lock"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "caps_word"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.caps_word"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "ctrl_backspace"
-platforms = ["ahk"]
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.ctrl_backspace"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "ctrl_delete"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.ctrl_delete"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "delete"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.delete"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "enter"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.enter"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "escape"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.escape"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "one_shot_shift"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.one_shot_shift"
-
-[[features.shortcuts.alt_gr_lalt]]
-id = "tab"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.alt_gr_lalt.tab"
-
-
-
-# ==========================================
-# ===== 3.5.7 shortcuts.lalt_caps_lock =====
-# ==========================================
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "backspace"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.backspace"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "caps_lock"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.caps_lock"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "caps_word"
-platforms = ["ahk"]
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.caps_word"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "ctrl_backspace"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.ctrl_backspace"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "ctrl_delete"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.ctrl_delete"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "delete"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.delete"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "enter"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.enter"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "escape"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.escape"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "one_shot_shift"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.one_shot_shift"
-
-[[features.shortcuts.lalt_caps_lock]]
-id = "tab"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = true
-type = "boolean"
-description_key = "menu.shortcuts.lalt_caps_lock.tab"
+type = "action"
+description_key = "menu.shortcuts.key_combinations"
 
 
 
 # ====================================
-# ===== 3.5.8 shortcuts.personal =====
+# ===== 3.5.6 shortcuts.personal =====
 # ====================================
 
 [[features.shortcuts.personal]]
@@ -2237,7 +1990,7 @@ description_key = "menu.shortcuts.personal.programmable_keyboard"
 
 
 # ==========================================
-# ===== 3.5.9 shortcuts.script_control =====
+# ===== 3.5.7 shortcuts.script_control =====
 # ==========================================
 
 # The script-management chords start with their preset in an empty
@@ -2312,9 +2065,9 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
 
 
-# =====================================
-# ===== 3.5.10 shortcuts.keyboard =====
-# =====================================
+# ====================================
+# ===== 3.5.8 shortcuts.keyboard =====
+# ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
 [[features.shortcuts.keyboard]]
@@ -2495,9 +2248,9 @@ description_key = "menu.shortcuts.keyboard.super_space"
 
 
 
-# ======================================
-# ===== 3.5.11 shortcuts.tap_keys =====
-# ======================================
+# ====================================
+# ===== 3.5.9 shortcuts.tap_keys =====
+# ====================================
 
 # The three keys at the edges of the number row, tapped alone. Each runs the
 # action assigned to it (any catalogue action, through the shared picker) and
@@ -2639,7 +2392,7 @@ description_key = "menu.gestures.tap_3"
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "screenshot_window_clipboard", hs = "win_app_next", linux = "none" }
+recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_4"
@@ -3754,14 +3507,13 @@ type = "boolean"
 description_key = "menu.category_enabled.tap_holds"
 
 # The « Combinaisons de touches » switch under Shortcuts: the only gate of the
-# AltGr / LAlt / CapsLock combination families, which the Shortcuts master no
-# longer reaches (decision of 2026-09-29), each family keeping its own choices.
-# macOS keeps the same switch as [mod_combos] enabled in config_karabiner.toml,
-# beside the rules it gates. Its neutral value is on: the gate can only narrow
-# what each family already enables, so it activates nothing alone. An absent
-# key must leave the families live, and the sparse writer deletes a value
-# equal to the default, so a default of off would both disable upgraded
-# configs and never persist.
+# key combinations, which the Shortcuts master no longer reaches (decision of
+# 2026-09-29), each pair keeping its own slots. macOS keeps the same switch as
+# [mod_combos] enabled in config_karabiner.toml, beside the rules it gates. Its
+# neutral value is on: the gate can only narrow what each pair already binds,
+# so it activates nothing alone. An absent key must leave the pairs live, and
+# the sparse writer deletes a value equal to the default, so a default of off
+# would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
 platforms = ["ahk"]
@@ -3854,8 +3606,8 @@ description_key = "menu.layout.menubar_icon"
 5 = ["tap_5", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"]
 
 [menu.hotstring_groups]
-standard = ["distances_reduction", "autocorrection", "magic_key"]
-ergopti = ["sfbs_reduction", "rolls"]
+standard = ["autocorrection", "magic_key"]
+ergopti = ["distances_reduction", "sfbs_reduction", "rolls"]
 dynamic = ["dynamic_hotstrings"]
 
 [menu.hotstring_category_keys]
@@ -3937,6 +3689,11 @@ id = "---"
 platforms = ["hs"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
+# Versions, Configuration, then Language (the maintainer's order of
+# 2026-10-02): what runs, how it is set up, how it speaks.
+[[menu.top_level]]
+id = "about"
+
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
 [[menu.top_level]]
@@ -3944,9 +3701,6 @@ id = "configuration"
 
 [[menu.top_level]]
 id = "language"
-
-[[menu.top_level]]
-id = "about"
 
 [[menu.top_level]]
 id = "---"
@@ -4137,7 +3891,7 @@ platforms = ["ahk", "hs", "linux"]
 # with the subscribed channel and listing every channel of the shared
 # update-channel registry, right before the check row, the check frequency (a
 # `list`, because its rows come from the registry and the updater state), then
-# Versions and its GitHub page, and last, after a separator, Uninstall. Linux
+# Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
@@ -4161,6 +3915,14 @@ i18n = "menu.about.open_releases_page"
 # bottom of Configuration until 2026-09, where it read as one more setting.
 [[menu.about_menu]]
 type = "---"
+
+# Startup and removal share the installation group; startup stays immediately
+# above Uninstall and reads each driver's native startup owner.
+[[menu.about_menu]]
+type = "check"
+id = "start_at_login"
+i18n = "menu.global.start_at_login"
+checked_when = ["start_at_login_enabled"]
 
 # A local version run from source has nothing to remove: the row stays in place,
 # greyed by `disabled_when`, and says why. A row greyed with a reason is drawn
@@ -4264,6 +4026,16 @@ type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
 
+# Puts back the Precision Touchpad registry values backed up before Ergopti's
+# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
+# With the cleanup above it: both put something back as it was.
+[[menu.configuration_menu]]
+type = "command"
+id = "restore_touchpad_gestures"
+i18n = "menu.global.restore_touchpad_gestures"
+platforms = ["ahk"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
+
 # Set apart by a separator: the rows above rewrite the configuration, the rows
 # below open a window onto it.
 [[menu.configuration_menu]]
@@ -4279,12 +4051,6 @@ i18n = "menu.global.config_folder"
 type = "command"
 id = "setup_wizard"
 i18n = "menu.global.setup_wizard"
-
-[[menu.configuration_menu]]
-type = "check"
-id = "start_at_login"
-i18n = "menu.global.start_at_login"
-checked_when = ["start_at_login_enabled"]
 
 # « Ergopti uses Karabiner » (config_karabiner.toml [karabiner]
 # integration_enabled, default on). Off: no lease worker, no guardian registration, and every ErgoptiPlus
@@ -4305,15 +4071,6 @@ id = "remove_from_karabiner"
 i18n = "menu.global.remove_from_karabiner"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
-
-# Puts back the Precision Touchpad registry values backed up before Ergopti's
-# first gesture configuration (windows/modules/gestures/touchpad_registry.ahk).
-[[menu.configuration_menu]]
-type = "command"
-id = "restore_touchpad_gestures"
-i18n = "menu.global.restore_touchpad_gestures"
-platforms = ["ahk"]
-reason_key = "platform_reason.touchpad_stack_is_per_driver"
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
@@ -4371,12 +4128,6 @@ id = "open_error_log"
 i18n = "menu.debug.open_error_log"
 
 [[menu.debug_menu]]
-type = "check"
-id = "show_error_dialog"
-i18n = "menu.debug.show_error_dialog"
-checked_when = ["error_dialog_enabled"]
-
-[[menu.debug_menu]]
 type = "---"
 id = "---"
 
@@ -4384,6 +4135,14 @@ id = "---"
 type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
+
+# Right under the diagnostics window (the maintainer's request of 2026-10-02):
+# it decides whether an error shows itself, which that window then explains.
+[[menu.debug_menu]]
+type = "check"
+id = "show_error_dialog"
+i18n = "menu.debug.show_error_dialog"
+checked_when = ["error_dialog_enabled"]
 
 [[menu.debug_menu]]
 type = "command"
@@ -4531,10 +4290,14 @@ id = "keyboard_slots"
 # default there and every general catalogue assignment remains opt-in.
 platforms = ["ahk", "hs", "linux"]
 
-# « Combinaisons de touches »: every modifier combination, moved out of the
-# Tap-Hold submenu (macOS) and out of the « Combinaison de modificateurs »
-# group (Windows) into one group with a first-row switch of its own. Its rows
-# are key_combinations_group. Linux's tap-hold engine binds no combination.
+# « Combinaisons de touches »: every combination of two tap-hold keys, in one
+# group with a first-row switch of its own. Its rows are
+# key_combinations_group. Linux's tap-hold engine binds no combination yet.
+# A separator sets it apart from the submenus above, which each create
+# shortcuts under one modifier.
+[[menu.shortcuts_menu]]
+type = "---"
+
 [[menu.shortcuts_menu]]
 type = "group"
 id = "key_combinations"
@@ -4611,6 +4374,20 @@ platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combinations_group]]
 type = "---"
 platforms = ["ahk", "hs"]
 
@@ -4640,38 +4417,79 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.key_combinations_group]]
 type = "---"
 
-# macOS: one row per ordered pair of keys, each with its three slots —
-# « Accord (simultané) → », « Maintenir 1 + taper 2 → » and « Maintenir 1 +
-# maintenir 2 → ».
+# One row per ordered pair of tap-hold keys: the key held first, then the key
+# struck under it, so LAlt then CapsLock is not CapsLock then LAlt. Each pair
+# has its slots: « Maintenir 1 + taper 2 → » and « Maintenir 1 + maintenir
+# 2 → » on both, and on macOS « Accord (simultané) → », which Windows does
+# not have yet (it needs the first key of a chord to wait for the second).
+#
+# Two lists, by the hand of the key held first as [tap_hold.catalog] assigns it
+# (Space is a left-hand key), with the separator between them declared here:
+# a provider that inserted it would build a menu row in a driver's folder.
 [[menu.key_combinations_group]]
 type = "list"
-id = "key_combination_rows"
-platforms = ["hs"]
+id = "key_combination_rows_left"
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
-# Windows: its three AltGr / LAlt / CapsLock combination families. `path` is a
-# feature-manifest SECTION: each row expands to every feature under it, in one
-# submenu labelled by `group_label`, the key names (identical in every locale).
 [[menu.key_combinations_group]]
-type = "feature"
-path = "shortcuts.alt_gr_lalt"
-group_label = "AltGrLAlt"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+type = "---"
+platforms = ["ahk", "hs"]
 
 [[menu.key_combinations_group]]
-type = "feature"
-path = "shortcuts.alt_gr_caps_lock"
-group_label = "AltGrCapsLock"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+type = "list"
+id = "key_combination_rows_right"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
-[[menu.key_combinations_group]]
-type = "feature"
-path = "shortcuts.lalt_caps_lock"
-group_label = "LAltCapsLock"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+# Every category has explicit commands: neither command depends on its current
+# gate or section posture. Native owners commit the selected gate and sections
+# together while leaving the root engine, other categories and remapping alone.
+[[menu.hotstring_category_menu]]
+type = "command"
+id = "hotstring_category_enable_all"
+i18n = "menu.hotstrings.scope_enable_all"
+
+[[menu.hotstring_category_menu]]
+type = "command"
+id = "hotstring_category_disable_all"
+i18n = "menu.hotstrings.scope_disable_all"
+
+[[menu.hotstring_category_menu]]
+type = "list"
+id = "hotstring_category_file"
+
+[[menu.hotstring_category_menu]]
+type = "---"
+
+[[menu.hotstring_category_menu]]
+type = "list"
+id = "hotstring_category_sections"
+
+# The menu one pair of « Combinaisons de touches » opens on Windows, shown at
+# the pointer when its row is clicked: 182 pairs each carrying their slots and
+# a copy of the hold picker as submenus would be thousands of menu rows built
+# at every start. Its clear row and its separator are declared here; the two
+# slots are data (their labels carry the action and the hold in force). macOS
+# uses the same declaration for the submenu attached to each pair; the native
+# providers supply their supported slots and cached action-picker trees.
+[[menu.key_combination_pair_menu]]
+type = "command"
+id = "key_combination_clear"
+i18n = "menu.tapholds.nothing_combo"
+disabled_when = ["key_combination_pair_assigned"]
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.key_combination_pair_menu]]
+type = "---"
+platforms = ["ahk", "hs"]
+
+[[menu.key_combination_pair_menu]]
+type = "list"
+id = "key_combination_slots"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # « Raccourcis de gestion du script », the maintainer's first group of every
 # submenu (2026-09-30): the switch of the chords, the restore of their preset,
@@ -4782,35 +4600,31 @@ reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 # draws the same pill on the GTK surface the preview bubble already uses, and
 # reads its geometry and colours from _shared/modules/wpm_widget/constants.toml
 # rather than mirroring them the way the other two do.
-# `dynamic` ON PURPOSE, and this note exists because the obvious change is
-# wrong. These two are checkboxes, so `check` looks like the right type — the
-# menubar pair above became exactly that on 2026-08-07. It does not port here.
-#
-# The Windows handlers mutate the LIVE menu when clicked (Menu.ToggleCheck,
-# Enable/Disable on the two dependent rows) instead of rebuilding the tray, which
-# is what keeps a click on this row from costing a full tray rebuild. A `check`
-# row is drawn by the renderer, so its tick would not move until the next
-# rebuild: either the feedback regresses, or every click pays for a rebuild.
-#
-# The row stays `dynamic` on all three rather than splitting into two
-# declarations, which is the duplication this file spent the day removing.
+# Every widget control is a declared checkbox. After a committed click each
+# driver requests its normal menu rebuild; native widget effects stay in its
+# command handler. Stored checks remain visible while disabled, like the
+# menubar controls above, so disabling the widget never hides a retained choice.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "wpm_widget"
+i18n = "menu.metrics.show_wpm_widget"
+checked_when = ["wpm_widget_visible"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "widget_colors"
+i18n = "menu.metrics.colors_by_source"
+checked_when = ["metrics_widget_colors"]
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "include_realtime"
+i18n = "menu.metrics.include_realtime"
+checked_when = ["metrics_widget_graph"]
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-# `command` since 2026-08-07: a button with a label, a greying rule and a click.
-# Its two neighbours stay `dynamic` for the reason written above wpm_widget —
-# they mutate the live menu — but this one sets nothing on it.
+# A button with a label, a greying rule and a click, also drawn by the renderer.
 [[menu.metrics_menu]]
 type = "command"
 id = "reset_wpm_position"
@@ -4965,10 +4779,9 @@ type = "---"
 type = "section_header"
 i18n = "menu.layout.header_custom"
 
-# The custom layout picker, on every driver: the registry layouts the layout
-# manager installed (and, on Windows, the built-in Ergopti emulation), the one
-# typing uses checked; choosing another makes it the active layout (macOS and
-# Linux select the input source, Windows emulates it after a reload).
+# macOS and Linux list installed native input sources and select one through
+# the OS. Windows reports its enabled emulation as a disabled status row;
+# selection belongs to the shared layout manager immediately below it.
 [[menu.layout_menu]]
 type = "list"
 id = "custom_layouts"
@@ -5901,10 +5714,20 @@ restore_exclude = []
 clear_exclude = ["tap_holds.enabled", "category_enabled.tap_holds"]
 
 [scopes.shortcuts]
+includes = ["key_combinations"]
 action_parameters = { domains = ["keyboard", "script", "tap_key"], restore = "remove" }
 prefixes = ["shortcuts", "mod_combos", "category_enabled.shortcuts", "category_enabled.key_combinations"]
 restore_exclude = []
 dynamic_defaults = [{ prefix = "shortcuts.personal", depth = 1, default = false, recommended = false }, { prefix = "shortcuts.keyboard", depth = 1, default = "none", recommended = "none" }]
+
+# Combination assignments have their own menu owner. Clearing keeps its
+# switch; restoring imports the recommendation without changing other shortcuts.
+[scopes.key_combinations]
+action_parameters = { domains = ["combination"], restore = "remove" }
+prefixes = ["shortcuts.key_combination_taps", "shortcuts.key_combination_holds", "mod_combos", "category_enabled.key_combinations"]
+restore_exclude = []
+clear_exclude = ["mod_combos.enabled", "category_enabled.key_combinations"]
+dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }]
 
 # The Gestures clear removes the assignments and keeps the switch, like the
 # Tap-Holds one: the user assigns the next gesture from there.
@@ -5970,8 +5793,8 @@ restore_exclude = []
 #   consent      The answer is a privacy consent: never pre-selected.
 #   magic_key    The hotstrings page's trigger choice, asked on `platforms` only.
 #   sub_switch   Per-platform switch of part of the checklist that the category
-#                switch does not reach: `path` names it and `menu_group` the
-#                menu group whose `feature` rows are the sections it governs.
+#                switch does not reach: `path` names it and `sections` the
+#                feature sections it governs.
 #                The answer writes it only where it changes what is in force:
 #                off when it turns the category switch from Yes to No, on when
 #                it imports one of those items that was off.
@@ -6007,10 +5830,10 @@ checklist = "recommended"
 exclude = ["shortcuts.personal"]
 # The key combinations follow only their own switch (decision of 2026-09-29),
 # which the Shortcuts master no longer reaches, while this page still lists the
-# Windows AltGr / LAlt / CapsLock families: a re-run answered No must leave
+# Windows pairs that ship a recommendation: a re-run answered No must leave
 # them off as the master once did. macOS lists no combination here and Linux
 # has no combination engine.
-sub_switch = { ahk = { path = "category_enabled.key_combinations", menu_group = "key_combinations_group" } }
+sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"

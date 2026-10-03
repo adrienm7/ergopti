@@ -53,7 +53,10 @@ local function build(checks, local_source, state)
 	package.loaded["ui.menu.menu_about"] = nil
 	local ok, rows = pcall(function()
 		local About = helpers.load_with_stubs("ui.menu.menu_about")
-		return About.build({ channel_owner = fake_owner("dev"), update_checks = checks, state = state or {} }).submenu
+		return About.build({ channel_owner = fake_owner("dev"), update_checks = checks, state = state or {} }, {
+			start_at_login = function() error("Building About must not change startup.") end,
+			uninstall = function() error("Building About must not uninstall the application.") end,
+		}).submenu
 	end)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil

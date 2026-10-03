@@ -738,35 +738,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local sub = {}
 
-		-- The gate first, because everything under it is inert while it is off. A
-		-- checkbox with one label: it alternated « ✅ Activée (cliquer pour
-		-- désactiver) » and « ❌ Désactivée (cliquer pour activer) ».
-		sub[#sub + 1] = {
-			label   = i18n_safe("menu.hotstrings.category_enable"),
-			checked = on and true or false,
-			action  = function()
-				if config.toggle_group then config.toggle_group(id) end
-			end,
-		}
-
-		if category and category.path then
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.open_file"),
-				action    = function()
-					if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
-				end,
-			}
-		end
-
 		local sections = category and category.sections_order or {}
 		if #sections > 0 then
-			sub[#sub + 1] = { separator = true }
-			-- One checkbox for every section, the key all three drivers use. Not
-			-- greyed while the category is off: enabling lifts the gate, so this is
-			-- one click from a switched-off category to a fully-on one, and the tick
-			-- counts the gate so that click is the enabling one.
-			sub[#sub + 1] = all_sections_row({ id })
-			sub[#sub + 1] = { separator = true }
 
 			for _, name in ipairs(sections) do
 				local section = (category.sections or {})[name]
@@ -798,6 +771,35 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 
+		local function commit_scope(enabled)
+			local called, committed = pcall(function()
+				return config.set_category_scope_enabled({ id }, enabled)
+			end)
+			if called and committed == true then return true end
+			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
+				called and "owner-not-committed" or "owner-error")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		local render_ctx = { commands = {
+			["hotstring_category_enable_all"] = function()
+				return commit_scope(true)
+			end,
+			["hotstring_category_disable_all"] = function()
+				return commit_scope(false)
+			end,
+		} }
+		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+			render_ctx, {
+				["hotstring_category_file"] = function()
+					if not category or not category.path then return {} end
+					return { { label = i18n_safe("menu.hotstrings.open_file"), action = function()
+						if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
+					end } }
+				end,
+				["hotstring_category_sections"] = function() return sub end,
+			})
+
 		return {
 			-- The ACTIVE count, not the file's total. A user reads this figure as
 			-- "what is firing right now" and checks a disable by watching it fall;
@@ -805,7 +807,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- every entry it would have had.
 			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
 			checked = on and true or false,
-			items    = sub,
+			submenu = rendered,
 		}
 	end
 
@@ -1287,14 +1289,6 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local sub = {
 				{
-					label   = i18n_safe("menu.hotstrings.category_enable"),
-					checked = on and true or false,
-					action  = function()
-						if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				},
-				{
 					label = i18n_safe("menu.shortcuts.edit_personal_info"),
 					action = function()
 						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
@@ -1313,28 +1307,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
 			if #families > 0 then
-				-- The one « all » checkbox the other drivers put at the top of this
-				-- submenu, where a « tout activer » / « tout désactiver » pair used to
-				-- be. It acts on the families only; the category gate above is
-				-- separate, and switching every family off leaving the category on is
-				-- the point — it is what lets the user switch families back on one at
-				-- a time.
-				local all_families_on = true
-				for _, family in ipairs(families) do
-					if family.section and not family.enabled then all_families_on = false end
-				end
-				sub[#sub + 1] = { separator = true }
-				sub[#sub + 1] = {
-					label    = i18n_safe("menu.hotstrings.enable_all_sections"),
-					checked  = all_families_on,
-					disabled = not on,
-					action   = function()
-						for _, family in ipairs(families) do
-							if family.section then dyn.set_rule_enabled(family.section, not all_families_on) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
 				sub[#sub + 1] = { separator = true }
 
 				for _, family in ipairs(families) do
@@ -1375,6 +1347,25 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
+			local function commit_scope(enabled)
+				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
+				if not called or committed ~= true then
+					Logger.error(LOG, "Dynamic hotstring scope refused (%s).", called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+			local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+				{ commands = {
+					hotstring_category_enable_all = function() return commit_scope(true) end,
+					hotstring_category_disable_all = function() return commit_scope(false) end,
+				} }, {
+					hotstring_category_file = function() return {} end,
+					hotstring_category_sections = function() return sub end,
+				})
+
 			rows[#rows + 1] = {
 				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
 				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
@@ -1382,7 +1373,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- rendered as the raw string.
 				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
 				checked = on,
-				items    = sub,
+				submenu = rendered,
 			}
 			return rows
 		end,
@@ -2409,6 +2400,16 @@ local function _manifest_metrics_rows(ctx, k)
 		end
 	end
 
+	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
+	--- missing still builds its menu — the row then reports the widget as off,
+	--- which is what it is.
+	--- @return table|nil
+	local function wpm_widget()
+		local ok, widget = pcall(require, "ui.wpm.widget")
+		return ok and widget or nil
+	end
+
+
 	-- The canonical state keys the manifest's disabled_when / checked_when arrays
 	-- name. A key declared there with no getter here is an ERROR in the renderer,
 	-- not a silent always-enabled row — which is the whole point of resolving them
@@ -2427,8 +2428,16 @@ local function _manifest_metrics_rows(ctx, k)
 			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
 		end,
 		wpm_widget_visible     = function()
-			local ok, widget = pcall(require, "ui.wpm.widget")
-			return ok and widget.is_running() or false
+			local widget = wpm_widget()
+			return widget ~= nil and widget.is_running()
+		end,
+		metrics_widget_colors  = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_source_colors()
+		end,
+		metrics_widget_graph   = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_graph()
 		end,
 		-- The tray readout: the Linux counterpart of the macOS menu bar one.
 		metrics_menubar_wpm    = function()
@@ -2444,20 +2453,6 @@ local function _manifest_metrics_rows(ctx, k)
 			return ok and readout.is_running() or false
 		end,
 	}
-
-	--- One manifest row, with its disabled state resolved from the manifest.
-	--- @param id string Manifest item id.
-	--- @param label string Translated label.
-	--- @param checked boolean Whether to draw the checkmark.
-	--- @param on_click function
-	--- @return table
-	local function row(id, label, checked, on_click)
-		return {
-			title    = label .. (checked and " ✓" or ""),
-			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", id, getters) or nil,
-			fn       = on_click,
-		}
-	end
 
 	--- Opens one of the two metrics windows through the webview manager.
 	--- @param app string Window id, e.g. "metrics_typing".
@@ -2486,56 +2481,46 @@ local function _manifest_metrics_rows(ctx, k)
 		end
 	end
 
-	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
-	--- missing still builds its menu — the row then reports the widget as off,
-	--- which is what it is.
-	--- @return table|nil
-	local function wpm_widget()
-		local ok, widget = pcall(require, "ui.wpm.widget")
-		return ok and widget or nil
+
+	local function cmd_wpm_widget()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
+			return false
+		end
+		local changed
+		if widget.is_running() then
+			changed = widget.stop()
+		else
+			changed = widget.start()
+		end
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
 	end
 
-	local handlers = {
-		wpm_widget = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("wpm_widget", i18n_safe("menu.metrics.show_wpm_widget"),
-				widget ~= nil and widget.is_running(),
-				function()
-					if not widget then
-						Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
-						return
-					end
-					local changed = widget.is_running() and widget.stop() or widget.start()
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		widget_colors = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("widget_colors", i18n_safe("menu.metrics.colors_by_source"),
-				widget ~= nil and widget.uses_source_colors(),
-				function()
-					if not widget then return end
-					local changed = widget.set_use_source_colors(not widget.uses_source_colors())
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		-- The real-time graph in place of the pill, as on macOS.
-		include_realtime = function(items)
-			local widget = wpm_widget()
-			items[#items + 1] = row("include_realtime", i18n_safe("menu.metrics.include_realtime"),
-				widget ~= nil and widget.uses_graph(),
-				function()
-					if not widget then return end
-					local changed = widget.set_graph(not widget.uses_graph())
-					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end)
-		end,
-		-- The three privacy filters are gone from this table on purpose: their
-		-- manifest rows are `type = "check"` now, so the SHARED renderer builds
-		-- them from the declaration and this driver supplies only the behaviour,
-		-- through `ctx.commands` below. Three fewer rows built here, and the tick
-		-- is the tray's own check item instead of a " ✓" glued to the title.
-	}
+	local function cmd_widget_colors()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — colors cannot change.")
+			return false
+		end
+		local changed = widget.set_use_source_colors(not widget.uses_source_colors())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local function cmd_include_realtime()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — graph cannot change.")
+			return false
+		end
+		local changed = widget.set_graph(not widget.uses_graph())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local handlers = {}
 
 	-- The declarative rows read their state and their behaviour off the context:
 	-- `state_getters` answers the manifest's checked_when / disabled_when keys,
@@ -2558,6 +2543,9 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
+		["wpm_widget"] = cmd_wpm_widget,
+		["widget_colors"] = cmd_widget_colors,
+		["include_realtime"] = cmd_include_realtime,
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
 		["scope_restore"] = restore_metrics_scope,
@@ -3574,12 +3562,6 @@ local function _build_configuration(ctx)
 		-- off, and that neutral state for the clear.
 		["scope_restore"] = function() return apply_global_scope("recommended") end,
 		["scope_clear"] = function() return apply_global_scope("clear") end,
-		["start_at_login"] = function()
-			if not require("ui.menu.start_at_login").toggle() then
-				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
-			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
 		["clean_unused_keys"] = function()
@@ -3608,9 +3590,6 @@ local function _build_configuration(ctx)
 
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters.start_at_login_enabled = function()
-		return require("ui.menu.start_at_login").enabled() == true
-	end
 	return {
 		label   = i18n_safe("menu.configuration.title"),
 		submenu = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx),
@@ -3867,12 +3846,18 @@ local function _uninstall_command(ctx)
 end
 
 --- Builds the about item: the updater block, Versions and its GitHub page, then
---- Uninstall after a separator. Uninstall sat at the bottom of Configuration
---- until 2026-09, where it read as one more setting.
+--- startup and Uninstall after a separator. Uninstall sat at the bottom of
+--- Configuration until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
+		["start_at_login"] = function()
+			if not require("ui.menu.start_at_login").toggle() then
+				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 		["uninstall"] = _uninstall_command(ctx),
 		-- Opens the release notes. It used to log one line to a file the user
 		-- never sees and call that an About box — while ui/changelog/ was written,
@@ -3903,6 +3888,9 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	getters["start_at_login_enabled"] = function()
+		return require("ui.menu.start_at_login").enabled() == true
+	end
 	render_ctx.state_getters = getters
 
 	local rows = ManifestMenu
