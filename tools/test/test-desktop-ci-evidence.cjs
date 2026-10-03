@@ -474,6 +474,71 @@ function checkFreshSourceBoot(body) {
 }
 const sourceBoot = pipeline.job('test-ahk');
 checkFreshSourceBoot(sourceBoot);
+
+/** Requires bounded refusal facts without changing source admission authority. */
+function checkSourceOwnerEvidence(source) {
+	const body = source.match(/^function Get-SourceOwnerEvidence \{([\s\S]*?)^\}/m)?.[1];
+	assert.ok(body, 'the actual native source-owner evidence producer must exist');
+	const record = body.match(/return \[ordered\]@\{([\s\S]*?)\n {4}\}/)?.[1];
+	assert.ok(record, 'the native evidence must have one closed record');
+	assert.deepEqual(
+		[...record.matchAll(/^ {8}([a-z_]+) =/gm)].map((match) => match[1]),
+		[
+			'schema_version',
+			'native_present',
+			'image_present',
+			'image_exact',
+			'command_present',
+			'script_argument_exact'
+		],
+		'no process command, pathname or unrelated identity belongs in refusal evidence'
+	);
+	for (const predicate of [
+		'schema_version = 1',
+		'native_present = [bool]$nativePresent',
+		'image_present = [bool]$imagePresent',
+		'image_exact = [bool]($imagePresent -and $Native.ExecutablePath -ieq $Interpreter)',
+		'command_present = [bool]$commandPresent',
+		'script_argument_exact = [bool]($commandPresent -and\n' +
+			'            [SourceBootProcess]::HasExactEntry($Native.CommandLine, $Entry))'
+	])
+		assert.ok(record.includes(predicate), 'the actual predicate must produce ' + predicate);
+	assert.doesNotMatch(body, /OpenProcess|TerminateProcess|Get-AdmittedSourceHandle/);
+	const refusal = source.match(
+		/if \(\$null -eq \$native -or \$native\.ExecutablePath -ine \$Ahk -or\n {8}!\[SourceBootProcess\]::HasExactEntry\(\$native\.CommandLine, \$Entry\)\) \{([\s\S]*?)\n {4}\}/
+	)?.[1];
+	assert.ok(refusal, 'exact CIM image and first-script-argument admission must remain unchanged');
+	assert.match(
+		refusal,
+		/Get-SourceOwnerEvidence -Native \$native -Interpreter \$Ahk -Entry \$Entry/
+	);
+	assert.match(refusal, /throw \('[^']*source-owner-evidence=' \+/);
+	assert.match(refusal, /\$ownerEvidence \| ConvertTo-Json -Compress/);
+}
+const sourceObserver = fs.readFileSync(
+	path.join(__dirname, 'fixtures/observe_ahk_source_boot.ps1'),
+	'utf8'
+);
+checkSourceOwnerEvidence(sourceObserver);
+for (const [from, to] of [
+	['function Get-SourceOwnerEvidence {', 'function MissingEvidenceProducer {'],
+	['native_present = [bool]$nativePresent', 'raw_command = $Native.CommandLine'],
+	[
+		'image_exact = [bool]($imagePresent -and $Native.ExecutablePath -ieq $Interpreter)',
+		'image_exact = [bool]$nativePresent'
+	],
+	[
+		'[SourceBootProcess]::HasExactEntry($Native.CommandLine, $Entry))',
+		'[SourceBootProcess]::HasExactEntry($Native.CommandLine, $Interpreter))'
+	],
+	['($ownerEvidence | ConvertTo-Json -Compress)', '($native | ConvertTo-Json -Compress)']
+]) {
+	assert.ok(
+		sourceObserver.includes(from),
+		'the source-owner mutation must modify an actual producer'
+	);
+	assert.throws(() => checkSourceOwnerEvidence(sourceObserver.replaceAll(from, to)), from);
+}
 for (const [from, to] of [
 	['node tools/test/test-ahk-fresh-clone-startup.cjs', 'echo skipped source boot'],
 	['$env:ERGOPTI_AHK_EXE = $ahk', '$env:UNUSED_AHK_EXE = $ahk'],
