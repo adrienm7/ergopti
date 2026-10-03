@@ -6,20 +6,11 @@
 --- A zenity Cancel treated as an empty answer on LuaJIT.
 ---
 --- ROOT CAUSE ENCODED:
---- Production runs LuaJIT (Lua 5.1 semantics): io.popen's close() and
---- os.execute() return a NUMBER, 0 for success. A bare `if not status` is
---- therefore never true on LuaJIT — not even for a failure — so in
---- ui/menu/menu_builder.lua prompt_text() read Cancel (exit 1) as success and
---- returned "" instead of nil. Every caller treats "" as a value: cancelling
---- the tap-hold prompt CLEARED the key's tap action, cancelling a delay or
---- magic-key prompt wrote a value the user never entered, and show_error()'s
---- zenity-absent fallback never fired.
----
---- Fixed by routing every zenity exit status through one succeeded() helper
---- accepting `true` (Lua 5.2+) and 0 (LuaJIT). This test drives the real
---- tap-hold delay row with a stubbed zenity: Cancel (close -> 1, the LuaJIT
---- numeric spelling) must leave the writer untouched, while a confirmed
---- answer is written.
+--- A native Cancel must remain nil rather than an accepted empty string. Real
+--- LuaJIT pipe close acknowledgements can be true despite a non-zero child exit;
+--- ui/text_prompt.lua delegates that distinction to the checked shell owner.
+--- This integration test retains the real rendered tap-hold delay callback:
+--- cancellation never writes, while a confirmed 300 ms answer writes 0.3 s.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -42,16 +33,23 @@ local function install_fake_writer()
 	return previous
 end
 
---- Runs fn with io.popen stubbed as a zenity dialog whose output is
---- `read_body` and whose exit status is `close_status` (a NUMBER, the LuaJIT
---- spelling: 0 for OK, 1 for Cancel). Restores io.popen even on failure.
+--- Runs fn with native dialog boundaries recording stdout and child exit status.
+--- The public text prompt uses the checked shell authority; other dialog callers
+--- keep their pipe seam. Both authorities are restored even on failure.
 --- @param read_body string Dialog stdout.
 --- @param close_status number Exit status number.
 --- @param fn function Body to run inside the sandbox.
 --- @return table Commands handed to io.popen.
 local function with_zenity(read_body, close_status, fn)
 	local real_popen = io.popen
+	local shell = require("adapters.shell_runner")
+	local real_checked = shell.exec_checked
 	local commands = {}
+	shell.exec_checked = function(command)
+		if not command:find("zenity --entry", 1, true) then return real_checked(command) end
+		commands[#commands + 1] = command
+		return close_status == 0, read_body, close_status == 0 and nil or "command exited with status " .. close_status
+	end
 	io.popen = function(cmd)
 		commands[#commands + 1] = tostring(cmd)
 		return {
@@ -64,6 +62,7 @@ local function with_zenity(read_body, close_status, fn)
 	end
 	local ok, err = pcall(fn)
 	io.popen = real_popen
+	shell.exec_checked = real_checked
 	if not ok then error(err, 0) end
 	return commands
 end
@@ -137,12 +136,15 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local previous = install_fake_writer()
 		local th = manager()
 		local ok, err = pcall(function()
+			-- The builder captures TextPrompt at load time. Earlier adapter tests
+			-- reload Shell, so bind this public owner to the current authority.
+			helpers.load_module("ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.menu_builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil,
 				"a delay row shelling out to zenity --entry must exist — "
 					.. "without it this test proves nothing")
-			-- Cancel on LuaJIT: close() returns the NUMBER 1, never false.
+			-- The checked authority reports the real native exit-one cancellation.
 			writer_calls = {}
 			with_zenity("", 1, function() pcall(delay) end)
 			helpers.assert_eq(#writer_calls, 0,
@@ -157,6 +159,9 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local previous = install_fake_writer()
 		local th = manager()
 		local ok, err = pcall(function()
+			-- The builder captures TextPrompt at load time. Earlier adapter tests
+			-- reload Shell, so bind this public owner to the current authority.
+			helpers.load_module("ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.menu_builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil, "a delay row must exist")

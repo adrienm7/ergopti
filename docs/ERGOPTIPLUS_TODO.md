@@ -1114,6 +1114,13 @@ Native CI run 37087943283 exposed six Windows contextual fixture failures. The r
   class under #Warn All. It now uses InputControlHwnd; warnings and exact
   receipt assertions remain enabled. Production dialog code is unchanged;
   the corrected probe awaits native Windows CI.
+  Linux native text prompts now obtain the actual child exit status from the
+  existing checked shell owner. Real LuaJIT child regressions distinguish
+  exit-one cancellation and exit-seven failure from successful empty/text
+  answers; the existing rendered tap-hold callback still asserts zero writes
+  on Cancel and exactly one 0.3-second write on confirmation. This prerequisite
+  preserves modal keyboard ownership and leaves native caption integration
+  pending.
   Remaining native caption paths include file pickers, notifications and
   genuine Linux dialog title APIs.
   Non-release checkpoint 36949562328 at `5b4d9e8a3` passes the complete
