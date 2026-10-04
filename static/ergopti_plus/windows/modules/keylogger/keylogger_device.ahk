@@ -65,67 +65,63 @@ KL_MetricsDirFor(ConfigDir) {
 		return ConfigDir . "metrics"
 }
 
-KL_ResolveDevice(metrics_dir) {
+/**
+ * Recovers one proven local identity after checking the complete device history.
+ * @param {String} metrics_dir Metrics root whose device children are scanned.
+ * @param HostSignatureFn Optional host-signature callable for isolated fixtures.
+ * @param CreateGuidFn Optional native GUID buffer producer for isolated fixtures.
+ * @returns {Map} The complete decoded identity, or a newly generated identity.
+ * @throws {Error} An uncertain candidate or ambiguous local history refuses boot.
+ */
+KL_ResolveDevice(metrics_dir, HostSignatureFn := unset, CreateGuidFn := unset) {
 		md := metrics_dir
 		if !RegExMatch(md, "[\\/]$")
 				md .= "\"
 		by_root := md . "by_device\"
-		KL_MkdirP(by_root)
+		FSEnsureDirectoryStrict(by_root)
+		current_host := IsSet(HostSignatureFn) ? HostSignatureFn.Call() : KL_HostSignature()
+		if !(current_host is String) or current_host == ""
+				throw Error("Device recovery requires a non-empty host signature.", -1, by_root)
 
-		current_host := KL_HostSignature()
-
-		; Scan existing device folders, reuse the one whose host_signature
-		; matches this machine.
-		;
-		; We use a regex over the raw bytes rather than a full JSON parse —
-		; AHK v2 64-bit has no built-in JSON decoder and the COM
-		; ScriptControl bridge we used initially is x86-only, which made
-		; this scan silently fail on 64-bit hosts and mint a new device
-		; folder on every reload. The shape of device.json is fixed (we
-		; write it ourselves), so a targeted regex is both faster and
-		; impervious to the bitness mismatch.
-		if DirExist(by_root) {
-				Loop Files, by_root . "*", "D" {
-						djpath := A_LoopFileFullPath . "\device.json"
-						if FileExist(djpath) {
-								try {
-										raw := FileRead(djpath, "UTF-8")
-										if RegExMatch(raw, '"host_signature"\s*:\s*"([^"]+)"', &m) {
-												if (m[1] = current_host) {
-														; Reconstruct the minimal Map we need from
-														; the same raw blob — same regex trick.
-														obj := Map(
-																"device_id",      "",
-																"name",           "",
-																"os",             "windows",
-																"os_version",     "",
-																"host_signature", current_host,
-																"created_at",     "",
-																"schema_version", KeylogConst.SCHEMA_VERSION
-														)
-														for _, field in ["device_id", "name", "os", "os_version", "created_at"] {
-																if RegExMatch(raw, '"' . field . '"\s*:\s*"([^"]+)"', &mm)
-																		obj[field] := mm[1]
-														}
-														return obj
-												}
-										}
-								}
-						}
-				}
+		; An incomplete child may still own a journal. Never mint a replacement
+		; from uncertain history, and never let directory order hide corruption.
+		matching := 0
+		for DeviceDir in FSListDirectoryStrict(by_root, true) {
+				djpath := DeviceDir . "\device.json"
+				SplitPath(DeviceDir, &DeviceFolder)
+				try raw := FileRead(djpath, "UTF-8")
+				catch as Failure
+						throw Error("Cannot read device identity: " . Failure.Message, -1, djpath)
+				try obj := JsonParse(raw)
+				catch as Failure
+						throw Error("Cannot decode device identity: " . Failure.Message, -1, djpath)
+				if !(obj is Map) or !obj.Has("host_signature")
+						or !(obj["host_signature"] is String) or obj["host_signature"] == ""
+						throw Error("Device identity requires a non-empty top-level host signature.", -1, djpath)
+				; Foreign hosts do not grant authority over their unrelated metadata.
+				if obj["host_signature"] != current_host
+						continue
+				if !obj.Has("device_id") or !(obj["device_id"] is String)
+						or !RegExMatch(obj["device_id"], "i)\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z")
+						throw Error("Local device identity requires a safe GUID.", -1, djpath)
+				if obj["device_id"] != DeviceFolder
+						throw Error("Local device identity does not match its directory.", -1, djpath)
+				if IsObject(matching)
+						throw Error("Multiple device identities match this host.", -1, djpath)
+				matching := obj
 		}
+		if IsObject(matching)
+				return matching
 
-		; Fresh install or clone-from-other-device → mint a new identity.
-		obj := Map(
-				"device_id",      KL_UuidV4(),
-				"name",           A_ComputerName,
-				"os",             "windows",
-				"os_version",     A_OSVersion,
+		return Map(
+				"device_id", KL_UuidV4(CreateGuidFn?),
+				"name", A_ComputerName,
+				"os", "windows",
+				"os_version", A_OSVersion,
 				"host_signature", current_host,
-				"created_at",     KL_NowTimestamp(),
+				"created_at", KL_NowTimestamp(),
 				"schema_version", KeylogConst.SCHEMA_VERSION
 		)
-		return obj
 }
 
 KL_WriteDeviceJson(obj) {
