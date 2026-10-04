@@ -65,10 +65,11 @@ global _HTTP_CURL_ABORT_TIMER := 0
 ; worked in the browser. Mirrors release_sources.proxy_resolve_timeout_sec in
 ; _shared/modules/updater/defaults.json (pinned by the JS drift gate).
 global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS := 10000
-; PAC answers resolved this session, keyed by lower-case host ("" = direct).
+; PAC answers resolved this session, keyed by exact destination URL ("" = direct).
 global _SYSTEM_PROXY_PAC_CACHE := Map()
 ; Every waiter of the in-flight PAC resolution (0 = none running).
 global _SYSTEM_PROXY_PAC_PENDING := 0
+global _SYSTEM_PROXY_PAC_CONFIG := ""
 
 
 
@@ -254,6 +255,7 @@ class CurlAsyncRequest {
 		this.Url := ""
 		this.Headers := Map()
 		this.Proxy := ""
+		this.ProxySelected := false
 		; "" = the body arrives on stdout as ResponseText (see SetOutputFile).
 		this.OutputPath := ""
 		this.ConnectTimeoutMs := 5000
@@ -296,6 +298,7 @@ class CurlAsyncRequest {
 		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy))
 			throw ValueError("HTTP proxy must be an http, https or socks URL.")
 		this.Proxy := Proxy
+		this.ProxySelected := true
 	}
 
 	; Makes curl write the response body to Path, byte for byte, instead of
@@ -345,8 +348,9 @@ class CurlAsyncRequest {
 		; corporate TLS-inspection CA often publishes none reachable from the
 		; client, so check revocation best-effort, as browsers do.
 		Config .= "ssl-revoke-best-effort`n"
-		if (this.Proxy != "") {
+		if this.ProxySelected
 			Config .= "proxy = " . _HTTP_CurlConfigQuote(this.Proxy) . "`n"
+		if (this.Proxy != "") {
 			Config .= "proxy-anyauth`n"
 			Config .= "proxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
 		}
@@ -586,9 +590,9 @@ SystemProxy_ReadIEConfig() {
 
 ; Returns the scheme and lower-case host of an absolute http(s) URL.
 _SystemProxy_UrlParts(Url) {
-	if !(Url is String) || !RegExMatch(Url, "i)^(https?)://([A-Za-z0-9.-]+)(?::\d+)?(?:[/?#]|$)", &M)
-		throw ValueError("System proxy selection requires an absolute http(s) URL.", -1, Url)
-	return Map("scheme", StrLower(M[1]), "host", StrLower(M[2]))
+	if !(Url is String) || !RegExMatch(Url, "i)^(https?)://(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(?::\d+)?(?:[/?#]|$)", &M)
+		throw ValueError("System proxy selection requires an absolute http(s) URL.")
+	return Map("scheme", StrLower(M[1]), "host", StrLower(Trim(M[2], "[]")))
 }
 
 ; Adds the scheme WinINet omits ("host:port" means an HTTP proxy) and
@@ -654,19 +658,36 @@ SystemProxy_IsBypassed(Bypass, Host) {
 
 ; Static selection for one URL. "pac" reports that a PAC script governs the
 ; URL; its answer then overrides the static proxy once resolved.
-SystemProxy_SelectStatic(Config, Url) {
+SystemProxy_SelectStatic(Config, Url, IncludeAutoDetect := false) {
 	Parts := _SystemProxy_UrlParts(Url)
 	Proxy := ""
-	if (Config["proxy"] != "" && !SystemProxy_IsBypassed(Config["bypass"], Parts["host"]))
+	if (Config["proxy"] != "" && !SystemProxy_IsBypassed(Config["bypass"], Parts["host"])) {
 		Proxy := SystemProxy_ParseProxyList(Config["proxy"], Parts["scheme"])
-	return Map("proxy", Proxy, "pac", Config["pac_url"] != "")
+		if IncludeAutoDetect && Proxy == ""
+			throw ValueError("The system proxy configuration cannot be used by curl.")
+	}
+	return Map("proxy", Proxy, "pac", Config["pac_url"] != "" || (IncludeAutoDetect && Config.Get("auto_detect", false)))
+}
+
+; A relay, bypass or PAC change must invalidate earlier native selections.
+_SystemProxy_RefreshCache(Config) {
+	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_CONFIG
+	Identity := Config.Get("auto_detect", false) . "`n" . Config["pac_url"]
+		. "`n" . Config["proxy"] . "`n" . Config["bypass"]
+	if Identity != _SYSTEM_PROXY_PAC_CONFIG {
+		_SYSTEM_PROXY_PAC_CONFIG := Identity
+		_SYSTEM_PROXY_PAC_CACHE := Map()
+	}
+	return Identity
 }
 
 ; Reads the settings, logging and degrading to a direct connection when the
 ; OS refuses them.
-_SystemProxy_Config(ReaderFn := 0) {
+_SystemProxy_Config(ReaderFn := 0, Strict := false) {
 	try return IsObject(ReaderFn) ? ReaderFn.Call() : SystemProxy_ReadIEConfig()
 	catch as Err {
+		if Strict
+			throw Err
 		try LoggerWarn("HttpClient", "Windows proxy settings unreadable ({1}); connecting directly.", Err.Message)
 		return Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", "")
 	}
@@ -680,97 +701,155 @@ SystemProxy_ForUrl(Url, ReaderFn := 0, SpawnFn := 0) {
 	; WinINet proxies only govern http(s); any other scheme connects as given.
 	if !(Url is String) || !RegExMatch(Url, "i)^https?://")
 		return ""
-	Selection := SystemProxy_SelectStatic(_SystemProxy_Config(ReaderFn), Url)
-	Host := _SystemProxy_UrlParts(Url)["host"]
+	Config := _SystemProxy_Config(ReaderFn)
+	_SystemProxy_RefreshCache(Config)
+	Selection := SystemProxy_SelectStatic(Config, Url)
 	if !Selection["pac"]
 		return Selection["proxy"]
-	if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
-		return _SYSTEM_PROXY_PAC_CACHE[Host]
+	if _SYSTEM_PROXY_PAC_CACHE.Has(Url)
+		return _SYSTEM_PROXY_PAC_CACHE[Url]
 	SystemProxy_ResolveAsync([Url], (*) => 0, ReaderFn, SpawnFn)
 	return Selection["proxy"]
 }
 
 ; Resolves the proxy of every URL, running the configured PAC script when one
 ; governs them, then calls Callback(Map url -> proxy) exactly once. PAC is
-; evaluated by .NET in a tree-owned PowerShell child bounded by
+; evaluated in a tree-owned PowerShell child bounded by
 ; SYSTEM_PROXY_RESOLVE_TIMEOUT_MS, so the keyboard thread never waits on the
 ; PAC download. A failed resolution is logged and keeps the static selection.
-; Automatic detection (WPAD) alone is not probed: it is Windows' default on
-; home machines, where it would cost a child process for a direct answer.
-SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0) {
+; Strict admission uses documented WinHTTP receipts and resolves WPAD-only
+; settings without reusing the application cache. It reports an unresolved
+; receipt instead of allowing a caller to mistake static fallback for success.
+SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := false, Budget := 0) {
+	global _VendorDir, SYSTEM_PROXY_RESOLVE_TIMEOUT_MS
+	if Strict && !(Budget is Map)
+		Budget := Map("start", A_TickCount)
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
-	Config := _SystemProxy_Config(ReaderFn)
-	Result := Map()
+	Config := _SystemProxy_Config(ReaderFn, Strict)
+	ConfigIdentity := _SystemProxy_RefreshCache(Config)
+	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map())
 	Missing := []
 	for Url in Urls {
-		Selection := SystemProxy_SelectStatic(Config, Url)
+		Selection := SystemProxy_SelectStatic(Config, Url, Strict)
 		Result[Url] := Selection["proxy"]
+		Result["_proxy_receipts"][Url] := Map("source", Selection["proxy"] == "" ? "system_direct" : "system_static",
+			"native_error", 0)
 		if !Selection["pac"]
 			continue
-		Host := _SystemProxy_UrlParts(Url)["host"]
-		if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
-			Result[Url] := _SYSTEM_PROXY_PAC_CACHE[Host]
+		if !Strict && _SYSTEM_PROXY_PAC_CACHE.Has(Url)
+			Result[Url] := _SYSTEM_PROXY_PAC_CACHE[Url]
 		else
 			Missing.Push(Url)
+	}
+	if Strict && TickExpired64(Budget["start"], SYSTEM_PROXY_RESOLVE_TIMEOUT_MS) {
+		Result["_proxy_resolved"] := false
+		Callback.Call(Result)
+		return true
 	}
 	if (Missing.Length == 0) {
 		Callback.Call(Result)
 		return true
 	}
-	Waiter := { Urls: Urls, Result: Result, Callback: Callback }
+	Waiter := { Urls: Urls, Result: Result, Callback: Callback, Queued: false,
+		Reader: ReaderFn, Spawn: SpawnFn, Strict: Strict, Budget: Budget }
 	if IsObject(_SYSTEM_PROXY_PAC_PENDING) {
+		Waiter.Queued := true
 		_SYSTEM_PROXY_PAC_PENDING.Waiters.Push(Waiter)
 		return true
 	}
-	Origins := []
-	for Url in Missing
-		Origins.Push("https://" . _SystemProxy_UrlParts(Url)["host"] . "/")
-	PacRun := { Origins: Origins, Waiters: [Waiter], Handle: 0, Done: false }
+	PacRun := { Urls: Missing, Waiters: [Waiter], Handle: 0, Done: false,
+		Reader: ReaderFn, Spawn: SpawnFn, Capture: 0, ConfigIdentity: ConfigIdentity,
+		Config: Config, Strict: Strict }
 	_SYSTEM_PROXY_PAC_PENDING := PacRun
-	try LoggerStart("HttpClient", "Resolving the Windows PAC proxy for {1} host(s)…", Origins.Length)
-	Script := "$w=[System.Net.WebRequest]::GetSystemWebProxy();"
-	for Origin in Origins
-		Script .= "[Console]::Out.WriteLine($w.GetProxy([Uri]'" . Origin . "').AbsoluteUri);"
+	try LoggerStart("HttpClient", "Resolving the Windows PAC proxy for {1} destination(s)…", Missing.Length)
+	; Destination queries can contain API keys. The native child reads its owned
+	; input file; neither the URL nor an encoded credential enters process argv.
+	Script := "$ErrorActionPreference='Stop';try{$w=[System.Net.WebRequest]::GetSystemWebProxy();"
+		. "foreach($u in [IO.File]::ReadAllLines($args[0],[Text.Encoding]::UTF8)){"
+		. "$p=$w.GetProxy([Uri]$u);if($p.AbsoluteUri -eq ([Uri]$u).AbsoluteUri){"
+		. "[Console]::Out.WriteLine('DIRECT')}else{[Console]::Out.WriteLine($p.AbsoluteUri)}}}"
+		. "catch{[Console]::Error.WriteLine('System proxy resolution failed.');exit 1}"
 	Exe := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
-	Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Script]
 	OnDone := _SystemProxy_FinishPac.Bind(PacRun)
 	try {
+		Directory := _SR_AcquireCaptureDirectory()
+		PacRun.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
+		Input := ""
+		for Url in Missing {
+			if !_HTTP_CurlScalarIsSafe(Url)
+				throw ValueError("System proxy destination contains a control character.")
+			Input .= Url . "`n"
+		}
+		if Strict {
+			Input := '{"version":1,"auto_detect":' . (Config.Get("auto_detect", false) ? "true" : "false")
+				. ',"pac_url":' . JsonStringLiteral(Config["pac_url"]) . ',"urls":['
+			for Index, Url in Missing
+				Input .= (Index == 1 ? "" : ",") . JsonStringLiteral(Url)
+			Input .= "]}"
+		}
+		if !FSWrite(PacRun.Capture["TmpFile"], Input)
+			throw Error("System proxy input could not be staged.")
+		; Invoke a script block so its sole argument is the input path, whose
+		; quotes are PowerShell literals inside one native argv element.
+		Command := "& {" . Script . "} '" . StrReplace(PacRun.Capture["TmpFile"], "'", "''") . "'"
+		Args := Strict
+			? ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+				"-File", _VendorDir . "\ergopti_system_proxy_worker.ps1", "-InputPath", PacRun.Capture["TmpFile"]]
+			: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Command]
 		PacRun.Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Exe, Args, OnDone)
 			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, 65536)
 		if !(IsObject(PacRun.Handle) && PacRun.Handle.start())
 			throw Error("the PowerShell child did not start")
 	} catch as Err {
-		_SystemProxy_FinishPac(PacRun, -1, "", "spawn failed: " . Err.Message)
+		_SystemProxy_FinishPac(PacRun, -1, "", "spawn failed")
 		return true
 	}
-	SetTimer(_SystemProxy_PacDeadline.Bind(PacRun), -SYSTEM_PROXY_RESOLVE_TIMEOUT_MS)
+	Remaining := Strict ? TickRemaining64(Budget["start"], SYSTEM_PROXY_RESOLVE_TIMEOUT_MS)
+		: SYSTEM_PROXY_RESOLVE_TIMEOUT_MS
+	SetTimer(_SystemProxy_PacDeadline.Bind(PacRun), -Max(1, Remaining))
 	return true
 }
 
 _SystemProxy_PacDeadline(PacRun) {
+	global HTTP_CURL_CLEANUP_RETRY_MS
 	if PacRun.Done
 		return
-	try PacRun.Handle.terminate()
-	catch as Err
-		try LoggerWarn("HttpClient", "The timed-out PAC resolver could not be terminated: {1}.", Err.Message)
-	_SystemProxy_FinishPac(PacRun, -1, "", "timed out after " . SYSTEM_PROXY_RESOLVE_TIMEOUT_MS . " ms")
+	Terminated := false
+	try Terminated := PacRun.Handle.terminate() == true
+	catch {
+		try LoggerError("HttpClient", "The exact PAC resolver termination failed.")
+	}
+	if !Terminated {
+		if !PacRun.HasOwnProp("TerminationReported") {
+			PacRun.TerminationReported := true
+			try LoggerError("HttpClient", "The exact PAC resolver has not acknowledged retirement.")
+		}
+		SetTimer(_SystemProxy_PacDeadline.Bind(PacRun), -HTTP_CURL_CLEANUP_RETRY_MS)
+		return
+	}
+	_SystemProxy_FinishPac(PacRun, -1, "", "timed out")
 }
 
-; Completes one PAC run: caches every usable answer and releases all waiters.
+; Completes one PAC run, fencing strict receipts against current OS settings.
+; Only the legacy non-blocking caller retains session cache compatibility.
 _SystemProxy_FinishPac(PacRun, ExitCode, Stdout, Stderr) {
-	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING, _SYSTEM_PROXY_PAC_CONFIG
+	global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS
 	if PacRun.Done
 		return
 	PacRun.Done := true
 	if (_SYSTEM_PROXY_PAC_PENDING == PacRun)
 		_SYSTEM_PROXY_PAC_PENDING := 0
 	Lines := StrSplit(Trim(StrReplace(Stdout, "`r", ""), "`n"), "`n")
-	Resolved := (ExitCode == 0 && Lines.Length == PacRun.Origins.Length)
-	if Resolved {
-		for Index, Origin in PacRun.Origins {
+	Resolved := (ExitCode == 0 && !PacRun.HasOwnProp("TerminationReported")
+		&& Lines.Length == PacRun.Urls.Length)
+	Answers := Map()
+	Metadata := Map()
+	if Resolved && !PacRun.Strict {
+		for Index, Origin in PacRun.Urls {
 			Answer := RegExReplace(Trim(Lines[Index]), "/+$")
-			if (Answer == RegExReplace(Origin, "/+$")) {
+			if (Answer == "DIRECT") {
 				Proxy := ""
 			} else {
 				Proxy := _SystemProxy_NormalizeEndpoint(Answer, "http")
@@ -779,26 +858,212 @@ _SystemProxy_FinishPac(PacRun, ExitCode, Stdout, Stderr) {
 					break
 				}
 			}
-			_SYSTEM_PROXY_PAC_CACHE[_SystemProxy_UrlParts(Origin)["host"]] := Proxy
+			Answers[Origin] := Proxy
+		}
+	}
+	if PacRun.Strict {
+		Resolved := false
+		if ExitCode == 0 && !PacRun.HasOwnProp("TerminationReported") {
+			try {
+				Answers := _SystemProxy_ParseNativeAnswers(PacRun, Stdout, &Metadata)
+				Resolved := true
+			} catch {
+				try LoggerWarn("HttpClient", "Native automatic proxy receipt was refused.")
+			}
 		}
 	}
 	if Resolved {
-		try LoggerSuccess("HttpClient", "Windows PAC proxy resolved for {1} host(s).", PacRun.Origins.Length)
+		if !PacRun.Strict && PacRun.ConfigIdentity == _SYSTEM_PROXY_PAC_CONFIG {
+			for Url, Proxy in Answers
+				_SYSTEM_PROXY_PAC_CACHE[Url] := Proxy
+		}
+		try LoggerSuccess("HttpClient", "Windows PAC proxy resolved for {1} destination(s).", PacRun.Urls.Length)
 	} else {
-		try LoggerDone("HttpClient", "Windows PAC proxy resolution failed (exit {1}: {2}); using the static proxy settings.",
-			ExitCode, SubStr(Trim(Stderr), 1, 200))
+		Message := PacRun.Strict ? "Native automatic proxy admission failed (exit {1})."
+			: "Windows PAC proxy resolution failed (exit {1}); using the static proxy settings."
+		try LoggerDone("HttpClient", Message, ExitCode)
 	}
+	_SystemProxy_CleanupInput(PacRun)
 	for Waiter in PacRun.Waiters {
+		WaiterResolved := Resolved
+		Redo := Waiter.Queued
+		if Waiter.Strict {
+			try {
+				Current := _SystemProxy_Config(Waiter.Reader, true)
+				Redo := Redo || _SystemProxy_RefreshCache(Current) != PacRun.ConfigIdentity
+			} catch {
+				WaiterResolved := false
+				Redo := false
+			}
+			if TickExpired64(Waiter.Budget["start"], SYSTEM_PROXY_RESOLVE_TIMEOUT_MS) {
+				WaiterResolved := false
+				Redo := false
+			}
+		}
+		if Redo {
+			try SystemProxy_ResolveAsync(Waiter.Urls, Waiter.Callback, Waiter.Reader, Waiter.Spawn, Waiter.Strict, Waiter.Budget)
+			catch {
+				Waiter.Result["_proxy_resolved"] := false
+				try Waiter.Callback.Call(Waiter.Result)
+				catch
+					LoggerError("HttpClient", "System proxy callback threw.")
+			}
+			continue
+		}
+		Waiter.Result["_proxy_resolved"] := WaiterResolved
 		for Url in Waiter.Urls {
-			Host := _SystemProxy_UrlParts(Url)["host"]
-			if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
-				Waiter.Result[Url] := _SYSTEM_PROXY_PAC_CACHE[Host]
+			if WaiterResolved && Answers.Has(Url)
+				Waiter.Result[Url] := Answers[Url]
+			if Metadata.Has(Url)
+				Waiter.Result["_proxy_receipts"][Url] := Metadata[Url]
 		}
 		try Waiter.Callback.Call(Waiter.Result)
 		catch as Err
-			LoggerError("HttpClient", "System proxy callback threw: {1}.", Err.Message)
+			LoggerError("HttpClient", "System proxy callback threw.")
 	}
 }
+
+; A successful native lookup carries an access type, not a guessed URI echo.
+; Parse the complete receipt before admitting any destination from its cohort.
+_SystemProxy_ParseNativeAnswers(PacRun, Stdout, &Metadata) {
+	Metadata := Map()
+	Receipt := JsonParse(Stdout)
+	if !(Receipt is Map) || Receipt.Get("version", 0) != 1
+			|| Receipt.Get("status", "") != "completed" || !(Receipt.Get("results", 0) is Array)
+			|| Receipt["results"].Length != PacRun.Urls.Length
+		throw ValueError("Native automatic proxy receipt is incomplete.")
+	Answers := Map()
+	for Index, Url in PacRun.Urls {
+		Item := Receipt["results"][Index]
+		if !(Item is Map) || !(Item.Get("proxy", 0) is String) || !(Item.Get("bypass", 0) is String)
+				|| !_HTTP_CurlScalarIsSafe(Item["proxy"]) || !_HTTP_CurlScalarIsSafe(Item["bypass"])
+			throw ValueError("Native automatic proxy answer is malformed.")
+		Kind := Item.Get("kind", "")
+		ErrorCode := Item.Get("native_error", -1)
+		if !(ErrorCode is Integer) || ErrorCode < 0
+			throw ValueError("Native automatic proxy error code is malformed.")
+		Metadata[Url] := Map("source", "native_refused", "native_error", ErrorCode)
+		if Kind == "no_auto_proxy" {
+			; WinHTTP 12180 means no PAC URL was discovered. An explicitly
+			; configured PAC never receives this home-network fallback.
+			if PacRun.Config["pac_url"] != "" || !PacRun.Config.Get("auto_detect", false)
+					|| Item.Get("ok", true) || ErrorCode != 12180 || Item.Get("stage", "") != "lookup"
+					|| Item.Get("access_type", -1) != 0 || Item["proxy"] != "" || Item["bypass"] != ""
+				throw ValueError("Native automatic proxy absence was not acknowledged.")
+			Answers[Url] := SystemProxy_SelectStatic(PacRun.Config, Url, true)["proxy"]
+			Metadata[Url]["source"] := Answers[Url] == "" ? "wpad_absent_direct" : "wpad_absent_static"
+			continue
+		}
+		if !Item.Get("ok", false) || ErrorCode != 0
+			throw ValueError("Native automatic proxy lookup failed.")
+		if Kind == "no_proxy" && Item.Get("access_type", 0) == 1 && Item["proxy"] == "" {
+			Answers[Url] := ""
+			Metadata[Url]["source"] := "native_direct"
+		} else if Kind == "named_proxy" && Item.Get("access_type", 0) == 3 && Item["proxy"] != "" {
+			Proxy := _SystemProxy_UsableNativeProxy(Item["proxy"], _SystemProxy_UrlParts(Url)["scheme"])
+			if !_SystemProxy_NativeBypassIsUsable(Item["bypass"])
+				throw ValueError("Native proxy bypass requires an unsupported representation.")
+			Answers[Url] := SystemProxy_IsBypassed(Item["bypass"], _SystemProxy_UrlParts(Url)["host"]) ? "" : Proxy
+			Metadata[Url]["source"] := Answers[Url] == "" ? "native_bypass" : "native_proxy"
+		} else {
+			throw ValueError("Native automatic proxy access type is unsupported.")
+		}
+	}
+	return Answers
+}
+
+; curl owns one relay per request. Refuse ambiguous native failover lists and
+; unsupported endpoints rather than silently discarding network policy.
+_SystemProxy_UsableNativeProxy(List, Scheme) {
+	Candidates := []
+	for Entry in StrSplit(Trim(List), [";", " "]) {
+		Entry := Trim(Entry)
+		if Entry == ""
+			continue
+		Key := ""
+		Endpoint := Entry
+		if RegExMatch(Entry, "^([A-Za-z]+)=(.+)$", &Match) {
+			Key := StrLower(Match[1])
+			Endpoint := Match[2]
+			if Key != "http" && Key != "https" && Key != "socks"
+				throw ValueError("Native proxy scheme is unsupported.")
+		}
+		DefaultScheme := Key == "socks" ? "socks4a" : "http"
+		Proxy := _SystemProxy_NormalizeEndpoint(Endpoint, DefaultScheme)
+		if Proxy == "" || (RegExMatch(Proxy, ":(\d+)$", &Port)
+				&& (Integer(Port[1]) < 1 || Integer(Port[1]) > 65535))
+			throw ValueError("Native proxy endpoint is unsupported.")
+		if Key == "" || Key == Scheme
+			Candidates.Push(Proxy)
+	}
+	if Candidates.Length != 1
+		throw ValueError("Native proxy failover selection is unsupported.")
+	return Candidates[1]
+}
+
+_SystemProxy_NativeBypassIsUsable(Bypass) {
+	for Pattern in StrSplit(Bypass, [";", " ", ","]) {
+		Pattern := RegExReplace(StrLower(Trim(Pattern)), "^https?://")
+		if Pattern != "" && Pattern != "<local>" && !RegExMatch(Pattern, "^[a-z0-9.*_-]+$")
+			return false
+	}
+	return true
+}
+
+; Retains the owned input until transient locks release it. It can carry keys.
+_SystemProxy_CleanupInput(PacRun) {
+	global HTTP_CURL_CLEANUP_RETRY_MS
+	if !(PacRun.Capture is Map)
+		return true
+	try Removed := _SR_CaptureRemove(PacRun.Capture) == 0
+	catch {
+		Removed := false
+		if !PacRun.HasOwnProp("CleanupReported") {
+			PacRun.CleanupReported := true
+			try LoggerError("HttpClient", "System proxy input cleanup was refused.")
+		}
+	}
+	if Removed {
+		PacRun.Capture := 0
+		return true
+	}
+	SetTimer(_SystemProxy_CleanupInput.Bind(PacRun), -HTTP_CURL_CLEANUP_RETRY_MS)
+	return false
+}
+
+; Explicit environment relay configuration wins over GUI settings, as curl's
+; inherited environment does. Empty system DIRECT remains an explicit answer.
+SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn := EnvGet) {
+	Parts := _SystemProxy_UrlParts(Url)
+	Host := Parts["host"]
+	if Host == "localhost" || Host == "127.0.0.1" || Host == "::1" {
+		Callback.Call(Map("ok", true, "inherit", false, "proxy", "", "source", "loopback", "native_error", 0))
+		return true
+	}
+	; Mirror curl's destination-specific environment precedence. Windows
+	; environment lookup is case-insensitive, as curl's native getenv is.
+	Names := Parts["scheme"] == "https"
+		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
+		: ["http_proxy", "all_proxy", "ALL_PROXY"]
+	for Name in Names {
+		if EnvFn.Call(Name) != "" {
+			Callback.Call(Map("ok", true, "inherit", true, "proxy", "", "source", "environment", "native_error", 0))
+			return true
+		}
+	}
+	return SystemProxy_ResolveAsync([Url], _SystemProxy_PublishCurlSelection.Bind(Url, Callback), ReaderFn, SpawnFn, true)
+}
+
+
+; Preserve closed native diagnosis without exposing any captured URL or stderr.
+_SystemProxy_PublishCurlSelection(Url, Callback, Resolved) {
+	Ok := Resolved.Get("_proxy_resolved", false)
+	Metadata := Resolved.Get("_proxy_receipts", Map()).Get(Url, Map())
+	Callback.Call(Map("ok", Ok, "inherit", false, "proxy", Resolved[Url],
+		"source", Ok ? Metadata.Get("source", "system_direct") : "native_refused",
+		"native_error", Metadata.Get("native_error", 0)))
+}
+
 
 
 
