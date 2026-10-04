@@ -2643,7 +2643,13 @@ The existing actual GTK/WebKit model-pull fixture now sends the progress
 bridge's session/failed-presentation epoch protocol. Its successful retry uses
 that actual owner, and its post-success stale retry reuses the same failed
 token. Every original assertion, native loop deadline and retirement check is
-unchanged. Native Linux execution of this corrected fixture remains required.
+unchanged. Actual Linux CI run 37243798345 on 846eb713514b3921b35594dbca92cc3cb5525aef
+passes this native GTK/WebKit/luv/curl scenario. The shared JS and Linux unit
+jobs also pass. Six other native E2E steps fail with unknown first assertions;
+Linux packaging and installation are consequently skipped. The available
+reference run skips E2E after its unit failure and cannot prove these causes
+are historical. Preserve the focused follow-up steps in the Linux handover;
+this successful scenario does not qualify the whole lane or close item 62.
 
 The unintegrated Linux HTTP producer is preserved in the
 [Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
