@@ -1204,6 +1204,22 @@ These are software implementations; final hardware verification remains below.
   bounded native follow-up remains with the principal owner. Windows has no
   equivalent devices-table registration by source. No metrics enable/fallback,
   reserved input/configuration policy, foreign runtime suite or hosted CI changed.
+- [~] **L89.** Linux asynchronous shell admission: capture each allocation
+  before another constructor can fail; protect and require native timer and
+  stdout/stderr activation receipts, retaining NativeTimer and zero-valued
+  success. Refused startup returns nil/error synchronously with no completion
+  callback, preserving callers' single-report contract. Partial native handles
+  are retired and any spawned group follows the existing termination/late-exit
+  cleanup path. Five of eight native component checks fail before and all pass
+  after: constructor refusals and handle invalidation are explicitly simulated;
+  actual EINVAL, real handles, stdout/stderr, child groups, deadline/cancellation
+  and reaping are observed. Nineteen registered units cover each nil/false/raised
+  allocation/start receipt and invoke the native fixture. Healthy termination
+  is proved for those children; kill-refusal settlement/debt is not qualified
+  or redesigned here. macOS checks hs.task construction/start and retains a
+  task on terminate refusal by source; Windows uses native startup/termination
+  accounting by source. Foreign runtime suites, hosted CI and physical input
+  remain deferred. No caller, shared API or reserved surface changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

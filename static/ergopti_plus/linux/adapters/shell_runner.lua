@@ -490,8 +490,8 @@ end
 --- @param args table Array of string arguments.
 --- @param options table|nil { timeout_ms }
 --- @param callback function Receives { ok, code, stdout, stderr, error } once.
---- @return table|nil handle { cancel = function() } — nil when nothing started.
---- @return string|nil error Why nothing started.
+--- @return table|nil handle { cancel = function() } — nil when admission failed.
+--- @return string|nil error Why admission failed; the completion callback stays silent.
 function M.run_async(executable, args, options, callback)
 	if not luv then return nil, "asynchronous execution needs libuv" end
 	local refusal = M.validate_spawn_args(executable, args)
@@ -504,11 +504,32 @@ function M.run_async(executable, args, options, callback)
 		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,
 		exited = false, terminal = false, silent = false,
 	}
-	request.stdout, request.stderr, request.timer = luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
-	NativeTimer.start(luv, request.timer, timeout_ms, 0, function()
+	local function refuse(reason)
+		-- The caller reports synchronous admission failures from nil/error.
+		-- A reader can fail after spawn; retire that group without also delivering
+		-- a callback, while the late exit still closes its owned process handle.
+		request.silent = true
+		stop_group(request)
+		finish_async(request, { ok = false, error = reason })
+		return nil, reason
+	end
+	local allocated, allocation_error = pcall(function()
+		-- Capture ownership before the next constructor can refuse or raise.
+		request.stdout = luv.new_pipe(false)
+		if not request.stdout then error("stdout allocation refused", 0) end
+		request.stderr = luv.new_pipe(false)
+		if not request.stderr then error("stderr allocation refused", 0) end
+		request.timer = luv.new_timer()
+		if not request.timer then error("timer allocation refused", 0) end
+	end)
+	if not allocated then return refuse("handle allocation failed: " .. tostring(allocation_error)) end
+	local timer_ok, timer_started, timer_error = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
 		stop_group(request)
 		finish_async(request, { ok = false, error = "timeout" })
 	end)
+	if not timer_ok or timer_started == nil or timer_started == false then
+		return refuse("timeout activation failed: " .. tostring(timer_ok and timer_error or timer_started))
+	end
 	local spawned, process, pid = pcall(luv.spawn, executable, {
 		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
 	}, function(code, signal)
@@ -521,14 +542,12 @@ function M.run_async(executable, args, options, callback)
 		-- No child was dispatched. Callers handle this synchronous refusal from
 		-- the return value; invoking their completion callback would report twice.
 		local reason = "spawn failed: " .. tostring(pid or process)
-		request.silent = true
-		finish_async(request, { ok = false, error = reason })
-		return nil, reason
+		return refuse(reason)
 	end
 	request.process, request.pid = process, pid
 	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do
 		local field, text, eof = stream[1], stream[2], stream[3]
-		luv.read_start(request[field], function(err, chunk)
+		local read_ok, read_started, read_error = pcall(luv.read_start, request[field], function(err, chunk)
 			if request.terminal then return end
 			if err then
 				stop_group(request)
@@ -543,6 +562,9 @@ function M.run_async(executable, args, options, callback)
 				request[text] = request[text] .. chunk
 			end
 		end)
+		if not read_ok or read_started == nil or read_started == false then
+			return refuse(field .. " activation failed: " .. tostring(read_ok and read_error or read_started))
+		end
 	end
 	return {
 		cancel = function()
