@@ -636,7 +636,7 @@ _LLM_Menu_ApiTestProgressTick(NowTick?) {
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return
 	State := _LLM_Menu_ApiTestProgress
-	Elapsed := TickElapsed(State["start"], NowTick?)
+	Elapsed := TickElapsed64(State["start"], NowTick?)
 	Budget := State.Get("budget", 0)
 	if State.Has("label")
 		try State["label"].Text := _LLM_Menu_ApiTestProgressText(
@@ -890,7 +890,7 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	}
 	if (Matches != 1 || !LLM_AuxFinish(Owner))
 		return false
-	Ms := TickElapsed(StartedTick, NowTick?)
+	Ms := TickElapsed64(StartedTick, NowTick?)
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)

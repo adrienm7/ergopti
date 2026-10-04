@@ -443,7 +443,7 @@ _LAT_ProgressCancel() {
 Test("llm api test: cancel aborts headlessly and stays silent (api-test-entry-progress-cancel)",
 	_LAT_ProgressCancel)
 
-/** Passive controls exercise the timer owner across ordinary and wrapped ticks. */
+/** Native monotonic observations exercise ordinary and DWORD-boundary uptimes. */
 _LAT_ProbeClockProgress(Origin, Elapsed, Budget := 120000) {
 	global _LLM_Menu_ApiTestProgress
 	Saved := _LLM_Menu_ApiTestProgress
@@ -452,9 +452,9 @@ _LAT_ProbeClockProgress(Origin, Elapsed, Budget := 120000) {
 	try {
 		_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
 			"start", Origin, "budget", Budget, "label", Label, "bar", Bar)
-		_LLM_Menu_ApiTestProgressTick((Origin + Elapsed) & 0xFFFFFFFF)
+		_LLM_Menu_ApiTestProgressTick(Origin + Elapsed)
 		AssertEqual(_LLM_Menu_ApiTestProgressText("Prod", Elapsed, Budget), Label.Text,
-			"the real timer must publish elapsed whole seconds after rollover")
+			"the real timer must publish full elapsed whole seconds from the native monotonic clock")
 		AssertEqual(Budget > 0 ? Min(100, (Elapsed * 100) // Budget) : 0, Bar.Value,
 			"the real timer must retain its capped progress and zero-budget behavior")
 	} finally _LLM_Menu_ApiTestProgress := Saved
@@ -468,7 +468,7 @@ for Origin in [0, 100, 0xFFFFFFF0]
 		_LAT_ProbeClockProgress.Bind(Origin, 1000, 0))
 
 /** Completion retains real auxiliary ownership and publishes exact elapsed time. */
-_LAT_ProbeClockCompletion(Origin) {
+_LAT_ProbeClockCompletion(Origin, Elapsed := 1234) {
 	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
 	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
 	SavedMenu := _LAT_FixtureMenu()
@@ -481,10 +481,10 @@ _LAT_ProbeClockCompletion(Origin) {
 		_LLM_Menu_ApiTestProgress := Map()
 		Owner := _LAT_TestOwner()
 		AssertTrue(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod", Origin,
-			Owner, (Ok, Tip) => Notices.Push(Tip), "", (Origin + 1234) & 0xFFFFFFFF))
+			Owner, (Ok, Tip) => Notices.Push(Tip), "", Origin + Elapsed))
 		AssertEqual(1, Notices.Length)
-		AssertEqual(Format(t("menu.llm.api_test_ok_body"), "Prod", 1234, "OK"),
-			Notices[1]["body"], "the actual completion must not relabel wrapped latency as zero")
+		AssertEqual(Format(t("menu.llm.api_test_ok_body"), "Prod", Elapsed, "OK"),
+			Notices[1]["body"], "the actual completion must retain full native elapsed latency")
 		AssertFalse(LLM_AuxIsCurrent(Owner), "successful publication must retire its exact owner")
 	} finally {
 		_LLM_Menu_ApiTestProgress := SavedProgress
@@ -499,3 +499,11 @@ _LAT_ProbeClockCompletion(Origin) {
 for Origin in [0, 100, 0xFFFFFFF0]
 	Test("llm api probe clock: completion origin=" . Origin,
 		_LAT_ProbeClockCompletion.Bind(Origin))
+
+for Origin in [100, 0x100000064]
+	for Elapsed in [0x100000000, 0x10001D4BF, 0x10001D4C0, 0x10001D4C1, 0x2000004D2]
+		Test("llm api probe clock: long progress origin=" . Origin . " elapsed=" . Elapsed,
+			_LAT_ProbeClockProgress.Bind(Origin, Elapsed))
+for Elapsed in [0x1000004D2, 0x2000004D2]
+	Test("llm api probe clock: long completion elapsed=" . Elapsed,
+		_LAT_ProbeClockCompletion.Bind(100, Elapsed))
