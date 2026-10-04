@@ -2539,6 +2539,12 @@ every stdout, stderr, exit and scenario assertion. Native retry is pending.
 The other failure is the pre-existing personal-TOML metadata case (item 102).
 E2E, packaging and installation were skipped after the unit failure.
 
+The same qualification also exposed one shared-core CI prerequisite failure:
+Lua 5.4 could not use the installed Linux regular-file reader without lua-luv.
+The Core runner now installs that native dependency. This changes only runner
+prerequisites; the fail-closed reader and its assertions remain unchanged.
+The exact installed-registry probe is checked with Lua 5.4 before retrying CI.
+
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
 installation variants. Linux unit passes, but its real accessibility-bus probe
