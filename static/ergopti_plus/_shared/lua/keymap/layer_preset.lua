@@ -136,9 +136,10 @@ end
 --- @return string|nil err Why the created file could not be removed.
 function M.undo(result, file_adapter)
 	if type(result) ~= "table" or result.status ~= M.IMPORTED then return true end
-	local current, status = TomlWriter.read_classified(result.path, file_adapter)
+	local current, status, detail = TomlWriter.read_classified(result.path, file_adapter)
 	if status == "absent" then return true end
-	if status ~= "ok" or current ~= result.content then return true end
+	if status ~= "ok" then return false, "the imported layer cannot be read: " .. tostring(detail or status) end
+	if current ~= result.content then return true end
 	return TomlWriter.remove_if_unchanged(result.path, file_adapter, { status = "ok", content = result.content })
 end
 

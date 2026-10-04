@@ -341,4 +341,360 @@ helpers.describe("Linux tap-hold scope: the recommended navigation layer", funct
 	end)
 end)
 
+-- The layer import is a third owned destination. Its refused inverse must stay
+-- attached to the same owner after the primary runtime and files are restored.
+helpers.describe("Linux tap-hold scope: retained navigation-layer compensation", function()
+	local refusals = {
+		{ id = "false", run = function() return false end },
+		{ id = "nil", run = function() return nil end },
+		{ id = "zero", run = function() return 0 end },
+		{ id = "string", run = function() return "removed" end },
+		{ id = "object", run = function() return {} end },
+		{ id = "exception", run = function() error("controlled removal refusal") end },
+	}
+	local function removal(s, receipt)
+		local native = require("adapters.file_system").delete
+		local calls = { layer = 0 }
+		s.files.delete = function(path)
+			if path == s.dir .. "/layers.toml" then
+				calls.layer = calls.layer + 1
+				if receipt then return receipt() end
+			end
+			return native(path)
+		end
+		return calls
+	end
+
+	for _, refusal in ipairs(refusals) do
+		helpers.it("retains a refused recommended-layer revert: " .. refusal.id, function()
+			with_scope(nil, nil, function(s)
+				local calls = removal(s, refusal.run)
+				local owner = s.owner()
+				helpers.assert_eq(owner.apply("recommended"), true)
+				helpers.assert_eq(owner.revert(), false, "a refused native removal is not a reverted scope")
+				helpers.assert_eq(owner.pending(), true)
+				helpers.assert_eq(s.parameters.state.owner, owner, "the parameter fence retains its owner")
+				helpers.assert_nil(read(s.tap_path), "the primary inverse already settled")
+				helpers.assert_true(type(read(s.dir .. "/layers.toml")) == "string")
+				helpers.assert_eq(owner.apply("clear"), false)
+				helpers.assert_eq(owner.release(), false, "release cannot discard unresolved debt")
+				helpers.assert_eq(owner.retry_restore(), false)
+				helpers.assert_eq(calls.layer, 2, "one removal per explicit compensation attempt")
+				removal(s)
+				helpers.assert_eq(owner.retry_restore(), true)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_nil(read(s.dir .. "/layers.toml"))
+				helpers.assert_nil(s.parameters.state.owner)
+				helpers.assert_eq(owner.apply("clear"), true, "the recovered owner admits the next request")
+			end)
+		end)
+	end
+
+	helpers.it("retains a refused apply's layer cleanup until exact retry", function()
+		with_scope(nil, '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n', function(s)
+			local before = read(s.config_path)
+			removal(s, function() return false end)
+			s.controls.refuse = s.config_path
+			local owner = s.owner()
+			helpers.assert_eq(owner.apply("recommended"), false)
+			helpers.assert_eq(owner.pending(), true)
+			helpers.assert_eq(read(s.config_path), before)
+			helpers.assert_nil(read(s.tap_path))
+			helpers.assert_eq(s.parameters.state.owner, owner)
+			removal(s)
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_nil(read(s.dir .. "/layers.toml"))
+			helpers.assert_eq(owner.pending(), false)
+		end)
+	end)
+
+	helpers.it("keeps a later external layer edit while settling retained cleanup", function()
+		with_scope(nil, nil, function(s)
+			local calls = removal(s, function() return false end)
+			local owner = s.owner()
+			helpers.assert_eq(owner.apply("recommended"), true)
+			helpers.assert_eq(owner.revert(), false)
+			local external = '# External editor owns these bytes.\n[layers.personal.all]\nKeyA = "keystroke:ArrowLeft"\n'
+			write(s.dir .. "/layers.toml", external)
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_eq(read(s.dir .. "/layers.toml"), external)
+			helpers.assert_eq(calls.layer, 1, "the external record is never passed to removal")
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_nil(s.parameters.state.owner)
+		end)
+	end)
+
+	helpers.it("settles an already absent imported layer without repeating removal", function()
+		with_scope(nil, nil, function(s)
+			local calls = removal(s, function() return false end)
+			local owner = s.owner()
+			helpers.assert_eq(owner.apply("recommended"), true)
+			helpers.assert_eq(owner.revert(), false)
+			assert(os.remove(s.dir .. "/layers.toml"))
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_eq(calls.layer, 1)
+			helpers.assert_eq(owner.pending(), false)
+		end)
+	end)
+
+	for _, refusal in ipairs(refusals) do
+		helpers.it("retains fence release after the layer inverse: " .. refusal.id, function()
+			with_scope(nil, nil, function(s)
+				local calls = removal(s)
+				local owner = s.owner()
+				helpers.assert_eq(owner.apply("recommended"), true)
+				local native = s.parameters.release_parameter_configuration
+				s.parameters.release_parameter_configuration = refusal.run
+				helpers.assert_eq(owner.revert(), false)
+				helpers.assert_nil(read(s.dir .. "/layers.toml"))
+				helpers.assert_eq(owner.pending(), true)
+				helpers.assert_eq(owner.retry_restore(), false)
+				helpers.assert_eq(calls.layer, 1, "settled layer removal is not repeated")
+				s.parameters.release_parameter_configuration = native
+				helpers.assert_eq(owner.retry_restore(), true)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_nil(s.parameters.state.owner)
+			end)
+		end)
+	end
+
+	helpers.it("defers layer removal until the primary runtime inverse is acknowledged", function()
+		with_scope(nil, nil, function(s)
+			local calls = removal(s)
+			local owner = s.owner()
+			helpers.assert_eq(owner.apply("recommended"), true)
+			local native = s.manager.restore_configuration
+			local attempts = 0
+			s.manager.restore_configuration = function() attempts = attempts + 1; return false end
+			helpers.assert_eq(owner.revert(), false)
+			helpers.assert_eq(attempts, 1, "no implicit second native retry")
+			helpers.assert_eq(calls.layer, 0)
+			helpers.assert_true(type(read(s.dir .. "/layers.toml")) == "string")
+			helpers.assert_eq(owner.pending(), true)
+			s.manager.restore_configuration = native
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_eq(calls.layer, 1)
+			helpers.assert_nil(read(s.dir .. "/layers.toml"))
+		end)
+	end)
+
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("retains the actual composed " .. mode .. " inverse after a later category refuses", function()
+			with_scope(nil, nil, function(s)
+				local calls = removal(s, function() return false end)
+				local owner = s.owner()
+				local participant = require("config_scope_participant").synchronous({
+					apply = function(selected) return owner.apply(selected) end,
+					owner = function() return owner end,
+				})
+				local failed = {
+					apply = function(_, done) return done(false, "controlled later category refusal") end,
+					revert = function(done) return done(true) end,
+					release = function() end,
+					pending = function() return false end,
+					retry_restore = function(done) return done(true) end,
+				}
+				local composition = require("config_scope_composition").new({
+					manifest = require("infra.manifest_reader"), scope = "global",
+					logger = helpers.make_logger_stub(),
+					participants = function() return { tap_holds = participant, llm = failed } end,
+				})
+				local observed
+				helpers.assert_eq(composition.apply(mode, function(ok, report) observed = { ok, report } end), true)
+				helpers.assert_eq(observed[1], false)
+				helpers.assert_eq(observed[2].applied, { "tap_holds" })
+				helpers.assert_eq(composition.pending(), mode == "recommended")
+				helpers.assert_eq(owner.pending(), mode == "recommended")
+				if mode == "recommended" then
+					local settled
+					composition.retry_restore(function(ok) settled = ok end)
+					helpers.assert_eq(settled, false)
+					removal(s)
+					composition.retry_restore(function(ok) settled = ok end)
+					helpers.assert_eq(settled, true)
+				else
+					helpers.assert_eq(calls.layer, 0, "clear imports no layer")
+				end
+				helpers.assert_eq(composition.pending(), false)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_nil(read(s.dir .. "/layers.toml"))
+				helpers.assert_nil(read(s.tap_path))
+				helpers.assert_nil(s.parameters.state.owner)
+			end)
+		end)
+	end
+	helpers.it("keeps the public scope owner until its refused layer cleanup settles", function()
+		with_scope(nil, '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n', function(s)
+			local names = { "infra.config_paths", "modules.gestures.manager", "adapters.file_system" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local Scope = require("infra.tap_hold_scope")
+			Scope._reset_for_test()
+			removal(s, function() return false end)
+			package.loaded["infra.config_paths"] = { config = function(name)
+				helpers.assert_eq(name, "config.toml")
+				return s.config_path
+			end }
+			package.loaded["modules.gestures.manager"] = s.parameters
+			package.loaded["adapters.file_system"] = s.files
+			local ok, err = pcall(function()
+				s.controls.refuse = s.config_path
+				helpers.assert_eq(Scope.apply("recommended", function() return false end), false)
+				local retained = s.parameters.state.owner
+				helpers.assert_true(type(retained) == "table", "the public request retains its fence owner")
+				helpers.assert_eq(retained.pending(), true)
+				s.controls.refuse = nil
+				helpers.assert_eq(Scope.apply("clear", function() return false end), false)
+				helpers.assert_eq(s.parameters.state.owner, retained, "a later request cannot replace the indebted owner")
+				helpers.assert_nil(read(s.tap_path), "the next clear did not publish a candidate")
+				s.files.delete = function(path) return os.remove(path) end
+				helpers.assert_eq(Scope.apply("clear", function() return false end), true)
+				helpers.assert_nil(read(s.dir .. "/layers.toml"))
+				helpers.assert_nil(s.parameters.state.owner)
+				helpers.assert_eq(Codec.decode(read(s.tap_path)), {}, "the admitted clear persists the neutral empty document")
+			end)
+			Scope._reset_for_test()
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			for name in require("lfs").dir(s.dir) do
+				if name:match("^config%.toml%.tap_holds%-.*%.bak$") or name:match("^tap_hold%.toml%.tap_holds%-.*%.bak$") then
+					assert(os.remove(s.dir .. "/" .. name))
+				end
+			end
+			if not ok then error(err, 0) end
+		end)
+	end)
+	local read_refusals = {
+		{ id = "error", run = function() return nil, "error", "controlled unreadable layer" end },
+		{ id = "unknown status", run = function() return nil, "busy", "unclassified source" end },
+		{ id = "missing status", run = function() return nil end },
+		{ id = "exception", run = function() error("controlled layer read refusal") end },
+	}
+	for _, refusal in ipairs(read_refusals) do
+		helpers.it("the shared layer undo refuses an unreadable source: " .. refusal.id, function()
+			with_scope(nil, nil, function(s)
+				local layer_path = s.dir .. "/layers.toml"
+				local bytes = "# Imported source retained through read refusal.\n"
+				write(layer_path, bytes)
+				local native = s.files.read_with_status
+				local calls = removal(s)
+				s.files.read_with_status = function(path)
+					if path == layer_path then return refusal.run() end
+					return native(path)
+				end
+				local Preset = require("keymap.layer_preset")
+				local imported = { status = Preset.IMPORTED, path = layer_path, content = bytes }
+				local undone, detail = Preset.undo(imported, s.files)
+				helpers.assert_eq(undone, false)
+				helpers.assert_true(type(detail) == "string" and detail ~= "")
+				helpers.assert_eq(read(layer_path), bytes)
+				helpers.assert_eq(calls.layer, 0)
+				s.files.read_with_status = native
+				helpers.assert_eq(Preset.undo(imported, s.files), true)
+				helpers.assert_nil(read(layer_path))
+				helpers.assert_eq(calls.layer, 1)
+			end)
+		end)
+		helpers.it("the native scope retains unreadable layer compensation: " .. refusal.id, function()
+			with_scope(nil, nil, function(s)
+				local owner = s.owner()
+				helpers.assert_eq(owner.apply("recommended"), true)
+				local layer_path = s.dir .. "/layers.toml"
+				local before = read(layer_path)
+				local native = s.files.read_with_status
+				local calls = removal(s)
+				s.files.read_with_status = function(path)
+					if path == layer_path then return refusal.run() end
+					return native(path)
+				end
+				helpers.assert_eq(owner.revert(), false)
+				helpers.assert_eq(owner.pending(), true)
+				helpers.assert_eq(owner.retry_restore(), false)
+				helpers.assert_eq(read(layer_path), before)
+				helpers.assert_eq(calls.layer, 0)
+				helpers.assert_eq(s.parameters.state.owner, owner)
+				s.files.read_with_status = native
+				helpers.assert_eq(owner.retry_restore(), true)
+				helpers.assert_nil(read(layer_path))
+				helpers.assert_eq(calls.layer, 1)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_nil(s.parameters.state.owner)
+			end)
+		end)
+	end
+	for _, refusal in ipairs(refusals) do
+		helpers.it("compensates a committed candidate whose apply fence release refuses: " .. refusal.id, function()
+			local original = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n'
+			with_scope(nil, original, function(s)
+				local owner = s.owner()
+				local initial = s.manager.configuration_snapshot()
+				local native = s.parameters.release_parameter_configuration
+				s.parameters.release_parameter_configuration = refusal.run
+				helpers.assert_eq(owner.apply("recommended"), false, "an unreleased committed candidate must compensate")
+				helpers.assert_eq(owner.pending(), true)
+				helpers.assert_eq(read(s.config_path), original)
+				helpers.assert_nil(read(s.tap_path))
+				helpers.assert_nil(read(s.dir .. "/layers.toml"))
+				helpers.assert_eq(s.manager.configuration_snapshot(), initial)
+				helpers.assert_eq(s.parameters.state.params, {
+					tap_hold__open_url = "https://tap.example", tap_4__open_url = "https://keep.example",
+				})
+				helpers.assert_eq(s.parameters.state.owner, owner)
+				helpers.assert_eq(owner.retry_restore(), false)
+				s.parameters.release_parameter_configuration = native
+				helpers.assert_eq(owner.retry_restore(), true)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_nil(s.parameters.state.owner)
+			end)
+		end)
+	end
+
+	helpers.it("global composition does not advance after an apply-only fence release refusal", function()
+		local original = '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n'
+		with_scope(nil, original, function(s)
+			local owner = s.owner()
+			local initial = s.manager.configuration_snapshot()
+			local native = s.parameters.release_parameter_configuration
+			local releases = 0
+			s.parameters.release_parameter_configuration = function(retained)
+				releases = releases + 1
+				if releases == 1 then return false end
+				return native(retained)
+			end
+			local participant = require("config_scope_participant").synchronous({
+				apply = function(mode) return owner.apply(mode) end,
+				owner = function() return owner end,
+			})
+			local later = 0
+			local next_category = {
+				apply = function(_, done) later = later + 1; return done(false) end,
+				revert = function(done) return done(true) end,
+				release = function() end,
+				pending = function() return false end,
+				retry_restore = function(done) return done(true) end,
+			}
+			local composition = require("config_scope_composition").new({
+				manifest = require("infra.manifest_reader"), scope = "global",
+				logger = helpers.make_logger_stub(),
+				participants = function() return { tap_holds = participant, llm = next_category } end,
+			})
+			local observed
+			helpers.assert_eq(composition.apply("recommended", function(ok, report) observed = { ok, report } end), true)
+			helpers.assert_eq(observed[1], false)
+			helpers.assert_eq(observed[2].applied, {}, "the unacknowledged Tap-Hold participant never commits")
+			helpers.assert_eq(later, 0, "a release-refused participant cannot advance the composition")
+			helpers.assert_eq(releases, 2, "the compensated request releases its retained fence")
+			helpers.assert_eq(composition.pending(), false)
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(read(s.config_path), original)
+			helpers.assert_nil(read(s.tap_path))
+			helpers.assert_nil(read(s.dir .. "/layers.toml"))
+			helpers.assert_eq(s.manager.configuration_snapshot(), initial)
+			helpers.assert_eq(s.parameters.state.params, {
+				tap_hold__open_url = "https://tap.example", tap_4__open_url = "https://keep.example",
+			})
+			helpers.assert_nil(s.parameters.state.owner)
+		end)
+	end)
+end)
+
 return true

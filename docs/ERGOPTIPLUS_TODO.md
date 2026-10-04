@@ -1064,6 +1064,22 @@ These are software implementations; final hardware verification remains below.
   validation remains pending. Recommended-delay native verification and
   editable handwritten [[hotstrings.terminators]] support remain open under
   item 34.
+
+  2026-10-04 candidate: the Linux Tap-Hold scope retains refused compensation
+  for the navigation layer it imported, including strict native removal and
+  parameter-fence release receipts. Its primary runtime/file inverse settles
+  before layer removal; later requests cannot replace the indebted owner, and
+  valid external edits survive exact-source cleanup. The shared layer helper
+  refuses unreadable sources instead of treating them as foreign edits.
+  All 14 original registered
+  cases remain unchanged; 34 added real-file cases give original 15/33 and
+  corrected 48/0 on LuaJIT and Lua5.4, including shared-participant global
+  recommendation/clear refusal and rejected apply-time fence release before
+  advancing to another category. Local selected and hosted native qualification
+  remain pending. The macOS sibling still discards refused layer cleanup and
+  does not compose a created layer's inverse into global settings restoration;
+  this candidate does not complete item 5 or establish physical-device behavior.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
