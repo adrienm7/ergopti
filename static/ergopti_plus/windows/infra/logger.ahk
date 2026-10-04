@@ -665,14 +665,56 @@ _LoggerRepairShutdownDebts() {
 ; bounded successor flush is required before the queues can be declared empty.
 ; An in-flight owner returns false: after OnExit refusal that owner resumes and
 ; completes its append instead of being abandoned with its snapshot detached.
-LoggerPrepareShutdown() {
-	if !_LoggerRepairShutdownDebts()
+; Optional refusal evidence contains only a detached snapshot of native owner
+; counters; inspecting it never flushes, repairs, or releases logger ownership.
+; @param Refusal {Map|Integer} Receives primitive refusal evidence, or zero on success.
+; @returns {Boolean} True only after the existing durable shutdown boundary.
+LoggerPrepareShutdown(&Refusal := 0) {
+	Refusal := 0
+	if !_LoggerRepairShutdownDebts() {
+		Refusal := _LoggerShutdownRefusalSnapshot("repair")
 		return false
-	if !_LoggerFlush(true)
+	}
+	if !_LoggerFlush(true) {
+		Refusal := _LoggerShutdownRefusalSnapshot("flush")
 		return false
-	if _LoggerHasPendingDebt() && !_LoggerFlush(true)
+	}
+	if _LoggerHasPendingDebt() && !_LoggerFlush(true) {
+		Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
 		return false
-	return !_LoggerHasPendingDebt()
+	}
+	if _LoggerHasPendingDebt() {
+		Refusal := _LoggerShutdownRefusalSnapshot("pending_debt")
+		return false
+	}
+	return true
+}
+
+; Sample existing ownership and queue counts at the refusing caller's boundary.
+; Paths, queue names, message bodies, file objects, and handles never leave here.
+_LoggerShutdownRefusalSnapshot(Phase) {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	global _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		TopicalLines := 0
+		for _, Lines in _LOGGER_SUB_PENDING
+			TopicalLines += Lines.Length
+		return Map(
+			"phase", Phase,
+			"flush_active", _LOGGER_FLUSH_ACTIVE,
+			"force_flush_pending", _LOGGER_FORCE_FLUSH_PENDING,
+			"append_owners", _LOGGER_APPEND_OWNERS.Count,
+			"append_debts", _LOGGER_APPEND_DEBTS.Count,
+			"append_repairs", _LOGGER_APPEND_DEBT_REPAIRS.Count,
+			"main_lines", _LOGGER_PENDING.Length,
+			"error_lines", _LOGGER_PENDING_ERRORS.Length,
+			"topical_queues", _LOGGER_SUB_PENDING.Count,
+			"topical_lines", TopicalLines)
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Drain the pending-lines queue into the log file in one complete append.
