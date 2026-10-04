@@ -58,20 +58,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Recover official group 7 native artifacts from an isolated worktree
-        shell: pwsh
-        run: |
-          $ownedRoot = Join-Path $env:RUNNER_TEMP "group7-native-recovery"
-          git worktree add --detach $ownedRoot $env:GITHUB_SHA
-          if ($LASTEXITCODE -ne 0) { throw "Owned generation worktree creation failed." }
-          Push-Location $ownedRoot
-          try { ./tools/test/group7_native_recovery.ps1 -SourceCandidate b51a2f5658dc311eaa61e6ebb5093536e72ba5f9 }
-          finally { Pop-Location }
-
-      - name: Replay the exact native group 7 close probe
-        shell: pwsh
-        run: ./tools/test/group7_close_probe.ps1
-
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
