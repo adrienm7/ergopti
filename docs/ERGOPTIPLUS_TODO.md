@@ -662,6 +662,16 @@ These are software implementations; final hardware verification remains below.
   native stores and have no corresponding temporary JSON file by source. No
   TOML persistence, reserved source, native cross-OS gate, hardware input or
   manual CI was modified or exercised.
+- [~] **L51.** Linux native storage harness loader arity: expose exactly one
+  adapter from fresh(), because Lua 5.4 require also returns its loader path.
+  A final table-list expression previously expanded that path into a second
+  snapshot owner and crashed on owner.get. The failure reproduces with the
+  exact preceding production source, so it is pre-existing rather than an
+  exclusive-staging regression. Keep every scalar false/zero/Unicode/NUL and
+  durable snapshot assertion; all thirty-eight actual file/permission receipts
+  now pass under LuaJIT and Lua 5.4. The eleven new exclusive-staging/kernel-limit
+  receipts also remain valid. No product behavior, TOML, reserved native gate,
+  physical input or manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
