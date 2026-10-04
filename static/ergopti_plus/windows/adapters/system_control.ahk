@@ -56,6 +56,8 @@ global SYSTEM_CONTROL_HKEY_CURRENT_USER := 0x80000001
 global SYSTEM_CONTROL_KEY_QUERY_VALUE := 0x0001
 ; How long an activated window may take to come to the foreground.
 global SYSTEM_CONTROL_ACTIVATE_WAIT_S := 1
+; OpenProcess receives a process identifier as a native DWORD.
+global SYSTEM_CONTROL_MAX_PROCESS_ID := 0xFFFFFFFF
 ; Least rights needed by a retained process target.
 global SYSTEM_CONTROL_PROCESS_TERMINATE := 0x0001
 global SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
@@ -156,13 +158,15 @@ class SystemControl {
 	}
 
 	; Acquires one non-inheritable process capability before destructive approval.
-	; @param {Integer} Pid The resolved process id; reused ids are never reopened.
+	; @param {Integer} Pid The resolved positive DWORD process id; reused ids are never reopened.
 	; @returns {Object} The retained native handle and its process id.
+	; @throws {TypeError} When the PID is outside the native DWORD domain.
 	; @throws {OSError} When Windows refuses the process access.
 	AcquireProcessTarget(Pid) {
 		global SYSTEM_CONTROL_PROCESS_TERMINATE, SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION, SYSTEM_CONTROL_SYNCHRONIZE
-		if !(Pid is Integer) || Pid <= 0
-			throw TypeError("A process target requires a positive integer PID.")
+		global SYSTEM_CONTROL_MAX_PROCESS_ID
+		if !(Pid is Integer) || Pid <= 0 || Pid > SYSTEM_CONTROL_MAX_PROCESS_ID
+			throw TypeError("A process target requires a positive DWORD PID.")
 		Access := SYSTEM_CONTROL_PROCESS_TERMINATE | SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION | SYSTEM_CONTROL_SYNCHRONIZE
 		Handle := DllCall("Kernel32\OpenProcess", "UInt", Access, "Int", false, "UInt", Pid, "Ptr")
 		if !Handle
