@@ -1145,6 +1145,21 @@ These are software implementations; final hardware verification remains below.
   or a physical graphical session. Windows SetTimer and macOS hs.timer/hs.task
   do not expose this cached Lua/libuv clock by source; their native duration
   qualification remains deferred. No reserved input, menu or title source changed.
+- [~] **L85.** Linux diagnostics export completion: delegate report saves to
+  the established FileSystem.write owner and require its exact true receipt
+  before revealing the path. Previously a buffered write could succeed while
+  fclose failed with EFBIG, leaving a truncated report advertised as complete.
+  Two of seven actual kernel/file/permission cases fail before and all pass
+  after on LuaJIT and Lua 5.4: partial and zero-byte closes, immediate write
+  refusal, read-only file, unwritable directory, exact literal path/content and
+  redaction controls. Native write/close results are unmodified; reveal alone
+  is a simulated UI observer, not a physical graphical validation. Eight unit
+  controls explicitly simulate adapter receipts and preserve failure, directory
+  admission and successful save/reveal separation. macOS has the same unchecked
+  report close by source; its existing checked FileSystem.write is the bounded
+  follow-up proposal for the principal owner. Windows uses its native Write/Close
+  exception boundary by source. Foreign native suites and hosted CI are deferred.
+  No new writer policy or reserved configuration/diagnostic gate was introduced.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
