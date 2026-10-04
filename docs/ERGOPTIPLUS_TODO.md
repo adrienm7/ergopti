@@ -1731,6 +1731,17 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
+The launch CLI now exposes existing observations in one bounded failure-only
+notice so their closed scalar values remain accessible when raw Actions logs
+or artifacts cannot be downloaded. It retains the exact-PID boot-journal
+scripting witness, managed launch state/timing, no-prompt native status/origin,
+received-Lua stage and supplementary bootstrap outcome without treating any of
+them as original admission. All errors, failure exit status, deadlines and
+feature assertions are unchanged. Two actual CLI regressions fail against the
+original source; 225 portable Python tests pass, with one native AppKit test
+skipped on Linux. Live macOS observations and the original AppleEvent admission
+still require an exact-candidate manual CI checkpoint.
+
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
