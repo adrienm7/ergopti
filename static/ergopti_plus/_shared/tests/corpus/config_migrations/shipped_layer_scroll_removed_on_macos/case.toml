@@ -5,4 +5,4 @@ description = "The shipped step deletes the retired Layer + Scroll switch from a
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 6
-to_version = 9
+to_version = 10

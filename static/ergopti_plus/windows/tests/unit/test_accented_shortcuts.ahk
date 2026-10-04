@@ -36,7 +36,7 @@ _ACS_WithShortcuts(Config, Callback, DigitAccess := false) {
 	if HadLayout
 		SavedLayout := Features["layout"]
 	Features["shortcuts"] := Config
-	Features["layout"] := Map("direct_access_digits", DigitAccess)
+	Features["layout"] := Map("direct_access_digits", DigitAccess ? "digits" : "native")
 	try Callback()
 	finally {
 		if HadShortcuts
@@ -165,11 +165,11 @@ _ACS_LayoutSectionsCase() {
 	for Row in ["custom_layouts", "layout_manager", "layout_features_base", "layout_features_altgr"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > Custom && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
 			Row . " belongs to the custom layout section")
-	for Row in ["layout.direct_access_digits", "accented_letters",
+	for Row in ["number_row_policy", "accented_letters",
 			"hotstrings.magic_key.replace", "layout.ctrl_magic_save"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
 	AltGrRows := _DriverFuncBody("_LAY_LayoutFeatureAltGrRows")
-	Assert(InStr(AltGrRows, '"direct_access_digits", true') > 0,
+	Assert(InStr(AltGrRows, '"direct_access_digits", "digits"') > 0,
 		"the Ergopti AltGr list must not repeat the any-layout digit row")
 	Assert(InStr(_TrayRootBuilderBodies(), "group_accented") == 0,
 		"the accented-letter group must stay enabled without the Ergopti emulation")

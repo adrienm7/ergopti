@@ -570,6 +570,9 @@ M.features = {
 		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
+		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", input_altering = true, enum_values = { "native", "digits", "symbols" },
+	},
+	{
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 }
@@ -997,9 +1000,6 @@ M.unavailable = {
 	},
 	{
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "layout.direct_access_digits", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },

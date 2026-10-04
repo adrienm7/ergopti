@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Gendan Windows-touchpadbevægelser",
 	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
 	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen.",
-	"platform_reason.token_streaming_transport_missing": "Ikke på Windows: Windows kan endnu ikke vise forslag token for token. Denne indstilling forbliver inaktiv."
+	"platform_reason.token_streaming_transport_missing": "Ikke på Windows: Windows kan endnu ikke vise forslag token for token. Denne indstilling forbliver inaktiv.",
+	"menu.layout.number_row": "Talrække",
+	"menu.layout.number_row_native": "Systemets rækkefølge",
+	"menu.layout.number_row_digits": "Tal først",
+	"menu.layout.number_row_symbols": "Symboler først",
+	"platform_reason.number_row_override_unsupported": "Ikke understøttet: Denne driver bevarer systemets talrække; tal og symboler kan ikke gennemtvinges.",
+	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken."
 }

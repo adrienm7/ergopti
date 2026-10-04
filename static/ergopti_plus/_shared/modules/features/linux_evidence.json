@@ -754,6 +754,20 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
 			]
+		},
+		"layout.direct_access_digits": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "not_applicable",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/tests/unit/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/_shared/lua/test/number_row_policy_contract.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+			]
 		}
 	}
 }

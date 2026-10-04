@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Windows 터치패드 제스처 복원",
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
 	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
-	"platform_reason.token_streaming_transport_missing": "Windows 제외: Windows는 아직 제안을 토큰 단위로 표시할 수 없습니다. 이 옵션은 비활성 상태로 유지됩니다."
+	"platform_reason.token_streaming_transport_missing": "Windows 제외: Windows는 아직 제안을 토큰 단위로 표시할 수 없습니다. 이 옵션은 비활성 상태로 유지됩니다.",
+	"menu.layout.number_row": "숫자 행",
+	"menu.layout.number_row_native": "시스템 순서",
+	"menu.layout.number_row_digits": "숫자 우선",
+	"menu.layout.number_row_symbols": "기호 우선",
+	"platform_reason.number_row_override_unsupported": "지원 안 됨: 이 드라이버는 시스템의 숫자 행을 유지하며 숫자나 기호를 강제할 수 없습니다.",
+	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다."
 }

@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Windows टचपैड जेस्चर पुनर्स्थापित करें",
 	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
 	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।",
-	"platform_reason.token_streaming_transport_missing": "Windows पर नहीं: Windows अभी सुझावों को टोकन दर टोकन नहीं दिखा सकता। यह विकल्प निष्क्रिय रहता है।"
+	"platform_reason.token_streaming_transport_missing": "Windows पर नहीं: Windows अभी सुझावों को टोकन दर टोकन नहीं दिखा सकता। यह विकल्प निष्क्रिय रहता है।",
+	"menu.layout.number_row": "अंक पंक्ति",
+	"menu.layout.number_row_native": "सिस्टम का क्रम",
+	"menu.layout.number_row_digits": "अंक पहले",
+	"menu.layout.number_row_symbols": "चिह्न पहले",
+	"platform_reason.number_row_override_unsupported": "असमर्थित: यह ड्राइवर सिस्टम की मूल अंक पंक्ति बनाए रखता है; अंक या चिह्न बाध्य नहीं किए जा सकते।",
+	"platform_reason.number_row_source_unavailable": "अनुपलब्ध: चिह्न पहले के लिए सक्रिय अनुकरण लेआउट चाहिए, जिसकी अंक पंक्ति के हर स्थान पर मान्य अंक और चिह्न स्तर हों।"
 }

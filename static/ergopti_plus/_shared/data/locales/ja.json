@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Windows のタッチパッド ジェスチャを復元",
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
-	"platform_reason.token_streaming_transport_missing": "Windows では非対応: Windows ではまだ候補をトークンごとに表示できません。このオプションは無効のままです。"
+	"platform_reason.token_streaming_transport_missing": "Windows では非対応: Windows ではまだ候補をトークンごとに表示できません。このオプションは無効のままです。",
+	"menu.layout.number_row": "数字列",
+	"menu.layout.number_row_native": "システムの順序",
+	"menu.layout.number_row_digits": "数字を優先",
+	"menu.layout.number_row_symbols": "記号を優先",
+	"platform_reason.number_row_override_unsupported": "未対応: このドライバーはシステムの数字列を維持します。数字や記号を強制することはできません。",
+	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。"
 }

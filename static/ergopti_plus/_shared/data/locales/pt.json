@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Restaurar os gestos do touchpad do Windows",
 	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
 	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu.",
-	"platform_reason.token_streaming_transport_missing": "Não no Windows: O Windows ainda não pode mostrar sugestões token por token. Esta opção permanece inativa."
+	"platform_reason.token_streaming_transport_missing": "Não no Windows: O Windows ainda não pode mostrar sugestões token por token. Esta opção permanece inativa.",
+	"menu.layout.number_row": "Fila de números",
+	"menu.layout.number_row_native": "Ordem nativa",
+	"menu.layout.number_row_digits": "Números primeiro",
+	"menu.layout.number_row_symbols": "Símbolos primeiro",
+	"platform_reason.number_row_override_unsupported": "Não suportado: Este controlador mantém a fila nativa do sistema; não é possível forçar números ou símbolos.",
+	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila."
 }

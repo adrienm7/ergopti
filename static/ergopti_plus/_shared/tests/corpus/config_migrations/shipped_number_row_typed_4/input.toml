@@ -1,0 +1,6 @@
+[_meta]
+schema_version = 9
+
+[layout]
+future = "kept" # independently retained
+direct_access_digits = "symbols"

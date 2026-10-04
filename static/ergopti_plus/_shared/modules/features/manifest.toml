@@ -3411,13 +3411,13 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "direct_access_digits"
-platforms = ["ahk"]
-default = false
-recommended = true
+platforms = ["ahk", "hs", "linux"]
+default = "native"
+recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
 input_altering = true
-type = "boolean"
-description_key = "menu.layout.direct_access_digits"
-superseded_reason_key = "menu.layout.superseded_digit_row"
+type = "enum"
+enum_values = ["native", "digits", "symbols"]
+description_key = "menu.layout.number_row"
 
 [[features.layout]]
 id = "ergopti_alt_gr"
@@ -5101,13 +5101,12 @@ id = "base_layouts"
 platforms = ["linux"]
 reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
 
-# Swaps digits and symbols on any layout whose digits sit behind Shift (AZERTY,
-# BÉPO) — not an Ergopti-only setting.
+# One policy, with actual source-scoped availability supplied by native owners.
+# Lua drivers report native input only; Windows can also force digits and can
+# force symbols through a supported registry source's original action machine.
 [[menu.layout_menu]]
-type = "feature"
-path = "layout.direct_access_digits"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+type = "list"
+id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter directly in the user's own layout, not Ergopti's positions.
@@ -6303,3 +6302,12 @@ i18n = "menu.llm.nav_label"
 type = "list"
 id = "llm_val_modifiers"
 i18n = "menu.llm.val_label"
+
+# The existing choice renderer supplies provider DATA; availability and writes
+# remain native-owned. This child declaration owns all labels and value order.
+[[menu.number_row_policy_rows]]
+type = "choice"
+id = "number_row_mode"
+path = "layout.direct_access_digits"
+i18n = "menu.layout.number_row"
+choice_label_prefix = "menu.layout.number_row_"

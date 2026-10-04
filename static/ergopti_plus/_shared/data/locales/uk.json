@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Відновити жести сенсорної панелі Windows",
 	"dialog.start_at_login.failed": "Не вдалося змінити автозапуск. Перевірте налаштування автозапуску системи.",
 	"onboarding.error.open_failed": "Не вдалося відкрити майстер налаштування. Перевірте журнали та повторіть спробу через меню.",
-	"platform_reason.token_streaming_transport_missing": "Не в Windows: Windows поки не може показувати пропозиції токен за токеном. Цей параметр залишається неактивним."
+	"platform_reason.token_streaming_transport_missing": "Не в Windows: Windows поки не може показувати пропозиції токен за токеном. Цей параметр залишається неактивним.",
+	"menu.layout.number_row": "Цифровий ряд",
+	"menu.layout.number_row_native": "Системний порядок",
+	"menu.layout.number_row_digits": "Спочатку цифри",
+	"menu.layout.number_row_symbols": "Спочатку символи",
+	"platform_reason.number_row_override_unsupported": "Не підтримується: Цей драйвер зберігає системний цифровий ряд; примусове введення цифр і символів недоступне.",
+	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду."
 }

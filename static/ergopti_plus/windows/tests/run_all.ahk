@@ -241,6 +241,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
+#Include ../../_shared/modules/features/number_row_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).

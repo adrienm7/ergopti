@@ -85,7 +85,7 @@ AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode)
 _AccentedShortcutDigitAccessEnabled() {
 	global Features
 	return IsSet(Features) && Features.Has("layout")
-		&& Features["layout"].Get("direct_access_digits", false)
+		&& NumberRowEffectiveMode() == "digits"
 }
 
 _AccentedShortcutKeysCached(Hkl) {

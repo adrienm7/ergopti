@@ -102,7 +102,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 global Features := Map(
     "layout", Map(
         "ergopti_base",         true,
-        "direct_access_digits", true,
+        "direct_access_digits", "digits",
         "ergopti_alt_gr",       true,
         "ergopti_plus",         false,
         "emulated_layout",      "",

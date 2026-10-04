@@ -45,7 +45,7 @@ const CONSUMERS = [
 		token: 'LayoutSupersededReason('
 	}
 ];
-const EXPECTED = ['ergopti_base', 'ergopti_alt_gr', 'ergopti_plus', 'direct_access_digits'];
+const EXPECTED = ['ergopti_base', 'ergopti_alt_gr', 'ergopti_plus'];
 
 let failures = 0;
 
@@ -92,6 +92,22 @@ const declared = blocks
 	}));
 
 console.log('Layout features an emulated layout supersedes');
+check('number-row modes are independently source-scoped rather than boolean supersession', () => {
+	const row = blocks.find(
+		(b) => b.section === 'layout' && JSON.parse(b.fields.id) === 'direct_access_digits'
+	);
+	assert.ok(row, 'the genuine number-row feature must exist');
+	assert.strictEqual(row.fields.type, '"enum"');
+	assert.deepStrictEqual(JSON.parse(row.fields.enum_values), ['native', 'digits', 'symbols']);
+	assert.deepStrictEqual(JSON.parse(row.fields.platforms), ['ahk', 'hs', 'linux']);
+	assert.strictEqual(row.fields.default, '"native"');
+	assert.strictEqual(
+		row.fields.superseded_reason_key,
+		undefined,
+		'a source-scoped enum cannot be switched off as a boolean'
+	);
+	assert.ok(!declared.some((d) => d.section === 'layout' && d.id === 'direct_access_digits'));
+});
 
 check('the Ergopti emulation features are declared, on Windows-only booleans', () => {
 	assert.ok(declared.length >= EXPECTED.length, `only ${declared.length} declaration(s) found`);

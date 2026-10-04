@@ -34,11 +34,18 @@ _LSD_DeclaredCase() {
 	Declared := Map()
 	for Entry in LayoutSupersededFeatures()
 		Declared[Entry["path"]] := Entry["superseded_reason_key"]
-	Assert(Declared.Count >= 4, "at least the four Ergopti emulation features must be declared, got " . Declared.Count)
-	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_plus", "layout.direct_access_digits"]
+	Assert(Declared.Count >= 3, "the three Ergopti boolean emulation features must remain declared, got " . Declared.Count)
+	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_plus"]
 		Assert(Declared.Has(Path), Path . " must be declared as superseded by an emulated layout")
-	for Path in ["layout.ctrl_magic_save", "layout.emulated_layout"]
+	for Path in ["layout.ctrl_magic_save", "layout.emulated_layout", "layout.direct_access_digits"]
 		AssertFalse(Declared.Has(Path), Path . " works whatever the layout and must not be declared")
+	NumberRow := ManifestFindEntryByPath("layout.direct_access_digits")
+	AssertEqual("enum", NumberRow["type"], "number-row policy cannot use boolean supersession")
+	AssertEqual("native", ManifestDefaultFor("layout.direct_access_digits"))
+	AssertEqual("native", NumberRowPolicyMode("native"))
+	AssertEqual("digits", NumberRowPolicyMode("digits"))
+	AssertEqual("symbols", NumberRowPolicyMode("symbols"))
+	AssertEqual("", NumberRowPolicyMode(true), "legacy booleans must be migrated rather than coerced")
 	for Path, Reason in Declared
 		AssertTrue(t(Reason) != Reason, Path . " names a reason that does not translate: " . Reason)
 }

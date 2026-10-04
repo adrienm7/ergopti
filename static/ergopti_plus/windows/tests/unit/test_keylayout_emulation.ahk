@@ -372,7 +372,7 @@ _KLT_IndependentLayersCase() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone()]
 	try {
 		Desired := Map("emulated_layout", "ergol", "ergopti_base", false,
-			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", false)
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "native")
 		Features := Map("layout", Desired.Clone())
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
@@ -417,12 +417,12 @@ _KLT_IndependentLayersCase() {
 		AssertTrue(Step["Native"], "an OS dead key is replayed to its native state machine")
 		AssertEqual("^", Step["Output"], "the registry dead key terminates before a native dead key")
 		AssertFalse(Capture.Rows["SC010"].Call(), "a native dead key never leaves registry state armed")
-		Features["layout"]["direct_access_digits"] := true
+		Features["layout"]["direct_access_digits"] := "digits"
 		KeylayoutEmulation_Press("SC010", true, false, true)
 		; Ergo-L's digit1 action explicitly maps circumflex + 1 to superscript 1.
 		AssertEqual(Chr(0xB9), KeylayoutEmulation_PressNative("SC002", false, false, Azerty)["Output"],
 			"a dead-key continuation composes the direct digit, not the native ampersand")
-		Features["layout"]["direct_access_digits"] := false
+		Features["layout"]["direct_access_digits"] := "native"
 		Desired["ergopti_base"] := true
 		AssertTrue(Capture.Rows["SC010"].Call(), "base can be enabled independently")
 		AssertTrue(Capture.Rows["+SC010"].Call(), "the same base switch owns Shift")
@@ -431,7 +431,7 @@ _KLT_IndependentLayersCase() {
 		Desired["ergopti_alt_gr"] := false
 		AssertFalse(KeylayoutEmulation_LayerIsActive("ergopti_alt_gr"))
 		AssertFalse(Capture.Rows["SC138 & SC010"].Call(), "disabled AltGr must not capture its key")
-		Features["layout"]["direct_access_digits"] := true
+		Features["layout"]["direct_access_digits"] := "digits"
 		AssertFalse(Capture.Rows["SC002"].Call(), "direct digits own their unshifted row")
 		AssertTrue(Capture.Rows["SC010"].Call(), "direct digits do not disable letters")
 		CategoryEnabled["Layout"] := false
@@ -560,7 +560,7 @@ _KLT_MagicKeyYieldCase() {
 	try {
 		Replace := Map("enabled", true)
 		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
-			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", false),
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "native"),
 			"hotstrings", Map("magic_key", Map("replace", Replace)))
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
@@ -649,22 +649,24 @@ Test("master gates: a selected registry layout supersedes the Ergopti emulation 
 _KLT_SupersedeCase() {
 	global Features, TapHold
 	Selected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_plus", true,
-		"direct_access_digits", true, "ctrl_magic_save", true, "emulated_layout", "ergol")
+		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "ergol")
 	_KLT_WithLayoutFeatures(Selected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertFalse(Features["layout"]["ergopti_base"], "the Ergopti base layer stands down"),
 		AssertFalse(Features["layout"]["ergopti_alt_gr"], "the Ergopti AltGr layer stands down"),
 		AssertFalse(Features["layout"]["ergopti_plus"], "the Ergopti+ changes stand down"),
 		AssertTrue(Features["layout"]["direct_access_digits"], "the independent digit override keeps its choice"),
+		AssertEqual("digits", Features["layout"]["direct_access_digits"], "the typed intent remains digits rather than a truthy native/symbols string"),
 		AssertTrue(Features["layout"]["ctrl_magic_save"], "a feature that works on any layout is kept"),
 		AssertEqual("ergol", Features["layout"]["emulated_layout"], "the selection itself is kept")
 	))
 	NoneSelected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_plus", true,
-		"direct_access_digits", true, "ctrl_magic_save", true, "emulated_layout", "")
+		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "")
 	_KLT_WithLayoutFeatures(NoneSelected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertTrue(Features["layout"]["ergopti_base"], "without a registry layout the Ergopti emulation stays"),
-		AssertTrue(Features["layout"]["direct_access_digits"])
+		AssertTrue(Features["layout"]["direct_access_digits"]),
+		AssertEqual("digits", Features["layout"]["direct_access_digits"])
 	))
 }
 

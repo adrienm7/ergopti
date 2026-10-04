@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Ripristina i gesti del touchpad di Windows",
 	"dialog.start_at_login.failed": "Impossibile modificare l’avvio automatico. Controlla le impostazioni di avvio del sistema.",
 	"onboarding.error.open_failed": "Impossibile aprire la configurazione guidata. Controlla i registri e riprova dal menu.",
-	"platform_reason.token_streaming_transport_missing": "Non su Windows: Windows non può ancora mostrare i suggerimenti token per token. Questa opzione rimane inattiva."
+	"platform_reason.token_streaming_transport_missing": "Non su Windows: Windows non può ancora mostrare i suggerimenti token per token. Questa opzione rimane inattiva.",
+	"menu.layout.number_row": "Riga dei numeri",
+	"menu.layout.number_row_native": "Ordine nativo",
+	"menu.layout.number_row_digits": "Numeri prima",
+	"menu.layout.number_row_symbols": "Simboli prima",
+	"platform_reason.number_row_override_unsupported": "Non supportato: Questo driver mantiene la riga nativa del sistema; non consente di forzare numeri e simboli.",
+	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga."
 }

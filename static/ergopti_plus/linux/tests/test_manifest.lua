@@ -21,6 +21,7 @@ return {
 	"tests.unit.adapters.test_keyboard_hook_safety",
 	"tests.unit.adapters.test_keyboard_hook_xkb_capture",
 	"tests.unit.adapters.test_keyboard_layout",
+	"tests.unit.keymap.test_number_row_policy",
 	"tests.unit.adapters.test_keyboard_layout_sources",
 	"tests.unit.adapters.test_process_lifecycle",
 	"tests.unit.adapters.test_process_runner",

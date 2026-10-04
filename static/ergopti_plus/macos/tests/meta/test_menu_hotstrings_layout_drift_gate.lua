@@ -161,6 +161,7 @@ local CANONICAL_LAYOUT_MENU = {
 	"section_header:menu.layout.header_any",
 	-- The pause/resume layout pickers, declared 2026-08-07 with the blocks
 	-- above and for the same reason: their choices are macOS input sources.
+	"list:number_row_policy",
 	"list:layout_switching",
 	"feature:hotstrings.magic_key.replace",
 	-- UPDATED 2026-09-30: the physical key the replace switch turns into the

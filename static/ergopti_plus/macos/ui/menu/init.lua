@@ -1254,7 +1254,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
 				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 				runtime = {
-					capture = function() return menu_mods.keyboard_layout.capture_scope(state) end,
+					capture = function(_, source) return menu_mods.keyboard_layout.capture_scope(state, source) end,
 					apply = function(_, rows) return menu_mods.keyboard_layout.apply_scope(state, rows) end,
 					restore = function(snapshot) return menu_mods.keyboard_layout.restore_scope(state, snapshot) end,
 				},

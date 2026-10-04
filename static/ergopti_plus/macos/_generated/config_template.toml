@@ -461,6 +461,12 @@ swipe_3_horiz = 3.5
 swipe_4_horiz = 3.5
 swipe_5_horiz = 3.5
 
+[layout]
+direct_access_digits = "native"
+pause_switch_enabled = false
+on_pause = false
+on_resume = false
+
 [ui]
 menubar_icon = "v1"
 
@@ -489,8 +495,3 @@ ctrl_period = false
 ctrl_quote = false
 cmd_shift_v = false
 cmd_star = false
-
-[layout]
-pause_switch_enabled = false
-on_pause = false
-on_resume = false

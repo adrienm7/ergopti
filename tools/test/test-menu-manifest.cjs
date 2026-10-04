@@ -1674,3 +1674,71 @@ checkPrivacyTriggerControls();
 			require('node:assert/strict').ok(source.includes(row.id), `${native} binds ${row.id}`);
 	}
 }
+
+// Number-row choices share one declaration; native capability stays adapter-owned.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expectedChoices = ['native', 'digits', 'symbols'];
+	assert.equal(manifest.number_row_policy_rows.length, 1);
+	const row = manifest.number_row_policy_rows[0];
+	assert.equal(row.type, 'choice');
+	assert.equal(row.id, 'number_row_mode');
+	assert.equal(row.path, 'layout.direct_access_digits');
+	assert.deepEqual(
+		row.choices.map((choice) => choice.value),
+		expectedChoices
+	);
+	assert.deepEqual(
+		row.choices.map((choice) => choice.i18n),
+		expectedChoices.map((mode) => `menu.layout.number_row_${mode}`)
+	);
+	assert.equal(
+		manifest.layout_menu.filter((item) => item.type === 'list' && item.id === 'number_row_policy')
+			.length,
+		1
+	);
+	assert.equal(
+		manifest.layout_menu.filter((item) => item.type === 'feature' && item.path === row.path).length,
+		0,
+		'the obsolete Boolean native row cannot coexist'
+	);
+	const localeNames = readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'));
+	assert.equal(localeNames.length, 21, 'every published locale owns the new captions and refusals');
+	for (const name of localeNames) {
+		const locale = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, name), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const key of [
+			'menu.layout.number_row',
+			...expectedChoices.map((mode) => `menu.layout.number_row_${mode}`),
+			'platform_reason.number_row_override_unsupported',
+			'platform_reason.number_row_source_unavailable'
+		]) {
+			assert.equal(typeof locale[key], 'string', name + ': ' + key);
+			assert(locale[key].trim().length > 0, name + ': nonempty translated value');
+		}
+	}
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_init.ahk', '_LAY_NumberRowRows()'],
+		[
+			'macos',
+			'ui/menu/menu_keyboard_layout.lua',
+			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)'
+		],
+		[
+			'linux',
+			'ui/menu/menu_builder.lua',
+			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)'
+		]
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(source.includes(call), driver + ': actual declared choice provider');
+	}
+	console.log(
+		'Number-row choices: one typed declaration, 21 translations and three native providers.'
+	);
+}

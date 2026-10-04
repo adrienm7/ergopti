@@ -405,7 +405,7 @@ tap_4 = "none"
 
 [layout]
 ergopti_base = false
-direct_access_digits = false
+direct_access_digits = "native"
 ergopti_alt_gr = false
 ergopti_plus = false
 ctrl_magic_save = false

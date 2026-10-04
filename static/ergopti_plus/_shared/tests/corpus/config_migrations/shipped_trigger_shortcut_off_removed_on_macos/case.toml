@@ -5,4 +5,4 @@ description = "The shipped v3 to v4 step deletes an unset llm.trigger.shortcut (
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 3
-to_version = 9
+to_version = 10

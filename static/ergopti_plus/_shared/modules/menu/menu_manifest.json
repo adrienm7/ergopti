@@ -1637,12 +1637,8 @@
 			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
 		},
 		{
-			"type": "feature",
-			"path": "layout.direct_access_digits",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"type": "list",
+			"id": "number_row_policy"
 		},
 		{
 			"type": "group",
@@ -2320,6 +2316,28 @@
 			"type": "list",
 			"id": "llm_val_modifiers",
 			"i18n": "menu.llm.val_label"
+		}
+	],
+	"number_row_policy_rows": [
+		{
+			"type": "choice",
+			"id": "number_row_mode",
+			"path": "layout.direct_access_digits",
+			"i18n": "menu.layout.number_row",
+			"choices": [
+				{
+					"value": "native",
+					"i18n": "menu.layout.number_row_native"
+				},
+				{
+					"value": "digits",
+					"i18n": "menu.layout.number_row_digits"
+				},
+				{
+					"value": "symbols",
+					"i18n": "menu.layout.number_row_symbols"
+				}
+			]
 		}
 	]
 }
