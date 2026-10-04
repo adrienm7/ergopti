@@ -428,7 +428,7 @@ GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 			LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original process target is no longer owned.")
 			return false
 		}
-		if IsObject(ConfirmedTarget) && A_IsSuspended {
+		if A_IsSuspended {
 			LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
 			return false
 		}
@@ -579,7 +579,7 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	}
 	Window := _GestureSysActiveExplorer(Sys, IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow())
 	Paths := IsObject(Window) ? GestureSysExplorerSelectedPaths(Window) : ""
-	if IsObject(ConfirmedTarget) && A_IsSuspended {
+	if A_IsSuspended {
 		LoggerInfo("gestures", "unblock_file_selection was cancelled after selection inspection: the script is suspended.")
 		return false
 	}
@@ -595,7 +595,7 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	Removed := 0, Failed := 0
 	for Path in Paths {
 		for Target in (Sys.IsDirectory(Path) ? Sys.FilesUnder(Path) : [Path]) {
-			if IsObject(ConfirmedTarget) && A_IsSuspended {
+			if A_IsSuspended {
 				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: the script is suspended.")
 				return false
 			}

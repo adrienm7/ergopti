@@ -1668,3 +1668,172 @@ for _SysActions_ResolvedGuardMode in ["resolver", "confirmed", "direct"] {
 		Test("system actions: resolved process " . _SysActions_ResolvedGuardMode . " " . _SysActions_ResolvedGuardPid . " (resolved-process-guards)",
 			_SysActions_ResolvedGuardTest(_SysActions_ResolvedGuardPid, _SysActions_ResolvedGuardMode))
 }
+
+class _SysActions_DirectForcePause extends _SysActions_ProcessLeaseFake {
+	__New(At, Pauses) {
+		super.__New("unchanged")
+		this.At := At
+		this.Pauses := Pauses
+		this.TerminationAttempts := 0
+	}
+	PauseAt(Phase) {
+		if this.Pauses && this.At == Phase
+			Suspend(true)
+	}
+	ShellPid() {
+		Pid := super.ShellPid()
+		this.PauseAt("shell")
+		return Pid
+	}
+	AcquireProcessTarget(Pid) {
+		Lease := super.AcquireProcessTarget(Pid)
+		this.PauseAt("acquire")
+		return Lease
+	}
+	ProcessTargetIsLive(Lease) {
+		Alive := super.ProcessTargetIsLive(Lease)
+		this.PauseAt("alive")
+		return Alive
+	}
+	TerminateProcessTarget(Lease) {
+		this.TerminationAttempts += 1
+		return super.TerminateProcessTarget(Lease)
+	}
+	ReleaseProcessTarget(Lease) {
+		super.ReleaseProcessTarget(Lease)
+		this.PauseAt("release")
+	}
+}
+_SysActions_DirectForcePauseCase(At, Pauses) {
+	Fake := _SysActions_DirectForcePause(At, Pauses)
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		_GestureMakeSystemRunner("force_quit_frontmost", GestureSysForceQuitFrontmost.Bind(Fake), Fake).Call()
+		if Pauses && At == "entry"
+			Suspend(true)
+		Fake.Deferred.RemoveAt(1).Call()
+		Expected := Pauses && At != "release" ? 0 : 1
+		AssertEqual(Expected, Fake.TerminationAttempts, "a direct runner cannot enter termination after a native query suspended the driver")
+		AssertEqual(Expected, Fake.Effects.Length, "only an unpaused effect admission can terminate its retained target")
+		ExpectedLeases := Pauses && At == "entry" ? 0 : 1
+		AssertEqual(ExpectedLeases, Fake.Leases.Length, "the original deferred admission still refuses pause before acquisition")
+		AssertEqual(ExpectedLeases, Fake.Releases, "an acquired direct capability always releases, including during pause")
+		for Lease in Fake.Leases
+			AssertEqual(0, Lease.Handle, "cancelled direct work leaves no retained native resource")
+	} finally Suspend(PriorPause)
+}
+_SysActions_DirectForcePauseTest(At, Pauses) => () => _SysActions_DirectForcePauseCase(At, Pauses)
+for _SysActions_DirectForcePhase in ["shell", "acquire", "alive"] {
+	Test("system actions: direct force pause after " . _SysActions_DirectForcePhase . " (direct-force-query-pause)",
+		_SysActions_DirectForcePauseTest(_SysActions_DirectForcePhase, true))
+	Test("system actions: direct force unchanged " . _SysActions_DirectForcePhase . " (direct-force-query-pause)",
+		_SysActions_DirectForcePauseTest(_SysActions_DirectForcePhase, false))
+}
+Test("system actions: direct force pause before deferred entry (direct-force-query-pause)",
+	_SysActions_DirectForcePauseTest("entry", true))
+Test("system actions: direct force release completes during pause (direct-force-query-pause)",
+	_SysActions_DirectForcePauseTest("release", true))
+
+class _SysActions_DirectSelectionPath {
+	__New(Sys, Value) {
+		this.Sys := Sys
+		this.Value := Value
+	}
+	Path {
+		get {
+			this.Sys.PauseAt("path")
+			return this.Value
+		}
+	}
+}
+class _SysActions_DirectSelectionDoc {
+	__New(Sys) => this.Sys := Sys
+	SelectedItems() {
+		this.Sys.PauseAt("selection")
+		return this.Sys.EmptySelection ? [] : [_SysActions_DirectSelectionPath(this.Sys, "C:\owned\a"), _SysActions_DirectSelectionPath(this.Sys, "C:\owned\b")]
+	}
+}
+class _SysActions_DirectQueryFake extends _SysActionsFake {
+	__New(Action, At, Pauses, EmptySelection := false) {
+		super.__New()
+		this.At := At
+		this.Pauses := Pauses
+		this.EmptySelection := EmptySelection
+		this.Active := { Hwnd: 0x100, Pid: 812, Class: Action == "quit_frontmost_app" ? "Notepad" : "CabinetWClass" }
+		this.Windows := [0x100, 0x101]
+		if Action == "quit_frontmost_app" && At == "shell"
+			this.ShellPidValue := 812
+	}
+	PauseAt(Phase) {
+		if this.Pauses && this.At == Phase
+			Suspend(true)
+	}
+	ActiveWindow() {
+		Current := super.ActiveWindow()
+		this.PauseAt("active")
+		return Current
+	}
+	ShellApplication() {
+		this.PauseAt("shell")
+		return { Windows: (*) => [{ HWND: this.Active.Hwnd, Document: _SysActions_DirectSelectionDoc(this) }] }
+	}
+	IsDirectory(Path) {
+		this.PauseAt("directory")
+		return this.At == "files"
+	}
+	FilesUnder(Path) {
+		this.PauseAt("files")
+		return [Path . "\one", Path . "\two"]
+	}
+	DeleteZoneIdentifier(Path) {
+		Result := super.DeleteZoneIdentifier(Path)
+		this.PauseAt("deleted")
+		return Result
+	}
+	ShellPid() {
+		Pid := super.ShellPid()
+		this.PauseAt("shell")
+		return Pid
+	}
+	WindowsOfProcess(Pid) {
+		Windows := super.WindowsOfProcess(Pid)
+		this.PauseAt("windows")
+		return Windows
+	}
+	PostClose(Hwnd) {
+		Result := super.PostClose(Hwnd)
+		this.PauseAt("closed")
+		return Result
+	}
+}
+_SysActions_DirectQueryCase(Action, At, Pauses, EmptySelection := false) {
+	Fake := _SysActions_DirectQueryFake(Action, At, Pauses, EmptySelection)
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		Fn := Action == "quit_frontmost_app" ? GestureSysQuitFrontmostApp : GestureSysUnblockFileSelection
+		_GestureMakeSystemRunner(Action, Fn.Bind(Fake), Fake).Call()
+		Fake.Deferred.RemoveAt(1).Call()
+		Effect := Action == "quit_frontmost_app" ? "PostClose" : "DeleteZoneIdentifier"
+		Expected := EmptySelection ? 0 : (Pauses ? (At == "deleted" || At == "closed" ? 1 : 0) : (At == "shell" && Action == "quit_frontmost_app" ? 1 : (At == "files" ? 4 : 2)))
+		AssertEqual(Expected, _SysActions_CallsNamed(Fake, Effect).Length,
+			"every direct query boundary admits the next effect only while unpaused; committed earlier effects stay owned")
+		AssertEqual(EmptySelection && !Pauses ? 1 : 0, _SysActions_CallsNamed(Fake, "Notify").Length,
+			"a paused empty selection cannot publish a deferred notice")
+	} finally Suspend(PriorPause)
+}
+_SysActions_DirectQueryTest(Action, At, Pauses, EmptySelection := false) => () => _SysActions_DirectQueryCase(Action, At, Pauses, EmptySelection)
+for _SysActions_DirectSelectionPhase in ["active", "shell", "selection", "path", "directory", "files", "deleted"] {
+	for _SysActions_DirectSelectionPauses in [true, false]
+		Test("system actions: direct selection " . _SysActions_DirectSelectionPhase . " pause=" . _SysActions_DirectSelectionPauses . " (direct-selection-query-pause)",
+			_SysActions_DirectQueryTest("unblock_file_selection", _SysActions_DirectSelectionPhase, _SysActions_DirectSelectionPauses))
+}
+for _SysActions_DirectSelectionPauses in [true, false]
+	Test("system actions: direct empty selection pause=" . _SysActions_DirectSelectionPauses . " (direct-selection-query-pause)",
+		_SysActions_DirectQueryTest("unblock_file_selection", "selection", _SysActions_DirectSelectionPauses, true))
+for _SysActions_DirectQuitPhase in ["shell", "windows", "closed"] {
+	for _SysActions_DirectQuitPauses in [true, false]
+		Test("system actions: direct quit " . _SysActions_DirectQuitPhase . " pause=" . _SysActions_DirectQuitPauses . " (direct-quit-query-pause)",
+			_SysActions_DirectQueryTest("quit_frontmost_app", _SysActions_DirectQuitPhase, _SysActions_DirectQuitPauses))
+}
