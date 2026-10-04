@@ -60,10 +60,10 @@ _TestUninstallClock(Started, Scenario, FirstElapsed := 0) {
 	Revoked := false
 	Clock() {
 		ClockCalls += 1
-		Elapsed := ClockCalls == 1 ? 0 : Sleeps.Length == 0 ? FirstElapsed : 10001
+		Elapsed := ClockCalls == 1 ? 0 : Sleeps.Length == 0 ? FirstElapsed : Max(FirstElapsed + 1, 10001)
 		if Scenario == "revoked" && Sleeps.Length > 0
 			Elapsed := 10000
-		return Mod(Started + Elapsed, 0x100000000)
+		return Started + Elapsed
 	}
 	Wait(Handle, Milliseconds) {
 		AssertEqual(0, Milliseconds)
@@ -117,17 +117,22 @@ _TestUninstallClock(Started, Scenario, FirstElapsed := 0) {
 		}
 	}
 }
-Test("Uninstall ready-clock-wrap: ordinary immediate READY", (*) => _TestUninstallClock(100, "immediate"))
-Test("Uninstall ready-clock-wrap: wrapped immediate READY", (*) => _TestUninstallClock(0xFFFFFFF0, "immediate"))
-Test("Uninstall ready-clock-wrap: ordinary overdue READY wins", (*) => _TestUninstallClock(100, "late-ready", 10000))
-Test("Uninstall ready-clock-wrap: wrapped overdue READY wins", (*) => _TestUninstallClock(0xFFFFFFF0, "late-ready", 10000))
-Test("Uninstall ready-clock-wrap: ordinary deadline minus one", (*) => _TestUninstallClock(100, "pending", 9999))
-Test("Uninstall ready-clock-wrap: wrapped deadline minus one", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 9999))
-Test("Uninstall ready-clock-wrap: ordinary exact deadline", (*) => _TestUninstallClock(100, "pending", 10000))
-Test("Uninstall ready-clock-wrap: wrapped exact deadline", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 10000))
-Test("Uninstall ready-clock-wrap: ordinary deadline plus one", (*) => _TestUninstallClock(100, "pending", 10001))
-Test("Uninstall ready-clock-wrap: wrapped deadline plus one", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 10001))
-Test("Uninstall ready-clock-wrap: ordinary process exit", (*) => _TestUninstallClock(100, "process-exit", 100))
-Test("Uninstall ready-clock-wrap: wrapped process exit", (*) => _TestUninstallClock(0xFFFFFFF0, "process-exit", 100))
-Test("Uninstall ready-clock-wrap: ordinary cancellation revokes both handles", (*) => _TestUninstallClock(100, "revoked", 100))
-Test("Uninstall ready-clock-wrap: wrapped cancellation revokes both handles", (*) => _TestUninstallClock(0xFFFFFFF0, "revoked", 100))
+Test("Uninstall ready-clock-native64: ordinary immediate READY", (*) => _TestUninstallClock(100, "immediate"))
+Test("Uninstall ready-clock-native64: DWORD-boundary immediate READY", (*) => _TestUninstallClock(0xFFFFFFF0, "immediate"))
+Test("Uninstall ready-clock-native64: ordinary overdue READY wins", (*) => _TestUninstallClock(100, "late-ready", 10000))
+Test("Uninstall ready-clock-native64: DWORD-boundary overdue READY wins", (*) => _TestUninstallClock(0xFFFFFFF0, "late-ready", 10000))
+Test("Uninstall ready-clock-native64: ordinary deadline minus one", (*) => _TestUninstallClock(100, "pending", 9999))
+Test("Uninstall ready-clock-native64: DWORD-boundary deadline minus one", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 9999))
+Test("Uninstall ready-clock-native64: ordinary exact deadline", (*) => _TestUninstallClock(100, "pending", 10000))
+Test("Uninstall ready-clock-native64: DWORD-boundary exact deadline", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 10000))
+Test("Uninstall ready-clock-native64: ordinary deadline plus one", (*) => _TestUninstallClock(100, "pending", 10001))
+Test("Uninstall ready-clock-native64: DWORD-boundary deadline plus one", (*) => _TestUninstallClock(0xFFFFFFF0, "pending", 10001))
+Test("Uninstall ready-clock-native64: ordinary process exit", (*) => _TestUninstallClock(100, "process-exit", 100))
+Test("Uninstall ready-clock-native64: DWORD-boundary process exit", (*) => _TestUninstallClock(0xFFFFFFF0, "process-exit", 100))
+Test("Uninstall ready-clock-native64: ordinary cancellation revokes both handles", (*) => _TestUninstallClock(100, "revoked", 100))
+Test("Uninstall ready-clock-native64: DWORD-boundary cancellation revokes both handles", (*) => _TestUninstallClock(0xFFFFFFF0, "revoked", 100))
+
+for Started in [100, 0x100000064]
+	for Elapsed in [0x100000000, 0x10000270F, 0x100002710, 0x100002711]
+		Test("Uninstall ready-clock-native64: long pending origin=" . Started . " elapsed=" . Elapsed,
+			_TestUninstallClock.Bind(Started, "pending", Elapsed))

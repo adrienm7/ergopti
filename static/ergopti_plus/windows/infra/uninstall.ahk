@@ -179,7 +179,7 @@ _UninstallAwaitReady(Owner, Info, ClockFn := unset, WaitFn := unset, SleepFn := 
 	Nap := IsSet(SleepFn) ? SleepFn : Sleep
 	Started := Clock.Call()
 	while Wait.Call(Owner.Get("Ready", 0), 0) != 0 {
-		if TickElapsed(Started, Clock.Call()) > 10000 || Wait.Call(NumGet(Info, 0, "Ptr"), 0) != 0x102
+		if TickElapsed64(Started, Clock.Call()) > 10000 || Wait.Call(NumGet(Info, 0, "Ptr"), 0) != 0x102
 			throw Error("The removal worker did not become ready")
 		Nap.Call(20)
 	}
