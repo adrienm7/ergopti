@@ -2234,6 +2234,12 @@ if (failed.length === 0) {
 
 console.log(`❌  ${failed.length}/${results.length} JS check(s) FAILED:\n`);
 for (const f of failed) {
+	if (process.env?.GITHUB_ACTIONS === 'true') {
+		// Check names remain available through the API when archived log access
+		// fails. Never copy command output, URLs or native receipts here.
+		const name = f.name.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+		console.log(`::error title=Shared validation check failed::${name}`);
+	}
 	console.log(`  ✗ ${f.name}`);
 	console.log(`    reproduce: ${f.repro}`);
 	console.log(

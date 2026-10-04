@@ -18,7 +18,9 @@ io.popen = function(...)
 	return {
 		read = function(_, mode)
 			local body = pipe:read(mode)
-			local rows = body == '' and {} or json.decode(body)
+			local accepted, payload, reason = command.read_exit_receipt(body)
+			assert(accepted, 'native SQLite exit receipt failed: ' .. tostring(reason))
+			local rows = payload == '' and {} or json.decode(payload)
 			assert(type(rows) == 'table', 'native SQLite must return JSON rows')
 			row_count = row_count + #rows
 			return body
