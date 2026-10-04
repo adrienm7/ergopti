@@ -1,0 +1,42 @@
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -531,6 +531,9 @@
+ #Include vendor/WebView2.ahk
+ BootProfile_Stamp("WebView and metrics UI state initialised")
+ #Include infra/webview_utils.ahk
++#Include modules/network/failure_host.ahk
++#Include ui/download_window/session.ahk
++#Include ui/download_window/init.ahk
+ #Include ui/console_window.ahk
+ #Include modules/keylogger/keylogger_app_categories.ahk
+ #Include modules/keylogger/keylogger.ahk
+@@ -730,6 +733,9 @@
+ ; Right after the logger: every later ERROR of the boot can open the error
+ ; window, which waits for the driver to be ready before it shows
+ ErrorDialog_Init(_IniCache)
++ManagedNetworkFailureWindows_Init()
++Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
++	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
+ bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
+ if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
+ 		bootScriptName := A_ScriptFullPath
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -263,6 +263,9 @@
+ #Include ../infra/registry.ahk
+ #Include ../infra/json.ahk
+ #Include ../../_shared/modules/network/failure.ahk
++#Include ../modules/network/failure_host.ahk
++#Include ../ui/download_window/session.ahk
++#Include ../ui/download_window/init.ahk
+ ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
+ ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
+ ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
+@@ -1047,6 +1050,7 @@
+ #Include meta/test_remote_generate_curl_dispatch.ahk
+ #Include unit/test_network_dispatch_nonblocking.ahk
+ #Include unit/test_managed_network_failure.ahk
++#Include unit/test_managed_network_windows_actions.ahk
+ #Include meta/test_remote_connect_timeout_bounded.ahk
+ #Include meta/test_keylogger_json_64bit_decode.ahk
+ #Include meta/test_crash_build_offthread.ahk
