@@ -2001,13 +2001,22 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 103, macOS 180, Linux 111, each
+  drivers still build (current baseline: Windows 96, macOS 153, Linux 97, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+
+The fixed per-key native/no-action command now consumes one shared command
+declaration on all three drivers, with the existing Windows/Linux and macOS
+caption variants and their original native persistence owners. Tap/hold pickers
+and the native separator remain driver-owned. The existing scanner retires one
+fixed caption source per driver: Windows/macOS/Linux 97/154/98 to 96/153/97.
+Independent caption/state/platform corpus and actual menu callback regressions
+cover the bounded slice; hosted Windows execution, physical native validation
+and the final complete three-OS gate remain required. This item stays partial.
 
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
@@ -2433,7 +2442,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 103, macOS 180 and Linux 111 rows are still built by the
+  Windows 96, macOS 153 and Linux 97 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -2474,6 +2483,12 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 The fixed Linux selection helper trio is now declared; see item 54 for its
 independent regression evidence and remaining separator/native qualification.
+
+The per-key native/no-action command uses the shared declaration on all three
+drivers, retaining each platform's established caption and native callback.
+Only this fixed command source is retired; tap/hold pickers, separators and
+remaining provider rows keep items 54 and 81 partial. Final native qualification
+is still required.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and

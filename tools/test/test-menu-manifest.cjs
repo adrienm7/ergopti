@@ -1782,3 +1782,44 @@ checkPrivacyTriggerControls();
 		'Number-row choices: one typed declaration, 21 translations and three native providers.'
 	);
 }
+
+// Per-key clearing keeps the established caption and native owner on each platform.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/tap_hold_key_native.json'),
+			'utf8'
+		)
+	);
+	assert.equal(
+		corpus.variants.length,
+		2,
+		'both established platform caption variants remain independent'
+	);
+	assert.deepEqual(
+		manifest[corpus.section],
+		corpus.variants.map((variant) => ({
+			type: 'command',
+			id: variant.id,
+			i18n: variant.label_key,
+			disabled_when: ['tap_hold_key_configured'],
+			platforms: variant.platforms,
+			unavailable: 'hide'
+		})),
+		'the shared declaration owns each platform caption and per-key availability'
+	);
+	for (const [path, consumer, id] of [
+		['windows/ui/menu/menu_taphold.ahk', 'MenuRenderer_CommandRow', 'tap_hold_key_native'],
+		['macos/ui/menu/menu_tap_holds.lua', 'ManifestMenu.command_row', 'tap_hold_key_no_action'],
+		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row', 'tap_hold_key_native']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
+		assert(
+			source.includes(consumer + '("tap_hold_key_native_commands", "' + id + '"'),
+			path + ' must consume the actual declared clearing command'
+		);
+	}
+	console.log('Tap-Hold key clearing: declared platform captions and unchanged native owners.');
+}

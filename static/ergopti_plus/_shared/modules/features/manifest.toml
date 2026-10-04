@@ -6318,6 +6318,24 @@ disabled_when = ["selection_paste_plain_ready"]
 platforms = ["linux"]
 unavailable = "hide"
 
+# A key's native/no-action command keeps its established caption per platform.
+# Native binding persistence and reload/deployment remain owned by each driver.
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_native"
+i18n = "tap_hold.action.disable"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_no_action"
+i18n = "menu.tapholds.nothing_tap_hold"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["hs"]
+unavailable = "hide"
+
 # Native prompts and modifier picker subtrees retain their own settings owners.
 [[menu.llm_navigation_rows]]
 type = "list"

@@ -3671,11 +3671,9 @@ local function _build_tap_holds(ctx)
 					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
 				checked = configured or nil,
 				items = {
-					{
-						label = i18n_safe("tap_hold.action.disable"),
-						disabled = not configured or nil,
-						action = function() changed(Writer.set_native(key_id)) end,
-					},
+					ManifestMenu.command_row("tap_hold_key_native_commands", "tap_hold_key_native", {
+						["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
+					}, { ["tap_hold_key_configured"] = function() return configured end }),
 					{ separator = true },
 					{
 						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
