@@ -43,6 +43,7 @@
 local M = {}
 
 local Shell = require("adapters.shell_runner")
+local SqliteLiteral = require("sqlite.literal")
 
 
 
@@ -159,7 +160,7 @@ end
 --- @param value string Content between the caller's literal quotes.
 --- @return string Escaped content with native control bytes expressed in SQL.
 function M.escape_literal(value)
-	return (value:gsub("'", "''"):gsub("\r", "'||char(13)||'"):gsub("%z", "'||char(0)||'"))
+	return SqliteLiteral.escape(value)
 end
 
 --- Decodes the terminal receipt of a capture_exit invocation.

@@ -281,6 +281,25 @@ helpers.describe("text_migration plan — what may be rewritten", function()
 end)
 
 
+helpers.describe("text_migration plan — literal byte preservation", function()
+	for _, case in ipairs({
+		{ "CRLF", "a\r\nb", "a'||char(13)||'\nb" },
+		{ "NUL", "a\0b", "a'||char(0)||'b" },
+		{ "mixed", "'\0\r\n'", "''" .. "'||char(0)||'" .. "'||char(13)||'\n''" },
+	}) do
+		helpers.it("linux-migration-literal: " .. case[1] .. " retains complete decrypted values in owned SQL", function()
+			local escaped = Plan.sql_quote(case[2])
+			helpers.assert_eq(escaped, case[3])
+			local sql = assert(Plan.update_row_sql(DEVICE, 7, {{ name = "text", value = case[2] }}))
+			helpers.assert_contains(sql, "text = '" .. escaped .. "'")
+			helpers.assert_contains(sql, "device_id = '" .. DEVICE .. "' AND id = 7")
+			helpers.assert_true(sql:find("\0", 1, true) == nil and sql:find("\r", 1, true) == nil,
+				"native script must represent these data bytes rather than pass unrepresentable framing")
+		end)
+	end
+end)
+
+
 helpers.describe("text_migration plan — the idempotence rule", function()
 	helpers.it("converts only what is not already in the target state", function()
 		local envelope = TextCrypto.wrap(IV, "AABB")

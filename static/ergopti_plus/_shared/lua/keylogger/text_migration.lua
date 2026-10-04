@@ -38,6 +38,7 @@
 --- ==============================================================================
 
 local M = {}
+local SqliteLiteral = require("sqlite.literal")
 
 
 
@@ -130,7 +131,7 @@ end
 --- @return string The literal body, WITHOUT its surrounding quotes.
 function M.sql_quote(value)
 	if type(value) ~= "string" then value = tostring(value == nil and "" or value) end
-	return (value:gsub("'", "''"))
+	return SqliteLiteral.escape(value)
 end
 
 --- Counts the rows this migration is allowed to touch, so progress can be
