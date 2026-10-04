@@ -133,13 +133,17 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 	}
 
 	private func archive(_ format: String, app: URL, root: URL) throws -> URL {
-		let target = root.appendingPathComponent("payload." + format)
-		if format == "tar.xz" {
-			_ = try successful("/usr/bin/tar", ["-cJf", target.path, "-C", app.deletingLastPathComponent().path, app.lastPathComponent], root: root)
-		} else {
-			_ = try successful("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app.path, target.path], root: root)
-		}
-		return target
+		let output = root.appendingPathComponent("produced-" + UUID().uuidString)
+		try manager.createDirectory(at: output, withIntermediateDirectories: false)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
+		let produced = try successful("/usr/bin/env", ["node", owner.path, app.path, output.path], root: root)
+		XCTAssertEqual(produced.stdout,
+			"Created ErgoptiPlus.app.tar.xz\nCreated ErgoptiPlus.app.zip\n",
+			"The actual producer emits both canonical names after native readback verification")
+		XCTAssertTrue(produced.stderr.isEmpty, produced.stderr)
+		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("ErgoptiPlus.app.zip").path))
+		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("ErgoptiPlus.app.tar.xz").path))
+		return output.appendingPathComponent(format == "zip" ? "ErgoptiPlus.app.zip" : "ErgoptiPlus.app.tar.xz")
 	}
 
 	private func digest(_ payload: URL, root: URL) throws -> String {
@@ -232,7 +236,8 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertEqual(foreignIdentity.status, 27, "A valid foreign signature cannot replace the running identity")
 		XCTAssertFalse(foreignIdentity.stdout.contains("READY"))
 		try Data("Corrupted signed resource\n".utf8).write(to: app.appendingPathComponent("Contents/Resources/données.txt"))
-		let broken = try archive("tar.xz", app: app, root: root)
+		let broken = root.appendingPathComponent("corrupted-resource.tar.xz")
+		_ = try successful("/usr/bin/tar", ["-cJf", broken.path, "-C", app.deletingLastPathComponent().path, app.lastPathComponent], root: root)
 		let (signature, _, _) = try stage(payload: broken, format: "tar.xz",
 			digest: digest(broken, root: root), running: app, expectedVersion: version, root: root)
 		XCTAssertEqual(signature.status, 27)

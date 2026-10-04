@@ -11,8 +11,9 @@
 # spawns the embedded Hammerspoon under a rebranded bundle id.
 #
 # OUTPUT:
-#  build/macos/Ergopti.app          — bundle ready to launch
-#  build/macos/Ergopti.app.zip      — release asset (Sparkle expects a zip)
+#  build/macos/ErgoptiPlus.app          — signed bundle ready to launch
+#  build/macos/ErgoptiPlus.app.zip      — historical ZIP release asset
+#  build/macos/ErgoptiPlus.app.tar.xz   — preferred archive consumer prerequisite
 #  build/macos/appcast.xml-payload  — the <enclosure> snippet for the appcast,
 #                                     emitted once the zip is signed below.
 #
@@ -666,9 +667,9 @@ codesign_app() {
 
 }
 
-# Zip the bundle as a release artefact. Sparkle expects a zip whose top-level
-# entry is the .app itself (no extra wrapping directory). -9 is still plain
-# deflate, which ditto, Sparkle and Homebrew extract unchanged, at a smaller size.
+# Package only the source-native helper here. Its existing ZIP stays separate
+# from the full release archive owner; maximum deflate and symbolic links remain
+# unchanged for checkout startup and helper installation.
 zip_app() {
 	log "Zipping $APP_PATH → $ZIP_PATH"
 	(cd "$BUILD_DIR" && zip -qry -9 "$(basename "$ZIP_PATH")" "$(basename "$APP_PATH")")
@@ -720,7 +721,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
-	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil shasum git node; do
+	for cmd in curl unzip zip ditto tar swift lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
 	check_signing_configuration
@@ -740,11 +741,11 @@ main() {
 	codesign_app
 	verify_app_signature "$APP_PATH"
 	verify_app_signature "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
-	zip_app
+	node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"
 
 	log "Done."
 	log "  bundle      : $APP_PATH"
-	log "  zip         : $ZIP_PATH"
+	log "  archives    : shared release_install.macos_archives"
 	log "  version    : $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
 	log "  channel    : $ERGOPTI_CHANNEL"
 	log "  hammerspoon: $HAMMERSPOON_VERSION"

@@ -361,9 +361,9 @@ jobs:
           (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
           echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
-      # One artifact on every run: launch installs its zip, and on a release
-      # run Release attaches all of it. Outside a release only the app zip
-      # exists. Seven days on a release run, so a next-day re-run of failed
+      # Both app formats remain in the package artifact. Launch, the public
+      # release whitelist, Sparkle signatures/feed and Homebrew still use ZIP
+      # until their separate migration. Seven days on a release run, so a next-day re-run of failed
       # jobs still finds the archive this job gated.
       - name: Upload the package
         uses: actions/upload-artifact@v4
@@ -374,6 +374,7 @@ jobs:
           if-no-files-found: error
           path: |
             build/macos/ErgoptiPlus.app.zip
+            build/macos/ErgoptiPlus.app.tar.xz
             build/macos/Ergopti_macOS.zip
             build/macos/_ErgoptiPlus.app.zip.sig
             build/macos/appcast-*.xml
