@@ -1362,6 +1362,204 @@ class NoPromptServerSample:
         return self.interval_qualified
 
 
+class ManagedLaunchObservation:
+    """Own one concurrent AppKit read; its result never admits AppleEvents."""
+
+    CONTRACT = "hs.managed.public-launch-state"
+
+    def __init__(self, pid, executable, domain, nonce, processes):
+        self.pid, self.executable, self.domain = pid, executable, domain
+        self.nonce, self.processes = nonce, processes
+        self.process = None
+        self.thread = None
+        self.packet = None
+        self.failure = "unobserved"
+        self.created = time.monotonic()
+        self.query_begin = self.query_end = None
+        self.control_begin = self.control_end = None
+        self.stop = threading.Event()
+
+    @staticmethod
+    def script():
+        # Native getters are deliberately not coerced: native calibration owns their ABI.
+        return """ObjC.import('AppKit');
+ObjC.import('Foundation');
+function run(argv) {
+    try {
+        var pid = Number(argv[0]);
+        if (!Number.isSafeInteger(pid) || pid <= 0) throw Error('identity');
+        var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(pid);
+        ObjC.castObjectToRef(app);
+        if (app.isNil() !== false || app.isKindOfClass($.NSRunningApplication) !== true)
+            throw Error('class');
+        var observedPid = app.processIdentifier;
+        var terminated = app.isTerminated;
+        var finished = app.isFinishedLaunching;
+        var path = ObjC.unwrap(app.executableURL.path);
+        var bundle = ObjC.unwrap(app.bundleIdentifier);
+        if (typeof observedPid !== 'number' || observedPid !== pid
+            || typeof terminated !== 'boolean' || terminated !== false
+            || typeof finished !== 'boolean' || typeof path !== 'string'
+            || typeof bundle !== 'string' || path !== argv[1] || bundle !== argv[2])
+            throw Error('identity');
+        return JSON.stringify({schema_version:1,contract:'hs.managed.public-launch-state',
+            nonce:argv[3],pid:observedPid,
+            sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),
+            executable:path,bundle_id:bundle,native_class:true,terminated:terminated,
+            raw_type:typeof finished,finished_launching:finished});
+    } catch (_) { throw Error('Managed public AppKit observation refused'); }
+}
+"""
+
+    def start(self):
+        if self.thread is not None:
+            raise RuntimeError("Managed public observer already started")
+        self.thread = threading.Thread(target=self._observe, daemon=True)
+        self.thread.start()
+        return self
+
+    def _observe(self):
+        try:
+            if self.processes(self.executable) != [self.pid] or self.stop.is_set():
+                self.failure = "identity-refused"
+                return
+            self.query_begin = time.monotonic()
+            self.process = subprocess.Popen(
+                [
+                    "/usr/bin/osascript",
+                    "-l",
+                    "JavaScript",
+                    "-e",
+                    self.script(),
+                    str(self.pid),
+                    str(self.executable),
+                    self.domain,
+                    self.nonce,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if self.stop.is_set():
+                self.process.kill()
+            stdout, _ = self.process.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
+            if self.process.returncode != 0 or len(stdout) > 16384:
+                self.failure = "query-refused"
+                return
+            packet = json.loads(stdout, object_pairs_hook=unique_object)
+            if not self.valid_packet(packet) or self.processes(self.executable) != [self.pid]:
+                self.failure = "identity-refused"
+                return
+            self.packet = packet
+            self.query_end = time.monotonic()
+            self.failure = None
+        except subprocess.TimeoutExpired:
+            self.failure = "query-timeout"
+        except Exception:
+            # Arbitrary Cocoa errors, stderr, source and private paths are never diagnostic text.
+            self.failure = "query-refused"
+        finally:
+            if self.process is not None and self.process.returncode is None:
+                try:
+                    self.process.kill()
+                    self.process.communicate(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                except Exception:
+                    self.failure = "cleanup-unsettled"
+
+    def valid_packet(self, packet):
+        return (
+            type(packet) is dict
+            and set(packet)
+            == {
+                "schema_version",
+                "contract",
+                "nonce",
+                "pid",
+                "sender_pid",
+                "executable",
+                "bundle_id",
+                "native_class",
+                "terminated",
+                "raw_type",
+                "finished_launching",
+            }
+            and type(packet["schema_version"]) is int
+            and packet["schema_version"] == 1
+            and packet["contract"] == self.CONTRACT
+            and packet["nonce"] == self.nonce
+            and type(packet["pid"]) is int
+            and packet["pid"] == self.pid
+            and self.process is not None
+            and type(packet["sender_pid"]) is int
+            and packet["sender_pid"] == self.process.pid
+            and packet["executable"] == str(self.executable)
+            and packet["bundle_id"] == self.domain
+            and packet["native_class"] is True
+            and packet["terminated"] is False
+            and packet["raw_type"] == "boolean"
+            and type(packet["finished_launching"]) is bool
+        )
+
+    def mark_control_entry(self):
+        self.control_begin = time.monotonic()
+
+    def mark_control_exit(self):
+        self.control_end = time.monotonic()
+
+    def finish(self):
+        try:
+            if self.thread is not None:
+                remaining = max(0, self.created + SCRIPTING_TIMEOUT_SECONDS - time.monotonic())
+                self.thread.join(timeout=remaining)
+                if self.thread.is_alive() or (
+                    self.process is not None and self.process.returncode is None
+                ):
+                    self.stop.set()
+                    if self.process is not None and self.process.returncode is None:
+                        self.process.kill()
+                    self.thread.join(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                if (
+                    not self.thread.is_alive()
+                    and self.process is not None
+                    and self.process.returncode is None
+                ):
+                    self.process.communicate(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                if self.thread.is_alive() or (
+                    self.process is not None and self.process.returncode is None
+                ):
+                    raise RuntimeError("Managed public observer cleanup has not settled")
+        except Exception:
+            # Keep owned debt and close exception text: TimeoutExpired embeds argv and nonce.
+            raise RuntimeError("Managed public observer cleanup has not settled") from None
+        timing = "unknown"
+        if (
+            self.packet is not None
+            and self.query_begin is not None
+            and self.query_end is not None
+            and self.control_begin is not None
+            and self.control_end is not None
+        ):
+            if self.query_end <= self.control_begin:
+                timing = "before_path"
+            elif self.query_begin >= self.control_end:
+                timing = "after_path"
+            else:
+                timing = "overlaps_path"
+        return {
+            "contract": self.CONTRACT,
+            "observation": "observed" if self.packet else "unobserved",
+            "finished_launching": self.packet["finished_launching"] if self.packet else None,
+            "timing": timing,
+            "query_begin": self.query_begin,
+            "query_end": self.query_end,
+            "control_begin": self.control_begin,
+            "control_end": self.control_end,
+            "failure": self.failure,
+            "qualified": False,
+            "readiness": "unobserved",
+        }
+
+
 class NativeDelayedTimerProbe:
     """Use the launch gate's signed embedded runtime without starting another process."""
 
@@ -1380,6 +1578,15 @@ class NativeDelayedTimerProbe:
         self.no_prompt_scope = None
         self.server_sample_workers = []
         self.no_prompt_sample_diagnostics = []
+        self.managed_launch_observation = None
+
+    def start_managed_launch_observation(self, pid, processes):
+        if self.managed_launch_observation is not None:
+            raise RuntimeError("Managed public observer already has an owner")
+        self.managed_launch_observation = ManagedLaunchObservation(
+            pid, self.executable, self.domain, self.nonce, processes
+        ).start()
+        return self.managed_launch_observation
 
     @staticmethod
     def executable_path(app):
@@ -1567,23 +1774,32 @@ class NativeDelayedTimerProbe:
 
     def control(self, pid, processes):
         """Test the same live AppleEvent handler with an exact owned nonce line."""
-        self.bind_runtime(pid, processes)
-        acknowledgement = self.execute("return " + json.dumps(self.nonce), phase="control")
-        if type(acknowledgement) is not str or acknowledgement != self.nonce:
-            raise RuntimeError("The native AppleEvent control owner did not acknowledge its nonce")
-        if processes(self.executable) != [pid]:
-            raise RuntimeError(
-                "The native AppleEvent control process changed before receipt admission"
-            )
-        return {
-            "schema_version": 1,
-            "contract": CONTROL_CONTRACT,
-            "phase": "control",
-            "acknowledged": True,
-            "nonce": self.nonce,
-            "pid": pid,
-            "executable": str(self.executable),
-        }
+        observer = self.managed_launch_observation
+        if observer is not None:
+            observer.mark_control_entry()
+        try:
+            self.bind_runtime(pid, processes)
+            acknowledgement = self.execute("return " + json.dumps(self.nonce), phase="control")
+            if type(acknowledgement) is not str or acknowledgement != self.nonce:
+                raise RuntimeError(
+                    "The native AppleEvent control owner did not acknowledge its nonce"
+                )
+            if processes(self.executable) != [pid]:
+                raise RuntimeError(
+                    "The native AppleEvent control process changed before receipt admission"
+                )
+            return {
+                "schema_version": 1,
+                "contract": CONTROL_CONTRACT,
+                "phase": "control",
+                "acknowledged": True,
+                "nonce": self.nonce,
+                "pid": pid,
+                "executable": str(self.executable),
+            }
+        finally:
+            if observer is not None:
+                observer.mark_control_exit()
 
     @staticmethod
     def pid_event_constructor():
@@ -2271,6 +2487,8 @@ function run(argv) {
 
     def restore(self):
         """Restore the scripting key after ordinary Quit or exact process cleanup."""
+        if self.managed_launch_observation is not None:
+            self.managed_launch_observation.finish()
         for command in list(self.scripting_commands):
             self.retire_scripting_command(command)
         for worker in list(self.server_sample_workers):

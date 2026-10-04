@@ -304,6 +304,8 @@ def seed(scenario, home, seed_tag, today):
 def evaluate(scenario, observation):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
+    if observation.get("managed_launch_observation_error") == "observer-cleanup-unsettled":
+        failures.append("the supplemental managed public observer cleanup has not settled")
     if scenario in ("clean", "karabiner_config"):
         if observation.get("native_transport_control_error"):
             failures.append(
@@ -628,6 +630,18 @@ def print_native_probe_diagnostics(report):
             "timing=unknown; qualified=false"
         )
 
+    managed = report.get("managed_launch_observation")
+    if isinstance(managed, dict):
+        value = managed.get("finished_launching")
+        state = "true" if value is True else "false" if value is False else "unknown"
+        timing = managed.get("timing")
+        if timing not in ("before_path", "overlaps_path", "after_path"):
+            timing = "unknown"
+        print(
+            "native probe managed public launch state: "
+            f"finished_launching={state}; timing={timing}; qualified=false; readiness=unobserved"
+        )
+
 
 def print_tails(output):
     """Print the relevant log tails into the job log so a red gate is readable."""
@@ -716,6 +730,10 @@ def run(app, output, scenario, seed_tag):
                         "The native probe requires the launcher's single exact child"
                     )
                 try:
+                    native_probe.start_managed_launch_observation(child_pids[0], processes)
+                except Exception:
+                    observation["managed_launch_observation_error"] = "observer-start-refused"
+                try:
                     observation["native_transport_control"] = native_probe.control(
                         child_pids[0], processes
                     )
@@ -756,6 +774,15 @@ def run(app, output, scenario, seed_tag):
                 observation[native_result_key] = native_probe.observe(child_pids[0], processes)
             except Exception as error:
                 observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
+            finally:
+                observer = native_probe.managed_launch_observation
+                if observer is not None:
+                    try:
+                        observation["managed_launch_observation"] = observer.finish()
+                    except Exception:
+                        observation["managed_launch_observation_error"] = (
+                            "observer-cleanup-unsettled"
+                        )
         observation["quit_seconds"] = (
             quit_application(bundle_id, (launcher, child))
             if observation["alive_after_window"]
@@ -823,6 +850,11 @@ def run(app, output, scenario, seed_tag):
                         previous + "; " if previous else ""
                     ) + f"preference restoration failed: {error}"
     if native_probe:
+        report["managed_launch_observation"] = observation.get("managed_launch_observation")
+        if observation.get("managed_launch_observation_error"):
+            report["managed_launch_observation_error"] = observation[
+                "managed_launch_observation_error"
+            ]
         report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
         report["supplementary_received_lua_stage"] = native_probe.observe_early_lua_stage(
             observation.get("boot_log", "")

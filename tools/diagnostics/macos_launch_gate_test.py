@@ -1076,5 +1076,159 @@ class EarlyLuaJournalObservationTests(unittest.TestCase):
             self.assertTrue(gate.evaluate(scenario, after))
 
 
+class ConcurrentManagedLaunchGateTests(unittest.TestCase):
+    """The gate retires the independent reader after every original control attempt."""
+
+    def test_public_launch_stdout_never_prints_foreign_payload_or_promotes_readiness(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            gate.print_native_probe_diagnostics(
+                {
+                    "managed_launch_observation": {
+                        "finished_launching": "PRIVATE",
+                        "timing": "PRIVATE",
+                        "qualified": True,
+                    }
+                }
+            )
+        self.assertNotIn("PRIVATE", output.getvalue())
+        self.assertIn(
+            "finished_launching=unknown; timing=unknown; qualified=false", output.getvalue()
+        )
+
+    def exercise(self, refuse_feature=False, refuse_cleanup=False):
+        with tempfile.TemporaryDirectory() as directory:
+            home, app = Path(directory) / "home", Path(directory) / "ErgoptiPlus.app"
+            output = Path(directory) / "evidence"
+            output.mkdir()
+            child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
+            launcher = app / "Contents/MacOS/ErgoptiPlus"
+            for executable in (launcher, child):
+                executable.parent.mkdir(parents=True)
+                executable.write_text("inert exact executable")
+            with (app / "Contents/Info.plist").open("wb") as file:
+                plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, file)
+            owner = timer_probe.NativeDelayedTimerProbe(app, output, gate.HS_DOMAIN)
+            owner.nonce = "a" * 32
+            seen, live = [], {"started": False}
+            observer = mock.Mock()
+
+            def begin(pid, resolve):
+                seen.append("observer-start")
+                owner.managed_launch_observation = observer
+                return observer
+
+            def finish():
+                seen.append("observer-join")
+                if refuse_cleanup:
+                    raise RuntimeError("arbitrary private worker text")
+                return {"observation": "unobserved", "qualified": False, "timing": "unknown"}
+
+            observer.finish.side_effect = finish
+
+            def step(name, value):
+                def invoke(*arguments):
+                    seen.append(name)
+                    return value
+
+                return invoke
+
+            def feature(*arguments):
+                seen.append("feature")
+                if refuse_feature:
+                    raise RuntimeError("original feature refused")
+                return timer_summary()
+
+            def quit_owned(*arguments):
+                seen.append("quit")
+                live["started"] = False
+                return 0.5
+
+            def native_run(arguments, **options):
+                if arguments[0] == "open":
+                    live["started"] = True
+                return subprocess.CompletedProcess(arguments, 0, "arm64", "")
+
+            def processes(executable):
+                return [42 if executable == child else 41] if live["started"] else []
+
+            with (
+                mock.patch.object(gate.Path, "home", return_value=home),
+                mock.patch.object(gate, "seed", return_value={"logs_dir": gate.logs_folder(home)}),
+                mock.patch.object(gate, "NativeDelayedTimerProbe", return_value=owner),
+                mock.patch.object(owner, "enable"),
+                mock.patch.object(owner, "start_managed_launch_observation", side_effect=begin),
+                mock.patch.object(owner, "control", side_effect=step("path", control_summary())),
+                mock.patch.object(
+                    owner, "constructor_control", side_effect=step("constructor", {})
+                ),
+                mock.patch.object(owner, "control_pid", side_effect=step("pid", {})),
+                mock.patch.object(
+                    owner, "control_pid_no_prompt", side_effect=step("no-prompt", {})
+                ),
+                mock.patch.object(owner, "observe", side_effect=feature),
+                mock.patch.object(owner, "restore"),
+                mock.patch.object(gate, "processes", side_effect=processes),
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
+                mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
+                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
+                mock.patch.object(gate, "check_state", return_value=[]),
+                mock.patch.object(gate, "quit_application", side_effect=quit_owned),
+                mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
+                mock.patch.object(
+                    gate.SupplementaryNativeBootstrap,
+                    "observe",
+                    side_effect=RuntimeError("supplement refused"),
+                ),
+            ):
+                report = gate.run(app, output, "clean", "")
+            return seen, report
+
+    def test_original_controls_proceed_before_observer_join(self):
+        seen, report = self.exercise()
+        self.assertEqual(
+            seen,
+            [
+                "observer-start",
+                "path",
+                "constructor",
+                "pid",
+                "no-prompt",
+                "feature",
+                "observer-join",
+                "quit",
+            ],
+        )
+        self.assertEqual(report["managed_launch_observation"]["qualified"], False)
+        self.assertEqual(report["native_transport_control"], control_summary())
+
+    def test_original_feature_refusal_still_precedes_independent_retirement(self):
+        seen, report = self.exercise(refuse_feature=True)
+        self.assertEqual(
+            seen,
+            [
+                "observer-start",
+                "path",
+                "constructor",
+                "pid",
+                "no-prompt",
+                "feature",
+                "observer-join",
+                "quit",
+            ],
+        )
+        self.assertTrue(any("original feature refused" in reason for reason in report["failures"]))
+        self.assertFalse(report["managed_launch_observation"]["qualified"])
+
+    def test_unsettled_cleanup_adds_failure_without_masking_original(self):
+        seen, report = self.exercise(refuse_feature=True, refuse_cleanup=True)
+        self.assertEqual(seen.index("observer-join"), 6)
+        self.assertEqual(report["managed_launch_observation_error"], "observer-cleanup-unsettled")
+        self.assertTrue(any("public observer cleanup" in reason for reason in report["failures"]))
+        self.assertTrue(any("original feature refused" in reason for reason in report["failures"]))
+        self.assertNotIn("arbitrary private", json.dumps(report))
+
+
 if __name__ == "__main__":
     unittest.main()

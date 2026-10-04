@@ -3980,5 +3980,546 @@ class EarlyLuaInterpreterPrerequisiteTests(unittest.TestCase):
             )
 
 
+class ManagedLaunchObservationTests(unittest.TestCase):
+    """Independent executors cannot let launch-state information admit transport."""
+
+    def owner(self):
+        return probe.ManagedLaunchObservation(42, EXECUTABLE, DOMAIN, NONCE, lambda _: [42])
+
+    def packet(self, sender=123):
+        return {
+            "schema_version": 1,
+            "contract": probe.ManagedLaunchObservation.CONTRACT,
+            "nonce": NONCE,
+            "pid": 42,
+            "sender_pid": sender,
+            "executable": str(EXECUTABLE),
+            "bundle_id": DOMAIN,
+            "native_class": True,
+            "terminated": False,
+            "raw_type": "boolean",
+            "finished_launching": True,
+        }
+
+    def test_real_held_observer_cannot_delay_original_first_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            release = Path(directory) / "release"
+            original_popen = subprocess.Popen
+            seen = []
+            script = "import os,json,sys,time; p=json.loads(sys.argv[2]); p['sender_pid']=os.getpid();\nwhile not os.path.exists(sys.argv[1]): time.sleep(.005)\nprint(json.dumps(p))"
+
+            def spawn(arguments, **options):
+                seen.append(arguments)
+                child = original_popen(
+                    [sys.executable, "-c", script, str(release), json.dumps(self.packet())],
+                    **options,
+                )
+                # The list is populated later by actual communicate calls.
+                child._observed_budgets = observe_child_budgets(child)
+                return child
+
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(directory), DOMAIN
+            )
+            owner.nonce = NONCE
+            with mock.patch.object(probe.subprocess, "Popen", side_effect=spawn):
+                observation = owner.start_managed_launch_observation(42, lambda _: [42])
+                control_seen = []
+
+                def execute(source, **options):
+                    control_seen.append((source, observation.thread.is_alive(), release.exists()))
+                    return NONCE
+
+                with mock.patch.object(owner, "execute", side_effect=execute):
+                    result = owner.control(42, lambda _: [42])
+                self.assertEqual(len(control_seen), 1)
+                self.assertEqual(control_seen[0], ('return "' + NONCE + '"', True, False))
+                self.assertTrue(result["acknowledged"])
+                release.write_text("now the independent observer may reply")
+                summary = observation.finish()
+            self.assertEqual(len(seen), 1)
+            self.assertNotIn("sendEvent", seen[0][4])
+            self.assertNotIn("NSAppleEvent", seen[0][4])
+            self.assertEqual(observation.process._observed_budgets, [10])
+            self.assertEqual(observation.process.returncode, 0)
+            self.assertIn(summary["timing"], ("overlaps_path", "after_path"))
+            self.assertFalse(summary["qualified"])
+            self.assertEqual(summary["readiness"], "unobserved")
+
+    def test_parent_brackets_classify_only_completed_before_actual_entry(self):
+        for begin, end, expected in [
+            (1, 2, "before_path"),
+            (2, 5, "overlaps_path"),
+            (3.1, 3.2, "overlaps_path"),
+            (4, 5, "after_path"),
+        ]:
+            with self.subTest(expected=expected, begin=begin):
+                owner = self.owner()
+                owner.packet = self.packet()
+                owner.query_begin, owner.query_end = begin, end
+                owner.control_begin, owner.control_end = 3, 4
+                result = owner.finish()
+                self.assertEqual(result["timing"], expected)
+                self.assertFalse(result["qualified"])
+        owner.control_end = None
+        self.assertEqual(owner.finish()["timing"], "unknown")
+
+    def test_packet_requires_native_identity_nonce_actual_sender_and_boolean(self):
+        owner = self.owner()
+        owner.process = mock.Mock(pid=123)
+        self.assertTrue(owner.valid_packet(self.packet()))
+        for field, value in [
+            ("native_class", False),
+            ("terminated", True),
+            ("pid", True),
+            ("pid", 43),
+            ("sender_pid", 124),
+            ("nonce", "b" * 32),
+            ("executable", "/foreign"),
+            ("bundle_id", "foreign"),
+            ("raw_type", "number"),
+            ("finished_launching", 1),
+            ("finished_launching", "true"),
+            ("schema_version", True),
+        ]:
+            changed = self.packet()
+            changed[field] = value
+            self.assertFalse(owner.valid_packet(changed), field)
+        for field in self.packet():
+            changed = self.packet()
+            del changed[field]
+            self.assertFalse(owner.valid_packet(changed), field)
+        changed = self.packet()
+        changed["foreign"] = True
+        self.assertFalse(owner.valid_packet(changed))
+        changed = self.packet()
+        changed["finished_launching"] = False
+        self.assertTrue(
+            owner.valid_packet(changed), "false is a public value, not a refusal or readiness"
+        )
+
+    def test_foreign_owner_refuses_without_spawning_and_failure_is_closed(self):
+        owner = self.owner()
+        owner.processes = lambda _: [43]
+        with mock.patch.object(probe.subprocess, "Popen") as spawned:
+            result = owner.start().finish()
+        spawned.assert_not_called()
+        self.assertEqual(result["observation"], "unobserved")
+        self.assertEqual(result["failure"], "identity-refused")
+        owner = self.owner()
+        with mock.patch.object(
+            probe.subprocess, "Popen", side_effect=OSError("PRIVATE arbitrary path")
+        ):
+            result = owner.start().finish()
+        self.assertNotIn("PRIVATE", json.dumps(result))
+        self.assertEqual(result["failure"], "query-refused")
+
+    def test_actual_child_timeout_retires_without_promoting_missing_result(self):
+        native_popen = subprocess.Popen
+        with (
+            mock.patch.object(probe, "SCRIPTING_TIMEOUT_SECONDS", 0.05),
+            mock.patch.object(
+                probe.subprocess,
+                "Popen",
+                side_effect=lambda arguments, **options: native_popen(
+                    [sys.executable, "-c", "import time; time.sleep(30)"], **options
+                ),
+            ),
+        ):
+            owner = self.owner()
+            result = owner.start().finish()
+        self.assertIsNotNone(owner.process.returncode)
+        self.assertFalse(owner.thread.is_alive())
+        self.assertEqual(result["observation"], "unobserved")
+        self.assertFalse(result["qualified"])
+
+    def test_unsettled_child_and_thread_remain_cleanup_debt(self):
+        owner = self.owner()
+        owner.thread = mock.Mock()
+        owner.thread.is_alive.return_value = True
+        owner.process = mock.Mock(returncode=None)
+        with self.assertRaisesRegex(RuntimeError, "cleanup has not settled"):
+            owner.finish()
+        self.assertIsNotNone(owner.process)
+        self.assertIsNotNone(owner.thread)
+        owner.process.kill.assert_called_once()
+
+    def test_restore_cannot_release_preferences_with_observer_debt(self):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path("/tmp"), DOMAIN
+        )
+        owner.managed_launch_observation = mock.Mock()
+        owner.managed_launch_observation.finish.side_effect = RuntimeError("owned debt")
+        with mock.patch.object(owner.preference, "restore") as restored:
+            with self.assertRaisesRegex(RuntimeError, "owned debt"):
+                owner.restore()
+        restored.assert_not_called()
+
+    def test_actual_cleanup_timeout_keeps_debt_and_never_exposes_child_argv(self):
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)", "PRIVATE-NONCE-SOURCE"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        retire = child.kill
+        owner = self.owner()
+        owner.process = child
+        owner.thread = mock.Mock()
+        owner.thread.is_alive.return_value = False
+        try:
+            with (
+                mock.patch.object(child, "kill"),
+                mock.patch.object(probe, "SCRIPT_CLEANUP_TIMEOUT_SECONDS", 0.03),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "cleanup has not settled") as error:
+                    owner.finish()
+            self.assertNotIn("PRIVATE", str(error.exception))
+            self.assertNotIn("sleep", str(error.exception))
+            self.assertIs(owner.process, child)
+            self.assertIsNone(child.returncode)
+        finally:
+            retire()
+            child.communicate(timeout=2)
+        self.assertIsNotNone(child.returncode)
+
+
+class ManagedLaunchNativeCalibrationTests(unittest.TestCase):
+    """Mandatory on native Mac collection; Linux does not claim Cocoa calibration."""
+
+    @unittest.skipUnless(sys.platform == "darwin", "native AppKit calibration unexecuted on Linux")
+    def test_real_nsworkspace_identity_bool_foreign_and_closed_observations(self):
+        swift = r"""
+import AppKit
+import Foundation
+import Darwin
+let args = CommandLine.arguments
+if args.count > 1 && args[1] == "--app" {
+    final class Delegate: NSObject, NSApplicationDelegate {
+        let marker: String
+        init(_ marker: String) { self.marker = marker }
+        func applicationDidFinishLaunching(_ note: Notification) {
+            DispatchQueue.main.async {
+                try! Data("ready".utf8).write(to: URL(fileURLWithPath: self.marker))
+            }
+        }
+    }
+    let application = NSApplication.shared
+    let delegate = Delegate(args[2]); application.delegate = delegate
+    application.setActivationPolicy(.prohibited); application.run()
+} else {
+    let url = URL(fileURLWithPath: args[1])
+    let ready = args[2], receipt = args[3]
+    var application: NSRunningApplication?
+    var launchFailed = false
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.createsNewApplicationInstance = true
+    configuration.activates = false
+    configuration.arguments = ["--app", ready]
+    var environment = ProcessInfo.processInfo.environment
+    environment.removeValue(forKey: "__CFBundleIdentifier")
+    environment.removeValue(forKey: "XPC_SERVICE_NAME")
+    configuration.environment = environment
+    NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+        application = app; launchFailed = error != nil
+    }
+    let deadline = Date().addingTimeInterval(10)
+    while (application == nil || !FileManager.default.fileExists(atPath: ready)) && Date() < deadline && !launchFailed {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    guard let app = application, !app.isTerminated, FileManager.default.fileExists(atPath: ready),
+          let executable = app.executableURL, let bundle = app.bundleIdentifier else { exit(2) }
+    let packet: [String:Any] = ["pid":Int(app.processIdentifier),"executable":executable.path,
+        "bundle_id":bundle,"finished_launching":app.isFinishedLaunching]
+    try JSONSerialization.data(withJSONObject: packet).write(to: URL(fileURLWithPath: receipt))
+    let end = Date().addingTimeInterval(30)
+    while !app.isTerminated && Date() < end { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+    if !app.isTerminated { kill(app.processIdentifier, SIGKILL); exit(3) }
+    exit(0)
+}
+"""
+        import signal
+        import time
+
+        directory = tempfile.mkdtemp(prefix="ergopti-appkit-calibration-")
+        root = Path(directory)
+        source = root / "Calibration.swift"
+        source.write_text(swift)
+        controllers, children, owned_executables, bundles = [], [], set(), []
+
+        def native_owned_pids(expected_executables=None):
+            listing = subprocess.run(
+                ["/bin/ps", "-axo", "pid=,comm="],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            result = []
+            for line in listing.stdout.splitlines():
+                fields = line.strip().split(None, 1)
+                if len(fields) == 2 and fields[1] in (
+                    owned_executables if expected_executables is None else expected_executables
+                ):
+                    result.append(int(fields[0]))
+            return result
+
+        try:
+            for name in ("Owned", "Foreign"):
+                app = root / (name + ".app")
+                exe = app / "Contents/MacOS/Calibration"
+                exe.parent.mkdir(parents=True)
+                with (app / "Contents/Info.plist").open("wb") as file:
+                    plistlib.dump(
+                        {
+                            "CFBundleIdentifier": "com.ergopti.calibration." + name,
+                            "CFBundleExecutable": "Calibration",
+                            "CFBundlePackageType": "APPL",
+                        },
+                        file,
+                    )
+                subprocess.run(
+                    [
+                        "/usr/bin/xcrun",
+                        "swiftc",
+                        "-framework",
+                        "AppKit",
+                        str(source),
+                        "-o",
+                        str(exe),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=60,
+                )
+                subprocess.run(
+                    ["/usr/bin/codesign", "--force", "--sign", "-", str(app)],
+                    check=True,
+                    capture_output=True,
+                    timeout=10,
+                )
+                bundles.append((name, app, exe))
+            # Compile and sign both before either native lifetime begins.
+            for name, app, exe in bundles:
+                ready, receipt = root / (name + ".ready"), root / (name + ".json")
+                controller = subprocess.Popen(
+                    [str(exe), str(app), str(ready), str(receipt)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                controllers.append(controller)
+                owned_executables.add(str(exe.resolve()))
+                owned_executables.add(str(exe))
+                deadline = time.monotonic() + 10
+                while (
+                    not receipt.exists()
+                    and controller.poll() is None
+                    and time.monotonic() < deadline
+                ):
+                    time.sleep(0.01)
+                self.assertTrue(
+                    receipt.exists(),
+                    "real NSWorkspace launch did not publish its native identity",
+                )
+                identity = json.loads(receipt.read_text())
+                children.append(identity)
+                self.assertIs(type(identity["finished_launching"]), bool)
+                self.assertTrue(
+                    identity["finished_launching"],
+                    "independent native Swift owner observes finished launch",
+                )
+            identity = children[0]
+            observation = probe.ManagedLaunchObservation(
+                identity["pid"],
+                Path(identity["executable"]),
+                identity["bundle_id"],
+                NONCE,
+                lambda _: [identity["pid"]],
+            )
+            result = observation.start().finish()
+            self.assertEqual(result["observation"], "observed")
+            self.assertEqual(result["finished_launching"], identity["finished_launching"])
+            self.assertFalse(result["qualified"])
+            foreign = children[1]
+            mismatch = probe.ManagedLaunchObservation(
+                foreign["pid"],
+                Path(identity["executable"]),
+                identity["bundle_id"],
+                NONCE,
+                lambda _: [foreign["pid"]],
+            )
+            self.assertEqual(mismatch.start().finish()["observation"], "unobserved")
+            self.assertIsNone(
+                controllers[0].poll(), "actual retained native controller remains live"
+            )
+            self.assertIn(
+                identity["executable"],
+                {str(bundles[0][2]), str(bundles[0][2].resolve())},
+                "native receipt names only the independently built Owned executable",
+            )
+            self.assertIn(
+                identity["pid"],
+                native_owned_pids({identity["executable"]}),
+                "fresh physical exact Owned executable admits retirement, never remembered PID alone",
+            )
+            os.kill(identity["pid"], signal.SIGKILL)
+            controllers[0].communicate(timeout=2)
+            self.assertEqual(
+                controllers[0].returncode,
+                0,
+                "native retained NSRunningApplication observed its actual termination",
+            )
+            closed = probe.ManagedLaunchObservation(
+                identity["pid"],
+                Path(identity["executable"]),
+                identity["bundle_id"],
+                NONCE,
+                lambda _: [identity["pid"]],
+            )
+            self.assertEqual(closed.start().finish()["observation"], "unobserved")
+        finally:
+            primary_error = sys.exc_info()[1]
+            settled = self.retire_native_owners(controllers, native_owned_pids, os.kill)
+            if settled:
+                try:
+                    self.assertEqual(
+                        native_owned_pids(), [], "every actual owned native calibration PID retired"
+                    )
+                except Exception:
+                    settled = False
+            if settled:
+                shutil.rmtree(root)
+            else:
+                # Missing physical ownership never authorizes remembered target PID kills.
+                # Retain executable paths and fixture bytes if an app may remain outstanding.
+                self.native_cleanup_debt = {
+                    "owned_executables": sorted(owned_executables),
+                    "controllers": [controller.pid for controller in controllers],
+                    "directory": root,
+                }
+                print(
+                    "Native AppKit calibration cleanup refused; owned target debt retained.",
+                    file=sys.stderr,
+                )
+                if primary_error is None:
+                    self.fail(
+                        "Native AppKit calibration cleanup refused; owned target debt retained"
+                    )
+
+    @staticmethod
+    def retire_native_owners(controllers, owned_pids, kill):
+        import signal
+        import time
+
+        refused = False
+        try:
+            for pid in owned_pids():
+                try:
+                    kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except Exception:
+                    refused = True
+        except Exception:
+            refused = True
+        finally:
+            for controller in controllers:
+                try:
+                    if controller.poll() is None:
+                        controller.kill()
+                except Exception:
+                    refused = True
+                try:
+                    controller.communicate(timeout=2)
+                    if controller.returncode is None:
+                        refused = True
+                except Exception:
+                    refused = True
+        try:
+            deadline = time.monotonic() + 2
+            while owned_pids() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            if owned_pids():
+                refused = True
+        except Exception:
+            refused = True
+        return not refused
+
+    def test_path_enumeration_refusal_still_retires_controllers_and_keeps_target_debt(self):
+        seen = []
+        controller = mock.Mock(returncode=0)
+        controller.poll.side_effect = lambda: seen.append("poll")
+        controller.kill.side_effect = lambda: seen.append("kill")
+        controller.communicate.side_effect = lambda **options: seen.append(("communicate", options))
+
+        def owned_pids():
+            seen.append("physical-enumeration")
+            raise subprocess.TimeoutExpired(["ps", "PRIVATE"], 2)
+
+        kill = mock.Mock()
+        result = self.retire_native_owners([controller], owned_pids, kill)
+        self.assertFalse(result, "controller-only cleanup cannot acknowledge native-app retirement")
+        self.assertEqual(
+            seen,
+            [
+                "physical-enumeration",
+                "poll",
+                "kill",
+                ("communicate", {"timeout": 2}),
+                "physical-enumeration",
+            ],
+        )
+        kill.assert_not_called()
+
+
+class ManagedLaunchScriptPortTests(unittest.TestCase):
+    """Execute the emitted getter code; portable ports never claim Cocoa ABI."""
+
+    def test_generated_read_only_script_refuses_other_native_class_and_raw_truthiness(self):
+        port = r"""
+const vm=require('vm');const code=JSON.parse(process.argv[1]);
+const modes=['true','false','wrong-class','number','foreign','terminated','forged'];
+for (const mode of modes) {
+ const app={processIdentifier:42,isTerminated:mode==='terminated',
+   isFinishedLaunching:mode==='number'?1:mode!=='false',
+   executableURL:{path:mode==='foreign'?'/foreign':process.argv[2]},bundleIdentifier:process.argv[3],
+   isNil:()=>false,isKindOfClass:()=>mode!=='wrong-class'};
+ const context={ObjC:{import:()=>{},castObjectToRef:obj=>{if(mode==='forged')throw Error('not native');},unwrap:x=>x},
+   $:{NSRunningApplication:{runningApplicationWithProcessIdentifier:()=>app},NSProcessInfo:{processInfo:{processIdentifier:123}}}};
+ vm.createContext(context);vm.runInContext(code,context);
+ try { const packet=JSON.parse(context.run(['42',process.argv[2],process.argv[3],process.argv[4]]));
+       process.stdout.write(JSON.stringify({mode,observed:true,value:packet.finished_launching})+'\n'); }
+ catch (_) {process.stdout.write(JSON.stringify({mode,observed:false})+'\n');}
+}
+"""
+        result = subprocess.run(
+            [
+                "node",
+                "-e",
+                port,
+                json.dumps(probe.ManagedLaunchObservation.script()),
+                str(EXECUTABLE),
+                DOMAIN,
+                NONCE,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            [json.loads(line) for line in result.stdout.splitlines()],
+            [
+                {"mode": "true", "observed": True, "value": True},
+                {"mode": "false", "observed": True, "value": False},
+            ]
+            + [
+                {"mode": name, "observed": False}
+                for name in ("wrong-class", "number", "foreign", "terminated", "forged")
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
