@@ -106,9 +106,9 @@ KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "") {
 		if (KLHook.last_tick > 0 && ((now - KLHook.last_tick) & 0xFFFFFFFF) >= KLWatchConst.SESSION_TIMEOUT_MS)
 				return
 		date_str := A_YYYY . "-" . A_MM . "-" . A_DD
-		if (start_date != "" && date_str < start_date)
+		if (start_date != "" && StrCompare(date_str, start_date) < 0)
 				return
-		if (end_date != "" && date_str > end_date)
+		if (end_date != "" && StrCompare(date_str, end_date) > 0)
 				return
 		cell := KLR_GetCell(manifest, date_str, KLHook.prev_app)
 		cell["app_time_ms"] += elapsed
