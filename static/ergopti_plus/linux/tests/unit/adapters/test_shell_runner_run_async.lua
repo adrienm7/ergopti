@@ -22,6 +22,7 @@ local function fake_luv(spawn_error)
 	local luv = {}
 	local function handle(kind) return { kind = kind, closing = false } end
 	function luv.new_pipe() return handle("pipe") end
+	function luv.update_time() end -- native void-style clock refresh
 	function luv.new_timer() state.timer = handle("timer"); return state.timer end
 	function luv.timer_start(timer, timeout_ms, _, callback)
 		timer.timeout_ms, timer.callback = timeout_ms, callback

@@ -28,6 +28,7 @@ local function stop_fixture(source)
 		return handle
 	end
 	function backend.new_idle() return new_handle("idle") end
+	function backend.update_time() end -- native void-style clock refresh
 	function backend.new_timer() return new_handle("timer") end
 	function backend.idle_start(handle, callback) handle.active, handle.callback = true, callback; return 0 end
 	function backend.timer_start(handle, _, _, callback) handle.active, handle.callback = true, callback; return 0 end

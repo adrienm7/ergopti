@@ -26,6 +26,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativeTimer = require("infra.native_timer")
 local LOG = "adapters.event_loop"
 
 
@@ -187,7 +188,7 @@ local function _run_luv(opts)
 	if onPeriodic then
 		local periodMs = math.max(1, math.floor(periodSec * 1000))
 		_timer_handle = luv.new_timer()
-		luv.timer_start(_timer_handle, periodMs, periodMs, function()
+		NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
 			if not _running then
 				if _timer_handle then
 					luv.timer_stop(_timer_handle)

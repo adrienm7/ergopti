@@ -26,6 +26,7 @@ local function fake_luv(config)
 	end
 
 	function fake.new_pipe() return handle("pipe") end
+	function fake.update_time() end -- native void-style clock refresh
 	function fake.new_timer()
 		state.timer = handle("timer")
 		return state.timer
