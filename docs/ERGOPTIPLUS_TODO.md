@@ -863,6 +863,19 @@ These are software implementations; final hardware verification remains below.
   Windows disallows literal backslash in a component. Their native gates remain
   with the principal owner. No config-path/TOML policy, title, autostart placement,
   reserved source, physical input, macOS/AHK suite or manual CI was changed.
+- [~] **L65.** Linux actual working-directory ownership: resolve relative loader
+  and updater sources through one native cwd reader instead of inherited PWD.
+  Lua 5.4 previously lost the shared tree with stale PWD; both runtimes anchored
+  relative updater paths to the stale directory. Prefer libuv, retain the native
+  LuaJIT fallback, and check the shell fallback's completion while preserving
+  embedded newlines and trailing spaces. Expanded real filesystem fixtures
+  cover accurate, absent, stale PWD and a native post-launch chdir, both layouts,
+  both source modes and six filename forms. Before correction 24/96 LuaJIT and
+  26/96 Lua 5.4 cases fail; all pass afterwards. Six simulated boundary regressions
+  also fail before and pass after. macOS anchors from hs.configdir/module source
+  and Windows from A_ScriptDir by source; neither uses inherited PWD there.
+  Their native gates remain unexecuted as requested. No configuration/TOML,
+  title, autostart placement, physical input or reserved source was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

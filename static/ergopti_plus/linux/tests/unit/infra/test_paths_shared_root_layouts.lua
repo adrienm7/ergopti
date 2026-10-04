@@ -139,6 +139,35 @@ local function resolver_source()
 	return (src:gsub("\\", "/"))
 end
 
+helpers.describe("native current-directory receipts", function()
+	local cases = {
+		{ cwd = "/synthetic/actual", output = "/synthetic/unused\n", status = true, expected = "/synthetic/actual/linux" },
+		{ output = "/synthetic/line\r\nbreak \n", status = true, expected = "/synthetic/line\r\nbreak /linux" },
+		{ output = "/synthetic/actual\n", status = 0, expected = "/synthetic/actual/linux" },
+		{ output = "/synthetic/partial\n", expected = "linux" },
+		{ output = "/synthetic/partial\n", status = 1, expected = "linux" },
+	}
+	for number, case in ipairs(cases) do
+		helpers.it("linux-native-cwd: ignores stale PWD and checks cwd receipt " .. number, function()
+			local Paths = helpers.load_module("infra.paths")
+			local real_ffi, real_uv = package.loaded.ffi, package.loaded.luv
+			local real_getenv, real_popen = os.getenv, io.popen
+			package.loaded.ffi = { os = "Windows" }
+			package.loaded.luv = { cwd = function() return case.cwd end }
+			os.getenv = function(key) if key == "PWD" then return "/synthetic/stale" end; return real_getenv(key) end
+			io.popen = function()
+				return { read = function(_, mode) helpers.assert_eq(mode, "*a"); return case.output end,
+					close = function() return case.status, "exit", case.status == 1 and 1 or 0 end }
+			end
+			local ok, result = pcall(Paths._absolute_for_test, "linux")
+			package.loaded.ffi, package.loaded.luv = real_ffi, real_uv
+			os.getenv, io.popen = real_getenv, real_popen
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, case.expected)
+		end)
+	end
+end)
+
 helpers.describe("native path separator policy", function()
 	local cases = {
 		{ separator = "/", prefix = "/synthetic/literal\\backslash", expected = "/synthetic/literal\\backslash" },

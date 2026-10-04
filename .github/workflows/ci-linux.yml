@@ -432,7 +432,7 @@ jobs:
           ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
         timeout-minutes: 2
 
-      - name: Preserve literal POSIX path bytes in native root resolution
+      - name: Resolve native roots with literal POSIX bytes and the actual cwd
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
