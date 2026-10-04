@@ -366,6 +366,7 @@ return {
 	"tests.unit.ui.test_paths_editor_logs_dir",
 	"tests.unit.ui.test_unused_keys_cleanup",
 	"tests.unit.ui.test_update_check_bridge",
+	"tests.unit.ui.test_managed_download_failure_callers",
 	"tests.unit.ui.test_config_cleanup_bridge",
 	"tests.unit.ui.test_config_cleanup_session",
 	"tests.unit.ui.test_wpm_readouts",

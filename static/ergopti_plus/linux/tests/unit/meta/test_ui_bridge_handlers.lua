@@ -1792,11 +1792,19 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(handler.update(session_id, 42, "pulling manifest", "line"))
       helpers.assert_true(evaluated[#evaluated].code:find("update(42", 1, true) ~= nil)
 
-      local cancel = handler.on_message("cancel")
+      local cancel = handler.on_message({ action = "cancel", session = session_id })
       helpers.assert_true(cancel.cancelled)
       helpers.assert_eq(cancelled, 1)
       helpers.assert_true(evaluated[#evaluated].code:find("done(false", 1, true) ~= nil)
-      local retry = handler.on_message("retry")
+      helpers.assert_eq(handler.on_message("retry").retried, false, "an unbound retained string cannot retry cancellation")
+      -- A new explicit request owns a failed retry fixture; cancellation itself
+      -- does not keep authorization to restart the retired native operation.
+      local retry_id = handler.show({ kind = "ollama_model", label = "Owned retry fixture",
+        on_retry = function() retried = retried + 1; return true end })
+      helpers.assert_true(handler.complete(retry_id, false, "Independent download failure"))
+      local failure_epoch = handler.on_message("ready").failure_epoch
+      local retry = handler.on_message({ action = "failure_action", id = "retry",
+        session = retry_id, epoch = failure_epoch })
       helpers.assert_true(retry.retried)
       helpers.assert_eq(retried, 1)
       package.loaded["ui.webview_manager"] = previous_manager

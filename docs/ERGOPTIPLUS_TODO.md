@@ -2382,6 +2382,18 @@ Actual MLX children still produce unstructured stderr, so these consumer changes
 do not prove a deployed typed receipt producer or enterprise-network coverage.
 Native action opening and the final three-driver qualification remain pending.
 
+Linux progress windows now retain the actual session, failed-intent epoch and
+fresh native capability predicates. Model retries fence callbacks from earlier
+attempts even when they reuse the request table. Update retries retain the exact
+cached release and original consent, and use authenticated download_release;
+verification/install failures keep their separate existing messages. Native
+failure receipts stay private while the shared page receives translated action
+records. The renderer retires actions on reset, successor sessions and success,
+and refuses delayed reports from older failures. Model diagnostics, proxy
+settings and download-folder opening remain unavailable where no qualified
+native owner exists. The production Linux proxy/receipt producer, real WebView
+actions, installer/pull and updater/rollback qualification remain pending.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
