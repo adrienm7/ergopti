@@ -20,6 +20,7 @@ local KEYCODE_J = 38
 local KEYCODE_C = 8
 
 local RESET_MODULES = {
+	"modules.keylogger.physical_accounting_mode",
 	"adapters.event_provenance", "adapters.synthetic_input",
 	"infra.logger", "infra.text_utils",
 	"modules.hotstrings.hotstrings_config", "modules.keylogger",

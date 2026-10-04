@@ -221,6 +221,8 @@ local CoreState = {
 	-- Per-keycode modifier-down timestamps. Populated on flagsChanged-press,
 	-- consumed (and cleared) on flagsChanged-release to compute hold duration
 	modifier_down_at      = {},
+	-- A source-crossing held key must release before another press can credit.
+	modifier_suppressed_releases = {},
 
 	-- Passive-time accounting: timestamp at which the screen was locked or
 	-- the system went to sleep. Closed on the matching unlock/wake to credit
@@ -300,6 +302,32 @@ end
 -- Forward-declared here so the closure handed to KcBridge.init below captures
 -- the real upvalue rather than a nil global.
 local _is_paused
+
+--- Settles held modifiers without I/O or external callbacks during publication.
+--- Prepare both new tables before the one owned in-memory swap. Suppression
+--- survives successive source transitions until that exact physical key releases.
+--- @return boolean settled
+local function settle_physical_modifiers()
+	local held, suppressed = CoreState.modifier_down_at, CoreState.modifier_suppressed_releases
+	if type(held) ~= "table" or type(suppressed) ~= "table"
+		or getmetatable(held) ~= nil or getmetatable(suppressed) ~= nil then return false end
+	local next_suppressed = {}
+	for keycode, pending in next, suppressed do
+		if not MODIFIER_KEYCODES[keycode] or pending ~= true then return false end
+		next_suppressed[keycode] = true
+	end
+	for keycode, timestamp in next, held do
+		if not MODIFIER_KEYCODES[keycode] or type(timestamp) ~= "number"
+			or timestamp < 0 or timestamp >= math.huge or timestamp ~= timestamp then return false end
+		next_suppressed[keycode] = true
+	end
+	CoreState.modifier_down_at, CoreState.modifier_suppressed_releases = {}, next_suppressed
+	return true
+end
+
+if AccountingMode.bind_settlement(CoreState, settle_physical_modifiers) ~= true then
+	error("Physical accounting refused its keylogger settlement owner")
+end
 
 -- Passed as a closure because M.may_persist is published later in this module.
 -- A filesystem callback delivered during module construction must fail closed;
@@ -618,6 +646,18 @@ local function handle_key(event_obj)
 			CoreState.modifier_down_at = {}
 			CoreState.prev_flags = {}
 			return
+		end
+
+		-- A known physical crossing release must retire its marker even while
+		-- pause/privacy excludes telemetry. It emits no press or hold and cannot
+		-- borrow a timestamp from the source that observed its original press.
+		if evt_type == hs.eventtap.event.types.flagsChanged then
+			local keycode = event_obj:getKeyCode()
+			if CoreState.modifier_suppressed_releases[keycode] then
+				CoreState.modifier_suppressed_releases[keycode] = nil
+				CoreState.prev_flags = event_obj:getFlags() or {}
+				return
+			end
 		end
 
 		if not CoreState.is_enabled then return end
