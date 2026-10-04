@@ -946,6 +946,18 @@ These are software implementations; final hardware verification remains below.
   by source; Windows' distinct FileOpen/Close behavior needs native-owner
   qualification. No reserved read_with_status method, TOML writer, title,
   autostart placement, physical input or manual CI was changed.
+- [~] **L71.** Linux build-stamp version reads: route release metadata through
+  the native FileSystem read port, reusing regular-file admission and read/close
+  receipts. A FIFO build_stamp.txt previously blocked version resolution on
+  startup, including FIFO symlinks and a readable FIFO with a held peer.
+  Three of eleven real native endpoint cases fail before and all pass after per
+  LuaJIT/Lua 5.4 runtime, with regular release, symlink, malformed, empty,
+  unreadable, missing, directory and UNIX-socket controls. Four simulated adapter
+  unit cases check routing and the unchanged shared version-parser results.
+  macOS and Windows do not use this Linux startup version module; related
+  diagnostic reads use their native FileSystem ports by source. Native tests
+  for those drivers remain with their owners. No shared parser policy, TOML
+  persistence, reserved titles or autostart placement was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
