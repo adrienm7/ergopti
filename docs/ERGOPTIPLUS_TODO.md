@@ -1267,6 +1267,19 @@ These are software implementations; final hardware verification remains below.
   bytes stay off argv and owned transport files. Windows uses its own staged
   body and macOS hs.http by source; foreign runtime suites remain deferred.
   No public/shared API, credential/TLS, reserved surface or hosted CI changed.
+- [~] **L93.** Linux digest partial allocation: capture each native pipe and
+  timer immediately inside the existing protected constructor block. A later
+  raised constructor previously lost earlier handles while reporting refusal.
+  Two of four actual-handle controls fail before and all pass after; constructor
+  refusal seams are simulated, while pipes, foreign timer ownership, real abc
+  hashing, child reaping and zero retained handles are observed natively. Seven
+  registered regressions preserve nil/raised admission, exactly one error
+  callback, no spawn and inert cancellation. Existing path preflight, owner
+  isolation, hash/argv limits, NativeTimer and cleanup policies stay intact.
+  No memory-pressure failure or native kill/close-refusal debt is claimed.
+  macOS uses hs.hash and Windows Get-FileHash by source, without this libuv
+  allocation frame; foreign runtime suites remain deferred. No caller, shared
+  API, reserved surface or hosted CI changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
