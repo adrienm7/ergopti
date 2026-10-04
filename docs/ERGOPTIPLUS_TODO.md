@@ -761,6 +761,21 @@ These are software implementations; final hardware verification remains below.
   the CLI and have no matching personal .sqliterc startup by source. No reserved
   source, TOML, native cross-OS gate, physical input or manual CI was modified or
   exercised.
+- [~] **L58.** Linux SQLite multiline transaction failure: set native -bail so
+  the CLI stops at the first failed SQL statement instead of resuming at the
+  next input line and executing COMMIT. The previous failure receipt reported
+  refusal after both prefix and suffix rows had already been persisted, using
+  the same newline-separated format as native migration batches. Four real
+  missing-table/syntax/unique/CHECK failures now roll back all new rows while
+  retaining prior data. All twenty-three native write receipts pass on LuaJIT/
+  Lua 5.4, including same-line failure, healthy multiline commit, explicit
+  rollback and existing signal/privacy/large-input controls. Three unit modes
+  retain init isolation, output flags, exact script and terminal receipt while
+  requiring native stop-on-error. macOS native exec returns on the first error
+  and its migration owner rolls back; Windows's native prepare/step loop stops
+  on failure by source. Neither uses this CLI line-resumption behavior. No
+  schema, crypto format, TOML, reserved source, cross-OS native gate, physical
+  input or manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
