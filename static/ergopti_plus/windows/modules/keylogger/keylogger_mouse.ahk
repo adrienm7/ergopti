@@ -449,111 +449,148 @@ KL_Mouse_OnWheelLeft(*) {
 		KL_Mouse_AccumScrollH(-1)
 }
 
-KL_Mouse_AccumScroll(delta) {
+; Optional ports leave physical wheel callbacks unchanged and keep headless
+; qualification from querying the cursor or arming native timers.
+KL_Mouse_AccumScroll(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 		if A_IsSuspended
 				return
-		; Scrolls in a filtered window (password field / disabled app / private) must not
-		; accrue into session_scrolls — gate accumulation behind the privacy filter, cached
-		; (~50 ms TTL) so the hot-path cost stays negligible (mouse-counter-privacy-filter).
+		; Filter before session counts or timer admission.
 		filtered := false
-		try filtered := MF_ShouldFilter()
+		if IsSet(FilterFn) {
+				try filtered := FilterFn.Call()
+		} else {
+				try filtered := MF_ShouldFilter()
+		}
 		if filtered
 				return
-		now := A_TickCount
-		if (KLMouse.scroll_last > 0
-			and TickElapsed(KLMouse.scroll_last, now) > KLMouseConst.SCROLL_BURST_GAP_MS) {
-				; Gap exceeded — flush the previous burst before starting a new one
-				KL_Mouse_FlushScroll()
+		last := KLMouse.scroll_last
+		now := IsSet(NowTick) ? NowTick : A_TickCount
+		elapsed := TickElapsed64(last, now)
+		if (last > 0 and elapsed > KLMouseConst.SCROLL_BURST_GAP_MS) {
+				if IsSet(FlushFn)
+						FlushFn.Call()
+				else
+						KL_Mouse_FlushScroll()
 		}
 		if (KLMouse.scroll_start = 0)
 				KLMouse.scroll_start := now
 		KLMouse.scroll_ticks += delta
-		KLMouse.scroll_last  := now
-		KL_BumpMouseScroll()
-		; Arm a one-shot timer to flush after the burst ends
-		try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+		KLMouse.scroll_last := now
+		if IsSet(BumpFn)
+				BumpFn.Call()
+		else
+				KL_BumpMouseScroll()
+		if IsSet(ArmFn) {
+				try ArmFn.Call(-KLMouseConst.SCROLL_BURST_GAP_MS)
+		} else {
+				try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+		}
 }
 
-KL_Mouse_AccumScrollH(delta) {
+KL_Mouse_AccumScrollH(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 		if A_IsSuspended
 				return
-		; Same privacy gate as KL_Mouse_AccumScroll — a filtered window must not accrue into
-		; session_scrolls via the horizontal wheel either (mouse-counter-privacy-filter).
+		; Horizontal admission uses the same privacy and timing policy.
 		filtered := false
-		try filtered := MF_ShouldFilter()
+		if IsSet(FilterFn) {
+				try filtered := FilterFn.Call()
+		} else {
+				try filtered := MF_ShouldFilter()
+		}
 		if filtered
 				return
-		now := A_TickCount
-		if (KLMouse.scroll_last > 0
-			and TickElapsed(KLMouse.scroll_last, now) > KLMouseConst.SCROLL_BURST_GAP_MS) {
-				KL_Mouse_FlushScroll()
+		last := KLMouse.scroll_last
+		now := IsSet(NowTick) ? NowTick : A_TickCount
+		elapsed := TickElapsed64(last, now)
+		if (last > 0 and elapsed > KLMouseConst.SCROLL_BURST_GAP_MS) {
+				if IsSet(FlushFn)
+						FlushFn.Call()
+				else
+						KL_Mouse_FlushScroll()
 		}
 		if (KLMouse.scroll_start = 0)
 				KLMouse.scroll_start := now
 		KLMouse.scroll_h_ticks += delta
-		KLMouse.scroll_last    := now
-		KL_BumpMouseScroll()
-		try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+		KLMouse.scroll_last := now
+		if IsSet(BumpFn)
+				BumpFn.Call()
+		else
+				KL_BumpMouseScroll()
+		if IsSet(ArmFn) {
+				try ArmFn.Call(-KLMouseConst.SCROLL_BURST_GAP_MS)
+		} else {
+				try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+		}
 }
 
-KL_Mouse_FlushScroll() {
+KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 		if A_IsSuspended {
-				; Mirror KL_Mouse_ParkTick's suspend-path reset (line ~425): without
-				; clearing the accumulator here, scroll_start/scroll_last stay stale
-				; across the whole suspend window, so the next post-resume flush
-				; computes a duration/velocity spanning the entire pause instead of
-				; just the burst that actually occurred (keylogger-mouse-scroll-suspend-reset).
-				KLMouse.scroll_ticks   := 0
+				KLMouse.scroll_ticks := 0
 				KLMouse.scroll_h_ticks := 0
-				KLMouse.scroll_start   := 0
-				KLMouse.scroll_last    := 0
+				KLMouse.scroll_start := 0
+				KLMouse.scroll_last := 0
 				return
 		}
 		if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
 				return
 
-		; Snapshot and reset atomically before calling MF_ShouldFilter, which can
-		; yield the thread. Scrolls arriving during MF_ShouldFilter would otherwise
-		; be captured in the locals but then cleared, losing them silently.
+		; Claim before a yielding privacy query so subsequent input retains its
+		; own burst. Restore the caller's Critical state before any port call.
 		previous_critical := Critical("On")
 		try {
-				ticks   := KLMouse.scroll_ticks
+				ticks := KLMouse.scroll_ticks
 				h_ticks := KLMouse.scroll_h_ticks
-				start   := KLMouse.scroll_start
-				KLMouse.scroll_ticks   := 0
+				start := KLMouse.scroll_start
+				KLMouse.scroll_ticks := 0
 				KLMouse.scroll_h_ticks := 0
-				KLMouse.scroll_start   := 0
-				KLMouse.scroll_last    := 0
+				KLMouse.scroll_start := 0
+				KLMouse.scroll_last := 0
 		} finally {
-				; This timer can run inside a keyboard-owned transaction. Restore its
-				; prior setting rather than disabling the caller's serialization.
 				Critical(previous_critical)
 		}
 
 		filtered := false
-		try filtered := MF_ShouldFilter()
+		if IsSet(FilterFn) {
+				try filtered := FilterFn.Call()
+		} else {
+				try filtered := MF_ShouldFilter()
+		}
 		if filtered
 				return
 		if !Keylogger.initialized
 				return
-		; Use an async one-shot timer so context refresh doesn't block the hook thread
-		try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
-		duration_ms := (A_TickCount - start) & 0xFFFFFFFF
+		if IsSet(RefreshFn) {
+				try RefreshFn.Call()
+		} else {
+				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
+		}
+		now := IsSet(NowTick) ? NowTick : A_TickCount
+		duration_ms := TickElapsed64(start, now)
 		dir := (h_ticks != 0) ? "horizontal" : ((ticks > 0) ? "up" : "down")
 		total := (h_ticks != 0) ? Abs(h_ticks) : Abs(ticks)
 		velocity := (duration_ms > 0) ? Round(total / (duration_ms / 1000.0), 2) : 0
-		CoordMode("Mouse", "Screen")
-		MouseGetPos(&mx, &my)
-		KL_AppendLog(Map(
-				"type",        "mouse_scroll",
-				"app",         Keylogger.session_app,
-				"direction",   dir,
-				"ticks",       total,
-				"velocity",    velocity,
+		if IsSet(PositionFn) {
+				Position := PositionFn.Call()
+				mx := Position.x
+				my := Position.y
+		} else {
+				CoordMode("Mouse", "Screen")
+				MouseGetPos(&mx, &my)
+		}
+		Event := Map(
+				"type", "mouse_scroll",
+				"app", Keylogger.session_app,
+				"direction", dir,
+				"ticks", total,
+				"velocity", velocity,
 				"duration_ms", duration_ms,
-				"x",           mx,
-				"y",           my
-		))
+				"x", mx,
+				"y", my
+		)
+		if IsSet(AppendFn)
+				AppendFn.Call(Event)
+		else
+				KL_AppendLog(Event)
 }
 
 

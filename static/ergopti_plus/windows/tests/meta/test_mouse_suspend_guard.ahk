@@ -307,3 +307,92 @@ _MMSG_ReleaseMeasureMutations() {
 	}
 }
 Test("mouse: release measurement link rejects noncode, duplicate and overwritten owners", _MMSG_ReleaseMeasureMutations)
+
+; Native scroll origins are raw A_TickCount. The actual owners must consume the
+; captured origin once before publishing a new burst or computing its velocity.
+_MMSG_ScrollNativePolicy(Body, Flush := false) {
+	if Body == ""
+		return false
+	Code := _DriverMaskNonCode(&Body)
+	Origin := _MMSG_ReleaseUnique(Code, "im)^\h*(\w+)\h*:=\h*KLMouse\."
+		. (Flush ? "scroll_start" : "scroll_last") . "\h*$")
+	Clock := _MMSG_ReleaseUnique(Code,
+		"im)^\h*(\w+)\h*:=\h*IsSet\h*\(\h*NowTick\h*\)\h*\?\h*NowTick\h*:\h*A_TickCount\h*$")
+	if !IsObject(Origin) || !IsObject(Clock) || Origin.Pos >= Clock.Pos
+		return false
+	Elapsed := _MMSG_ReleaseUnique(Code,
+		"im)^\h*(\w+)\h*:=\h*TickElapsed64\h*\(\h*" . Origin[1]
+		. "\h*,\h*" . Clock[1] . "\h*\)\h*$")
+	if !IsObject(Elapsed) || !IsObject(_MMSG_ReleaseUnique(Code, "i)\bTickElapsed64\h*\("))
+		return false
+	for Name in [Origin[1], Clock[1], Elapsed[1]] {
+		if _MMSG_ReleaseWriteCount(Code, Name) != 1
+			return false
+	}
+	if Origin[1] = Clock[1] || Origin[1] = Elapsed[1] || Clock[1] = Elapsed[1]
+		return false
+	if Clock.Pos >= Elapsed.Pos
+		return false
+	AfterClock := SubStr(Code, Clock.Pos + Clock.Len)
+	if RegExMatch(AfterClock, "i)\bKLMouse\.scroll_" . (Flush ? "(?:start|last)" : "last")
+			. "\b(?!\h*:=)")
+		return false
+	if Flush {
+		Velocity := _MMSG_ReleaseUnique(Code,
+			"im)^\h*(\w+)\h*:=\h*\(\h*" . Elapsed[1]
+			. "\h*>\h*0\h*\)\h*\?\h*Round\h*\(\h*total\h*/\h*\(\h*"
+			. Elapsed[1] . "\h*/\h*1000\.0\h*\)\h*,\h*2\h*\)\h*:\h*0\h*$")
+		return IsObject(Velocity) && Elapsed.Pos < Velocity.Pos
+	}
+	Gap := _MMSG_ReleaseUnique(Code,
+		"i)\bif\h*\(\h*" . Origin[1] . "\h*>\h*0\h+and\h+"
+		. Elapsed[1] . "\h*>\h*KLMouseConst\.SCROLL_BURST_GAP_MS\h*\)")
+	return IsObject(Gap) && Elapsed.Pos < Gap.Pos
+}
+
+_MMSG_ScrollNativeConnections() {
+	for Name in ["KL_Mouse_AccumScroll", "KL_Mouse_AccumScrollH", "KL_Mouse_FlushScroll"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", "the actual scroll owner must be defined")
+		Assert(_MMSG_ScrollNativePolicy(Body, Name = "KL_Mouse_FlushScroll"),
+			"actual scroll timing must use one captured native origin and final clock")
+	}
+}
+Test("scroll-native64: actual owners preserve unique native timing authority", _MMSG_ScrollNativeConnections)
+
+_MMSG_ScrollNativeMutations() {
+	for Name in ["KL_Mouse_AccumScroll", "KL_Mouse_AccumScrollH", "KL_Mouse_FlushScroll"] {
+		Body := _DriverFuncBody(Name)
+		Flush := Name = "KL_Mouse_FlushScroll"
+		Assert(_MMSG_ScrollNativePolicy(Body, Flush))
+		OriginText := Flush ? "start := KLMouse.scroll_start" : "last := KLMouse.scroll_last"
+		ClockText := "now := IsSet(NowTick) ? NowTick : A_TickCount"
+		MovedOrigin := StrReplace(Body, OriginText, "; removed captured origin")
+		MovedOrigin := StrReplace(MovedOrigin, ClockText, ClockText . Chr(10) . OriginText)
+		Variants := [
+			"",
+			"/*" . Chr(10) . Body . Chr(10) . "*/",
+			StrReplace(Body, "TickElapsed64(", "TickElapsed("),
+			StrReplace(Body, "now := IsSet(NowTick) ? NowTick : A_TickCount",
+				'Ignored := "now := IsSet(NowTick) ? NowTick : A_TickCount"'),
+			StrReplace(Body, "now := IsSet(NowTick) ? NowTick : A_TickCount",
+				"; now := IsSet(NowTick) ? NowTick : A_TickCount"),
+			Body . Chr(10) . "if true { NOW := 0 }",
+			Body . Chr(10) . (Flush ? "START++" : "LAST++"),
+			Body . Chr(10) . (Flush ? "DURATION_MS := 0" : "ELAPSED := 0"),
+			MovedOrigin
+		]
+		for Variant in Variants
+			AssertFalse(_MMSG_ScrollNativePolicy(Variant, Flush), "noncode or overwritten clock authority must refuse")
+		Prose := Body . Chr(10) . '; now := IsSet(NowTick) ? NowTick : A_TickCount'
+			. Chr(10) . 'Ignored := "TickElapsed64(last, now)"'
+		Assert(_MMSG_ScrollNativePolicy(Prose, Flush), "prose does not contribute clock authority")
+		Comparisons := Body . Chr(10) . "Other.now := 0" . Chr(10) . "Ignored := now == 0"
+		Assert(_MMSG_ScrollNativePolicy(Comparisons, Flush), "other properties and comparisons do not write the clock")
+		Renamed := RegExReplace(Body, "i)\bnow\b", "CapturedNow")
+		Renamed := RegExReplace(Renamed, "i)\b" . (Flush ? "start" : "last") . "\b", "CapturedOrigin")
+		Renamed := RegExReplace(Renamed, "i)\b" . (Flush ? "duration_ms" : "elapsed") . "\b", "CapturedElapsed")
+		Assert(_MMSG_ScrollNativePolicy(Renamed, Flush), "coherent local renames preserve the timing contract")
+	}
+}
+Test("scroll-native64: actual timing rejects masked, noncode and rebound mutations", _MMSG_ScrollNativeMutations)
