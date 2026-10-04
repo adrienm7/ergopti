@@ -52,7 +52,7 @@ function M.run(callback)
 			encode = function(receipt) return receipt.baseline_ack or receipt.ack end,
 			context = function() return { allowed = true, app = "ObservedApp", timestamp = "2026-09-12 12:00:00.000" } end,
 			keycode = Frames.keycode,
-			emit = function(press) observed.credits[#observed.credits + 1] = press end,
+			emit = function(press) observed.credits[#observed.credits + 1] = press; return true end,
 		}
 		controls.dependencies = dependencies
 		controls.options = { executable = "/owned/runtime/karabiner_cli", arguments = { "--hs274-capture", "25" },

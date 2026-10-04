@@ -25,7 +25,7 @@ end
 --- nil and the reason the press cannot be attributed. An unattributed press is
 --- tallied as uncounted coverage, never guessed and never a reason to retire the
 --- capture.
----@param dependencies table admit, context, keycode and emit callbacks; batch_limit.
+---@param dependencies table admit, context, keycode and exact-true emit callbacks; batch_limit.
 ---@return table receiver
 function M.new(dependencies)
 	for _, name in ipairs({ "admit", "context", "keycode", "emit" }) do
@@ -156,7 +156,9 @@ function M.new(dependencies)
 			end
 			for _, press in ipairs(pending) do
 				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
-				dependencies.emit(press)
+				local accepted = dependencies.emit(press)
+				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
+				assert(accepted == true, "Physical sink refused the press")
 			end
 			assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 			for _, press in ipairs(pending_uncounted) do

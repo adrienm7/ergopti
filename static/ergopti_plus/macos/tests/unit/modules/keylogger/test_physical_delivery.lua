@@ -26,7 +26,7 @@ local function fixture(overrides)
 			contexts[#contexts + 1] = { timestamp, device }
 			return { allowed = true, app = "CapturedApp", timestamp = "2026-09-12 10:00:00.000" }
 		end,
-		emit = function(entry) emitted[#emitted + 1] = entry end,
+		emit = function(entry) emitted[#emitted + 1] = entry; return true end,
 	}
 	for key, value in pairs(overrides or {}) do dependencies[key] = value end
 	return Delivery.new(dependencies), emitted, contexts
@@ -70,6 +70,19 @@ local function rejects(callback, fragment)
 end
 
 helpers.describe("physical delivery (hs274)", function()
+	helpers.it("never acknowledges a batch whose sink did not accept its physical press", function()
+		for _, refusal in ipairs({ false, "accepted" }) do
+			local receiver = fixture({ emit = function() return refusal end })
+			start(receiver)
+			rejects(function() receiver.deliver(batch({ row(1, 41, 1) })) end, "sink refused")
+			helpers.assert_eq(receiver.active(), false)
+		end
+		local receiver = fixture({ emit = function() end })
+		start(receiver)
+		rejects(function() receiver.deliver(batch({ row(1, 41, 1) })) end, "sink refused")
+		helpers.assert_eq(receiver.active(), false)
+	end)
+
 	helpers.it("requires complete initial state and never admits an old opening", function()
 		local receiver, emitted = fixture()
 		receiver.open(opened())
@@ -121,6 +134,7 @@ helpers.describe("physical delivery (hs274)", function()
 			local receiver = fixture({ emit = function(press)
 				press.action = "physical_press"
 				events.walk_system_event(press)
+				return true
 			end })
 			start(receiver)
 			receiver.deliver(batch({ row(1, 41, 1), row(2, 41, 0), row(3, 44, 1), row(4, 44, 0) }))
@@ -170,6 +184,7 @@ helpers.describe("physical delivery (hs274)", function()
 		local receiver = fixture({ emit = function()
 			calls = calls + 1
 			if calls == 2 then error("sink refused") end
+			return true
 		end })
 		start(receiver)
 		local frame = batch({ row(1, 41, 1), row(2, 44, 1) })
@@ -203,6 +218,7 @@ helpers.describe("physical delivery (hs274)", function()
 			helpers.assert_eq(receiver.active(), true)
 			calls = calls + 1
 			receiver.stop()
+			return true
 		end })
 		start(receiver)
 		rejects(function() receiver.deliver(batch({ row(1, 41, 1), row(2, 44, 1) })) end, "delivery was revoked")
