@@ -155,13 +155,23 @@ final class KeyboardSourceTestDiagnostics {
 			events: events, omittedEvents: omittedEvents)
 	}
 
+	// Assemble the terminator with the body before handing the complete record to
+	// the output owner. Swift print may publish its body and newline separately,
+	// allowing an XCTest completion receipt to appear between those writes.
+	// A single FileHandle call does not promise global atomicity across producers.
+	static func writeRecord(encode: () throws -> Data,
+		write: (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
+		let payload: Data
+		do { payload = try encode() }
+		catch { payload = Data("{\"version\":1,\"diagnosticEncodingRefused\":true}".utf8) }
+		var record = Data("TIS_TEST_EVIDENCE ".utf8)
+		record.append(payload)
+		record.append(0x0A)
+		write(record)
+	}
+
 	func emit() {
-		do {
-			let data = try JSONEncoder().encode(receipt())
-			print("TIS_TEST_EVIDENCE " + String(decoding: data, as: UTF8.self))
-		} catch {
-			print("TIS_TEST_EVIDENCE {\"version\":1,\"diagnosticEncodingRefused\":true}")
-		}
+		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) })
 	}
 }
 
@@ -204,5 +214,64 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 		XCTAssertEqual(recorder.receipt().events.count, 64)
 		XCTAssertEqual(recorder.receipt().omittedEvents, 3)
 		XCTAssertEqual(recorder.receipt().events.first?.status, 0)
+	}
+}
+
+// Pure framing controls use the same emitter as the native tests. They do not
+// call Carbon, change a source, or relax the strict XCTest receipt reader.
+extension KeyboardSourceTestDiagnosticsTests {
+	func testEvidenceWritesOneCompleteUTF8RecordBeforeFollowingReceipt() throws {
+		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity")
+		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
+			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
+		var writes: [Data] = []
+		KeyboardSourceTestDiagnostics.writeRecord(encode: { try JSONEncoder().encode(recorder.receipt()) },
+			write: { writes.append($0) })
+		XCTAssertEqual(writes.count, 1)
+		let record = try XCTUnwrap(writes.first)
+		let prefix = Data("TIS_TEST_EVIDENCE ".utf8)
+		XCTAssertTrue(record.starts(with: prefix))
+		XCTAssertEqual(record.last, 0x0A)
+		XCTAssertEqual(record.filter { $0 == 0x0A }.count, 1)
+		let payload = Data(record.dropFirst(prefix.count).dropLast())
+		let decoded = try JSONDecoder().decode(KeyboardSourceTestDiagnostics.Receipt.self, from: payload)
+		XCTAssertEqual(decoded.test.value, "controlled.é\nidentity")
+		XCTAssertEqual(decoded.events.first?.status, -50)
+		let completion = "Test Case '-[Controlled framing]' passed (0.001 seconds).\n"
+		var transcript = record
+		transcript.append(Data(completion.utf8))
+		let lines = String(decoding: transcript, as: UTF8.self).split(separator: "\n")
+		XCTAssertEqual(lines.count, 2)
+		XCTAssertEqual(String(lines[1]) + "\n", completion)
+	}
+
+	func testEncodingRefusalStillWritesOneCompleteClosedRecord() {
+		enum ControlledRefusal: Error { case refused }
+		var writes: [Data] = []
+		KeyboardSourceTestDiagnostics.writeRecord(encode: { throw ControlledRefusal.refused },
+			write: { writes.append($0) })
+		XCTAssertEqual(writes.count, 1)
+		XCTAssertEqual(writes.first,
+			Data("TIS_TEST_EVIDENCE {\"version\":1,\"diagnosticEncodingRefused\":true}\n".utf8))
+	}
+
+	func testBoundedLargeReceiptKeepsTerminatorInTheSingleWrite() throws {
+		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512))
+		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: -50,
+			original: nil, target: nil, current: nil,
+			snapshotID: .bounded(String(repeating: "é", count: 512)), keyboardType: nil, unicodeDataBytes: nil)
+		for _ in 0..<67 { recorder.append(event) }
+		var writes: [Data] = []
+		KeyboardSourceTestDiagnostics.writeRecord(encode: { try JSONEncoder().encode(recorder.receipt()) },
+			write: { writes.append($0) })
+		XCTAssertEqual(writes.count, 1)
+		let record = try XCTUnwrap(writes.first)
+		XCTAssertGreaterThan(record.count, 4_096)
+		XCTAssertEqual(record.last, 0x0A)
+		XCTAssertEqual(record.filter { $0 == 0x0A }.count, 1)
+		let decoded = try JSONDecoder().decode(KeyboardSourceTestDiagnostics.Receipt.self,
+			from: Data(record.dropFirst(Data("TIS_TEST_EVIDENCE ".utf8).count).dropLast()))
+		XCTAssertEqual(decoded.events.count, 64)
+		XCTAssertEqual(decoded.omittedEvents, 3)
 	}
 }
