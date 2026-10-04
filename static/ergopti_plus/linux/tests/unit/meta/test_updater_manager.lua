@@ -482,7 +482,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
-	for _, mode in ipairs({ "transport", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
+	for _, mode in ipairs({ "transport", "conditional-transport", "conditional-false", "conditional-number", "conditional-table", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
 		helpers.it("linux-updater-etag: " .. mode .. " forces a fresh page after an unknown native validator", function()
 			local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
 			local real_fs = require("adapters.file_system")
@@ -497,6 +497,10 @@ helpers.describe("modules/updater/manager.lua", function()
 			for _ = 1, 21 do too_many[#too_many + 1] = '{"tag_name":"v2.0.0"}' end
 			local failure = {
 				transport = { ok = false, status = 200, body = "", error = "truncated native transfer" },
+				["conditional-transport"] = { ok = false, status = 304, body = "", error = "HTTP 304" },
+				["conditional-false"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = false },
+				["conditional-number"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = 0 },
+				["conditional-table"] = { ok = false, status = 304, body = "", error = "HTTP 304", error_body = {} },
 				["http-error"] = { ok = false, status = 503, body = "", error = "HTTP 503" },
 				["invalid-json"] = { ok = true, status = 200, body = "{malformed" },
 				["wrong-root"] = { ok = true, status = 200, body = '{"tag_name":"v2.0.0"}' },
@@ -520,8 +524,8 @@ helpers.describe("modules/updater/manager.lua", function()
 			fresh._file_digest = { cancel = function() return true end }
 			for index = 1, 3 do
 				local count = 0
-				fresh._fetch_releases("main", function(body, status, err)
-					completions[index] = { body = body, status = status, error = err }; count = count + 1
+				fresh._fetch_releases("main", function(body, status, err, reason)
+					completions[index] = { body = body, status = status, error = err, reason = reason }; count = count + 1
 				end)
 				if mode == "cancel" and index == 2 then helpers.assert_true(fresh.cancel_update()) end
 				helpers.assert_eq(count, 1)
@@ -532,6 +536,10 @@ helpers.describe("modules/updater/manager.lua", function()
 			helpers.assert_eq(completions[1].body, old)
 			helpers.assert_nil(completions[2].body)
 			helpers.assert_true(type(completions[2].error) == "string")
+			if mode:match("^conditional%-") then
+				helpers.assert_eq(completions[2].status, 304)
+				helpers.assert_eq(completions[2].reason, "no_connection")
+			end
 			helpers.assert_eq(completions[3].body, new)
 			helpers.assert_eq(completions[3].status, 200)
 		end)
@@ -551,8 +559,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		local final_page = '[{"tag_name":"v2.0.0"}]'
 		local responses = {
 			{ ok = true, status = 200, body = first_page }, { ok = true, status = 200, body = '[{"tag_name":"v1.0.21"}]' },
-			{ ok = false, status = 304, body = "", error = "HTTP 304" }, { ok = false, status = 200, body = "", error = "truncated page" },
-			{ ok = false, status = 304, body = "", error = "HTTP 304" }, { ok = true, status = 200, body = final_page },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = false, status = 200, body = "", error = "truncated page" },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = true, status = 200, body = final_page },
 		}
 		local requests, results = {}, {}
 		fresh._http_client = { get = function(_, _, options, callback)
@@ -595,7 +603,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local list = "[" .. release("v0.0.0-dev.140", true) .. "," .. release("v1.2.0", false) .. "]"
 		local responses = {
 			{ ok = true, status = 200, body = list },
-			{ ok = false, status = 304, body = "", error = "HTTP 304" },
+			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" },
 		}
 		local requests = {}
 		fresh._http_client = {
@@ -1233,7 +1241,7 @@ helpers.describe("updater bounded pagination", function()
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
 			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
-			local response = cached and { status = 304 } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
+			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			cb(response)
 			cb(response)
 			return true
