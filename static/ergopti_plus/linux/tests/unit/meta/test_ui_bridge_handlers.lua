@@ -82,7 +82,10 @@ helpers.describe("ui.bridge_handlers", function()
 
   local function make_spies(write_result, write_err)
     local captured = {}
+    local snapshot_parser = require("toml_codec.reader").parse_text
+    local classified_read = require("toml_codec.writer").read_classified
     local reader = {
+      parse_text = snapshot_parser,
       parse = function(_path)
         return {
           meta = { description = "english" },
@@ -103,6 +106,7 @@ helpers.describe("ui.bridge_handlers", function()
       end,
     }
     local writer = {
+      read_classified = classified_read,
       write = function(path, data)
         captured.path = path
         captured.data = data
