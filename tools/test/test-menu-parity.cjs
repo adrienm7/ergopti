@@ -118,6 +118,9 @@ const OPENS_SUBMENU = {
 	word_expander_entries: 'word_expander_custom_menu',
 	// The model provider publishes its fixed browser command on every driver.
 	llm_models: 'llm_model_commands',
+	// The backend/model providers render the active API-entry command head.
+	llm_backend: 'llm_api_active_commands',
+	llm_model: 'llm_api_active_commands',
 	// All three profile providers render the shared Create/Clone command head.
 	llm_profile: 'llm_profile_commands',
 	// Optional category-file providers return this declared opening command.

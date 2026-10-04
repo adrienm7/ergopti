@@ -73,17 +73,34 @@ _LLM_Menu_ApiEntriesRows() {
 	if (Type(entries) == "Array" and entries.Length > 0) {
 		; Management rows: most frequent first, destructive delete last.
 		Rows.Push(Map("separator", true))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_test_entry"),
-			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_edit_entry"),
-			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_remove_entry"),
-			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
+		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
+			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
+		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
+		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
+			; Keep the existing native Edit action immediately before removal.
+			if Declaration["id"] == "api_remove_active"
+				Rows.Push(Map(
+					"label",  t("menu.llm.api_edit_entry"),
+					"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
+			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
+			if Row is Map
+				Rows.Push(Row)
+		}
 	}
 	return Rows
+}
+
+/**
+ * Reads the existing active API owner before a retained menu command runs.
+ * @returns {Boolean} Whether the current entry is available to the configuration command.
+ */
+_LLM_Menu_ActiveApiCommandsReady() {
+	global _LLM_Menu
+	if !_LLM_Menu.Has("api_entry_id") || !(_LLM_Menu["api_entry_id"] is String)
+			|| _LLM_Menu["api_entry_id"] == ""
+			|| !_LLM_Menu.Has("api_entries") || !(_LLM_Menu["api_entries"] is Array)
+		return false
+	return _LLM_Menu_ApiEntryIdCount(_LLM_Menu["api_entries"], _LLM_Menu["api_entry_id"]) == 1
 }
 
 ; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"

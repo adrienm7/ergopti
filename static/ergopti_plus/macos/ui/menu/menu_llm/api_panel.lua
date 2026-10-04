@@ -629,6 +629,13 @@ function M.build(ctx)
 	-- Remove): resolve it once so the two cannot disagree mid-build.
 	local active_entry = api_remote and api_remote.get_active_entry() or nil
 	local active_label = active_entry and (names[active_entry.id] or "") or ""
+	local function active_commands_ready()
+		if type(ctx.is_paused) ~= "function" then return false end
+		local ok, current_paused = pcall(ctx.is_paused)
+		if not ok or type(current_paused) ~= "boolean" then return false end
+		return current_paused == false and _mutation_owner == nil and active_entry ~= nil
+			and api_remote.get_active_entry_id() == active_entry.id
+	end
 
 
 
@@ -644,10 +651,8 @@ function M.build(ctx)
 	if active_entry then
 		table.insert(rows, { separator = true })
 	end
-	table.insert(rows, {
-		label    = i18n.get("menu.llm.api_test_entry"),
-		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
-		action       = (not paused and not mutation_busy and active_entry) and function()
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+		api_test_active = function()
 			local probed_id = active_entry.id
 			local probed_label = active_label
 			local probed_entry = {
@@ -691,8 +696,8 @@ function M.build(ctx)
 				return false
 			end
 			return true
-		end or nil,
-	})
+		end,
+	}, { llm_api_active_ready = active_commands_ready })
 
 
 	-- =====================================================
@@ -703,12 +708,8 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	table.insert(rows, {
-		label    = active_entry
-			and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
-			or  "🗑️ " .. i18n.get("menu.llm.api_remove_entry"),
-		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
-		action       = (not paused and not mutation_busy and active_entry) and function()
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once
 			-- we delete it. Worth one extra click in a small menu.
@@ -719,6 +720,7 @@ function M.build(ctx)
 			if not (ok_c and choice == i18n.get("button.delete")) then
 				return
 			end
+			if not active_commands_ready() then return false end
 			local previous_entries = api_remote.get_entries() or {}
 			local previous_active_id = api_remote.get_active_entry_id()
 			local previous_model = state.llm_model
@@ -753,8 +755,20 @@ function M.build(ctx)
 				pcall_log("update_menu(delete rollback)", update_menu)
 			end, { delete_entry_ids = { active_entry.id } })
 			return true
-		end or nil,
-	})
+		end,
+	}, { llm_api_active_ready = active_commands_ready })
+	if remove_row then
+		remove_row.label = "🗑️ " .. remove_row.label .. (active_entry and (" (" .. active_label .. ")") or "")
+	end
+	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
+	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
+		local row = active_rows[declaration.id]
+		if row then
+			-- Preserve the native disabled-row ABI; retained live actions still recheck readiness.
+			if row.disabled then row.action = nil end
+			table.insert(rows, row)
+		end
+	end
 
 
 	-- =====================================================

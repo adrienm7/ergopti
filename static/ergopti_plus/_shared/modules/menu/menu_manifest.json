@@ -2240,5 +2240,23 @@
 				"hotstring_file_ready"
 			]
 		}
+	],
+	"llm_api_active_commands": [
+		{
+			"type": "command",
+			"id": "api_test_active",
+			"i18n": "menu.llm.api_test_entry",
+			"disabled_when": [
+				"llm_api_active_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "api_remove_active",
+			"i18n": "menu.llm.api_remove_entry",
+			"disabled_when": [
+				"llm_api_active_ready"
+			]
+		}
 	]
 }

@@ -1003,6 +1003,7 @@ local function create_menu(deps)
 						local api_title, api_menu = ApiPanel.build({
 								state       = state,
 								paused      = paused,
+								is_paused   = deps.script_control and deps.script_control.is_paused,
 								keymap      = keymap,
 								update_menu = update_menu,
 								WarmupCtrl  = WarmupCtrl,
