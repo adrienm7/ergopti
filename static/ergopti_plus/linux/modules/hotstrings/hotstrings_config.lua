@@ -1664,6 +1664,27 @@ function M.set_category_scope_enabled(targets, enabled)
 	return committed, refusal
 end
 
+--- Sets only the selected category gates in one acknowledged choice batch.
+--- Existing section choices and categories outside the scope are retained.
+--- @param targets table Dense discovered category ids.
+--- @param enabled boolean Explicit target state.
+--- @return boolean committed
+--- @return string|nil reason Stable planner or persistence refusal.
+function M.set_category_gates_enabled(targets, enabled)
+	local inventory = {}
+	-- This operation offers category gates only. The existing scope planner
+	-- validates their known identities with no section leaves in this domain.
+	for id in pairs(_categories) do inventory[id] = {} end
+	local changes, reason = BulkScope.plan(inventory, targets, enabled)
+	if not changes then
+		Logger.error(LOG, "Category gate selection refused: %s.", reason)
+		return false, reason
+	end
+	local committed, refusal = commit_choices(changes, "Hotstring category gate selection")
+	if committed then notify_change() end
+	return committed, refusal
+end
+
 --- Rereads the canonical choices and republishes the catalogue with them.
 --- Used after another owner published config.toml; a refusal keeps the previous
 --- choices and catalogue.

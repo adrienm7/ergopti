@@ -1580,29 +1580,31 @@ local function _manifest_hotstring_rows(ctx, config)
 			for _, extension_id in ipairs(order) do
 				local packs = by_extension[extension_id]
 				local sub = {}
+				local function commit_gates(enabled)
+					local called, committed = pcall(function()
+						if type(config.set_category_gates_enabled) ~= "function" then return false end
+						return config.set_category_gates_enabled(packs, enabled)
+					end)
+					if called and committed == true then
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
+					end
+					Logger.error(LOG, "Extension hotstring gate selection refused (%s).",
+						called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
 
 				-- Turning the extension off means turning off every pack it brought.
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
 				sub[#sub + 1] = {
 					label = i18n_safe("menu.hotstrings.check_all"),
-					action    = function()
-						for _, name in ipairs(packs) do
-							if config.is_group_enabled and not config.is_group_enabled(name)
-								and config.toggle_group then config.toggle_group(name) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
+					action = function() return commit_gates(true) end,
 				}
 				sub[#sub + 1] = {
 					label = i18n_safe("menu.hotstrings.uncheck_all"),
-					action    = function()
-						for _, name in ipairs(packs) do
-							if config.is_group_enabled and config.is_group_enabled(name)
-								and config.toggle_group then config.toggle_group(name) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
+					action = function() return commit_gates(false) end,
 				}
 				sub[#sub + 1] = { separator = true }
 
