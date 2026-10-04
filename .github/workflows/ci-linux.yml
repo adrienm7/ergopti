@@ -415,6 +415,15 @@ jobs:
           python3 tests/hardware/run_http_body_pipe_receipts.py
         timeout-minutes: 2
 
+      - name: Admit regular write destinations before truncation or append
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_file_write_special_receipts.py
+          ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
+          ERGOPTI_FILE_WRITE_TEST_LUA=lua5.4 ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
+        timeout-minutes: 2
+
       - name: Retain native POST resources after simulated cleanup refusal
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
