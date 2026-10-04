@@ -412,6 +412,8 @@ A Windows native independent-CIM enrichment control once reached the minimal fal
 
 TODO 16 remains partial. The Windows native launch evidence gate now reads log paths through the exact Python standard-library catalogue command already owned by its workflow, instead of importing an unavailable npm TOML parser in the package-only job. The canonical-directory, C# alias, native observer, log-root selection and cleanup assertions remain intact. Package-less Node loading and real canonical/independent TOML parsing pass locally; hosted Windows startup-log controls and the actual compiled artifact launch still require complete CI qualification.
 
+TODO 16 remains partial. The native Windows brightness provider fixture now retains closed owner-stage facts before mandatory teardown when its unchanged five-second settlement assertion fails. The native acquisition, WMI ABI, percentage/readback expectations, and physical cleanup contract remain unchanged; this diagnostic does not attribute the earlier timeout to hardware or host scheduling. Hosted AHK execution and the full downstream compiled controls remain pending.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
