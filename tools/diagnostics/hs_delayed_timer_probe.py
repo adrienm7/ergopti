@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
@@ -963,6 +964,32 @@ function calibrateOwnedNSError(event) {
             "decoder_facts": decoder_facts,
         }
 
+    def sender_stages(self):
+        """Read the same exact child-owned monotonic stage prefix during sampling."""
+        sender = self.read("sender.json")
+        stages = []
+        if sender is not None:
+            expected = {
+                "schema_version": 1,
+                "contract": "hs.applescript.sender-stages",
+                "nonce": self.identity["nonce"],
+                "target_pid": self.identity["pid"],
+                "sender_pid": self.sender_pid,
+            }
+            if set(sender) != set(expected) | {"stages"} or any(
+                type(sender[key]) is not type(value) or sender[key] != value
+                for key, value in expected.items()
+            ):
+                raise ValueError("Supplemental sender stages differ from the actual owned child")
+            stages = sender["stages"]
+            if (
+                not isinstance(stages, list)
+                or not stages
+                or stages != list(SUPPLEMENTAL_SENDER_STAGES[: len(stages)])
+            ):
+                raise ValueError("Supplemental sender stages are not a monotonic closed prefix")
+        return stages
+
     def observe(self, require_completion=False, terminal=False, native=None):
         """Keep execution and sender evidence separate from the native send status."""
         present = []
@@ -986,28 +1013,7 @@ function calibrateOwnedNSError(event) {
             raise ValueError("A completion witness has no preceding owned entry")
         if require_completion and present != ["entry", "completion"]:
             raise ValueError("The no-prompt nonce reply has incomplete server witnesses")
-        sender = self.read("sender.json")
-        stages = []
-        if sender is not None:
-            expected = {
-                "schema_version": 1,
-                "contract": "hs.applescript.sender-stages",
-                "nonce": self.identity["nonce"],
-                "target_pid": self.identity["pid"],
-                "sender_pid": self.sender_pid,
-            }
-            if set(sender) != set(expected) | {"stages"} or any(
-                type(sender[key]) is not type(value) or sender[key] != value
-                for key, value in expected.items()
-            ):
-                raise ValueError("Supplemental sender stages differ from the actual owned child")
-            stages = sender["stages"]
-            if (
-                not isinstance(stages, list)
-                or not stages
-                or stages != list(SUPPLEMENTAL_SENDER_STAGES[: len(stages)])
-            ):
-                raise ValueError("Supplemental sender stages are not a monotonic closed prefix")
+        stages = self.sender_stages()
         required_stages = list(
             SUPPLEMENTAL_SENDER_STAGES if require_completion else SUPPLEMENTAL_SENDER_STAGES[:-1]
         )
@@ -1239,6 +1245,107 @@ function ownedWitnessSource(source, pid, nonce) {
             raise RuntimeError("Supplemental scope removal was not acknowledged")
 
 
+class NoPromptServerSample:
+    """Own one sampler thread/process; never detach it or admit a late sample."""
+
+    def __init__(self, scope, pid, sample):
+        self.scope = scope
+        self.pid = pid
+        self.sample = sample
+        self.stop = threading.Event()
+        self.thread = threading.Thread(
+            target=self._run, name="owned-no-prompt-sample", daemon=False
+        )
+        self.started = False
+        self.process = None
+        self.interval_qualified = False
+        self.reason = "send_not_observed"
+
+    def start(self):
+        self.thread.start()
+        self.started = True
+
+    def _run(self):
+        try:
+            deadline = time.monotonic() + SCRIPTING_TIMEOUT_SECONDS
+            while not self.stop.is_set() and time.monotonic() < deadline:
+                stages = self.scope.sender_stages()
+                if stages == list(SUPPLEMENTAL_SENDER_STAGES[:2]):
+                    if self.sample.exists() or self.sample.is_symlink():
+                        self.reason = "sample_path_not_fresh"
+                        return
+                    # The stage packet is bound to the actual sender PID and scope.
+                    # Sampling has no pipes that could block its retirement.
+                    self.process = subprocess.Popen(
+                        [
+                            "/usr/bin/sample",
+                            str(self.pid),
+                            str(SCRIPT_SAMPLE_SECONDS),
+                            "-file",
+                            str(self.sample),
+                        ],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    starting_stages = self.scope.sender_stages()
+                    deadline = time.monotonic() + SCRIPT_CLEANUP_TIMEOUT_SECONDS
+                    while not self.stop.is_set() and time.monotonic() < deadline:
+                        try:
+                            self.process.wait(timeout=0.02)
+                            break
+                        except subprocess.TimeoutExpired:
+                            continue
+                    if self.process.returncode is None:
+                        self.reason = "sampler_cancelled_or_timed_out"
+                        return
+                    ending_stages = self.scope.sender_stages()
+                    self.interval_qualified = (
+                        not self.stop.is_set()
+                        and type(self.process.returncode) is int
+                        and self.process.returncode == 0
+                        and starting_stages == stages
+                        and ending_stages == stages
+                    )
+                    self.reason = (
+                        "inflight_interval"
+                        if self.interval_qualified
+                        else "sampler_refused_or_send_interval_changed"
+                    )
+                    return
+                if len(stages) > 2:
+                    self.reason = "send_already_returned"
+                    return
+                self.stop.wait(0.02)
+        except Exception:
+            # Never project arbitrary worker exceptions, receipt text or arguments.
+            self.reason = "sampler_observation_refused"
+        finally:
+            if self.process is not None and self.process.returncode is None:
+                try:
+                    self.process.kill()
+                    self.process.wait(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                    if self.process.returncode is None:
+                        raise RuntimeError("Owned sampler exit was not acknowledged")
+                except Exception:
+                    self.reason = "owned_sampler_retirement_unacknowledged"
+
+    def finish(self):
+        """Refuse progress while this exact sampler or worker retains physical debt."""
+        self.stop.set()
+        if self.started:
+            self.thread.join(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+            if self.thread.is_alive():
+                raise RuntimeError("Owned no-prompt sampler worker has not retired")
+        if self.process is not None and self.process.returncode is None:
+            # A previous bounded retirement failure may be retried by restore().
+            self.process.kill()
+            self.process.wait(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+            if self.process.returncode is None:
+                raise RuntimeError("Owned no-prompt sampler process has not retired")
+        return self.interval_qualified
+
+
 class NativeDelayedTimerProbe:
     """Use the launch gate's signed embedded runtime without starting another process."""
 
@@ -1255,6 +1362,8 @@ class NativeDelayedTimerProbe:
         self.diagnostic_receipts = []
         self.runtime_owner = None
         self.no_prompt_scope = None
+        self.server_sample_workers = []
+        self.no_prompt_sample_diagnostics = []
 
     @staticmethod
     def executable_path(app):
@@ -1284,7 +1393,7 @@ class NativeDelayedTimerProbe:
         """Require the owned reply; PID addressing is exclusive to its diagnostic."""
         if phase not in SCRIPTING_PHASES:
             raise ValueError("The native scripting phase is unknown")
-        if self.scripting_commands:
+        if self.scripting_commands or self.server_sample_workers:
             raise RuntimeError("The prior native scripting command has not settled")
         script = (
             "on run argv\n"
@@ -1325,11 +1434,25 @@ class NativeDelayedTimerProbe:
         )
         self.scripting_commands.append(command)
         self.scripting_command_number += 1
+        worker = None
+        primary_error = None
         try:
             if phase == "pid_no_prompt" and self.no_prompt_scope is not None:
                 self.no_prompt_scope.bind_sender(command.pid)
+                self.no_prompt_sample_diagnostics = []
+                worker = NoPromptServerSample(
+                    self.no_prompt_scope,
+                    pid,
+                    self.output
+                    / f"sample-hammerspoon-no-prompt-{self.scripting_command_number}.txt",
+                )
+                self.server_sample_workers.append(worker)
+                worker.start()
             stdout, stderr = command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
         except Exception as primary:
+            primary_error = primary
+            if worker is not None:
+                worker.stop.set()
             diagnostics = []
             if isinstance(primary, subprocess.TimeoutExpired):
                 try:
@@ -1356,6 +1479,47 @@ class NativeDelayedTimerProbe:
                 f"Native scripting command failed: {type(primary).__name__}: {primary}"
                 + (f"; {detail}" if detail else "")
             ) from primary
+        finally:
+            if worker is not None:
+                try:
+                    qualified_interval = worker.finish()
+                except Exception as cleanup:
+                    if primary_error is not None:
+                        raise RuntimeError(
+                            "Native scripting command failed: "
+                            + type(primary_error).__name__
+                            + "; owned no-prompt sampler cleanup has not settled"
+                        ) from primary_error
+                    # The existing PID helper classifies a TimeoutExpired cause as
+                    # sender debt. A sampler-only timeout must not impersonate it.
+                    raise RuntimeError("Owned no-prompt sampler cleanup has not settled") from None
+                self.server_sample_workers.remove(worker)
+                prefix = "native server sample phase=pid_no_prompt command=" + str(
+                    self.scripting_command_number
+                )
+                if qualified_interval:
+                    try:
+                        messages = self.read_native_runtime_sample(worker.sample, pid, processes)
+                    except Exception:
+                        # Supplemental admission must neither replace the primary
+                        # sender failure nor expose private native exception text.
+                        messages = [
+                            "native Hammerspoon server sample unqualified: sample admission refused"
+                        ]
+                    owner_state = (
+                        "qualified"
+                        if messages[0].startswith("native Hammerspoon server sample retained:")
+                        else "unqualified"
+                    )
+                    self.no_prompt_sample_diagnostics = [
+                        prefix
+                        + " send_interval=observed worker=retired sample_owner="
+                        + owner_state
+                    ] + messages
+                else:
+                    self.no_prompt_sample_diagnostics = [
+                        prefix + " send_interval=unqualified worker=retired reason=" + worker.reason
+                    ]
         if command.returncode is None:
             raise RuntimeError(
                 "The native scripting command did not acknowledge actual process exit"
@@ -1584,6 +1748,7 @@ function run(argv) {
                 evidence = scope.observe()
                 self.retain_diagnostics(
                     [
+                        *self.no_prompt_sample_diagnostics,
                         f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
                         f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
                         f"Supplemental constructor scalars: {evidence['scalar_facts']}",
@@ -1597,6 +1762,7 @@ function run(argv) {
             result["executable"] = str(self.executable)
             self.retain_diagnostics(
                 [
+                    *self.no_prompt_sample_diagnostics,
                     f"Exact owned no-prompt AppleEvent {result['outcome']}: "
                     f"status {result['status']}, origin {result['error_origin']}",
                     f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
@@ -1610,7 +1776,7 @@ function run(argv) {
             )
             return result
         finally:
-            if not self.scripting_commands:
+            if not self.scripting_commands and not self.server_sample_workers:
                 scope.cleanup()
                 self.no_prompt_scope = None
 
@@ -1917,8 +2083,14 @@ function run(argv) {
             return [
                 f"native Hammerspoon server sample refused (exit {result.returncode}): {result.stderr.strip()[:1000]}"
             ]
+        return self.read_native_runtime_sample(sample, pid, processes)
+
+    def read_native_runtime_sample(self, sample, pid, processes):
+        """Use identical native owner/header/closed-frame admission for both samplers."""
         if processes(self.executable) != [pid]:
             return ["native Hammerspoon server sample unqualified: owner changed before admission"]
+        if not sample.is_file() or sample.is_symlink():
+            return ["native Hammerspoon server sample unqualified: owned output unavailable"]
         with sample.open(encoding="utf-8", errors="replace") as handle:
             sample_text = handle.read(SCRIPT_SAMPLE_READ_LIMIT)
         header = sample_text.split("Call graph:", 1)[0]
@@ -2043,6 +2215,9 @@ function run(argv) {
         """Restore the scripting key after ordinary Quit or exact process cleanup."""
         for command in list(self.scripting_commands):
             self.retire_scripting_command(command)
+        for worker in list(self.server_sample_workers):
+            worker.finish()
+            self.server_sample_workers.remove(worker)
         self.preference.restore()
         if self.no_prompt_scope is not None:
             self.no_prompt_scope.cleanup()
