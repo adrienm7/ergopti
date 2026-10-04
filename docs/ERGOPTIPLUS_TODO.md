@@ -889,6 +889,20 @@ These are software implementations; final hardware verification remains below.
   kill probe without this Linux stat parser. Their native gates remain with the
   principal owner and were not run. No autostart placement, title, reserved
   source, physical input or manual CI was changed.
+- [~] **L67.** Linux bounded accessibility helper interpreter: resolve the first
+  negative Lua argument token through a shared launch-metadata policy. Index -1
+  can be an interpreter option or its value, so launches with -joff, -O0, -E or
+  -e previously failed closed despite a conclusively focused native GTK field.
+  Ten of twelve virtual X11/GTK/AT-SPI cases fail before and all pass after,
+  covering ordinary/password fields and six actual LuaJIT launch forms through
+  the production bounded helper. Six simulated metadata/command unit cases pass
+  on LuaJIT and Lua 5.4; three reproduce the old defect and three are controls.
+  The graphical fixture owns its Xvfb display, window manager and private D-Bus
+  session. This does not qualify physical input or a Lua 5.4 native AT-SPI backend
+  (the native library binding requires LuaJIT FFI). macOS embeds Lua and Windows
+  uses its native accessibility path; neither production path reads arg[-1]
+  there. Their native gates remain deferred as requested. No reserved AI menu,
+  title, autostart placement, TOML source or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

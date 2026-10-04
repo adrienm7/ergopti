@@ -14,6 +14,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local Timings = require("infra.timings")
+local Interpreter = require("process.interpreter")
 
 local LOG = "adapters.atspi_focus"
 local STATE_ACTIVE = 1
@@ -295,8 +296,7 @@ function M.get_snapshot()
 		}, true
 	end
 
-	local executable = type(arg) == "table" and arg[-1] or nil
-	if type(executable) ~= "string" or executable == "" then executable = "luajit" end
+	local executable = Interpreter.from_arguments(arg) or "luajit"
 	local timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local timeout_seconds = math.max(1, math.ceil(timeout_ms / 1000))
 	local child_code = "local m=require('adapters.atspi_focus'); local j=require('json'); "

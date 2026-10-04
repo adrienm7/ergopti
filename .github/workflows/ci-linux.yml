@@ -657,6 +657,12 @@ jobs:
           bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
         timeout-minutes: 5
 
+      - name: Launch the bounded accessibility helper with Lua interpreter options
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: python3 tests/hardware/run_atspi_interpreter_receipts.py
+        timeout-minutes: 1
+
       # The program a user starts, started: the real daemon with --tray on a
       # keyboard created through uinput, under an X server, a session bus, the
       # accessibility bus, a window manager and a focused GTK field (nothing
