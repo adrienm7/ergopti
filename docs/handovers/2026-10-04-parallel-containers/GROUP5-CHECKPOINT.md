@@ -15,6 +15,9 @@ The inspected base is `689d30293704093feab2e3caa077604e88560eb6` from the actual
 | `987fb3c838ebf6c7682d802364abf1fcffc455e4` | Close already validated TODO13/35 while preserving the legend and TODO16/38.          |
 | `f02abb8bc2365d579bc6246b56b2d40ab3b36b52` | Retain internal producer usage-page identity and strict baseline-v1 boundaries.       |
 | `00bec5d2ef036eefde9e19b58c8ecb0ef465fa31` | Expose existing native launch observations through one bounded failure notice.        |
+| `a0b595f09b24abbfcdca9cb7e30418c7ba6dda9b` | Reuse the released Group4 exact-descriptor Core provisioning prerequisite.            |
+| `10486f41de7ed8f20ebfe91220440ccac3dfcb26` | Require exact physical sink acceptance, copied outbox ownership and retained context. |
+| `6aa4121972dd4ed5764ec9b200ac0652d140bfda` | Include the actual CLI baseline version in the cheap admission preflight.             |
 
 Default startup does not load the new capture session. Opening v1, consumer
 baseline v2, producer baseline v1, fixture-only coverage and independent JSON
@@ -32,6 +35,23 @@ E2E vector was skipped. After staging new sources, the JS gate was repeated and
 passed; subsequent diagnostic/document commits passed their selected format/JS
 gates. JS and native suites were serialized.
 
+The subsequent sink/preflight/sample composition passed the complete selected
+gate: formatting, 356 JS checks, 13,909 portable Lua units and 101 stubbed E2E
+scenarios with the same one driver-specific skip. Its first restricted attempt
+failed 58 JS checks and 111 Lua cases: temporary fixture writes were refused and
+the false-green ratchet also found one new pcall-only identity assertion. That
+test now verifies the actual refusal reason and a valid same-capture commit
+control; no assertion or baseline was weakened. The complete rerun used the
+approved temporary-path access and passed. The first attempt finished before
+the proposed owned-unit interruption; no native CI run was cancelled.
+
+The real physical sink slice passes 108 focused Lua cases and 14 diagnostic
+Python cases. Two causal preimage regressions prove the missing acceptance
+boundary. Original application, timestamp and retained privacy remain
+authoritative; current disabled/private state cannot reclassify an older event.
+Exact true acknowledges copied ordered outbox ownership, not durable storage.
+Storage refusals retain the head and normal stop/restart fences new admission.
+
 The capture regression suite uses faithful native task doubles and the actual
 accounting, delivery and transport owners. The unsupported-version regression
 failed all three original cases; six independent reentry/start-acceptance cases
@@ -42,9 +62,12 @@ Producer validation compiled and ran six complete programs under C++17 and
 C++23, with `-Wall -Wextra -Werror -pthread`: raw capture, session, inventory,
 key state, protocol and source. All 12 executions pass with unchanged independent
 native JSON receipts. Two changed-page cases fail against the original source.
-The unrelated key-element test still fails GCC compilation on an unused local;
-an isolated exact-HEAD replay reproduces that failure. The clock/native probe
-requires Mach/IOKit and was not executed on Linux.
+The key-element source is a generator template: its original direct compilation
+attempt omitted `qualify_native_keys` and was not a valid test invocation. The
+actual origin harness now passes all three cases; its emitted inspection also
+compiles and runs under both C++17 and C++23 with warnings treated as errors.
+This corrects the earlier classification as historical GCC debt. The
+clock/native probe requires Mach/IOKit and was not executed on Linux.
 
 The launch diagnostic suite passed 225 portable Python cases; the native AppKit
 calibration `ManagedLaunchNativeCalibrationTests.test_real_nsworkspace_identity_bool_foreign_and_closed_observations`
@@ -52,6 +75,19 @@ is skipped on Linux. Two actual CLI tests fail against the original source
 because its notice is missing. Independent reviews found no blocking findings
 in the final three bounded source slices. No original deadline, assertion or
 failure verdict was relaxed.
+
+The owned-sample refinement passes 140 portable Python cases with one native
+AppKit calibration skipped. Its causal preimage omits the observed file-read
+descendant; the corrected closed frame markers retain bounded branch/thread
+ancestry without claiming a timeout cause. The pinned task source is Hammerspoon
+ref `1469832361b4c3687ec7d589c1b4efe4d3b742ee`, git blob
+`b76c2c50d59a8c90c106334e7371a2935548e390`. Source Ruff retains an unchanged
+F841 at line1709, reproduced against HEAD; formatting and test-file lint pass.
+
+The four-boundary preflight refuses a handwritten consumer2/producer2/Python2/
+CLI1 tree that the original script accepted. Current live versions remain
+consumer2, producer1, CLI1 and reader1..1. The deliberate exit3 refusal is not a
+native acceptance result, and frozen native JSON corpora remain unchanged.
 
 TODO13/35 closure reuses inspected native receipts:
 
@@ -98,8 +134,10 @@ No new group5 native CI has been executed. The existing remote lock
 `0563f0d589a181698bd2b13d75026aec673dbb61` belongs to group7, branch
 `feat/windows-native`, candidate `45d5c2db602ee74711da965ba17207c69b6dcba5`.
 Its first run37228466168 reached terminal failure; the owner subsequently
-continued the same reservation with new manual runs, including37232550379.
-Inspect the current terminal result and actual owner release before reserving. Do not take it over or delete it. Group5 has
+continued the same reservation with new manual runs. Run37232550379 completed
+with Windows unit failure; macOS and Release were skipped. Group5 requested the
+owner's next-phase/release status in issue86. Inspect the current terminal result
+and actual owner release before reserving. Do not take it over or delete it. Group5 has
 not moved `codex/ci-validation` and does not own either CI ref.
 
 Group4 published the standalone shared Core provisioning correction at

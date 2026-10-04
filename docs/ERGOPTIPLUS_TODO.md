@@ -1767,6 +1767,16 @@ correction byte-for-byte; original registry assertions, native lane selection
 and release policy remain unchanged. Fresh hosted macOS qualification is still
 pending the exclusive CI phase.
 
+The existing owned-sample reader now preserves observed file-read and native
+task-termination frames with their bounded thread ancestry. The pinned
+Hammerspoon1.1.1 task implementation performs synchronous pipe reads on the main
+queue before its Lua completion callback; the original observer could omit the
+read descendant. Three independent controls cover the omission, separate
+branches/threads, redaction and foreign owners. The portable probe suite passes
+140 cases, with one native AppKit calibration skipped on Linux. No extra probe,
+deadline, handler-admission or timeout-cause claim is introduced; exact-candidate
+native observations remain pending.
+
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
