@@ -346,10 +346,10 @@ function addLog(line) {
  *   of a plain retry when the failure was a gated/private HuggingFace repo.
  */
 function done(isSuccess, message, errorKind) {
+	globalErrorKind = errorKind || null;
 	if (window.clearNetworkFailure) window.clearNetworkFailure();
 	globalDoneState = true;
 	globalDoneSucceeded = isSuccess === true;
-	globalErrorKind = errorKind || null;
 
 	const cancelButton = document.getElementById('btn-cancel');
 	if (cancelButton) cancelButton.style.display = 'none';

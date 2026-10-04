@@ -2394,6 +2394,13 @@ settings and download-folder opening remain unavailable where no qualified
 native owner exists. The production Linux proxy/receipt producer, real WebView
 actions, installer/pull and updater/rollback qualification remain pending.
 
+Native qualification now preserves SQLite's exit receipt while the observational
+row-count fixture decodes only its acknowledged payload. The same stale fixture
+failed on dev before this tranche; independent workload/equality assertions are
+unchanged. Gated-model retry records its error kind before retiring old managed
+controls, preserving the existing macOS wiring check. Shared CI failures expose
+only check names in GitHub annotations when archived logs cannot be retrieved.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
