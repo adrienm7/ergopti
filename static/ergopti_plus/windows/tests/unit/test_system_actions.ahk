@@ -1837,3 +1837,43 @@ for _SysActions_DirectQuitPhase in ["shell", "windows", "closed"] {
 		Test("system actions: direct quit " . _SysActions_DirectQuitPhase . " pause=" . _SysActions_DirectQuitPauses . " (direct-quit-query-pause)",
 			_SysActions_DirectQueryTest("quit_frontmost_app", _SysActions_DirectQuitPhase, _SysActions_DirectQuitPauses))
 }
+
+; A native DWORD must never truncate a supplied process target identifier.
+; These probes only acquire, query and release this test process; they never terminate.
+_SysActions_ProcessPidDomain(Pid, Valid := false) {
+	Adapter := SystemControl()
+	Lease := ""
+	RejectedType := false
+	try {
+		try Lease := Adapter.AcquireProcessTarget(Pid)
+		catch TypeError
+			RejectedType := true
+		catch OSError {
+			; Native refusal is not the required input-domain refusal.
+		}
+		if !Valid {
+			ObservedPid := IsObject(Lease) ? DllCall("Kernel32\GetProcessId", "Ptr", Lease.Handle, "UInt") : 0
+			AssertTrue(RejectedType, "an invalid PID must be rejected before DWORD truncation or native access; requested="
+				. Pid . " retained=" . ObservedPid)
+			return
+		}
+		AssertTrue(IsObject(Lease), "a valid owned PID yields a retained native handle")
+		if !IsObject(Lease)
+			return
+		AssertEqual(DllCall("Kernel32\GetProcessId", "Ptr", Lease.Handle, "UInt"), Pid,
+			"the native process identity equals the admitted PID")
+		AssertTrue(Adapter.ProcessTargetIsLive(Lease), "the owned test process is still live")
+	} finally {
+		if IsObject(Lease) {
+			Adapter.ReleaseProcessTarget(Lease)
+			Adapter.ReleaseProcessTarget(Lease)
+			AssertEqual(Lease.Handle, 0, "the owned handle release debt is consumed exactly once")
+		}
+	}
+}
+
+for _SysActions_InvalidProcessPid in [0, -1, 1.5, "1", 0x100000000, DllCall("Kernel32\GetCurrentProcessId", "UInt") + 0x100000000]
+	Test("system control: invalid process PID " . _SysActions_InvalidProcessPid . " (process-pid-domain)",
+		_SysActions_ProcessPidDomain.Bind(_SysActions_InvalidProcessPid))
+Test("system control: owned process PID is retained without termination (process-pid-domain)",
+	_SysActions_ProcessPidDomain.Bind(DllCall("Kernel32\GetCurrentProcessId", "UInt"), true))
