@@ -32,14 +32,14 @@
 
 ; Build the legacy `manifest[date][app] = { chars, time, ... }` Map.
 ; Mirrors sqlite_reader.lua read_manifest line-for-line but in AHK.
-KLR_ReadManifest(db, start_date := "", end_date := "") {
+KLR_ReadManifest(db, start_date := "", end_date := "", Now := unset) {
 		manifest := KLR_ReadManifestBase(db, start_date, end_date)
 		if !db
 				return manifest
 		where := KLR_DateFilter(start_date, end_date)
 		KLR__SumHourly(db, manifest, where)
 		KLR__SumHourlyMin5(db, manifest, where)
-		KLR_AddLiveForegroundTime(manifest, start_date, end_date)
+		KLR_AddLiveForegroundTime(manifest, start_date, end_date, Now?)
 		return manifest
 }
 
@@ -96,25 +96,28 @@ KLR__SumSystemDay(db, manifest, where) {
 KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "", Now := unset) {
 		if !(manifest is Map)
 				return
-		if (KLHook.prev_app = "" || KLHook.app_entered_at = 0)
+		; Snapshot mutable publication before the final clock observation.
+		App := KLHook.prev_app
+		AppEnteredAt := KLHook.app_entered_at
+		if (App = "" || AppEnteredAt = 0)
 				return
+		LastActivity := KLHook.last_tick
+		if LastActivity = 0 && KLWatch.is_session_active
+				LastActivity := KLWatch.last_authorized_tick
+		date_str := A_YYYY . "-" . A_MM . "-" . A_DD
 		now := IsSet(Now) ? Now : A_TickCount
-		elapsed := (now - KLHook.app_entered_at) & 0xFFFFFFFF
+		elapsed := TickElapsed64(AppEnteredAt, now)
 		if (elapsed <= 0)
 				return
 		; Synthetic callbacks clear physical timing without ending accepted sessions.
 		; Retain that session clock so abandonment cannot become foreground work.
-		LastActivity := KLHook.last_tick
-		if LastActivity = 0 && KLWatch.is_session_active
-				LastActivity := KLWatch.last_authorized_tick
-		if (LastActivity > 0 && ((now - LastActivity) & 0xFFFFFFFF) >= KLWatchConst.SESSION_TIMEOUT_MS)
+		if (LastActivity > 0 && TickElapsed64(LastActivity, now) >= KLWatchConst.SESSION_TIMEOUT_MS)
 				return
-		date_str := A_YYYY . "-" . A_MM . "-" . A_DD
 		if (start_date != "" && StrCompare(date_str, start_date) < 0)
 				return
 		if (end_date != "" && StrCompare(date_str, end_date) > 0)
 				return
-		cell := KLR_GetCell(manifest, date_str, KLHook.prev_app)
+		cell := KLR_GetCell(manifest, date_str, App)
 		cell["app_time_ms"] += elapsed
 }
 
