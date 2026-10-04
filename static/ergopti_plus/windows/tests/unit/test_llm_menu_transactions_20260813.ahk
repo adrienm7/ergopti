@@ -2430,3 +2430,64 @@ _LMT_SharedPrivacyPolicy() {
 	}
 }
 Test("LLM privacy: shared strict source intent rejects malformed booleans and identities", _LMT_SharedPrivacyPolicy)
+
+_LMT_ProfileCreateCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\profile_create_command.json"))
+	Assert(Corpus is Map, "the independent profile command corpus must be readable")
+	return Corpus
+}
+
+_LMT_ProfileCreatePaused(Seen) {
+	return Seen["paused"]
+}
+
+_LMT_ProfileCreateOpen(Seen) {
+	Seen["opens"] += 1
+	return Seen["result"]
+}
+
+_LMT_SharedCreateProfileCommand() {
+	Corpus := _LMT_ProfileCreateCorpus()
+	Seen := Map("paused", 0, "opens", 0, "result", 1)
+	Row := _LLM_Menu_CreateProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+		_LMT_ProfileCreatePaused.Bind(Seen))
+	Assert(Row is Map, "the native profile owner must consume the declared row")
+	AssertEqual(t(Corpus["i18n"]), Row["label"])
+	AssertEqual(1, Row["action"].Call())
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 1
+	AssertEqual(false, Row["action"].Call(), "a held callback rechecks the exact pause owner")
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 0
+	Seen["result"] := 0
+	AssertEqual(0, Row["action"].Call(), "native editor refusal must remain refusal")
+	AssertEqual(2, Seen["opens"])
+	for Unknown in ["0", "false", Map(), 2] {
+		Seen["paused"] := Unknown
+		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot open an editor")
+		AssertEqual(2, Seen["opens"])
+	}
+}
+Test("LLM profiles: shared Create command keeps native pause and editor refusal", _LMT_SharedCreateProfileCommand)
+
+_LMT_SharedCreateProfileLabelOwner() {
+	global _MM_MANIFEST_ROOT_CACHE
+	Corpus := _LMT_ProfileCreateCorpus()
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the actual manifest must be loaded before mutation")
+	Declaration := Root[Corpus["section"]][1]
+	AssertEqual(Corpus["id"], Declaration["id"])
+	AssertEqual(Corpus["ready"], Declaration["disabled_when"][1])
+	SavedKey := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := "button.cancel"
+		Seen := Map("paused", 0, "opens", 0, "result", 1)
+		Row := _LLM_Menu_CreateProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+			_LMT_ProfileCreatePaused.Bind(Seen))
+		AssertEqual(t("button.cancel"), Row["label"], "the declaration alone owns the native label")
+		AssertEqual(1, Row["action"].Call())
+		AssertEqual(1, Seen["opens"])
+	} finally Declaration["i18n"] := SavedKey
+}
+Test("LLM profiles: actual Create provider follows a changed shared label", _LMT_SharedCreateProfileLabelOwner)

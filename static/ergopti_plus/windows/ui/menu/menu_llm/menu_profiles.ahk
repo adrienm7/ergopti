@@ -172,9 +172,7 @@ _LLM_Menu_ProfileRows() {
 	}
 
 	Rows.Push(Map("separator", true))
-	Rows.Push(Map(
-		"label",  t("menu.profiles.create_profile"),
-		"action", (*) => LLM_Menu_PromptCreateProfile()))
+	Rows.Push(_LLM_Menu_CreateProfileRow(LLM_Menu_PromptCreateProfile))
 
 	; "Clone active built-in" — exposes the built-in system prompt for
 	; editing without requiring the user to type it from scratch. The
@@ -586,10 +584,29 @@ _LLM_Menu_ApplyProfileCommitted(*) {
 	return true
 }
 
+; Reuses the native pause owner for the drawn row and retained callbacks.
+_LLM_Menu_CreateProfileReady(PausedFn) {
+	try {
+		Paused := PausedFn.Call()
+		return (Paused is Integer) && Paused == 0
+	} catch
+		return false
+}
+
+_LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
+	if (PausedFn is Integer) && PausedFn == 0
+		PausedFn := (*) => A_IsSuspended
+	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_create",
+		Map("llm_profile_create", OpenFn),
+		Map("llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
+}
+
 /**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
 LLM_Menu_PromptCreateProfile() {
+	if A_IsSuspended
+		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -608,11 +625,17 @@ LLM_Menu_PromptCreateProfile() {
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
 
+	if A_IsSuspended
+		return false
+
 	; Step 2: system prompt (multi-line via Edit control)
 	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
+
+	if A_IsSuspended
+		return false
 
 	; Generate a unique ID from the label
 	pid := "user_" . LLM_Menu_Slugify(plabel) . "_" . A_TickCount

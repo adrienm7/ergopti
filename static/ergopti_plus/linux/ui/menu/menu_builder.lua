@@ -2034,7 +2034,13 @@ local function _build_llm(ctx)
 			if saved then refresh() end
 			return saved
 		end
-		local function open_editor(existing, activate, opts)
+		local function create_ready()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+			local ok, current = pcall(ctx.is_paused)
+			return ok and current == false
+		end
+		local function open_editor(existing, activate, opts, create)
+			if create and not create_ready() then return false end
 			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
 			if not ok_editor or type(Editor.open) ~= "function" then
 				Logger.error(LOG, "Prompt editor is unavailable.")
@@ -2050,7 +2056,9 @@ local function _build_llm(ctx)
 				editor_opts.profile_id = ProfileSettings.next_user_profile_id()
 				opts = editor_opts
 			end
+			if create and not create_ready() then return false end
 			return Editor.open(existing, function(profile)
+				if create and not create_ready() then return false end
 				return save_profile(profile, activate, expected_existing)
 			end, opts)
 		end
@@ -2152,10 +2160,10 @@ local function _build_llm(ctx)
 			}
 		end
 		rows[#rows + 1] = { separator = true }
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.profiles.create_profile"),
-			action = function() return open_editor(nil, true) end,
-		}
+		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
+			{ llm_profile_create = function() return open_editor(nil, true, nil, true) end },
+			{ llm_profile_create_ready = create_ready })
+		if create_row then rows[#rows + 1] = create_row end
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,

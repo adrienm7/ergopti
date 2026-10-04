@@ -1163,45 +1163,54 @@ local function build_profile_menu(
 	end
 
 	table.insert(rows, { separator = true })
-	table.insert(rows, {
-		label = i18n.get("menu.profiles.create_profile"),
-		action    = not paused and function()
-			if not settle_profile_mutation_recovery(deps) then return false end
-			if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
-			local timer_fired = false
-			local editor_settled = false
-			local function open_create_editor()
-				if timer_fired then return false end
-				timer_fired = true
-				if not settle_profile_mutation_recovery(deps) then return false end
-				local editor_ok, editor_result = Logger.callback(LOG,
-					"Profile creation editor",
-					prompt_editor.open,
-					nil,
-					function(new_profile)
-						if editor_settled then return false end
-						editor_settled = true
-						if type(new_profile) ~= "table" then return false end
-						if not settle_profile_mutation_recovery(deps) then return false end
-						if type(activate_candidate) ~= "function"
-							or activate_candidate(new_profile) ~= true then
-							return false
-						end
-						Logger.callback(LOG, "Profile creation notification",
-							notifications.notify,
-							i18n.get("profiles.created_title"),
-							ProfileLabel.format(new_profile.label, state.llm_num_predictions),
-							"success")
-						Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
-						return true
-					end)
-				return editor_ok == true and editor_result ~= false
-			end
-			local _, timer_committed = schedule_editor(open_create_editor)
-			if timer_committed ~= true then return false end
-			return true
-		end or nil,
-	})
+	local function create_ready()
+		if type(deps.script_control) ~= "table"
+			or type(deps.script_control.is_paused) ~= "function" then return false end
+		local ok, current = pcall(deps.script_control.is_paused)
+		return ok and current == false
+	end
+	local function create_profile()
+		if not create_ready() or not settle_profile_mutation_recovery(deps)
+			or not create_ready() then return false end
+		if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
+		local timer_fired = false
+		local editor_settled = false
+		local function open_create_editor()
+			if timer_fired then return false end
+			timer_fired = true
+			if not create_ready() or not settle_profile_mutation_recovery(deps)
+				or not create_ready() then return false end
+			local editor_ok, editor_result = Logger.callback(LOG,
+				"Profile creation editor",
+				prompt_editor.open,
+				nil,
+				function(new_profile)
+					if editor_settled then return false end
+					editor_settled = true
+					if type(new_profile) ~= "table" then return false end
+					if not create_ready() or not settle_profile_mutation_recovery(deps)
+						or not create_ready() then return false end
+					if type(activate_candidate) ~= "function"
+						or activate_candidate(new_profile) ~= true then
+						return false
+					end
+					Logger.callback(LOG, "Profile creation notification",
+						notifications.notify,
+						i18n.get("profiles.created_title"),
+						ProfileLabel.format(new_profile.label, state.llm_num_predictions),
+						"success")
+					Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
+					return true
+				end)
+			return editor_ok == true and editor_result ~= false
+		end
+		local _, timer_committed = schedule_editor(open_create_editor)
+		if timer_committed ~= true then return false end
+		return true
+	end
+	local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
+		{ llm_profile_create = create_profile }, { llm_profile_create_ready = create_ready })
+	if create_row then table.insert(rows, create_row) end
 	
 	return ManifestMenu.render_rows(rows, "llm_profile")
 end

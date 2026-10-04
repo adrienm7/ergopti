@@ -8,6 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Pure shared owners are captured before native fixture dependencies are replaced.
+local ManifestRenderer = require("menu.renderer")
+local json = require("json")
 
 local MODULES = {
 	"adapters.hotkey_registrar",
@@ -19,6 +22,9 @@ local MODULES = {
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
+	"json",
+	"logger.shim",
+	"menu.renderer",
 	"llm.tone",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
@@ -405,8 +411,17 @@ local function with_delete_fixture(options, body)
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
+		local renderer = assert(ManifestRenderer.new({
+			platform = "hs",
+			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = json.decode,
+			i18n = package.loaded["infra.i18n"],
+			logger = package.loaded["infra.logger"],
+		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
+			command_row = renderer.command_row,
+			get_array = renderer.get_array,
 		}
 		package.loaded["infra.notifications"] = {notify = function() return true end}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {

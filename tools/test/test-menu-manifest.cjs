@@ -1402,3 +1402,33 @@ checkPrivacyTriggerControls();
 		'Configured lifecycle commands: shared labels and preserved native startup admission on all three drivers.'
 	);
 }
+
+// Profile creation is one ordinary command; native providers keep the editor owners.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/profile_create_command.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[corpus.section], [
+		{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }
+	]);
+	for (const file of [
+		'windows/ui/menu/menu_llm/menu_profiles.ahk',
+		'macos/ui/menu/menu_llm/profiles_manager.lua',
+		'linux/ui/menu/menu_builder.lua'
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert(
+			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			`${file}: the actual provider must consume the declared Create command`
+		);
+		assert(
+			!/label\s*=\s*i18n(?:_safe|\.get)\("menu\.profiles\.create_profile"\)|"label",\s*t\("menu\.profiles\.create_profile"\)/.test(
+				source
+			),
+			`${file}: a native provider cannot redeclare the fixed command label`
+		);
+	}
+	console.log('Create Profile: one common declaration and three existing native editor owners.');
+}
