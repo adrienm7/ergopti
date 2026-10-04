@@ -1254,6 +1254,8 @@ The native Windows corpus readers use the `_SharedDir` initialized by the test h
 
 The macOS preview callbacks now acquire the existing global preference writer fence before changing menu or native state. Native preview setters must acknowledge exact success; refused publication uses the ordinary preference transaction rollback, and refused native compensation retains the owning fence. Focused real menu/global-owner/preference-file regressions pass, including held admission, live pause, native refusal, source preservation, sparse reload and recovery; the original 57-call strict persistence census remains intact. These preview rows still need shared declarations, and native macOS preview execution plus the remaining platform/menu work are not claimed complete.
 
+The Windows startup menu unit fixture now supplies both observable native lifecycle callback identities required by the real shared reload/quit builders. The production boot owns them in infra/lifecycle.ahk, deliberately excluded from the unit graph because it owns suspension/watchdog effects. All original label, command-type, delayed-admission and lifecycle-precedence assertions remain intact; fixture fallback effects are recorded and refused rather than reloading or terminating the runner. Source-level old-negative/new-positive and four mutation controls pass, with BOM/LF/convention/loop-capture checks. Full selected verification and actual Windows CI remain pending. TODO54 remains partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
