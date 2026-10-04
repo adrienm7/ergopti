@@ -73,6 +73,19 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 			stderr: try String(contentsOf: errorURL, encoding: .utf8))
 	}
 
+	/// Only this owned fixture's display packet is eligible for diagnostics.
+	/// Escape control characters and cap each stream independently; never read
+	/// another process, an environment value or a signing-key payload.
+	private func requirementDisplayEvidence(_ receipt: Receipt) -> String {
+		func stream(_ label: String, _ value: String) -> String {
+			let bytes = Array(value.utf8)
+			let retained = String(decoding: bytes.prefix(2048), as: UTF8.self)
+			return "\(label)_bytes=\(bytes.count) \(label)_truncated=\(bytes.count > 2048) \(label)=\(String(reflecting: retained))"
+		}
+		return "native_requirement_display status=\(receipt.status) "
+			+ stream("stdout", receipt.stdout) + " " + stream("stderr", receipt.stderr)
+	}
+
 	private func successful(_ executable: String, _ arguments: [String], root: URL) throws -> Receipt {
 		let result = try child(executable, arguments, root: root)
 		guard result.status == 0 else {
@@ -249,15 +262,37 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertEqual(ProcessInfo.processInfo.environment["SWIFT_BACKTRACE"], inherited["SWIFT_BACKTRACE"])
 	}
 
+	func testRequirementDisplayEvidenceRetainsBoundedEscapedOwnedStreams() {
+		let exact = requirementDisplayEvidence(Receipt(status: 26,
+			stdout: "Owned output\n\"quoted\"", stderr: "Owned error\tpacket"))
+		XCTAssertTrue(exact.hasPrefix("native_requirement_display status=26 "))
+		XCTAssertTrue(exact.contains("stdout_bytes=21 stdout_truncated=false"))
+		XCTAssertTrue(exact.contains("stderr_bytes=18 stderr_truncated=false"))
+		XCTAssertTrue(exact.contains("Owned output\\n\\\"quoted\\\""))
+		XCTAssertTrue(exact.contains("Owned error\\tpacket"))
+		XCTAssertFalse(exact.contains("\n"))
+		XCTAssertFalse(exact.contains("\t"))
+		let bounded = requirementDisplayEvidence(Receipt(status: 0,
+			stdout: String(repeating: "a", count: 2048) + "STDOUT_AFTER_BOUND",
+			stderr: String(repeating: "b", count: 2048) + "STDERR_AFTER_BOUND"))
+		XCTAssertTrue(bounded.contains("stdout_bytes=2066 stdout_truncated=true"))
+		XCTAssertTrue(bounded.contains("stderr_bytes=2066 stderr_truncated=true"))
+		XCTAssertTrue(bounded.contains(String(repeating: "a", count: 2048)))
+		XCTAssertTrue(bounded.contains(String(repeating: "b", count: 2048)))
+		XCTAssertFalse(bounded.contains("STDOUT_AFTER_BOUND"))
+		XCTAssertFalse(bounded.contains("STDERR_AFTER_BOUND"))
+	}
+
 	func testActualNativeRequirementDisplayKeepsBothStreamsAndExitStatus() throws {
 		let root = try scratch()
 		defer { retire(root) }
 		let app = try signedBundle(root: root)
 		let display = try child("/usr/bin/codesign", ["-d", "-r-", app.path], root: root)
-		XCTAssertEqual(display.status, 0)
+		let evidence = requirementDisplayEvidence(display)
+		XCTAssertEqual(display.status, 0, evidence)
 		let declarations = (display.stdout + "\n" + display.stderr)
 			.split(separator: "\n").filter { $0.hasPrefix("designated => ") }
-		XCTAssertEqual(declarations.count, 1, "The actual running signature owns one designated requirement")
+		XCTAssertEqual(declarations.count, 1, "The actual running signature owns one designated requirement; " + evidence)
 		XCTAssertFalse(try XCTUnwrap(declarations.first).dropFirst("designated => ".count).isEmpty)
 		let missing = root.appendingPathComponent("unsigned-source.app")
 		try manager.createDirectory(at: missing, withIntermediateDirectories: false)
