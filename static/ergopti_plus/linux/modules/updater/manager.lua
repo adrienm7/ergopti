@@ -1048,8 +1048,8 @@ end
 --- @param failure_state string The updater state a failure returns to.
 --- @return boolean Whether the checksum request was dispatched.
 local function start_download(release, download_url, callback, failure_state)
-	local temp_path = os.tmpname()
-	if type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
+	local allocated, temp_path = pcall(os.tmpname)
+	if not allocated or type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
 		if type(callback) == "function" then callback(nil, "temporary path unavailable", "download") end
 		return false
 	end

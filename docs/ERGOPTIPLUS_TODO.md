@@ -818,6 +818,21 @@ These are software implementations; final hardware verification remains below.
   timestamp-derived staging directories. Windows has a separate staging worker.
   Their native staging-ownership qualification remains with the principal owner;
   no cross-OS native gate or source, TOML, physical input or manual CI was changed.
+- [~] **L62.** Linux updater native temporary-allocation refusal: protect
+  os.tmpname so native allocation errors return false and acknowledge a supplied
+  callback once, preserving the selected release and pre-download state. Twelve
+  native cases per runtime exercise both public download APIs with/without a
+  callback at real per-child descriptor limits of 0 and 3, plus four ordinary
+  allocation/curl-protocol-refusal controls. Eight fail before and all pass
+  after under LuaJIT and Lua 5.4; only owned child limits are lowered and restored
+  through real prlimit syscalls. No allocator/process/HTTP adapter is mocked.
+  A fixture seam seeds the selected release before the resource limit changes.
+  Four unit cases simulate allocator exceptions and forbid premature HTTP work.
+  macOS delegates automatic updates to Sparkle and separate release staging to
+  an exit-code-reporting script; Windows uses a separate native staging worker.
+  Neither sibling has this Lua os.tmpname call. Their native resource-exhaustion
+  qualification remains with the principal owner. No reserved source, TOML,
+  physical input, macOS/AHK suite or manual CI was changed or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
