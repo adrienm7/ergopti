@@ -200,3 +200,110 @@ _MMSG_AccumScrollHFiltersBeforeBump() {
 		"KL_Mouse_AccumScrollH must consult MF_ShouldFilter BEFORE KL_BumpMouseScroll (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_AccumScrollH filters before bumping the scroll count (mouse-counter-privacy-filter)", _MMSG_AccumScrollHFiltersBeforeBump)
+
+; Each real variadic release callback must consume the one pure measurement owner.
+_MMSG_ReleaseUnique(Code, Pattern) {
+	if !RegExMatch(Code, Pattern, &Found)
+		return false
+	if RegExMatch(Code, Pattern, , Found.Pos + Found.Len)
+		return false
+	return Found
+}
+
+_MMSG_ReleaseWriteCount(Code, Name) {
+	Pattern := "i)(?<![\w.])(?:" . Name
+		. "\b\h*(?::=|//=|\*\*=|<<=|>>>=|>>=|[+\-*/|&^.]=|\+\+|--)"
+		. "|(?:\+\+|--)\h*" . Name . "\b)"
+	Position := 1
+	Count := 0
+	while RegExMatch(Code, Pattern, &Found, Position) {
+		Count += 1
+		Position := Found.Pos + Found.Len
+	}
+	return Count
+}
+
+_MMSG_ReleaseMeasurePolicy(Body) {
+	if Body == ""
+		return false
+	Code := _DriverMaskNonCode(&Body)
+	Call := _MMSG_ReleaseUnique(Code,
+		"im)^\h*(\w+)\h*:=\h*_KL_Mouse_MeasureGesture\h*\(\h*Gesture\h*,\h*mx\h*,\h*my\h*\)\h*$")
+	if !IsObject(Call)
+		return false
+	if !IsObject(_MMSG_ReleaseUnique(Code, "i)\b_KL_Mouse_MeasureGesture\h*\("))
+		return false
+	Distance := _MMSG_ReleaseUnique(Code,
+		"im)^\h*(\w+)\h*:=\h*" . Call[1] . "\.distance\h*$")
+	Duration := _MMSG_ReleaseUnique(Code,
+		"im)^\h*(\w+)\h*:=\h*" . Call[1] . "\.duration\h*$")
+	if !IsObject(Distance) || !IsObject(Duration)
+		return false
+	for Name in [Call[1], Distance[1], Duration[1]] {
+		if _MMSG_ReleaseWriteCount(Code, Name) != 1
+			return false
+	}
+	Member := "(?<![\w.])" . Call[1] . "\h*\.\h*(?:distance|duration)\b"
+	if RegExMatch(Code, "i)(?:" . Member
+		. "\h*(?::=|//=|\*\*=|<<=|>>>=|>>=|[+\-*/|&^.]=|\+\+|--)"
+		. "|(?:\+\+|--)\h*" . Member . ")")
+		return false
+	MouseRead := _MMSG_ReleaseUnique(Code, "i)\bMouseGetPos\h*\(")
+	Filter := _MMSG_ReleaseUnique(Code, "i)\bMF_ShouldFilter\h*\(")
+	Publish := _MMSG_ReleaseUnique(Code,
+		"is)\bKL_Mouse_LogDrag\h*\([^)]*?Round\h*\(\h*" . Distance[1]
+		. "\h*\)\h*,\h*" . Duration[1] . "\h*\)")
+	return IsObject(MouseRead) && IsObject(Filter) && IsObject(Publish)
+		&& MouseRead.Pos < Call.Pos && Call.Pos < Filter.Pos
+		&& Call.Pos < Distance.Pos && Distance.Pos < Duration.Pos
+		&& Duration.Pos < Publish.Pos
+}
+
+_MMSG_ReleaseMeasureConnection() {
+	for Name in ["KL_Mouse_OnLUp", "KL_Mouse_OnRUp"] {
+		Body := _DriverFuncBody(Name)
+		Assert(_MMSG_ReleaseMeasurePolicy(Body),
+			"each actual release callback must uniquely measure and forward its claimed receipt")
+	}
+}
+Test("mouse: actual release callbacks retain the unique pure measurement owner", _MMSG_ReleaseMeasureConnection)
+
+_MMSG_ReleaseMeasureMutations() {
+	for Name in ["KL_Mouse_OnLUp", "KL_Mouse_OnRUp"] {
+		Body := _DriverFuncBody(Name)
+		Assert(_MMSG_ReleaseMeasurePolicy(Body))
+		Variants := [
+			"",
+			"/*" . Chr(10) . Body . Chr(10) . "*/",
+			StrReplace(Body, "Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)",
+				"; Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)"),
+			StrReplace(Body, "Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)",
+				'Ignored := "Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)"'),
+			StrReplace(Body, "_KL_Mouse_MeasureGesture(Gesture, mx, my)",
+				"_KL_Mouse_MeasureGesture(Gesture, my, mx)"),
+			StrReplace(Body, "duration := Measurement.duration", "duration := Measurement.distance"),
+			StrReplace(Body, "duration := Measurement.duration",
+				"duration := Measurement.duration" . Chr(10) . "DURATION := 0"),
+			StrReplace(Body, "dist := Measurement.distance",
+				"dist := Measurement.distance" . Chr(10) . "if true { DIST += 1 }"),
+			Body . Chr(10) . "Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)",
+			StrReplace(Body, "dist := Measurement.distance",
+				"dist := Measurement.distance" . Chr(10) . "Measurement.distance += 1"),
+			StrReplace(Body, "duration := Measurement.duration",
+				"duration := Measurement.duration" . Chr(10) . "MEASUREMENT.DURATION++"),
+			StrReplace(Body, "duration := Measurement.duration",
+				"duration := Measurement.duration" . Chr(10) . "if true { ++Measurement.duration }")
+		]
+		for Variant in Variants
+			AssertFalse(_MMSG_ReleaseMeasurePolicy(Variant), "each changed actual-owner link must be rejected")
+		Renamed := RegExReplace(Body, "i)\bMeasurement\b", "CapturedMeasure")
+		Assert(_MMSG_ReleaseMeasurePolicy(Renamed), "coherent measurement-local renames retain the contract")
+		Prose := Body . Chr(10) . "; Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)"
+			. Chr(10) . 'Ignored := "duration := Measurement.duration"'
+		Assert(_MMSG_ReleaseMeasurePolicy(Prose), "prose cannot supply or invalidate executable ownership")
+		Comparisons := Body . Chr(10) . "Other.duration := 0"
+			. Chr(10) . "Ignored := Measurement.duration == 0"
+		Assert(_MMSG_ReleaseMeasurePolicy(Comparisons), "other properties and comparisons are not receipt writes")
+	}
+}
+Test("mouse: release measurement link rejects noncode, duplicate and overwritten owners", _MMSG_ReleaseMeasureMutations)
