@@ -290,3 +290,140 @@ _LAIET_AutoModePastesInNotepadOnly() {
 }
 Test("TextSender: auto mode pastes in Notepad and types elsewhere (llm-accept-notepad-paste)",
 	_LAIET_AutoModePastesInNotepadOnly)
+
+; The incident's third slot erased sixteen characters before its fifty-character
+; correction. These recordings qualify acceptance and atomic batch construction,
+; not the clipboard worker or Notepad's asynchronous consumption of that batch.
+_LAIET_RewritePaste(Body) {
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
+	global _Stub_OutputHostExe, _Stub_OutputHostTitle
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+	global _OUTPUT_HOST_TITLE_PROBE, _OUTPUT_HOST_RESOLVE_SERIAL
+	SavedQueue := _TEXT_CLIPBOARD_QUEUE
+	SavedHost := { App: KLHook.prev_app, Title: KLHook.prev_title,
+		Exe: _Stub_OutputHostExe, StubTitle: _Stub_OutputHostTitle,
+		Cache: _OUTPUT_HOST_CACHE, Identity: _OUTPUT_HOST_IDENTITY_PROBE,
+		Metadata: _OUTPUT_HOST_METADATA_PROBE, TitleProbe: _OUTPUT_HOST_TITLE_PROBE,
+		Serial: _OUTPUT_HOST_RESOLVE_SERIAL }
+	AssertFalse(_TEXT_CLIPBOARD_BUSY, "the passive rewrite fixture cannot adopt a live clipboard worker")
+	try {
+		SimulateNotepadActive()
+		_TEXT_CLIPBOARD_QUEUE := []
+		_LAIET_Run(Body)
+	} finally {
+		try SetTimer(_TextSenderStartClipboard, 0)
+		finally {
+			_TEXT_CLIPBOARD_QUEUE := SavedQueue
+			KLHook.prev_app := SavedHost.App
+			KLHook.prev_title := SavedHost.Title
+			_Stub_OutputHostExe := SavedHost.Exe
+			_Stub_OutputHostTitle := SavedHost.StubTitle
+			_OUTPUT_HOST_CACHE := SavedHost.Cache
+			_OUTPUT_HOST_IDENTITY_PROBE := SavedHost.Identity
+			_OUTPUT_HOST_METADATA_PROBE := SavedHost.Metadata
+			_OUTPUT_HOST_TITLE_PROBE := SavedHost.TitleProbe
+			_OUTPUT_HOST_RESOLVE_SERIAL := SavedHost.Serial
+		}
+	}
+}
+
+_LAIET_ConfigureRewrite(Record, Text, DeletedText, Span, Count) {
+	Slot := { Text: Text, Deletes: Count, DeletedText: DeletedText, RewriteSpan: Span }
+	Record.Slots := ["unused first slot", "unused second slot", Slot]
+	Record.ActiveIdx := 3
+	Record.Lifecycle.Slots := Record.Slots.Clone()
+}
+
+_LAIET_DispatchRewriteWithoutWorker() {
+	; Keep the queued worker from running between dispatch and its cancellation.
+	; Only the actual acceptance and recording ports run in this short scope.
+	PreviousCritical := Critical("On")
+	try {
+		return _LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot())
+	} finally {
+		try SetTimer(_TextSenderStartClipboard, 0)
+		finally Critical(PreviousCritical)
+	}
+}
+
+_LAIET_RecordQueuedRewrite(Sent, Record, Text, Count, ExpectedBuffer) {
+	global _TEXT_CLIPBOARD_QUEUE, _AHK_SendInput, _LLM_Bridge_Buffer, TEXT_SENDER_SEND_LEVEL
+	AssertEqual(0, Sent.Length, "the rewrite must wait for its clipboard request instead of typing text")
+	AssertEqual(1, _TEXT_CLIPBOARD_QUEUE.Length, "the accepted rewrite queues exactly one paste")
+	Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
+	AssertEqual(Text, Request.Text, "the complete accepted correction is the queued clipboard payload")
+	AssertEqual(Count, Request.Opts["erase_before"], "the chosen slot's erasure reaches TextSend unchanged")
+	AssertTrue(_TextSenderHasAtomicHooks(Request.Opts), "erasure must retain admission and atomic commit owners")
+	; This is the same production atomic output owner exercised by the existing
+	; zero-erasure test. Clipboard write/wait/restore are deliberately not invoked.
+	Result := _TextSenderRunAtomicOutput(
+		_AHK_SendInput.Bind(_TextSenderErasePrefix(Request.Opts) . "^v"),
+		Request.Opts, "clipboard paste")
+	AssertTrue(Result.Ok, "the recording atomic output must succeed before completion is reported")
+	AssertEqual("", Result.ErrorMessage, "the recording output has no post-output warning")
+	Request.Callback.Call(Result.Ok, Result.ErrorMessage)
+	AssertEqual(1, Sent.Length, "erasure and paste are emitted in a single recorded batch")
+	AssertEqual("{Backspace " . Count . "}^v", Sent[1].Keys,
+		"the recorded rewrite batch must include both the exact erasure and Ctrl+V")
+	AssertEqual(TEXT_SENDER_SEND_LEVEL, Sent[1].Level, "rewriting preserves the sender's SendLevel")
+	AssertEqual(2, A_SendLevel, "the accepting thread's SendLevel is restored")
+	AssertEqual(ExpectedBuffer, _LLM_Bridge_Buffer, "the RAM mirror applies deletion and replacement once")
+	AssertEqual("accepted", Record.Lifecycle.Outcome, "only the completed recording retires the offer as accepted")
+}
+
+_LAIET_NotepadIncidentCorrectionByPaste() {
+	_LAIET_RewritePaste(_Body)
+	_Body(Sent, Record) {
+		global _LLM_Bridge_Buffer
+		Typed := "napéoléon is the"
+		Correction := "Napoleon is the greatest emperor in French history"
+		AssertEqual(16, StrLen(Typed), "the reported deletion has sixteen UTF-16 units and codepoints")
+		AssertEqual(50, StrLen(Correction), "the reported accepted third slot contains fifty characters")
+		_LLM_Bridge_Buffer := Typed
+		_LAIET_ConfigureRewrite(Record, Correction, Typed, Typed, 16)
+		SendLevel(2)
+		AssertTrue(_LAIET_DispatchRewriteWithoutWorker(), "the shown third rewrite slot is claimed and dispatched")
+		AssertEqual("claimed", Record.Lifecycle.Outcome, "the clipboard request must not retire before output")
+		AssertEqual(Typed, _LLM_Bridge_Buffer, "queued erasure cannot update the mirror before output")
+		_LAIET_RecordQueuedRewrite(Sent, Record, Correction, 16, Correction)
+	}
+}
+Test("LLM accept: the Notepad incident's third correction queues sixteen erasures and paste (llm-rewrite-paste-recording)",
+	_LAIET_NotepadIncidentCorrectionByPaste)
+
+_LAIET_NotepadScalarErasureByPaste() {
+	_LAIET_RewritePaste(_Body)
+	_Body(Sent, Record) {
+		global _LLM_Bridge_Buffer
+		Deleted := "i" . Chr(0x1F600)
+		Span := "Je sui" . Chr(0x1F600)
+		Correction := "is déjà allé."
+		AssertEqual(3, StrLen(Deleted), "the deleted suffix occupies three UTF-16 units")
+		_LLM_Bridge_Buffer := "Avant. " . Span
+		_LAIET_ConfigureRewrite(Record, Correction, Deleted, Span, 2)
+		SendLevel(2)
+		AssertTrue(_LAIET_DispatchRewriteWithoutWorker(), "the supplementary-character rewrite is dispatched")
+		_LAIET_RecordQueuedRewrite(Sent, Record, Correction, 2, "Avant. Je suis déjà allé.")
+	}
+}
+Test("LLM accept: Notepad rewrite erases codepoints while its mirror deletes UTF-16 units (llm-rewrite-paste-recording)",
+	_LAIET_NotepadScalarErasureByPaste)
+
+_LAIET_NotepadStaleRewriteNeverQueuesPaste() {
+	_LAIET_RewritePaste(_Body)
+	_Body(Sent, Record) {
+		global _LLM_Bridge_Buffer, _TEXT_CLIPBOARD_QUEUE
+		Typed := "napéoléon is the"
+		_LLM_Bridge_Buffer := Typed . " changed"
+		_LAIET_ConfigureRewrite(Record,
+			"Napoleon is the greatest emperor in French history", Typed, Typed, 16)
+		SendLevel(2)
+		AssertTrue(_LAIET_DispatchRewriteWithoutWorker(), "claim and dispatch are distinct from injection success")
+		AssertEqual(0, Sent.Length, "a stale correction must neither erase nor send a paste")
+		AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length, "a changed rewrite span must not enter the clipboard FIFO")
+		AssertEqual(Typed . " changed", _LLM_Bridge_Buffer, "a refused rewrite preserves the changed text")
+		AssertEqual("dismissed", Record.Lifecycle.Outcome, "a refused correction cannot be recorded as accepted")
+	}
+}
+Test("LLM accept: a stale Notepad correction refuses erasure before entering the clipboard FIFO (llm-rewrite-paste-recording)",
+	_LAIET_NotepadStaleRewriteNeverQueuesPaste)

@@ -290,3 +290,145 @@ _TSCS_ClipboardForwardsPostCommitDamageAsNonRetryable() {
 
 Test("TextSender: clipboard preserves non-retryable commit damage (llm-output-atomicity)",
 	_TSCS_ClipboardForwardsPostCommitDamageAsNonRetryable)
+
+; =======================================================
+; =======================================================
+; ======= 3/ Clipboard injection metadata ==============
+; =======================================================
+; =======================================================
+
+_TSCD_State() {
+	return Map("hwnd", 41, "pid", 73, "process_name", "Notepad.exe",
+		"window_class", "Notepad", "control_class", "RichEditD2DPT1",
+		"logical", 1, "physical", 0, "sequence", 19, "clipboard_units", 50,
+		"observed_tick", 4294967800,
+		"clipboard_plaintext", "PRIVATE CLIPBOARD CONTENT")
+}
+
+_TSCD_RecordInfo(Records, Tag, Message, Args*) {
+	Records.Push({ Tag: Tag, Message: Format(Message, Args*), Args: Args })
+}
+
+_TSCD_RecordStage(Stage, Emitted := -1, EraseCount := 16) {
+	Records := []
+	_TextSenderClipboardDiagnostic(Stage, 50, EraseCount, 7, 18, Emitted,
+		_TSCD_State, _TSCD_RecordInfo.Bind(Records))
+	return Records
+}
+
+_TSCD_MetadataCounts() {
+	Records := _TSCD_RecordStage("write-ready")
+	AssertEqual(1, Records.Length, "one stage emits one metadata record")
+	AssertEqual("TextSender", Records[1].Tag, "the central component owns the record")
+	Assert(InStr(Records[1].Message, "payload_units=50, erase_before=16") > 0,
+		"the reported replacement must distinguish deletion from insertion")
+	Assert(InStr(Records[1].Message, "generation=7, owned_sequence=18, current_sequence=19") > 0,
+		"the record must preserve the observed and owned clipboard identities separately")
+	Assert(InStr(Records[1].Message, "observed_tick=4294967800") > 0,
+		"native monotonic observations must retain their full width")
+}
+
+Test("TextSender: clipboard diagnostics retain incident erase and payload counts (clipboard-output-diagnostics)",
+	_TSCD_MetadataCounts)
+
+_TSCD_TargetModifiers() {
+	Records := _TSCD_RecordStage("write-ready")
+	Assert(InStr(Records[1].Message, "hwnd=41, pid=73, process_name=Notepad.exe") > 0,
+		"target identity must be available without document titles")
+	Assert(InStr(Records[1].Message, "window_class=Notepad, control_class=RichEditD2DPT1") > 0,
+		"the receiving control metadata must remain distinct from the top-level window")
+	Assert(InStr(Records[1].Message, "logical_modifiers=1, physical_modifiers=0") > 0,
+		"a logical Ctrl must not be reported as physically held")
+}
+
+Test("TextSender: clipboard diagnostics preserve target and separate modifier states (clipboard-output-diagnostics)",
+	_TSCD_TargetModifiers)
+
+_TSCD_PrivacyAndEmission() {
+	Records := _TSCD_RecordStage("send-returned", true)
+	Assert(InStr(Records[1].Message, "PRIVATE CLIPBOARD CONTENT") == 0,
+		"unused reader fields must never leak into the log")
+	Assert(InStr(Records[1].Message, "clipboard_units=50, primitive_returned=1") > 0,
+		"the observed length and native primitive return are metadata only")
+	Assert(InStr(Records[1].Message, "success") == 0,
+		"native primitive return must not claim successful application processing")
+}
+
+Test("TextSender: clipboard diagnostics omit clipboard content and do not claim app acknowledgement (clipboard-output-diagnostics)",
+	_TSCD_PrivacyAndEmission)
+
+_TSCD_Stages() {
+	Pending := _TSCD_RecordStage("write-ready")
+	Refused := _TSCD_RecordStage("send-refused", false)
+	Insertion := _TSCD_RecordStage("send-returned", true, 0)
+	Assert(InStr(Pending[1].Message, "primitive_returned=-1") > 0,
+		"an unattempted output must not claim an emitted primitive")
+	Assert(InStr(Refused[1].Message, "primitive_returned=0") > 0,
+		"a refused output must preserve its absent emission")
+	Assert(InStr(Insertion[1].Message, "erase_before=0") > 0,
+		"insertion-only comparison must report zero deletions")
+}
+
+Test("TextSender: clipboard diagnostics distinguish pending refused and insertion stages (clipboard-output-diagnostics)",
+	_TSCD_Stages)
+
+_TSCD_OwnerRouting() {
+	Body := _DriverFuncBody("_TextSendClipboard")
+	Atomic := _DriverFuncBody("_TextSenderRunAtomicOutput")
+	Diagnostic := _DriverFuncBody("_TextSenderClipboardDiagnostic")
+	Assert(Body != "" and Atomic != "" and Diagnostic != "",
+		"all actual owners are required subjects")
+	Code := _DriverMaskNonCode(&Body)
+	AtomicCode := _DriverMaskNonCode(&Atomic)
+	DiagnosticCode := _DriverMaskNonCode(&Diagnostic)
+	Guard := RegExMatch(Code, "i)\bif\s*\(\s*Generation\s*!=\s*_TEXT_CLIPBOARD_GENERATION\s*\)")
+	Write := RegExMatch(Code, "i)\bCB_Write\s*\(")
+	Ready := RegExMatch(Code, "i)\b_TextSenderTryClipboardDiagnostic\s*\(")
+	Send := RegExMatch(Code, "i)\b_TextSenderRunAtomicOutput\s*\(")
+	Assert(Ready > 0 and Guard > Ready and Send > Guard,
+		"yielding diagnostic work must precede the final clipboard and admission checks")
+	Assert(Write > 0 and Ready > Write,
+		"diagnostics must not introduce a yield between the entry pause guard and clipboard write")
+	Assert(InStr(AtomicCode, "ClipboardDiagnostic") == 0,
+		"the atomic output owner must contain no new diagnostic native probes or logger calls")
+	Assert(RegExMatch(DiagnosticCode, "i)\bTimerFn\s*:=\s*SetTimer\b") > 0,
+		"the default diagnostic timer must still resolve the real timer at call time")
+}
+
+Test("TextSender: clipboard diagnostics remain before final guards and outside the atomic owner (clipboard-output-diagnostics)",
+	_TSCD_OwnerRouting)
+
+_TSCD_ReadState(Observation) {
+	Observation.Reads += 1
+	return _TSCD_State()
+}
+
+_TSCD_CaptureTimer(Observation, Callback, Period) {
+	Observation.Callbacks.Push(Callback)
+	Observation.Periods.Push(Period)
+}
+
+_TSCD_CriticalDeferral() {
+	Observation := { Reads: 0, Callbacks: [], Periods: [] }
+	Records := []
+	PreviousCritical := Critical(17)
+	try {
+		_TextSenderClipboardDiagnostic("write-ready", 50, 16, 7, 18, -1,
+			_TSCD_ReadState.Bind(Observation), _TSCD_RecordInfo.Bind(Records),
+			_TSCD_CaptureTimer.Bind(Observation))
+		AssertEqual(17, A_IsCritical, "diagnostics must preserve the caller's exact Critical interval")
+		AssertEqual(0, Observation.Reads, "no native observation may occur on the Critical caller")
+		AssertEqual(0, Records.Length, "no log sink may run on the Critical caller")
+		AssertEqual(1, Observation.Callbacks.Length, "one deferred callback must be retained")
+		AssertEqual(-1, Observation.Periods[1], "deferral must remain one-shot")
+		Critical("Off")
+		Observation.Callbacks[1].Call()
+		AssertEqual(1, Observation.Reads, "the captured callback must observe once after Critical ends")
+		AssertEqual(1, Records.Length, "the captured callback must emit exactly one metadata log")
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+Test("TextSender: clipboard diagnostics defer native reads and logs under caller Critical (clipboard-output-diagnostics)",
+	_TSCD_CriticalDeferral)
