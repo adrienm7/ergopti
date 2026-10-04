@@ -1580,6 +1580,14 @@ and per-device keyboard-type classification remain pending. The consumer still
 requires baseline v2 and the native contract continues to refuse that mismatch;
 this prerequisite does not enable consumer or physical acceptance.
 
+The cheap baseline preflight now also checks the actual CLI transfer boundary.
+A handwritten consumer-v2/producer-v2/Python-v2 tree with a CLI-v1 reader passed
+the original gate incorrectly; it now refuses with the existing named reason
+and exit3. Aligned controls pass, while duplicate or missing declarations fail
+closed. The current producer, CLI and Python reader remain v1, and the consumer
+remains v2: native consumer admission is still deliberately refused. Independent
+native JSON corpora and all live wire versions are unchanged.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
