@@ -665,28 +665,46 @@ helpers.describe("API menu metadata path", function()
 		local names = {
 			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"menu.renderer", "adapters.json_codec",
 		}
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local resolver_calls = 0
 		local entry = { id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" }
-		package.loaded["modules.llm"] = {
-			api_remote = {
-				PROVIDERS = { openai = { label = "OpenAI" } },
-				PROVIDER_ORDER = { "openai" },
-				get_entries = function() return { entry } end,
-				get_active_entry_id = function() return "entry-a" end,
-				get_active_entry = function() return entry end,
-				resolve_active_entry = function() resolver_calls = resolver_calls + 1 end,
-			},
-		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = { error = function() end }
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.notifications"] = {}
-		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
-		package.loaded["ui.menu.menu_llm.api_panel"] = nil
 		local ok, err = xpcall(function()
+			local Renderer = require("menu.renderer")
+			local JsonCodec = require("adapters.json_codec")
+			local command_renderer = assert(Renderer.new({
+				platform = "hs",
+				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+				json_decode = JsonCodec.decode,
+				i18n = {
+					get = function(key) return key end,
+					-- These command rows do not request a translated section.
+					section = function() return {} end,
+				},
+				logger = helpers.make_logger_stub(),
+			}))
+			package.loaded["modules.llm"] = {
+				api_remote = {
+					PROVIDERS = { openai = { label = "OpenAI" } },
+					PROVIDER_ORDER = { "openai" },
+					get_entries = function() return { entry } end,
+					get_active_entry_id = function() return "entry-a" end,
+					get_active_entry = function() return entry end,
+					resolve_active_entry = function() resolver_calls = resolver_calls + 1 end,
+				},
+			}
+			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["infra.logger"] = { error = function() end }
+			package.loaded["infra.dialog_util"] = {}
+			package.loaded["infra.notifications"] = {}
+			package.loaded["infra.manifest_menu"] = {
+				command_row = command_renderer.command_row,
+				get_array = command_renderer.get_array,
+				render_rows = function(rows) return rows end,
+			}
+			package.loaded["ui.menu.menu_llm.api_panel"] = nil
 			local panel = require("ui.menu.menu_llm.api_panel")
 			local title, rows = panel.build({
 				state = { llm_backend = "api" }, paused = true,
@@ -698,5 +716,9 @@ helpers.describe("API menu metadata path", function()
 		end, debug.traceback)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err) end
+		helpers.assert_eq(package.loaded["menu.renderer"], saved["menu.renderer"],
+			"the borrowed renderer cache identity must be restored")
+		helpers.assert_eq(package.loaded["adapters.json_codec"], saved["adapters.json_codec"],
+			"the borrowed JSON adapter cache identity must be restored")
 	end)
 end)

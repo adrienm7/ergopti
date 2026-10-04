@@ -6243,3 +6243,17 @@ type = "command"
 id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
+
+# The fixed active API-entry commands share captions, order and live readiness.
+# Native adapters keep the existing probe and acknowledged removal owners.
+[[menu.llm_api_active_commands]]
+type = "command"
+id = "api_test_active"
+i18n = "menu.llm.api_test_entry"
+disabled_when = ["llm_api_active_ready"]
+
+[[menu.llm_api_active_commands]]
+type = "command"
+id = "api_remove_active"
+i18n = "menu.llm.api_remove_entry"
+disabled_when = ["llm_api_active_ready"]

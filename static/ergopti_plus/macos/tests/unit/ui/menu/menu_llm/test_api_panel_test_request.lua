@@ -17,6 +17,7 @@ local function fixture_context()
 	return {
 		state = { llm_backend = "api", llm_model = "probe-model" },
 		paused = false,
+		is_paused = function() return false end,
 		keymap = { reset_predictions = function() return true end },
 		update_menu = function() end,
 		WarmupCtrl = { warmup = function() end },
@@ -56,6 +57,7 @@ local function install_doubles(args)
 	-- The two body templates mirror the en.json shapes so the substitution
 	-- wiring is exercised; every other key echoes itself.
 	package.loaded["infra.i18n"] = { get = function(key)
+		if args.locale_strings then return args.locale_strings[key] or key end
 		if key == "menu.llm.api_test_ok_body" then
 			return '"{1}" answered in {2} ms: {3}'
 		end
@@ -80,7 +82,20 @@ local function install_doubles(args)
 			return true
 		end,
 	}
+	local command_renderer = assert(require("menu.renderer").new({
+		platform = "hs",
+		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		json_decode = require("adapters.json_codec").decode,
+		i18n = {
+			get = package.loaded["infra.i18n"].get,
+			-- These command rows never request a translated section.
+			section = function() return {} end,
+		},
+		logger = helpers.make_logger_stub(),
+	}))
 	package.loaded["infra.manifest_menu"] = {
+		command_row = command_renderer.command_row,
+		get_array = command_renderer.get_array,
 		render_rows = function(rows) return rows end,
 	}
 	package.loaded["ui.menu.menu_llm.api_panel"] = nil
@@ -495,4 +510,105 @@ helpers.describe("API panel test request", function()
 		end)
 	end)
 
+end)
+
+helpers.describe("Active API commands: canonical labels and retained owner", function()
+	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
+		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("uses the actual shared active commands in " .. locale, function()
+			helpers.with_fresh_modules(owned, function()
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/data/locales/" .. locale .. ".json", "rb"))
+				local raw = file:read("*a"); assert(file:close())
+				local labels = require("adapters.json_codec").decode(raw)
+				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+				install_doubles({ entries = { entry }, active_id = entry.id, spec = {}, locale_strings = labels })
+				local declaration = package.loaded["infra.manifest_menu"].get_array("llm_api_active_commands")
+				-- A real shared-data change must reach the actual provider, not its old hardcoded caption.
+				declaration[1].i18n = "button.cancel"
+				local _, rows = require("ui.menu.menu_llm.api_panel").build(fixture_context())
+				local positions = {}
+				for index, row in ipairs(rows) do
+					if row.label == labels["button.cancel"] then positions[1] = index end
+					if type(row.label) == "string" and row.label:find(labels["menu.llm.api_remove_entry"], 1, true) then positions[2] = index end
+				end
+				helpers.assert_type(positions[1], "number")
+				helpers.assert_eq(positions[2], positions[1] + 1, "the shared Test/Remove ordering is native")
+				helpers.assert_type(rows[positions[1]].action, "function")
+				helpers.assert_type(rows[positions[2]].action, "function")
+			end)
+		end)
+	end
+	for _, revoked in ipairs({ "paused", "selection" }) do
+		helpers.it("a retained Test refuses a revoked " .. revoked .. " owner before request creation", function()
+			helpers.with_fresh_modules(owned, function()
+				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+				local remote, calls = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
+				local ctx = fixture_context()
+				local live_paused = false
+				ctx.is_paused = function() return live_paused end
+				local _, rows = require("ui.menu.menu_llm.api_panel").build(ctx)
+				local held = test_row(rows).action
+				if revoked == "paused" then live_paused = true else remote.set_active_entry_id("other") end
+				local observed = held()
+				helpers.assert_eq(observed, false)
+				helpers.assert_eq(#calls, 0, "no stale HTTP owner is acquired")
+				helpers.assert_eq(remote.get_entries()[1], entry, "the secret/entry record remains untouched")
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Active API commands: strict native pause receipt", function()
+	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
+		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()
+			helpers.with_fresh_modules(owned, function()
+				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+				local _, calls = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
+				local ctx, failed = fixture_context(), false
+				ctx.is_paused = function()
+					if not failed then return false end
+					if fault == "nil" then return nil end
+					if fault == "number" then return 0 end
+					if fault == "table" then return {} end
+					if fault == "throw" then error("inert native pause-read refusal") end
+				end
+				local _, rows = require("ui.menu.menu_llm.api_panel").build(ctx)
+				local held = test_row(rows).action
+				failed = true
+				if fault == "missing" then ctx.is_paused = nil end
+				local observed = held()
+				helpers.assert_eq(observed, false)
+				helpers.assert_eq(#calls, 0)
+			end)
+		end)
+	end
+	helpers.it("rechecks native pause after confirmation before reset, entry mutation or persistence", function()
+		helpers.with_fresh_modules(owned, function()
+			local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+			local remote = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
+			local ctx, paused, resets, writes = fixture_context(), false, 0, 0
+			ctx.is_paused = function() return paused end
+			ctx.keymap.reset_predictions = function() resets = resets + 1; return true end
+			package.loaded["modules.llm"].persist_api_entries = function() writes = writes + 1 end
+			package.loaded["infra.dialog_util"].block_alert = function(_, _, affirmative)
+				paused = true
+				return affirmative
+			end
+			local _, rows = require("ui.menu.menu_llm.api_panel").build(ctx)
+			local remove
+			for _, row in ipairs(rows) do
+				if type(row.label) == "string" and row.label:find("menu.llm.api_remove_entry", 1, true) then remove = row.action end
+			end
+			local observed = remove()
+			helpers.assert_eq(observed, false)
+			helpers.assert_eq(resets, 0)
+			helpers.assert_eq(writes, 0)
+			helpers.assert_eq(remote.get_entries()[1], entry)
+			helpers.assert_eq(remote.get_active_entry_id(), entry.id)
+		end)
+	end)
 end)

@@ -28,6 +28,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
+local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "ui.menu.llm_backend_rows"
 -- The characters of a test reply shown in the verdict, as on macOS.
@@ -99,6 +100,7 @@ local function run_test(remote, dialogs, entry, name)
 		report_test(dialogs, name, ok, detail, elapsed_ms)
 	end)
 	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", name) end
+	return dispatched
 end
 
 --- Asks for a provider's key (and URL and model where needed), stores the
@@ -269,22 +271,30 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	end
 	rows[#rows + 1] = { label = tr("menu.llm.api_add_entry"), items = add_items }
 	local active_name = active and names[active.id] or nil
-	rows[#rows + 1] = {
-		label = tr("menu.llm.api_test_entry"),
-		disabled = active == nil or nil,
-		action = function() if active then run_test(remote, dialogs, active, active_name) end end,
-	}
-	rows[#rows + 1] = {
-		label = "🗑️ " .. tr("menu.llm.api_remove_entry") .. (active and (" (" .. active_name .. ")") or ""),
-		disabled = active == nil or nil,
-		action = function()
-			if not active then return end
+	local function active_commands_ready()
+		local current = entries.active()
+		return active ~= nil and current ~= nil and current.id == active.id
+	end
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+		api_test_active = function() return run_test(remote, dialogs, active, active_name) end,
+	}, { llm_api_active_ready = active_commands_ready })
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+		api_remove_active = function()
 			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
-			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return end
-			entries.remove(active.id)
+			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+			if not active_commands_ready() then return false end
+			if entries.remove(active.id) ~= true then return false end
 			changed()
+			return true
 		end,
-	}
+	}, { llm_api_active_ready = active_commands_ready })
+	if remove_row then
+		remove_row.label = "🗑️ " .. remove_row.label .. (active and (" (" .. active_name .. ")") or "")
+	end
+	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
+	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
+		if active_rows[declaration.id] then rows[#rows + 1] = active_rows[declaration.id] end
+	end
 	return rows
 end
 

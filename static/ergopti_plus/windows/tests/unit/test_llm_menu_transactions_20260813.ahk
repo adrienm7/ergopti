@@ -2546,3 +2546,41 @@ _LMT_SharedCloneProfileLabelOwner() {
 	} finally Declaration["i18n"] := SavedKey
 }
 Test("LLM profiles: actual Clone row follows a changed shared declaration", _LMT_SharedCloneProfileLabelOwner)
+
+_LMT_SharedApiActiveCommandRows() {
+	global _LLM_Menu, _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\api_active_commands.json"))
+	Assert(Corpus is Map, "the independent active API commands corpus must be readable")
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the real shared menu must be present")
+	Declarations := Root[Corpus["section"]]
+	AssertEqual(2, Declarations.Length)
+	SavedTestKey := Declarations[1]["i18n"]
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["api_entries"] := [_LMT_ApiEntry("active")]
+		_LLM_Menu["api_entry_id"] := "active"
+		Declarations[1]["i18n"] := "button.cancel"
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t("button.cancel"), Rows[Rows.Length - 2]["label"],
+			"the actual provider reads the canonical Test caption")
+		AssertEqual(t("menu.llm.api_edit_entry"), Rows[Rows.Length - 1]["label"],
+			"the existing native Edit action stays immediately before removal")
+		AssertEqual(t(Corpus["rows"][2]["i18n"]), Rows[Rows.Length]["label"])
+		for Index, Expected in Corpus["rows"] {
+			AssertEqual(Expected["id"], Declarations[Index]["id"])
+			AssertEqual(Corpus["ready"], Declarations[Index]["disabled_when"][1])
+		}
+		HeldTest := Rows[Rows.Length - 2]["action"]
+		HeldRemove := Rows[Rows.Length]["action"]
+		_LLM_Menu["api_entry_id"] := ""
+		AssertEqual(false, HeldTest.Call(), "a revoked active owner cannot acquire a test request")
+		AssertEqual(false, HeldRemove.Call(), "a revoked active owner cannot open the removal dialog")
+		AssertEqual(1, _LLM_Menu["api_entries"].Length)
+	} finally {
+		Declarations[1]["i18n"] := SavedTestKey
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM API: actual shared active commands preserve Edit and refuse revoked owners",
+	_LMT_SharedApiActiveCommandRows)
