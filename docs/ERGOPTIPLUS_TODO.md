@@ -1929,6 +1929,18 @@ semantic TOML corpus still require the next non-release Windows execution.
       `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
       arbiter route, make each one order-independent, and test both hook orders like
       `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+
+Partial: terminal replay now has one exclusive native release owner across the
+unlocked SendInput boundary. Reentrant and concurrent release attempts retain
+the FIFO; final acknowledgement and ownership retirement are atomic. A capture
+overflow during sending preserves its fault and original error while consuming
+only the accepted prefix. Independent native C regressions cover nested release,
+second-thread admission, retry, teardown and overflow. The original 929 native
+assertions remain unchanged; test and production DLL cross-compilation pass.
+Windows execution remains pending. KLE-first physical capture, event-specific
+layout replay, digit/profile routes and modifier/hold balancing still require
+the full hook-order audit; this prerequisite does not complete item 49.
+
 - [ ] **50.** Measure SendEvent against SendInput on Windows. While the native
       arbiter's low-level hook is installed, SendInput is interruptible anyway,
       which is the only reason AutoHotkey removes its own hook, so SendInput now
