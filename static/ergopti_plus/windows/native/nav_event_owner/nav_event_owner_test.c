@@ -2980,7 +2980,7 @@ static bool TestTerminalReleaseHasOneOwner(void)
 			TEST_ASSERT(name, snapshot.release_kind == kinds[kind_index]);
 			TEST_ASSERT(name, snapshot.replayed == first_count);
 			TEST_ASSERT(name, snapshot.queued == 5u - first_count);
-			TEST_ASSERT(name, snapshot.phase == (first_count == 5
+			TEST_ASSERT(name, snapshot.phase == (uint32_t)(first_count == 5
 				? ERGOPTI_NAV_TERMINAL_IDLE
 				: ERGOPTI_NAV_TERMINAL_RELEASE_PENDING));
 			before_refusal = snapshot;
