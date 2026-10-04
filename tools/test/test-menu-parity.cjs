@@ -105,6 +105,8 @@ const OPENS_SUBMENU = {
 	word_expanders: 'word_expanders_menu',
 	// The native delay providers open the same declared configuration command.
 	delays_colors: 'hotstrings_delays_menu',
+	// Both Lua preview providers consume the same declared coloured checkbox.
+	preview_bubbles: 'preview_colored_control',
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
 	// The model provider publishes its fixed browser command on every driver.

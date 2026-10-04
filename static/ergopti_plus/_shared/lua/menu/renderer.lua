@@ -597,6 +597,33 @@ function M.new(deps)
 		return nil
 	end
 
+	--- Supplies a declared checkbox as provider data through the shared policy.
+	--- A retained callback rechecks its declared readiness before delivery.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param row_id string Declared checkbox identity.
+	--- @param commands table Native mutation owners.
+	--- @param getters table Native state readers.
+	--- @return table|nil row
+	function R.check_row(manifest_key, row_id, commands, getters)
+		commands, getters = commands or {}, getters or {}
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.type == "check" and item.id == row_id and is_for_platform(item) then
+				local built = command_item(item, manifest_key, commands, getters)
+				if not built then return nil end
+				local action = built.fn
+				return {
+					label = built.title, checked = built.checked, disabled = built.disabled,
+					action = type(action) == "function" and function(...)
+						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+						return action(...)
+					end or nil,
+				}
+			end
+		end
+		Logger.error(LOG, "Missing declared checkbox '%s.%s' — provider row refused.", manifest_key, row_id)
+		return nil
+	end
+
 	--- Builds a menu items table from a manifest menu definition array.
 	---
 	--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)

@@ -225,6 +225,7 @@ return {
 	"tests.unit.modules.hotstrings.test_prefix_expansions",
 	"tests.unit.modules.hotstrings.test_priority_override_collision",
 	"tests.unit.modules.hotstrings.test_preview_candidates",
+	"tests.unit.modules.hotstrings.test_preview_colored_menu",
 	"tests.unit.modules.hotstrings.test_preview_masks_secrets",
 	"tests.unit.modules.hotstrings.test_preview_policy_failure",
 	"tests.unit.modules.hotstrings.test_preview_rows",

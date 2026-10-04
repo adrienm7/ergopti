@@ -20,15 +20,15 @@ local function read_bytes(path)
 	return bytes
 end
 
-local function find_row(rows)
+local function find_row(rows, label)
 	for _, row in ipairs(rows or {}) do
-		if row.label == "menu.hotstrings.tooltip_colored" then return row end
-		local nested = find_row(row.items or row.submenu)
+		if row.label == (label or "menu.hotstrings.tooltip_colored") then return row end
+		local nested = find_row(row.items or row.submenu, label)
 		if nested then return nested end
 	end
 end
 
-local function with_fixture(outcome, callback)
+local function with_fixture(outcome, callback, translate, declaration_label)
 	return helpers.with_stub_scope({
 		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
@@ -40,14 +40,19 @@ local function with_fixture(outcome, callback)
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Preview = require("ui.menu.preview_transaction")
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		translate = translate or function(key) return key end
+		package.loaded["infra.i18n"] = { get = translate }
 		local renderer = assert(require("menu.renderer").new({ platform = "hs",
 			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = { get = function(key) return key end, section = function(key) return key end },
+			json_decode = function(raw)
+				local decoded = require("adapters.json_codec").decode(raw)
+				if declaration_label then decoded.preview_colored_control[1].i18n = declaration_label end
+				return decoded
+			end, i18n = { get = translate, section = function(key) return key end },
 			logger = require("infra.logger"),
 		}))
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
-		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, build = function(_, _, _, _, _, providers)
+		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, build = function(_, _, _, _, _, providers)
 			if type(providers.preview_bubbles) == "function" then return providers.preview_bubbles() end
 			return {}
 		end }
@@ -109,10 +114,11 @@ local function with_fixture(outcome, callback)
 				notify_feature = function() calls.notices = calls.notices + 1 end,
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 			}
-			local row = assert(find_row(require("ui.menu.menu_hotstrings_management").build_management(context).menu))
-			callback({ action = row.action, state = state, calls = calls, owner = owner, global = global,
+			local menus = require("ui.menu.menu_hotstrings_management").build_management(context).menu
+			local row = assert(find_row(menus, translate(declaration_label or "menu.hotstrings.tooltip_colored")))
+			callback({ action = row.action, row = row, menus = menus, state = state, calls = calls, owner = owner, global = global,
 				path = path, runtime = function() return runtime end,
-				set_paused = function(v) paused = v end, set_terminal = function(v) terminal = v end,
+				set_paused = function(v) paused = v end, set_context_paused = function(v) context.paused = v end, set_terminal = function(v) terminal = v end,
 				release_restore = function() blocked_restore = false end, read = function() return read_bytes(path) end,
 				preferences = Preferences,
 			})
@@ -216,5 +222,59 @@ helpers.describe("preview menu mutation transaction", function()
 			if effective == nil then effective = require("infra.manifest_reader").default_for("hotstrings." .. KEY) end
 			helpers.assert_eq(effective, false, "the acknowledged choice remains effective after reload")
 		end)
+	end)
+end)
+
+
+helpers.describe("declared coloured preview checkbox", function()
+	helpers.it("rechecks declared readiness on a retained row before entering the native owner", function()
+		with_fixture("ok", function(f)
+			f.set_context_paused(true)
+			helpers.assert_eq(f.action(), false)
+			helpers.assert_eq(f.calls.native, 0)
+			helpers.assert_eq(f.calls.writes, 0)
+			helpers.assert_eq(f.read(), SOURCE)
+		end)
+	end)
+	helpers.it("takes its provider label from the declaration rather than the native label literal", function()
+		with_fixture("ok", function(f)
+			helpers.assert_eq(f.row.label, "button.ok")
+			helpers.assert_eq(f.row.checked, true)
+			helpers.assert_eq(f.action(), true)
+			helpers.assert_eq(f.calls.notices, 1)
+		end, nil, "button.ok")
+	end)
+	helpers.it("keeps every existing locale, presence switch and separator in the real provider", function()
+		local Paths = require("infra.paths")
+		local Codec = require("adapters.json_codec")
+		local function read_json(path)
+			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
+			return assert(Codec.decode(raw))
+		end
+		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_colored_control.json"))
+		local count = 0
+		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local function translate(key) return catalog[key] or key end
+			with_fixture("ok", function(f)
+				local function group(rows)
+					for _, row in ipairs(rows or {}) do
+						if row.items and row.items[corpus.colored_position] == f.row then return row.items end
+						local found = group(row.items or row.submenu); if found then return found end
+					end
+				end
+				local rows = assert(group(f.menus))
+				helpers.assert_eq(#rows, 5)
+				for index, label in ipairs(corpus.siblings) do helpers.assert_eq(rows[index].label, translate(label)) end
+				helpers.assert_eq(rows[corpus.separator_position].separator, true)
+				helpers.assert_eq(f.row.label, translate(corpus.row.i18n))
+				helpers.assert_true(f.row.label ~= corpus.row.i18n, "the actual locale supplies the label")
+				helpers.assert_eq(f.row.checked, true)
+				helpers.assert_eq(f.action(), true)
+				helpers.assert_eq(f.calls.writes, 1)
+			end, translate)
+			count = count + 1
+		end
+		helpers.assert_eq(count, 21)
 	end)
 end)

@@ -1649,14 +1649,29 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- is separated, the same way macOS separates it.
 				if index == #toggles then choices[#choices + 1] = { separator = true } end
 				local name = toggle.name
-				choices[#choices + 1] = {
-					label   = i18n_safe(toggle.label),
-					checked = PreviewSettings.get(name),
-					action  = function()
-						PreviewSettings.toggle(name)
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
+				if name == "colored" then
+					local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+						["preview_colored_tooltips"] = function()
+							if PreviewSettings.toggle("colored") ~= true then return false end
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							return true
+						end,
+					}, {
+						["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+						-- Configuring a preview remains allowed while the Linux engine is paused.
+						["preview_colored_ready"] = function() return true end,
+					})
+					if row then choices[#choices + 1] = row end
+				else
+					choices[#choices + 1] = {
+						label   = i18n_safe(toggle.label),
+						checked = PreviewSettings.get(name),
+						action  = function()
+							PreviewSettings.toggle(name)
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					}
+				end
 			end
 			return { { label = i18n_safe("menu.hotstrings.preview_bubbles"), items = choices } }
 		end,
