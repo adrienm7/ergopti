@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-03. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
+Updated: 2026-10-04. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
 ahead of it without a release (CI cancelled on purpose).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
@@ -25,14 +25,27 @@ was deleted after its useful content was committed here. The historical
 workflow context (prompts, task status, feature map, analysis reports and
 journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 
-The current session requires one atomic commit per fix or feature, updating this
-checklist in the same commit. Push each commit immediately to `dev`, then cancel
-every CI run triggered by that exact push to avoid releases. Run the full CI
-through `workflow_dispatch` on a temporary `codex/ci-*` branch: a non-dev ref runs
-the CI profile and publishes nothing. Use its Windows and macOS runners for
-native behavior and parity regression tests. Preserve unrelated changes, stage
-exact paths, never force-push `dev`/`main`, and delete only the temporary CI
-branches this session created after their evidence is recorded.
+Delivery now supports independent feature containers. The primary group and
+branch for every remaining item are recorded in
+[the parallel work contract](handovers/2026-10-04-parallel-containers/PARALLEL-WORK.md),
+with ready-to-copy fresh-context prompts and saved pending candidates in
+[the container-stop handover](handovers/2026-10-04-parallel-containers/README.md).
+Feature workers commit one coherent slice at a time, update only their assigned
+items and push their `feat/*` branch immediately. One coordinator integrates
+reviewed slices into `dev`, preserving concurrent workstation/Linux work, and
+pushes each integration immediately. Cancel every automatic workflow triggered
+by each exact pushed SHA to avoid releases. Only the coordinator moves the
+single `codex/ci-validation` branch and dispatches `ci.yml` with `os_lanes` set to
+the affected OSes; manual validation never publishes a release and runs to its
+terminal result. Shared checks remain mandatory. Preserve unrelated changes,
+stage exact paths, and never use reset, clean, stash or force-push.
+
+Item 22 (differential updates) is withdrawn by the maintainer on 2026-10-04:
+reported release downloads are below 20 MB, so the additional delta-generation,
+base-selection and reconstruction/fallback paths are not justified by a measured
+current benefit. Full signed/checksummed updates and rollback remain required.
+This is a scope decision, not a completed delta implementation. Archive
+compression (36) and managed-network downloads (62) remain in scope.
 
 Repository hygiene is complete. The 2026-10-03 cleanup retired 131 obsolete
 CI refs; a read-only 2026-10-04 inspection confirms only `main`, `dev`,
@@ -534,20 +547,15 @@ native three-OS qualification remains pending.
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
-- [ ] **22.** Delta updates: macOS Sparkle deltas are ready on
-      `wip/delta-updates` (mirrored as `backup/wip/delta-updates`, not integrated:
-      its CI step only runs on real releases, so it needs a dry-run CI mode first),
-      then Windows and Linux per ADR 010 with an automatic full-download fallback.
-
-Ergopti-only distance and SFB reduction, rolls and repeat corrections now
-come from the Ergopti extension. Their declared bindings preserve the historical
-categories, preference sections and `common` priority. These source files are
-unchanged since non-release checkpoint
-[37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
-at `b92d9dec8`, which passed the complete three-OS unit, E2E, packaging and
-installation pipeline with release publication skipped. Item 37 retains the
-installed-layout visibility and French suffix/magic-key placement decisions;
-item 104 separately tracks the common-autocorrection section split.
+  Ergopti-only distance and SFB reduction, rolls and repeat corrections now
+  come from the Ergopti extension. Their declared bindings preserve the historical
+  categories, preference sections and `common` priority. These source files are
+  unchanged since non-release checkpoint
+  [37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
+  at `b92d9dec8`, which passed the complete three-OS unit, E2E, packaging and
+  installation pipeline with release publication skipped. Item 37 retains the
+  installed-layout visibility and French suffix/magic-key placement decisions;
+  item 104 separately tracks the common-autocorrection section split.
 
 - [~] **24.** macOS tap-hold outage: a not-ready remap guardian held every
   Karabiner regeneration forever and pinned the first bulk edit (Restore

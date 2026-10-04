@@ -1,0 +1,27 @@
+{
+	"base": "cfa4041758b8cf0d17069dc0ec3f4e1993210eb2",
+	"patch_sha256": "f182674b59f41d4023201d500e7f7303fe02701d82cb1852045815ddadfac86e",
+	"paths": [
+		".github/workflows/ci-macos.yml",
+		".github/workflows/ci.yml",
+		".github/workflows/macos-release-launch.yml",
+		"docs/ERGOPTIPLUS_TODO.md",
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift",
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift",
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift",
+		"tools/build/generate_appcast.sh",
+		"tools/build/homebrew-cask.cjs",
+		"tools/build/macos-release-publication.cjs",
+		"tools/diagnostics/macos-release-launch.py",
+		"tools/diagnostics/macos_release_launch_test.py",
+		"tools/diagnostics/tis_evidence_transport.cjs",
+		"tools/test/test-ci-pipeline-wiring.cjs",
+		"tools/test/test-ci-release-reruns.cjs",
+		"tools/test/test-homebrew-cask.cjs",
+		"tools/test/test-macos-sparkle-feed.cjs",
+		"tools/test/test-release-notes-assets-are-uploaded.cjs",
+		"tools/test/test-release-packaging-workflow.cjs",
+		"tools/test/test-swift-xctest-evidence.cjs"
+	],
+	"status": "NOT INTEGRATED: verify-change failed two JS controls; Mac Lua13879 passed. Native consumers not executed."
+}

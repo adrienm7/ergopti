@@ -1,0 +1,3776 @@
+diff --git a/static/ergopti_plus/_shared/data/locales/ar.json b/static/ergopti_plus/_shared/data/locales/ar.json
+--- a/static/ergopti_plus/_shared/data/locales/ar.json
++++ b/static/ergopti_plus/_shared/data/locales/ar.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "الأرقام أولًا",
+ 	"menu.layout.number_row_symbols": "الرموز أولًا",
+ 	"platform_reason.number_row_override_unsupported": "غير مدعوم: يحتفظ هذا المشغّل بصف الأرقام الأصلي للنظام، ولا يمكن فرض الأرقام أو الرموز.",
+-	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام."
++	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام.",
++	"sg_actions.run_program": "▶️ تشغيل برنامج [قابل للضبط]",
++	"dialog.gestures.param_program": "اختر مسارًا مطلقًا للبرنامج وأدخل كل وسيطة على حدة. للبرامج النصية، اختر المفسّر وأضف مسار النص كوسيطة.",
++	"dialog.gestures.param_err_program": "استخدم مسارًا مطلقًا ووسائط نصية حرفية.",
++	"dialog.action_picker.program_executable": "الملف التنفيذي",
++	"dialog.action_picker.program_arguments": "الوسائط (واحدة لكل حقل)",
++	"dialog.action_picker.program_add_argument": "إضافة وسيطة",
++	"dialog.action_picker.program_remove_argument": "إزالة وسيطة",
++	"platform_reason.program_runner_unavailable": "غير متاح: مشغّل البرامج الأصلي أو هذا الربط غير متاح."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/cs.json b/static/ergopti_plus/_shared/data/locales/cs.json
+--- a/static/ergopti_plus/_shared/data/locales/cs.json
++++ b/static/ergopti_plus/_shared/data/locales/cs.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Nejprve číslice",
+ 	"menu.layout.number_row_symbols": "Nejprve symboly",
+ 	"platform_reason.number_row_override_unsupported": "Nepodporováno: Tento ovladač zachovává nativní číselnou řadu systému; vynucení číslic ani symbolů není dostupné.",
+-	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady."
++	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady.",
++	"sg_actions.run_program": "▶️ Spustit program [nastavitelné]",
++	"dialog.gestures.param_program": "Vyberte absolutní cestu k programu a každý argument zadejte zvlášť. U skriptu vyberte interpret a přidejte cestu ke skriptu jako argument.",
++	"dialog.gestures.param_err_program": "Použijte absolutní cestu a doslovné textové argumenty.",
++	"dialog.action_picker.program_executable": "Spustitelný soubor",
++	"dialog.action_picker.program_arguments": "Argumenty (jeden v každém poli)",
++	"dialog.action_picker.program_add_argument": "Přidat argument",
++	"dialog.action_picker.program_remove_argument": "Odebrat argument",
++	"platform_reason.program_runner_unavailable": "Nedostupné: Nativní spouštěč nebo tato vazba není dostupná."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/da.json b/static/ergopti_plus/_shared/data/locales/da.json
+--- a/static/ergopti_plus/_shared/data/locales/da.json
++++ b/static/ergopti_plus/_shared/data/locales/da.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Tal først",
+ 	"menu.layout.number_row_symbols": "Symboler først",
+ 	"platform_reason.number_row_override_unsupported": "Ikke understøttet: Denne driver bevarer systemets talrække; tal og symboler kan ikke gennemtvinges.",
+-	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken."
++	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken.",
++	"sg_actions.run_program": "▶️ Kør et program [kan indstilles]",
++	"dialog.gestures.param_program": "Vælg programmets absolutte sti, og indtast hvert argument separat. For et script skal du vælge fortolkeren og tilføje scriptets sti som argument.",
++	"dialog.gestures.param_err_program": "Brug en absolut sti og bogstavelige tekstargumenter.",
++	"dialog.action_picker.program_executable": "Programfil",
++	"dialog.action_picker.program_arguments": "Argumenter (ét pr. felt)",
++	"dialog.action_picker.program_add_argument": "Tilføj argument",
++	"dialog.action_picker.program_remove_argument": "Fjern argument",
++	"platform_reason.program_runner_unavailable": "Utilgængelig: Den native programstarter eller denne binding er utilgængelig."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/de.json b/static/ergopti_plus/_shared/data/locales/de.json
+--- a/static/ergopti_plus/_shared/data/locales/de.json
++++ b/static/ergopti_plus/_shared/data/locales/de.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Ziffern zuerst",
+ 	"menu.layout.number_row_symbols": "Symbole zuerst",
+ 	"platform_reason.number_row_override_unsupported": "Nicht unterstützt: Dieser Treiber behält die native Ziffernreihe des Systems bei; erzwungene Ziffern und Symbole sind nicht verfügbar.",
+-	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe."
++	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe.",
++	"sg_actions.run_program": "▶️ Programm ausführen [konfigurierbar]",
++	"dialog.gestures.param_program": "Wählen Sie einen absoluten Programmpfad und geben Sie jedes Argument einzeln ein. Wählen Sie für ein Skript dessen Interpreter und fügen Sie den Skriptpfad als Argument hinzu.",
++	"dialog.gestures.param_err_program": "Verwenden Sie einen absoluten Pfad und unveränderte Textargumente.",
++	"dialog.action_picker.program_executable": "Ausführbare Datei",
++	"dialog.action_picker.program_arguments": "Argumente (eines pro Feld)",
++	"dialog.action_picker.program_add_argument": "Argument hinzufügen",
++	"dialog.action_picker.program_remove_argument": "Argument entfernen",
++	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/en.json b/static/ergopti_plus/_shared/data/locales/en.json
+--- a/static/ergopti_plus/_shared/data/locales/en.json
++++ b/static/ergopti_plus/_shared/data/locales/en.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Digits first",
+ 	"menu.layout.number_row_symbols": "Symbols first",
+ 	"platform_reason.number_row_override_unsupported": "Unsupported: This driver keeps the system’s native number row; forced digits and symbols are unavailable.",
+-	"platform_reason.number_row_source_unavailable": "Unavailable: Symbols first requires an active emulated layout with valid digit and symbol levels at every number-row position."
++	"platform_reason.number_row_source_unavailable": "Unavailable: Symbols first requires an active emulated layout with valid digit and symbol levels at every number-row position.",
++	"sg_actions.run_program": "▶️ Run a program [configurable]",
++	"dialog.gestures.param_program": "Choose an absolute executable path and enter each argument separately. For a script, choose its interpreter and add the script path as an argument.",
++	"dialog.gestures.param_err_program": "Use an absolute executable path and literal text arguments.",
++	"dialog.action_picker.program_executable": "Executable",
++	"dialog.action_picker.program_arguments": "Arguments (one per field)",
++	"dialog.action_picker.program_add_argument": "Add argument",
++	"dialog.action_picker.program_remove_argument": "Remove argument",
++	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/es.json b/static/ergopti_plus/_shared/data/locales/es.json
+--- a/static/ergopti_plus/_shared/data/locales/es.json
++++ b/static/ergopti_plus/_shared/data/locales/es.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Números primero",
+ 	"menu.layout.number_row_symbols": "Símbolos primero",
+ 	"platform_reason.number_row_override_unsupported": "No compatible: Este controlador conserva la fila nativa del sistema; no permite forzar números ni símbolos.",
+-	"platform_reason.number_row_source_unavailable": "No disponible: Símbolos primero requiere una distribución emulada activa con niveles válidos de números y símbolos en cada posición de la fila."
++	"platform_reason.number_row_source_unavailable": "No disponible: Símbolos primero requiere una distribución emulada activa con niveles válidos de números y símbolos en cada posición de la fila.",
++	"sg_actions.run_program": "▶️ Ejecutar un programa [configurable]",
++	"dialog.gestures.param_program": "Elige la ruta absoluta del programa e introduce cada argumento por separado. Para un script, elige su intérprete y añade la ruta del script como argumento.",
++	"dialog.gestures.param_err_program": "Usa una ruta absoluta y argumentos de texto literales.",
++	"dialog.action_picker.program_executable": "Ejecutable",
++	"dialog.action_picker.program_arguments": "Argumentos (uno por campo)",
++	"dialog.action_picker.program_add_argument": "Añadir argumento",
++	"dialog.action_picker.program_remove_argument": "Eliminar argumento",
++	"platform_reason.program_runner_unavailable": "No disponible: El ejecutor nativo o esta asignación no está disponible."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/fr.json b/static/ergopti_plus/_shared/data/locales/fr.json
+--- a/static/ergopti_plus/_shared/data/locales/fr.json
++++ b/static/ergopti_plus/_shared/data/locales/fr.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Chiffres en premier",
+ 	"menu.layout.number_row_symbols": "Symboles en premier",
+ 	"platform_reason.number_row_override_unsupported": "Non pris en charge: Ce pilote conserve la rangée native du système ; les chiffres et symboles forcés sont indisponibles.",
+-	"platform_reason.number_row_source_unavailable": "Indisponible: Les symboles en premier nécessitent une disposition émulée active avec des niveaux chiffre et symbole valides sur toute la rangée."
++	"platform_reason.number_row_source_unavailable": "Indisponible: Les symboles en premier nécessitent une disposition émulée active avec des niveaux chiffre et symbole valides sur toute la rangée.",
++	"sg_actions.run_program": "▶️ Exécuter un programme [configurable]",
++	"dialog.gestures.param_program": "Choisissez le chemin absolu du programme et saisissez chaque argument séparément. Pour un script, choisissez son interpréteur et ajoutez le chemin du script comme argument.",
++	"dialog.gestures.param_err_program": "Utilisez un chemin absolu et des arguments textuels littéraux.",
++	"dialog.action_picker.program_executable": "Exécutable",
++	"dialog.action_picker.program_arguments": "Arguments (un par champ)",
++	"dialog.action_picker.program_add_argument": "Ajouter un argument",
++	"dialog.action_picker.program_remove_argument": "Supprimer un argument",
++	"platform_reason.program_runner_unavailable": "Indisponible : le lanceur natif ou cette association est indisponible."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/he.json b/static/ergopti_plus/_shared/data/locales/he.json
+--- a/static/ergopti_plus/_shared/data/locales/he.json
++++ b/static/ergopti_plus/_shared/data/locales/he.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "ספרות תחילה",
+ 	"menu.layout.number_row_symbols": "סמלים תחילה",
+ 	"platform_reason.number_row_override_unsupported": "לא נתמך: מנהל התקן זה שומר על שורת הספרות המקורית של המערכת; אי אפשר לכפות ספרות או סמלים.",
+-	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות."
++	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות.",
++	"sg_actions.run_program": "▶️ הפעלת תוכנית [ניתן להגדרה]",
++	"dialog.gestures.param_program": "בחר נתיב מוחלט לתוכנית והזן כל ארגומנט בנפרד. עבור סקריפט, בחר את המפרש והוסף את נתיב הסקריפט כארגומנט.",
++	"dialog.gestures.param_err_program": "השתמש בנתיב מוחלט ובארגומנטים טקסטואליים ללא פענוח.",
++	"dialog.action_picker.program_executable": "קובץ הפעלה",
++	"dialog.action_picker.program_arguments": "ארגומנטים (אחד בכל שדה)",
++	"dialog.action_picker.program_add_argument": "הוספת ארגומנט",
++	"dialog.action_picker.program_remove_argument": "הסרת ארגומנט",
++	"platform_reason.program_runner_unavailable": "לא זמין: מפעיל התוכניות המובנה או שיוך זה אינם זמינים."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/hi.json b/static/ergopti_plus/_shared/data/locales/hi.json
+--- a/static/ergopti_plus/_shared/data/locales/hi.json
++++ b/static/ergopti_plus/_shared/data/locales/hi.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "अंक पहले",
+ 	"menu.layout.number_row_symbols": "चिह्न पहले",
+ 	"platform_reason.number_row_override_unsupported": "असमर्थित: यह ड्राइवर सिस्टम की मूल अंक पंक्ति बनाए रखता है; अंक या चिह्न बाध्य नहीं किए जा सकते।",
+-	"platform_reason.number_row_source_unavailable": "अनुपलब्ध: चिह्न पहले के लिए सक्रिय अनुकरण लेआउट चाहिए, जिसकी अंक पंक्ति के हर स्थान पर मान्य अंक और चिह्न स्तर हों।"
++	"platform_reason.number_row_source_unavailable": "अनुपलब्ध: चिह्न पहले के लिए सक्रिय अनुकरण लेआउट चाहिए, जिसकी अंक पंक्ति के हर स्थान पर मान्य अंक और चिह्न स्तर हों।",
++	"sg_actions.run_program": "▶️ प्रोग्राम चलाएँ [कॉन्फ़िगर करने योग्य]",
++	"dialog.gestures.param_program": "प्रोग्राम का पूर्ण पथ चुनें और प्रत्येक तर्क अलग से दर्ज करें। स्क्रिप्ट के लिए उसका इंटरप्रेटर चुनें और स्क्रिप्ट का पथ तर्क के रूप में जोड़ें।",
++	"dialog.gestures.param_err_program": "पूर्ण पथ और अक्षरशः पाठ तर्कों का उपयोग करें।",
++	"dialog.action_picker.program_executable": "निष्पादन योग्य फ़ाइल",
++	"dialog.action_picker.program_arguments": "तर्क (प्रति फ़ील्ड एक)",
++	"dialog.action_picker.program_add_argument": "तर्क जोड़ें",
++	"dialog.action_picker.program_remove_argument": "तर्क हटाएँ",
++	"platform_reason.program_runner_unavailable": "अनुपलब्ध: मूल प्रोग्राम रनर या यह बाइंडिंग उपलब्ध नहीं है।"
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/it.json b/static/ergopti_plus/_shared/data/locales/it.json
+--- a/static/ergopti_plus/_shared/data/locales/it.json
++++ b/static/ergopti_plus/_shared/data/locales/it.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Numeri prima",
+ 	"menu.layout.number_row_symbols": "Simboli prima",
+ 	"platform_reason.number_row_override_unsupported": "Non supportato: Questo driver mantiene la riga nativa del sistema; non consente di forzare numeri e simboli.",
+-	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga."
++	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga.",
++	"sg_actions.run_program": "▶️ Esegui un programma [configurabile]",
++	"dialog.gestures.param_program": "Scegli il percorso assoluto del programma e inserisci ogni argomento separatamente. Per uno script, scegli il suo interprete e aggiungi il percorso dello script come argomento.",
++	"dialog.gestures.param_err_program": "Usa un percorso assoluto e argomenti di testo letterali.",
++	"dialog.action_picker.program_executable": "Eseguibile",
++	"dialog.action_picker.program_arguments": "Argomenti (uno per campo)",
++	"dialog.action_picker.program_add_argument": "Aggiungi argomento",
++	"dialog.action_picker.program_remove_argument": "Rimuovi argomento",
++	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/ja.json b/static/ergopti_plus/_shared/data/locales/ja.json
+--- a/static/ergopti_plus/_shared/data/locales/ja.json
++++ b/static/ergopti_plus/_shared/data/locales/ja.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "数字を優先",
+ 	"menu.layout.number_row_symbols": "記号を優先",
+ 	"platform_reason.number_row_override_unsupported": "未対応: このドライバーはシステムの数字列を維持します。数字や記号を強制することはできません。",
+-	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。"
++	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。",
++	"sg_actions.run_program": "▶️ プログラムを実行 [設定可能]",
++	"dialog.gestures.param_program": "実行ファイルの絶対パスを選び、引数を個別に入力してください。スクリプトの場合はインタープリターを選び、スクリプトのパスを引数に追加してください。",
++	"dialog.gestures.param_err_program": "絶対パスと、そのまま渡す文字列の引数を使用してください。",
++	"dialog.action_picker.program_executable": "実行ファイル",
++	"dialog.action_picker.program_arguments": "引数（各欄に1つ）",
++	"dialog.action_picker.program_add_argument": "引数を追加",
++	"dialog.action_picker.program_remove_argument": "引数を削除",
++	"platform_reason.program_runner_unavailable": "利用不可: ネイティブのプログラム実行機能またはこの割り当ては利用できません。"
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/ko.json b/static/ergopti_plus/_shared/data/locales/ko.json
+--- a/static/ergopti_plus/_shared/data/locales/ko.json
++++ b/static/ergopti_plus/_shared/data/locales/ko.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "숫자 우선",
+ 	"menu.layout.number_row_symbols": "기호 우선",
+ 	"platform_reason.number_row_override_unsupported": "지원 안 됨: 이 드라이버는 시스템의 숫자 행을 유지하며 숫자나 기호를 강제할 수 없습니다.",
+-	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다."
++	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다.",
++	"sg_actions.run_program": "▶️ 프로그램 실행 [설정 가능]",
++	"dialog.gestures.param_program": "실행 파일의 절대 경로를 선택하고 각 인수를 따로 입력하세요. 스크립트는 인터프리터를 선택하고 스크립트 경로를 인수로 추가하세요.",
++	"dialog.gestures.param_err_program": "절대 경로와 그대로 전달할 텍스트 인수를 사용하세요.",
++	"dialog.action_picker.program_executable": "실행 파일",
++	"dialog.action_picker.program_arguments": "인수 (필드당 하나)",
++	"dialog.action_picker.program_add_argument": "인수 추가",
++	"dialog.action_picker.program_remove_argument": "인수 제거",
++	"platform_reason.program_runner_unavailable": "사용 불가: 기본 프로그램 실행 기능 또는 이 할당을 사용할 수 없습니다."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/nl.json b/static/ergopti_plus/_shared/data/locales/nl.json
+--- a/static/ergopti_plus/_shared/data/locales/nl.json
++++ b/static/ergopti_plus/_shared/data/locales/nl.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Cijfers eerst",
+ 	"menu.layout.number_row_symbols": "Symbolen eerst",
+ 	"platform_reason.number_row_override_unsupported": "Niet ondersteund: Deze driver behoudt de oorspronkelijke cijferrij van het systeem; cijfers en symbolen kunnen niet worden geforceerd.",
+-	"platform_reason.number_row_source_unavailable": "Niet beschikbaar: Symbolen eerst vereist een actieve geëmuleerde indeling met geldige cijfer- en symboolniveaus op elke positie van de cijferrij."
++	"platform_reason.number_row_source_unavailable": "Niet beschikbaar: Symbolen eerst vereist een actieve geëmuleerde indeling met geldige cijfer- en symboolniveaus op elke positie van de cijferrij.",
++	"sg_actions.run_program": "▶️ Een programma uitvoeren [instelbaar]",
++	"dialog.gestures.param_program": "Kies het absolute pad van het programma en voer elk argument afzonderlijk in. Kies voor een script de interpreter en voeg het scriptpad als argument toe.",
++	"dialog.gestures.param_err_program": "Gebruik een absoluut pad en letterlijke tekstargumenten.",
++	"dialog.action_picker.program_executable": "Uitvoerbaar bestand",
++	"dialog.action_picker.program_arguments": "Argumenten (één per veld)",
++	"dialog.action_picker.program_add_argument": "Argument toevoegen",
++	"dialog.action_picker.program_remove_argument": "Argument verwijderen",
++	"platform_reason.program_runner_unavailable": "Niet beschikbaar: De native programmastarter of deze toewijzing is niet beschikbaar."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/no.json b/static/ergopti_plus/_shared/data/locales/no.json
+--- a/static/ergopti_plus/_shared/data/locales/no.json
++++ b/static/ergopti_plus/_shared/data/locales/no.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Tall først",
+ 	"menu.layout.number_row_symbols": "Symboler først",
+ 	"platform_reason.number_row_override_unsupported": "Ikke støttet: Denne driveren beholder systemets tallrekke; tall og symboler kan ikke tvinges fram.",
+-	"platform_reason.number_row_source_unavailable": "Utilgjengelig: Symboler først krever et aktivt emulert oppsett med gyldige tall- og symbolnivåer på hver plass i tallrekken."
++	"platform_reason.number_row_source_unavailable": "Utilgjengelig: Symboler først krever et aktivt emulert oppsett med gyldige tall- og symbolnivåer på hver plass i tallrekken.",
++	"sg_actions.run_program": "▶️ Kjør et program [konfigurerbart]",
++	"dialog.gestures.param_program": "Velg programmets absolutte sti og skriv inn hvert argument separat. For et skript velger du tolken og legger til skriptets sti som argument.",
++	"dialog.gestures.param_err_program": "Bruk en absolutt sti og bokstavelige tekstargumenter.",
++	"dialog.action_picker.program_executable": "Programfil",
++	"dialog.action_picker.program_arguments": "Argumenter (ett per felt)",
++	"dialog.action_picker.program_add_argument": "Legg til argument",
++	"dialog.action_picker.program_remove_argument": "Fjern argument",
++	"platform_reason.program_runner_unavailable": "Utilgjengelig: Den innebygde programstarteren eller denne tilordningen er utilgjengelig."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/pl.json b/static/ergopti_plus/_shared/data/locales/pl.json
+--- a/static/ergopti_plus/_shared/data/locales/pl.json
++++ b/static/ergopti_plus/_shared/data/locales/pl.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Najpierw cyfry",
+ 	"menu.layout.number_row_symbols": "Najpierw symbole",
+ 	"platform_reason.number_row_override_unsupported": "Nieobsługiwane: Ten sterownik zachowuje systemowy rząd cyfr; wymuszanie cyfr i symboli jest niedostępne.",
+-	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu."
++	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu.",
++	"sg_actions.run_program": "▶️ Uruchom program [konfigurowalne]",
++	"dialog.gestures.param_program": "Wybierz bezwzględną ścieżkę programu i wpisz każdy argument osobno. Dla skryptu wybierz interpreter i dodaj ścieżkę skryptu jako argument.",
++	"dialog.gestures.param_err_program": "Użyj ścieżki bezwzględnej i dosłownych argumentów tekstowych.",
++	"dialog.action_picker.program_executable": "Plik wykonywalny",
++	"dialog.action_picker.program_arguments": "Argumenty (jeden w każdym polu)",
++	"dialog.action_picker.program_add_argument": "Dodaj argument",
++	"dialog.action_picker.program_remove_argument": "Usuń argument",
++	"platform_reason.program_runner_unavailable": "Niedostępne: Natywny mechanizm uruchamiania lub to przypisanie jest niedostępne."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/pt.json b/static/ergopti_plus/_shared/data/locales/pt.json
+--- a/static/ergopti_plus/_shared/data/locales/pt.json
++++ b/static/ergopti_plus/_shared/data/locales/pt.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Números primeiro",
+ 	"menu.layout.number_row_symbols": "Símbolos primeiro",
+ 	"platform_reason.number_row_override_unsupported": "Não suportado: Este controlador mantém a fila nativa do sistema; não é possível forçar números ou símbolos.",
+-	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila."
++	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila.",
++	"sg_actions.run_program": "▶️ Executar um programa [configurável]",
++	"dialog.gestures.param_program": "Escolha o caminho absoluto do programa e introduza cada argumento separadamente. Para um script, escolha o interpretador e adicione o caminho do script como argumento.",
++	"dialog.gestures.param_err_program": "Use um caminho absoluto e argumentos de texto literais.",
++	"dialog.action_picker.program_executable": "Executável",
++	"dialog.action_picker.program_arguments": "Argumentos (um por campo)",
++	"dialog.action_picker.program_add_argument": "Adicionar argumento",
++	"dialog.action_picker.program_remove_argument": "Remover argumento",
++	"platform_reason.program_runner_unavailable": "Indisponível: O executor nativo ou esta associação está indisponível."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/ru.json b/static/ergopti_plus/_shared/data/locales/ru.json
+--- a/static/ergopti_plus/_shared/data/locales/ru.json
++++ b/static/ergopti_plus/_shared/data/locales/ru.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Сначала цифры",
+ 	"menu.layout.number_row_symbols": "Сначала символы",
+ 	"platform_reason.number_row_override_unsupported": "Не поддерживается: Этот драйвер сохраняет системный цифровой ряд; принудительный вывод цифр и символов недоступен.",
+-	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда."
++	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда.",
++	"sg_actions.run_program": "▶️ Запустить программу [настраиваемое]",
++	"dialog.gestures.param_program": "Выберите абсолютный путь к программе и введите каждый аргумент отдельно. Для скрипта выберите интерпретатор и добавьте путь к скрипту как аргумент.",
++	"dialog.gestures.param_err_program": "Используйте абсолютный путь и текстовые аргументы без интерпретации.",
++	"dialog.action_picker.program_executable": "Исполняемый файл",
++	"dialog.action_picker.program_arguments": "Аргументы (по одному в поле)",
++	"dialog.action_picker.program_add_argument": "Добавить аргумент",
++	"dialog.action_picker.program_remove_argument": "Удалить аргумент",
++	"platform_reason.program_runner_unavailable": "Недоступно: Нативный запуск программ или эта привязка недоступны."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/sv.json b/static/ergopti_plus/_shared/data/locales/sv.json
+--- a/static/ergopti_plus/_shared/data/locales/sv.json
++++ b/static/ergopti_plus/_shared/data/locales/sv.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Siffror först",
+ 	"menu.layout.number_row_symbols": "Symboler först",
+ 	"platform_reason.number_row_override_unsupported": "Stöds inte: Den här drivrutinen behåller systemets sifferrad; siffror och symboler kan inte tvingas fram.",
+-	"platform_reason.number_row_source_unavailable": "Inte tillgängligt: Symboler först kräver en aktiv emulerad layout med giltiga siffer- och symbolnivåer på varje plats i sifferraden."
++	"platform_reason.number_row_source_unavailable": "Inte tillgängligt: Symboler först kräver en aktiv emulerad layout med giltiga siffer- och symbolnivåer på varje plats i sifferraden.",
++	"sg_actions.run_program": "▶️ Kör ett program [konfigurerbart]",
++	"dialog.gestures.param_program": "Välj programmets absoluta sökväg och ange varje argument separat. För ett skript väljer du tolken och lägger till skriptets sökväg som argument.",
++	"dialog.gestures.param_err_program": "Använd en absolut sökväg och bokstavliga textargument.",
++	"dialog.action_picker.program_executable": "Programfil",
++	"dialog.action_picker.program_arguments": "Argument (ett per fält)",
++	"dialog.action_picker.program_add_argument": "Lägg till argument",
++	"dialog.action_picker.program_remove_argument": "Ta bort argument",
++	"platform_reason.program_runner_unavailable": "Otillgänglig: Den inbyggda programstartaren eller denna koppling är otillgänglig."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/tr.json b/static/ergopti_plus/_shared/data/locales/tr.json
+--- a/static/ergopti_plus/_shared/data/locales/tr.json
++++ b/static/ergopti_plus/_shared/data/locales/tr.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Önce rakamlar",
+ 	"menu.layout.number_row_symbols": "Önce simgeler",
+ 	"platform_reason.number_row_override_unsupported": "Desteklenmiyor: Bu sürücü sistemin sayı satırını korur; rakamlar ve simgeler zorlanamaz.",
+-	"platform_reason.number_row_source_unavailable": "Kullanılamıyor: Önce simgeler için sayı satırının her konumunda geçerli rakam ve simge düzeyleri bulunan etkin bir öykünülmüş düzen gerekir."
++	"platform_reason.number_row_source_unavailable": "Kullanılamıyor: Önce simgeler için sayı satırının her konumunda geçerli rakam ve simge düzeyleri bulunan etkin bir öykünülmüş düzen gerekir.",
++	"sg_actions.run_program": "▶️ Program çalıştır [yapılandırılabilir]",
++	"dialog.gestures.param_program": "Programın mutlak yolunu seçin ve her bağımsız değişkeni ayrı girin. Betik için yorumlayıcıyı seçin ve betiğin yolunu bağımsız değişken olarak ekleyin.",
++	"dialog.gestures.param_err_program": "Mutlak yol ve olduğu gibi iletilecek metin bağımsız değişkenleri kullanın.",
++	"dialog.action_picker.program_executable": "Çalıştırılabilir dosya",
++	"dialog.action_picker.program_arguments": "Bağımsız değişkenler (alan başına bir)",
++	"dialog.action_picker.program_add_argument": "Bağımsız değişken ekle",
++	"dialog.action_picker.program_remove_argument": "Bağımsız değişkeni kaldır",
++	"platform_reason.program_runner_unavailable": "Kullanılamıyor: Yerel program çalıştırıcısı veya bu atama kullanılamıyor."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/uk.json b/static/ergopti_plus/_shared/data/locales/uk.json
+--- a/static/ergopti_plus/_shared/data/locales/uk.json
++++ b/static/ergopti_plus/_shared/data/locales/uk.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "Спочатку цифри",
+ 	"menu.layout.number_row_symbols": "Спочатку символи",
+ 	"platform_reason.number_row_override_unsupported": "Не підтримується: Цей драйвер зберігає системний цифровий ряд; примусове введення цифр і символів недоступне.",
+-	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду."
++	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду.",
++	"sg_actions.run_program": "▶️ Запустити програму [налаштовуване]",
++	"dialog.gestures.param_program": "Виберіть абсолютний шлях до програми та введіть кожен аргумент окремо. Для скрипту виберіть інтерпретатор і додайте шлях до скрипту як аргумент.",
++	"dialog.gestures.param_err_program": "Використовуйте абсолютний шлях і текстові аргументи без інтерпретації.",
++	"dialog.action_picker.program_executable": "Виконуваний файл",
++	"dialog.action_picker.program_arguments": "Аргументи (по одному в полі)",
++	"dialog.action_picker.program_add_argument": "Додати аргумент",
++	"dialog.action_picker.program_remove_argument": "Видалити аргумент",
++	"platform_reason.program_runner_unavailable": "Недоступно: Нативний запуск програм або ця прив’язка недоступні."
+ }
+diff --git a/static/ergopti_plus/_shared/data/locales/zh.json b/static/ergopti_plus/_shared/data/locales/zh.json
+--- a/static/ergopti_plus/_shared/data/locales/zh.json
++++ b/static/ergopti_plus/_shared/data/locales/zh.json
+@@ -3189,5 +3189,13 @@
+ 	"menu.layout.number_row_digits": "数字优先",
+ 	"menu.layout.number_row_symbols": "符号优先",
+ 	"platform_reason.number_row_override_unsupported": "不支持: 此驱动保留系统的原生数字行，无法强制使用数字或符号。",
+-	"platform_reason.number_row_source_unavailable": "不可用: 符号优先需要启用模拟布局，且数字行的每个位置都必须具有有效的数字和符号层级。"
++	"platform_reason.number_row_source_unavailable": "不可用: 符号优先需要启用模拟布局，且数字行的每个位置都必须具有有效的数字和符号层级。",
++	"sg_actions.run_program": "▶️ 运行程序 [可配置]",
++	"dialog.gestures.param_program": "选择程序的绝对路径并分别输入每个参数。对于脚本，请选择其解释器，并将脚本路径添加为参数。",
++	"dialog.gestures.param_err_program": "请使用绝对路径和原样传递的文本参数。",
++	"dialog.action_picker.program_executable": "可执行文件",
++	"dialog.action_picker.program_arguments": "参数（每个字段一个）",
++	"dialog.action_picker.program_add_argument": "添加参数",
++	"dialog.action_picker.program_remove_argument": "移除参数",
++	"platform_reason.program_runner_unavailable": "不可用: 原生程序运行功能或此绑定不可用。"
+ }
+diff --git a/static/ergopti_plus/_shared/lua/program_parameter.lua b/static/ergopti_plus/_shared/lua/program_parameter.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/program_parameter.lua
+@@ -0,0 +1,44 @@
++--- _shared/lua/program_parameter.lua
++
++--- Validates a private executable and literal argv without interpreting shell text.
++local Json = require("json")
++local Unicode = require("compat.utf8")
++local function clean(value)
++	return type(value) == "string" and not value:find("%z") and Unicode.len(value) ~= nil
++end
++local M = {}
++
++--- Decodes one versioned binding value without borrowing native availability.
++--- @param value any Persisted scalar JSON value.
++--- @param platform string Native path syntax: ahk, hs or linux.
++--- @return table|nil program Detached executable and argument vector.
++function M.parse(value, platform)
++	if type(value) ~= "string" then return nil end
++	local ok, data = pcall(Json.decode_lossless, value)
++	if not ok or type(data) ~= "table" or Json.is_array(data) or Json.is_null(data) then return nil end
++	local count = 0
++	for key in pairs(data) do
++		if key ~= "version" and key ~= "executable" and key ~= "arguments" then return nil end
++		count = count + 1
++	end
++	if count ~= 3 or type(data.version) ~= "number" or data.version ~= 1 then return nil end
++	local executable = data.executable
++	if not clean(executable) or executable == "" then return nil end
++	if platform == "ahk" then
++		if not executable:match("^%a:[/\\]") and not executable:match("^\\\\[^\\/]+\\[^\\/]+\\.") then return nil end
++		if executable:match("^\\\\[?.]\\") then return nil end
++	elseif platform == "hs" or platform == "linux" then
++		if executable:sub(1, 1) ~= "/" then return nil end
++	else
++		return nil
++	end
++	if not Json.is_array(data.arguments) then return nil end
++	local arguments = {}
++	for index, argument in ipairs(data.arguments) do
++		if not clean(argument) then return nil end
++		arguments[index] = argument
++	end
++	return { executable = executable, arguments = arguments }
++end
++
++return M
+diff --git a/static/ergopti_plus/_shared/modules/actions/actions.toml b/static/ergopti_plus/_shared/modules/actions/actions.toml
+--- a/static/ergopti_plus/_shared/modules/actions/actions.toml
++++ b/static/ergopti_plus/_shared/modules/actions/actions.toml
+@@ -792,6 +792,11 @@
+ # no compositor-independent way to warp the pointer.
+ platform = "ahk,hs"
+ 
++[sg_actions.run_program]
++# Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
++platform = "all"
++parameter = "program"
++
+ [sg_actions.open_app]
+ # Opens the application stored for the binding: macOS `open -a` (a name or
+ # path) or `open -b` (a bundle identifier), Windows the shell's Run (a program,
+@@ -1680,6 +1685,7 @@
+     "clear_clipboard",
+     "center_mouse",
+     "open_app",
++    "run_program",
+     "quit_frontmost_app",
+     "force_quit_frontmost",
+     "empty_trash",
+diff --git a/static/ergopti_plus/_shared/tests/corpus/action_parameters/program_vectors.json b/static/ergopti_plus/_shared/tests/corpus/action_parameters/program_vectors.json
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/tests/corpus/action_parameters/program_vectors.json
+@@ -0,0 +1,163 @@
++{
++	"contract": "versioned executable and literal argv; target availability is native and separate",
++	"cases": [
++		{
++			"id": "posix-empty",
++			"platforms": ["hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/tmp/program\",\"arguments\":[]}",
++			"expected": {
++				"executable": "/tmp/program",
++				"arguments": []
++			}
++		},
++		{
++			"id": "literal-argv",
++			"platforms": ["hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/tmp/été program\",\"arguments\":[\"\",\"two words\",\"日本語\",\"\\\"quoted\\\"\",\"\\\\tail\\\\\",\"$(touch ignored); %TOKEN%\",\"line\\nnext\"]}",
++			"expected": {
++				"executable": "/tmp/été program",
++				"arguments": [
++					"",
++					"two words",
++					"日本語",
++					"\"quoted\"",
++					"\\tail\\",
++					"$(touch ignored); %TOKEN%",
++					"line\nnext"
++				]
++			}
++		},
++		{
++			"id": "windows-literal",
++			"platforms": ["ahk"],
++			"value": "{\"version\":1,\"executable\":\"C:\\\\Program Files\\\\été\\\\program.exe\",\"arguments\":[\"\",\"two words\",\"日本語\",\"\\\"quote\\\"\",\"trail\\\\\",\"%TOKEN%\",\"a&b\"]}",
++			"expected": {
++				"executable": "C:\\Program Files\\été\\program.exe",
++				"arguments": ["", "two words", "日本語", "\"quote\"", "trail\\", "%TOKEN%", "a&b"]
++			}
++		},
++		{
++			"id": "unc-file",
++			"platforms": ["ahk"],
++			"value": "{\"version\":1,\"executable\":\"\\\\\\\\server\\\\share\\\\program.exe\",\"arguments\":[]}",
++			"expected": {
++				"executable": "\\\\server\\share\\program.exe",
++				"arguments": []
++			}
++		},
++		{
++			"id": "null",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "null",
++			"expected": null
++		},
++		{
++			"id": "empty-object",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{}",
++			"expected": null
++		},
++		{
++			"id": "array",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "[]",
++			"expected": null
++		},
++		{
++			"id": "version-two",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":2,\"executable\":\"/bin/true\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "version-bool",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":true,\"executable\":\"/bin/true\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "version-text",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":\"1\",\"executable\":\"/bin/true\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "args-object",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":{}}",
++			"expected": null
++		},
++		{
++			"id": "args-null",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":null}",
++			"expected": null
++		},
++		{
++			"id": "argument-number",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[2]}",
++			"expected": null
++		},
++		{
++			"id": "argument-null",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[null]}",
++			"expected": null
++		},
++		{
++			"id": "argument-object",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[{}]}",
++			"expected": null
++		},
++		{
++			"id": "duplicate-executable",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/false\",\"executable\":\"/bin/true\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "duplicate-escaped-key",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"argum\\u0065nts\":[],\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "extra-field",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[],\"shell\":true}",
++			"expected": null
++		},
++		{
++			"id": "missing-arguments",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\"}",
++			"expected": null
++		},
++		{
++			"id": "relative-executable",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"program\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "nul-executable",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/tmp/a\\u0000b\",\"arguments\":[]}",
++			"expected": null
++		},
++		{
++			"id": "nul-argument",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[\"a\\u0000b\"]}",
++			"expected": null
++		},
++		{
++			"id": "invalid-surrogate",
++			"platforms": ["ahk", "hs", "linux"],
++			"value": "{\"version\":1,\"executable\":\"/bin/true\",\"arguments\":[\"\\ud800\"]}",
++			"expected": null
++		}
++	]
++}
+diff --git a/static/ergopti_plus/_shared/ui/action_picker/index.html b/static/ergopti_plus/_shared/ui/action_picker/index.html
+--- a/static/ergopti_plus/_shared/ui/action_picker/index.html
++++ b/static/ergopti_plus/_shared/ui/action_picker/index.html
+@@ -62,6 +62,13 @@
+ 				<label id="param-language-label" for="param-language-select"></label>
+ 				<select id="param-language-select"></select>
+ 			</div>
++			<div id="param-program" hidden>
++				<label id="param-program-executable-label" for="param-program-executable"></label>
++				<input id="param-program-executable" type="text" autocomplete="off" spellcheck="false" />
++				<p id="param-program-arguments-label"></p>
++				<div id="param-program-arguments"></div>
++				<button id="param-program-add" type="button"></button>
++			</div>
+ 			<p id="param-error" hidden></p>
+ 			<div class="param-buttons">
+ 				<button id="param-back" type="button"></button>
+@@ -82,6 +89,7 @@
+ 			<button id="btn-cancel" type="button" onclick="doCancel()"></button>
+ 		</footer>
+ 
++		<script src="../program_parameter.js"></script>
+ 		<script src="script.js"></script>
+ 	</body>
+ </html>
+diff --git a/static/ergopti_plus/_shared/ui/action_picker/script.js b/static/ergopti_plus/_shared/ui/action_picker/script.js
+--- a/static/ergopti_plus/_shared/ui/action_picker/script.js
++++ b/static/ergopti_plus/_shared/ui/action_picker/script.js
+@@ -116,6 +116,9 @@
+ 		el('param-vision-provider-label').textContent = paramStrings.visionProviderLabel || '';
+ 		el('param-vision-model-label').textContent = paramStrings.visionModelLabel || '';
+ 		el('param-language-label').textContent = paramStrings.languageLabel || '';
++		el('param-program-executable-label').textContent = paramStrings.programExecutableLabel || '';
++		el('param-program-arguments-label').textContent = paramStrings.programArgumentsLabel || '';
++		el('param-program-add').textContent = paramStrings.programAddLabel || '';
+ 	}
+ 	if (editing) closeParamEditor();
+ 
+@@ -464,7 +467,8 @@
+ 	'shortcut',
+ 	'llm_prompt',
+ 	'llm_vision',
+-	'llm_language'
++	'llm_language',
++	'program'
+ ]);
+ const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
+ 
+@@ -596,6 +600,8 @@
+ // Canonical form of a value, or null when invalid.
+ function parseParameter(kind, value) {
+ 	if (typeof value !== 'string') return null;
++	if (kind === 'program')
++		return ProgramParameter.parse(value, hostPlatform) === null ? null : value;
+ 	if (kind === 'text') return parseSendText(value);
+ 	if (kind === 'key') return parseSendKey(value, false);
+ 	if (kind === 'shortcut') return parseSendShortcut(value);
+@@ -663,6 +669,7 @@
+ 
+ function canEdit(entry) {
+ 	if (!entry || !EDITABLE_KINDS.has(entry.parameter) || paramStrings === null) return false;
++	if (entry.parameter === 'program') return typeof ProgramParameter === 'object';
+ 	if (entry.parameter === 'llm_prompt')
+ 		return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
+ 	if (entry.parameter === 'llm_vision') return visionChoices !== null && visionChoices.length > 0;
+@@ -764,6 +771,7 @@
+ 	const choosing = entry.parameter === 'llm_prompt';
+ 	const vision = entry.parameter === 'llm_vision';
+ 	const language = entry.parameter === 'llm_language';
++	const program = entry.parameter === 'program';
+ 	el('param-title').textContent = entry.label;
+ 	el('param-prompt').textContent =
+ 		choosing || vision || language ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
+@@ -774,13 +782,23 @@
+ 				? paramStrings.captureShortcut
+ 				: '';
+ 	el('param-error').hidden = true;
+-	el('param-input').hidden = choosing || vision || language;
++	el('param-input').hidden = choosing || vision || language || program;
+ 	el('param-choice').hidden = !choosing;
+ 	el('param-vision').hidden = !vision;
+ 	el('param-language').hidden = !language;
++	el('param-program').hidden = !program;
+ 	el('param').hidden = false;
+ 	el('list').hidden = true;
+ 	el('search-bar').hidden = true;
++	if (program) {
++		const current = ProgramParameter.parse(entry.parameterValue || '', hostPlatform);
++		el('param-program-executable').value = current === null ? '' : current.executable;
++		el('param-program-arguments').replaceChildren();
++		for (const argument of current === null ? [] : current.arguments)
++			appendProgramArgument(argument);
++		el('param-program-executable').focus();
++		return;
++	}
+ 	if (choosing) {
+ 		fillPromptChoices(entry.parameterValue);
+ 		el('param-profile').focus();
+@@ -800,6 +818,22 @@
+ 	el('param-input').focus();
+ 	// Selected, the current value is replaced by the first key typed or captured.
+ 	el('param-input').select();
++}
++
++function appendProgramArgument(value) {
++	const row = document.createElement('div');
++	row.className = 'program-argument';
++	const input = document.createElement('textarea');
++	input.value = value;
++	input.spellcheck = false;
++	input.setAttribute('aria-label', paramStrings.programArgumentsLabel || '');
++	const remove = document.createElement('button');
++	remove.type = 'button';
++	remove.textContent = paramStrings.programRemoveLabel || '';
++	remove.addEventListener('click', () => row.remove());
++	row.append(input, remove);
++	el('param-program-arguments').appendChild(row);
++	return input;
+ }
+ 
+ function closeParamEditor() {
+@@ -813,13 +847,22 @@
+ function saveParameter() {
+ 	if (!editing) return;
+ 	const value =
+-		editing.parameter === 'llm_prompt'
+-			? promptChoiceValue()
+-			: editing.parameter === 'llm_vision'
+-				? visionChoiceValue()
+-				: editing.parameter === 'llm_language'
+-					? el('param-language-select').value
+-					: el('param-input').value;
++		editing.parameter === 'program'
++			? ProgramParameter.encode(
++					el('param-program-executable').value,
++					Array.from(
++						el('param-program-arguments').querySelectorAll('textarea'),
++						(input) => input.value
++					),
++					hostPlatform
++				)
++			: editing.parameter === 'llm_prompt'
++				? promptChoiceValue()
++				: editing.parameter === 'llm_vision'
++					? visionChoiceValue()
++					: editing.parameter === 'llm_language'
++						? el('param-language-select').value
++						: el('param-input').value;
+ 	if (value === null || parseParameter(editing.parameter, value) === null) {
+ 		el('param-error').textContent = (paramStrings.errors || {})[editing.parameter] || '';
+ 		el('param-error').hidden = false;
+@@ -905,7 +948,12 @@
+ function onParamKeydown(e) {
+ 	if (!editing) return false;
+ 	const input = el('param-input');
+-	if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
++	if (editing.parameter === 'program') {
++		if (e.key === 'Escape') {
++			e.preventDefault();
++			closeParamEditor();
++		}
++	} else if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
+ 	else if (editing.parameter === 'shortcut') onShortcutCaptureKeydown(e, input);
+ 	else if (
+ 		editing.parameter === 'llm_prompt' ||
+@@ -939,6 +987,9 @@
+ 	});
+ 	el('param-back').addEventListener('click', function () {
+ 		closeParamEditor();
++	});
++	el('param-program-add').addEventListener('click', function () {
++		appendProgramArgument('').focus();
+ 	});
+ 	el('param-save').addEventListener('click', function () {
+ 		saveParameter();
+diff --git a/static/ergopti_plus/_shared/ui/action_picker/style.css b/static/ergopti_plus/_shared/ui/action_picker/style.css
+--- a/static/ergopti_plus/_shared/ui/action_picker/style.css
++++ b/static/ergopti_plus/_shared/ui/action_picker/style.css
+@@ -508,3 +508,14 @@
+ 	border-color: var(--accent);
+ 	color: #fff;
+ }
++
++#param-program input,
++#param-program textarea {
++	box-sizing: border-box;
++	width: 100%;
++}
++.program-argument {
++	display: flex;
++	gap: 8px;
++	margin-bottom: 8px;
++}
+diff --git a/static/ergopti_plus/_shared/ui/program_parameter.js b/static/ergopti_plus/_shared/ui/program_parameter.js
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/ui/program_parameter.js
+@@ -0,0 +1,85 @@
++// _shared/ui/program_parameter.js
++
++/** Literal program parameters are data; they never undergo shell expansion. */
++var ProgramParameter = (() => {
++	function cleanString(value) {
++		if (typeof value !== 'string' || value.includes('\0')) return false;
++		for (let index = 0; index < value.length; index += 1) {
++			const code = value.charCodeAt(index);
++			if (code >= 0xd800 && code <= 0xdbff) {
++				const next = value.charCodeAt(++index);
++				if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
++			} else if (code >= 0xdc00 && code <= 0xdfff) return false;
++		}
++		return true;
++	}
++
++	// JSON.parse discards duplicate object keys. Inspect the actual top-level
++	// string tokens first; escaped keys have the same identity as plain keys.
++	function uniqueFields(raw) {
++		const fields = new Set();
++		let depth = 0;
++		for (let index = 0; index < raw.length; index += 1) {
++			const character = raw[index];
++			if (character === '"') {
++				const start = index;
++				for (index += 1; index < raw.length; index += 1) {
++					if (raw[index] === '\\') index += 1;
++					else if (raw[index] === '"') break;
++				}
++				if (index >= raw.length) return false;
++				let next = index + 1;
++				while (/\s/.test(raw[next] || '') && next < raw.length) next += 1;
++				if (depth === 1 && raw[next] === ':') {
++					const key = JSON.parse(raw.slice(start, index + 1));
++					if (fields.has(key)) return false;
++					fields.add(key);
++				}
++			} else if (character === '{' || character === '[') depth += 1;
++			else if (character === '}' || character === ']') depth -= 1;
++		}
++		return true;
++	}
++
++	function parse(raw, platform) {
++		if (typeof raw !== 'string') return null;
++		try {
++			if (!uniqueFields(raw)) return null;
++			const data = JSON.parse(raw);
++			if (!data || Array.isArray(data) || typeof data !== 'object') return null;
++			if (
++				Object.keys(data).length !== 3 ||
++				!Object.hasOwn(data, 'version') ||
++				!Object.hasOwn(data, 'executable') ||
++				!Object.hasOwn(data, 'arguments')
++			)
++				return null;
++			if (typeof data.version !== 'number' || data.version !== 1) return null;
++			if (!cleanString(data.executable) || data.executable === '') return null;
++			if (platform === 'ahk') {
++				if (
++					!/^[A-Za-z]:[/\\]/.test(data.executable) &&
++					!/^\\\\[^\\/]+\\[^\\/]+\\./.test(data.executable)
++				)
++					return null;
++				if (/^\\\\[?.]\\/.test(data.executable)) return null;
++			} else if (platform === 'hs' || platform === 'linux') {
++				if (!data.executable.startsWith('/')) return null;
++			} else return null;
++			if (!Array.isArray(data.arguments) || !data.arguments.every(cleanString)) return null;
++			return { executable: data.executable, arguments: data.arguments.slice() };
++		} catch {
++			return null;
++		}
++	}
++
++	function encode(executable, argumentsValue, platform) {
++		try {
++			const raw = JSON.stringify({ version: 1, executable, arguments: argumentsValue });
++			return parse(raw, platform) === null ? null : raw;
++		} catch {
++			return null;
++		}
++	}
++	return { parse, encode };
++})();
+diff --git a/static/ergopti_plus/linux/_generated/action_catalogue.lua b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+--- a/static/ergopti_plus/linux/_generated/action_catalogue.lua
++++ b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+@@ -152,6 +152,7 @@
+ 		{ kind = "action", id = "mic_mute_toggle" },
+ 		{ kind = "action", id = "clear_clipboard" },
+ 		{ kind = "action", id = "open_app" },
++		{ kind = "action", id = "run_program" },
+ 		{ kind = "action", id = "quit_frontmost_app" },
+ 		{ kind = "action", id = "force_quit_frontmost" },
+ 		{ kind = "action", id = "empty_trash" },
+@@ -292,6 +293,7 @@
+ 		["quit_frontmost_app"] = { family = "sg", label_key = "sg_actions.quit_frontmost_app", requires = { "session:x11", "tool:xdotool", "tool:xprop" } },
+ 		["redo"] = { family = "sg", label_key = "sg_actions.redo" },
+ 		["right_click_toggle"] = { family = "sg", label_key = "sg_actions.right_click_toggle", requires = { "session:x11", "tool:xdotool" } },
++		["run_program"] = { family = "sg", label_key = "sg_actions.run_program", parameter = "program" },
+ 		["screen_capture"] = { family = "sg", label_key = "sg_actions.screen_capture" },
+ 		["screenshot_fullscreen_clipboard"] = { family = "sg", label_key = "sg_actions.screenshot_fullscreen_clipboard" },
+ 		["screenshot_fullscreen_save"] = { family = "sg", label_key = "sg_actions.screenshot_fullscreen_save" },
+diff --git a/static/ergopti_plus/linux/adapters/program_runner.lua b/static/ergopti_plus/linux/adapters/program_runner.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/adapters/program_runner.lua
+@@ -0,0 +1,110 @@
++--- adapters/program_runner.lua
++
++--- Owns one private direct child until native exit, independently of signal ACK.
++local loaded, Native = pcall(require, "luv")
++if not loaded then Native = nil end
++local M = {}
++
++function M.supported()
++	return type(Native) == "table" and type(Native.spawn) == "function"
++		and type(Native.fs_stat) == "function" and type(Native.kill) == "function"
++end
++
++--- Checks current native execution capability and target availability.
++--- @param executable string Absolute native target.
++--- @param native table|nil Controlled native port; production uses luv.
++--- @return boolean
++function M.available(executable, native)
++	local port = native or Native
++	if type(port) ~= "table" or type(port.spawn) ~= "function" or type(port.fs_stat) ~= "function"
++		or type(port.kill) ~= "function" then return false end
++	if type(executable) ~= "string" or executable:sub(1, 1) ~= "/" or executable:find("%z") then return false end
++	local ok, info = pcall(port.fs_stat, executable)
++	if not ok or type(info) ~= "table" or info.type ~= "file" or type(info.mode) ~= "number" then return false end
++	local mode = info.mode
++	return math.floor(mode / 64) % 2 == 1 or math.floor(mode / 8) % 2 == 1 or mode % 2 == 1
++end
++
++--- Constructs a lazy native child whose output is never captured or logged.
++--- @param executable string Absolute target.
++--- @param arguments table Dense literal argv.
++--- @param completed function Closed terminal receipt: exit code only.
++--- @param admitted function Fresh binding/lifecycle admission predicate.
++--- @param native table|nil Controlled native port.
++--- @return table handle Exact start, terminate and settlement capability.
++function M.spawn(executable, arguments, completed, admitted, native)
++	local port = native or Native
++	local process, pid = nil, nil
++	local state, cancelled = "prepared", false
++	local observers = {}
++	local handle = {}
++	local function authorized()
++		local ok, value = pcall(admitted)
++		return ok and value == true
++	end
++	local function observe()
++		if process ~= nil or state == "starting" then return end
++		local pending = observers
++		observers = {}
++		for _, callback in ipairs(pending) do pcall(callback) end
++	end
++	function handle.isSettled() return process == nil and state ~= "starting" and state ~= "running" and state ~= "unknown" end
++	function handle.onSettled(callback)
++		if type(callback) ~= "function" then return false end
++		if handle.isSettled() then pcall(callback) else observers[#observers + 1] = callback end
++		return true
++	end
++	function handle.terminate(force)
++		cancelled = true
++		if handle.isSettled() then return true, "settled" end
++		if not pid then return false, "pending" end
++		local ok, result = pcall(port.kill, -pid, force == true and "sigkill" or "sigterm")
++		if not ok or result ~= 0 then return false, "refused" end
++		return false, "pending"
++	end
++	function handle.start()
++		if state ~= "prepared" or cancelled or not authorized()
++			or not M.available(executable, port) then return false end
++		if type(arguments) ~= "table" or type(completed) ~= "function" then return false end
++		local count = 0
++		for index, argument in pairs(arguments) do
++			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or type(argument) ~= "string"
++				or argument:find("%z") then return false end
++			count = count + 1
++		end
++		for index = 1, count do if rawget(arguments, index) == nil then return false end end
++		local args = {}
++		for index = 1, count do args[index] = arguments[index] end
++		state = "starting"
++		local exited, code = false, nil
++		local function terminal(exit_code)
++			exited, code = true, exit_code
++			if state == "starting" then return end
++			state = "exited"
++			local owned = process
++			process, pid = nil, nil
++			if owned then pcall(owned.close, owned) end
++			if not cancelled and authorized() then pcall(completed, code) end
++			observe()
++		end
++		local ok, acquired, native_pid = pcall(port.spawn, executable, {
++			args = args, stdio = { nil, nil, nil }, detached = true,
++		}, terminal)
++		if not ok then state = "unknown"; return false end
++		if acquired == nil or acquired == false then state = "refused"; observe(); return false end
++		process = acquired
++		if type(native_pid) == "number" and native_pid % 1 == 0 and native_pid > 0 then pid = native_pid end
++		if pid == nil then
++			state = "unknown"
++			if exited then terminal(code) end
++			return false
++		end
++		state = "running"
++		if exited then terminal(code) end
++		if cancelled or not authorized() then handle.terminate(); return false end
++		return true
++	end
++	return handle
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/ergopti_hotstrings.lua b/static/ergopti_plus/linux/ergopti_hotstrings.lua
+--- a/static/ergopti_plus/linux/ergopti_hotstrings.lua
++++ b/static/ergopti_plus/linux/ergopti_hotstrings.lua
+@@ -205,6 +205,16 @@
+ local shutdown = ShutdownCoordinator.new({
+ 	pre_wait = {
+ 		{
++			name = "user programs",
++			stop = function()
++				return gestures == nil or gestures.stop_programs() == true
++			end,
++			when_settled = function(callback)
++				if gestures == nil then callback(); return true end
++				return gestures.when_programs_settled(callback)
++			end,
++		},
++		{
+ 			name = "updater background checks",
+ 			stop = function()
+ 				if updater and type(updater.stop_background_checks) == "function" then
+@@ -442,6 +452,11 @@
+ --- process to signal itself: the menu now calls this directly.
+ --- @param trigger string What asked for the reload, for the log line.
+ local function perform_reload(trigger)
++	if gestures and gestures.stop_programs() ~= true then
++		Logger.warn(LOG, "Reload postponed while a user program owns native cleanup debt.")
++		return false
++	end
++	if gestures then gestures.set_program_paused(false) end
+ 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
+ 	local ok, count = pcall(function() return hotstrings_config.reload() end)
+ 	if ok then
+@@ -769,6 +784,7 @@
+ 		-- The tray greys every feature row while paused and its title row
+ 		-- resumes; without a rebuild here the menu kept showing the old state.
+ 		on_pause_change = function(paused)
++			if gestures then gestures.set_program_paused(paused) end
+ 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
+ 			-- modifier held through the pause is released.
+ 			TapHold.set_paused(paused)
+diff --git a/static/ergopti_plus/linux/infra/shutdown_coordinator.lua b/static/ergopti_plus/linux/infra/shutdown_coordinator.lua
+--- a/static/ergopti_plus/linux/infra/shutdown_coordinator.lua
++++ b/static/ergopti_plus/linux/infra/shutdown_coordinator.lua
+@@ -39,6 +39,15 @@
+ 
+ 	local requested = false
+ 	local coordinator = {}
++	local pending, registering, input_stopped = {}, false, false
++	local completed = false
++	local function finish()
++		if not completed and not registering and input_stopped and next(pending) == nil then
++			completed = true
++			event_loop.stop()
++			Logger.done(LOG, "Shutdown quiescence complete.")
++		end
++	end
+ 
+ 	--- Quiesces every registered owner exactly once.
+ 	--- @param reason string Human-readable shutdown trigger.
+@@ -49,10 +58,22 @@
+ 		requested = true
+ 		Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+ 
++		registering = true
+ 		for _, owner in ipairs(pre_wait) do
+ 			local ok, failure = xpcall(owner.stop, debug.traceback)
+ 			if not ok then
+ 				Logger.error(LOG, "Shutdown owner '%s' failed: %s", owner.name, tostring(failure))
++			end
++			if type(owner.when_settled) == "function" and (not ok or failure ~= true) then
++				local token = {}
++				pending[token] = owner
++				pcall(owner.when_settled, function()
++					if pending[token] ~= owner then return end
++					local checked, settled = pcall(owner.stop)
++					if not checked or settled ~= true then return end
++					pending[token] = nil
++					finish()
++				end)
+ 			end
+ 		end
+ 
+@@ -63,8 +84,8 @@
+ 				keyboard_hook.stop()
+ 			end
+ 		end
+-		event_loop.stop()
+-		Logger.done(LOG, "Shutdown quiescence complete.")
++		input_stopped, registering = true, false
++		finish()
+ 		return true
+ 	end
+ 
+diff --git a/static/ergopti_plus/linux/modules/gestures/manager.lua b/static/ergopti_plus/linux/modules/gestures/manager.lua
+--- a/static/ergopti_plus/linux/modules/gestures/manager.lua
++++ b/static/ergopti_plus/linux/modules/gestures/manager.lua
+@@ -44,6 +44,8 @@
+ local Monotonic = require("infra.monotonic")
+ local Manifest = require("infra.manifest_reader")
+ local ParameterLabel = require("action_parameter_label")
++local ProgramParameter = require("program_parameter")
++local ProgramOwner = require("modules.gestures.program_owner")
+ local PromptAction = require("llm.prompt_action")
+ local Vision = require("llm.vision")
+ local AppParameter = require("app_parameter")
+@@ -463,6 +465,7 @@
+ --- Actions that need more than one fixed command, by action id. Each receives
+ --- the binding that fired it, which parameterized actions read their value by.
+ local BUILTIN_HANDLERS = {
++	["run_program"] = function(binding) return M.run_program(binding) end,
+ 	["open_system_settings"] = function()
+ 		local Shell = require("adapters.shell_runner")
+ 		for _, application in ipairs(SETTINGS_APPLICATIONS) do
+@@ -862,6 +865,9 @@
+ 	local items, probed = {}, {}
+ 	--- Resolves one action's availability, probing each token once per build.
+ 	local function availability(action_name)
++		if action_name == "run_program" and not ProgramOwner.available() then
++			return false, i18n.get("platform_reason.program_runner_unavailable")
++		end
+ 		local meta = Catalogue.actions[action_name]
+ 		for _, token in ipairs(meta and meta.requires or {}) do
+ 			if probed[token] == nil then
+@@ -925,6 +931,8 @@
+ local _scope_owner   = nil   -- retains refused runtime compensation
+ local _scope_native = false -- admits only the scope's synchronous native inverse
+ local _scope_sequence = 0
++local _program_owner = nil
++local _program_revision = 0
+ 
+ --- Keeps captured preferences exclusively owned until compensation completes.
+ --- @return boolean admitted
+@@ -1075,6 +1083,7 @@
+ 		return false
+ 	end
+ 	_actions = staged
++	_program_revision = _program_revision + 1
+ 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
+ 	return true
+ end
+@@ -1139,6 +1148,7 @@
+ 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
+ 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
+ 	if spec == "app" then return AppParameter.is_valid(value) end
++	if spec == "program" then return ProgramParameter.parse(value, "linux") ~= nil end
+ 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
+ 	if spec == "search_url" then
+ 		local _, placeholders = value:gsub("%%s", "")
+@@ -1158,6 +1168,7 @@
+ 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+ 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+ 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
++	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+ 	if spec == "wrap_pair" then
+ 		local Shortcuts = shortcuts_manager()
+ 		local WrapPair = require("wrap_pair")
+@@ -1207,6 +1218,7 @@
+ 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
+ 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+ 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
++	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+ 	if SEND_INPUT_KINDS[spec] then
+ 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+ 			tostring(send_vocabulary().text_max_code_points))
+@@ -1238,6 +1250,74 @@
+ 
+ function M.get_action_parameter(binding, action_name)
+ 	return _action_params[parameter_key(binding, action_name)] or ""
++end
++
++--- Captures the actual binding and exact canonical source before native acquisition.
++local function capture_program(binding)
++	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
++	local FileSystem = require("adapters.file_system")
++	local function binding_action()
++		if M.DEFAULT_GESTURES[binding] ~= nil then return M.get_action(binding), "gestures", binding end
++		local descriptors = {
++			{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
++			{ "script__", "modules.shortcuts.script_chords", "script_control" },
++			{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
++		}
++		for _, descriptor in ipairs(descriptors) do
++			if binding:sub(1, #descriptor[1]) == descriptor[1] then
++				local id = binding:sub(#descriptor[1] + 1)
++				local loaded, provider = pcall(require, descriptor[2])
++				if not loaded or type(provider) ~= "table" or type(provider.get_action) ~= "function" then return nil end
++				return provider.get_action(id), descriptor[3], id
++			end
++		end
++		return nil
++	end
++	local runtime, section, id = binding_action()
++	if runtime ~= "run_program" then return nil end
++	local scalar = M.get_action_parameter(binding, "run_program")
++	if ProgramParameter.parse(scalar, "linux") == nil then return nil end
++	local content, status = FileSystem.read_with_status(_config_path)
++	if status ~= "ok" or type(content) ~= "string" then return nil end
++	local decoded, config = pcall(TomlCodec.decode, content)
++	if not decoded or type(config) ~= "table" then return nil end
++	local parameters = config[CONFIG_SECTION_PARAMS]
++	local actions = section == "gestures" and config.gestures
++		or type(config.shortcuts) == "table" and config.shortcuts[section]
++	if type(actions) ~= "table" or actions[id] ~= "run_program" or type(parameters) ~= "table"
++		or parameters[parameter_key(binding, "run_program")] ~= scalar then return nil end
++	local revision = _program_revision
++	return scalar, function()
++		local paused_ok, paused = pcall(_is_paused)
++		if not paused_ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
++			or M.get_action_parameter(binding, "run_program") ~= scalar or binding_action() ~= "run_program" then return false end
++		local current, current_status = FileSystem.read_with_status(_config_path)
++		return current_status == "ok" and current == content
++	end
++end
++
++--- Returns the physical native start receipt, independently of dispatch ownership.
++function M.run_program(binding)
++	if _program_owner == nil then _program_owner = ProgramOwner.new(capture_program) end
++	return _program_owner.run(binding)
++end
++
++function M.set_program_paused(paused)
++	if _program_owner == nil then return type(paused) == "boolean" end
++	return _program_owner.set_paused(paused)
++end
++
++function M.stop_programs()
++	if _program_owner == nil then return true end
++	return _program_owner.stop()
++end
++
++function M.when_programs_settled(callback)
++	if _program_owner == nil then
++		if type(callback) ~= "function" then return false end
++		pcall(callback); return true
++	end
++	return _program_owner.when_settled(callback)
+ end
+ 
+ --- Readies picker items for the picker's own parameter editor: each action that
+@@ -1257,9 +1337,15 @@
+ 	for _, item in ipairs(items) do
+ 		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
+ 		if kind then
++			if kind == "program" and (type(binding) ~= "string"
++				or (M.DEFAULT_GESTURES[binding] == nil and not binding:match("^keyboard__.+$")
++					and not binding:match("^script__.+$") and not binding:match("^tap_key__.+$"))) then
++				item.disabled = true
++				item.hint = i18n.get("platform_reason.program_runner_unavailable")
++			end
+ 			item.parameter = kind
+ 			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
+-			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
++			if SEND_INPUT_KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
+ 				prompts[kind] = M.get_action_parameter_prompt(item.id)
+ 				errors[kind] = M.get_action_parameter_error(item.id)
+ 			end
+@@ -1287,6 +1373,10 @@
+ 			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
+ 			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
+ 			languageLabel = i18n.get("dialog.action_picker.language_label"),
++			programExecutableLabel = i18n.get("dialog.action_picker.program_executable"),
++			programArgumentsLabel = i18n.get("dialog.action_picker.program_arguments"),
++			programAddLabel = i18n.get("dialog.action_picker.program_add_argument"),
++			programRemoveLabel = i18n.get("dialog.action_picker.program_remove_argument"),
+ 			prompts = prompts,
+ 			errors = errors,
+ 		},
+@@ -1299,11 +1389,12 @@
+ 	local key = parameter_key(binding, action_name)
+ 	local staged = copy_state(_action_params)
+ 	staged[key] = value
+-	if not M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } }) then
++	if not M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } }, action_name == "run_program") then
+ 		Logger.error(LOG, "Gesture action parameter was not persisted — nothing changed.")
+ 		return false
+ 	end
+ 	_action_params = staged
++	_program_revision = _program_revision + 1
+ 	return true
+ end
+ 
+@@ -1317,6 +1408,7 @@
+ 	local action = M.get_action(slot) or "none"
+ 	local label = M.get_action_label(action)
+ 	local value = M.get_action_parameter(slot, action)
++	if M.get_action_parameter_spec(action) == "program" then return label end
+ 	return ParameterLabel.format(label, value)
+ end
+ 
+@@ -1370,6 +1462,7 @@
+ 	if not called or acknowledged ~= true then return false end
+ 	_enabled = candidate.enabled
+ 	_actions, _action_params = actions, parameters
++	_program_revision = _program_revision + 1
+ 	return true
+ end
+ 
+@@ -1429,6 +1522,7 @@
+ 		return false
+ 	end
+ 	_actions = staged
++	_program_revision = _program_revision + 1
+ 	Logger.info(LOG, "Gestures reset to defaults.")
+ 	return true
+ end
+@@ -1448,6 +1542,7 @@
+ 		return false
+ 	end
+ 	_actions = staged
++	_program_revision = _program_revision + 1
+ 	Logger.info(LOG, "Every gesture binding was set to none.")
+ 	return true
+ end
+@@ -1671,7 +1766,7 @@
+ -- =========================================
+ -- =========================================
+ 
+-function M._persist_updates(updates)
++function M._persist_updates(updates, private)
+ 	if not admit_mutation() then return false end
+ 	if not _persist then return true end
+ 	if type(updates) ~= "table" or #updates == 0 then
+@@ -1689,8 +1784,12 @@
+ 
+ 	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates)
+ 	if not call_ok or committed ~= true then
+-		Logger.error(LOG, "Could not persist gesture configuration: %s",
++		if private == true then
++			Logger.error(LOG, "Could not persist private user program configuration.")
++		else
++			Logger.error(LOG, "Could not persist gesture configuration: %s",
+ 			tostring(call_ok and err or committed))
++		end
+ 		return false
+ 	end
+ 	return true
+@@ -1859,6 +1958,9 @@
+ ---   monotonic clock. action_handlers owns daemon lifecycle operations.
+ function M.init(opts)
+ 	if not admit_mutation() then return false end
++	if _program_owner and _program_owner.stop() ~= true then return false end
++	_program_owner = ProgramOwner.new(capture_program)
++	_program_revision = _program_revision + 1
+ 	opts = type(opts) == "table" and opts or {}
+ 	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
+ 		error("gestures action_handlers must be a table")
+@@ -1932,6 +2034,7 @@
+ 		copy[key] = value
+ 	end
+ 	_action_params = copy
++	_program_revision = _program_revision + 1
+ 	return true
+ end
+ 
+diff --git a/static/ergopti_plus/linux/modules/gestures/program_owner.lua b/static/ergopti_plus/linux/modules/gestures/program_owner.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/modules/gestures/program_owner.lua
+@@ -0,0 +1,117 @@
++--- modules/gestures/program_owner.lua
++
++--- Private user programs retain their exact child until native exit acknowledges it.
++local Runner = require("adapters.program_runner")
++local Parameter = require("program_parameter")
++local Timings = require("infra.timings")
++local loaded, Native = pcall(require, "luv")
++if not loaded then Native = nil end
++local M = {}
++
++function M.available()
++	return Runner.supported() and type(Native) == "table" and type(Native.new_timer) == "function"
++end
++
++--- Builds the lifecycle owner used by gesture and keyboard action dispatch.
++--- @param capture function Returns an admitted scalar and a fresh admission callback.
++--- @param ports table|nil Native/test ports, never user configuration.
++function M.new(capture, ports)
++	ports = ports or {}
++	local runner, native = ports.runner or Runner, ports.native or Native
++	local timeout = Timings.sec("gestures", "aux_shell_timeout_ms")
++	local retry = Timings.sec("gestures", "aux_shell_cleanup_retry_ms")
++	local current, paused, generation = nil, false, 0
++	local desired_paused = false
++	local idle = {}
++	local owner = {}
++	local function notify_idle()
++		if current ~= nil then return end
++		local callbacks = idle; idle = {}
++		for _, callback in ipairs(callbacks) do pcall(callback) end
++	end
++	local function settled(entry)
++		if current ~= entry then return end
++		local ok, value = pcall(entry.handle.isSettled)
++		if not ok or value ~= true then return end
++		if entry.timer then
++			local stop_ok = pcall(native.timer_stop, entry.timer)
++			local close_ok = pcall(native.close, entry.timer)
++			if not stop_ok or not close_ok then return end
++			entry.timer = nil
++		end
++		current = nil
++		if desired_paused == false and paused then
++			generation = generation + 1
++			paused = false
++		end
++		notify_idle()
++	end
++	local function cancel(entry)
++		entry.cancelled = true
++		entry.attempts = entry.attempts + 1
++		pcall(entry.handle.terminate, entry.attempts > 1)
++		settled(entry)
++	end
++	function owner.when_settled(callback)
++		if type(callback) ~= "function" then return false end
++		if current == nil then pcall(callback) else idle[#idle + 1] = callback end
++		return true
++	end
++	function owner.stop()
++		generation = generation + 1
++		desired_paused, paused = true, true
++		if current then cancel(current) end
++		return current == nil
++	end
++	function owner.set_paused(value)
++		if type(value) ~= "boolean" then return false end
++		if value then return owner.stop() end
++		desired_paused = false
++		if current ~= nil then return false end
++		generation = generation + 1
++		paused = false
++		return true
++	end
++	function owner.has_pending() return current ~= nil end
++	function owner.run(binding)
++		if paused or current ~= nil or type(capture) ~= "function" then return false end
++		local ok, scalar, admission = pcall(capture, binding)
++		local parsed = ok and Parameter.parse(scalar, "linux") or nil
++		if not parsed or type(admission) ~= "function" then return false end
++		local epoch = generation
++		local entry = { cancelled = false, attempts = 0, ticks = 0 }
++		local function admitted()
++			if paused or generation ~= epoch or current ~= entry or entry.cancelled then return false end
++			local holds, value = pcall(admission)
++			return holds and value == true
++		end
++		local created, handle = pcall(runner.spawn, parsed.executable, parsed.arguments,
++			function() end, admitted)
++		if not created or type(handle) ~= "table" or type(handle.start) ~= "function"
++			or type(handle.isSettled) ~= "function" or type(handle.terminate) ~= "function"
++			or type(handle.onSettled) ~= "function" then return false end
++		entry.handle = handle
++		current = entry
++		local armed = pcall(function()
++			entry.timer = assert(native.new_timer())
++			local result = native.timer_start(entry.timer, math.floor(retry * 1000), math.floor(retry * 1000), function()
++				if current ~= entry then return end
++				entry.ticks = entry.ticks + 1
++				if not admitted() or entry.ticks * retry >= timeout then cancel(entry) end
++			end)
++			if result ~= 0 then error("private timer refused") end
++		end)
++		if not armed then cancel(entry); return false end
++		local started, accepted = pcall(handle.start)
++		local observed, receipt = pcall(handle.onSettled, function() settled(entry) end)
++		if not started or accepted ~= true or not observed or receipt ~= true
++			or (current ~= nil and not admitted()) or generation ~= epoch or paused then
++			cancel(entry)
++			return false
++		end
++		return true
++	end
++	return owner
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/tests/test_manifest.lua b/static/ergopti_plus/linux/tests/test_manifest.lua
+--- a/static/ergopti_plus/linux/tests/test_manifest.lua
++++ b/static/ergopti_plus/linux/tests/test_manifest.lua
+@@ -316,6 +316,7 @@
+ 	"tests.unit.modules.test_open_app_action",
+ 	"tests.unit.modules.test_system_actions",
+ 	"tests.unit.modules.test_gesture_dispatch",
++	"tests.unit.modules.test_program_lifecycle",
+ 	"tests.unit.modules.test_text_actions_route_through_handlers",
+ 	"tests.unit.modules.test_gesture_enable_transaction",
+ 	"tests.unit.modules.test_gesture_pump_chain",
+diff --git a/static/ergopti_plus/linux/tests/unit/infra/test_shutdown_coordinator.lua b/static/ergopti_plus/linux/tests/unit/infra/test_shutdown_coordinator.lua
+--- a/static/ergopti_plus/linux/tests/unit/infra/test_shutdown_coordinator.lua
++++ b/static/ergopti_plus/linux/tests/unit/infra/test_shutdown_coordinator.lua
+@@ -100,3 +100,33 @@
+ 		end
+ 	end)
+ end)
++
++
++helpers.describe("shutdown coordinator: retained user program", function()
++	helpers.it("stops input but retains the event loop until physical settlement", function()
++		local terminal, notify, loop_calls, hook_calls = false, nil, 0, 0
++		local coordinator = ShutdownCoordinator.new({
++			pre_wait = { {
++				name = "user programs",
++				stop = function() return terminal end,
++				when_settled = function(callback) notify = callback; return true end,
++			} },
++			keyboard_hook = {
++				isRunning = function() return true end,
++				stop = function() hook_calls = hook_calls + 1 end,
++				emergency_stop = function() error("unexpected emergency stop") end,
++			},
++			event_loop = { stop = function() loop_calls = loop_calls + 1 end },
++		})
++		helpers.assert_eq(coordinator.request("owned fixture quit"), true)
++		helpers.assert_eq(hook_calls, 1)
++		helpers.assert_eq(loop_calls, 0)
++		notify()
++		helpers.assert_eq(loop_calls, 0, "early observer must not release a live child")
++		terminal = true
++		notify()
++		helpers.assert_eq(loop_calls, 1)
++		notify()
++		helpers.assert_eq(loop_calls, 1, "the physical release is acknowledged once")
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_program_lifecycle.lua b/static/ergopti_plus/linux/tests/unit/modules/test_program_lifecycle.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_program_lifecycle.lua
+@@ -0,0 +1,326 @@
++--- tests/unit/modules/test_program_lifecycle.lua
++
++--- Exercises literal native argv and retained physical program ownership.
++local helpers = require("tests.helpers")
++local Runner = require("adapters.program_runner")
++local Owner = require("modules.gestures.program_owner")
++local Native = require("luv")
++local scalar = '{"version":1,"executable":"/bin/sh","arguments":[]}'
++
++local function fixture(options)
++	options = options or {}
++	local f = { admission = true, settled = false, starts = 0, kills = 0, timers = {}, observers = {} }
++	local runner = {}
++	function runner.spawn(_, arguments, _, admission)
++		f.arguments = arguments
++		return {
++			start = function()
++				f.starts = f.starts + 1
++				if options.before_start then options.before_start(f) end
++				return admission() and options.start ~= false
++			end,
++			isSettled = function() return f.settled end,
++			terminate = function()
++				f.kills = f.kills + 1
++				if options.kill_throw then error("private terminate failure") end
++				return true
++			end,
++			onSettled = function(callback) f.observers[#f.observers + 1] = callback; return true end,
++		}
++	end
++	local timer_port = {
++		new_timer = function() local timer = {}; f.timers[#f.timers + 1] = timer; return timer end,
++		timer_start = function(timer, _, _, callback) timer.callback = callback; return 0 end,
++		timer_stop = function(timer) timer.stopped = true end,
++		close = function(timer) timer.closed = true end,
++	}
++	f.owner = Owner.new(function() return scalar, function() return f.admission end end,
++		{ runner = runner, native = timer_port })
++	function f.finish()
++		f.settled = true
++		for _, callback in ipairs(f.observers) do callback() end
++	end
++	return f
++end
++
++helpers.describe("private user program lifecycle", function()
++	helpers.it("retains the exact child after signal acceptance and blocks replacement", function()
++		local f = fixture()
++		helpers.assert_eq(f.owner.run("keyboard__F1"), true)
++		helpers.assert_eq(f.owner.stop(), false)
++		helpers.assert_eq(f.owner.has_pending(), true)
++		helpers.assert_eq(f.owner.run("gesture__up"), false)
++		helpers.assert_eq(f.starts, 1)
++		f.finish()
++		helpers.assert_eq(f.owner.has_pending(), false)
++		helpers.assert_eq(f.timers[1].closed, true)
++		helpers.assert_eq(f.owner.set_paused(false), true)
++		helpers.assert_eq(f.owner.run("gesture__up"), true)
++		f.finish()
++	end)
++
++	helpers.it("retains refused retirement and delivers shutdown receipt only after exit", function()
++		local f = fixture({ kill_throw = true })
++		local idle = 0
++		helpers.assert_eq(f.owner.run("keyboard__F1"), true)
++		f.owner.when_settled(function() idle = idle + 1 end)
++		helpers.assert_eq(f.owner.stop(), false)
++		helpers.assert_eq(idle, 0)
++		f.finish()
++		helpers.assert_eq(idle, 1)
++		helpers.assert_eq(f.owner.stop(), true)
++	end)
++
++	helpers.it("remembers resume while cancellation is still pending", function()
++		local f = fixture()
++		helpers.assert_eq(f.owner.run("gesture__up"), true)
++		helpers.assert_eq(f.owner.set_paused(true), false)
++		helpers.assert_eq(f.owner.set_paused(false), false)
++		helpers.assert_eq(f.owner.run("keyboard__F1"), false)
++		f.finish()
++		helpers.assert_eq(f.owner.run("keyboard__F1"), true)
++		f.finish()
++	end)
++
++	helpers.it("cancels a retained child when its source admission changes", function()
++		local f = fixture()
++		helpers.assert_eq(f.owner.run("gesture__up"), true)
++		f.admission = false
++		f.timers[1].callback()
++		helpers.assert_eq(f.kills, 1)
++		helpers.assert_eq(f.owner.has_pending(), true)
++		f.finish()
++		helpers.assert_eq(f.owner.run("gesture__up"), false)
++		helpers.assert_eq(f.starts, 2)
++		f.finish()
++	end)
++
++	helpers.it("refuses lifecycle revocation during native acquisition", function()
++		local f = fixture({ before_start = function(state) state.owner.stop() end })
++		helpers.assert_eq(f.owner.run("keyboard__F1"), false)
++		helpers.assert_eq(f.owner.has_pending(), true)
++		helpers.assert_eq(f.owner.run("keyboard__F1"), false)
++		f.finish()
++		helpers.assert_eq(f.owner.has_pending(), false)
++	end)
++
++	helpers.it("requires a literal true current admission", function()
++		for _, value in ipairs({ false, 0, 1, "true", {} }) do
++			local f = fixture()
++			f.admission = value
++			helpers.assert_eq(f.owner.run("keyboard__F1"), false)
++			helpers.assert_eq(f.owner.has_pending(), true)
++			f.finish()
++		end
++	end)
++end)
++
++local function with_bindings(callback)
++	local modules = { "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
++		"infra.config_paths", "infra.i18n", "logger.shim", "ui.gesture_conflicts" }
++	local saved = {}
++	for _, name in ipairs(modules) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
++	local path = os.tmpname()
++	local initial = assert(io.open(path, "wb")); initial:write("# retained foreign note\n"); initial:close()
++	local manager
++	local ok, failure = xpcall(function()
++		package.loaded["infra.config_paths"] = { config = function() return path end, get_config_dir = function() return "/tmp" end }
++		package.loaded["infra.i18n"] = { get = function(key) return key end }
++		package.loaded["logger.shim"] = helpers.make_logger_stub()
++		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
++		manager = require("modules.gestures.manager")
++		manager.init({ persist = true, config_path = path, enabled = false, is_paused = function() return false end })
++		callback(manager, require("modules.shortcuts.keyboard_shortcuts"), path)
++	end, debug.traceback)
++	if manager then
++		manager.stop_programs()
++		local deadline = Native.hrtime() + 3e9
++		while manager.stop_programs() ~= true and Native.hrtime() < deadline do Native.run("nowait") end
++	end
++	os.remove(path)
++	for _, name in ipairs(modules) do package.loaded[name] = saved[name] end
++	if not ok then error(failure, 0) end
++end
++
++helpers.describe("private user program real gesture and keyboard bindings", function()
++	helpers.it("persists and dispatches the same typed program through gesture and keyboard owners", function()
++		with_bindings(function(manager, keyboard, path)
++			local Json = require("json")
++			local output = path .. ".out"
++			local parameter = Json.encode({ version = 1, executable = "/bin/sh",
++				arguments = { "-c", 'printf "%s" "$2" > "$1"', "fixture", output, "été 日本 literal" } })
++			helpers.assert_eq(manager.set_action("swipe_3_up", "run_program"), true)
++			helpers.assert_eq(manager.set_action_parameter("swipe_3_up", "run_program", parameter), true)
++			manager._test_begin_reading({})
++			helpers.assert_eq(manager.enable(), true)
++			helpers.assert_eq(manager.dispatch_gesture({ fingers = 3, direction = "up" }), true)
++			local deadline = Native.hrtime() + 3e9
++			local settled = false
++			manager.when_programs_settled(function() settled = true end)
++			while not settled and Native.hrtime() < deadline do Native.run("nowait") end
++			helpers.assert_eq(settled, true)
++			local receipt = assert(io.open(output, "rb")); local bytes = receipt:read("*a"); receipt:close()
++			helpers.assert_eq(bytes, "été 日本 literal")
++			while manager.stop_programs() ~= true and Native.hrtime() < deadline do Native.run("nowait") end
++			helpers.assert_eq(manager.set_program_paused(false), true)
++			os.remove(output)
++			helpers.assert_eq(keyboard.set_action("ctrl_p", "run_program"), true)
++			helpers.assert_eq(manager.set_action_parameter("keyboard__ctrl_p", "run_program", parameter), true)
++			helpers.assert_eq(keyboard.dispatch({ key = "p", mods = { ctrl = true } }), true)
++			deadline = Native.hrtime() + 3e9
++			settled = false
++			manager.when_programs_settled(function() settled = true end)
++			while not settled and Native.hrtime() < deadline do Native.run("nowait") end
++			helpers.assert_eq(settled, true)
++			local file = io.open(output, "rb")
++			helpers.assert_not_nil(file)
++			if file then bytes = file:read("*a"); file:close() end
++			helpers.assert_eq(bytes, "été 日本 literal")
++			local canonical = assert(io.open(path, "rb")); local source = canonical:read("*a"); canonical:close()
++			helpers.assert_contains(source, "# retained foreign note")
++			local document = require("toml_codec").decode(source)
++			helpers.assert_eq(document.gesture_parameters["keyboard__ctrl_p__run_program"], parameter)
++			os.remove(output)
++		end)
++	end)
++
++	helpers.it("refuses canonical source disagreement even when the runtime assignment still matches", function()
++		with_bindings(function(manager, _, path)
++			helpers.assert_eq(manager.set_action("swipe_3_up", "run_program"), true)
++			helpers.assert_eq(manager.set_action_parameter("swipe_3_up", "run_program", scalar), true)
++			local file = assert(io.open(path, "wb")); file:write('[gestures]\nswipe_3_up = "none"\n'); file:close()
++			helpers.assert_eq(manager.run_program("swipe_3_up"), false)
++			helpers.assert_eq(manager.stop_programs(), true)
++		end)
++	end)
++end)
++
++local function await(predicate)
++	local deadline = Native.hrtime() + 3e9
++	while not predicate() and Native.hrtime() < deadline do Native.run("nowait") end
++	helpers.assert_eq(predicate(), true, "owned native child did not settle")
++end
++
++helpers.describe("private user program native POSIX receipts", function()
++	helpers.it("executes Unicode paths and literal empty, spaced, Unicode and newline arguments", function()
++		local base = os.tmpname()
++		os.remove(base)
++		local script, output = base .. " été 日本.sh", base .. ".receipt"
++		local file = assert(io.open(script, "wb"))
++		file:write('destination=$1\nshift\nprintf "%s\\0" "$@" > "$destination"\n')
++		file:close()
++		local terminal, observed = nil, 0
++		local ok, failure = xpcall(function()
++			local arguments = { script, output, "", "two words", "日本語", "%TOKEN%;$(ignored)", "line\nnext" }
++			local handle = Runner.spawn("/bin/sh", arguments,
++				function(code) terminal = code end, function() return true end)
++			helpers.assert_eq(handle.start(), true)
++			handle.onSettled(function() observed = observed + 1 end)
++			await(handle.isSettled)
++			helpers.assert_eq(terminal, 0)
++			helpers.assert_eq(observed, 1)
++			local receipt = assert(io.open(output, "rb"))
++			local bytes = receipt:read("*a"); receipt:close()
++			helpers.assert_eq(bytes, "\0two words\0日本語\0%TOKEN%;$(ignored)\0line\nnext\0")
++		end, debug.traceback)
++		os.remove(script); os.remove(output)
++		if not ok then error(failure, 0) end
++	end)
++
++	helpers.it("waits for native exit after accepting a process-group cancellation", function()
++		local callbacks, settlements = 0, 0
++		local handle = Runner.spawn("/bin/sh", { "-c", "exec sleep 30" },
++			function() callbacks = callbacks + 1 end, function() return true end)
++		helpers.assert_eq(handle.start(), true)
++		handle.onSettled(function() settlements = settlements + 1 end)
++		helpers.assert_eq(handle.terminate(), false)
++		helpers.assert_eq(handle.isSettled(), false)
++		await(handle.isSettled)
++		helpers.assert_eq(settlements, 1)
++		helpers.assert_eq(callbacks, 0)
++		helpers.assert_eq(handle.terminate(), true)
++	end)
++
++	helpers.it("refuses a missing executable without acquiring a child", function()
++		local handle = Runner.spawn("/not/a/real/program106", {}, function() end, function() return true end)
++		helpers.assert_eq(handle.start(), false)
++		helpers.assert_eq(handle.isSettled(), true)
++	end)
++end)
++
++helpers.describe("private user program durable parameter receipts", function()
++	for _, mode in ipairs({ "false", "nil", "truthy", "throw" }) do
++		helpers.it("retains RAM and exact source after writer " .. mode, function()
++			with_bindings(function(manager, _, path)
++				local Writer = require("toml_codec.writer")
++				local Logger = require("logger.shim")
++				local write, log = Writer.batch_write, Logger.error
++				local messages, calls = {}, 0
++				local f = assert(io.open(path, "rb")); local before = f:read("*a"); f:close()
++				local ok, failure = xpcall(function()
++					Logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
++					Writer.batch_write = function()
++						calls = calls + 1
++						if mode == "throw" then error("PRIVATE_PROGRAM_PARAMETER_106") end
++						if mode == "nil" then return nil, "PRIVATE_PROGRAM_PARAMETER_106" end
++						if mode == "truthy" then return 2, "PRIVATE_PROGRAM_PARAMETER_106" end
++						return false, "PRIVATE_PROGRAM_PARAMETER_106"
++					end
++					local receipt = manager.set_action_parameter("swipe_3_up", "run_program", scalar)
++					helpers.assert_eq(receipt, false)
++					helpers.assert_eq(calls, 1)
++					helpers.assert_eq(manager.get_action_parameter("swipe_3_up", "run_program"), "")
++					local actual = assert(io.open(path, "rb")); local bytes = actual:read("*a"); actual:close()
++					helpers.assert_eq(bytes, before)
++					helpers.assert_eq(table.concat(messages, "\n"):find("PRIVATE_PROGRAM_PARAMETER_106", 1, true), nil)
++				end, debug.traceback)
++				Writer.batch_write, Logger.error = write, log
++				if not ok then error(failure, 0) end
++				helpers.assert_eq(manager.set_action_parameter("swipe_3_up", "run_program", scalar), true)
++				helpers.assert_eq(manager.get_action_parameter("swipe_3_up", "run_program"), scalar)
++			end)
++		end)
++	end
++end)
++
++helpers.describe("private program lossless shared parameter corpus", function()
++	helpers.it("checks every platform against independently declared literal vectors", function()
++		local Json, Program = require("json"), require("program_parameter")
++		local file = assert(io.open(require("infra.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
++		local corpus = assert(Json.decode_lossless(file:read("*a"))); file:close()
++		local count = 0
++		for _, vector in ipairs(corpus.cases) do
++			for _, platform in ipairs(vector.platforms) do
++				local actual = Program.parse(vector.value, platform)
++				if Json.is_null(vector.expected) then
++					helpers.assert_eq(actual, nil, vector.id .. "/" .. platform)
++				else
++					helpers.assert_not_nil(actual, vector.id .. "/" .. platform)
++					if actual then
++						helpers.assert_eq(actual.executable, vector.expected.executable)
++						helpers.assert_eq(actual.arguments, vector.expected.arguments)
++					end
++				end
++				count = count + 1
++			end
++		end
++		helpers.assert_eq(count, 63, "the whole independent cross-platform vector census executes")
++	end)
++end)
++
++helpers.describe("private native program execution refusal", function()
++	helpers.it("reports a nonzero child exit without retaining or publishing private streams", function()
++		local code, calls, streams_absent = nil, 0, nil
++		local handle = Runner.spawn("/bin/sh", { "-c", 'printf "%s" PRIVATE_STDOUT_106; printf "%s" PRIVATE_STDERR_106 >&2; exit 7' },
++			function(status, stdout, stderr)
++				code, calls = status, calls + 1
++				streams_absent = stdout == nil and stderr == nil
++			end, function() return true end)
++		helpers.assert_eq(handle.start(), true)
++		await(handle.isSettled)
++		helpers.assert_eq(streams_absent, true)
++		helpers.assert_eq(code, 7)
++		helpers.assert_eq(calls, 1)
++		helpers.assert_eq(handle.terminate(), true)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/_generated/action_catalogue.lua b/static/ergopti_plus/macos/_generated/action_catalogue.lua
+--- a/static/ergopti_plus/macos/_generated/action_catalogue.lua
++++ b/static/ergopti_plus/macos/_generated/action_catalogue.lua
+@@ -158,6 +158,7 @@
+ 		{ kind = "action", id = "clear_clipboard" },
+ 		{ kind = "action", id = "center_mouse" },
+ 		{ kind = "action", id = "open_app" },
++		{ kind = "action", id = "run_program" },
+ 		{ kind = "action", id = "quit_frontmost_app" },
+ 		{ kind = "action", id = "force_quit_frontmost" },
+ 		{ kind = "action", id = "empty_trash" },
+@@ -343,6 +344,7 @@
+ 		["quit_frontmost_app"] = { family = "sg", label_key = "sg_actions.quit_frontmost_app" },
+ 		["remove_quarantine_selection"] = { family = "sg", label_key = "sg_actions.remove_quarantine_selection", confirm = true },
+ 		["right_click_toggle"] = { family = "sg", label_key = "sg_actions.right_click_toggle" },
++		["run_program"] = { family = "sg", label_key = "sg_actions.run_program", parameter = "program" },
+ 		["save"] = { family = "sg", label_key = "sg_actions.save" },
+ 		["screen_capture"] = { family = "sg", label_key = "sg_actions.screen_capture" },
+ 		["screen_capture_instant"] = { family = "sg", label_key = "sg_actions.screen_capture_instant" },
+diff --git a/static/ergopti_plus/macos/adapters/shell_runner.lua b/static/ergopti_plus/macos/adapters/shell_runner.lua
+--- a/static/ergopti_plus/macos/adapters/shell_runner.lua
++++ b/static/ergopti_plus/macos/adapters/shell_runner.lua
+@@ -130,7 +130,14 @@
+ --- a launch failure by shape alone: start() is false, and the task is settled
+ --- because no process was ever created.
+ --- @return table
+-local function refused_handle()
++local function process_logger(private)
++	if private ~= true then return Logger end
++	local function closed() Logger.error(LOG, "Private user program native operation refused.") end
++	return { error = closed, warn = closed, trace = function() end, done = function() end }
++end
++
++local function refused_handle(private)
++	local Logger = process_logger(private)
+ 	local handle = {}
+ 	function handle.start() return false end
+ 	function handle.set_input() return false end
+@@ -164,12 +171,13 @@
+ --- @param environment table|nil Explicit child values, copied and verified without
+ ---   modifying the Hammerspoon environment or admitting launcher-only authority.
+ --- @return table Handle with start() (returns boolean) and terminate() methods.
+-function M.spawn(executable, args, on_done, on_chunk, environment)
++function M.spawn(executable, args, on_done, on_chunk, environment, private)
++	local Logger = process_logger(private)
+ 	local refusal = M.validate_spawn_args(executable, args)
+ 	if refusal ~= "" then
+ 		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
+ 			tostring(executable), refusal)
+-		return refused_handle()
++		return refused_handle(private)
+ 	end
+ 	local handle = {}
+ 	local _task  = nil
+@@ -269,7 +277,7 @@
+ 		_start_dispatching = true
+ 		local ok, started = pcall(function() return task:start() end)
+ 		_start_dispatching = false
+-		if ok and started then
++		if ok and started and (private ~= true or started == true or started == task) then
+ 			_started_ms = now_ms()
+ 			_start_committed = true
+ 			if _lifecycle == "starting" then _lifecycle = "started" end
+@@ -376,7 +384,7 @@
+ 	--- @param err any The error value captured by xpcall.
+ 	local function report_callback_throw(label, err)
+ 		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
+-		if type(_G.ergopti_report_crash) == "function" then
++		if private ~= true and type(_G.ergopti_report_crash) == "function" then
+ 			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
+ 			DeferredWork.after(0,
+ 				function() pcall(_G.ergopti_report_crash, report_ctx) end,
+@@ -428,8 +436,10 @@
+ 		_task = nil
+ 		_input_closed = true
+ 		_lifecycle = "completed"
+-		_record_exit(RuntimeLog.program_name(executable), exit_code,
+-			_started_ms and (now_ms() - _started_ms) or 0)
++		if private ~= true then
++			_record_exit(RuntimeLog.program_name(executable), exit_code,
++				_started_ms and (now_ms() - _started_ms) or 0)
++		end
+ 		if _start_dispatching then
+ 			if _pending_completion == nil then
+ 				_pending_completion = table.pack(exit_code, stdout, stderr)
+@@ -695,6 +705,20 @@
+ ---        code 0 and stdout has its trailing whitespace stripped.
+ --- @return boolean started True when the subprocess was started.
+ --- @return table|nil handle Exact lifecycle handle; nil only before construction.
++--- Constructs a privacy-safe literal-argv task; terminal receipts expose no child output.
++function M.spawn_private(executable, arguments, terminal, admitted)
++	local handle = M.spawn(executable, arguments, function(code)
++		if type(terminal) == "function" then terminal(code == 0) end
++	end, function() return true end, nil, true)
++	local start = handle.start
++	handle.start = function()
++		local ok, receipt = pcall(admitted)
++		if not ok or receipt ~= true then handle.terminate(); return false end
++		return start()
++	end
++	return handle
++end
++
+ function M.run(executable, args, on_done)
+ 	local refusal = M.validate_spawn_args(executable, args)
+ 	if refusal ~= "" then
+diff --git a/static/ergopti_plus/macos/modules/gestures/actions.lua b/static/ergopti_plus/macos/modules/gestures/actions.lua
+--- a/static/ergopti_plus/macos/modules/gestures/actions.lua
++++ b/static/ergopti_plus/macos/modules/gestures/actions.lua
+@@ -28,6 +28,9 @@
+ local DesktopNavigation = require("desktop_navigation")
+ local SendInput     = require("send_input")
+ local AppParameter  = require("app_parameter")
++local ProgramParameter = require("program_parameter")
++local _program_revision = 0
++local _program_parameters_owned = false
+ local PromptAction  = require("llm.prompt_action")
+ local ProfileSelector = require("llm.profile_selector")
+ local Tone          = require("llm.tone")
+@@ -1407,6 +1410,7 @@
+ 	sg(system_action, owner_action("modules.gestures.system_actions", system_action))
+ end
+ -- The application is the binding's own parameter, as for open_url.
++sg("run_program", function(binding) return M.run_program(binding) end)
+ sg("open_app", function(binding)
+ 	local value = M.get_action_parameter(binding, "open_app")
+ 	if not M.validate_action_parameter("open_app", value) then
+@@ -2247,6 +2251,7 @@
+ 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
+ 	-- Syntax only: whether the application is installed is checked when it opens
+ 	if spec == "app" then return AppParameter.is_valid(value) end
++	if spec == "program" then return ProgramParameter.parse(value, "hs") ~= nil end
+ 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
+ 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
+ 	if spec == "search_url" then
+@@ -2268,6 +2273,7 @@
+ 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+ 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+ 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
++	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+ 	if spec == "text" then
+ 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
+ 			tostring(M.send_vocabulary().text_max_code_points))
+@@ -2317,6 +2323,7 @@
+ 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
+ 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
+ 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
++	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+ 	if SendInput.KINDS[spec] then
+ 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+ 			tostring(M.send_vocabulary().text_max_code_points))
+@@ -2405,10 +2412,82 @@
+ 	return _state.action_params[parameter_key(binding, action)] or ""
+ end
+ 
++--- Identifies existing executable binding families without inventing another invoker.
++function M.program_binding_supported(binding)
++	return type(binding) == "string" and ((type(_state) == "table" and type(_state.ga) == "table"
++		and _state.ga[binding] ~= nil) or binding:match("^keyboard__.+$") ~= nil
++		or binding:match("^script__.+$") ~= nil or binding:match("^tap_key__.+$") ~= nil)
++end
++
++--- Captures a real configuration view, runtime binding and the current action parent.
++function M.run_program(binding)
++	local ok, started = pcall(function()
++		local parent = current_action_parent()
++		if not M.program_binding_supported(binding) or not _state or not AuxOwner.program_available()
++			or not aux_admission_open(parent) then return false end
++		local Preferences = require("infra.preferences")
++		local ConfigPaths = require("infra.config_paths")
++		local Toml = require("infra.toml.codec")
++		local path = ConfigPaths.get("ConfigTomlPath")
++		local scalar = M.get_action_parameter(binding, "run_program")
++		local parsed = ProgramParameter.parse(scalar, "hs")
++		if not parsed then return false end
++		local function binding_action()
++			if type(_state.ga) == "table" and _state.ga[binding] ~= nil then
++				return _state.ga[binding], "gestures", binding
++			end
++			if binding:match("^script__") then
++				local id = binding:sub(9)
++				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], "script_control", id
++			end
++			local descriptors = {
++				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
++				{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
++			}
++			for _, descriptor in ipairs(descriptors) do
++				if binding:sub(1, #descriptor[1]) == descriptor[1] then
++					local id = binding:sub(#descriptor[1] + 1)
++					return require(descriptor[2]).get_action(id), descriptor[3], id
++				end
++			end
++			return nil
++		end
++		local action, section, id = binding_action()
++		local canonical, source = Preferences.current_view(path)
++		if action ~= "run_program" or type(canonical) ~= "table" or type(source) ~= "table"
++			or source.status ~= "ok" or type(canonical.gesture_action_parameters) ~= "table"
++			or canonical.gesture_action_parameters[parameter_key(binding, "run_program")] ~= scalar then return false end
++		local config = Toml.decode(source.content)
++		local actions = section == "gestures" and config.gestures
++			or type(config.shortcuts) == "table" and config.shortcuts[section]
++		if type(actions) ~= "table" or actions[id] ~= "run_program" then return false end
++		local revision = _program_revision
++		local function admitted()
++			if not aux_admission_open(parent) or revision ~= _program_revision
++				or M.get_action_parameter(binding, "run_program") ~= scalar
++				or binding_action() ~= "run_program" then return false end
++			local current, physical = Preferences.current_view(path)
++			return type(current) == "table" and Preferences.source_matches(source, physical) == true
++		end
++		_program_parameters_owned = true
++		return AuxOwner.run_program(parsed.executable, parsed.arguments, admitted, parent)
++	end)
++	return ok and started == true
++end
++
++local function retire_program_parameters()
++	if not _program_parameters_owned then return true end
++	local gestures = AuxOwner.stop_programs(GESTURE_ACTION_PARENT)
++	local shortcuts = AuxOwner.stop_programs(SHORTCUT_ACTION_PARENT)
++	return gestures == true and shortcuts == true
++end
++
+ function M.set_action_parameter(binding, action, value)
+ 	if not _state or not M.validate_action_parameter(action, value) then return false end
++	if not retire_program_parameters() then return false end
+ 	_state.action_params = _state.action_params or {}
+ 	_state.action_params[parameter_key(binding, action)] = value
++	_program_revision = _program_revision + 1
+ 	return true
+ end
+ 
+@@ -2418,6 +2497,7 @@
+ --- @return boolean committed
+ function M.replace_action_parameters(parameters)
+ 	if not _state or type(parameters) ~= "table" then return false end
++	if not retire_program_parameters() then return false end
+ 	local staged = {}
+ 	for key, value in pairs(parameters) do
+ 		if type(key) ~= "string" or type(value) ~= "string" then return false end
+@@ -2426,6 +2506,7 @@
+ 		staged[key] = value
+ 	end
+ 	_state.action_params = staged
++	_program_revision = _program_revision + 1
+ 	return true
+ end
+ 
+diff --git a/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua b/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua
+--- a/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua
++++ b/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua
+@@ -62,6 +62,10 @@
+ end
+ 
+ local function authorized(entry)
++	if entry.admit ~= nil then
++		local ok, receipt = pcall(entry.admit)
++		if not ok or receipt ~= true then return false end
++	end
+ 	local scope = entry.scope
+ 	return entry_is_current(entry)
+ 		and type(scope) == "table" and scope.paused ~= true
+@@ -276,6 +280,14 @@
+ 	return ok == true and settled == true
+ end
+ 
++local function shell_error(entry, message, ...)
++	if entry.strict == true then
++		Logger.error(LOG, "Private user program cleanup or admission remains unacknowledged.")
++	else
++		Logger.error(LOG, message, ...)
++	end
++end
++
+ local function observe_shell_timer(entry, field, handle, continuation)
+ 	local observer_field = field .. "_observer"
+ 	if entry[observer_field] == handle then return true end
+@@ -289,7 +301,7 @@
+ 		end)
+ 	if not ok or observed ~= true then
+ 		if entry[observer_field] == handle then entry[observer_field] = nil end
+-		Logger.error(LOG, "%s %s timer observer refused: %s.",
++		shell_error(entry, "%s %s timer observer refused: %s.",
+ 			tostring(entry.label), field, tostring(observed))
+ 		return false
+ 	end
+@@ -304,7 +316,7 @@
+ 	end)
+ 	local ok, cancelled = xpcall(TimerScheduler.cancel, debug.traceback, handle)
+ 	if not ok or cancelled ~= true then
+-		Logger.error(LOG, "%s %s timer cleanup remains pending: %s.",
++		shell_error(entry, "%s %s timer cleanup remains pending: %s.",
+ 			tostring(entry.label), field, tostring(cancelled))
+ 	end
+ 	return observed and ok and cancelled == true and entry[field] == nil
+@@ -327,7 +339,7 @@
+ 			end)
+ 			TimerScheduler.cancel(handle)
+ 		end
+-		Logger.error(LOG, "%s %s timer acquisition failed: %s.",
++		shell_error(entry, "%s %s timer acquisition failed: %s.",
+ 			tostring(entry.label), field, tostring(committed))
+ 		return false
+ 	end
+@@ -361,19 +373,20 @@
+ 	end)
+ 	if not ok or observed ~= true then
+ 		entry.observing = false
+-		Logger.error(LOG, "%s process observer refused: %s.",
++		shell_error(entry, "%s process observer refused: %s.",
+ 			tostring(entry.label), tostring(observed))
+ 	end
+ end
+ 
+ local function degrade_shell(entry, reason)
++	if entry.strict == true then return false end
+ 	if _shells[entry.id] ~= entry then return false end
+ 	_shells[entry.id] = nil
+ 	_degraded_shells[entry.id] = entry
+ 	entry.degraded = true
+ 	entry.discard = true
+ 	entry.committed = false
+-	Logger.error(LOG,
++	shell_error(entry,
+ 		"%s process remained live after bounded termination; action owner released in degraded mode: %s.",
+ 		tostring(entry.label), tostring(reason))
+ 	return true
+@@ -399,7 +412,7 @@
+ 			request_shell_termination(entry, "cleanup retry exhausted")
+ 		end)
+ 	if not armed then return degrade_shell(entry, "cleanup retry timer refused") end
+-	Logger.error(LOG, "%s process cleanup remains pending: %s (%s).",
++	shell_error(entry, "%s process cleanup remains pending: %s (%s).",
+ 		tostring(entry.label), tostring(terminate_ok and accepted or accepted), tostring(state))
+ 	return false
+ end
+@@ -415,18 +428,20 @@
+ 	entry.callback_active = true
+ 	invoke(entry.scope, entry.label, entry.callback, false, nil)
+ 	entry.callback_active = false
+-	Logger.error(LOG, "%s process exceeded its %.1f-second settlement deadline.",
++	shell_error(entry, "%s process exceeded its %.1f-second settlement deadline.",
+ 		tostring(entry.label), SHELL_DEADLINE_SEC)
+ 	request_shell_termination(entry, "settlement deadline exhausted")
+ 	return true
+ end
+ 
+-local function start_shell(method, payload, label, callback, parent)
++local function start_shell(method, payload, label, callback, parent, strict, admit)
+ 	local admitted, scope = admission_open(parent)
+ 	if not admitted then return false end
+ 	local entry = {
+ 		id = next_id(),
+ 		kind = "shell",
++		strict = strict == true,
++		admit = admit,
+ 		parent = scope.id,
+ 		scope = scope,
+ 		label = label,
+@@ -444,6 +459,7 @@
+ 		retry_handle = nil,
+ 	}
+ 	_shells[entry.id] = entry
++	if not authorized(entry) then release_shell(entry); return false end
+ 	scope.acquisitions = scope.acquisitions + 1
+ 	local function terminal(...)
+ 		if entry.terminal_received == true then return end
+@@ -523,6 +539,32 @@
+ 	end, { executable = executable, args = args }, label or "process", callback, parent)
+ end
+ 
++--- Runs an explicitly owned user program without legacy degraded-debt release.
++function M.run_program(executable, arguments, admitted, parent)
++	if type(admitted) ~= "function" then return false end
++	return start_shell(function(payload, terminal)
++		local handle = ShellRunner.spawn_private(payload.executable, payload.arguments, terminal, admitted)
++		local ok, receipt = pcall(handle.start)
++		return ok and receipt == true, handle
++	end, { executable = executable, arguments = arguments }, "user program", nil, parent, true, admitted)
++end
++
++function M.stop_programs(parent)
++	local scope = action_scope(parent)
++	local selected = {}
++	for _, entry in pairs(_shells) do
++		if entry.scope == scope and entry.strict == true then selected[#selected + 1] = entry end
++	end
++	local settled = true
++	for _, entry in ipairs(selected) do if terminate_shell(entry) ~= true then settled = false end end
++	return settled
++end
++
++function M.program_available()
++	return type(hs) == "table" and type(hs.task) == "table" and type(hs.task.new) == "function"
++		and type(ShellRunner.spawn_private) == "function"
++end
++
+ local function settle_all(parent)
+ 	local scope = action_scope(parent)
+ 	local timers, shells = {}, {}
+diff --git a/static/ergopti_plus/macos/modules/gestures/init.lua b/static/ergopti_plus/macos/modules/gestures/init.lua
+--- a/static/ergopti_plus/macos/modules/gestures/init.lua
++++ b/static/ergopti_plus/macos/modules/gestures/init.lua
+@@ -562,6 +562,7 @@
+ M.get_sg_names       = Actions.get_sg_names
+ M.get_action_label   = Actions.get_label
+ M.get_action_parameter_spec = Actions.get_action_parameter_spec
++M.program_binding_supported = Actions.program_binding_supported
+ M.is_assignable     = Actions.is_assignable
+ M.validate_action_parameter = Actions.validate_action_parameter
+ M.parameter_prompt   = Actions.parameter_prompt
+diff --git a/static/ergopti_plus/macos/tests/unit/adapters/test_shell_runner_start_rollback_ownership.lua b/static/ergopti_plus/macos/tests/unit/adapters/test_shell_runner_start_rollback_ownership.lua
+--- a/static/ergopti_plus/macos/tests/unit/adapters/test_shell_runner_start_rollback_ownership.lua
++++ b/static/ergopti_plus/macos/tests/unit/adapters/test_shell_runner_start_rollback_ownership.lua
+@@ -418,3 +418,80 @@
+ 		end)
+ 	end)
+ end)
++
++helpers.describe("private user program native boundary", function()
++	helpers.it("rechecks the captured source after native construction before start", function()
++		with_runner(function(runner, native)
++			local admitted = true
++			local construct = _G.hs.task.new
++			_G.hs.task.new = function(...)
++				local task = construct(...)
++				admitted = false
++				return task
++			end
++			local handle = runner.spawn_private("/private/été program", { "private literal" },
++				function() end, function() return admitted end)
++			helpers.assert_eq(handle.start(), false)
++			helpers.assert_eq(native.tasks[1].start_calls, 0)
++			helpers.assert_eq(handle.isSettled(), true)
++		end)
++	end)
++
++	for _, stage in ipairs({ "construct", "environment", "start", "terminate", "observer", "terminal" }) do
++		helpers.it("closes private data in " .. stage .. " native failures", function()
++			with_runner(function(runner, native)
++				local marker = "PRIVATE106_PATH_ARG_STDERR"
++				local logs, crashes = {}, 0
++				local logger = package.loaded["infra.logger"]
++				for _, name in ipairs({ "trace", "done", "error", "warn" }) do
++					logger[name] = function(_, message, ...)
++						logs[#logs + 1] = string.format(message, ...)
++					end
++				end
++				local old_reporter = _G.ergopti_report_crash
++				local ok, failure = xpcall(function()
++					_G.ergopti_report_crash = function() crashes = crashes + 1 end
++					if stage == "construct" then _G.hs.task.new = function() error(marker) end end
++					if stage == "environment" then
++						local construct = _G.hs.task.new
++						_G.hs.task.new = function(...)
++							local task = construct(...)
++							task.setEnvironment = function() error(marker) end
++							return task
++						end
++					end
++					local handle = runner.spawn_private("/" .. marker, { marker },
++						function() if stage == "terminal" then error(marker) end end, function() return true end)
++					if stage == "construct" or stage == "environment" then
++						helpers.assert_eq(handle.start(), false)
++					else
++						local task = native.tasks[1]
++						if stage == "start" then task.start = function() task.running = true; error(marker) end end
++						local started = handle.start()
++						helpers.assert_eq(started, stage ~= "start")
++						if stage == "terminate" then task.terminate = function() error(marker) end; handle.terminate() end
++						if stage == "observer" then handle.onSettled(function() error(marker) end) end
++						task:complete(0, marker, marker)
++						helpers.assert_eq(handle.isSettled(), true)
++					end
++				end, debug.traceback)
++				_G.ergopti_report_crash = old_reporter
++				if not ok then error(failure, 0) end
++				helpers.assert_eq(crashes, 0)
++				helpers.assert_eq(table.concat(logs, "\n"):find(marker, 1, true), nil)
++			end)
++		end)
++	end
++
++	helpers.it("refuses a truthy native launch while retaining its unsettled child", function()
++		with_runner(function(runner, native)
++			local handle = runner.spawn_private("/fixture/private", {}, function() end, function() return true end)
++			local task = native.tasks[1]
++			task.start = function() task.running = true; return 2 end
++			helpers.assert_eq(handle.start(), false)
++			helpers.assert_eq(handle.isSettled(), false)
++			task:complete(15, "", "")
++			helpers.assert_eq(handle.isSettled(), true)
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_run_program.lua b/static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_run_program.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_run_program.lua
+@@ -0,0 +1,141 @@
++--- tests/unit/modules/gestures/actions/test_run_program.lua
++
++--- Real action, preference and native task owners with explicit test-owned tasks.
++local helpers = require("tests.helpers")
++
++local function with_program(callback)
++	local saved = {}
++	for name, value in pairs(package.loaded) do saved[name] = value end
++	local old_hs = _G.hs
++	local path = os.tmpname()
++	os.remove(path)
++	local tasks, actions, auxiliary = {}, nil, nil
++	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
++		"adapters.task_environment", "adapters.file_system", "adapters.timer_scheduler", "infra.preferences",
++		"infra.config_paths", "infra.paths", "infra.i18n", "infra.logger", "infra.timings",
++		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
++	for _, name in ipairs(owned) do package.loaded[name] = nil end
++	local ok, failure = xpcall(function()
++		local native = require("tests.stubs.hs")
++		native.__reset()
++		_G.hs = native
++		package.loaded["hs"] = native
++		package.loaded["infra.logger"] = helpers.make_logger_stub()
++		package.loaded["infra.i18n"] = { get = function(key) return key end, format = function(key) return key end }
++		package.loaded["infra.config_paths"] = { get = function() return path end }
++		native.task.new = function(executable, terminal, chunks, arguments)
++			local task = { executable = executable, arguments = arguments, starts = 0, running = false,
++				terminal = terminal, chunks = chunks, env = { PATH = "/usr/bin:/bin", HOME = "/Users/tester" } }
++			function task:environment() local result = {}; for k, v in pairs(self.env) do result[k] = v end; return result end
++			function task:setEnvironment(value) self.env = value; return self end
++			function task:start() self.starts = self.starts + 1; self.running = true; return self end
++			function task:isRunning() return self.running end
++			function task:terminate() return self end
++			function task:complete(code) self.running = false; return self.terminal(code or 0, "private output", "private error") end
++			tasks[#tasks + 1] = task
++			return task
++		end
++		actions = require("modules.gestures.actions")
++		auxiliary = require("modules.gestures.actions_aux_owner")
++		local preferences = require("infra.preferences")
++		local state = { ga = { tap_3 = "run_program" }, action_params = {} }
++		actions.init(state)
++		preferences.load(path)
++		local scalar = '{"version":1,"executable":"/private/été program","arguments":["","two words","日本語","line\\nnext"]}'
++		helpers.assert_eq(actions.set_action_parameter("tap_3", "run_program", scalar), true)
++		local gesture_port = {
++			get_all_actions = function() return state.ga end,
++			get_all_action_parameters = actions.get_all_action_parameters,
++		}
++		helpers.assert_eq(preferences.save(path, {}, {}, { gestures = gesture_port }), true)
++		callback(actions, auxiliary, preferences, native, tasks, path, scalar, state, gesture_port)
++	end, debug.traceback)
++	for _, task in ipairs(tasks) do if task.running then task:complete(15) end end
++	if auxiliary then auxiliary.stop_programs("gestures"); auxiliary.stop_programs("shortcut_bindings") end
++	local acquired_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
++	if type(acquired_keyboard) == "table" and acquired_keyboard ~= saved["modules.shortcuts.keyboard_shortcuts"] then
++		pcall(acquired_keyboard.stop)
++	end
++	os.remove(path)
++	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
++	for name, value in pairs(saved) do package.loaded[name] = value end
++	_G.hs = old_hs
++	if not ok then error(failure, 0) end
++end
++
++helpers.describe("private run_program real action/preferences chain", function()
++	helpers.it("dispatches the persisted gesture with opaque literal native argv", function()
++		with_program(function(actions, _, preferences, _, tasks, path, scalar)
++			helpers.assert_eq(actions.execute_single("run_program", "tap_3"), true)
++			helpers.assert_eq(#tasks, 1)
++			helpers.assert_eq(tasks[1].starts, 1)
++			helpers.assert_eq(tasks[1].executable, "/private/été program")
++			helpers.assert_eq(tasks[1].arguments, { "", "two words", "日本語", "line\nnext" })
++			local flat = preferences.current_view(path)
++			helpers.assert_eq(flat.gesture_action_parameters["tap_3__run_program"], scalar)
++			tasks[1]:complete()
++		end)
++	end)
++
++	helpers.it("refuses foreign canonical assignment without constructing a native task", function()
++		with_program(function(actions, _, _, _, tasks, path)
++			local file = assert(io.open(path, "wb")); file:write('[gestures]\ntap_3 = "none"\n'); file:close()
++			helpers.assert_eq(actions.run_program("tap_3"), false)
++			helpers.assert_eq(#tasks, 0)
++		end)
++	end)
++
++	helpers.it("retains running child debt before accepting parameter replacement", function()
++		with_program(function(actions, auxiliary, _, _, tasks, _, scalar)
++			helpers.assert_eq(actions.run_program("tap_3"), true)
++			helpers.assert_eq(actions.set_action_parameter("tap_3", "run_program", scalar), false)
++			helpers.assert_eq(auxiliary.has_pending("gestures"), true)
++			helpers.assert_eq(#tasks, 1)
++			tasks[1]:complete(15)
++			helpers.assert_eq(actions.set_action_parameter("tap_3", "run_program", scalar), true)
++		end)
++	end)
++end)
++
++helpers.describe("private run_program real keyboard port", function()
++	helpers.it("executes the same persisted scalar through the actual registered keyboard callback", function()
++		with_program(function(actions, _, preferences, native, tasks, path, scalar, _, gesture_port)
++			helpers.assert_eq(actions.set_action_parameter("keyboard__cmd_1", "run_program", scalar), true)
++			helpers.assert_eq(preferences.save(path, {}, {}, { gestures = gesture_port }), true)
++			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
++			helpers.assert_eq(keyboard.set_action("cmd_1", "run_program"), true)
++			helpers.assert_eq(keyboard.start(), true)
++			local count, registered = 0, nil
++			for _, item in ipairs(native.hotkey._bound) do
++				if item.key == "1" and #item.mods == 1 and item.mods[1] == "cmd" then
++					count, registered = count + 1, item
++				end
++			end
++			helpers.assert_eq(count, 1)
++			local accepted = registered.pressed_fn()
++			helpers.assert_eq(accepted, true)
++			helpers.assert_eq(#tasks, 1)
++			helpers.assert_eq(tasks[1].starts, 1)
++			helpers.assert_eq(tasks[1].arguments, { "", "two words", "日本語", "line\nnext" })
++			tasks[1]:complete()
++			helpers.assert_eq(keyboard.stop(), true)
++		end)
++	end)
++end)
++
++helpers.describe("private run_program actual scoped pause", function()
++	helpers.it("retains native program debt through aggregate cleanup and fences held delivery", function()
++		with_program(function(actions, auxiliary, _, _, tasks)
++			helpers.assert_eq(actions.run_program("tap_3"), true)
++			helpers.assert_eq(actions.force_cleanup("gestures"), false)
++			helpers.assert_eq(auxiliary.is_paused("gestures"), true)
++			helpers.assert_eq(auxiliary.has_pending("gestures"), true)
++			helpers.assert_eq(actions.run_program("tap_3"), false)
++			helpers.assert_eq(#tasks, 1)
++			tasks[1]:complete(15)
++			helpers.assert_eq(auxiliary.has_pending("gestures"), false)
++			helpers.assert_eq(actions.run_program("tap_3"), false)
++			helpers.assert_eq(#tasks, 1)
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_actions_aux_pause_ownership.lua b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_actions_aux_pause_ownership.lua
+--- a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_actions_aux_pause_ownership.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_actions_aux_pause_ownership.lua
+@@ -132,6 +132,11 @@
+ 		return true, shell
+ 	end
+ 	package.loaded["adapters.shell_runner"] = {
++		spawn_private = function(executable, arguments, terminal)
++			local accepted, handle = start_shell("program", { executable, arguments }, terminal)
++			handle.start = function() return accepted end
++			return handle
++		end,
+ 		open = function(target, callback) return start_shell("open", target, callback) end,
+ 		applescript = function(script, callback)
+ 			return start_shell("applescript", script, callback)
+@@ -168,6 +173,48 @@
+ 		f.shells[1]:deliver(true)
+ 		f.shells[1]:deliver(true)
+ 		helpers.assert_eq(f.business, 2)
++		helpers.assert_eq(f.subject.has_pending(), false)
++	end)
++end)
++
++helpers.describe("gesture auxiliary owner: strict private programs", function()
++	helpers.it("retains program debt past legacy degradation and blocks its successor", function()
++		local f = fresh_owner()
++		helpers.assert_eq(f.subject.run_program("/fixture/private", { "opaque" }, function() return true end), true)
++		local shell = f.shells[1]
++		f.timers[1]:fire()
++		f.timers[2]:fire()
++		f.timers[3]:fire()
++		helpers.assert_eq(shell.terminate_calls, 3)
++		helpers.assert_eq(f.subject.has_pending(), true)
++		helpers.assert_eq(f.subject.pause(), false)
++		helpers.assert_eq(f.subject.resume(), false)
++		helpers.assert_eq(f.subject.run_program("/fixture/next", {}, function() return true end), false)
++		helpers.assert_eq(#f.shells, 1)
++		shell:deliver(false)
++		helpers.assert_eq(f.subject.has_pending(), false)
++		helpers.assert_eq(f.subject.resume(), true)
++	end)
++
++	helpers.it("retires only user programs without cancelling an ordinary sibling action", function()
++		local f = fresh_owner()
++		helpers.assert_eq(f.subject.open("/tmp/legacy", "legacy", function() end), true)
++		helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() return true end), true)
++		helpers.assert_eq(f.subject.stop_programs(), false)
++		helpers.assert_eq(f.shells[1].terminate_calls, 0)
++		helpers.assert_eq(f.shells[2].terminate_calls, 1)
++		f.shells[2]:deliver(false)
++		helpers.assert_eq(f.subject.stop_programs(), true)
++		f.shells[1]:deliver(true)
++	end)
++
++	helpers.it("requires strict fresh admission before any native construction", function()
++		local f = fresh_owner()
++		for _, value in ipairs({ false, 0, 1, "true", {} }) do
++			helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() return value end), false)
++		end
++		helpers.assert_eq(f.subject.run_program("/fixture/private", {}, function() error("private admission") end), false)
++		helpers.assert_eq(#f.shells, 0)
+ 		helpers.assert_eq(f.subject.has_pending(), false)
+ 	end)
+ end)
+diff --git a/static/ergopti_plus/macos/ui/menu/menu_gestures.lua b/static/ergopti_plus/macos/ui/menu/menu_gestures.lua
+--- a/static/ergopti_plus/macos/ui/menu/menu_gestures.lua
++++ b/static/ergopti_plus/macos/ui/menu/menu_gestures.lua
+@@ -316,7 +316,10 @@
+ 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
+ 			or (current or "none")
+ 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
+-		actionLbl = ParameterLabel.format(actionLbl, parameter)
++		if type(gestures.get_action_parameter_spec) ~= "function"
++			or gestures.get_action_parameter_spec(current) ~= "program" then
++			actionLbl = ParameterLabel.format(actionLbl, parameter)
++		end
+ 
+ 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+ 
+diff --git a/static/ergopti_plus/macos/ui/menu/shortcut_utils.lua b/static/ergopti_plus/macos/ui/menu/shortcut_utils.lua
+--- a/static/ergopti_plus/macos/ui/menu/shortcut_utils.lua
++++ b/static/ergopti_plus/macos/ui/menu/shortcut_utils.lua
+@@ -332,9 +332,15 @@
+ 	for _, item in ipairs(items) do
+ 		local kind = item.type == "action" and gestures.get_action_parameter_spec(item.id) or nil
+ 		if kind then
++			if kind == "program" and (require("modules.gestures.actions_aux_owner").program_available() ~= true
++				or type(gestures.program_binding_supported) ~= "function"
++				or gestures.program_binding_supported(binding) ~= true) then
++				item.disabled = true
++				item.hint = i18n.get("platform_reason.program_runner_unavailable")
++			end
+ 			item.parameter = kind
+ 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
+-			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" then
++			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
+ 				prompts[kind] = gestures.parameter_prompt(item.id)
+ 				errors[kind] = gestures.parameter_error(item.id)
+ 			end
+@@ -362,6 +368,10 @@
+ 			visionModelDefault = i18n.get("dialog.action_picker.vision_model_default"),
+ 			visionModelRequired = i18n.get("dialog.action_picker.vision_model_required"),
+ 			languageLabel = i18n.get("dialog.action_picker.language_label"),
++			programExecutableLabel = i18n.get("dialog.action_picker.program_executable"),
++			programArgumentsLabel = i18n.get("dialog.action_picker.program_arguments"),
++			programAddLabel = i18n.get("dialog.action_picker.program_add_argument"),
++			programRemoveLabel = i18n.get("dialog.action_picker.program_remove_argument"),
+ 			prompts = prompts,
+ 			errors = errors,
+ 		},
+diff --git a/static/ergopti_plus/windows/ErgoptiPlus.ahk b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+--- a/static/ergopti_plus/windows/ErgoptiPlus.ahk
++++ b/static/ergopti_plus/windows/ErgoptiPlus.ahk
+@@ -479,6 +479,8 @@
+ #Include ui/update_check/init.ahk
+ #Include modules/diagnostics/crash_reporter.ahk
+ #Include infra/json.ahk
++#Include infra/program_parameter.ahk
++#Include infra/program_actions.ahk
+ ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
+ ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
+ #Include infra/locale.ahk
+diff --git a/static/ergopti_plus/windows/_generated/action_catalogue.ahk b/static/ergopti_plus/windows/_generated/action_catalogue.ahk
+--- a/static/ergopti_plus/windows/_generated/action_catalogue.ahk
++++ b/static/ergopti_plus/windows/_generated/action_catalogue.ahk
+@@ -161,6 +161,7 @@
+ 	Items.Push({ Kind: "action", Id: "clear_clipboard" })
+ 	Items.Push({ Kind: "action", Id: "center_mouse" })
+ 	Items.Push({ Kind: "action", Id: "open_app" })
++	Items.Push({ Kind: "action", Id: "run_program" })
+ 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
+ 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
+ 	Items.Push({ Kind: "action", Id: "empty_trash" })
+@@ -329,6 +330,7 @@
+ 	Actions["quit_frontmost_app"] := { Family: "sg", LabelKey: "sg_actions.quit_frontmost_app", Parameter: "", Confirm: false }
+ 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
+ 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
++	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
+ 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
+ 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
+ 	Actions["screen_record"] := { Family: "sg", LabelKey: "sg_actions.screen_record", Parameter: "", Confirm: false }
+diff --git a/static/ergopti_plus/windows/adapters/shell_runner.ahk b/static/ergopti_plus/windows/adapters/shell_runner.ahk
+--- a/static/ergopti_plus/windows/adapters/shell_runner.ahk
++++ b/static/ergopti_plus/windows/adapters/shell_runner.ahk
+@@ -1001,7 +1001,7 @@
+ 	}
+ 	try _SR_EnsurePoller()
+ 	catch as Err
+-		_SR_LogError("Task {1} completion retry timer failed: {2}", Claim["TaskId"], Err.Message)
++		_SR_TreeLogError(Claim, "Task {1} completion retry timer failed: {2}", Claim["TaskId"], Err.Message)
+ }
+ 
+ ; Admission is atomic, but arbitrary client callbacks never run under our lock
+@@ -1030,7 +1030,7 @@
+ 	}
+ 	try callback.Call(result*)
+ 	catch as Err
+-		_SR_LogError("Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
++		_SR_TreeLogError(Claim, "Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+ 	return true
+ }
+ 
+@@ -1226,7 +1226,7 @@
+  * unbounded staging file.
+  */
+ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
+-		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true) {
++		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+ 	global _SR_TaskCounter
+ 	local previous_critical := Critical("On")
+ 	local task_id := 0
+@@ -1235,7 +1235,7 @@
+ 
+ 	local capture_output := !!CaptureOutput
+ 	local validation := ShellRunner_ValidateSpawnArgs(Executable, Args)
+-	local bad_arg_index := validation["bad_arg_index"]
++	local bad_arg_index := PrivateDiagnostics == true ? 0 : validation["bad_arg_index"]
+ 	local validation_error := validation["error"]
+ 
+ 	; This API receives an executable and argv, never shell syntax. Launch it
+@@ -1249,6 +1249,7 @@
+ 		"TmpFile", "",
+ 		"CaptureDir", "",
+ 		"CaptureOutput", capture_output,
++		"PrivateDiagnostics", PrivateDiagnostics == true,
+ 		"MaxOutputBytes", Max(0, Integer(MaxOutputBytes)),
+ 		"BadArgIndex", bad_arg_index,
+ 		"ValidationError", validation_error,
+@@ -1303,6 +1304,13 @@
+ 	return handle
+ }
+ 
++_SR_TreeLogError(Owner, Message, Arguments*) {
++	if (Owner is Map) && Owner.Get("PrivateDiagnostics", false) == true
++		_SR_LogError("Private user program native operation remains unacknowledged.")
++	else
++		_SR_LogError(Message, Arguments*)
++}
++
+ _SR_TreeHandleStart(State) {
+ 	local validation_error := State["ValidationError"]
+ 	local bad_arg_index := State["BadArgIndex"]
+@@ -1311,7 +1319,7 @@
+ 		_SR_TreeQuiesceNative(invalid_claim, true)
+ 		_SR_TreeRecordQuiesced(State, invalid_claim)
+ 		_SR_TreeFinishClaim(invalid_claim)
+-		_SR_LogError("tree-owned spawn() refused for '{1}': {2}",
++		_SR_TreeLogError(State, "tree-owned spawn() refused for '{1}': {2}",
+ 			State["Executable"], validation_error)
+ 		return false
+ 	}
+@@ -1320,7 +1328,7 @@
+ 		_SR_TreeQuiesceNative(newline_claim, true)
+ 		_SR_TreeRecordQuiesced(State, newline_claim)
+ 		_SR_TreeFinishClaim(newline_claim)
+-		_SR_LogError("tree-owned spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline; stage a multi-line payload to a file and pass its path instead.",
++		_SR_TreeLogError(State, "tree-owned spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline; stage a multi-line payload to a file and pass its path instead.",
+ 			State["Executable"], bad_arg_index)
+ 		return false
+ 	}
+@@ -1346,7 +1354,7 @@
+ 			previous_critical := Critical("On")
+ 			try State["Starting"] := false
+ 			finally Critical(previous_critical)
+-			_SR_LogError("tree-owned capture allocation failed for '{1}': {2}",
++			_SR_TreeLogError(State, "tree-owned capture allocation failed for '{1}': {2}",
+ 				State["Executable"], Err.Message)
+ 			return false
+ 		}
+@@ -1363,7 +1371,7 @@
+ 		_SR_TreeQuiesceNative(failed_claim, true)
+ 		_SR_TreeRecordQuiesced(State, failed_claim)
+ 		_SR_TreeFinishClaim(failed_claim)
+-		_SR_LogError("tree-owned spawn.start() failed for '{1}': {2}",
++		_SR_TreeLogError(State, "tree-owned spawn.start() failed for '{1}': {2}",
+ 			State["Executable"], Err.Message)
+ 		return false
+ 	}
+@@ -1468,10 +1476,10 @@
+ 		; this owner now kills and closes the unpublished handles exactly once.
+ 		_SR_TreeQuiesceNative(native, true)
+ 		for NativeError in native["NativeErrors"]
+-			_SR_LogError("tree-owned canceled-start cleanup warning for '{1}': {2}",
++			_SR_TreeLogError(State, "tree-owned canceled-start cleanup warning for '{1}': {2}",
+ 				State["Executable"], NativeError)
+ 		if before_adopt_failed
+-			_SR_LogError("tree-owned before-adopt hook failed for '{1}': {2}",
++			_SR_TreeLogError(State, "tree-owned before-adopt hook failed for '{1}': {2}",
+ 				State["Executable"], before_adopt_error)
+ 		return false
+ 	}
+@@ -1480,7 +1488,7 @@
+ 		_SR_TreeRecordQuiesced(State, canceled_claim)
+ 		_SR_TreeFinishClaim(canceled_claim)
+ 		if before_adopt_failed
+-			_SR_LogError("tree-owned before-adopt hook failed for '{1}': {2}",
++			_SR_TreeLogError(State, "tree-owned before-adopt hook failed for '{1}': {2}",
+ 				State["Executable"], before_adopt_error)
+ 		return false
+ 	}
+@@ -1488,12 +1496,12 @@
+ 		_SR_TreeQuiesceNative(resume_claim, true)
+ 		_SR_TreeRecordQuiesced(State, resume_claim)
+ 		_SR_TreeFinishClaim(resume_claim)
+-		_SR_LogError("tree-owned spawn.start() failed for '{1}': {2}",
++		_SR_TreeLogError(State, "tree-owned spawn.start() failed for '{1}': {2}",
+ 			State["Executable"], resume_error)
+ 		return false
+ 	}
+ 	if thread_close_error != ""
+-		_SR_LogError("tree-owned spawn.start() cleanup warning for '{1}': {2}",
++		_SR_TreeLogError(State, "tree-owned spawn.start() cleanup warning for '{1}': {2}",
+ 			State["Executable"], thread_close_error)
+ 	_SR_TreeEnsurePoller()
+ 	return true
+@@ -1545,7 +1553,7 @@
+ 		return claim["TreeQuiesced"]
+ 	}
+ 	if finalization_pending
+-		_SR_LogError("tree-owned task {1} termination is already being finalized; returning false instead of claiming an unverified empty tree.",
++		_SR_TreeLogError(State, "tree-owned task {1} termination is already being finalized; returning false instead of claiming an unverified empty tree.",
+ 			State["TaskId"])
+ 	return already_quiesced
+ }
+@@ -1778,6 +1786,7 @@
+ 	State["OnDone"] := 0
+ 	local claim := Map(
+ 		"OwnerState", State,
++		"PrivateDiagnostics", State.Get("PrivateDiagnostics", false),
+ 		"NativeExitObserved", State["RootReaped"],
+ 		"TaskId", task_id,
+ 		"Executable", State["Executable"],
+@@ -2080,7 +2089,7 @@
+ 		return
+ 	Claim["NativeDiagnostic"] := diagnostic
+ 	if diagnostic != ""
+-		_SR_LogError("tree-owned task {1} native teardown diagnostic: {2}",
++		_SR_TreeLogError(Claim, "tree-owned task {1} native teardown diagnostic: {2}",
+ 			Claim.Get("TaskId", "unpublished"), RTrim(diagnostic))
+ }
+ 
+@@ -2132,7 +2141,7 @@
+ 				local output_bytes := FileGetSize(tmp_file)
+ 				if max_output_bytes > 0 && output_bytes > max_output_bytes {
+ 					Claim["ExitCode"] := 63
+-					_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
++					_SR_TreeLogError(Claim, "tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
+ 						Claim["TaskId"], max_output_bytes)
+ 				} else {
+ 					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
+@@ -2140,7 +2149,7 @@
+ 				}
+ 			}
+ 		} catch as Err {
+-			_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
++			_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
+ 				Claim["TaskId"], Err.Message)
+ 		} finally {
+ 			_SR_TreeCleanupCapture(Claim, DeleteFn)
+@@ -2162,7 +2171,7 @@
+ 	try refusal := _SR_CaptureRemove(Claim, DeleteFn)
+ 	catch as Err {
+ 		_SR_TreeSetCaptureDebt(Claim, false)
+-		_SR_LogError("tree-owned task {1} output deletion failed: {2}",
++		_SR_TreeLogError(Claim, "tree-owned task {1} output deletion failed: {2}",
+ 			Claim["TaskId"], Err.Message)
+ 		return true
+ 	}
+@@ -2189,7 +2198,7 @@
+ 	; Completion never depends on the retry timer; any later poll still drains it
+ 	try _SR_TreeEnsurePoller()
+ 	catch as Err
+-		_SR_LogError("tree-owned task {1} capture retry timer failed: {2}",
++		_SR_TreeLogError(Claim, "tree-owned task {1} capture retry timer failed: {2}",
+ 			Claim["TaskId"], Err.Message)
+ }
+ 
+@@ -2350,7 +2359,7 @@
+ 			Critical(previous_critical)
+ 		}
+ 		if poll_diagnostic != ""
+-			_SR_LogError("tree-owned task {1} poll diagnostic: {2}",
++			_SR_TreeLogError(state, "tree-owned task {1} poll diagnostic: {2}",
+ 				task_id, poll_diagnostic)
+ 		if IsObject(claim) {
+ 			_SR_TreeQuiesceNative(claim, force_terminate)
+diff --git a/static/ergopti_plus/windows/infra/lifecycle.ahk b/static/ergopti_plus/windows/infra/lifecycle.ahk
+--- a/static/ergopti_plus/windows/infra/lifecycle.ahk
++++ b/static/ergopti_plus/windows/infra/lifecycle.ahk
+@@ -170,6 +170,8 @@
+ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
+ 		StageFailureFn) {
+ 	global ConfigurationFile
++	if IsSet(ProgramActions_Stop) && ProgramActions_Stop(false) != true
++		return false
+ 	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
+ 		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
+ 	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
+@@ -458,6 +460,8 @@
+ 	global _SpaceHoldInputHook
+ 	global _MagicKeyEditorInputHook
+ 	Transition := LifecycleTransitionBegin("suspend")
++	if IsSet(ProgramActions_Stop)
++		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+ 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
+ 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
+ 		LifecycleTransitionFinish(Transition)
+@@ -623,6 +627,8 @@
+ }
+ Ergopti_OnSuspendResume() {
+ 		Transition := LifecycleTransitionBegin("resume")
++		if IsSet(ProgramActions_Stop)
++			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
+ 		LoggerStart("Lifecycle", "Resuming from suspend…")
+ 		LifecycleTransitionMarkStarted(Transition)
+ 		_LifecycleRunRequiredStep(Transition, "navigation-event",
+@@ -861,6 +867,8 @@
+ }
+ 
+ Ergopti_OnShutdown(reason, code) {
++		if IsSet(ProgramActions_Stop) && ProgramActions_Stop(true) != true
++			return 1
+ 		global _LifecycleShutdownReason
+ 		_LifecycleShutdownReason := reason
+ 		; Button holds are OS state, so release them before any gate may keep this
+diff --git a/static/ergopti_plus/windows/infra/program_actions.ahk b/static/ergopti_plus/windows/infra/program_actions.ahk
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/windows/infra/program_actions.ahk
+@@ -0,0 +1,165 @@
++﻿; infra/program_actions.ahk
++
++; User executable/argv actions own a native tree until strict terminal acknowledgement.
++global _UserProgramEntries := Map()
++global _UserProgramGeneration := 0
++global _UserProgramPaused := false
++global _UserProgramAcquiring := 0
++
++ProgramActions_Available() {
++	return IsSet(ShellRunner_SpawnTreeOwned) && IsSet(FSReadUtf8Exact)
++		&& IsSet(TOML_ParseDocument) && IsSet(ProgramParameterParse)
++}
++
++ProgramActions_BindingSupported(Binding) {
++	return (Binding is String) && RegExMatch(Binding, "^(gesture|keyboard|script|tap_key)__.+$")
++}
++
++_ProgramActions_BindingAction(Binding, &Section := "", &Slot := "") {
++	global GestureAssignments, KeyboardShortcutAssignments, ScriptShortcutAssignments, TapKeyAssignments
++	if !RegExMatch(Binding, "^(gesture|keyboard|script|tap_key)__(.+)$", &Parts)
++		return ""
++	Slot := Parts[2]
++	switch Parts[1] {
++		case "gesture":
++			Section := "gestures"
++			return IsSet(GestureAssignments) && (GestureAssignments is Map) ? GestureAssignments.Get(Slot, "") : ""
++		case "keyboard":
++			Section := "keyboard"
++			return IsSet(KeyboardShortcutAssignments) && (KeyboardShortcutAssignments is Map) ? KeyboardShortcutAssignments.Get(Slot, "") : ""
++		case "script":
++			Section := "script_control"
++			return IsSet(ScriptShortcutAssignments) && (ScriptShortcutAssignments is Map) ? ScriptShortcutAssignments.Get(Slot, "") : ""
++		case "tap_key":
++			Section := "tap_keys"
++			return IsSet(TapKeyAssignments) && (TapKeyAssignments is Map) ? TapKeyAssignments.Get(Slot, "") : ""
++	}
++	return ""
++}
++
++_ProgramActions_Snapshot(Binding) {
++	global ConfigurationFile, _UserProgramGeneration, _UserProgramPaused
++	if !ProgramActions_Available() || !ProgramActions_BindingSupported(Binding)
++		|| _UserProgramPaused || A_IsSuspended || ConfigWriteLeaseBusy() || !(ConfigurationFile is String)
++		return false
++	Scalar := GestureGetActionParameter(Binding, "run_program")
++	Program := ProgramParameterParse(Scalar)
++	if !(Program is Map) || !(_ProgramActions_BindingAction(Binding, &Section, &Slot) == "run_program")
++		return false
++	Content := FSReadUtf8Exact(ConfigurationFile)
++	Document := TOML_ParseDocument(Content)
++	Parameters := Document.Get("action_parameters", 0)
++	Actions := Section == "gestures" ? Document.Get("gestures", 0) : Document.Get("shortcuts", Map()).Get(Section, 0)
++	if !(Parameters is Map) || !(Actions is Map)
++		|| !(Parameters.Get(GestureActionParameterKey(Binding, "run_program"), "") == Scalar)
++		|| !(Actions.Get(Slot, "") == "run_program")
++		return false
++	return Map("binding", Binding, "scalar", Scalar, "source", Content,
++		"path", ConfigurationFile, "generation", _UserProgramGeneration, "program", Program)
++}
++
++_ProgramActions_Admitted(Snapshot) {
++	global ConfigurationFile, _UserProgramGeneration, _UserProgramPaused
++	try {
++		return !_UserProgramPaused && !A_IsSuspended && !ConfigWriteLeaseBusy()
++			&& _UserProgramGeneration == Snapshot["generation"]
++			&& ConfigurationFile == Snapshot["path"]
++			&& GestureGetActionParameter(Snapshot["binding"], "run_program") == Snapshot["scalar"]
++			&& _ProgramActions_BindingAction(Snapshot["binding"]) == "run_program"
++			&& FSReadUtf8Exact(Snapshot["path"]) == Snapshot["source"]
++	} catch {
++		return false
++	}
++}
++
++_ProgramActions_BeforeAdopt(Snapshot, *) {
++	if !_ProgramActions_Admitted(Snapshot)
++		throw Error("User program admission changed")
++}
++
++_ProgramActions_Done(Entry, *) {
++	global _UserProgramEntries
++	try {
++		if _UserProgramEntries.Get(Entry["binding"], 0) == Entry
++			_UserProgramEntries.Delete(Entry["binding"])
++	} catch {
++		return false
++	}
++	return true
++}
++
++_ProgramActions_Retire(Entry) {
++	global _UserProgramEntries
++	Entry["cancelled"] := true
++	try Receipt := Entry["handle"].terminate()
++	catch
++		return false
++	if !(Receipt is Integer) || Receipt != 1
++		return false
++	if _UserProgramEntries.Get(Entry["binding"], 0) == Entry
++		_UserProgramEntries.Delete(Entry["binding"])
++	return true
++}
++
++ProgramActions_Run(Binding) {
++	global _UserProgramEntries, _UserProgramAcquiring, _UserProgramGeneration
++	PreviousCritical := Critical("On")
++	try {
++		if _UserProgramEntries.Count != 0 || IsObject(_UserProgramAcquiring)
++			return false
++		Acquisition := Map("generation", _UserProgramGeneration)
++		_UserProgramAcquiring := Acquisition
++	} finally Critical(PreviousCritical)
++	try {
++		Snapshot := _ProgramActions_Snapshot(Binding)
++		if !(Snapshot is Map) || Acquisition["generation"] != _UserProgramGeneration
++			return false
++		Entry := Map("binding", Binding, "snapshot", Snapshot, "cancelled", false, "started", A_TickCount)
++		Program := Snapshot["program"]
++		Handle := ShellRunner_SpawnTreeOwned(Program["executable"], Program["arguments"],
++			_ProgramActions_Done.Bind(Entry), , _ProgramActions_BeforeAdopt.Bind(Snapshot), 0, false, true)
++		Entry["handle"] := Handle
++		_UserProgramEntries[Binding] := Entry
++		SetTimer(ProgramActions_Poll, TimingsGet("gestures", "aux_shell_cleanup_retry_ms"))
++		try Started := Handle.start()
++		catch
++			Started := false
++		if !(Started is Integer) || Started != 1 || !_ProgramActions_Admitted(Snapshot) {
++			_ProgramActions_Retire(Entry)
++			return false
++		}
++		return true
++	} catch {
++		if IsSet(Entry) && (Entry is Map) && Entry.Has("handle")
++			_ProgramActions_Retire(Entry)
++		return false
++	} finally {
++		PreviousCritical := Critical("On")
++		try {
++			if _UserProgramAcquiring == Acquisition
++				_UserProgramAcquiring := 0
++		} finally Critical(PreviousCritical)
++	}
++}
++
++ProgramActions_Poll(*) {
++	global _UserProgramEntries
++	for _, Entry in _UserProgramEntries.Clone() {
++		if Entry["cancelled"] || !_ProgramActions_Admitted(Entry["snapshot"])
++			|| A_TickCount - Entry["started"] >= TimingsGet("gestures", "aux_shell_timeout_ms")
++			_ProgramActions_Retire(Entry)
++	}
++	if _UserProgramEntries.Count == 0
++		SetTimer(ProgramActions_Poll, 0)
++}
++
++ProgramActions_Stop(Pause := false) {
++	global _UserProgramEntries, _UserProgramGeneration, _UserProgramPaused, _UserProgramAcquiring
++	_UserProgramGeneration += 1
++	_UserProgramPaused := Pause == true
++	Receipt := !IsObject(_UserProgramAcquiring)
++	for _, Entry in _UserProgramEntries.Clone()
++		if !_ProgramActions_Retire(Entry)
++			Receipt := false
++	return Receipt
++}
+diff --git a/static/ergopti_plus/windows/infra/program_parameter.ahk b/static/ergopti_plus/windows/infra/program_parameter.ahk
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/windows/infra/program_parameter.ahk
+@@ -0,0 +1,121 @@
++﻿; infra/program_parameter.ahk
++
++/**
++ * Decodes executable/argv data using the native JSON string owner. The narrow
++ * structural scan rejects duplicate keys, NUL and Boolean versions before the
++ * generic Map/Array parser can erase those distinctions.
++ * @param {Any} Value Persisted scalar JSON.
++ * @returns {Map|false} Detached executable and literal argument vector.
++ */
++ProgramParameterParse(Value) {
++	if Type(Value) != "String"
++		return false
++	try {
++		Position := 1
++		_ProgramParameterWs(Value, &Position)
++		if SubStr(Value, Position++, 1) != "{"
++			return false
++		Data := Map()
++		Data.CaseSense := "On"
++		loop {
++			Key := _ProgramParameterString(Value, &Position)
++			if Type(Key) != "String" || Data.Has(Key)
++				|| !(Key == "version" || Key == "executable" || Key == "arguments")
++				return false
++			_ProgramParameterWs(Value, &Position)
++			if SubStr(Value, Position++, 1) != ":"
++				return false
++			_ProgramParameterWs(Value, &Position)
++			switch Key {
++				case "version":
++					if !RegExMatch(SubStr(Value, Position), "^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?", &Token)
++						return false
++					Data[Key] := JsonParse(Token[0])
++					if Data[Key] != 1
++						return false
++					Position += StrLen(Token[0])
++				case "executable":
++					Data[Key] := _ProgramParameterString(Value, &Position)
++					if Type(Data[Key]) != "String" || Data[Key] = ""
++						return false
++				case "arguments":
++					if SubStr(Value, Position++, 1) != "["
++						return false
++					Arguments := []
++					_ProgramParameterWs(Value, &Position)
++					if SubStr(Value, Position, 1) != "]" {
++						loop {
++							Argument := _ProgramParameterString(Value, &Position)
++							if Type(Argument) != "String"
++								return false
++							Arguments.Push(Argument)
++							_ProgramParameterWs(Value, &Position)
++							if SubStr(Value, Position, 1) != ","
++								break
++							Position++
++						}
++					}
++					if SubStr(Value, Position++, 1) != "]"
++						return false
++					Data[Key] := Arguments
++				default:
++					return false
++			}
++			_ProgramParameterWs(Value, &Position)
++			if SubStr(Value, Position, 1) != ","
++				break
++			Position++
++		}
++		if SubStr(Value, Position++, 1) != "}" || Data.Count != 3
++			return false
++		_ProgramParameterWs(Value, &Position)
++		if Position <= StrLen(Value)
++			return false
++		Executable := Data["executable"]
++		if !RegExMatch(Executable, "^[A-Za-z]:[/\\]") && !RegExMatch(Executable, "^\\\\[^\\/]+\\[^\\/]+\\.")
++			return false
++		if RegExMatch(Executable, "^\\\\[?.]\\")
++			return false
++		return Map("executable", Executable, "arguments", Data["arguments"])
++	} catch {
++		return false
++	}
++}
++
++_ProgramParameterWs(Value, &Position) {
++	while InStr(" `t`r`n", SubStr(Value, Position, 1)) && Position <= StrLen(Value)
++		Position++
++}
++
++_ProgramParameterString(Value, &Position) {
++	_ProgramParameterWs(Value, &Position)
++	if !RegExMatch(SubStr(Value, Position), '^"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4}))*"', &Token)
++		return false
++	Raw := Token[0]
++	Index := 2
++	while Index < StrLen(Raw) {
++		if SubStr(Raw, Index, 1) = "\" {
++			if SubStr(Raw, Index + 1, 5) == "u0000"
++				return false
++			Index += 2
++		} else
++			Index++
++	}
++	Position += StrLen(Raw)
++	Decoded := JsonParse(Raw)
++	Index := 0
++	while Index < StrLen(Decoded) {
++		Unit := NumGet(StrPtr(Decoded), Index * 2, "UShort")
++		if Unit >= 0xD800 && Unit <= 0xDBFF {
++			Index++
++			if Index >= StrLen(Decoded)
++				return false
++			Low := NumGet(StrPtr(Decoded), Index * 2, "UShort")
++			if Low < 0xDC00 || Low > 0xDFFF
++				return false
++		} else if Unit >= 0xDC00 && Unit <= 0xDFFF
++			return false
++		Index++
++	}
++	return Decoded
++}
+diff --git a/static/ergopti_plus/windows/modules/gestures/actions.ahk b/static/ergopti_plus/windows/modules/gestures/actions.ahk
+--- a/static/ergopti_plus/windows/modules/gestures/actions.ahk
++++ b/static/ergopti_plus/windows/modules/gestures/actions.ahk
+@@ -15,6 +15,7 @@
+ 
+ ; Action registry — each action has a label and an execution function
+ global GESTURE_ACTIONS := Map(
++		"run_program", { Fn: (BindingId := "") => ProgramActions_Run(BindingId) },
+ 		"none", {
+ 				Fn: (*) => 0,
+ 		},
+diff --git a/static/ergopti_plus/windows/modules/gestures/config.ahk b/static/ergopti_plus/windows/modules/gestures/config.ahk
+--- a/static/ergopti_plus/windows/modules/gestures/config.ahk
++++ b/static/ergopti_plus/windows/modules/gestures/config.ahk
+@@ -71,6 +71,8 @@
+ }
+ 
+ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
++		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
++				return false
+ 		global GestureActionParameters, ConfigurationFile
+ 		Key := GestureActionParameterKey(BindingId, ActionName)
+ 		CandidateParameters := GestureActionParameters.Clone()
+@@ -94,6 +96,12 @@
+ 
+ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
+ 		Spec := GestureActionParameterSpec(ActionName)
++		if Spec == "program" {
++				if IsSet(ProgramParameterParse) && (ProgramParameterParse(Value) is Map)
++						return true
++				ErrorText := t("dialog.gestures.param_err_program")
++				return false
++		}
+ 		if (Spec = "")
+ 				return true
+ 		; Checked before the trim below: the spaces of a text to type are part of it,
+@@ -169,6 +177,8 @@
+ GestureActionParameterPrompt(ActionName) {
+ 		global _WS_BUILTIN_PAIRS
+ 		switch GestureActionParameterSpec(ActionName) {
++				case "program":
++						return t("dialog.gestures.param_program")
+ 				case "search_url":
+ 						return t("dialog.gestures.param_search_url")
+ 				case "url":
+@@ -246,6 +256,8 @@
+ 		}
+ 		Prompt := GestureActionParameterPrompt(ActionName)
+ 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
++		if Spec == "program"
++				return _GesturePickProgram(BindingId, ActionName, Title, Existing)
+ 		if (Spec = "app")
+ 				return _GesturePickApplication(BindingId, ActionName, Prompt)
+ 		loop {
+@@ -310,6 +322,8 @@
+ 				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
+ 				return false
+ 		}
++		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
++				return false
+ 		CandidateAssignments := AssignmentsTarget.Clone()
+ 		CandidateParameters := ParametersTarget.Clone()
+ 		CandidateAssignments[Slot] := ActionName
+@@ -337,6 +351,9 @@
+ 
+ ; Prompts when needed, then commits the related parameter + assignment once.
+ GestureAssignConfiguredAction(&AssignmentsTarget, Scope, AssignmentSection, Slot, ActionName, WriterFn := 0, NotifyFn := 0) {
++		if ActionName == "run_program" && (!IsSet(ProgramActions_BindingSupported)
++				|| !ProgramActions_BindingSupported(GestureBindingId(Scope, Slot)))
++				return false
+ 		global GestureActionParameters
+ 		if !GestureActionIsAssignable(ActionName) {
+ 				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
+@@ -364,6 +381,8 @@
+ 
+ GestureActionDisplayLabel(ActionName, BindingId := "") {
+ 		Label := _GestureActionLabel(ActionName)
++		if GestureActionParameterSpec(ActionName) == "program"
++				return Label
+ 		if (BindingId = "")
+ 				return Label
+ 		Value := GestureGetActionParameter(BindingId, ActionName)
+@@ -959,3 +978,53 @@
+ 		else
+ 				LoggerError("gestures", "Deferred touchpad auto-configuration failed — user can retry from the tray menu.")
+ }
++
++; Native fallback edits the same executable and literal argv, never a command line.
++_GesturePickProgram(BindingId, ActionName, Title, Existing) {
++	if !IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
++				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId)
++		return false
++	Current := ProgramParameterParse(Existing)
++	Arguments := (Current is Map) ? Current["arguments"].Clone() : []
++	W := Gui_Create("", Title)
++	W.Add("Text", "xm", t("dialog.action_picker.program_executable"))
++	Executable := W.Add("Edit", "xm w560", (Current is Map) ? Current["executable"] : "")
++	W.Add("Text", "xm", t("dialog.action_picker.program_arguments"))
++	List := W.Add("ListBox", "xm w560 r6", Arguments)
++	W.Add("Button", "xm", t("dialog.action_picker.program_add_argument")).OnEvent("Click", AddArgument)
++	W.Add("Button", "x+8", t("dialog.action_picker.program_remove_argument")).OnEvent("Click", RemoveArgument)
++	W.Add("Button", "xm", t("button.save")).OnEvent("Click", Save)
++	W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
++	Result := false
++	W.OnEvent("Close", (*) => W.Destroy())
++	W.OnEvent("Escape", (*) => W.Destroy())
++	W.Show()
++	WinWaitClose("ahk_id " . W.Hwnd)
++	return Result
++	AddArgument(*) {
++		Picked := Ui_InputBox(t("dialog.action_picker.program_arguments"), Title, "w560 h240", "")
++		if Picked.Result != "OK"
++			return
++		Arguments.Push(Picked.Value)
++		List.Delete()
++		List.Add(Arguments)
++	}
++	RemoveArgument(*) {
++		Index := List.Value
++		if Index <= 0
++			return
++		Arguments.RemoveAt(Index)
++		List.Delete()
++		List.Add(Arguments)
++	}
++	Save(*) {
++		Items := ""
++		for Index, Argument in Arguments
++			Items .= (Index == 1 ? "" : ",") . JsonStringLiteral(Argument)
++		Scalar := '{"version":1,"executable":' . JsonStringLiteral(Executable.Value) . ',"arguments":[' . Items . "]}"
++		if !(ProgramParameterParse(Scalar) is Map)
++			return
++		Result := Map("has_value", true, "key", GestureActionParameterKey(BindingId, ActionName), "value", Scalar)
++		W.Destroy()
++	}
++}
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -262,6 +262,8 @@
+ ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
+ #Include ../infra/registry.ahk
+ #Include ../infra/json.ahk
++#Include ../infra/program_parameter.ahk
++#Include ../infra/program_actions.ahk
+ ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
+ ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
+ ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
+@@ -1962,6 +1964,7 @@
+ #Include unit/test_shell_runner_legacy_state_machine.ahk
+ #Include unit/test_shell_runner_multiline_arg.ahk
+ #Include unit/test_shell_runner_tree_owned.ahk
++#Include unit/test_run_program_actions.ahk
+ #Include unit/test_shell_runner_launch_cleanup.ahk
+ #Include unit/test_shell_runner_native_argv.ahk
+ #Include unit/test_shell_runner_native_exit_code.ahk
+diff --git a/static/ergopti_plus/windows/tests/unit/test_run_program_actions.ahk b/static/ergopti_plus/windows/tests/unit/test_run_program_actions.ahk
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_run_program_actions.ahk
+@@ -0,0 +1,142 @@
++﻿; tests/unit/test_run_program_actions.ahk
++
++_RPA_ProgramCorpus() {
++	global _SharedDir, JSON_NULL
++	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\action_parameters\program_vectors.json"))
++	Count := 0
++	for Vector in Corpus["cases"] {
++		Windows := false
++		for Platform in Vector["platforms"]
++			if Platform == "ahk"
++				Windows := true
++		if !Windows
++			continue
++		Actual := ProgramParameterParse(Vector["value"])
++		Expected := Vector["expected"]
++		if Expected == JSON_NULL {
++			AssertFalse(Actual, Vector["id"] . ": invalid scalar must refuse")
++		} else {
++			Assert(Actual is Map, Vector["id"] . ": actual program scalar parses")
++			AssertEqual(Expected["executable"], Actual["executable"], Vector["id"] . ": executable bytes")
++			AssertEqual(Expected["arguments"].Length, Actual["arguments"].Length, Vector["id"] . ": argument count")
++			for Index, Argument in Expected["arguments"]
++				AssertEqual(Argument, Actual["arguments"][Index], Vector["id"] . ": literal argument")
++		}
++		Count += 1
++	}
++	Assert(Count >= 20, "the independent Windows parameter corpus actually runs")
++}
++Test("user program: actual JSON typed scalar corpus", _RPA_ProgramCorpus)
++
++_RPA_WithFixture(Body) {
++	global ConfigurationFile, GestureAssignments, GestureActionParameters, KeyboardShortcutAssignments
++	global _UserProgramEntries, _UserProgramGeneration, _UserProgramPaused, _UserProgramAcquiring
++	AssertEqual(0, _UserProgramEntries.Count, "native fixture starts without borrowed program debt")
++	AssertFalse(IsObject(_UserProgramAcquiring), "native fixture cannot borrow an acquisition")
++	SavedFile := ConfigurationFile
++	SavedGestures := GestureAssignments
++	SavedKeyboard := KeyboardShortcutAssignments
++	SavedParameters := GestureActionParameters
++	SavedPaused := _UserProgramPaused
++	Directory := A_Temp . "\program106_" . A_TickCount . "_" . Random(1000, 9999)
++	DirCreate(Directory)
++	ConfigurationFile := Directory . "\configuration.toml"
++	Script := Directory . "\été 日本 program.ahk"
++	Output := Directory . "\literal.receipt"
++	FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n"
++		. 'for Index, Value in A_Args {`n'
++		. ' if Index > 1`n'
++		. '  FileAppend(StrLen(Value) . ":" . Value, A_Args[1], "UTF-8-RAW")`n'
++		. '}`nExitApp(0)`n', Script, "UTF-8")
++	Scalar := '{"version":1,"executable":' . JsonStringLiteral(A_AhkPath)
++		. ',"arguments":[' . JsonStringLiteral(Script) . ',' . JsonStringLiteral(Output)
++		. ',"","two words","日本語","line\nnext"]}'
++	GestureAssignments := Map("tap_3", "run_program")
++	KeyboardShortcutAssignments := Map("ctrl_p", "run_program")
++	GestureActionParameters := Map("gesture__tap_3__run_program", Scalar, "keyboard__ctrl_p__run_program", Scalar)
++	FileAppend('[gestures]`ntap_3 = "run_program"`n[shortcuts.keyboard]`nctrl_p = "run_program"`n'
++		. '[action_parameters]`n"gesture__tap_3__run_program" = ' . JsonStringLiteral(Scalar)
++		. '`n"keyboard__ctrl_p__run_program" = ' . JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
++	_UserProgramPaused := false
++	try Body.Call(Map("directory", Directory, "script", Script, "output", Output, "scalar", Scalar))
++	finally {
++		Deadline := A_TickCount + 5000
++		while !ProgramActions_Stop(true) && A_TickCount < Deadline
++			Sleep(10)
++		AssertEqual(0, _UserProgramEntries.Count, "owned native child is retired before fixture cleanup")
++		SetTimer(ProgramActions_Poll, 0)
++		ConfigurationFile := SavedFile
++		GestureAssignments := SavedGestures
++		KeyboardShortcutAssignments := SavedKeyboard
++		GestureActionParameters := SavedParameters
++		_UserProgramPaused := SavedPaused
++		DirDelete(Directory, true)
++	}
++}
++
++_RPA_WaitSettled() {
++	global _UserProgramEntries
++	Deadline := A_TickCount + 5000
++	while _UserProgramEntries.Count != 0 && A_TickCount < Deadline
++		Sleep(10)
++	AssertEqual(0, _UserProgramEntries.Count, "native tree reports strict terminal settlement")
++}
++
++_RPA_NativeGestureAndKeyboard(Context) {
++	GestureInvokeAction("run_program", "gesture__tap_3")
++	_RPA_WaitSettled()
++	AssertEqual("0:9:two words3:日本語9:line`nnext", FSReadUtf8Exact(Context["output"]),
++		"real gesture invocation preserves literal empty/Unicode/newline arguments")
++	FileDelete(Context["output"])
++	GestureInvokeAction("run_program", "keyboard__ctrl_p")
++	_RPA_WaitSettled()
++	AssertEqual("0:9:two words3:日本語9:line`nnext", FSReadUtf8Exact(Context["output"]),
++		"real keyboard invocation shares the executable/argv owner")
++}
++Test("user program: real native gesture and keyboard argv", _RPA_WithFixture.Bind(_RPA_NativeGestureAndKeyboard))
++
++_RPA_ForeignSource(Context) {
++	global ConfigurationFile
++	Snapshot := _ProgramActions_Snapshot("gesture__tap_3")
++	Assert(Snapshot is Map, "actual admitted source was captured")
++	Foreign := '[gestures]`ntap_3 = "none"`n'
++	FileDelete(ConfigurationFile)
++	FileAppend(Foreign, ConfigurationFile, "UTF-8")
++	AssertThrows(_ProgramActions_BeforeAdopt.Bind(Snapshot), "foreign source cannot borrow a held native start")
++	AssertFalse(ProgramActions_Run("gesture__tap_3"), "fresh canonical assignment mismatch refuses")
++	AssertEqual(Foreign, FSReadUtf8Exact(ConfigurationFile), "program refusal preserves the foreign source")
++	AssertFalse(FileExist(Context["output"]), "source refusal never executes the private child")
++}
++Test("user program: held source and fresh binding refuse foreign replacement", _RPA_WithFixture.Bind(_RPA_ForeignSource))
++
++_RPA_NativeCancellation(Context) {
++	global _UserProgramEntries
++	FileDelete(Context["script"])
++	FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`nSleep(30000)`n", Context["script"], "UTF-8")
++	Started := ProgramActions_Run("gesture__tap_3")
++	AssertEqual(true, Started, "actual native long-running child starts")
++	AssertEqual(1, _UserProgramEntries.Count, "exact native program owner is retained")
++	Receipt := ProgramActions_Stop(true)
++	if Receipt != true
++		AssertFalse(ProgramActions_Run("keyboard__ctrl_p"), "unsettled cancelled tree prevents replacement")
++	_RPA_WaitSettled()
++	AssertEqual(true, ProgramActions_Stop(true), "physical retirement eventually acknowledges")
++	AssertFalse(ProgramActions_Run("gesture__tap_3"), "paused native owner cannot acquire another program")
++	AssertFalse(FileExist(Context["output"]), "retired child never publishes the literal-output receipt")
++}
++Test("user program: actual native cancellation and retained pause", _RPA_WithFixture.Bind(_RPA_NativeCancellation))
++
++_RPA_MissingExecutable(Context) {
++	global GestureActionParameters, ConfigurationFile
++	Scalar := '{"version":1,"executable":' . JsonStringLiteral(Context["directory"] . "\missing.exe") . ',"arguments":[]}'
++	GestureActionParameters := Map("gesture__tap_3__run_program", Scalar)
++	FileDelete(ConfigurationFile)
++	FileAppend('[gestures]`ntap_3 = "run_program"`n[action_parameters]`n"gesture__tap_3__run_program" = '
++		. JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
++	Before := FSReadUtf8Exact(ConfigurationFile)
++	AssertFalse(ProgramActions_Run("gesture__tap_3"), "real missing executable refuses actual native launch")
++	_RPA_WaitSettled()
++	AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "launch refusal preserves exact canonical source")
++	AssertFalse(FileExist(Context["output"]), "refused executable publishes no private output")
++}
++Test("user program: actual native launch refusal preserves canonical data", _RPA_WithFixture.Bind(_RPA_MissingExecutable))
+diff --git a/static/ergopti_plus/windows/ui/action_picker/init.ahk b/static/ergopti_plus/windows/ui/action_picker/init.ahk
+--- a/static/ergopti_plus/windows/ui/action_picker/init.ahk
++++ b/static/ergopti_plus/windows/ui/action_picker/init.ahk
+@@ -74,6 +74,10 @@
+ 		; level, starts the category the rows below it are shown under.
+ 		CurrentCat := ""
+ 		for _, Item in PickerItems {
++				if Item.HasOwnProp("Id") && Item.Id == "run_program"
++						&& (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
++				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
++						continue
+ 				if (Item.Type = "heading")
+ 						CurrentCat := Item.Text
+ 				else
+diff --git a/static/ergopti_plus/windows/ui/action_picker_webview.ahk b/static/ergopti_plus/windows/ui/action_picker_webview.ahk
+--- a/static/ergopti_plus/windows/ui/action_picker_webview.ahk
++++ b/static/ergopti_plus/windows/ui/action_picker_webview.ahk
+@@ -267,6 +267,8 @@
+ 			; "edit the current action" button reopens any of them. Other kinds
+ 			; confirm without a value, and the native prompt asks for it.
+ 			Kind := GestureActionParameterSpec(It.Id)
++			DisabledProgram := Kind == "program" && (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
++				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
+ 			Parameter := (Kind != "")
+ 				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
+ 					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
+@@ -276,6 +278,7 @@
+ 				. _ActPickWeb_Kv("id", It.Id) . ","
+ 				. _ActPickWeb_Kv("label", It.Label)
+ 				. Parameter
++				. (DisabledProgram ? ',"disabled":true,"hint":' . JsonStringLiteral(t("platform_reason.program_runner_unavailable")) : "")
+ 				. "}"
+ 		}
+ 	}
+@@ -332,6 +335,8 @@
+ 	Errors .= "," . _ActPickWeb_Kv("llm_vision", t("dialog.gestures.param_err_llm_vision"))
+ 	Prompts .= "," . _ActPickWeb_Kv("llm_language", GestureActionParameterPrompt("llm_translate_selection"))
+ 	Errors .= "," . _ActPickWeb_Kv("llm_language", t("dialog.gestures.param_err_llm_language"))
++	Prompts .= "," . _ActPickWeb_Kv("program", t("dialog.gestures.param_program"))
++	Errors .= "," . _ActPickWeb_Kv("program", t("dialog.gestures.param_err_program"))
+ 	return "{"
+ 		. _ActPickWeb_Kv("save", t("button.save")) . ","
+ 		. _ActPickWeb_Kv("back", t("dialog.action_picker.back")) . ","
+@@ -345,6 +350,10 @@
+ 		. _ActPickWeb_Kv("visionModelDefault", t("dialog.action_picker.vision_model_default")) . ","
+ 		. _ActPickWeb_Kv("visionModelRequired", t("dialog.action_picker.vision_model_required")) . ","
+ 		. _ActPickWeb_Kv("languageLabel", t("dialog.action_picker.language_label")) . ","
++		. _ActPickWeb_Kv("programExecutableLabel", t("dialog.action_picker.program_executable")) . ","
++		. _ActPickWeb_Kv("programArgumentsLabel", t("dialog.action_picker.program_arguments")) . ","
++		. _ActPickWeb_Kv("programAddLabel", t("dialog.action_picker.program_add_argument")) . ","
++		. _ActPickWeb_Kv("programRemoveLabel", t("dialog.action_picker.program_remove_argument")) . ","
+ 		. '"prompts":{' . Prompts . '},"errors":{' . Errors . "}}"
+ }
+ 
+diff --git a/tools/codegen/codegen-action-catalogue.cjs b/tools/codegen/codegen-action-catalogue.cjs
+--- a/tools/codegen/codegen-action-catalogue.cjs
++++ b/tools/codegen/codegen-action-catalogue.cjs
+@@ -70,7 +70,8 @@
+ 	'llm_prompt',
+ 	'llm_vision',
+ 	'llm_language',
+-	'app'
++	'app',
++	'program'
+ ]);
+ 
+ const SG_FIELDS = new Set([
+diff --git a/tools/test/test-action-picker-disabled-rows.cjs b/tools/test/test-action-picker-disabled-rows.cjs
+--- a/tools/test/test-action-picker-disabled-rows.cjs
++++ b/tools/test/test-action-picker-disabled-rows.cjs
+@@ -117,7 +117,13 @@
+ 	'param-vision-provider',
+ 	'param-vision-provider-label',
+ 	'param-vision-model',
+-	'param-vision-model-label'
++	'param-vision-model-label',
++	'param-program',
++	'param-program-executable-label',
++	'param-program-executable',
++	'param-program-arguments-label',
++	'param-program-arguments',
++	'param-program-add'
+ ]) {
+ 	byId[id] = new FakeElement('div', id);
+ }
+@@ -188,6 +194,27 @@
+ 	'an enabled row still confirms'
+ );
+ 
++// Native-unavailable programs retain the same visible/inert DATA contract.
++posted.length = 0;
++vm.runInContext(
++	`init({ title: 'T', current: 'none', noneLabel: 'Nothing', items: [
++ {type:'action', id:'run_program', label:'Run a program [configurable]', parameter:'program', disabled:true, hint:'Unavailable: Native runner'}
++] })`,
++	context
++);
++const program = byId.list.children.find((row) => row.dataset.id === 'run_program');
++check(
++	program && program.classList.contains('disabled'),
++	'unavailable program remains visibly disabled'
++);
++check(
++	program && program.text().includes('Unavailable: Native runner'),
++	'unavailable program carries its closed native reason'
++);
++if (program) program.dispatch('click');
++vm.runInContext("doConfirm('run_program')", context);
++check(posted.length === 0, 'neither click nor direct confirm may acquire an unavailable program');
++
+ if (errors.length > 0) {
+ 	console.error('\x1b[31m[ERROR] action picker disabled rows:\x1b[0m');
+ 	for (const e of errors) console.error('    - ' + e);
+diff --git a/tools/test/test-action-picker-parameter-editor.cjs b/tools/test/test-action-picker-parameter-editor.cjs
+--- a/tools/test/test-action-picker-parameter-editor.cjs
++++ b/tools/test/test-action-picker-parameter-editor.cjs
+@@ -83,8 +83,23 @@
+ 		if (v === '') this.children = [];
+ 	}
+ 	appendChild(child) {
++		child.parent = this;
+ 		this.children.push(child);
+ 		return child;
++	}
++	append(...children) {
++		for (const child of children) this.appendChild(child);
++	}
++	replaceChildren() {
++		this.children = [];
++	}
++	remove() {
++		if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
++	}
++	querySelectorAll(tag) {
++		return this.children.flatMap((child) =>
++			(child.tagName === tag ? [child] : []).concat(child.querySelectorAll(tag))
++		);
+ 	}
+ 	addEventListener(type, fn) {
+ 		(this.listeners[type] = this.listeners[type] || []).push(fn);
+@@ -149,7 +164,13 @@
+ 	'param-vision-model-label',
+ 	'param-language',
+ 	'param-language-label',
+-	'param-language-select'
++	'param-language-select',
++	'param-program',
++	'param-program-executable',
++	'param-program-executable-label',
++	'param-program-arguments',
++	'param-program-arguments-label',
++	'param-program-add'
+ ];
+ for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
+ 
+@@ -171,6 +192,10 @@
+ 		console
+ 	};
+ 	vm.createContext(context);
++	vm.runInContext(
++		fs.readFileSync(path.join(SP, '_shared', 'ui', 'program_parameter.js'), 'utf8'),
++		context
++	);
+ 	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), context, { filename: SCRIPT });
+ 	for (const fn of docListeners.DOMContentLoaded || []) fn();
+ 	posted.length = 0;
+@@ -194,6 +219,8 @@
+ 				promptLabel: 'Prompt', countLabel: 'Count', countDefault: 'Menu ({1})',
+ 				visionProviderLabel: 'Provider', visionModelLabel: 'Model', visionModelDefault: 'Default: {1}',
+ 				visionModelRequired: 'Required', languageLabel: 'Translate into',
++				programExecutableLabel: 'Executable', programArgumentsLabel: 'Arguments',
++				programAddLabel: 'Add argument', programRemoveLabel: 'Remove argument',
+ 				prompts: { text: 'Text?', key: 'Key?', shortcut: 'Shortcut?' },
+ 				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt',
+ 					llm_vision: 'Bad vision', llm_language: 'Bad language' }
+@@ -209,6 +236,7 @@
+ 					parameterValue: 'cerebras|llama-4-scout' },
+ 				{ type: 'action', id: 'llm_translate_selection', label: 'Translate', parameter: 'llm_language',
+ 					parameterValue: 'ja' },
++				{ type: 'action', id: 'run_program', label: 'Run program', parameter: 'program' },
+ 				{ type: 'action', id: 'enter', label: 'Enter' }
+ 			]
+ 		})`,
+@@ -655,6 +683,75 @@
+ 	);
+ }
+ 
++// 11. The editor stores an executable and literal ordered arguments, including
++// empty strings and line breaks, without interpreting shell syntax.
++for (const platform of ['ahk', 'hs', 'linux']) {
++	const page = loadPage(platform);
++	vm.runInContext("doConfirm('run_program')", page.context);
++	check(
++		page.posted.length === 0 && page.byId['param-program'].hidden === false,
++		'program selection opens its real executable/argv editor'
++	);
++	check(page.byId['param-input'].hidden === true, 'raw scalar JSON is not the program input');
++	check(
++		page.byId['param-program-executable-label'].textContent === 'Executable',
++		'host executable label is forwarded'
++	);
++	page.byId['param-program-executable'].value =
++		platform === 'ahk' ? 'C:\\Program Files\\été.exe' : '/private/été 日本 program';
++	const literal = ['', 'two words', ' padded ', '日本語', '%TOKEN%;$(literal)', 'line\nnext'];
++	for (const argument of literal) {
++		page.byId['param-program-add'].dispatch('click');
++		const inputs = page.byId['param-program-arguments'].querySelectorAll('textarea');
++		inputs[inputs.length - 1].value = argument;
++	}
++	const enter = page.keydown({ key: 'Enter', code: 'Enter' });
++	check(
++		page.posted.length === 0 && enter.prevented === false,
++		'Enter remains literal program argument input'
++	);
++	page.byId['param-save'].dispatch('click');
++	check(
++		page.posted.length === 1 && page.posted[0].id === 'run_program',
++		'program save delivers the actual action choice'
++	);
++	const decoded = page.posted[0] && JSON.parse(page.posted[0].parameter);
++	check(
++		decoded &&
++			decoded.version === 1 &&
++			decoded.executable === page.byId['param-program-executable'].value,
++		'program executable remains an opaque absolute path'
++	);
++	check(
++		decoded && JSON.stringify(decoded.arguments) === JSON.stringify(literal),
++		'all literal argv values/order remain exact'
++	);
++}
++
++// 12. Independent shared vectors reject duplicate, null, bool/version and
++// malformed argument shapes across each actual picker platform.
++{
++	const corpus = JSON.parse(
++		fs.readFileSync(
++			path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'program_vectors.json'),
++			'utf8'
++		)
++	);
++	let count = 0;
++	for (const vector of corpus.cases)
++		for (const platform of vector.platforms) {
++			const page = loadPage(platform);
++			page.context.__raw = vector.value;
++			const parsed = vm.runInContext('ProgramParameter.parse(__raw, hostPlatform)', page.context);
++			check(
++				JSON.stringify(parsed) === JSON.stringify(vector.expected),
++				`${vector.id}/${platform}: program codec disagrees with independent vector`
++			);
++			count += 1;
++		}
++	check(count >= 63, 'all independent program vectors execute');
++}
++
+ if (errors.length > 0) {
+ 	console.error('\x1b[31m[ERROR] action picker parameter editor:\x1b[0m');
+ 	for (const e of errors) console.error('    - ' + e);

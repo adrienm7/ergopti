@@ -1,0 +1,89 @@
+{
+	"files": [
+		{
+			"path": "COORDINATOR-PROMPT.md",
+			"sha256": "d5dc9bd97baaf4d7721b9b9fde9764b50b514ef9814bb960e4587996f40b9d4d",
+			"bytes": 1945
+		},
+		{
+			"path": "PARALLEL-WORK.md",
+			"sha256": "00c9902392f69a8adaa4812a3943b8708df36ef5bfe87931a76bf532bf195279",
+			"bytes": 7199
+		},
+		{
+			"path": "PROMPT-actions.md",
+			"sha256": "09572b298907c4b396790c1634a1132c976273160e9b48b850280b24b6c0012e",
+			"bytes": 3549
+		},
+		{
+			"path": "PROMPT-ai.md",
+			"sha256": "a4bd8ff6a0a905387c41375cbefb2e64af1cbc82a644bc84151a4722e205c1ec",
+			"bytes": 3539
+		},
+		{
+			"path": "PROMPT-config-menus.md",
+			"sha256": "33e16a80be1b530bd438dd996d7786433ea469de460fbe5a125bfb1b6090f9bc",
+			"bytes": 3559
+		},
+		{
+			"path": "PROMPT-hotstrings.md",
+			"sha256": "6c68d1f87cb36048fc388b33ce5ab1924c3e1e124d3366576aba080524be9686",
+			"bytes": 3555
+		},
+		{
+			"path": "PROMPT-macos-input.md",
+			"sha256": "dac0cb29e4ad95a51ca3c31ee2b9e793f88487e06868ddef995a855456b00153",
+			"bytes": 3557
+		},
+		{
+			"path": "PROMPT-release-network.md",
+			"sha256": "c12aea67c255dcadc135fb02b3b5313eeee4d816c00d65b0d5c843bf141517b7",
+			"bytes": 3565
+		},
+		{
+			"path": "PROMPT-windows-native.md",
+			"sha256": "16edd927dcb9c96746375eb3819771441229eadce42f117c4f45c0780adfaa47",
+			"bytes": 3563
+		},
+		{
+			"path": "README.md",
+			"sha256": "469e9cdd1797caad05c53e00cd722f8d44f1bfc949c9dbd2101a161424922ff1",
+			"bytes": 6865
+		},
+		{
+			"path": "evidence.tar.gz",
+			"sha256": "71b904d227ec233a4d20ea132ab1d8a06d590c1f6c7ea8cc0a3b41b090f01ce6",
+			"bytes": 482162
+		},
+		{
+			"path": "pending/linux-window111-after106.patch",
+			"sha256": "18ba5c28b2d46d3b0de129888124ae9f6d10ec2538f5dcb0d9509563e318b4f7",
+			"bytes": 25486
+		},
+		{
+			"path": "pending/linux-window111-standalone.patch",
+			"sha256": "bc0f82e1243968188d32007ce8dc49f2bf2698ed6ddf86ad5fd3f1175fd7dd7a",
+			"bytes": 25486
+		},
+		{
+			"path": "pending/macos-archive-gate-suggestions.patch",
+			"sha256": "94391073c1229a1476c3bb3b75bf199cc7d3dea8793010f3bd8a25d799c42a7c",
+			"bytes": 2182
+		},
+		{
+			"path": "pending/macos-archive-publication.base.json",
+			"sha256": "50ccc89219c36d31b668af89734513fc4af4ff4fa28c5f0759a81f721ec7d059",
+			"bytes": 1308
+		},
+		{
+			"path": "pending/macos-archive-publication.patch",
+			"sha256": "f182674b59f41d4023201d500e7f7303fe02701d82cb1852045815ddadfac86e",
+			"bytes": 156343
+		},
+		{
+			"path": "pending/run-program106.patch",
+			"sha256": "cb59bd2002a4728a01e8bc419d6b0fa695ee3f584ee97b1ad522fd13c97e9570",
+			"bytes": 185530
+		}
+	]
+}
