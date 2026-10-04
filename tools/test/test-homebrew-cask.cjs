@@ -164,7 +164,8 @@ check(
 	'the release workflow runs the generator on the published asset and the docs name its tap',
 	() => {
 		assert.ok(WORKFLOW.includes('node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap"'));
-		assert.ok(WORKFLOW.includes(`--pattern ${Cask.ASSET_NAME}`));
+		assert.ok(WORKFLOW.includes('node tools/build/macos-release-publication.cjs download'));
+		assert.ok(WORKFLOW.includes('"$tap" "$archive"'));
 		const tap = WORKFLOW.match(
 			/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/
 		);
@@ -229,6 +230,37 @@ check('Ruby parses both casks', () => {
 	for (const cask of [dev, stable]) {
 		const run = spawnSync('ruby', ['-c'], { input: cask.text, encoding: 'utf8' });
 		assert.strictEqual(run.status, 0, `${cask.token}: ${run.stderr}`);
+	}
+});
+
+check('an admitted preferred name remains coupled to its independent hash', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	const preferred = publication.bindings()[0];
+	const crypto = require('node:crypto');
+	const tap = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-preferred-cask-'));
+	try {
+		const payload = path.join(tap, preferred.name);
+		fs.writeFileSync(payload, Buffer.from('independent selected public archive bytes'));
+		const actualHash = crypto.createHash('sha256').update(fs.readFileSync(payload)).digest('hex');
+		const selected = Cask.renderCask('v0.0.0-dev.142', actualHash, preferred.name);
+		assert.ok(selected.text.includes(`/v#{version}/${preferred.name}"`));
+		assert.ok(selected.text.includes(`sha256 "${actualHash}"`));
+		const result = spawnSync(
+			process.execPath,
+			[
+				path.join(ROOT, 'tools/build/homebrew-cask.cjs'),
+				'v0.0.0-dev.142',
+				actualHash,
+				tap,
+				preferred.name
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(fs.readFileSync(path.join(tap, selected.file), 'utf8'), selected.text);
+		assert.throws(() => Cask.renderCask('v1.2.3', actualHash, 'unknown.tar.xz'), /undeclared/);
+	} finally {
+		fs.rmSync(tap, { recursive: true });
 	}
 });
 

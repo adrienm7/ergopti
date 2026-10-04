@@ -29,7 +29,7 @@ on:
         description: Sparkle EdDSA public key embedded as SUPublicEDKey; absent for fork pull requests
         required: false
       SPARKLE_ED_PRIVATE_KEY:
-        description: Sparkle EdDSA private key that signs the release zip; passed on release runs only
+        description: Sparkle EdDSA private key that signs the declared release archives; passed on release runs only
         required: false
       MACOS_SIGNING_CERTIFICATE_BASE64:
         description: Self-signed code-signing .p12, base64; passed on release runs only
@@ -179,6 +179,19 @@ jobs:
         run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci"
         timeout-minutes: 10
 
+      # The native archive fixture uses disposable file keys on every run.
+      - name: Install Sparkle signing tool
+        shell: bash
+        env:
+          SPARKLE_VERSION: '2.9.2'
+        run: |
+          set -euo pipefail
+          curl -fsSLo /tmp/Sparkle.tar.xz \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p /tmp/sparkle-dist
+          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
       - name: Run Swift launcher tests
@@ -189,11 +202,19 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"
           xctest_log="$(mktemp "$RUNNER_TEMP/swift-launcher-evidence/xctest.log.XXXXXX")"
+          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/swift-launcher-evidence/tis-session.XXXXXX")"
+          echo "tis_session_dir=$ERGOPTI_TIS_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
+          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
           set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"
           swift_pipeline_status=("${PIPESTATUS[@]}")
-          set -e
           node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
+          xctest_evidence_status=$?
+          node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
+          tis_evidence_status=$?
+          set -e
+          if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
+          if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
           if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
@@ -206,6 +227,19 @@ jobs:
         with:
           name: swift-launcher-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swift-launcher-evidence
+          if-no-files-found: error
+
+      # Preserve only the fresh session acquired by this exact Swift step.
+      - name: Retain closed TIS diagnostic session
+        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-tis-session-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/start.json
+            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/manifest.json
+            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/record-*.dat
+            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/refusal.json
           if-no-files-found: error
 
       # LauncherLogTests append to the real launcher log,
@@ -319,23 +353,10 @@ jobs:
           path: ${{ runner.temp }}/release-launch
           if-no-files-found: warn
 
-      - name: Install Sparkle signing tool
-        if: inputs.release
-        shell: bash
-        env:
-          SPARKLE_VERSION: '2.9.2'
-        run: |
-          set -euo pipefail
-          curl -fsSLo /tmp/Sparkle.tar.xz \
-              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
-          mkdir -p /tmp/sparkle-dist
-          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
-          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
-
       # A release fails here rather than skipping the signature: without it no
       # appcast is written, and Release would otherwise have nothing to feed
       # Sparkle. This is the only step that sees the private key.
-      - name: Sign zip with Sparkle EdDSA key
+      - name: Sign declared archives with Sparkle EdDSA key
         if: inputs.release
         shell: bash
         env:
@@ -347,10 +368,10 @@ jobs:
               exit 1
           fi
           printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
-          "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
-              > build/macos/_ErgoptiPlus.app.zip.sig
-          rm -f /tmp/sparkle_priv.key
-          echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
+          trap 'rm -f /tmp/sparkle_priv.key' EXIT
+          node tools/build/macos-release-publication.cjs sign \
+              build/macos "$SIGN_UPDATE" /tmp/sparkle_priv.key
+          echo "Declared Sparkle archive signatures and exact publication receipt written."
 
       - name: Generate Sparkle appcast
         if: inputs.release
@@ -359,8 +380,7 @@ jobs:
           ERGOPTI_VERSION: ${{ inputs.version }}
           ERGOPTI_BUILD: ${{ github.run_number }}
           ERGOPTI_CHANNEL: ${{ inputs.channel }}
-          SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
-          ZIP_PATH: build/macos/ErgoptiPlus.app.zip
+          ARCHIVE_DIR: build/macos
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
           OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml
@@ -387,8 +407,8 @@ jobs:
           path: build/macos/ErgoptiPlus.app.ci-receipt.json
 
       # CI installs the first declared available format from the independently
-      # signed source receipt. Public release assets, Sparkle and Homebrew keep ZIP
-      # until their separate migration. Keep release artifacts for seven days so
+      # signed source receipt. Public consumers validate their own archive/signature publication
+      # receipt. Keep release artifacts for seven days so
       # a next-day retry can find the archive this job gated.
       - name: Upload the package
         uses: actions/upload-artifact@v4
@@ -401,7 +421,8 @@ jobs:
             build/macos/ErgoptiPlus.app.zip
             build/macos/ErgoptiPlus.app.tar.xz
             build/macos/Ergopti_macOS.zip
-            build/macos/_ErgoptiPlus.app.zip.sig
+            build/macos/_*.sig
+            build/macos/macos-publication.json
             build/macos/appcast-*.xml
 
   # ─────────────────────────────────────────────────
