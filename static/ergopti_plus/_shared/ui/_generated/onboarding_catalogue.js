@@ -1891,12 +1891,12 @@
 									},
 									{
 										"path": "layout.direct_access_digits",
-										"value": true,
-										"default": false,
+										"value": "digits",
+										"default": "native",
 										"recommended": true,
 										"label": [
 											{
-												"key": "layout.directaccessdigits"
+												"key": "menu.layout.number_row"
 											}
 										]
 									},

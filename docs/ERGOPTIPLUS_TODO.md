@@ -1886,17 +1886,26 @@ Linux ordinary hotstring override setters and clears now edit only changed owned
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
-  Windows Boolean and preserved unrelated settings. The current Boolean now
-  resolves actual desired KLE base descriptors before falling back to native
+  Windows Boolean and preserved unrelated settings. The earlier Boolean slice
+  resolved actual desired KLE base descriptors before falling back to native
   HKL probing. Already-direct Ergo-L over AZERTY retains Shift symbols; an
   emulated swap emits through the existing KLE owner rather than flattening
   actions/dead states to text. Inspection preserves Caps and pending state.
   Independent ten-key vectors and captured registered criteria/callbacks cover
   actual AZERTY/QWERTY HKLs, base/category/navigation changes, AltGr, Caps
   descriptors and dead-key composition; native CI remains pending.
-  Remaining: the three-choice shared policy, persistent migration, translated
-  choices and corresponding owners on supported macOS/Linux paths, with genuine
-  platform limits documented. No enum or schema change occurs in this slice.
+  The earlier Boolean slice did not change the enum or schema. The shared
+  native/digits/symbols policy now owns the three translated choices and
+  schema9→10 migration; only the legacy Windows Boolean is converted. Windows
+  symbols use the current supported KLE descriptor source. macOS/Linux expose
+  native posture without acquiring forced input or persistence authority.
+  Remaining: native-HKL and Lua forced-symbol owners, actual native Windows
+  acceptance of the new policy, and physical keyboard validation.
+
+TODO107 — tranche préparée, validation native restante : politique partagée native/digits/symbols et schéma9→10 ; seule la migration booléenne Windows est reconnue. Le mode symbols utilise exclusivement les dix paires de descripteurs de la source KLE actuelle, avec son émetteur et son état de touche morte existants. HKL natif et les deux pilotes Lua n’acquièrent aucun nouveau mode forcé : les choix indisponibles portent une raison traduite dans les21 langues, Lua affiche son état natif en lecture seule. Les sources inconnues/malformées restent préservées ; le scope macOS refuse leur acquisition avant sauvegarde et publication. Le menu Windows conserve la source brute, les propriétaires de configuration/pause/master et l’identité \_LayoutPollRetry avec HKL ; seule une transition OBSERVÉE est ainsi clôturée. Les tests Windows ajoutés (émission, répétition, touches mortes, légendes, publication/refus et callbacks retenus) ne sont pas exécutés localement : CI Windows et vérification physique requises. Le forçage symbols HKL natif/Lua reste à réaliser ; TODO107 reste partiel.
+
+Composition préparée après Navigation12/DynamicACK2 et BaselineDelay macOS : les133 autres candidats restent identiques à la version initiale ; les sept sorties sont recalculées par leurs générateurs, avec retour exact au parent puis répétition exacte. Les43cas Lua ciblés passent sur la composition. Le census natif réel du parent97/154/98 reste inchangé. Les gardes menu/graph/census ciblées passent ; aucune qualification complète de cette composition ni exécution Windows native n’est revendiquée.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
   macOS, Win/Super on Windows and Linux. The shared conditional policy now

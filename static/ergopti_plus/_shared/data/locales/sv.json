@@ -3183,5 +3183,11 @@
 	"menu.global.restore_touchpad_gestures": "Återställ Windows pekplattegester",
 	"dialog.start_at_login.failed": "Kunde inte ändra automatisk start. Kontrollera systemets startinställningar.",
 	"onboarding.error.open_failed": "Kunde inte öppna installationsguiden. Kontrollera loggarna och försök igen från menyn.",
-	"platform_reason.token_streaming_transport_missing": "Inte på Windows: Windows kan ännu inte visa förslag token för token. Det här alternativet förblir inaktivt."
+	"platform_reason.token_streaming_transport_missing": "Inte på Windows: Windows kan ännu inte visa förslag token för token. Det här alternativet förblir inaktivt.",
+	"menu.layout.number_row": "Sifferrad",
+	"menu.layout.number_row_native": "Systemets ordning",
+	"menu.layout.number_row_digits": "Siffror först",
+	"menu.layout.number_row_symbols": "Symboler först",
+	"platform_reason.number_row_override_unsupported": "Stöds inte: Den här drivrutinen behåller systemets sifferrad; siffror och symboler kan inte tvingas fram.",
+	"platform_reason.number_row_source_unavailable": "Inte tillgängligt: Symboler först kräver en aktiv emulerad layout med giltiga siffer- och symbolnivåer på varje plats i sifferraden."
 }

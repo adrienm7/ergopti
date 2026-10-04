@@ -158,7 +158,7 @@ _LDRP_RowFollowsTheForegroundLayout() {
 	global _DigitRowProfiles
 	Layouts := _LDRP_RealLayouts()
 	SavedProfiles := _DigitRowProfiles
-	SavedDigits := _LDRP_SetLayoutFeature("direct_access_digits", true)
+	SavedDigits := _LDRP_SetLayoutFeature("direct_access_digits", "digits")
 	_DigitRowProfiles := Map()
 	try {
 		Shifted := 0, Direct := 0
@@ -179,7 +179,7 @@ _LDRP_RowFollowsTheForegroundLayout() {
 		if (EnvGet("GITHUB_ACTIONS") = "true")
 			AssertTrue(Shifted > 0 and Direct > 0, "the CI runner switches between a shifted and a direct digit row")
 		AssertFalse(DigitRowIsSwapped(0), "no foreground window (HKL 0): nothing is swapped")
-		_LDRP_SetLayoutFeature("direct_access_digits", false)
+		_LDRP_SetLayoutFeature("direct_access_digits", "native")
 		for _, Hkl in Layouts {
 			AssertFalse(DigitRowIsSwapped(Hkl), Format("the feature off: layout 0x{:X} is not swapped", Hkl))
 			AssertEqual("", DigitRowSwapSymbol(0x02, Hkl), Format("the feature off: layout 0x{:X} types no swapped symbol", Hkl))
@@ -287,7 +287,7 @@ _LDRP_EffectiveRegistryRow() {
 	AssertEqual(10, Corpus["digits"].Length, "the independent corpus must cover the complete number row")
 	try {
 		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
-			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", true))
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "digits"))
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
 		State["initialized"] := false
@@ -399,7 +399,7 @@ _LDRP_TypedSourceSwap() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(), _SendHook]
 	try {
 		Features := Map("layout", Map("emulated_layout", "typed-row-fixture", "ergopti_base", true,
-			"ergopti_alt_gr", false, "ergopti_plus", false, "direct_access_digits", true))
+			"ergopti_alt_gr", false, "ergopti_plus", false, "direct_access_digits", "digits"))
 		CategoryEnabled := Map("Layout", true)
 		LayerEnabled := false
 		State["initialized"] := false
@@ -468,3 +468,291 @@ _LDRP_TypedSourceSwap() {
 }
 Test("digit row: typed source swaps preserve CapsLock and the real dead-key owner (digit-row-effective-source)",
 	_KLT_WithEmulation.Bind(_LDRP_TypedSourceSwap))
+
+/** Replays the independent typed capability and real descriptor corpus. */
+_NRP_SharedPolicyCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\layouts\number_row_policy.json"))
+	AssertEqual(18, Corpus["capabilities"].Length, "all three drivers and source capabilities are represented")
+	for Row in Corpus["capabilities"]
+		AssertEqual(Row["expected"], NumberRowPolicyCapable(Row["platform"], Row["mode"], Row["symbols"]))
+	for Row in Corpus["symbols"] {
+		Actual := NumberRowPolicySymbolsShift(Row["digit"], Row["plain"], Row["shifted"])
+		AssertEqual(Row["supported"], Actual["supported"], "only actual typed text/dead source descriptors are valid")
+		if Row["supported"]
+			AssertEqual(Row["shift"], Actual["shift"], "the non-digit level is independently specified")
+	}
+	for Value in Corpus["invalid_modes"]
+		AssertEqual("", NumberRowPolicyMode(Value), "legacy booleans belong to migration, never runtime truthiness")
+	Owner := Map(), Source := Map()
+	Expected := Map("owner", Owner, "source", Source, "native_owner", Map(), "generation", 2, "lifecycle", 3,
+		"hkl", -268435447, "platform", "ahk", "mode", "native", "symbols", true,
+		"master", true, "paused", false, "blocked", false, "caps", false)
+	for Mode in ["native", "digits", "symbols"]
+		AssertTrue(NumberRowPolicyIntent(Expected, Expected.Clone(), Mode))
+	for Field in ["owner", "source", "native_owner", "generation", "lifecycle", "hkl", "mode", "symbols", "caps"] {
+		Current := Expected.Clone()
+		Current[Field] := Field == "owner" || Field == "source" || Field == "native_owner" ? Map()
+			: Field == "mode" ? "digits" : Field == "caps" ? true
+			: Field == "symbols" ? false : Current[Field] + 1
+		AssertFalse(NumberRowPolicyIntent(Expected, Current, "native"), "a retained callback cannot borrow changed " . Field)
+	}
+}
+Test("number row: shared typed source policy refuses unsupported and stale owners", _NRP_SharedPolicyCorpus)
+
+/** Uses the real registry callback and existing Send capture, including repeats. */
+_NRP_RegisteredSymbols() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, _SendHook, _Stub_RecordedSends, _SharedDir
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(), _SendHook]
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\layouts\number_row_levels.json"))
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "symbols"))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergol")
+		AssertTrue(NumberRowSymbolsCapable(false))
+		AssertTrue(NumberRowSymbolsCapable(true), "hardware CapsLock has an independently valid source pair")
+		KLE_Registered := false
+		Capture := { Criterion: 0, Rows: Map() }
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, Options) => Capture.Rows[Name] := { Criterion: Capture.Criterion, Callback: Callback },
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+		_SendHook := _HOOK_RecordSend
+		CapsBefore := GetKeyState("CapsLock", "T")
+		for Index, Sc in Corpus["scancodes"] {
+			Legend := LayerEditor_CurrentEmulation()["character"].Call(Sc)
+			AssertEqual(Corpus["emulated"]["shift"][Index], Legend,
+				"the actual layer-editor legend follows the same unshifted symbols source")
+			for Shift in [false, true] {
+				Row := Capture.Rows[Shift ? "+" . Sc : Sc]
+				AssertTrue(Row.Criterion.Call(), "the original KLE owner admits its actual key")
+				Loop 2 {
+					ResetHotstringRecorders()
+					Row.Callback.Call()
+					AssertEqual(1, _Stub_RecordedSends.Length, "each press and repeat emits once")
+					AssertEqual(Corpus["emulated"][Shift ? "plain" : "shift"][Index], _Stub_RecordedSends[1].args[1],
+						"symbols-first retains exact source levels, with Shift reversing them")
+				}
+			}
+		}
+		AssertEqual(CapsBefore, GetKeyState("CapsLock", "T"), "policy never changes hardware CapsLock")
+		State["features"]["layout"]["emulated_layout"] := "foreign-source"
+		AssertFalse(NumberRowSymbolsCapable(CapsBefore), "a loaded old source is not a current capability receipt")
+		AssertEqual("native", NumberRowEffectiveMode(), "unsupported desired symbols cannot claim effective symbols")
+		AssertEqual("symbols", State["features"]["layout"]["direct_access_digits"], "unsupported intent remains explicit, never default-flushed")
+		State["features"]["layout"]["emulated_layout"] := "ergol"
+		CategoryEnabled["Layout"] := false
+		AssertEqual("native", NumberRowEffectiveMode(), "master-off retains native input despite the stored enum")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_SendHook := Saved[6]
+	}
+}
+Test("number row: symbols use actual registered KLE levels and repeat owner", () => _KLT_WithEmulation(_NRP_RegisteredSymbols))
+
+
+/** Records an exact native writer result; assertions remain outside callbacks. */
+_NRP_MenuWriter(Mode, Seen, Path, Updates, Content, Presence) {
+	Seen["calls"] += 1
+	Seen["content"] := Content
+	Seen["presence"] := Presence
+	if Mode == "source-race" {
+		Foreign := StrReplace(Content, '"kept"', '"foreign"')
+		Seen["changed"] := StrCompare(Content, Foreign, true) != 0
+		FileDelete(Path)
+		FileAppend(Foreign, Path, "UTF-8-RAW")
+		return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+	}
+	if Mode == "throw"
+		throw Error("owned number-row writer refusal")
+	if Mode == "nil"
+		return
+	if Mode == "false"
+		return false
+	if Mode == "two"
+		return 2
+	if Mode == "string"
+		return "1"
+	if Mode == "float"
+		return 1.0
+	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+}
+
+_NRP_MenuFixture(Path, Mode := "native") {
+	global Features, CategoryEnabled, LayerEnabled
+	Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
+		"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", Mode))
+	CategoryEnabled := Map("Layout", true)
+	LayerEnabled := false
+	State := MasterGateState()
+	State["initialized"] := false
+	MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+	_KLT_Load("ergol")
+	Image := '[layout]`nemulated_layout = "ergol"`nergopti_base = true`n'
+		. 'future = "kept" # exact neighbour`n'
+	if Mode != "native"
+		Image .= 'direct_access_digits = "' . Mode . '"`n'
+	Image .= '`n[category_enabled]`nlayout = true`n'
+	if FileExist(Path)
+		FileDelete(Path)
+	FileAppend(Image, Path, "UTF-8-RAW")
+	return Image
+}
+
+_NRP_MenuNativeOwners() {
+	global Features, CategoryEnabled, LayerEnabled, ConfigurationFile, _TrayRootLifecycleEpoch, _LayoutPollRetry
+	Saved := [Features, CategoryEnabled, LayerEnabled, ConfigurationFile,
+		MasterGateState().Clone(), _TrayRootLifecycleEpoch, A_IsSuspended, MagicEditorState()["configuration_generation"], _LayoutPollRetry]
+	Dir := _KLT_TempDir()
+	ConfigurationFile := Dir . "config.toml"
+	try {
+		if A_IsSuspended
+			Suspend(false)
+		for Mode in ["ack", "false", "nil", "two", "string", "float", "throw", "source-race"] {
+			Before := _NRP_MenuFixture(ConfigurationFile)
+			Seen := Map("calls", 0, "refresh", 0, "changed", false)
+			Rows := _LAY_NumberRowRows(_NRP_MenuWriter.Bind(Mode, Seen), (*) => Seen["refresh"] += 1, (*) => true)
+			AssertEqual(1, Rows.Length, "the actual choice renderer must produce its canonical head")
+			AssertEqual(3, Rows[1]["items"].Length)
+			AssertTrue(Rows[1]["items"][1]["checked"])
+			AssertFalse(Rows[1]["items"][2].Get("disabled", false), "fresh digits choice is executable")
+			AssertFalse(Rows[1]["items"][3].Get("disabled", false), "only a real supported KLE source admits symbols")
+			AssertFalse(Rows[1]["items"][1]["action"].Call(), "same-native status acquires no default write")
+			AssertEqual(0, Seen["calls"])
+			Result := Rows[1]["items"][3]["action"].Call()
+			AssertEqual(Mode == "ack", Result, "only strict native publication may acknowledge the selection")
+			AssertEqual(1, Seen["calls"])
+			AssertEqual(Before, Seen["content"], "the terminal seam receives the admitted raw image")
+			AssertEqual(1, Seen["presence"])
+			AssertEqual(Mode == "ack" ? 1 : 0, Seen["refresh"])
+			AssertEqual(Mode == "ack" ? "symbols" : "native", MasterGateDesiredFeatures(Features)["layout"]["direct_access_digits"])
+			if Mode == "source-race" {
+				AssertTrue(Seen["changed"], "foreign replacement must genuinely change bytes outside the caught writer")
+				AssertEqual(StrReplace(Before, '"kept"', '"foreign"'), FSReadUtf8Exact(ConfigurationFile))
+			} else if Mode != "ack"
+				AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile))
+			else {
+				AssertContains(FSReadUtf8Exact(ConfigurationFile), 'direct_access_digits = "symbols"')
+				AssertContains(FSReadUtf8Exact(ConfigurationFile), 'future = "kept" # exact neighbour')
+			}
+		}
+		for Condition in ["source", "external-mode", "model", "pause", "master", "configuration", "lifecycle", "native-source"] {
+			Before := _NRP_MenuFixture(ConfigurationFile)
+			Seen := Map("calls", 0, "refresh", 0)
+			Rows := _LAY_NumberRowRows(_NRP_MenuWriter.Bind("ack", Seen), (*) => Seen["refresh"] += 1, (*) => true)
+			Callback := Rows[1]["items"][3]["action"]
+			switch Condition {
+				case "source": FileAppend("# foreign edit`n", ConfigurationFile, "UTF-8-RAW")
+				case "external-mode":
+					Image := StrReplace(Before, '[layout]', '[layout]`ndirect_access_digits = "digits"')
+					FileDelete(ConfigurationFile)
+					FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
+				case "model": _KLT_Load("ergol")
+				case "pause": Suspend(true)
+				case "master": CategoryEnabled["Layout"] := false
+				case "configuration":
+					MagicEditorConfigurationChanged()
+				case "lifecycle": _TrayRootLifecycleEpoch += 1
+				case "native-source":
+					Hkl := GetForegroundKeyboardLayout()
+					Other := 0
+					for Native in _LDRP_RealLayouts() {
+						if Native != Hkl {
+							Other := Native
+							break
+						}
+					}
+					AssertTrue(Other != 0, "a second genuine HKL must qualify the observed source cycle")
+					_LayoutPollObserve(Other)
+					_LayoutPollObserve(Hkl)
+
+			}
+			Foreign := FSReadUtf8Exact(ConfigurationFile)
+			AssertFalse(Callback.Call(), Condition . " must retire the captured source")
+			AssertEqual(0, Seen["calls"])
+			AssertEqual(0, Seen["refresh"])
+			AssertEqual(Foreign, FSReadUtf8Exact(ConfigurationFile))
+			if A_IsSuspended
+				Suspend(false)
+		}
+	} finally {
+		if A_IsSuspended != Saved[7]
+			Suspend(Saved[7])
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		ConfigurationFile := Saved[4]
+		State := MasterGateState()
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_TrayRootLifecycleEpoch := Saved[6]
+		MagicEditorState()["configuration_generation"] := Saved[8]
+		_LayoutPollRetry := Saved[9]
+		DirDelete(Dir, true)
+	}
+}
+Test("number row: real menu callbacks retain source and strict native ACK before publication", _KLT_WithEmulation.Bind(_NRP_MenuNativeOwners))
+
+
+/** A real dead action is routed through the unchanged KLE composition owner. */
+_NRP_RegisteredSymbolsDeadAction() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, _SendHook, KLE_State, _Stub_RecordedSends
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(), _SendHook]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "symbols"))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		Text := _KLT_LayoutText("ergol")
+		Text := _KLT_Tamper(Text, '<key code="18"  action="ae01_' . Chr(0x20AC) . '" />',
+			'<key code="18"  action="number_row_dead" />')
+		Text := _KLT_Tamper(Text, '</actions>',
+			'<action id="number_row_dead"><when state="none" next="number_row_pending"/></action></actions>')
+		Text := _KLT_Tamper(Text, '</terminators>',
+			'<when state="number_row_pending" output="^"/></terminators>')
+		KeylayoutEmulation_Load("ergol", Text, "ansi", LayoutRegistry_Keycodes())
+		AssertTrue(NumberRowSymbolsCapable(false), "all ten real levels include the typed dead source")
+		AssertEqual("dead", KeylayoutEmulation_NumberRowLevels(0x02, false)["shift"]["Kind"])
+		AssertEqual("number_row_pending", KeylayoutEmulation_NumberRowLevels(0x02, false)["shift"]["State"])
+		KLE_Registered := false
+		Capture := { Criterion: 0, Rows: Map() }
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, Options) => Capture.Rows[Name] := { Criterion: Capture.Criterion, Callback: Callback },
+			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0)
+		_SendHook := _HOOK_RecordSend
+		Row := Capture.Rows["SC002"]
+		AssertTrue(Row.Criterion.Call())
+		ResetHotstringRecorders()
+		; CapsLock is read by the genuine callback. Both source Caps maps share
+		; the digits level; only its Shift source was changed by the exact XML.
+		Row.Callback.Call()
+		AssertEqual("number_row_pending", KLE_State, "symbols-first must arm the real action state")
+		AssertEqual(0, _Stub_RecordedSends.Length, "arming a dead source emits no invented Unicode glyph")
+		AssertEqual("^q", KeylayoutEmulation_Press("SC010", false, false, false), "the unchanged source machine retires its own pending state")
+		AssertEqual("none", KLE_State)
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_SendHook := Saved[6]
+	}
+}
+Test("number row: symbols retain real dead-action composition without a new emitter", _KLT_WithEmulation.Bind(_NRP_RegisteredSymbolsDeadAction))

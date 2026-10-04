@@ -179,7 +179,7 @@ _TapKeyEmulatedCharacter(Scancode) {
 	global Features
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout")
 		return ""
-	if (Features["layout"].Get("direct_access_digits", false) != true)
+	if NumberRowEffectiveMode() != "digits"
 		return ""
 	Table := ErgoptiNumberRowEdgeMapping()
 	return Table.Has(Scancode) ? Table[Scancode] : ""

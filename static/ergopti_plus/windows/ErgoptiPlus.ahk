@@ -508,6 +508,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
+#Include ../_shared/modules/features/number_row_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below

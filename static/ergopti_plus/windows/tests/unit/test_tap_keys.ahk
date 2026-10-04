@@ -47,7 +47,7 @@ _TK_UsQwerty() {
 _TK_WithEmulation(Enabled, Body) {
 	global Features
 	Saved := Features["layout"]["direct_access_digits"]
-	Features["layout"]["direct_access_digits"] := Enabled
+	Features["layout"]["direct_access_digits"] := Enabled ? "digits" : "native"
 	try
 		return Body.Call()
 	finally

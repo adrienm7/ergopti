@@ -5,4 +5,4 @@ description = "The shipped v3 to v4 step deletes the retired [llm] trigger_short
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 3
-to_version = 9
+to_version = 10

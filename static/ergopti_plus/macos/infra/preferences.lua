@@ -123,6 +123,7 @@ local KEY_MAP = {
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
+	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },

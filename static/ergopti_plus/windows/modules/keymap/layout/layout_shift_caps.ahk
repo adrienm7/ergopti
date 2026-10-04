@@ -262,6 +262,42 @@ _DigitRowProfile(Hkl) {
 	return _DigitRowProfiles[Hkl]
 }
 
+/** Returns typed effective intent; category masking never treats a string as a switch. */
+NumberRowEffectiveMode() {
+	global Features
+	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
+			|| !IsCategoryGated("Layout")
+		return "native"
+	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
+	; Desired unsupported intent remains stored and greyed in the menu. The
+	; effective input owner retains its native source; it never claims symbols.
+	if Mode == "symbols" && !NumberRowSymbolsCapable(GetKeyState("CapsLock", "T"))
+		return "native"
+	return Mode
+}
+
+/** Resolves the symbols-first level from the currently selected registry source. */
+NumberRowSymbolsLevel(Sc, Caps) {
+	global KLE_Id, Features
+	Refused := Map("supported", false, "shift", false)
+	if !IsSet(Features) || !(Features is Map) || !IsSet(KLE_Id) || !(KLE_Id is String)
+			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive("ergopti_base")
+			|| Sc < 0x02 || Sc > 0x0B
+			|| StrCompare(KLE_Id, KeylayoutEmulation_SelectedId(MasterGateDesiredFeatures(Features)), true) != 0
+		return Refused
+	Levels := KeylayoutEmulation_NumberRowLevels(Sc, Caps)
+	return Levels is Map ? NumberRowPolicySymbolsShift(Mod(Sc - 1, 10) . "", Levels["plain"], Levels["shift"]) : Refused
+}
+
+/** Every physical position must have a genuine source pair before offering symbols. */
+NumberRowSymbolsCapable(Caps) {
+	Loop 10 {
+		if !NumberRowSymbolsLevel(A_Index + 1, Caps)["supported"]
+			return false
+	}
+	return true
+}
+
 ; Resolve one effective digit-row key before the override chooses its level.
 ; The native profile retains its measured MapVirtualKeyEx/VkKeyScan behavior.
 ; A registry source instead owns its actual neutral-state descriptors, including
@@ -272,7 +308,7 @@ _DigitRowProfile(Hkl) {
 ; @return {Map} Swap, Source and Descriptor; inspection never changes KLE_State.
 _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 	global Features
-	if !Features["layout"].Get("direct_access_digits", false) || Sc < 0x02 || Sc > 0x0B
+	if NumberRowEffectiveMode() != "digits" || Sc < 0x02 || Sc > 0x0B
 		return Map("swap", false, "source", "native", "descriptor", 0)
 	if !IsSet(Caps)
 		Caps := GetKeyState("CapsLock", "T")

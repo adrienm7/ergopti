@@ -593,6 +593,49 @@ helpers.describe("Preferences current canonical view", function()
 	end)
 end)
 
+
+helpers.describe("Number-row native-only preferences", function()
+	helpers.it("keeps native absence sparse through the existing preference owner", function()
+		local path, disk, written = "/virtual/number-row-native.toml", nil, 0
+		local preferences = load_preferences({
+			read_with_status = function() return disk, disk and "ok" or "absent" end,
+			write_if_unchanged = function(_, content, expected)
+				if expected.status ~= "absent" then return false end
+				disk, written = content, written + 1
+				return true
+			end,
+		})
+		local saved, status = preferences.load(path)
+		helpers.assert_eq(status, "absent")
+		helpers.assert_eq(preferences.flat_key_for("layout.direct_access_digits"), "layout_number_row_mode")
+		helpers.assert_eq(require("infra.manifest_reader").default_for("layout.direct_access_digits"), "native")
+		helpers.assert_eq(saved.layout_number_row_mode, nil)
+		helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
+		helpers.assert_eq(written, 1)
+		helpers.assert_eq(disk:find("direct_access_digits", 1, true), nil,
+			"an unrelated ordinary save must not flush native absence")
+	end)
+	helpers.it("preserves malformed and future personal values through ordinary saves", function()
+		for _, value in ipairs({ '"future-mode"', 'true', '1', '"true"', '{ future = 7 }' }) do
+			local path = "/virtual/number-row-unknown.toml"
+			local before = '[layout]\ndirect_access_digits = ' .. value .. ' # retained personal spelling\nfuture = { keep = 8 }\n'
+			local disk = before
+			local preferences = load_preferences({
+				read_with_status = function() return disk, "ok" end,
+				write_if_unchanged = function(_, content, expected)
+					if expected.content ~= disk then return false end
+					disk = content
+					return true
+				end,
+			})
+			local saved = preferences.load(path)
+			helpers.assert_eq(saved.layout_number_row_mode, nil)
+			helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
+			helpers.assert_eq(disk:sub(1, #before), before, "native default never acquires outdated personal intent")
+		end
+	end)
+end)
+
 -- Do not leak the final FileSystem double into later test modules in the same
 -- Lua process; those modules intentionally exercise the real atomic adapter.
 package.loaded["adapters.file_system"] = nil

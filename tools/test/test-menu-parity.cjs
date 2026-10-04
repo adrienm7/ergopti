@@ -91,6 +91,7 @@ const OPENS_SUBMENU = {
 	shortcuts: 'shortcuts_menu',
 	metrics: 'metrics_menu',
 	keyboard_layout: 'layout_menu',
+	number_row_policy: 'number_row_policy_rows',
 	hotstrings: 'hotstrings_menu',
 	// The personal provider renders the shared editor command head on every driver.
 	hotstring_personal: 'personal_hotstring_commands',
@@ -662,6 +663,134 @@ function driverSource(root) {
 	return out;
 }
 
+/** Resolve only the actual read-only number-row provider's shared getter owner. */
+function numberRowGetterSource(source) {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const contains = (text, expected) => {
+		const tokens = scriptTokens(text, '.lua').map((token) => `${token.kind}:${token.value}`);
+		return tokens.some((_, index) =>
+			expected.every((value, offset) => tokens[index + offset] === value)
+		);
+	};
+	if (
+		!contains(source, [
+			'identifier:local',
+			'identifier:NumberRowPolicy',
+			'symbol:=',
+			'identifier:require',
+			'symbol:(',
+			'string:layout.number_row_policy',
+			'symbol:)'
+		]) ||
+		!contains(source, [
+			'identifier:NumberRowPolicy',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:ManifestMenu',
+			'symbol:,',
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			'symbol:)'
+		])
+	)
+		return '';
+	if (
+		!contains(source, [
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			'symbol:[',
+			'string:number_row_mode',
+			'symbol:]',
+			'symbol:=',
+			'identifier:function',
+			'symbol:(',
+			'symbol:)',
+			'identifier:return',
+			'identifier:false',
+			'identifier:end'
+		])
+	)
+		return '';
+	const sharedSource = fs.readFileSync(
+		path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
+		'utf8'
+	);
+	if (
+		!contains(sharedSource, [
+			'identifier:function',
+			'identifier:M',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:renderer',
+			'symbol:,',
+			'identifier:commands',
+			'symbol:)'
+		]) ||
+		!contains(sharedSource, [
+			'identifier:renderer',
+			'symbol:.',
+			'identifier:choice_row',
+			'symbol:(',
+			'string:number_row_policy_rows',
+			'symbol:,',
+			'string:number_row_mode',
+			'symbol:,',
+			'identifier:commands',
+			'symbol:,'
+		]) ||
+		!contains(sharedSource, [
+			'symbol:[',
+			'string:layout.direct_access_digits',
+			'symbol:]',
+			'symbol:=',
+			'identifier:function',
+			'symbol:(',
+			'symbol:)',
+			'identifier:return',
+			'string:native',
+			'identifier:end'
+		])
+	)
+		return '';
+	return sharedSource;
+}
+
+// Independent literal controls pin the new dependency boundary without changing
+// any existing getter checks or menu floors. Comments and quoted code are inert.
+{
+	const assert = require('node:assert/strict');
+	const binding = 'local NumberRowPolicy = require("layout.number_row_policy")';
+	const call = 'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)';
+	const command = 'render_ctx.commands["number_row_mode"] = function() return false end';
+	assert(
+		numberRowGetterSource(binding + '\n' + command + '\n' + call).includes(
+			'layout.direct_access_digits'
+		)
+	);
+	for (const source of [
+		binding,
+		call,
+		binding + '\n' + call,
+		binding + '\n' + command.replace('return false', 'return true') + '\n' + call,
+		binding + '\n' + command + '\n' + call.replace('render_ctx.commands', 'other_commands'),
+		'-- ' + binding + '\n' + call,
+		binding + '\n-- ' + call,
+		'local x = [[' + binding + '\n' + call + ']]',
+		binding.replace('number_row_policy', 'other_policy') + '\n' + call,
+		binding + '\n' + call.replace('ManifestMenu', 'OtherRenderer')
+	]) {
+		assert.equal(
+			numberRowGetterSource(source),
+			'',
+			'a missing actual shared port cannot borrow its getter'
+		);
+	}
+}
+
 const renderedCounts = {};
 for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 	const src = driverSource(root);
@@ -686,7 +815,8 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 			if (row.type === 'choice' && typeof row.path === 'string') needed.add(row.path);
 		}
 	}
-	const absent = [...needed].filter((key) => !src.includes(key));
+	const getterSource = src + numberRowGetterSource(src);
+	const absent = [...needed].filter((key) => !getterSource.includes(key));
 	if (absent.length > 0) {
 		errors.push(
 			`${DRIVER_OF[driver]} names no getter for ${absent.length} state key(s) the manifest requires ` +

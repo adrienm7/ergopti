@@ -786,6 +786,9 @@ M.features = {
 		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, input_altering = false,
 	},
 	{
+		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", input_altering = true, enum_values = { "native", "digits", "symbols" },
+	},
+	{
 		path = "ui.menubar_icon", id = "menubar_icon", section = "ui", default = "v1", type = "enum", description_key = "menu.layout.menubar_icon", platforms = { "hs" }, recommended = "v1", input_altering = false, enum_values = { "v1", "v2" },
 	},
 	{
@@ -1090,9 +1093,6 @@ M.unavailable = {
 	},
 	{
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "layout.direct_access_digits", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
