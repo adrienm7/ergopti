@@ -324,7 +324,7 @@ _LLM_Menu_ApplyModelRuntimeCommitted(Candidate) {
 ; Force lets the tray-build path demand a refresh the idle gate cannot veto. It
 ; is surgically limited to that gate: every other guard below still applies, and
 ; the suspend guard deliberately sits ahead of it.
-_LLM_Menu_FireHealthProbe(Force := false) {
+_LLM_Menu_FireHealthProbe(Force := false, NowTick := unset, DispatchFn := unset) {
 	global _LLM_Menu, LLM_HEALTH_PROBE_IDLE_MAX_MS, LLM_HEALTH_PROBE_THROTTLE_MS
 	global _DriverInputInitPending
 	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
@@ -351,9 +351,9 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 	; Throttle to one probe per LLM_HEALTH_PROBE_THROTTLE_MS. Opening the tray menu
 	; fires a rebuild which calls this helper; without the throttle the user
 	; opening the menu twice in 100 ms would fire two redundant pings.
-	now := A_TickCount
+	now := IsSet(NowTick) ? NowTick : A_TickCount
 	last := _LLM_Menu.Has("last_health_probe_tick") ? _LLM_Menu["last_health_probe_tick"] : 0
-	if (last > 0 and (now - last) < LLM_HEALTH_PROBE_THROTTLE_MS)
+	if (last > 0 and TickElapsed(last, now) < LLM_HEALTH_PROBE_THROTTLE_MS)
 		return
 	; Idle gate, kept LAST so the caller-supplied bypass reaches only this guard
 	; and can never defeat the suspend, backend, enabled or throttle checks above.
@@ -379,7 +379,8 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 	_LLM_Menu["last_health_probe_tick"] := now
 	Owner := _LLM_Menu_BeginOllamaAux("menu_health")
 	try {
-		LLM_OllamaIsRunning_Async(
+		Dispatch := IsSet(DispatchFn) ? DispatchFn : LLM_OllamaIsRunning_Async
+		Dispatch(
 			(reachable) => _LLM_Menu_OnHealthProbeDone(reachable, Owner), Owner)
 	} catch {
 		LLM_AuxFinish(Owner)
@@ -394,7 +395,7 @@ _LLM_Menu_FireHealthProbe(Force := false) {
  * run inline per catalogue row at build time and froze the keyboard thread for up
  * to ~20 s on a cold daemon — this moves it off the hot path entirely.
  */
-_LLM_Menu_FireInstalledTagsProbe() {
+_LLM_Menu_FireInstalledTagsProbe(NowTick := unset, DispatchFn := unset) {
 	global _LLM_Menu, _LLM_InstalledTagsCacheAt, LLM_INSTALLED_CACHE_TTL_MS
 	global _DriverInputInitPending
 	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
@@ -412,14 +413,16 @@ _LLM_Menu_FireInstalledTagsProbe() {
 		return
 	; Throttle on the cache age (the same TTL the blocking path used) so repeated
 	; menu opens / rebuilds don't re-query the daemon every time.
-	now := A_TickCount
-	if (_LLM_InstalledTagsCacheAt > 0 and (now - _LLM_InstalledTagsCacheAt) < LLM_INSTALLED_CACHE_TTL_MS)
+	now := IsSet(NowTick) ? NowTick : A_TickCount
+	if (_LLM_InstalledTagsCacheAt > 0 and TickElapsed(_LLM_InstalledTagsCacheAt, now) < LLM_INSTALLED_CACHE_TTL_MS)
 		return
 	Owner := _LLM_Menu_BeginOllamaAux("menu_tags")
-	try LLM_OllamaListModels_Async(
-		(tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner), Owner)
-	catch
+	try {
+		Dispatch := IsSet(DispatchFn) ? DispatchFn : LLM_OllamaListModels_Async
+		Dispatch((tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner), Owner)
+	} catch {
 		LLM_AuxFinish(Owner)
+	}
 }
 
 LLM_Menu_SetProfile(id) {
