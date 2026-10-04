@@ -136,6 +136,24 @@ function M.validate_spawn_args(executable, args)
 	return ""
 end
 
+--- Applies the same execve byte boundary to libc's implicit sh -c argv.
+--- popen/system silently shorten an embedded NUL before the shell sees it.
+--- @param command any Composed shell command.
+--- @param operation string Constant operation name for diagnostics.
+--- @return boolean admitted, string|nil refusal
+local function valid_shell_command(command, operation)
+	if type(command) ~= "string" or command == "" then
+		Logger.warn(LOG, "%s(): empty command — ignored.", operation)
+		return false, "empty command"
+	end
+	local refusal = M.validate_spawn_args("sh", { "-c", command })
+	if refusal ~= "" then
+		Logger.error(LOG, "%s(): %s.", operation, refusal)
+		return false, refusal
+	end
+	return true
+end
+
 
 
 
@@ -150,10 +168,7 @@ end
 --- @param cmd string Fully composed shell command (quote every interpolation).
 --- @return boolean True when the command exited 0, false on any failure.
 function M.run(cmd)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "run(): empty command — ignored.")
-		return false
-	end
+	if not valid_shell_command(cmd, "run") then return false end
 	if _test_runner then
 		-- A runner that returns a boolean is simulating the exit status, so a
 		-- test can drive the failure branch too; anything else means the runner
@@ -180,10 +195,7 @@ end
 --- @param cmd string Fully composed shell command (quote every interpolation).
 --- @return string Captured stdout, or "" on any failure.
 function M.exec(cmd)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "exec(): empty command — ignored.")
-		return ""
-	end
+	if not valid_shell_command(cmd, "exec") then return "" end
 	if _test_runner then
 		local captured = _test_runner(cmd)
 		return type(captured) == "string" and captured or ""
@@ -216,10 +228,8 @@ end
 --- @return string output Captured stdout, including the empty string.
 --- @return string|nil error_message
 function M.exec_checked(cmd, options)
-	if type(cmd) ~= "string" or cmd == "" then
-		Logger.warn(LOG, "exec_checked(): empty command — ignored.")
-		return false, "", "empty command"
-	end
+	local admitted, refusal = valid_shell_command(cmd, "exec_checked")
+	if not admitted then return false, "", refusal end
 	if options ~= nil and type(options) ~= "table" then return false, "", "invalid checked command options" end
 	local output_dir = options and options.output_dir
 	if output_dir ~= nil and (type(output_dir) ~= "string" or output_dir == "" or output_dir:find("\0", 1, true)) then
