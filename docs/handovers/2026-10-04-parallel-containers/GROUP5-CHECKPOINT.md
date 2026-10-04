@@ -97,18 +97,19 @@ it can prove. Hardware double results cannot close these acceptance requirements
 No new group5 native CI has been executed. The existing remote lock
 `0563f0d589a181698bd2b13d75026aec673dbb61` belongs to group7, branch
 `feat/windows-native`, candidate `45d5c2db602ee74711da965ba17207c69b6dcba5`.
-Its run37228466168 reached terminal failure; the owner has been asked to record
-its verdict and release the lock. Do not take it over or delete it. Group5 has
+Its first run37228466168 reached terminal failure; the owner subsequently
+continued the same reservation with new manual runs, including37232550379.
+Inspect the current terminal result and actual owner release before reserving. Do not take it over or delete it. Group5 has
 not moved `codex/ci-validation` and does not own either CI ref.
 
-Group4 owns the standalone shared Core provisioning correction in `ci.yml`:
-install `lua-luv` beside Lua5.4/libxml2. The existing installed Linux registry
-probe correctly refuses exact file admission when neither luv nor LuaJIT FFI
-is available. The local toolchain supplies luv; Core's earlier runner did not.
-Reuse the owner's published correction after checking its preimage, instead of
-introducing a fallback or changing independent assertions. The pending group5
-macOS phase must verify the exact candidate/CI tree, actual tested SHA, terminal
-job conclusions and skipped Release before releasing its own newly acquired lock.
+Group4 published the standalone shared Core provisioning correction at
+b57a94802986adb80496d8abb7e4c1bcb6298299. Group5 reuses only its workflow hunk;
+`.github/workflows/ci.yml` matches that released owner image byte-for-byte.
+Stock Lua5.4 receives lua-luv for unchanged exact native file admission; no
+fallback, assertion, lane or release-policy change is made. Fresh hosted proof
+remains pending. The group5 macOS phase must verify candidate/CI tree equality,
+the actual tested SHA, terminal job conclusions and skipped Release before
+releasing its own newly acquired lock.
 
 ## Coordination and setup
 
