@@ -17,7 +17,7 @@ local function fixture(overrides)
 		admit = function() return "fixture-capture" end,
 		context = function() return { allowed = true, app = "Fixture", timestamp = "2026-09-12 12:00:00.000" } end,
 		keycode = Frames.keycode,
-		emit = function(press) observed.presses[#observed.presses + 1] = press; return true end,
+		emit = function(press) observed.presses[#observed.presses + 1] = press end,
 	})
 	local frames = Frames.new("fixture", "1")
 	local opening = frames.opened

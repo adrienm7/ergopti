@@ -5,7 +5,6 @@
 local M = {}
 local Wire = require("modules.keylogger.physical_wire")
 local Baseline = require("modules.keylogger.physical_baseline")
-local Protocol = require("modules.keylogger.physical_protocol")
 local decimal, successor = Wire.decimal, Wire.successor
 
 --- Orders uncounted tally rows by page, usage, keyboard type and reason.
@@ -25,7 +24,7 @@ end
 --- nil and the reason the press cannot be attributed. An unattributed press is
 --- tallied as uncounted coverage, never guessed and never a reason to retire the
 --- capture.
----@param dependencies table admit, context, keycode and exact-true emit callbacks; batch_limit.
+---@param dependencies table admit, context, keycode and emit callbacks; batch_limit.
 ---@return table receiver
 function M.new(dependencies)
 	for _, name in ipairs({ "admit", "context", "keycode", "emit" }) do
@@ -63,10 +62,9 @@ function M.new(dependencies)
 	function receiver.open(frame)
 		assert(state == "new", "Physical receiver cannot reopen")
 		state = "failed"
-		assert(type(frame) == "table" and frame.kind == "opened"
+		assert(type(frame) == "table" and frame.version == 1 and frame.kind == "opened"
 			and type(frame.incarnation) == "string" and frame.incarnation ~= ""
 			and type(frame.coverage) == "string", "Invalid physical opening envelope")
-		Protocol.require_version("opening", frame.version, Protocol.OPENING_VERSION)
 		decimal(frame.lease, true)
 		initial = Baseline.new(frame.baseline)
 		local owner = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
@@ -156,9 +154,7 @@ function M.new(dependencies)
 			end
 			for _, press in ipairs(pending) do
 				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
-				local accepted = dependencies.emit(press)
-				assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
-				assert(accepted == true, "Physical sink refused the press")
+				dependencies.emit(press)
 			end
 			assert(state == "delivering" and ownership == owner, "Physical delivery was revoked")
 			for _, press in ipairs(pending_uncounted) do
