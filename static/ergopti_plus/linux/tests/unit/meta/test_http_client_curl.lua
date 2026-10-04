@@ -1077,6 +1077,17 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 end)
 
 helpers.describe("file_digest: asynchronous sha256sum ownership", function()
+	local native_ok = pcall(require, "luv")
+	local ffi_ok = pcall(require, "ffi")
+	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-digest-replacement: rejected paths preserve an actual native incumbent", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_replacement.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest replacement fixture must pass")
+		end)
+	end
+
 	for _, length in ipairs({ 957, 958, 1106, 3500 }) do
 		helpers.it("linux-digest-path-budget: hashes a " .. length .. "-byte path", function()
 			local digest, state = fresh_digest()
