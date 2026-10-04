@@ -25,10 +25,13 @@ KL_HostSignature() {
 KL_UuidV4(CreateGuidFn := unset) {
 		; CoCreateGuid via DllCall, formatted RFC 4122.
 		guid_buf := Buffer(16, 0)
-		if IsSet(CreateGuidFn)
-				CreateGuidFn.Call(guid_buf)
-		else
-				DllCall("ole32\CoCreateGuid", "Ptr", guid_buf)
+		Result := IsSet(CreateGuidFn)
+				? CreateGuidFn.Call(guid_buf)
+				: DllCall("ole32\CoCreateGuid", "Ptr", guid_buf, "Int")
+		if !(Result is Integer)
+				throw TypeError("GUID creation must return an integer HRESULT.")
+		if Result != 0
+				throw Error("GUID creation failed (HRESULT " . Format("0x{:08X}", Result & 0xFFFFFFFF) . ").")
 		bytes := []
 		Loop 16
 				bytes.Push(NumGet(guid_buf, A_Index - 1, "UChar"))
