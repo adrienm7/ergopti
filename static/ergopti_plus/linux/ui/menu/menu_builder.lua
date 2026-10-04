@@ -3370,16 +3370,25 @@ local function _build_shortcuts(ctx)
 	-- own description key, as on Windows.
 	sc_ctx.feature_rows = {}
 	for key, value in pairs(ctx.feature_rows or {}) do sc_ctx.feature_rows[key] = value end
+	local function wrap_on_type_ready()
+		return type(sc.is_enabled) == "function" and sc.is_enabled() == true
+			and type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
+	end
 	if type(sc.is_wrap_on_type_enabled) == "function" then
 		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
 			local on = sc.is_wrap_on_type_enabled()
 			return {
 				label = i18n_safe("shortcuts.label_wrap_text"),
-				checked = on,
-				disabled = not enabled,
+				checked = on == true,
+				disabled = not wrap_on_type_ready() or type(on) ~= "boolean",
 				action = function()
-					sc.set_wrap_on_type_enabled(not on)
+					if not wrap_on_type_ready() then return false end
+					local current = sc.is_wrap_on_type_enabled()
+					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
+					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
 				end,
 			}
 		end
