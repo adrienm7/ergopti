@@ -140,7 +140,8 @@ end
 --- @return boolean|nil
 local function read_muted()
 	if Shell.has_command("pactl") then
-		local out = Shell.exec_line("pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null")
+		-- pactl translates yes/no through gettext; machine parsing needs C locale.
+		local out = Shell.exec_line("LC_ALL=C pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null")
 		if out and out:find("yes", 1, true) then return true end
 		if out and out:find("no", 1, true) then return false end
 	end

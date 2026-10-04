@@ -833,6 +833,20 @@ These are software implementations; final hardware verification remains below.
   Neither sibling has this Lua os.tmpname call. Their native resource-exhaustion
   qualification remains with the principal owner. No reserved source, TOML,
   physical input, macOS/AHK suite or manual CI was changed or exercised.
+- [~] **L63.** Linux localized native audio metrics: run pactl's machine query
+  under C locale so gettext's French oui/German ja are recognized as mute. A
+  real 30-second sampler run previously recorded zero muted time while the
+  private PulseAudio null sink remained muted. Native processes, Unix sockets,
+  gettext catalogs and production sampler execute under C/French/German with
+  muted/unmuted controls; two of six cases fail before and all pass after per
+  LuaJIT/Lua 5.4 runtime. These regression cases supply explicit sampler time
+  inputs; the additional timed reproduction uses actual monotonic elapsed time.
+  Four simulated CLI unit cases cover both states and locales. This is a native
+  virtual audio service, not a physical sound-device or graphical-session test.
+  Windows/macOS initialize the shared metric column to zero without this pactl
+  reader by source; native audio parity and the ALSA hardware fallback remain
+  unqualified here. No schema, product label, reserved source, TOML, macOS/AHK
+  suite, physical device or manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -39,7 +39,10 @@ local function with_shell(answers, body)
 	--- @return string
 	local function answer(command)
 		for _, entry in ipairs(answers) do
-			if command:find(entry.match, 1, true) then return entry.out end
+			if command:find(entry.match, 1, true) then
+				if type(entry.out) == "function" then return entry.out(command) end
+				return entry.out
+			end
 		end
 		return ""
 	end
@@ -63,6 +66,26 @@ local function with_shell(answers, body)
 	package.loaded[module_name] = previous_module
 	helpers.assert_true(ok, "the sampler must not throw: " .. tostring(err))
 end
+
+helpers.describe("system audio native output locale", function()
+	for _, locale in ipairs({ "French", "German" }) do
+		for _, muted in ipairs({ true, false }) do
+			helpers.it("linux-system-audio-locale: retains " .. locale .. " muted=" .. tostring(muted), function()
+				with_shell({ { match = "pactl get-sink-mute", out = function(command)
+					if command:match("^LC_ALL=C ") then return "Mute: " .. (muted and "yes" or "no") end
+					if locale == "French" then return "Mute: " .. (muted and "oui" or "non") end
+					return "Mute: " .. (muted and "ja" or "nein")
+				end } }, function(metrics)
+					local interval = metrics._sample_interval_ms()
+					metrics.sample(0, "2026-01-02")
+					local day = metrics.sample(interval, "2026-01-02")
+					helpers.assert_eq(day.audio_muted_ms, muted and interval or 0)
+					helpers.assert_eq(day.awake_ms, interval)
+				end)
+			end)
+		end
+	end
+end)
 
 
 
