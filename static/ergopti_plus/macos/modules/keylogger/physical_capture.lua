@@ -213,7 +213,7 @@ function M.start(options)
 		emit = function(press)
 			assert(current(candidate) and candidate.state == "capturing"
 				and Accounting.admitted_capture() == press.capture, "Physical capture publication was revoked")
-			dependencies.emit(press)
+			return dependencies.emit(press)
 		end,
 	})
 	local previous = session

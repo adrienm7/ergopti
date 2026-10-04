@@ -17,7 +17,7 @@ local function refusal(alter)
 		admit = function() observed.admissions = observed.admissions + 1; return "capture" end,
 		context = function() error("A refused opening cannot resolve context") end,
 		keycode = function() error("A refused opening cannot map keys") end,
-		emit = function() observed.credits = observed.credits + 1 end,
+		emit = function() observed.credits = observed.credits + 1; return true end,
 	})
 	local task = {}
 	function task.start() return true end

@@ -1557,6 +1557,16 @@ context, log-sink binding and physical holds, bounded recovery, controlled async
 shutdown, native and real-Mac acceptance are still required before completing
 WP3 or enabling the owned runtime.
 
+WP3 sink acceptance now requires exact true before a delivery batch can be
+acknowledged. The real LogManager copies validated physical presses into its
+ordered outbox under the exact admitted capture; stop revokes new admission
+before native cleanup while retaining accepted work for storage retry. Retained
+event-time privacy, application and timestamp remain authoritative even when
+current state has changed. Two causal regressions fail against the preimage;
+108 focused portable Lua cases and 14 diagnostic Python cases pass. Outbox
+ownership is not durable storage, full production history wiring or native
+acceptance. The capture owner remains dormant and TODO31 remains partial.
+
 WP4 remains partial. The diagnostic producer now retains usage page in its
 internal inventory, reconciliation and immutable snapshots. A changed page on
 an admitted element cookie faults the exact state and interrupts its lease;
