@@ -143,7 +143,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends lua-luv lua5.4 curl openssl python3
+          sudo apt-get install -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
         timeout-minutes: 1
 
@@ -390,6 +390,14 @@ jobs:
         run: |
           python3 tests/hardware/run_storage_backup_type_receipts.py
         timeout-minutes: 1
+
+      - name: Preserve competing JSON backups at native publication
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_storage_backup_race_receipts.py
+          ERGOPTI_STORAGE_TEST_LUA=lua5.4 python3 tests/hardware/run_storage_backup_race_receipts.py
+        timeout-minutes: 2
 
       - name: Preserve release-page associations after failed native validator saves
         if: ${{ !cancelled() }}

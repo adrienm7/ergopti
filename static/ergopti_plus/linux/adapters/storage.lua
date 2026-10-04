@@ -23,6 +23,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Shell  = require("adapters.shell_runner")
+local NoReplaceMove = require("infra.no_replace_move")
 
 -- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The
 -- bespoke encoder/decoder this replaces silently flattened nested tables and
@@ -108,7 +109,14 @@ end
 local function _preserve_corrupt_store(reason)
 	local recovery_path = _next_recovery_path()
 	local ok, renamed = false, false
-	if recovery_path then ok, renamed = pcall(os.rename, _STORE_PATH, recovery_path) end
+	while recovery_path do
+		local failure
+		ok, renamed, failure = pcall(NoReplaceMove.move, _STORE_PATH, recovery_path)
+		if not ok or renamed == true or failure ~= "EEXIST" then break end
+		-- Inspection is advisory: another writer can claim this name before the
+		-- native move. Reinspect without replacing any concurrently created inode.
+		recovery_path = _next_recovery_path()
+	end
 	if ok and renamed == true then
 		_recovery = { reason = reason, path = recovery_path, preserved = true }
 		Logger.error(LOG, "Corrupt storage preserved at '%s'; starting with an empty store.", recovery_path)
