@@ -43,10 +43,11 @@ found=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Con
 [ "$found" = "$version" ] || exit 25
 # Display owns both output streams and its true exit status, before parsing.
 displayed=$(/usr/bin/codesign -d -r- "$running" 2>&1) || exit 26
-# Count records before command substitution can erase trailing empty lines.
-designations=$(printf '%s\n' "$displayed" | /usr/bin/sed -n '/^designated => /s/.*/x/p') || exit 26
+# Native codesign can comment a displayed designation with the fixed "# "
+# prefix. Count both observed forms before substitution can erase empty lines.
+designations=$(printf '%s\n' "$displayed" | /usr/bin/sed -n '/^designated => /s/.*/x/p; /^# designated => /s/.*/x/p') || exit 26
 [ "$designations" = x ] || exit 26
-requirement=$(printf '%s\n' "$displayed" | /usr/bin/sed -n 's/^designated => //p') || exit 26
+requirement=$(printf '%s\n' "$displayed" | /usr/bin/sed -n 's/^# designated => /designated => /; s/^designated => //p') || exit 26
 [ -n "$requirement" ] || exit 26
 case "$requirement" in
 	*'

@@ -291,9 +291,17 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let evidence = requirementDisplayEvidence(display)
 		XCTAssertEqual(display.status, 0, evidence)
 		let declarations = (display.stdout + "\n" + display.stderr)
-			.split(separator: "\n").filter { $0.hasPrefix("designated => ") }
+			.split(separator: "\n").map { line in
+				line.hasPrefix("# designated => ") ? line.dropFirst(2) : line
+			}.filter { $0.hasPrefix("designated => ") }
 		XCTAssertEqual(declarations.count, 1, "The actual running signature owns one designated requirement; " + evidence)
 		XCTAssertFalse(try XCTUnwrap(declarations.first).dropFirst("designated => ".count).isEmpty)
+		let ownedRequirement = String(try XCTUnwrap(declarations.first).dropFirst("designated => ".count))
+		let verifiedOwner = try child("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R",
+			"=" + ownedRequirement, app.path], root: root)
+		XCTAssertEqual(verifiedOwner.status, 0, "The parsed native requirement must match its actual signed source")
+		XCTAssertTrue(verifiedOwner.stdout.isEmpty)
+		XCTAssertTrue(verifiedOwner.stderr.isEmpty)
 		let missing = root.appendingPathComponent("unsigned-source.app")
 		try manager.createDirectory(at: missing, withIntermediateDirectories: false)
 		let refused = try child("/usr/bin/codesign", ["-d", "-r-", missing.path], root: root)
