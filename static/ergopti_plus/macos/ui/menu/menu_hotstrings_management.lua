@@ -38,10 +38,9 @@ local LOG               = "menu_hotstrings"
 --- @param ctx table Context.
 --- @param label string Display label for the toggle item.
 --- @param enabled_key string State key for the enabled flag.
---- @param set_enabled_fn string Keymap setter name for the enabled flag.
 --- @param notify_label string Label used in the notification.
 --- @return table The toggle menu item.
-local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_label)
+local function buildBubbleItem(ctx, label, enabled_key, notify_label)
 	local state  = ctx.state
 	local paused = ctx.paused
 
@@ -50,13 +49,12 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 		checked  = state[enabled_key] or nil,
 		disabled = paused or nil,
 		action       = not paused and function()
-			state[enabled_key] = not state[enabled_key]
-			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
-				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(enabled_key) ~= true then
+				return false
 			end
-			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(notify_label, state[enabled_key])
 			ctx.updateMenu()
+			return true
 		end or nil,
 	}
 end
@@ -76,19 +74,16 @@ function M.build_management(ctx)
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_magic"),
 		"preview_star_enabled",
-		"set_preview_star_enabled",
 		i18n.get("menu.hotstrings.notify_bubble_star")))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_autocorrect"),
 		"preview_autocorrect_enabled",
-		"set_preview_autocorrect_enabled",
 		i18n.get("menu.hotstrings.notify_bubble_autocorrect")))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_ai"),
 		"preview_ai_enabled",
-		"set_preview_ai_enabled",
 		i18n.get("menu.hotstrings.notify_bubble_ai")))
 
 	table.insert(bubble_sub, { separator = true })
@@ -96,7 +91,6 @@ function M.build_management(ctx)
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_colored"),
 		"preview_colored_tooltips",
-		"set_preview_colored_tooltips",
 		i18n.get("menu.hotstrings.notify_bubble_colored")))
 
 	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }

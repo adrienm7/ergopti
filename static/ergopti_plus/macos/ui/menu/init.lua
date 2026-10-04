@@ -1342,6 +1342,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return global_scope.apply(mode)
 	end
+	-- This owner enters the global writer fence before touching preview state.
+	-- Its save port is the ordinary transaction itself, avoiding nested admission.
+	local preview_owner = require("ui.menu.preview_transaction").new({
+		state = state, keymap = keymap, admission = run_global_exclusive,
+		paused = function()
+			if type(core_mods.shortcuts_mod) ~= "table"
+				or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+			return core_mods.shortcuts_mod.is_paused()
+		end,
+		save_prefs = transactional_save_prefs,
+	})
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
@@ -1349,6 +1360,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,
+		commit_preview           = preview_owner.toggle,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,
