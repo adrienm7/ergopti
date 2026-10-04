@@ -71,10 +71,20 @@ function M.build_management(ctx)
 
 	local bubble_sub = {}
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_magic"),
-		"preview_star_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_star")))
+	local magic_row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+		["preview_star_enabled"] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_star_enabled") ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_star"), state.preview_star_enabled)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		["hotstrings.preview_star_enabled"] = function() return state.preview_star_enabled == true end,
+		["preview_magic_ready"] = function() return not ctx.paused end,
+	})
+	if magic_row then table.insert(bubble_sub, magic_row) end
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_autocorrect"),

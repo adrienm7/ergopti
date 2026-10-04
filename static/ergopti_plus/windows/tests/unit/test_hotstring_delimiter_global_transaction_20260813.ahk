@@ -854,3 +854,29 @@ _HSDT_ColoredPreviewDeclaredCapability() {
 }
 Test("preview coloured checkbox: shared declaration keeps Windows capability truthful",
 	_HSDT_ColoredPreviewDeclaredCapability)
+
+
+Test("Magic preview: shared checkbox remains truthfully unavailable on Windows", _HSDT_DeclaredMagicPreviewUnavailable)
+
+_HSDT_DeclaredMagicPreviewUnavailable() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_magic_control.json"))
+	Definition := _MR_GetManifestRoot()[Corpus["section"]]
+	AssertEqual(1, Definition.Length, "The presence command has one authoritative row.")
+	Row := Definition[1]
+	AssertEqual("check", Row["type"], "The shared declaration owns the checkbox type.")
+	AssertEqual(Corpus["row"]["id"], Row["id"], "The real flag identity is preserved.")
+	AssertEqual(Corpus["row"]["i18n"], Row["i18n"], "All platforms use the canonical existing key.")
+	AssertEqual(Corpus["unavailable"]["mode"], Row["unavailable"], "Unsupported Windows previews remain grey.")
+	AssertEqual(Corpus["unavailable"]["reason"], Row["reason_key"], "The actual Lua-only reason stays shared.")
+	Called := Map("count", 0)
+	Commands := Map(Row["id"], (*) => Called["count"] += 1)
+	Getters := Map("hotstrings.preview_star_enabled", (*) => true, "preview_magic_ready", (*) => true)
+	Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
+	AssertFalse(Native is Map, "The real provider refuses to acquire unsupported native work.")
+	Grey := _MR_CommandRowData(Row, Corpus["section"], Commands, Getters)
+	Assert(Grey is Map, "The renderer owns the truthful grey stand-in data.")
+	AssertEqual(Corpus["unavailable"]["reason"], Grey["disabled_reason_key"], "The stand-in retains the actual reason.")
+	AssertFalse(Grey.Has("action"), "An unavailable stand-in has no native mutation callback.")
+	AssertEqual(0, Called["count"], "Unsupported native work never executes.")
+}

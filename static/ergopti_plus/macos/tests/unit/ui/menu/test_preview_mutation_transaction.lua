@@ -28,7 +28,13 @@ local function find_row(rows, label)
 	end
 end
 
-local function with_fixture(outcome, callback, translate, declaration_label)
+local MAGIC_SOURCE = '# independent retained header\n[hotstrings]\npreview_star_enabled = true\npreview_colored_tooltips = true\n[foreign]\nfuture = "kept" # retained\n'
+
+local function with_fixture(outcome, callback, translate, declaration_label, selected_key)
+	local owned_key = selected_key or KEY
+	local owned_source = selected_key and MAGIC_SOURCE or SOURCE
+	local label_key = selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored"
+	local section = selected_key and "preview_magic_control" or "preview_colored_control"
 	return helpers.with_stub_scope({
 		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
@@ -46,7 +52,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
 			json_decode = function(raw)
 				local decoded = require("adapters.json_codec").decode(raw)
-				if declaration_label then decoded.preview_colored_control[1].i18n = declaration_label end
+				if declaration_label and decoded[section] then decoded[section][1].i18n = declaration_label end
 				return decoded
 			end, i18n = { get = translate, section = function(key) return key end },
 			logger = require("infra.logger"),
@@ -57,7 +63,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 			return {}
 		end }
 		return OutputFixture.with_output(function(path)
-			local file = assert(io.open(path, "wb")); assert(file:write(SOURCE)); file:close()
+			local file = assert(io.open(path, "wb")); assert(file:write(owned_source)); file:close()
 			local loaded, status = Preferences.load(path)
 			helpers.assert_eq(status, "ok")
 			local state = { preview_colored_tooltips = loaded.preview_colored_tooltips,
@@ -66,7 +72,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 			local calls = { native = 0, saves = 0, writes = 0, notices = 0, updates = 0, rollbacks = 0 }
 			local runtime, paused, terminal, blocked_restore = true, false, false, false
 			local keymap = { get_terminator_defs = function() return {} end }
-			keymap.set_preview_colored_tooltips = function(value)
+			keymap["set_" .. owned_key] = function(value)
 				calls.native = calls.native + 1
 				if value == false and outcome == "native_false" then return false end
 				if value == false and outcome == "native_nil" then return nil end
@@ -76,7 +82,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 				runtime = value
 				return true
 			end
-			if outcome == "native_missing" then keymap.set_preview_colored_tooltips = nil end
+			if outcome == "native_missing" then keymap["set_" .. owned_key] = nil end
 			local native_write = FileSystem.write_if_unchanged
 			FileSystem.write_if_unchanged = function(...)
 				calls.writes = calls.writes + 1
@@ -89,7 +95,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 				initial_preferences = Transaction.clone(state), hotfiles = {}, core_modules = {},
 				restore_runtime = function(snapshot)
 					calls.rollbacks = calls.rollbacks + 1
-					runtime = snapshot.preview_colored_tooltips
+					runtime = snapshot[owned_key]
 					return true
 				end,
 			})
@@ -115,7 +121,7 @@ local function with_fixture(outcome, callback, translate, declaration_label)
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 			}
 			local menus = require("ui.menu.menu_hotstrings_management").build_management(context).menu
-			local row = assert(find_row(menus, translate(declaration_label or "menu.hotstrings.tooltip_colored")))
+			local row = assert(find_row(menus, translate(declaration_label or label_key)))
 			callback({ action = row.action, row = row, menus = menus, state = state, calls = calls, owner = owner, global = global,
 				path = path, runtime = function() return runtime end,
 				set_paused = function(v) paused = v end, set_context_paused = function(v) context.paused = v end, set_terminal = function(v) terminal = v end,
@@ -276,5 +282,90 @@ helpers.describe("declared coloured preview checkbox", function()
 			count = count + 1
 		end
 		helpers.assert_eq(count, 21)
+	end)
+end)
+
+
+helpers.describe("declared magic preview checkbox", function()
+	helpers.it("refuses retained pause before entering the actual preview owner", function()
+		with_fixture("ok", function(f)
+			f.set_context_paused(true)
+			helpers.assert_eq(f.action(), false)
+			helpers.assert_eq(f.calls.native, 0)
+			helpers.assert_eq(f.calls.writes, 0)
+			helpers.assert_eq(f.state.preview_star_enabled, true)
+			helpers.assert_eq(f.read(), MAGIC_SOURCE)
+		end, nil, nil, "preview_star_enabled")
+	end)
+	helpers.it("keeps the real global admission fence for the magic flag", function()
+		with_fixture("ok", function(f)
+			local observed
+			local accepted = f.global.run_exclusive("Held unrelated scope", function() observed = f.action(); return true end)
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(observed, false)
+			helpers.assert_eq(f.calls.native, 0)
+			helpers.assert_eq(f.calls.writes, 0)
+			helpers.assert_eq(f.read(), MAGIC_SOURCE)
+		end, nil, nil, "preview_star_enabled")
+	end)
+	for _, mode in ipairs({ "native_false", "native_nil", "native_throw", "write_false", "write_throw" }) do
+		helpers.it("keeps magic source and runtime after " .. mode, function()
+			with_fixture(mode, function(f)
+				helpers.assert_eq(f.action(), false)
+				helpers.assert_eq(f.state.preview_star_enabled, true)
+				helpers.assert_eq(f.runtime(), true)
+				helpers.assert_eq(f.calls.notices, 0)
+				helpers.assert_eq(f.calls.updates, 0)
+				helpers.assert_eq(f.read(), MAGIC_SOURCE)
+			end, nil, nil, "preview_star_enabled")
+		end)
+	end
+	helpers.it("reloads the acknowledged neutral choice without losing independent foreign bytes", function()
+		with_fixture("ok", function(f)
+			helpers.assert_eq(f.action(), true)
+			helpers.assert_eq(f.state.preview_star_enabled, false)
+			helpers.assert_eq(f.calls.writes, 1)
+			helpers.assert_eq(f.calls.updates, 1)
+			local loaded, status = f.preferences.load(f.path)
+			helpers.assert_eq(status, "ok")
+			helpers.assert_nil(loaded.preview_star_enabled)
+			helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings.preview_star_enabled"), false)
+			helpers.assert_true(f.read():find('[foreign]\nfuture = "kept" # retained', 1, true) ~= nil)
+		end, nil, nil, "preview_star_enabled")
+	end)
+end)
+
+
+helpers.describe("magic preview shared label contract", function()
+	helpers.it("uses the edited declaration and preserves all other preview rows", function()
+		with_fixture("ok", function(f)
+			helpers.assert_eq(f.row.label, "button.ok")
+			helpers.assert_eq(f.row.checked, true)
+			helpers.assert_eq(f.action(), true)
+			helpers.assert_eq(f.calls.writes, 1)
+		end, nil, "button.ok", "preview_star_enabled")
+	end)
+	helpers.it("uses every actual locale without changing the two other presence flags", function()
+		local Codec = require("adapters.json_codec")
+		local Paths = require("infra.paths")
+		local function read_json(path)
+			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
+			return assert(Codec.decode(raw))
+		end
+		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_magic_control.json"))
+		local observed = 0
+		for _, code in ipairs(corpus.locales) do
+			local catalog = read_json(Paths.shared("data/locales/" .. code .. ".json"))
+			local function translate(key) return catalog[key] or key end
+			with_fixture("ok", function(f)
+				helpers.assert_eq(f.row.label, catalog[corpus.row.i18n])
+				helpers.assert_true(f.row.label ~= corpus.row.i18n)
+				helpers.assert_eq(f.action(), true)
+				helpers.assert_eq(f.state.preview_autocorrect_enabled, true)
+				helpers.assert_eq(f.state.preview_ai_enabled, true)
+			end, translate, nil, "preview_star_enabled")
+			observed = observed + 1
+		end
+		helpers.assert_eq(observed, 21)
 	end)
 end)
