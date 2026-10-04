@@ -2834,6 +2834,12 @@ Linux ordinary hotstring override setters and clears now edit only changed owned
       scripts, paths/arguments with spaces and Unicode, process-start refusal,
       execution errors, lifecycle/cancellation and cross-consumer parity.
 
+The Linux action-catalogue fixture reloads its captured workspace dependencies.
+A deliberate earlier tool provider reproduces the missing-wmctrl assertion
+failure before the repair; all ten catalogue cases pass afterward without
+weakening absent-tool or availability assertions. This fixture correction does
+not integrate or qualify the pending executable/provider feature.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice

@@ -36,6 +36,9 @@ local function recording_manager()
 	local saved = package.loaded["logger.shim"]
 	package.loaded["logger.shim"] = logger
 	package.loaded[MANAGER] = nil
+	-- The workspace provider captures its shell and display dependencies when
+	-- required. Earlier native fixtures may have replaced either table.
+	package.loaded["modules.gestures.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
 	package.loaded["logger.shim"] = saved
 	if not ok then error(manager, 0) end
@@ -261,6 +264,33 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true, "X11 without wmctrl cannot list its desktops")
 		helpers.assert_eq(by_id.desktop_prev_wrap.hint,
 			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
+	end)
+
+	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
+		local name = "modules.gestures.workspace_switcher"
+		local saved = package.loaded[name]
+		local Display = require("infra.display_server")
+		Display._set_for_test(Display.X11, "xfce")
+		local ok, err = pcall(function()
+			local stale = helpers.load_module_with_dependency(name, "adapters.shell_runner", {
+				has_command = function() return true end,
+			})
+			helpers.assert_eq(stale.detect().name, "wmctrl", "the earlier fixture captured a different tool provider")
+			local M = recording_manager()
+			without_tools(function()
+				local by_id = {}
+				for _, item in ipairs(M.get_picker_items()) do
+					if item.type == "action" then by_id[item.id] = item end
+				end
+				helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true,
+					"this fixture must inspect its own absent wmctrl provider")
+				helpers.assert_eq(by_id.desktop_prev_wrap.hint,
+					(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
+			end)
+		end)
+		package.loaded[name] = saved
+		Display._set_for_test(nil, nil)
+		if not ok then error(err, 0) end
 	end)
 
 end)
