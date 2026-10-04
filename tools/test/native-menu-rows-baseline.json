@@ -39,7 +39,7 @@
 			"windows/ui/menu/menu_init.ahk:46 separator",
 			"windows/ui/menu/menu_init.ahk:47 static",
 			"windows/ui/menu/menu_init.ahk:66 add",
-			"windows/ui/menu/menu_init.ahk:498 separator",
+			"windows/ui/menu/menu_init.ahk:512 separator",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:95 separator",
@@ -107,18 +107,16 @@
 		]
 	},
 	"macos": {
-		"count": 166,
+		"count": 164,
 		"sites": [
 			"macos/ui/menu/builder.lua:318 separator",
 			"macos/ui/menu/builder.lua:352 separator",
 			"macos/ui/menu/builder.lua:363 separator",
 			"macos/ui/menu/builder.lua:643 static",
 			"macos/ui/menu/builder.lua:652 static",
-			"macos/ui/menu/builder.lua:669 static",
-			"macos/ui/menu/builder.lua:672 static",
-			"macos/ui/menu/builder.lua:702 static",
-			"macos/ui/menu/builder.lua:710 separator",
-			"macos/ui/menu/builder.lua:757 separator",
+			"macos/ui/menu/builder.lua:708 static",
+			"macos/ui/menu/builder.lua:716 separator",
+			"macos/ui/menu/builder.lua:763 separator",
 			"macos/ui/menu/canvas_badge.lua:123 separator",
 			"macos/ui/menu/menu_about.lua:181 separator",
 			"macos/ui/menu/menu_about.lua:196 static",
@@ -278,7 +276,7 @@
 		]
 	},
 	"linux": {
-		"count": 109,
+		"count": 107,
 		"sites": [
 			"linux/ui/menu/agent_rows.lua:102 separator",
 			"linux/ui/menu/agent_rows.lua:188 separator",
@@ -383,12 +381,10 @@
 			"linux/ui/menu/menu_builder.lua:3924 static",
 			"linux/ui/menu/menu_builder.lua:4018 static",
 			"linux/ui/menu/menu_builder.lua:4090 static",
-			"linux/ui/menu/menu_builder.lua:4106 static",
-			"linux/ui/menu/menu_builder.lua:4126 static",
-			"linux/ui/menu/menu_builder.lua:4150 static",
-			"linux/ui/menu/menu_builder.lua:4188 static",
-			"linux/ui/menu/menu_builder.lua:4309 separator",
-			"linux/ui/menu/menu_builder.lua:4333 separator"
+			"linux/ui/menu/menu_builder.lua:4148 static",
+			"linux/ui/menu/menu_builder.lua:4186 static",
+			"linux/ui/menu/menu_builder.lua:4307 separator",
+			"linux/ui/menu/menu_builder.lua:4331 separator"
 		]
 	}
 }

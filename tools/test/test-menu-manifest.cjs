@@ -1349,3 +1349,56 @@ checkPrivacyTriggerControls();
 		'Personal editor command: one shared declaration, three actual providers and seven independent owner states.'
 	);
 }
+
+// The two configured terminal commands take their labels from their root declaration.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(
+		manifest.top_level.filter((row) => row.id === 'reload' || row.id === 'quit'),
+		[
+			{ type: 'command', id: 'reload', i18n: 'menu.global.reload' },
+			{ type: 'command', id: 'quit', i18n: 'menu.global.quit' }
+		],
+		'the existing root owns both lifecycle labels and their order'
+	);
+	for (const file of ['macos/ui/menu/builder.lua', 'linux/ui/menu/menu_builder.lua']) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		for (const id of ['reload', 'quit']) {
+			assert(
+				source.includes(`ManifestMenu.command_row("top_level", "${id}"`),
+				`${file}: the real lifecycle provider reads its shared command`
+			);
+			assert(
+				!new RegExp(
+					`(?:label|title)\\s*=.*(?:i18n_safe|i18n\\.get)\\("menu\\.global\\.${id}"\\)`
+				).test(source),
+				`${file}: the lifecycle provider cannot redeclare its label`
+			);
+		}
+	}
+	const windows = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_init.ahk'),
+		'utf8'
+	);
+	for (const [name, id, owner] of [
+		['Reload', 'reload', 'ActivateReload'],
+		['Quit', 'quit', 'ActivateExitApp']
+	]) {
+		const body = windows.match(new RegExp(`_MI_Stage${name}\\(\\) \\{([\\s\\S]*?)\\n\\}`))?.[1];
+		assert(body, `the real Windows ${id} builder must be readable`);
+		assert(body.includes(`MenuRenderer_CommandRow("top_level", "${id}"`));
+		assert(body.includes(`MenuStartupLifecycleDispatch.Bind("${id}", ${owner})`));
+		assert(
+			body.includes('TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))'),
+			'the shared callback wrapper must retain native startup lifecycle admission'
+		);
+		assert(
+			!body.includes('t("menu.global.'),
+			'the native stage cannot duplicate the canonical label'
+		);
+	}
+	console.log(
+		'Configured lifecycle commands: shared labels and preserved native startup admission on all three drivers.'
+	);
+}

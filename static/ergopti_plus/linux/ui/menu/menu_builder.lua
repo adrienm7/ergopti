@@ -4102,9 +4102,8 @@ end
 --- The daemon owns the reload; the menu asks it to, exactly as the quit item
 --- asks via on_quit. No signal, no subprocess, no PID to get wrong.
 local function _build_reload(ctx)
-	return {
-		label = i18n_safe("menu.global.reload"),
-		action = function()
+	return ManifestMenu.command_row("top_level", "reload", {
+		reload = function()
 			if type(ctx.on_reload) ~= "function" then
 				-- Loudly, not silently: a Reload item that cannot reload is the
 				-- exact failure this replaced.
@@ -4117,18 +4116,17 @@ local function _build_reload(ctx)
 				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
 			end
 		end,
-	}
+	})
 end
 
 --- Builds the quit item.
 local function _build_quit(ctx)
-	return {
-		label = i18n_safe("menu.global.quit"),
-		action = function()
+	return ManifestMenu.command_row("top_level", "quit", {
+		quit = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if ctx.on_quit then ctx.on_quit() end
 		end,
-	}
+	})
 end
 
 --- Builds the debug submenu from the shared manifest.

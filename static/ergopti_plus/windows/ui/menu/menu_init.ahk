@@ -412,12 +412,26 @@ _MI_StageSuspend() {
 
 
 _MI_StageReload() {
-	TrayMenuStage_AddAction(t("menu.global.reload"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	Row := MenuRenderer_CommandRow("top_level", "reload",
+		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
 _MI_StageQuit() {
-	TrayMenuStage_AddAction(t("menu.global.quit"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	Row := MenuRenderer_CommandRow("top_level", "quit",
+		Map("quit", MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
