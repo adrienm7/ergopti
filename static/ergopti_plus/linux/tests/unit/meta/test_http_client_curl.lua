@@ -118,6 +118,50 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+		for _, scheme in ipairs({ "https", "HTTPS" }) do
+			helpers.it("linux-http-tls-redirect: " .. method .. " keeps " .. scheme .. " on every native hop", function()
+				local client, state = fresh_client()
+				local url = scheme .. "://example.invalid/api"
+				local options = { follow_redirects = true, https_only = false }
+				local result = nil
+				local function complete(value) result = value end
+				local dispatched
+				if method == "get" then dispatched = client.get(url, {}, options, complete)
+				elseif method == "post" then dispatched = client.post(url, {}, "{}", complete, options)
+				elseif method == "download" then dispatched = client.download(url, {}, "/tmp/owned-tls-unit-download", options, complete)
+				else dispatched = client.postStream(url, {}, "{}", options, function() end, complete) end
+				helpers.assert_true(dispatched)
+				helpers.assert_eq(options.https_only, false)
+				local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+				helpers.assert_true(joined:find("\n--location\n", 1, true) ~= nil)
+				helpers.assert_true(joined:find("\n--proto-redir\n=https\n", 1, true) ~= nil,
+					"secure redirect policy must not depend on the caller's https_only flag")
+				if method == "postStream" then state.stderr("\nERGOPTI_HTTP_STATUS:307\n"); state.complete()
+				else state.complete_request(1, "\nERGOPTI_HTTP_STATUS:307\n") end
+				helpers.assert_true(result and result.ok == false and result.status == 307)
+			end)
+		end
+	end
+
+	helpers.it("linux-http-tls-redirect: public HTTP request can upgrade to TLS", function()
+		local client, state = fresh_client()
+		helpers.assert_true(client.get("http://example.invalid/api", {}, { follow_redirects = true }, function() end))
+		local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+		helpers.assert_true(joined:find("\n--location\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n--proto-redir\n", 1, true) == nil)
+		state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+	end)
+
+	helpers.it("linux-http-tls-redirect: explicit no-follow remains a single native request", function()
+		local client, state = fresh_client()
+		helpers.assert_true(client.get("https://example.invalid/api", {}, { follow_redirects = false }, function() end))
+		local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+		helpers.assert_true(joined:find("\n--location\n", 1, true) == nil)
+		helpers.assert_true(joined:find("\n--proto-redir\n", 1, true) == nil)
+		state.complete_request(1, "\nERGOPTI_HTTP_STATUS:307\n")
+	end)
+
 	local sensitive_headers = { "Api-Key", "Authorization", "Cookie", "Cookie2", "Proxy-Authorization", "X-Api-Key", "X-Goog-Api-Key" }
 	for _, name in ipairs(sensitive_headers) do
 		for _, method in ipairs({ "get", "post", "postStream", "download" }) do

@@ -552,6 +552,20 @@ These are software implementations; final hardware verification remains below.
   before allocating handles or replacing an active request. Credentialed
   redirect support remains deferred until explicit per-hop ownership exists.
   Native cross-OS checks, manual CI and physical keyboard tests were not run.
+- [~] **L43.** Linux HTTPS redirect downgrade refusal: native curl previously
+  followed HTTPS to HTTP unless callers explicitly set https_only. Restrict
+  every native-followed hop from an HTTPS URL to HTTPS, including uppercase
+  schemes, without requiring that opt-in or changing caller options. Five of
+  twenty-one actual certificate-verifying TLS/loopback cases fail before the
+  fix. Controls cover four request APIs, direct verified responses, same-origin
+  and public cross-origin HTTPS redirects, certificate hostname refusal,
+  HTTP-to-HTTPS upgrades and existing no-follow/https_only fences. Portable
+  regressions cover methods, URL casing and unchanged public options. macOS
+  explicitly refuses downgrade in its credentialed manual-hop path by source;
+  its public native-follow path remains a source concern for the reserved native
+  owner. Windows curl never enables native follow by source inspection. Neither
+  driver's source or native gate was changed. Manual CI and physical input
+  remain unexecuted; Linux uses real TLS, curl, libuv, sockets and private files.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

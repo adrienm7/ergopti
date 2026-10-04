@@ -152,7 +152,15 @@ local function curl_args(url, headers, body, options)
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
 		"--request", options.method,
 	}
-	if options.follow_redirects then args[#args + 1] = "--location" end
+	if options.follow_redirects then
+		args[#args + 1] = "--location"
+		-- An HTTPS caller keeps TLS on every native-followed hop even without
+		-- the updater's separate https_only constraint on the initial request.
+		if options.https_only or url:lower():match("^https://") then
+			args[#args + 1] = "--proto-redir"
+			args[#args + 1] = "=https"
+		end
+	end
 	if options.https_only then
 		args[#args + 1] = "--proto"
 		args[#args + 1] = "=https"
